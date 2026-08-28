@@ -259,8 +259,11 @@ identifier.
 Requirements:
 
 ``R-DOC-01``
-    Every ``R-`` rule shall be implemented by exactly one phase, and each phase
-    document shall list the ``R-`` and ``AC-`` identifiers it delivers.
+    Every ``R-`` rule shall have exactly one **owning** phase, named in that
+    phase's ``:Delivers:`` field. A phase that implements part of a rule it
+    does not own -- typically the UI half of a rule whose model half lives
+    elsewhere -- shall name it under ``:Contributes to:``. Every phase document
+    shall also list the ``AC-`` criteria it proves.
 
 ``R-DOC-02``
     Every ``AC-`` criterion shall name at least one automated test that proves

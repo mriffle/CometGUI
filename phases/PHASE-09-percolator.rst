@@ -1,0 +1,88 @@
+=====================================================
+PHASE-09: Percolator Adapter and Version Capabilities
+=====================================================
+
+:Phase: 09
+:Status: NOT STARTED
+:Depends on: 05, 08
+:Blocked by decisions: D-002, D-003
+:Delivers: R-PERC-01..09
+:Proves: AC-RES-05, AC-RES-06, AC-RES-07, AC-PRV-10
+
+Purpose
+-------
+Run Percolator correctly for whichever version and capability set is actually
+present, and never ask a binary for something it does not have. This is where
+the 3.09 XML removal stops being a footnote and becomes command construction.
+
+In scope
+--------
+
+* Version parsing and the capability model, driven by probe results from
+  phase 05.
+* Per-version command construction that emits only advertised options.
+* Platform-aware default version resolution from the manifest
+  (``R-PERC-02``), never a hard-coded 3.08.
+* PIN validation before invocation, including the decoy-row check.
+* Output handling: PSM and peptide TSV, optional decoy TSVs, weights, XML
+  when capable and needed, logs.
+* Effective random seed defaulting and recording.
+* Advisory model for known version defects.
+* The compatible-version rerun action: preserve the original run, create a
+  distinct execution record, reuse the merged PIN, do not rerun Comet -- and
+  offer local-binary registration instead where no managed XML-capable build
+  exists.
+* Raw output immutability.
+
+Out of scope
+------------
+
+* The results UI and filters (phase 10).
+* Limelight conversion (phase 12).
+
+Deliverables
+------------
+
+* ``org.cometgui.tools.percolator`` and ``org.cometgui.params.percolator``.
+* ``docs/percolator.rst``, ``docs/reference/percolator_options.rst``,
+  ``docs/developer/version_capabilities.rst``.
+
+Exit gate
+---------
+
+Every item is verified by the orchestrator, independently of the phase
+agent's report. An item that cannot be verified has not passed.
+
+1. A real Percolator run on the merged PIN from phase 08 produces PSM,
+   peptide and weights artefacts that parse.
+2. With an XML-capable version, XML is produced and parses; with 3.09, no
+   XML option is passed and none is expected -- asserted on the recorded
+   argument array, not only on the outcome.
+3. The default version is resolved from the manifest; a test with a
+   manifest lacking any XML-capable build for the platform yields a default
+   that is not XML-capable and a Limelight stage marked unavailable.
+4. A PIN with zero decoy rows fails the stage before Percolator is
+   launched.
+5. The compatible-version rerun produces a second execution record with a
+   different version, checksum and argument array, and the recorded Comet
+   stage is untouched.
+6. The effective seed appears in provenance for every run.
+7. Weights parsing reads the split count from the artefact; a two-split and
+   a three-split fixture both parse.
+8. Raw Percolator outputs are byte-identical before and after any filtering
+   or export operation.
+
+Risks and notes
+---------------
+
+* Version-number-driven branching will pass on the versions you test and
+  fail on the one a user has. Branch on capability.
+
+Handoff
+-------
+
+Before finishing -- whether the phase passed, stalled or was abandoned --
+write ``handoffs/PHASE-09-handoff.rst`` covering: what was built and where;
+which gate items pass and the evidence for each; what is incomplete and why;
+decisions encountered; surprises a later phase must know about; and the
+first thing the next agent should do.
