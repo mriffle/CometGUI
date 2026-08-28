@@ -1,18 +1,154 @@
-# CometGUI: Comet + Percolator Desktop Workflow
+.. _cometgui-specification:
 
-# Implementation Specification
+##############################################################################
+CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
+##############################################################################
 
 :Status: Implementation-ready design specification
-:Date: 2026-08-28
+:Revision: 2
+:Revision date: 2026-08-28
+:Supersedes: Revision 1, 2026-08-28
 :Target application: Cross-platform Java desktop application
-:Primary source base: Noble-Lab CasanovoGUI
+:Primary source base: Noble-Lab CasanovoGUI (licence unresolved -- see :ref:`spec-decisions`)
 :Primary search engine: Comet
 :Primary post-processor: Percolator
-:Visualization: PDV
+:Visualisation: PDV
 :Downstream integration: Limelight
 :Documentation format: reStructuredText / Sphinx / Read the Docs
 
-## Executive Summary
+.. contents:: Contents
+   :depth: 2
+   :local:
+
+.. _spec-revision-history:
+
+Revision History
+================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 8 14 78
+
+   * - Rev
+     - Date
+     - Summary
+   * - 1
+     - 2026-08-28
+     - Initial implementation-ready specification.
+   * - 2
+     - 2026-08-28
+     - Upstream release facts verified against live sources (see
+       :ref:`spec-verified-facts`). Percolator artefact strategy rewritten
+       after discovering that no XML-capable Percolator 3.08 build is
+       published for Windows or macOS. Added: supported-platform matrix with
+       a glibc floor and macOS quarantine handling; Comet invocation and
+       output-containment rules; multi-input-file run model; a normative
+       target/decoy strategy; locale-independent serialisation; input-hash
+       caching; project schema versioning and single-instance locking;
+       requirement identifiers and traceability; sharpened two-tier
+       end-to-end test model. Converted the document to valid
+       reStructuredText so it builds under the project's own strict Sphinx
+       gate. Implementation sequence replaced by a pointer to ``phases/``.
+
+.. _spec-verified-facts:
+
+Verified Upstream Facts
+=======================
+
+Every external claim in this specification was verified against the live
+upstream source on **2026-08-28**. These facts are *dated inputs*, not
+constants: they shall be represented in version/capability metadata and
+re-verified at the start of implementation (see ``phases/PHASE-00``) and before
+each release.
+
+.. list-table:: Upstream facts, verified 2026-08-28
+   :header-rows: 1
+   :widths: 26 44 30
+
+   * - Subject
+     - Verified finding
+     - Source / method
+   * - Comet current release
+     - ``v2026.02.2``, published 2026-08-11.
+     - GitHub releases API, ``UWPR/Comet``
+   * - Comet artefacts
+     - Standalone executables, no archive: ``comet.linux.exe``,
+       ``comet.aarch64.linux.exe``, ``comet.macos.exe``,
+       ``comet.aarch64.macos.exe``, ``comet.win64.exe``, plus
+       ``CometWrapper.dll``, ``ThermoFisher.CommonCore.Data.dll`` and
+       ``ThermoFisher.CommonCore.RawFileReader.dll`` companions for Thermo RAW
+       on Windows.
+     - Release asset list
+   * - Comet binary linkage
+     - ``comet.linux.exe`` is statically linked (no ``NEEDED`` entries) and
+       runs on a glibc 2.36 host.
+     - ``readelf -d``; executed
+   * - Comet parameter dump
+     - ``-p`` emits 96 parameters; ``-q`` emits 118. ``-q`` adds
+       ``variable_mod06``--``variable_mod15``, ``mass_type_parent``,
+       ``mass_type_fragment``, ``num_results``, ``peff_format``, ``peff_obo``,
+       ``pinfile_protein_delimiter``, ``print_expect_score``,
+       ``print_ascorepro_score``, ``spectral_library_name``,
+       ``spectral_library_ms_level``, ``compoundmods_file``,
+       ``protein_modslist_file``.
+     - Executed ``comet -p`` / ``comet -q``
+   * - Comet CLI
+     - ``-P<params>``, ``-N<name>`` (*valid only with one input file*),
+       ``-D<dbase>``, ``-F``/``-L`` scan range, ``-i`` fragment-ion index,
+       ``-j`` peptide index. Inputs: mzXML, mzML, Thermo RAW, mgf, ms2/cms2/bms2.
+     - Executed ``comet`` with no arguments
+   * - Percolator current release
+     - ``rel-3-09``, published 2026-05-21.
+     - GitHub releases API, ``percolator/percolator``
+   * - Percolator XML removal
+     - Confirmed verbatim in the ``rel-3-09`` release notes: *"Removed
+       XML/XSD I/O support, which was incompatible with modern C++
+       toolchains. (#399)"*
+     - Release notes
+   * - **Percolator 3.08 XML artefacts**
+     - **The only XML-capable published 3.08 artefact is
+       ``percolator-v3-08-linux-amd64.deb`` (Linux x86-64).** The macOS and
+       Windows portable archives are explicitly ``percolator-noxml-*``. The
+       release has exactly five assets; no XML-capable Windows or macOS build
+       exists.
+     - Full asset list for ``rel-3-08``
+   * - Percolator 3.08 Linux binary
+     - The ``.deb`` is a plain ``ar`` archive (``debian-binary``,
+       ``control.tar.gz``, ``data.tar.gz``) and extracts without root;
+       ``./usr/bin/percolator`` is 5.0 MB, reports package version 3.08.0.
+       It is dynamically linked and **requires ``GLIBC_2.38`` and
+       ``GLIBCXX_3.4.32``**; it fails to load on a glibc 2.36 host with a
+       loader error, not a tool error.
+     - Downloaded, extracted, executed
+   * - Percolator XML on Windows/macOS
+     - The newest XML-capable published builds for those platforms are
+       ``percolator-v3-07.exe`` and ``percolator-v3-07-osx-x86_64.pkg``
+       (installers, macOS x86-64 only), from ``rel-3-07-01`` (2024-06-20).
+     - Release asset lists
+   * - PDV current release
+     - ``v2.7.0``, published 2026-08-14 (``PDV-2.7.0.zip``, ~99 MB). 2.6.0 is
+       one release behind.
+     - GitHub releases API, ``wenbostar/PDV``
+   * - Limelight converter
+     - ``yeastrc/limelight-import-comet-percolator``, Apache-2.0, newest
+       release ``v2.8.1`` (2025-08-19), single asset
+       ``cometPercolator2LimelightXML.jar``.
+     - GitHub API
+   * - CasanovoGUI licence
+     - ``Noble-Lab/CasanovoGUI`` (Java, last pushed 2026-08-21) still
+       publishes **no licence**: the GitHub licence field is null and no
+       licence file is detected.
+     - GitHub repository API
+
+.. warning::
+
+   The third and seventh rows invalidate the assumption, held throughout
+   Revision 1, that selecting "Percolator 3.08.0" delivers the complete
+   Comet -> Percolator -> Limelight workflow on every supported platform. It
+   does not. See :ref:`spec-percolator-artefacts` and decision ``D-002``.
+
+Executive Summary
+=================
 
 CometGUI shall be a cross-platform desktop application for configuring and
 running a complete Comet -> Percolator proteomics workflow without requiring
@@ -25,62 +161,57 @@ shell, bundled Java runtime, managed tool installation, live process output,
 PDV integration patterns, Limelight upload patterns, and cross-platform
 packaging. The Casanovo-specific workflow layer shall be replaced by a general
 scientific workflow/tool-adapter architecture suitable for Comet and
-Percolator.
+Percolator. Derivation is gated on ``D-001`` (CasanovoGUI licensing).
 
 The primary difficulty in this project is not invoking Comet. It is creating a
 safe, understandable, version-aware graphical editor for Comet's large and
-interdependent parameter space. The application shall therefore *not* expose
-`comet.params` as a flat collection of text boxes. It shall maintain a typed,
-versioned Comet parameter model and present parameters using progressive
-disclosure, domain-oriented groups, dedicated controls for structured values,
-version-matched help, cross-parameter validation, presets, search, reset/diff
-operations, and an Expert raw-parameter view that round-trips without silently
-dropping unknown settings.
+interdependent parameter space -- 118 parameters in the verified current
+release, several of them structured tuples rather than scalars. The application
+shall therefore *not* expose ``comet.params`` as a flat collection of text
+boxes. It shall maintain a typed, versioned Comet parameter model and present
+parameters using progressive disclosure, domain-oriented groups, dedicated
+controls for structured values, version-matched help, cross-parameter
+validation, presets, search, reset/diff operations, and an Expert raw-parameter
+view that round-trips without silently dropping unknown settings.
 
-As of the date of this specification, the current Comet release is
-2026.02.2. The current Percolator release is 3.09, but Percolator 3.09 removed
-XML/XSD I/O. The required Comet/Percolator-to-Limelight converter consumes
-Percolator XML, so the default *full-workflow-compatible* Percolator version
-shall be 3.08.0, the latest release immediately preceding removal of XML I/O.
-Percolator 3.09 and future versions shall nevertheless be selectable and fully
-usable for search rescoring and result viewing when their capabilities permit.
-The UI shall explain that Limelight conversion is unavailable for a selected
-Percolator that cannot emit XML and shall offer an explicit rerun of the
-Percolator stage with a compatible version, without rerunning Comet.
+The second difficulty, newly quantified in Revision 2, is **obtaining an
+XML-capable Percolator at all**. Percolator 3.09 removed XML/XSD I/O, and the
+Limelight converter consumes Percolator XML; but the only XML-capable 3.08
+artefact upstream is a Linux x86-64 ``.deb`` whose binary requires glibc 2.38.
+The full Limelight-compatible workflow is therefore **not** obtainable from
+upstream artefacts on Windows, on macOS, or on Linux hosts older than roughly
+Ubuntu 24.04, and the project must choose and execute an explicit artefact
+strategy before promising one-click Limelight conversion on those platforms
+(:ref:`spec-percolator-artefacts`, ``D-002``).
 
-The product shall support user-selectable Percolator versions starting with
-3.05. Support shall be capability-driven rather than based only on semantic
-version numbers. Managed builds or upstream release binaries shall be tested
-against a compatibility matrix. A user may also register a local Percolator
-binary >= 3.05; the application shall probe its version and capabilities before
-allowing it to run.
+Percolator support shall be capability-driven rather than version-number
+driven, for versions 3.05 and newer, including user-registered local binaries.
+The UI shall explain when Limelight conversion is unavailable for the selected
+Percolator and shall offer an explicit rerun of the Percolator stage with a
+compatible version, reusing the Comet PIN and without rerunning Comet.
 
-Percolator result filtering in the GUI shall default to:
-
-* PSM q-value <= 0.01.
-* Peptide q-value <= 0.01.
-
-These are *result-view/export filters*. They shall be independent from
-Percolator's `--trainFDR` and `--testFDR` learning/evaluation options,
-which shall also default to their conventional 0.01 values but shall be shown
-under Advanced Percolator settings. Changing a GUI result filter shall never
-rerun Percolator or mutate the original Percolator result files.
+Percolator result filtering in the GUI shall default to PSM q-value <= 0.01 and
+peptide q-value <= 0.01. These are *result-view/export filters*, independent
+from Percolator's ``--trainFDR`` and ``--testFDR`` learning options, which
+default to their conventional 0.01 values and are shown under Advanced
+Percolator settings. Changing a GUI result filter shall never rerun Percolator
+or mutate the original Percolator result files.
 
 Percolator learned model coefficients shall be captured and displayed in a
 "Learned feature weights" view. The UI may use "parameter importances" as a
 navigation label to match user expectations, but explanatory text shall make
-clear that these are learned normalized SVM feature weights, not causal
+clear that these are learned normalised SVM feature weights, not causal
 importance values. The view shall show each cross-validation split, summary
 statistics, ranking by mean absolute coefficient, coefficient sign, and
 cross-split consistency.
 
-Every workflow run shall produce a provenance record. At minimum, provenance
-shall contain every tool name/version, exact executable checksum, exact command
-arguments, timestamps, exit status, all generated parameter files, and MD5
-checksums for every input and output file. SHA-256 shall be recorded alongside
-MD5 and shall be used for download/integrity verification because MD5 alone is
-not an adequate security checksum. Provenance shall be viewable in the GUI and
-exportable in a machine-readable JSON representation and a human-readable RST
+Every workflow run shall produce a provenance record containing every tool
+name/version, exact executable checksum, exact command argument array,
+timestamps, exit status, all generated parameter files, and MD5 plus SHA-256
+checksums for every input and output file. SHA-256 is the integrity/trust
+mechanism; MD5 is recorded because it is an explicit product requirement and
+because downstream proteomics repositories use it. Provenance shall be viewable
+in the GUI and exportable as machine-readable JSON and a human-readable RST
 report.
 
 Testing is a first-class deliverable. Unit testing alone is insufficient. The
@@ -90,119 +221,347 @@ generates real Comet parameters from those controls, obtains real tool
 binaries, executes real Comet and Percolator processes on real spectra and
 FASTA fixtures, verifies real output, verifies q-value filtering and learned
 weights, exercises PDV and Limelight conversion, independently recomputes
-provenance hashes, closes/reopens the project, and exercises meaningful
+provenance hashes, closes and reopens the project, and exercises meaningful
 failure cases. The actual packaged application shall be tested on supported
 operating systems before release.
 
-## Normative Language
+Normative Language
+==================
 
-The words **shall**, **must**, and **required** describe mandatory behavior.
-The word **should** describes behavior expected unless there is a documented
-technical reason to deviate. The word **may** describes optional behavior.
+The words **shall**, **must**, and **required** describe mandatory behaviour.
+The word **should** describes behaviour expected unless there is a documented
+technical reason to deviate. The word **may** describes optional behaviour.
 
-## Project Goals
+.. _spec-requirement-ids:
 
-The application shall satisfy the following top-level goals.
+Requirement Identifiers and Traceability
+========================================
 
-1. Make a high-quality Comet + Percolator workflow accessible without manual
+Rules that a phase must implement and a test must prove carry a stable
+identifier.
+
+``R-<AREA>-<nn>``
+    A normative implementation rule. Areas: ``PLAT`` (platform), ``TOOL``
+    (tool registry/installation), ``PROC`` (process execution), ``PARAM``
+    (Comet parameters), ``CMT`` (Comet adapter), ``PERC`` (Percolator),
+    ``DEC`` (target/decoy), ``RUN`` (workflow/run storage), ``RES``
+    (results), ``PDV``, ``LL`` (Limelight), ``PROV`` (provenance), ``SEC``
+    (security), ``TEST`` (testing), ``DOC`` (documentation).
+
+``AC-<AREA>-<nn>``
+    A release acceptance criterion (:ref:`spec-acceptance`).
+
+``D-<nnn>``
+    A decision the owner or the project team must make; recorded in
+    ``DECISIONS.rst``. A ``D`` item that is still open blocks any exit gate
+    that names it.
+
+Requirements:
+
+``R-DOC-01``
+    Every ``R-`` rule shall be implemented by exactly one phase, and each phase
+    document shall list the ``R-`` and ``AC-`` identifiers it delivers.
+
+``R-DOC-02``
+    Every ``AC-`` criterion shall name at least one automated test that proves
+    it, or shall be explicitly marked as requiring human sign-off.
+
+``R-DOC-03``
+    A traceability report mapping ``R-``/``AC-`` identifiers to phases and to
+    test names shall be generated from source annotations or a checked-in
+    mapping file, and shall be built by documentation CI. An identifier with no
+    implementing phase, or an ``AC-`` with no test and no human-sign-off mark,
+    is a documentation build failure.
+
+Project Goals
+=============
+
+#. Make a high-quality Comet + Percolator workflow accessible without manual
    command-line tool installation.
-2. Preserve the scientific flexibility of Comet rather than hiding its useful
+#. Preserve the scientific flexibility of Comet rather than hiding its useful
    parameters.
-3. Make configuration safer than editing `comet.params` manually.
-4. Support reproducible reruns with exact tool and parameter provenance.
-5. Allow Percolator versions >= 3.05 to be selected and managed explicitly.
-6. Make version-dependent capabilities visible instead of failing late.
-7. Provide first-class PSM and peptide result exploration with independent
+#. Make configuration safer than editing ``comet.params`` manually.
+#. Support reproducible reruns with exact tool and parameter provenance.
+#. Allow Percolator versions >= 3.05 to be selected and managed explicitly.
+#. Make version-dependent capabilities visible instead of failing late.
+#. Provide first-class PSM and peptide result exploration with independent
    q-value filtering.
-8. Make Percolator learned SVM weights inspectable.
-9. Provide PDV spectrum visualization.
-10. Convert compatible Comet + Percolator results to Limelight XML and upload
-    them to Limelight.
-11. Provide comprehensive, automated scientific and GUI testing.
-12. Package the application so a user can install CometGUI and run it on a
-    clean supported system without manually installing its scientific tools.
-13. Document all user and developer-facing behavior in RST for Sphinx and Read
-    the Docs.
+#. Make Percolator learned SVM weights inspectable.
+#. Provide PDV spectrum visualisation.
+#. Convert compatible Comet + Percolator results to Limelight XML and upload
+   them to Limelight.
+#. Provide comprehensive, automated scientific and GUI testing.
+#. Package the application so a user can install CometGUI and run it on a clean
+   supported system without manually installing its scientific tools.
+#. Document all user and developer-facing behaviour in RST for Sphinx and Read
+   the Docs.
 
-## Non-Goals
+Non-Goals
+=========
 
 The first production release is not required to:
 
 * Reimplement Comet scoring.
 * Reimplement Percolator machine learning or FDR estimation.
-* Invent a new PSM visualization engine when PDV already supports Comet
-  pepXML.
+* Perform protein inference or report protein-level FDR. Percolator's
+  protein-level options shall not be exposed in release 1; protein-level
+  analysis is Limelight's role downstream. This exclusion shall be stated in
+  the UI where a user might expect protein results.
+* Expose Comet spectral-library search (``spectral_library_name``,
+  ``spectral_library_ms_level``) or PEFF search (``peff_format``, ``peff_obo``)
+  as supported workflows in release 1. These parameters shall still be modelled
+  by the schema, round-tripped, and editable in Expert mode, but they are
+  untested paths and shall be labelled as such.
+* Invent a new PSM visualisation engine when PDV already supports Comet pepXML.
 * Modify Percolator output q-values in place.
 * Pretend that newer Percolator versions support XML when they do not.
 * Silently translate incompatible Percolator output into a made-up XML format.
 * Reproduce all possible raw command-line flags as equal-priority controls on
   the primary screen.
-* Guarantee byte-identical floating point scores across every operating system
+* Guarantee byte-identical floating-point scores across every operating system
   and every tool version when upstream tools do not guarantee this.
 * Automate an external GUI such as PDV with screen-coordinate clicking in
   production code.
+* Convert vendor raw formats other than through Comet's own supported readers.
 
-## Research-Derived Constraints and Release Assumptions
+.. _spec-platforms:
 
-These assumptions are dated and shall be represented in version/capability
-metadata rather than scattered hard-coded conditionals.
+Supported Platforms
+===================
+
+Revision 1 named release targets only inside the release-pipeline section. The
+supported matrix is normative and appears here once.
+
+.. list-table:: Supported platform matrix
+   :header-rows: 1
+   :widths: 20 16 16 48
+
+   * - Platform
+     - Tier
+     - Packaging
+     - Notes
+   * - Linux x86-64
+     - 1 -- fully supported
+     - ``tar.gz`` + ``.deb``/AppImage as infrastructure permits
+     - Reference platform for CI, real-tool tests and the canonical E2E.
+   * - Windows x64
+     - 1 -- fully supported
+     - MSI/EXE via ``jpackage``
+     - Only platform on which Comet reads Thermo RAW, and only with the
+       ``CometWrapper.dll`` and ``ThermoFisher.*`` companion files installed
+       beside the executable.
+   * - macOS arm64
+     - 1 -- fully supported
+     - ``.dmg``/``.pkg`` via ``jpackage``
+     - Native Comet ``aarch64`` build exists. Percolator artefacts may be
+       x86-64 only; running them requires Rosetta 2 (see ``D-004``).
+   * - macOS x86-64
+     - 2 -- best effort
+     - ``.dmg``
+     - Built and smoke-tested if CI runners permit; not release-blocking.
+   * - Linux aarch64
+     - 3 -- unsupported in release 1
+     - not packaged
+     - Comet publishes an ``aarch64`` build; Percolator does not. Local-binary
+       registration only.
+
+Requirements:
+
+``R-PLAT-01``
+    The application shall declare a minimum host baseline and shall verify it
+    at startup: a 64-bit OS, and on Linux a glibc version sufficient for the
+    tools the user selects.
+
+``R-PLAT-02``
+    Because managed tool binaries have their own, *higher*, system-library
+    requirements than the JVM does, tool compatibility shall be established by
+    executing the installed binary (:ref:`spec-runtime-probe`), never by
+    assuming that a successful download implies a runnable tool.
+
+``R-PLAT-03``
+    A dynamic-loader failure (missing ``GLIBC_*``/``GLIBCXX_*`` symbol version,
+    missing shared object, wrong architecture, macOS quarantine refusal) shall
+    be detected and reported as a distinct, actionable diagnostic naming the
+    host's version, the required version, and the available alternatives. It
+    shall never be surfaced as an opaque non-zero exit.
+
+``R-PLAT-04``
+    On macOS, every file extracted or downloaded into the tool cache that will
+    be executed shall have its ``com.apple.quarantine`` extended attribute
+    cleared, or shall be launched by a mechanism not subject to quarantine
+    refusal. This shall be covered by a macOS-only integration test; without
+    it, managed tool execution fails on a clean Mac with a Gatekeeper dialog
+    the application cannot dismiss.
+
+``R-PLAT-05``
+    Downloaded executables shall be made executable (POSIX permission bits) as
+    part of the atomic install, since Comet and Percolator artefacts include
+    bare executables and archive-preserved modes cannot be relied on.
+
+Research-Derived Constraints and Release Assumptions
+====================================================
+
+These assumptions are dated (:ref:`spec-verified-facts`) and shall be
+represented in version/capability metadata rather than scattered hard-coded
+conditionals.
 
 CasanovoGUI base
-
-```
+----------------
 
 The existing CasanovoGUI application provides an appropriate JavaFX desktop
 foundation, cross-platform packaging, a bundled Java runtime, managed
 first-run installation of scientific software, live process output, PDV launch
 support, and Limelight-related integration patterns.
 
-However, the CasanovoGUI repository, as inspected for this specification, does
-not expose a license file in its repository root and its Maven POM does not
-state a project license. **Before code is copied into or redistributed as a
-new product, ownership/licensing permission for the CasanovoGUI source must be
-made explicit.** This is a release gate, not a documentation nicety.
+However, ``Noble-Lab/CasanovoGUI`` still exposes **no licence** -- verified
+2026-08-28, with the repository last pushed 2026-08-21. A public GitHub
+repository is not a grant of redistribution rights.
 
-The base currently targets Java 23+ and JavaFX 25.x and uses AtlantaFX. The
-new project should initially preserve that stack so that the work focuses on
-the workflow and parameter editor rather than an unnecessary GUI-framework
-migration.
+``R-SEC-01``
+    No CasanovoGUI source shall be copied into the CometGUI repository until
+    ``D-001`` is resolved by an explicit licence added upstream or written
+    permission from the copyright holders, recorded in ``DECISIONS.rst``. Until
+    then, CasanovoGUI may be *read* for design guidance, and CometGUI code
+    shall be written independently. This is a release gate and an early
+    implementation gate, not a documentation nicety.
+
+The base targets Java 23+ and JavaFX 25.x and uses AtlantaFX. The new project
+should initially preserve that stack so the work focuses on the workflow and
+parameter editor rather than a GUI-framework migration. The exact JDK and
+JavaFX versions shall be pinned in the build and recorded in provenance.
 
 Comet
-~~~
+-----
 
 The default verified Comet version for the initial implementation shall be
-2026.02.2. Tool metadata shall not assume that this remains latest forever.
-New Comet releases shall enter the managed registry only after automated
+``2026.02.2``. Tool metadata shall not assume this remains latest forever. New
+Comet releases shall enter the managed registry only after automated
 compatibility and regression tests pass.
 
-Comet configuration is versioned. The parameter schema used by the GUI shall
-therefore be tied to the selected Comet version. The application shall use the
-selected binary itself, where possible, as one source of truth for supported
-parameter names and generated defaults, and shall supplement that with
-curated metadata for types, value ranges, descriptions, relationships, and UI
-presentation.
+Comet ships **standalone executables**, not archives, one per platform, plus
+Windows-only companion DLLs for Thermo RAW reading. The installer must
+therefore treat "bare executable plus companion files" as a first-class
+artefact kind (:ref:`spec-tool-registry`).
 
-On current Comet releases, ``comet -p`` produces a normal parameter file and
-``comet -q`` can expose a more complete parameter set. Schema drift tests shall
-compare GUI metadata with parameters emitted by supported binaries.
+Comet configuration is versioned, so the schema used by the GUI shall be tied
+to the selected Comet version.
 
-Percolator
-~~~~~~~~
+``R-PARAM-01``
+    Schema discovery shall use ``comet -q``, not ``comet -p``. The verified
+    difference is 118 parameters versus 96: ``-p`` omits
+    ``variable_mod06``--``variable_mod15``, both ``mass_type_*`` parameters,
+    ``num_results``, the PEFF parameters, the spectral-library parameters,
+    ``pinfile_protein_delimiter``, ``print_expect_score``,
+    ``print_ascorepro_score``, ``compoundmods_file`` and
+    ``protein_modslist_file``. A GUI built from ``-p`` would silently offer 5
+    variable-modification slots where Comet supports 15.
 
-Percolator 3.09 is the newest release at the date of this specification and
-removed XML/XSD I/O. Percolator 3.08.0 supports XML output and shall be the
-initial default for the complete Comet -> Percolator -> Limelight workflow.
+``R-PARAM-02``
+    If a selected Comet binary does not support ``-q``, the schema provider
+    shall fall back to ``-p`` and shall mark the resulting schema
+    ``PARTIAL_DISCOVERY``; parameters known to curated metadata but absent from
+    a partial dump shall not be reported as removed by drift detection.
 
-The application shall support Percolator 3.05 and newer. Older point releases
-may contain known behavioral defects. Version metadata shall support advisory
-messages and CI shall test representative versions. For example, older 3.06
-behavior around peptide protein IDs is a reason to test version-specific
-outputs rather than treating all 3.x releases as interchangeable.
+.. _spec-percolator-artefacts:
+
+Percolator versions and artefact availability
+---------------------------------------------
+
+Percolator 3.09 (2026-05-21) removed XML/XSD I/O. Percolator 3.08.0 supports
+XML. The Limelight converter consumes Percolator XML. Revision 1 concluded from
+this that 3.08.0 should be the default for the complete workflow. That
+conclusion is correct in the abstract and **unachievable as stated on two of
+the three tier-1 platforms**, because of what upstream actually publishes:
+
+.. list-table:: Published Percolator artefacts relevant to the Limelight path
+   :header-rows: 1
+   :widths: 14 30 28 28
+
+   * - Release
+     - Linux x86-64
+     - Windows x64
+     - macOS
+   * - ``rel-3-09``
+     - ``.deb``, ``.rpm`` -- no XML
+     - ``percolator.exe`` -- no XML
+     - ``percolator-osx-portable.zip`` -- no XML
+   * - ``rel-3-08``
+     - ``percolator-v3-08-linux-amd64.deb`` -- **XML**; needs glibc >= 2.38
+     - ``percolator-noxml-windows-portable.zip`` -- **no XML build published**
+     - ``percolator-noxml-osx-portable.zip`` -- **no XML build published**
+   * - ``rel-3-07-01``
+     - ``percolator-v3-07-linux-amd64.deb`` -- XML
+     - ``percolator-v3-07.exe`` -- XML, installer
+     - ``percolator-v3-07-osx-x86_64.pkg`` -- XML, installer, x86-64 only
+   * - ``rel-3-06-05``
+     - ``.deb``/``.rpm`` -- XML
+     - ``percolator-v3-06.exe`` -- XML, installer
+     - ``percolator-v3-06-osx-x86_64.pkg`` -- XML, installer, x86-64 only
+
+Consequences that the implementation must respect:
+
+* Every portable archive upstream publishes is a ``noxml`` build. "Portable"
+  and "XML-capable" have not coexisted in a Percolator release since at least
+  3.06.
+* The XML-capable artefacts are operating-system *packages* (``.deb``,
+  ``.rpm``, ``.pkg``, NSIS-style ``.exe``), designed to be installed with
+  administrative rights, which the zero-manual-install requirement forbids.
+* The ``.deb`` payload is extractable without root -- verified -- but the
+  extracted 3.08 binary is dynamically linked against glibc 2.38 and
+  ``GLIBCXX_3.4.32``, so it will not run on Ubuntu 22.04, Debian 12, RHEL 9 or
+  any comparable long-term-support host.
+
+``R-PERC-01``
+    The application shall not present a Percolator version/platform
+    combination as a one-click managed install unless a verified artefact for
+    that combination exists in the manifest and its post-install runtime probe
+    has passed on that platform. The UI must not promise a downloadable build
+    that does not exist or cannot run.
+
+``R-PERC-02``
+    The default selected Percolator version shall be resolved *per platform*
+    from the manifest as "the newest verified version whose capability set
+    satisfies the enabled downstream stages", not hard-coded to 3.08.0.
+
+``R-PERC-03``
+    When no XML-capable Percolator is available for the host platform, the
+    Limelight stage shall be shown as unavailable with a specific explanation
+    and the documented remedies (register a local XML-capable binary; run the
+    conversion on a supported platform), rather than being silently absent or
+    failing at conversion time.
+
+``D-002`` shall choose, before Phase 09 completes, one or more of these
+strategies for obtaining an XML-capable Percolator on each tier-1 platform:
+
+#. **Project-built companion binaries.** Percolator is Apache-2.0 licensed and
+   redistributable. Build XML-enabled Percolator from a pinned upstream tag in
+   CometGUI CI for each tier-1 platform, statically linking or targeting an old
+   glibc, publish as CometGUI release artefacts with checksums, and register
+   them in the manifest as ``project-built``. Highest cost, best user outcome,
+   and it also solves the glibc floor.
+#. **Payload extraction from upstream packages.** Extract ``.deb``/``.rpm``/
+   ``.pkg`` payloads in-process without root. Verified feasible for ``.deb``
+   with pure-JDK code (``ar`` + ``tar.gz``). Cheapest, but inherits the glibc
+   floor and does not help Windows, whose XML-capable artefact is an installer.
+#. **Older XML-capable version as the Limelight default.** Use 3.07.1 on
+   Windows/macOS from its installer artefacts, accepting the extraction problem
+   and macOS x86-64/Rosetta constraint.
+#. **Platform-scoped feature.** Ship Limelight conversion as Linux-first,
+   documented as such, with local-binary registration everywhere else.
+
+Whichever is chosen, the capability model, the manifest and the UI messaging
+described in this specification are unchanged; only the manifest contents and
+the release pipeline change. Support for versions 3.05 and newer remains
+capability-driven, and older point releases may carry advisories -- for
+example 3.06 behaviour around peptide protein IDs -- which is a reason to test
+version-specific outputs rather than treating all 3.x releases as
+interchangeable.
 
 Limelight converter
-```
+-------------------
 
-The required `limelight-import-comet-percolator` converter consumes:
+The required ``limelight-import-comet-percolator`` converter (Apache-2.0,
+release ``v2.8.1``, asset ``cometPercolator2LimelightXML.jar``) consumes:
 
 * the Comet parameter file;
 * Comet pepXML output;
@@ -212,85 +571,82 @@ The required `limelight-import-comet-percolator` converter consumes:
 
 Because the converter has one q-value override, the GUI shall not pretend that
 its independent PSM and peptide display filters map one-to-one onto Limelight
-conversion. Limelight conversion shall have its own explicitly labeled
-"Limelight q-value cutoff", default 0.01.
+conversion. Limelight conversion shall have its own explicitly labelled
+**Limelight q-value cutoff**, default 0.01.
+
+The converter is a JAR and runs on the bundled Java runtime, so it has no
+native-artefact problem. Its exact accepted argument names shall be verified by
+running the pinned JAR's help output during Phase 00 and encoded in the
+adapter, not guessed.
 
 PDV
+---
 
-```
+PDV supports Comet pepXML with MGF, mzML and mzXML spectrum files and shall be
+the supported annotated-spectrum viewer. The initial managed version shall be
+**PDV 2.7.0** (2026-08-14); Revision 1 named 2.6.0, which was superseded
+before implementation began. The download is ~99 MB, which is large enough that
+installation must be cancellable, resumable-or-restartable, and must not block
+the first search.
 
-PDV supports Comet pepXML with MGF, mzML, and mzXML spectrum files and therefore
-shall be the supported annotated-spectrum viewer. The current PDV 2.6.0 release
-shall be the initial managed version.
+PDV's documented external control server is specific to its ``denovo-gui``
+mode as used by CasanovoGUI. A corresponding database-search control mode is
+not documented. CometGUI shall therefore distinguish two integration levels:
 
-PDV's current external control server is documented for its ``denovo-gui``
-mode used by CasanovoGUI. A corresponding database-search control mode is not
-documented. CometGUI shall therefore distinguish two integration levels:
+baseline
+    Managed PDV installation plus reliable opening/batch visualisation of Comet
+    pepXML and source spectra using documented PDV database-search support.
 
-* baseline: managed PDV installation plus reliable opening/batch visualization
-  of Comet pepXML and source spectra using documented PDV database-search
-  support;
-* enhanced: exact row-to-spectrum selection from CometGUI through a generalized
-  PDV database-search launch/control mode, preferably contributed upstream to
-  PDV.
+enhanced
+    Exact row-to-spectrum selection from CometGUI through a generalised PDV
+    database-search launch/control mode, preferably contributed upstream.
 
 The product shall not rely on brittle screen-coordinate automation of PDV.
+``D-005`` selects baseline-only or baseline-plus-enhanced for release 1.
 
 UX Design Methodology
----------------------
+=====================
 
 The Comet parameter editor shall be designed using explicit human-computer
 interaction methods rather than by mechanically exposing the underlying text
 file.
 
 User classes
-```
+------------
 
 At minimum, design and usability work shall consider these user classes.
 
 Routine proteomics user
-Wants a correct search with familiar parameters, common modifications,
-tryptic digestion, instrument-appropriate mass tolerances, and clear
-results. This user should not need to understand every Comet internal
-option.
+    Wants a correct search with familiar parameters, common modifications,
+    tryptic digestion, instrument-appropriate mass tolerances, and clear
+    results. This user should not need to understand every Comet internal
+    option.
 
 Advanced search-method developer
-Intentionally changes less common fragmentation, indexing, enzyme,
-modification, spectral-processing, decoy, and output settings. This user
-requires access to the complete parameter space and exact serialization.
+    Intentionally changes less common fragmentation, indexing, enzyme,
+    modification, spectral-processing, decoy and output settings. This user
+    requires access to the complete parameter space and exact serialisation.
 
 Workflow administrator / reproducibility reviewer
-Primarily cares about versions, tool installation, provenance, exact
-commands, checksums, logs, compatibility, and the ability to reproduce a
-prior run.
+    Primarily cares about versions, tool installation, provenance, exact
+    commands, checksums, logs, compatibility, and the ability to reproduce a
+    prior run.
 
 Primary user tasks
+------------------
 
-```
-
-The UI shall be optimized around actual tasks, including:
-
-* choose spectra and a sequence database;
-* start from an instrument/search preset;
-* define precursor and fragment tolerances;
-* define digestion;
-* define static and variable modifications;
-* configure decoy behavior;
-* review advanced Comet settings when needed;
-* choose a Percolator version;
-* run the complete workflow;
-* diagnose failure from a specific stage;
-* filter PSMs and peptides by q-value;
-* inspect learned Percolator feature weights;
-* inspect a PSM in PDV;
-* convert/upload a result to Limelight;
-* inspect/export exact provenance;
-* reopen a historical run and know exactly what happened.
+The UI shall be optimised around actual tasks, including: choose spectra and a
+sequence database; start from an instrument/search preset; define precursor and
+fragment tolerances; define digestion; define static and variable
+modifications; configure decoy behaviour; review advanced Comet settings when
+needed; choose a Percolator version; run the complete workflow; diagnose
+failure from a specific stage; filter PSMs and peptides by q-value; inspect
+learned Percolator feature weights; inspect a PSM in PDV; convert and upload a
+result to Limelight; inspect and export exact provenance; and reopen a
+historical run and know exactly what happened.
 
 Design principles
-~~~~~~~~~~~~~~~
-
-The implementation shall apply the following principles.
+-----------------
 
 Progressive disclosure
     Common, high-impact parameters are shown first. Advanced and Expert
@@ -298,7 +654,7 @@ Progressive disclosure
 
 Recognition rather than recall
     Users see units, valid ranges, descriptions, current defaults, preset
-    origin, and common choices. They do not need to memorize Comet's numeric
+    origin and common choices. They do not need to memorise Comet's numeric
     enum encodings.
 
 Error prevention
@@ -311,181 +667,123 @@ User control and reversibility
     destructively changed by result filters.
 
 Visibility of system state
-    Tool downloads, validation, hashing, Comet, Percolator, conversion, upload,
-    and finalization each have explicit states and progress/status indicators.
+    Tool downloads, validation, hashing, Comet, Percolator, conversion, upload
+    and finalisation each have explicit states and progress indicators.
 
 Consistency
-    Similar parameter types use similar controls. Units and serialized values
+    Similar parameter types use similar controls. Units and serialised values
     are represented consistently across categories.
 
 Version transparency
-    When behavior is unavailable because of a selected tool version, the UI
+    When behaviour is unavailable because of a selected tool version, the UI
     says so at configuration time rather than allowing a late cryptic process
     failure.
 
 Inline help
-    Each parameter has concise help and a link/action to open version-matched
+    Each parameter has concise help and an action to open version-matched
     documentation. Help shall describe the scientific meaning, not merely
     restate the parameter name.
 
 Accessibility
-    Every interactive control requires an accessible label/name; validation
-    errors must be conveyed in text, not by color alone; keyboard navigation
-    and visible focus shall be tested; custom JavaFX controls shall expose
+    Every interactive control requires an accessible label; validation errors
+    must be conveyed in text, not by colour alone; keyboard navigation and
+    visible focus shall be tested; custom JavaFX controls shall expose
     appropriate accessibility attributes.
 
 UX validation activities
-```
+------------------------
 
-Before release, the parameter UI shall undergo:
+Before release, the parameter UI shall undergo domain/task analysis with at
+least one experienced Comet user; a heuristic evaluation against standard
+usability heuristics; a cognitive walkthrough of the primary workflow; at least
+one usability test with a routine proteomics user who has not implemented the
+GUI; a usability test with an advanced Comet user using imported or custom
+parameters; and a keyboard-only accessibility review. Issues found in these
+sessions shall be tracked like software defects.
 
-1. Domain/task analysis with at least one experienced Comet user.
-2. A heuristic evaluation against standard usability heuristics.
-3. A cognitive walkthrough of the primary workflow.
-4. At least one usability test with a routine proteomics user who has not
-   implemented the GUI.
-5. A usability test with an advanced Comet user using imported/custom
-   parameters.
-6. Keyboard-only and accessibility review.
+.. note::
 
-Issues found in these sessions shall be tracked like software defects.
+   These six activities require human participants and cannot be discharged by
+   an implementing agent. They are recorded as ``AC-UX-01``--``AC-UX-06`` and
+   are owner-scheduled; see ``phases/PHASE-16`` and ``STATUS.rst``.
 
-## Information Architecture
+Information Architecture
+========================
 
-The primary application window should use a stable left navigation or top-level
-workflow navigation rather than proliferating modal dialogs.
-
-Recommended primary sections are:
+The primary application window should use a stable left navigation rather than
+proliferating modal dialogs. Recommended primary sections:
 
 Run
-Inputs, workflow summary, selected tool versions, high-level parameter
-summary, validation, and Run/Cancel controls.
+    Inputs, workflow summary, selected tool versions, high-level parameter
+    summary, validation, and Run/Cancel controls.
 
 Comet Parameters
-Typed parameter editor with Essentials, Advanced, and Expert modes.
+    Typed parameter editor with Essentials, Advanced and Expert modes.
 
 Percolator
-Version selection, result-filter defaults, advanced learning options, and
-version capability/advisory information.
+    Version selection, result-filter defaults, advanced learning options, and
+    version capability/advisory information.
 
 Results
-Run summary, PSM table, peptide table, learned feature weights, and export.
+    Run summary, PSM table, peptide table, learned feature weights, export.
 
-Visualization
-PDV status, selected spectrum/PSM context, and Open in PDV actions.
+Visualisation
+    PDV status, selected spectrum/PSM context, and Open in PDV actions.
 
 Limelight
-Converter compatibility, converter parameters, generated Limelight XML,
-upload configuration, and upload log/status.
+    Converter compatibility, converter parameters, generated Limelight XML,
+    upload configuration, upload log/status.
 
 Provenance
-Tool versions/checksums, file hashes, exact commands, parameter files,
-run timeline, environment, warnings, and export.
+    Tool versions/checksums, file hashes, exact commands, parameter files, run
+    timeline, environment, warnings, export.
 
 Console
-A persistent or collapsible live console that can filter messages by
-workflow stage.
+    A persistent or collapsible live console that can filter messages by
+    workflow stage.
 
-Tool Manager and application Settings may be secondary navigation/dialogs.
+Tool Manager and application Settings may be secondary navigation or dialogs.
 
-The primary Run screen should present the workflow as a stage stepper:
+The primary Run screen should present the workflow as a stage stepper::
 
-`Inputs -> Validate -> Comet -> Percolator -> Results`
+    Inputs -> Validate -> Comet -> Percolator -> Results
 
-Optional downstream stages should be visibly attached:
+with optional downstream stages visibly attached::
 
-`Results -> PDV`
+    Results -> PDV
+    Results -> Limelight XML -> Limelight Upload
 
-`Results -> Limelight XML -> Limelight Upload`
-
-## Software Architecture
+Software Architecture
+=====================
 
 Architectural style
-
-```
+-------------------
 
 The project shall use a layered ports/adapters architecture with a UI-facing
 MVVM or Presenter boundary. JavaFX controllers must not contain scientific
-process logic, file hashing logic, download logic, or output parsing logic.
+process logic, file hashing logic, download logic or output parsing logic.
 
 The workflow engine and domain logic shall be usable from tests without
 launching JavaFX. The JavaFX layer shall translate user actions into domain
 commands and observe state.
 
-Recommended package structure
-```
+Recommended package structure::
 
-::
-
-```
-org.cometgui.app
-    bootstrap/
-    config/
-
-org.cometgui.domain
-    project/
-    run/
-    tools/
-    params/
-    results/
-    provenance/
-
-org.cometgui.workflow
-    engine/
-    steps/
-    state/
-
-org.cometgui.tools
-    api/
-    comet/
-    percolator/
-    pdv/
-    limelight/
-    process/
-
-org.cometgui.install
-    registry/
-    download/
-    verify/
-    archive/
-    probe/
-
-org.cometgui.params.comet
-    schema/
-    parser/
-    writer/
-    validation/
-    presets/
-    migration/
-
-org.cometgui.params.percolator
-    schema/
-    validation/
-
-org.cometgui.results
-    parser/
-    filtering/
-    export/
-
-org.cometgui.provenance
-    hashing/
-    manifest/
-    events/
-    report/
-
-org.cometgui.ui
-    view/
-    viewmodel/
-    controls/
-    dialogs/
-```
+    org.cometgui.app          bootstrap/ config/
+    org.cometgui.domain       project/ run/ tools/ params/ results/ provenance/
+    org.cometgui.workflow     engine/ steps/ state/
+    org.cometgui.tools        api/ comet/ percolator/ pdv/ limelight/ process/
+    org.cometgui.install      registry/ download/ verify/ archive/ probe/
+    org.cometgui.params.comet schema/ parser/ writer/ validation/ presets/ migration/
+    org.cometgui.params.percolator  schema/ validation/
+    org.cometgui.results      parser/ filtering/ export/
+    org.cometgui.provenance   hashing/ manifest/ events/ report/
+    org.cometgui.ui           view/ viewmodel/ controls/ dialogs/
 
 Key interfaces
+--------------
 
-```
-
-The exact Java names may change, but the following responsibilities shall
-exist.
+Exact Java names may change, but these responsibilities shall exist.
 
 .. code-block:: java
 
@@ -496,762 +794,836 @@ exist.
         ToolExecutionResult validateOutputs(ToolExecutionContext context);
     }
 
-.. code-block:: java
-
     public interface ProcessRunner {
         RunningProcess start(ToolCommand command, ProcessListener listener)
             throws IOException;
     }
 
-.. code-block:: java
-
     public interface HashService {
         FileHashes hash(Path path) throws IOException;
     }
-
-.. code-block:: java
 
     public interface ProvenanceRecorder {
         void record(ProvenanceEvent event);
         ProvenanceManifest finalizeManifest(RunOutcome outcome);
     }
 
-.. code-block:: java
-
     public interface CometParameterSchemaProvider {
         CometParameterSchema schemaFor(CometToolIdentity comet);
     }
 
-Dependencies such as the clock, environment reader, process runner, downloader,
-filesystem abstraction where useful, random run-ID source, and hash service
-shall be injectable. This is necessary for deterministic tests.
+``R-PROC-01``
+    The clock, environment reader, process runner, downloader, filesystem
+    abstraction where useful, run-ID source and hash service shall be
+    injectable. Deterministic tests depend on this.
 
 Workflow state model
-```
+--------------------
 
-Each workflow step shall use explicit states:
-
-* `NOT_STARTED`
-* `VALIDATING`
-* `READY`
-* `RUNNING`
-* `SUCCEEDED`
-* `FAILED`
-* `CANCEL_REQUESTED`
-* `CANCELLED`
-* `SKIPPED`
-
-The overall run state shall be derived from step states. State changes shall be
-observable by the UI and written to provenance.
+Each workflow step shall use explicit states: ``NOT_STARTED``, ``VALIDATING``,
+``READY``, ``RUNNING``, ``SUCCEEDED``, ``FAILED``, ``CANCEL_REQUESTED``,
+``CANCELLED``, ``SKIPPED``. The overall run state shall be derived from step
+states. State changes shall be observable by the UI and written to provenance.
 
 Process execution
+-----------------
 
-```
+``R-PROC-02``
+    Processes shall be started using argument arrays, never by constructing a
+    single shell command string. An ArchUnit rule shall confine
+    ``ProcessBuilder`` construction to the process service.
 
-Processes shall be started using argument arrays, never by constructing a
-single shell command string. This avoids shell quoting problems and injection.
+The process service shall stream stdout and stderr independently; timestamp
+emitted lines and events; never block the JavaFX application thread; preserve
+full logs to disk; expose exit code and duration; support cancellation;
+attempt to terminate descendant processes when cancelling; time out only where
+a stage-specific timeout is explicitly configured; and redact secrets before
+provenance or log display.
 
-The process service shall:
+``R-PROC-03``
+    Log capture shall be bounded in memory. Process output shall be written to
+    the run's log files as it arrives, and the in-memory console buffer shall
+    be capped with a documented retention policy, so that a tool emitting
+    hundreds of megabytes of output cannot exhaust the heap.
 
-* stream stdout and stderr independently;
-* timestamp emitted lines/events;
-* never block the JavaFX application thread;
-* preserve full logs to disk;
-* expose exit code and duration;
-* support cancellation;
-* attempt to terminate descendant processes when cancelling;
-* time out only where a stage-specific timeout is explicitly configured;
-* redact secrets before provenance/log display where applicable.
+``R-PROC-04``
+    Every launched process shall be started with an explicit working directory
+    inside the run directory, and with an explicitly constructed environment.
+    Inherited environment variables that are known to change tool behaviour
+    shall be recorded in provenance.
+
+.. _spec-tool-registry:
 
 Tool Installation and Version Management
-----------------------------------------
+========================================
 
 Zero-manual-install requirement
-```
+-------------------------------
 
 A supported user workflow must begin from a clean machine on which only the
-CometGUI installer has been installed/extracted. The application shall bundle
-its own Java runtime in native release packages, following the CasanovoGUI
-packaging approach.
+CometGUI installer has been installed or extracted. The application shall
+bundle its own Java runtime in native release packages.
 
 The application shall install scientific tools into an application-private
-cache, for example:
+cache, for example::
 
-::
+    ~/.comet-gui/
+        tools/
+            comet/2026.02.2/{linux-x64,windows-x64,macos-arm64}/
+            percolator/{3.08.0,3.09.0}/<platform>/
+            pdv/2.7.0/
+            limelight-converter/2.8.1/
+        cache/downloads/
+        cache/hashes/
 
-```
-~/.comet-gui/
-    tools/
-        comet/
-            2026.02.2/
-                windows-x64/
-                linux-x64/
-                macos-arm64/
-        percolator/
-            3.08.0/
-            3.09.0/
-        pdv/
-            2.6.0/
-        limelight-converter/
-            <version>/
-```
+Exact platform names may differ. Tool installs shall not require root or
+administrative privileges after the application itself is installed.
 
-Exact platform names may differ. Tool installs shall not require root/admin
-privileges after the application itself is installed.
+Managed artefact manifest
+-------------------------
 
-Managed artifact manifest
+Tool locations shall come from a versioned, release-bundled (and ideally
+signed) manifest, not ad hoc URL construction spread through the code.
 
-```
+Each managed artefact record shall contain at least: tool name; upstream
+version; release tag or commit when known; operating system; architecture;
+download URL; **artefact kind**; expected executable or JAR path; expected
+SHA-256; expected MD5 when available; licence metadata; required companion
+files; known capabilities; known advisories; minimum host requirements; and
+minimum compatible CometGUI version.
 
-Tool locations shall come from a versioned, signed or release-bundled manifest,
-not ad hoc URL construction spread throughout the code.
+``R-TOOL-01``
+    Artefact kind shall be an explicit enumeration covering at least
+    ``BARE_EXECUTABLE`` (Comet), ``ZIP``, ``TAR_GZ``, ``JAR`` (PDV, Limelight
+    converter), ``DEB_PAYLOAD`` and ``PKG_PAYLOAD``. The extractor for each
+    kind shall be selected from this field, never inferred from the URL
+    suffix alone.
 
-Each managed artifact record shall contain at least:
+``R-TOOL-02``
+    Companion files shall be modelled as part of the artefact record and
+    installed atomically with the primary executable. Comet's Thermo RAW
+    support requires ``CometWrapper.dll``, ``ThermoFisher.CommonCore.Data.dll``
+    and ``ThermoFisher.CommonCore.RawFileReader.dll`` beside
+    ``comet.win64.exe``; a Comet install missing them shall not advertise the
+    ``THERMO_RAW_WINDOWS`` capability.
 
-* tool name;
-* upstream version;
-* release/tag/commit when known;
-* operating system;
-* architecture;
-* download URL;
-* archive type;
-* expected executable/JAR path;
-* expected SHA-256;
-* expected MD5, when available or computed during release preparation;
-* license metadata;
-* required companion files;
-* known capabilities;
-* known advisories;
-* minimum compatible CometGUI version.
+``R-TOOL-03``
+    Manifest records shall carry ``minimumHostRequirements`` (for example a
+    minimum glibc version) so the UI can explain in advance that an artefact
+    will not run here, instead of only discovering it at probe time.
 
-SHA-256 verification is mandatory before an executable is launched. MD5 shall
-also be computed and recorded for provenance but shall not be the security
-trust mechanism.
+``R-SEC-02``
+    SHA-256 verification is mandatory before an executable is launched. MD5
+    shall also be computed and recorded for provenance but shall never be the
+    security trust mechanism.
 
 Installation shall be atomic:
 
-1. Download to a temporary file.
-2. Verify expected SHA-256.
-3. Extract into a temporary directory with path-traversal and unsafe-symlink
-   protections.
-4. Verify expected executable/companion layout.
-5. Probe version/capabilities.
-6. Rename/move atomically into the final cache directory.
-7. Record installation metadata.
+#. Download to a temporary file.
+#. Verify expected SHA-256.
+#. Extract into a temporary directory with path-traversal and unsafe-symlink
+   protections, using the extractor for the declared artefact kind.
+#. Verify the expected executable and companion layout.
+#. Apply platform fix-ups: executable permission bits, macOS quarantine
+   removal.
+#. Probe version, runtime loadability and capabilities.
+#. Rename or move atomically into the final cache directory.
+#. Record installation metadata.
 
-Interrupted installations shall be safely discarded or resumed without leaving
-a tool that appears installed but is incomplete.
+``R-TOOL-04``
+    Interrupted installations shall be safely discarded or resumed and shall
+    never leave a tool that appears installed but is incomplete. A tool
+    directory shall be considered installed only when a completion marker
+    written last is present and its recorded checksums match.
 
-Percolator version support
-```
+``R-TOOL-05``
+    Concurrent installation of the same artefact by two CometGUI processes
+    shall be serialised by a lock file or shall be made idempotent; a partially
+    written cache entry shall never be observed as complete.
+
+Percolator installation modes
+-----------------------------
 
 The Tool Manager shall show all supported verified Percolator versions >= 3.05
-that are available for the user's platform.
-
-The user shall have three installation modes:
+that are available **and runnable** for the user's platform. The user shall
+have three installation modes:
 
 Managed verified version
-Downloaded and verified by CometGUI from the curated artifact manifest.
+    Downloaded and verified by CometGUI from the curated artefact manifest.
 
 Registered local binary
-The user selects a local executable. CometGUI probes it, verifies it is
-Percolator >= 3.05, computes checksums, and records it as unmanaged/local.
+    The user selects a local executable. CometGUI probes it, verifies it is
+    Percolator >= 3.05, computes checksums, probes capabilities, and records it
+    as unmanaged/local. This is the documented remedy wherever a managed
+    XML-capable build is unavailable.
 
-Developer/custom artifact
-Optional expert mode. A custom URL or local archive may be registered only
-if an expected SHA-256 is supplied. This mode shall be clearly marked
-unsupported/unverified unless the compatibility suite has been run.
+Developer/custom artefact
+    Optional expert mode. A custom URL or local archive may be registered only
+    if an expected SHA-256 is supplied. Clearly marked unsupported/unverified
+    unless the compatibility suite has been run.
 
-If official upstream release assets do not exist for every requested
-Percolator version/platform pair, the product must choose one of these explicit
-strategies:
+.. _spec-runtime-probe:
 
-* publish reproducibly built companion binaries from project CI after license
-  review; or
-* mark that version/platform combination unavailable as a managed install while
-  still permitting a local binary.
+Capability and runtime probing
+------------------------------
 
-The UI must not promise a downloadable build that does not exist.
+Version strings alone shall not determine behaviour. Each registered tool shall
+have a capability set. Example Percolator capabilities: ``XML_OUTPUT``,
+``PSM_TSV_OUTPUT``, ``PEPTIDE_TSV_OUTPUT``, ``DECOY_OUTPUT``,
+``WEIGHTS_OUTPUT``, ``THREAD_OPTION``, ``SEED_OPTION``. Example Comet
+capabilities: ``PEPXML_OUTPUT``, ``PIN_OUTPUT``, ``COMPLETE_PARAMS_QUERY``
+(``-q``), ``THERMO_RAW_WINDOWS``, ``FRAGMENT_ION_INDEX`` (``-i``),
+``PEPTIDE_INDEX`` (``-j``), ``SCAN_RANGE`` (``-F``/``-L``),
+``OUTPUT_BASENAME`` (``-N``).
 
-Capability probing
+``R-TOOL-06``
+    Probing shall proceed in three ordered stages, each with a distinct
+    failure state: **loadability** (the binary starts at all -- distinguishing
+    loader/link/architecture/quarantine failures per ``R-PLAT-03``);
+    **identity** (a parsed version string); **capability** (help-text
+    inspection and, where cheap and unambiguous, a small smoke run). A tool
+    that fails loadability shall never be offered for selection.
 
-```
+``R-TOOL-07``
+    Capability claims taken from the manifest shall be confirmed by probe on
+    first install and shall be re-confirmed if the recorded executable checksum
+    changes. Where manifest and probe disagree, the probe wins and the
+    discrepancy is recorded as a warning in provenance.
 
-Version strings alone shall not determine all behavior. Each registered tool
-shall have a capability set. Example Percolator capabilities include:
+``R-TOOL-08``
+    Unknown local binaries shall be probed conservatively: absent positive
+    evidence of a capability, the capability is absent.
 
-* ``XML_OUTPUT``
-* ``PSM_TSV_OUTPUT``
-* ``PEPTIDE_TSV_OUTPUT``
-* ``DECOY_OUTPUT``
-* ``WEIGHTS_OUTPUT``
-* ``THREAD_OPTION``
+Version pinning
+---------------
 
-Example Comet capabilities include:
+``R-TOOL-09``
+    Existing projects shall pin exact tool versions and artefact checksums.
+    Application updates shall never silently change the scientific tools used
+    when rerunning a historical run. If a pinned artefact is missing from the
+    cache at rerun time, the application shall offer to reinstall exactly that
+    artefact, and shall refuse to substitute a different version without an
+    explicit user action recorded in provenance.
 
-* ``PEPXML_OUTPUT``
-* ``PIN_OUTPUT``
-* ``COMPLETE_PARAMS_QUERY``
-* ``THERMO_RAW_WINDOWS``
-* ``INDEX_SEARCH``
-* ``FRAGMENT_ION_INDEX``
-* ``REAL_TIME_SEARCH_OPTIONS``
-
-A capability may be established from verified registry metadata and confirmed
-by ``--help``/``--version``/small smoke test. Unknown local binaries should be
-probed conservatively.
-
-Percolator compatibility behavior
-```
-
-Expected initial behavior is:
-
-.. list-table:: Percolator workflow compatibility
-:header-rows: 1
-:widths: 18 18 20 44
-
-* * Version family
-  * Standard rescoring
-  * Percolator XML
-  * Limelight behavior
-* * 3.05
-  * Supported/tested
-  * Expected; verify in CI
-  * Enabled only after capability probe/test
-* * 3.06.x
-  * Supported/tested
-  * Expected; verify in CI
-  * Enabled only after capability probe/test; show advisories for affected releases
-* * 3.07.x
-  * Supported/tested
-  * Expected; verify in CI
-  * Enabled after capability probe/test
-* * 3.08.0
-  * Supported; recommended default
-  * Yes
-  * Enabled; default complete-workflow version
-* * 3.09
-  * Supported
-  * No
-  * Disabled for this run; offer explicit 3.08 rerun
-* * Future
-  * Capability-dependent
-  * Capability-dependent
-  * Capability-dependent
-
-Existing projects shall pin exact tool versions. Application updates shall
-never silently change the scientific tools used when rerunning a historical
-run.
-
-## Comet Parameter Model and Editor
+Comet Parameter Model and Editor
+================================
 
 Core rule
+---------
 
-```
-
-The Comet parameter editor shall be schema-driven and typed. The UI shall not
-be the source of truth. The parameter model shall be serializable to canonical
-``comet.params`` text, parsable from existing parameter files, diffable, and
-version-aware.
+``R-PARAM-03``
+    The Comet parameter editor shall be schema-driven and typed. The UI shall
+    not be the source of truth. The parameter model shall be serialisable to
+    canonical ``comet.params`` text, parsable from existing parameter files,
+    diffable and version-aware.
 
 Parameter definition model
-```
+--------------------------
 
 A parameter definition should contain fields equivalent to:
 
 .. code-block:: java
 
-```
-public record ParameterDefinition<T>(
-    String name,
-    String displayName,
-    ParameterCategory category,
-    ParameterValueType valueType,
-    T defaultValue,
-    Optional<T> minValue,
-    Optional<T> maxValue,
-    List<Choice<T>> choices,
-    VisibilityLevel visibility,
-    String shortHelp,
-    String detailedHelpRef,
-    VersionRange supportedVersions,
-    SerializationRule serialization,
-    List<ValidatorId> validators
-) {}
-```
+    public record ParameterDefinition<T>(
+        String name,
+        String displayName,
+        ParameterCategory category,
+        ParameterValueType valueType,
+        T defaultValue,
+        Optional<T> minValue,
+        Optional<T> maxValue,
+        List<Choice<T>> choices,
+        VisibilityLevel visibility,
+        String shortHelp,
+        String detailedHelpRef,
+        VersionRange supportedVersions,
+        SerializationRule serialization,
+        List<ValidatorId> validators
+    ) {}
 
-A parameter value in a project/run shall also remember its origin:
+A parameter value in a project or run shall also remember its origin -- Comet
+default, application preset, user changed, imported from file, or
+workflow-enforced -- and the UI shall be able to show it.
 
-* Comet default;
-* application preset;
-* user changed;
-* imported from file;
-* workflow-enforced.
+Structured parameter kinds
+--------------------------
 
-The UI shall be able to show this origin.
+The verified 2026.02.2 parameter file is not a flat list of scalars. The schema
+shall model at least these structural kinds, because each needs its own parser,
+writer, validator and control:
+
+Scalar
+    ``allowed_missed_cleavage = 2``, with an inline ``#`` comment after the
+    value.
+
+Signed tolerance pair
+    ``peptide_mass_tolerance_lower = -20.0`` with
+    ``peptide_mass_tolerance_upper = 20.0``. The lower bound is **normally
+    negative**.
+
+    ``R-PARAM-04``
+        The generic "lower <= upper" range validator shall not be applied to
+        the precursor tolerance pair. Its rule is ``lower <= 0 <= upper`` with
+        a warning, not an error, if the user chooses an asymmetric or
+        same-signed window deliberately.
+
+Two-value range on one line
+    ``peptide_length_range = 5 50``.
+
+Variable-modification tuple
+    ``variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0`` -- fifteen slots
+    (``variable_mod01``--``variable_mod15``) in 2026.02.2, whose field count
+    and meaning are version-dependent.
+
+Enzyme table
+    A trailing ``[COMET_ENZYME_INFO]`` block of numbered rows, verified as
+    ``number. name sense cut-residues no-cut-residues``, referenced by
+    ``search_enzyme_number``, ``search_enzyme2_number`` and
+    ``sample_enzyme_number``.
+
+Bit-like family of booleans
+    ``use_A_ions`` .. ``use_Z1_ions``, presented as an ion-series control.
+
+Empty-valued parameter
+    ``pinfile_protein_delimiter =`` and ``peff_obo =`` have empty values by
+    default; empty is meaningful and shall round-trip as empty, not as absent.
+
+Free-path parameter
+    ``database_name``, ``spectral_library_name``, ``compoundmods_file``,
+    ``protein_modslist_file``.
+
+``R-PARAM-05``
+    The parser shall preserve the file's comment structure: the leading
+    ``# comet_version <version>`` marker line, block comments between
+    parameters, and inline trailing comments. The canonical writer shall
+    regenerate the version marker for the *selected* Comet version and shall
+    emit curated inline comments from the schema; imported comments that
+    cannot be re-derived shall be preserved for unknown parameters.
+
+``R-PARAM-06``
+    The parsed ``# comet_version`` marker shall be compared with the selected
+    binary's reported version on import; a mismatch shall produce a visible
+    compatibility warning naming both versions.
 
 Schema discovery and drift detection
+------------------------------------
 
-```
+For supported Comet binaries that expose complete parameter generation, the
+build and application shall use that output to verify supported names and
+defaults (``R-PARAM-01``). Curated schema metadata is still required: the
+binary output alone does not provide scientific descriptions, value semantics,
+relationships, enum labels, recommended groupings or structured-control
+behaviour.
 
-For supported Comet binaries that expose complete parameter generation/query,
-the build and application shall use that output to verify supported names and
-defaults.
+CI shall contain a schema-drift test that installs each Comet version in the
+release matrix, asks each binary for its complete parameter set, parses names
+and generated defaults, compares them with the checked-in schema metadata, and
+fails if a supported binary introduces a parameter with no metadata (unless
+explicitly allow-listed as hidden/internal) or if the GUI claims a parameter
+that the verified binary no longer recognises.
 
-Curated schema metadata is still required because the binary output alone does
-not provide enough information for a high-quality GUI: scientific descriptions,
-value semantics, relationships, enum labels, recommended groupings, and
-structured-control behavior must be modeled explicitly.
-
-CI shall contain a schema-drift test:
-
-1. Install each Comet version supported by the release matrix.
-2. Ask the binary for its complete parameter set where supported.
-3. Parse parameter names and generated defaults.
-4. Compare them with the checked-in schema metadata.
-5. Fail if a supported binary introduces a parameter with no metadata unless
-   it is explicitly allow-listed as hidden/internal.
-6. Fail if the GUI claims a parameter supported when the verified binary no
-   longer recognizes it.
-
-Imported unknown parameters shall never be silently discarded. They shall be
-preserved in Expert mode with a warning and round-tripped on write unless the
-user explicitly removes them.
+``R-PARAM-07``
+    Imported unknown parameters shall never be silently discarded. They shall
+    be preserved in Expert mode with a warning and round-tripped on write
+    unless the user explicitly removes them.
 
 Parameter editor levels
-~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 Essentials
-^^^^^^^^^^
+~~~~~~~~~~
 
-Essentials shall contain the common workflow-defining controls most users need:
-
-* spectrum inputs;
-* FASTA database;
-* search/acquisition preset;
-* precursor mass tolerance lower/upper and units;
-* precursor tolerance type and isotope handling;
-* fragment mass tolerance;
-* search enzyme;
-* number of enzymatic termini;
-* allowed missed cleavages;
-* static modifications;
-* variable modifications;
-* target/decoy strategy and decoy prefix/behavior where applicable;
-* thread count / automatic CPU selection;
-* a concise output summary showing that pepXML and PIN are required.
+Essentials shall contain the common workflow-defining controls: spectrum
+inputs; FASTA database; search/acquisition preset; precursor mass tolerance
+lower/upper and units; precursor tolerance type and isotope handling; fragment
+mass tolerance (``fragment_bin_tol``/``fragment_bin_offset``, presented in
+instrument terms); search enzyme; number of enzymatic termini; allowed missed
+cleavages; static modifications; variable modifications; target/decoy strategy
+and decoy prefix; thread count or automatic CPU selection; and a concise output
+summary showing that pepXML and PIN are required.
 
 Advanced
-^^^^^^^^
+~~~~~~~~
 
 Advanced mode shall group parameters by scientific concept rather than file
-order. At minimum categories shall include:
-
-* Database and PEFF.
-* CPU and execution.
-* Precursor mass and isotope handling.
-* Digestion/enzyme.
-* Fragment ion scoring.
-* Fragment-ion and peptide-index search options.
-* Spectrum/scan/charge filters.
-* Spectral preprocessing.
-* Search ranges and peptide constraints.
-* Output options.
-* MS1/real-time-search options when supported.
-* Static modifications.
-* Variable modifications.
-* Miscellaneous/version-specific options.
+order. At minimum: Database and PEFF; CPU and execution; Precursor mass and
+isotope handling; Digestion and enzymes (including the second enzyme);
+Fragment-ion scoring; Fragment-ion and peptide-index search options;
+Spectrum/scan/charge filters; Spectral pre-processing; Search ranges and
+peptide constraints; Output options; MS1/real-time-search options where
+supported; Static modifications; Variable modifications;
+Miscellaneous/version-specific options.
 
 Expert
-^^^^^^
+~~~~~~
 
-Expert mode shall provide:
+Expert mode shall provide the canonical raw ``comet.params`` text; syntax
+highlighting; line-level validation diagnostics where possible; a diff versus
+the selected preset or defaults; a diff versus the last saved or run
+configuration; the list of unknown imported parameters; a round-trip action
+from raw text into the typed model; and explicit confirmation before a raw edit
+changes the typed configuration.
 
-* canonical raw ``comet.params`` text;
-* syntax highlighting;
-* line-level validation diagnostics where possible;
-* diff versus selected preset/default;
-* diff versus last saved/run configuration;
-* unknown imported parameters;
-* a round-trip action from raw text into the typed model;
-* explicit confirmation before a raw edit changes the typed configuration.
-
-The raw editor must not become a second unsynchronized source of truth. Apply
-must parse and validate into the typed model.
+``R-PARAM-08``
+    The raw editor must not become a second unsynchronised source of truth.
+    Apply must parse and validate into the typed model, and a failed parse must
+    leave the typed model untouched.
 
 Global parameter search
-~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
-The parameter editor shall include a search field matching:
-
-* parameter name;
-* display name;
-* help text;
-* category;
-* common aliases such as "precursor tolerance", "missed cleavage", or
-  "oxidation" where appropriate.
-
-Additional filters should include:
-
-* Modified only.
-* Errors only.
-* Warnings only.
-* Expert parameters.
-* Unsupported/imported parameters.
+The parameter editor shall include a search field matching parameter name,
+display name, help text, category, and common aliases such as "precursor
+tolerance", "missed cleavage" or "oxidation". Additional filters should
+include: Modified only; Errors only; Warnings only; Expert parameters;
+Unsupported/imported parameters.
 
 Typed control requirements
-~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------
 
 Boolean parameters
-    Use check boxes/toggles. The UI may show the serialized 0/1 value in help
+    Check boxes or toggles. The UI may show the serialised 0/1 value in help
     but shall not require users to type it.
 
 Enums
-    Use descriptive combo boxes/radio groups. The serialized integer or token
-    shall be displayed in advanced help.
+    Descriptive combo boxes or radio groups. The serialised integer or token
+    shall be shown in advanced help -- for example ``isotope_error`` values
+    ``0``--``5`` map to distinct C13 offset sets, and ``num_enzyme_termini``
+    uses ``1``, ``2``, ``8`` and ``9``, which no user should be expected to
+    recall.
 
 Numeric parameters
-    Use validated numeric fields/spinners appropriate to range and precision.
-    Scientific notation shall be supported when Comet supports it.
+    Validated numeric fields or spinners appropriate to range and precision.
+    Scientific notation shall be supported where Comet supports it.
 
 Ranges
-    Use paired controls with one semantic label and validate lower <= upper.
+    Paired controls with one semantic label; validate lower <= upper except
+    where ``R-PARAM-04`` applies.
 
 Mass tolerances
-    Use compound controls containing value(s), unit, and tolerance semantics.
+    Compound controls containing value or values, unit and tolerance
+    semantics.
 
 File parameters
-    Use a path field plus chooser; show existence/readability checks and avoid
-    truncating the full path in accessible text/tooltips.
+    A path field plus chooser, with existence/readability checks; do not
+    truncate the full path in accessible text or tooltips.
 
 Ion families
-    Use named checkboxes for A/B/C/X/Y/Z-related ion series and neutral-loss
-    behavior instead of asking users to edit numeric flags.
+    Named checkboxes for the A/B/C/X/Y/Z and Z+1 series and neutral-loss
+    behaviour instead of numeric flags.
 
 Static modifications
-    Use a residue/terminus-oriented table or grid with modification mass, name
-    if user-supplied, and reset/default state.
+    A residue/terminus-oriented table with modification mass, name where
+    user-supplied, and reset/default state.
 
 Enzyme definitions
-    Use an enzyme selector for known entries and a dedicated editor for custom
-    enzyme definitions. The selected enzyme number and the enzyme table must be
-    serialized consistently.
+    An enzyme selector for known entries, plus a dedicated editor for custom
+    enzyme definitions, plus a second-enzyme selector. The selected enzyme
+    numbers and the serialised ``[COMET_ENZYME_INFO]`` table must stay
+    consistent; the writer shall never emit an enzyme number absent from the
+    table it writes.
 
 Variable modification editor
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------
 
 Variable modifications are sufficiently structured that they require a
 purpose-built editor. A free-form text field is not acceptable as the primary
 control.
 
-The editor shall present rows for Comet's variable modification slots and
-model the fields represented by current Comet variable-mod syntax, including:
+``R-PARAM-09``
+    The editor shall present all variable-modification slots supported by the
+    selected version -- fifteen in 2026.02.2 -- and shall model every field of
+    the version's tuple syntax: mass delta; residue or terminus selector token;
+    binary/group behaviour; maximum (and where applicable minimum)
+    modification count; distance from a terminus; terminus type;
+    required/exclusive semantics; and optional neutral-loss values. Field
+    count and order shall come from the version schema, not from a hard-coded
+    format string.
 
-* mass delta;
-* residue(s) or terminus selector token;
-* binary/group behavior;
-* minimum/maximum or maximum modification count semantics;
-* distance from a terminus;
-* terminus type;
-* required/exclusive semantics;
-* optional neutral loss value(s).
+The UI should display a human-readable summary such as::
 
-The UI should display a human-readable summary such as:
+    Oxidation: +15.994915 on M; max 3 per peptide; optional
 
-``Oxidation: +15.994915 on M; max 3 per peptide; optional``
+rather than forcing users to decode ``15.9949 M 0 3 -1 0 0 0.0``.
 
-rather than forcing users to mentally decode the serialized tuple.
+Required features: add; remove; reorder or assign slot where order matters;
+common modification presets; residue multi-select; N-/C-terminal choices;
+explicit max/min count controls; required/exclusive behaviour with explanation;
+neutral-loss editor; validation of illegal residue/terminus/count combinations;
+"show serialised value" for expert inspection; and round-trip tests for every
+supported tuple form.
 
-Required features:
-
-* Add modification.
-* Remove modification.
-* Reorder/assign slot where order matters.
-* Common modification presets.
-* Residue multi-select.
-* N-/C-terminal choices.
-* Explicit max/min count controls.
-* Required/exclusive behavior with explanation.
-* Neutral-loss editor.
-* Validation of illegal residue/terminus/count combinations.
-* "Show serialized value" for expert inspection.
-* Round-trip tests for every supported tuple form.
+``R-PARAM-10``
+    ``max_variable_mods_in_peptide`` and ``require_variable_mod`` shall be
+    presented next to the slot editor, because they change the meaning of every
+    slot, and shall be cross-validated against the configured slots.
 
 Presets
-~~~~~
+-------
 
 Presets shall be versioned configuration deltas, not opaque replacement files.
-
 Initial presets should include Comet's conventional instrument-resolution
-patterns such as low-low, high-low, and high-high as appropriate to the
-selected version, plus a minimal set of clearly named project presets if the
-scientific team defines them.
+patterns -- low-low, high-low, high-high -- as appropriate to the selected
+version, plus a minimal set of clearly named project presets.
 
-Applying a preset shall show a reviewable diff:
-
-::
+Applying a preset shall show a reviewable diff::
 
     Parameter                    Current        Preset
     ----------------------------------------------------
     fragment_bin_tol             0.02           1.0005
     mass_type_fragment           monoisotopic   monoisotopic
-    ...
 
-The user can apply all or selected changes. User-defined presets shall store
-which Comet version/schema they were created against. Applying them to a
-newer/older version shall run a compatibility check.
+The user can apply all or selected changes. User-defined presets shall record
+the Comet version and schema they were created against; applying them to a
+different version shall run a compatibility check.
 
 Workflow-enforced Comet outputs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------
 
-The CometGUI workflow requires Comet artifacts consumed by downstream stages.
-The application shall therefore force the corresponding Comet output settings
-needed to create:
-
-* pepXML for PDV and Limelight conversion;
-* PIN/Percolator input for Percolator.
+``R-CMT-01``
+    The workflow requires Comet artefacts consumed by downstream stages, so the
+    application shall force ``output_pepxmlfile = 1`` (for PDV and Limelight)
+    and ``output_percolatorfile = 1`` (the PIN for Percolator). The verified
+    default for ``output_percolatorfile`` is ``0``, so this is a real change
+    the application makes on the user's behalf and must show as such.
 
 These fields shall appear in the output section as locked/on with text such as
-"Required by CometGUI workflow". The exact option names shall come from the
-selected version's schema.
+"Required by CometGUI workflow". Exact option names shall come from the
+selected version's schema. Users may enable additional Comet outputs but
+cannot disable artefacts required by an enabled downstream stage.
 
-Users may enable additional Comet outputs, but they cannot disable artifacts
-required by an enabled downstream stage.
+.. _spec-decoy:
+
+Target/decoy strategy
+---------------------
+
+The interaction between Comet's decoy generation, the FASTA contents,
+Percolator's expectations and the Limelight converter's decoy handling is the
+single most likely cause of a run that "succeeds" and is scientifically
+meaningless. Revision 1 mentioned it only as one validation bullet; it is
+specified here.
+
+Verified defaults: ``decoy_search = 0`` (no internal decoys), ``decoy_prefix =
+DECOY_``. Comet's ``decoy_search`` accepts ``0`` (none), ``1`` (internal decoys
+concatenated into the same output) and ``2`` (internal decoys reported
+separately).
+
+``R-DEC-01``
+    The project shall model the decoy source explicitly as one of
+    ``FASTA_CONTAINS_DECOYS``, ``COMET_INTERNAL_CONCATENATED``
+    (``decoy_search = 1``) or ``COMET_INTERNAL_SEPARATE``
+    (``decoy_search = 2``), and shall present it as a single Essentials control
+    rather than as a bare numeric parameter.
+
+``R-DEC-02``
+    Before Comet runs, the application shall detect whether the selected FASTA
+    already contains decoy entries by scanning accessions for the configured
+    decoy prefix, and shall report the count. Both "no decoys anywhere" and
+    "decoys in the FASTA *and* ``decoy_search != 0``" shall block the run with
+    an explanatory error, because the first yields a Percolator run with no
+    negative examples and the second double-counts decoys.
+
+``R-DEC-03``
+    The decoy prefix shall be a single project-level value that drives Comet's
+    ``decoy_prefix``, the Percolator decoy-pattern option where the selected
+    version supports it, and the Limelight converter's decoy prefix. Where a
+    stage's prefix is deliberately overridden, the override shall be explicit
+    in the UI and recorded in provenance.
+
+``R-DEC-04``
+    After Comet runs and before Percolator starts, the PIN shall be checked to
+    contain both target and decoy rows in the quantity the configured mode
+    requires; a PIN with zero decoy rows shall fail the stage with a specific
+    message naming the decoy configuration, not a generic Percolator error.
 
 Comet validation
-~~~~~~~~~~~~~~
+----------------
 
-Validation shall occur both per-field and across fields. Examples include:
+Validation shall occur per-field and across fields. At minimum: database exists
+and is readable; spectra exist and use a supported format (mzML, mzXML, mgf,
+ms2/cms2/bms2, and Thermo RAW only on Windows with the companion DLLs
+present); precursor tolerance values and units are valid; numeric ranges are
+ordered (subject to ``R-PARAM-04``); peptide-length ranges are valid; the
+selected enzyme numbers exist in the serialised enzyme table; variable
+modification tuples are internally valid; modification counts are consistent
+with version limits; ``output_pepxmlfile`` and ``output_percolatorfile`` are
+enabled; selected index and search options are compatible; decoy configuration
+satisfies :ref:`spec-decoy`; output paths are writable; imported unknown
+parameters are surfaced; and parameters unavailable in the selected Comet
+version are blocked rather than ignored.
 
-* database exists and is readable;
-* spectra exist and use a supported format;
-* Thermo RAW is permitted only on supported platform/tool combinations;
-* precursor tolerance values and units are valid;
-* numeric ranges have lower <= upper;
-* peptide-length ranges are valid;
-* selected enzyme exists in the serialized enzyme table;
-* variable modification tuples are internally valid;
-* modification counts are consistent with selected version limits;
-* output pepXML and PIN are enabled for the workflow;
-* selected index/search options are compatible;
-* decoy configuration is sufficient for Percolator;
-* output paths are writable;
-* an imported unknown parameter is explicitly surfaced;
-* parameters unavailable in the selected Comet version are blocked rather than
-  ignored.
+Errors shall be attached to the responsible field and category, summarised at
+the top of the editor, and reachable by keyboard.
 
-Errors shall be attached to the responsible field/category, summarized at the
-top of the editor, and accessible by keyboard.
+Canonical serialisation
+-----------------------
 
-Canonical serialization
-~~~~~~~~~~~~~~~~~~~~~
+The Comet parameter writer shall be deterministic for a given model: stable
+ordering; stable numeric formatting; stable newline convention within a
+platform-independent canonical artefact; an explicit generated header
+containing the CometGUI version and target Comet version; and no hidden
+mutation at process-launch time.
 
-The Comet parameter writer shall be deterministic for a given model:
+``R-PARAM-11``
+    All numeric formatting and parsing in serialisation shall use
+    ``Locale.ROOT``. A JVM running under a locale that uses a decimal comma
+    would otherwise write ``fragment_bin_tol = 0,02``, which Comet parses as a
+    different value or rejects. A test shall run the writer under at least one
+    comma-decimal locale and assert byte-identical output.
 
-* stable ordering;
-* stable numeric formatting;
-* stable newline convention within a platform-independent canonical artifact;
-* explicit generated header containing CometGUI version and target Comet
-  version;
-* no hidden mutation at process-launch time.
+``R-PARAM-12``
+    The exact file written to disk shall be the exact file recorded in
+    provenance and passed to Comet. The writer shall write once, hash what it
+    wrote, and pass that path; it shall not regenerate the file for the
+    process invocation.
 
-The exact file written to disk shall be the exact file recorded in provenance
-and passed to Comet.
+Comet Invocation and the Multi-File Run Model
+=============================================
+
+Revision 1 did not state how Comet is invoked, where its outputs land, or
+whether a run may contain more than one spectrum file. All three are decided
+here, because Comet's verified CLI constrains them.
+
+Spectrum-file batches
+---------------------
+
+``R-CMT-02``
+    A run shall accept **one or more** spectrum files. Real DDA experiments are
+    searched as a set of fractions or replicates, and Percolator is normally
+    trained on the pooled PIN, so a one-file-per-run design would make the
+    product unusable for its actual audience.
+
+``R-CMT-03``
+    Comet shall be invoked **once per spectrum file**, with ``-N`` naming an
+    output base path inside the run directory. The verified CLI restricts
+    ``-N`` to a single input file, and without ``-N`` Comet writes
+    ``<input-basename>.pep.xml`` and ``<input-basename>.pin`` **beside the
+    input spectra**. Writing into the user's data directory -- which may be
+    read-only, shared, or a network mount -- is not acceptable, and it makes
+    two runs of the same data overwrite each other's outputs.
+
+``R-CMT-04``
+    The canonical parameter file shall be passed with ``-P`` from the run's
+    ``parameters/`` directory, and the database with ``-D`` only when it must
+    override the serialised ``database_name``; the run shall record which
+    mechanism was used. Per-file invocations shall differ only in the input
+    path and the ``-N`` base name, and every argument array shall be recorded
+    in provenance separately.
+
+``R-CMT-05``
+    Per-file Comet invocations may run concurrently, bounded by a configured
+    limit derived from the thread setting and available cores. Concurrency
+    shall not change the parameter file, the output layout or the recorded
+    provenance, and a failure in one file shall fail the stage with the
+    per-file logs retained.
+
+``R-CMT-06``
+    The PIN files produced per spectrum file shall be merged into one PIN for
+    Percolator, preserving exactly one header, validating that all files share
+    the same feature columns in the same order, and recording the merge (inputs,
+    row counts, output hash) as a provenance event. A feature-column mismatch
+    shall fail the stage with a message naming the differing files.
+
+Index modes
+-----------
+
+``R-CMT-07``
+    Comet's fragment-ion index (``-i``) and peptide index (``-j``) build a
+    ``.idx`` file from the FASTA. Where the GUI exposes an index mode, index
+    construction shall be a distinct, cached, provenance-recorded workflow step
+    keyed by FASTA hash plus the digestion parameters that affect the index, so
+    that repeated runs reuse it and a changed FASTA or digestion setting
+    invalidates it. An ``.idx`` file is self-describing about which mode built
+    it, and the application shall read that rather than assume.
+
+Output containment
+------------------
+
+``R-CMT-08``
+    All tool outputs, logs and generated parameter files shall be written
+    inside the run directory. Nothing shall be written next to the user's
+    input spectra or FASTA, and no input file shall ever be modified. A test
+    shall run the full workflow with the input directory mounted read-only.
 
 Percolator Configuration
-------------------------
+========================
 
 Standard Percolator UI
-~~~~~~~~~~~~~~~~~~~~
+----------------------
 
-The standard Percolator screen shall expose:
-
-* Percolator version selector.
-* Capability/status badge.
-* PSM result q-value filter: default 0.01.
-* Peptide result q-value filter: default 0.01.
-* A concise explanation that these filters change display/export only.
-* An Advanced settings disclosure.
+The standard Percolator screen shall expose the version selector; a
+capability/status badge; the PSM result q-value filter (default 0.01); the
+peptide result q-value filter (default 0.01); a concise explanation that these
+filters change display and export only; and an Advanced settings disclosure.
 
 Advanced Percolator settings
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------
 
-Advanced settings shall expose at minimum, where supported by the selected
-version:
+Advanced settings shall expose, where supported by the selected version:
+``testFDR`` (default 0.01); ``trainFDR`` (default 0.01); random seed; maximum
+iterations; thread count; train-subset options where relevant; search-input and
+target-decoy behaviour where relevant; decoy-prefix behaviour where relevant;
+and any additional supported options explicitly chosen for the product schema.
 
-* ``testFDR``; default 0.01.
-* ``trainFDR``; default 0.01.
-* random seed.
-* maximum iterations.
-* thread count.
-* train subset options where relevant.
-* search-input/target-decoy behavior where relevant.
-* protein decoy prefix behavior where relevant.
-* additional supported options explicitly chosen for the product schema.
+``R-PERC-04``
+    The GUI shall not equate ``testFDR`` with the PSM result display filter.
+    Their descriptions shall state the difference explicitly.
 
-The GUI shall not equate ``testFDR`` with the PSM result display filter.
-Descriptions shall distinguish them.
+``R-PERC-05``
+    The random seed shall have a fixed, recorded default rather than being left
+    implicit, and its effective value shall always be written to provenance,
+    so that a rerun of an archived run is reproducible.
+
+``R-PERC-06``
+    Command construction shall be capability-driven per version. The
+    application shall never pass an option the probed version does not
+    advertise -- in particular it shall not pass any XML output option to a
+    version lacking ``XML_OUTPUT``, which is the specific failure mode
+    introduced by the 3.09 removal.
 
 Percolator outputs
-~~~~~~~~~~~~~~~~
+------------------
 
-For a normal run, the adapter shall request and preserve as available:
+For a normal run the adapter shall request and preserve, as available: target
+PSM TSV; target peptide TSV; optional decoy PSM TSV; optional decoy peptide
+TSV; the learned weights file; XML output when the selected version supports it
+and an enabled downstream stage needs it; and stdout and stderr logs.
 
-* target PSM TSV;
-* target peptide TSV;
-* optional decoy PSM TSV;
-* optional decoy peptide TSV;
-* learned weights file;
-* XML output when the selected version supports XML and an enabled downstream
-  stage needs it;
-* stdout and stderr logs.
-
-Raw outputs shall be immutable after successful completion. Derived filtered
-exports shall be new files.
+``R-PERC-07``
+    Raw outputs shall be immutable after successful completion. Derived
+    filtered exports shall be new files under a distinct directory.
 
 Input validation before Percolator
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------------
 
-Before invoking Percolator, CometGUI shall validate the PIN sufficiently to
-catch common workflow mistakes:
-
-* file exists and is nonempty;
-* required header fields exist;
-* both target and decoy labels are present when the configured mode requires
-  them;
-* feature columns contain parsable numeric values where required;
-* protein/decoy prefix behavior is not obviously inconsistent with the selected
-  configuration.
-
-This validation should produce a useful GUI error before Percolator emits a
-more obscure message.
+Before invoking Percolator, CometGUI shall validate the merged PIN: the file
+exists and is non-empty; required header fields exist; both target and decoy
+labels are present when the configured mode requires them (``R-DEC-04``);
+feature columns contain parsable numeric values where required; and the
+protein/decoy prefix behaviour is not obviously inconsistent with the selected
+configuration. This validation should produce a useful GUI error before
+Percolator emits a more obscure one.
 
 Q-value result filters
-~~~~~~~~~~~~~~~~~~~~
+----------------------
 
-The Results model shall keep original q-values read from Percolator. A filter
-is a view predicate:
-
-.. code-block:: text
+The Results model shall keep the original q-values read from Percolator. A
+filter is a view predicate::
 
     PSM visible     := psm.q_value <= psm_filter
     Peptide visible := peptide.q_value <= peptide_filter
 
-Required behavior:
+``R-RES-01``
+    Defaults are 0.01 and 0.01, independently. The valid range is [0, 1]. The
+    boundary is inclusive. Changing a value updates counts and table contents
+    without rerunning any tool. The UI shows total records and records passing
+    the current filter. Raw Percolator files remain unchanged. Filter values
+    are stored in project/run view state, and are written to provenance when
+    used to generate an export, with exported filtered files identifying the
+    cutoff in their metadata.
 
-* Defaults are 0.01 and 0.01 independently.
-* Valid range is [0, 1].
-* Values are stored in the project/run view state and provenance when used to
-  generate an export.
-* Changing a value updates counts/table contents without rerunning tools.
-* Filter boundary behavior is inclusive (<=).
-* The UI shows total records and records passing the current filter.
-* Exported filtered files identify the cutoff in their provenance/metadata.
-* Raw Percolator files remain unchanged.
+``R-RES-02``
+    Rows whose q-value is missing or unparsable shall be counted and shown as
+    a distinct "unfiltered/unknown" category rather than being silently dropped
+    or silently included; the policy shall be identical in the UI and in export.
 
-Learned feature weights / parameter importance view
-```
+Learned feature weights
+-----------------------
 
-The application shall always request a Percolator weights artifact when the
-selected version supports it. If a stable weights file is unavailable for a
-specific version, a version-specific parser may fall back to the documented
-stdout block, but the weights file is preferred.
+``R-PERC-08``
+    The application shall always request a Percolator weights artefact when
+    the selected version supports it. If a stable weights file is unavailable
+    for a version, a version-specific parser may fall back to the documented
+    stdout block, but the file is preferred and the fallback shall be recorded
+    as a provenance warning.
 
 The UI shall call this view **Learned feature weights (Percolator SVM)**. A
 navigation shortcut may say **Parameter importances**, but the description must
 state that the values are coefficients learned after Percolator's feature
-normalization/cross-validation and should not be interpreted as causal
-importance.
+normalisation and cross-validation, and are not causal importances.
 
-For every feature show:
+For every feature show: feature name; the weight from each cross-validation
+split; mean signed weight; mean absolute weight; standard deviation; a sign
+consistency indicator; and rank by mean absolute weight. The table shall be
+sortable. A bar chart may show mean absolute magnitude with signed direction
+available in text; the table remains the accessibility and export source of
+truth. The weights artefact shall be checksummed and listed in provenance.
 
-* feature name;
-* split 1 weight;
-* split 2 weight;
-* split 3 weight, when three splits are present;
-* mean signed weight;
-* mean absolute weight;
-* standard deviation;
-* sign consistency indicator;
-* rank by mean absolute weight.
+``R-PERC-09``
+    The number of cross-validation splits shall be read from the artefact, not
+    assumed to be three.
 
-The table shall be sortable. A bar chart may show mean absolute magnitude with
-signed direction available in text/table/tooltips. The table remains the
-accessibility and export source of truth.
-
-The weights artifact itself shall be checksummed and listed in provenance.
-
-## Workflow Engine
+Workflow Engine
+===============
 
 Canonical workflow DAG
-
-```
+----------------------
 
 A normal run shall use these steps:
 
-1. Validate project inputs/configuration.
-2. Resolve/install/probe Comet.
-3. Resolve/install/probe Percolator.
-4. Serialize canonical Comet parameter file.
-5. Hash immutable inputs.
-6. Run Comet.
-7. Validate Comet pepXML and PIN outputs.
-8. Run Percolator.
-9. Validate/parse Percolator outputs and learned weights.
-10. Finalize core result indexes and summaries.
-11. Hash outputs and finalize core provenance.
-12. Optional: launch/use PDV.
-13. Optional: run Limelight converter.
-14. Optional: upload to Limelight.
-15. Append downstream provenance events and refresh report.
+#. Validate project inputs and configuration.
+#. Resolve, install and probe Comet.
+#. Resolve, install and probe Percolator.
+#. Serialise the canonical Comet parameter file.
+#. Hash immutable inputs.
+#. Build or reuse the Comet index, if an index mode is selected.
+#. Run Comet once per spectrum file.
+#. Validate Comet pepXML and PIN outputs per file.
+#. Merge PIN files.
+#. Run Percolator.
+#. Validate and parse Percolator outputs and learned weights.
+#. Finalise core result indexes and summaries.
+#. Hash outputs and finalise core provenance.
+#. Optional: launch or use PDV.
+#. Optional: run the Limelight converter.
+#. Optional: upload to Limelight.
+#. Append downstream provenance events and refresh the report.
 
 Hashing may execute concurrently with tool installation when safe, but a tool
-must never begin reading an input that is being mutated by CometGUI. The input
+must never begin reading an input that CometGUI is mutating, and the input
 fingerprint recorded for a run must correspond to the file contents actually
 used.
 
 Stage reruns
-~~~~~~~~~~
+------------
 
-The workflow shall understand stage dependencies.
+The workflow shall understand stage dependencies. Changing only the PSM or
+peptide display filters requires no scientific rerun. Changing Percolator
+parameters reruns Percolator and downstream conversion, not Comet. Choosing an
+XML-capable Percolator for Limelight after running a version without XML reruns
+Percolator from the preserved merged PIN, then conversion; Comet is reused.
+Changing Comet parameters invalidates Comet and everything downstream. Changing
+only the Limelight q cutoff invalidates only conversion and upload.
 
-Examples:
-
-* Changing only PSM/peptide display q filters requires no scientific rerun.
-* Changing Percolator parameters requires rerunning Percolator and downstream
-  Limelight conversion, but not Comet.
-* Choosing Percolator 3.08 for Limelight after running 3.09 requires rerunning
-  Percolator from the preserved PIN, then conversion; Comet is reused.
-* Changing Comet parameters invalidates Comet, Percolator, and downstream
-  stages.
-* Changing only Limelight q cutoff invalidates only conversion/upload.
-
-The UI shall preview which stages will rerun before execution.
+``R-RUN-01``
+    Stage invalidation shall be computed from a declared dependency graph and
+    an input fingerprint per stage, not from ad hoc conditionals, and the UI
+    shall preview exactly which stages will rerun before execution starts.
 
 Cancellation and recovery
-```
+-------------------------
 
 Cancelling shall terminate the active stage and its process descendants where
-possible, mark outputs as partial, and preserve logs/provenance.
+possible, mark outputs as partial, and preserve logs and provenance. A failed
+or cancelled run shall be reopenable, and the user shall be able to retry from
+the failed stage while prerequisites remain valid.
 
-A failed or cancelled run shall be reopenable. The user shall be able to retry
-from the failed stage when prerequisites are still valid. CometGUI shall not
-silently reuse a prerequisite whose checksum no longer matches the manifest.
+``R-RUN-02``
+    CometGUI shall not reuse a prerequisite whose checksum no longer matches
+    the recorded manifest; it shall say which file changed and offer to rerun
+    the producing stage.
 
-## Project and Run Storage
+Project and Run Storage
+=======================
 
 Project model
+-------------
 
-```
-
-A project contains mutable user intent and one or more immutable run records.
-
-Recommended top-level structure:
-
-::
+A project contains mutable user intent and one or more immutable run records::
 
     MyProject/
         project.json
+        project.lock
         presets/
         runs/
             20260828T231500Z-<id>/
@@ -1259,1319 +1631,1319 @@ Recommended top-level structure:
                 parameters/
                     comet.params
                     percolator-settings.json
+                inputs/
+                    pin/merged.pin
                 outputs/
-                    comet/
+                    comet/<spectrum-basename>.{pep.xml,pin}
                     percolator/
                     limelight/
                 logs/
-                    comet.stdout.log
-                    comet.stderr.log
-                    percolator.stdout.log
-                    percolator.stderr.log
+                    comet.<spectrum-basename>.{stdout,stderr}.log
+                    percolator.{stdout,stderr}.log
                     limelight-converter.log
                     limelight-upload.log
                 provenance/
                     provenance.json
                     provenance.rst
 
-Large input spectra/FASTA should not be copied into the project by default.
-The project shall store canonical path, size, timestamps, MD5, SHA-256, and
-other identity data. A future "portable project" function may copy/hard-link
-inputs explicitly.
+``R-RUN-03``
+    Large input spectra and FASTA files shall not be copied into the project by
+    default. The project shall store canonical path, size, timestamps, MD5 and
+    SHA-256. A "portable project" function may later copy or hard-link inputs
+    explicitly.
+
+``R-RUN-04``
+    ``project.json`` and ``run.json`` shall each carry a schema version, and
+    the application shall define and test its policy for opening older
+    versions (migrate, or refuse with a clear message) and newer ones (refuse
+    without data loss, never partially parse).
+
+``R-RUN-05``
+    A project opened by one CometGUI instance shall be locked against
+    concurrent modification by another instance on the same machine, with a
+    stale-lock recovery path that identifies the owning process.
 
 Run immutability
-```
+----------------
 
-Once a run starts, its serialized Comet and Percolator scientific parameters
-shall be immutable. Editing the project creates a new prospective configuration
-or a new run/retry record. This prevents the GUI from showing a parameter state
-that differs from what was actually executed.
+``R-RUN-06``
+    Once a run starts, its serialised Comet and Percolator scientific
+    parameters are immutable. Editing the project creates a new prospective
+    configuration or a new run/retry record, so the GUI can never display a
+    parameter state that differs from what was executed.
 
-## Results Model and UI
+Results Model and UI
+====================
 
 Result indexing
-
-```
-
-Percolator outputs shall be parsed into a queryable local result model. For
-moderate files, in-memory models are acceptable; for very large result sets,
-the implementation should support a disk-backed indexed representation such as
-SQLite so the GUI does not require loading millions of rows into heap memory.
-
-The parser layer shall be independent of the UI and version-aware.
-
-PSM table
-~~~~~~~
-
-Columns should include when available:
-
-* spectrum/native identifier;
-* source file;
-* scan/index;
-* precursor charge;
-* peptide/peptidoform;
-* protein IDs;
-* Percolator score;
-* q-value;
-* PEP;
-* useful Comet score/features carried through the output;
-* decoy/target state where appropriate.
-
-Peptide table
-~~~~~~~~~~~
-
-Columns should include when available:
-
-* peptide/peptidoform;
-* proteins;
-* Percolator score;
-* q-value;
-* PEP;
-* number of supporting PSMs if derivable without changing scientific meaning.
-
-Result tables shall support sorting, text filtering, column visibility,
-copy/export, and stable selection.
-
-PDV Integration
 ---------------
 
-Managed installation
-```
+Percolator outputs shall be parsed into a queryable local result model. The
+parser layer shall be independent of the UI and version-aware.
 
-PDV shall be managed by the same Tool Registry as Comet and Percolator. The
-initial verified version shall be PDV 2.6.0. Its JAR checksum and reported
-version shall appear in provenance whenever PDV is launched from a run.
+``R-RES-03``
+    The results architecture shall not assume the result set fits in heap. A
+    disk-backed indexed representation (for example SQLite) shall be used above
+    a documented row-count threshold, and the UI shall bind to a paged,
+    query-backed model rather than to an ``ObservableList`` holding every PSM.
+    A performance fixture large enough to cross the threshold shall exist
+    before the results UI is built, not after.
+
+PSM table
+---------
+
+Columns, where available: spectrum/native identifier; source file; scan or
+index; precursor charge; peptide/peptidoform; protein IDs; Percolator score;
+q-value; PEP; useful Comet scores or features carried through; and
+decoy/target state where appropriate. With multi-file runs the source file
+column is mandatory, not optional.
+
+Peptide table
+-------------
+
+Columns, where available: peptide/peptidoform; proteins; Percolator score;
+q-value; PEP; and the number of supporting PSMs where derivable without
+changing scientific meaning.
+
+Result tables shall support sorting, text filtering, column visibility, copy
+and export, and stable selection across filter changes.
+
+``R-RES-04``
+    Export shall produce a new file that records, in an accompanying metadata
+    block or sidecar, the run ID, the filter values applied, the row count
+    before and after filtering, and the CometGUI version.
+
+PDV Integration
+===============
+
+Managed installation
+--------------------
+
+PDV shall be managed by the same Tool Registry as Comet and Percolator, with
+PDV 2.7.0 as the initial verified version. Its JAR checksum and reported
+version shall appear in provenance whenever PDV is launched from a run. Because
+the download is approximately 99 MB, PDV installation shall be deferred until
+first use, cancellable, and shall not be a prerequisite for a search.
 
 Baseline integration
-
-```
+--------------------
 
 The baseline production integration shall use documented PDV functionality for
-Comet pepXML plus MGF/mzML/mzXML.
+Comet pepXML plus MGF/mzML/mzXML. The Comet pepXML produced by the search shall
+be preserved even though the primary result tables come from Percolator,
+because it is the native search identification data PDV understands.
 
-The Comet pepXML produced by the search shall be preserved even though the
-primary result tables come from Percolator. This provides the native search
-identification data PDV understands.
-
-The Results UI shall provide:
-
-* Open run in PDV.
-* Open selected source/spectrum context in PDV when a robust documented mapping
-  is available.
-* A clear error if the source spectrum format cannot be visualized by the
-  selected PDV version.
+The Results UI shall provide: Open run in PDV; Open the selected
+source/spectrum context in PDV where a robust documented mapping exists; and a
+clear error when the source spectrum format cannot be visualised by the
+selected PDV version.
 
 Enhanced exact-selection integration
-```
+------------------------------------
 
-A desirable enhancement is a generalized database-search equivalent of PDV's
-existing de novo external-control mode. The preferred approach is an upstream
-PDV contribution, conceptually similar to:
+A desirable enhancement is a generalised database-search equivalent of PDV's
+existing de novo external-control mode, preferably contributed upstream,
+conceptually::
 
-.. code-block:: text
+    java -jar PDV.jar db-gui \
+        --result search.pep.xml \
+        --result-format pepxml \
+        --spectrum run.mzML \
+        --port <ephemeral-port> \
+        --hide-psm-table
 
-```
-java -jar PDV.jar db-gui \
-    --result search.pep.xml \
-    --result-format pepxml \
-    --spectrum run.mzML \
-    --port <ephemeral-port> \
-    --hide-psm-table
-```
-
-and a loopback-only selection API based on a stable spectrum/native identifier.
-
-If this does not exist upstream when implementation begins, the team shall
-choose one explicit path:
-
-1. ship baseline Open-in-PDV plus PDV CLI batch figure generation; or
-2. maintain a minimal, clearly versioned PDV fork containing only the required
-   database-search launcher/control extension.
-
-A fork must be checksum/version tracked and should be upstreamed as quickly as
-possible.
+with a loopback-only selection API keyed on a stable spectrum/native
+identifier. If this does not exist upstream when implementation begins,
+``D-005`` shall choose either (a) baseline Open-in-PDV plus PDV CLI batch figure
+generation, or (b) a minimal, clearly versioned PDV fork containing only the
+required database-search launcher and control extension. A fork must be
+checksum- and version-tracked and should be upstreamed as quickly as possible.
 
 PDV testing
+-----------
 
-```
-
-Automated tests shall not rely only on whether a PDV window appears. At least
-one test shall invoke PDV's deterministic command-line figure generation on a
-known Comet pepXML + spectrum and assert that a valid nonempty output figure is
-produced. If the enhanced control server exists, E2E tests shall additionally
-probe its health endpoint and select a known PSM.
+``R-PDV-01``
+    Automated tests shall not rely on whether a PDV window appears. At least
+    one test shall invoke PDV's deterministic command-line figure generation on
+    a known Comet pepXML plus spectrum file and assert a valid, non-empty
+    output figure. If the enhanced control server exists, end-to-end tests
+    shall additionally probe its health endpoint and select a known PSM.
 
 Limelight Conversion and Upload
--------------------------------
+===============================
 
 Converter management
-```
+--------------------
 
-The `limelight-import-comet-percolator` JAR shall be installed and versioned
-through the Tool Registry. The project shall pin a tested converter version for
-each application release rather than silently using an untested latest JAR.
+The ``limelight-import-comet-percolator`` JAR shall be installed and versioned
+through the Tool Registry, pinned per CometGUI release (initially ``v2.8.1``,
+``cometPercolator2LimelightXML.jar``) rather than silently tracking latest.
 
 Conversion prerequisites
+------------------------
 
-```
+The Limelight tab shall validate that the canonical Comet parameter file
+exists; Comet pepXML exists; Percolator XML exists; the selected converter is
+installed and verified; the FASTA path is available when needed; and the output
+directory is writable.
 
-The Limelight tab shall validate:
+``R-LL-01``
+    If the selected Percolator lacks ``XML_OUTPUT``, conversion controls shall
+    be disabled with an explanation and an explicit action, labelled with the
+    version that will actually be used, for example ``Rerun Percolator with
+    3.08.0 for Limelight``. The action shall preserve the original Percolator
+    run and create a distinct Percolator-stage execution and provenance record.
+    It shall reuse the merged PIN and shall not rerun Comet unless the PIN
+    fails checksum or prerequisite validation.
 
-* canonical Comet parameter file exists;
-* Comet pepXML exists;
-* Percolator XML exists;
-* selected converter is installed/verified;
-* FASTA path is available when needed;
-* output directory is writable.
-
-If the selected Percolator lacks ``XML_OUTPUT``, conversion controls shall be
-disabled with an explanatory message and an action:
-
-``Rerun Percolator with 3.08.0 for Limelight``
-
-This action shall preserve the original Percolator run and create a distinct
-Percolator-stage execution/provenance record. It shall reuse the Comet PIN and
-shall not rerun Comet unless the PIN fails its checksum/prerequisite validation.
+``R-LL-02``
+    Where no XML-capable Percolator is available for the host platform at all
+    (:ref:`spec-percolator-artefacts`), the action offered shall be to register
+    a local XML-capable binary, and the message shall say plainly that no
+    managed build exists for this platform. The UI shall never offer a rerun
+    with a version it cannot obtain.
 
 Converter UI
-~~~~~~~~~~
+------------
 
-The standard converter UI shall expose:
+The standard converter UI shall expose the Limelight q-value cutoff (default
+0.01); the output Limelight XML path; whether to import decoys; an optional
+independent decoy prefix; open-mod mode; the resolved FASTA; and the resolved
+pepXML directory. Advanced values that can be inferred reliably should be shown
+read-only by default and be editable only when necessary. The converter's
+single q-value option is separate from the GUI's independent PSM and peptide
+result filters.
 
-* Limelight q-value cutoff, default 0.01;
-* output Limelight XML path;
-* whether to import decoys;
-* optional independent decoy prefix;
-* open-mod mode;
-* resolved FASTA;
-* resolved pepXML directory.
-
-Advanced values that can be inferred reliably should be shown read-only by
-default and editable only when necessary.
-
-The converter's one q-value option is separate from the GUI's independent PSM
-and peptide result filters.
+``R-LL-03``
+    With multi-file runs, the converter's expectations about the pepXML
+    directory shall be satisfied by the run's own ``outputs/comet/`` layout,
+    and the adapter shall verify that every pepXML the converter will consume
+    belongs to the same run.
 
 Conversion validation
-~~~~~~~~~~~~~~~~~~~
+---------------------
 
-A successful process exit is necessary but not sufficient. CometGUI shall also
-validate that the Limelight XML:
-
-* exists;
-* is nonempty;
-* is readable;
-* has expected top-level XML structure;
-* passes any readily available converter/schema validation that can be run
-  locally.
-
-The output shall be checksummed and recorded in provenance.
+``R-LL-04``
+    A successful process exit is necessary but not sufficient. CometGUI shall
+    also validate that the Limelight XML exists, is non-empty, is readable, has
+    the expected top-level XML structure, and passes any locally runnable
+    converter or schema validation. The output shall be checksummed and
+    recorded in provenance.
 
 Upload
-~~~~
+------
 
-The upload UI should reuse/refactor the CasanovoGUI Limelight upload approach.
-It shall provide server/project selection as required by the Limelight API,
-show live upload/import logs, and retain the final server-side identifier/URL
-metadata when available.
+The upload UI shall provide server and project selection as required by the
+Limelight API, show live upload and import logs, and retain the final
+server-side identifier or URL metadata when available.
 
-Credentials/tokens/passwords shall never be written to provenance or ordinary
-logs. Prefer OS credential/keychain storage where practical. At minimum,
-secrets must be held separately from project files and redacted from command
-display, process environment capture, and exported reports.
+``R-SEC-03``
+    Credentials, tokens and passwords shall never be written to provenance or
+    ordinary logs. OS credential/keychain storage is preferred. At minimum,
+    secrets shall be held separately from project files and redacted from
+    command display, process environment capture and exported reports.
+
+``R-SEC-04``
+    Upload is the only outward-facing action in the product. It shall require
+    an explicit user action every time, shall show the exact destination server
+    and project before sending, and shall never be triggered automatically as
+    part of a run.
 
 Provenance and Reproducibility
-------------------------------
+==============================
 
 Provenance is a primary feature, not an afterthought.
 
 Hash requirements
-~~~~~~~~~~~~~~~
+-----------------
 
-For every regular input and output file used/created by a run, record:
+For every regular input and output file used or created by a run, record the
+canonical path at time of run; role/type; byte size; modification timestamp;
+MD5; and SHA-256.
 
-* canonical path at time of run;
-* role/type;
-* byte size;
-* modification timestamp;
-* MD5;
-* SHA-256.
+``R-PROV-01``
+    Files shall be hashed by streaming chunks, not by reading whole files into
+    memory. Output files shall be hashed only after the producing process has
+    closed them. Partial files from failed or cancelled stages may be hashed
+    but shall be marked ``partial``.
 
-MD5 is mandatory because it is an explicit product requirement. SHA-256 is
-also mandatory for robust integrity/security use.
+``R-PROV-02``
+    An input-hash cache keyed by canonical path, size, modification time and,
+    where available, file identity may be used to avoid rehashing multi-
+    gigabyte spectrum files on every run. The cache shall be revalidated on
+    every use, shall be invalidated by any attribute change, and shall be
+    bypassable. A run's recorded hash shall always be a hash of the content the
+    tools actually read; when in doubt, rehash.
 
-Files shall be hashed by streaming chunks, not by reading the whole file into
-memory. Output files shall be hashed only after the producing process has
-closed/finalized them. Partial files from failed/cancelled stages may be hashed
-but must be marked ``partial``.
+``R-PROV-03``
+    Both MD5 and SHA-256 shall be computed in a single pass over the file.
 
 Tool provenance
-~~~~~~~~~~~~~
+---------------
 
-For each tool invocation record:
-
-* logical tool name;
-* reported version;
-* release/tag/commit when known;
-* executable/JAR path;
-* executable/JAR MD5 and SHA-256;
-* upstream/managed artifact identity;
-* managed versus local status;
-* capabilities;
-* exact argument array;
-* safely rendered command for display;
-* working directory;
-* environment variables added/overridden;
-* start timestamp;
-* end timestamp;
-* duration;
-* exit code;
-* stdout log path/checksums;
-* stderr log path/checksums;
-* cancellation/failure state;
-* warnings/advisories active for that version.
+For each tool invocation record: logical tool name; reported version; release
+tag or commit when known; executable or JAR path; its MD5 and SHA-256; upstream
+or managed artefact identity; managed versus local status; probed capabilities;
+the exact argument array; a safely rendered command for display; working
+directory; environment variables added or overridden; start and end timestamps;
+duration; exit code; stdout and stderr log paths and checksums;
+cancellation/failure state; and warnings or advisories active for that version.
 
 Application provenance
-~~~~~~~~~~~~~~~~~~~~
+----------------------
 
-Record:
+Record the CometGUI version; build identifier or git commit; operating system
+and version; architecture; JVM/runtime version; locale and time zone; project
+and run IDs; the generated Comet parameter file hash and a full archived copy;
+Percolator scientific settings including the effective random seed;
+result-view q filters when used for a derived export; Limelight conversion
+parameters; and PDV launch and version when used. Do not record secrets.
 
-* CometGUI version;
-* build identifier/git commit;
-* operating system/version;
-* architecture;
-* JVM/runtime version;
-* locale/time zone where relevant;
-* project/run IDs;
-* generated Comet parameter file hash and full archived copy;
-* Percolator scientific settings;
-* result-view q filters when used for a derived export;
-* Limelight conversion parameters;
-* PDV launch/version when used.
-
-Do not record secrets.
+``R-PROV-04``
+    The recorded locale shall be the JVM default locale in effect during the
+    run, precisely because locale can affect serialisation (``R-PARAM-11``).
 
 Provenance event model
-~~~~~~~~~~~~~~~~~~~~
+----------------------
 
-Provenance should be written incrementally as appendable events or atomically
-updated state so a crash still leaves useful history. The final
-``provenance.json`` shall have a schema version.
+``R-PROV-05``
+    Provenance shall be written incrementally as appendable events, or as
+    atomically updated state, so that a crash still leaves useful history. The
+    final ``provenance.json`` shall carry a schema version, and finalisation
+    shall be atomic (write-temp-then-rename).
 
 The human-readable ``provenance.rst`` report shall be generated from the same
-machine-readable model, not maintained independently.
+machine-readable model, never maintained independently.
 
 Provenance UI
-~~~~~~~~~~~
+-------------
 
 The Provenance tab shall contain:
 
 Summary
-    Run ID, status, start/end, tool versions, input count, output count.
+    Run ID, status, start and end, tool versions, input and output counts.
 
 Tools
-    Name, version, managed/local, binary path, MD5, SHA-256, capability badge.
+    Name, version, managed or local, binary path, MD5, SHA-256, capability
+    badge.
 
 Inputs/outputs
     File role, path, size, MD5, SHA-256, status.
 
 Parameters
-    Exact Comet file, Percolator settings, preset/origin information, and diffs
-    where useful.
+    The exact Comet file, Percolator settings, preset and origin information,
+    and diffs where useful.
 
 Timeline
-    Ordered workflow stages with command, time, duration, exit status.
+    Ordered workflow stages with command, time, duration and exit status.
 
 Logs
-    Links/actions to open archived logs.
+    Actions to open the archived logs.
 
 Warnings
-    Version advisories, compatibility workarounds, partial-file notices.
+    Version advisories, compatibility workarounds, partial-file notices,
+    manifest/probe discrepancies.
 
 Actions shall include Copy MD5, Copy SHA-256, Copy command, Open file location,
-Export provenance JSON, and Export provenance RST.
+Export provenance JSON and Export provenance RST.
 
 Supply-Chain and Application Security
--------------------------------------
+=====================================
 
-At minimum:
+At minimum: use HTTPS for managed downloads; verify SHA-256 before executing
+downloaded artefacts; prefer signed upstream releases or a signed CometGUI
+artefact manifest; guard ZIP, TAR and package-payload extraction against
+``../`` traversal, absolute paths and unsafe symlinks; never execute a tool
+from an unverified temporary download; record provenance for the exact artefact
+executed; keep tool caches user-writable but application-scoped; do not put
+credentials in command-line arguments where a safer mechanism exists; redact
+known secret environment variables; generate an SBOM at release time; run
+dependency vulnerability scanning in CI; pin build-plugin versions; sign native
+installers where infrastructure permits; publish release checksums; and audit
+licences for the CasanovoGUI source, Comet, Percolator, PDV, the converter, the
+Java runtime and all bundled and transitive components before redistribution.
 
-* Use HTTPS for managed downloads.
-* Verify SHA-256 before executing downloaded artifacts.
-* Prefer signed upstream releases or a signed CometGUI artifact manifest.
-* Guard ZIP/TAR extraction against ``../`` traversal, absolute paths, and unsafe
-  symlinks.
-* Never execute a tool directly from an unverified temporary download.
-* Record provenance for the exact artifact executed.
-* Keep tool caches user-writable but application-scoped.
-* Do not put credentials in command-line arguments when a safer API exists.
-* Redact known secret environment variables.
-* Generate an SBOM for CometGUI dependencies at release time.
-* Run dependency vulnerability scanning in CI.
-* Pin build-plugin versions.
-* Sign native installers/packages where project infrastructure permits.
-* Publish release checksums.
-* Audit licenses for CasanovoGUI source, Comet, Percolator, PDV, converter,
-  Java runtime, and bundled/transitive components before redistribution.
+``R-SEC-05``
+    Archive and package-payload extraction shall be implemented once, in one
+    class, with the traversal, absolute-path, symlink and decompression-bomb
+    checks applied uniformly to every artefact kind, including ``.deb`` and
+    ``.pkg`` payloads if ``D-002`` selects that strategy.
+
+``R-SEC-06``
+    Any project-built tool binaries published under ``D-002`` shall be built
+    from a pinned upstream tag by a reproducible CI job, shall carry their
+    upstream licence and build provenance, and shall be checksummed in the
+    manifest exactly like third-party artefacts.
 
 Testing Strategy
-----------------
+================
 
 Testing philosophy
-~~~~~~~~~~~~~~~~
+------------------
 
 The test suite must be able to catch real defects. Tests that only assert that
-a method returns non-null, a window opens, or an exception does not occur are
-insufficient for scientific and provenance-critical code.
+a method returns non-null, that a window opens, or that an exception does not
+occur are insufficient for scientific and provenance-critical code.
 
 The suite shall distinguish:
 
 Fast unit tests
-    Run on every local/CI build and do not require network or native scientific
-    tools.
+    Run on every local and CI build; no network, no native scientific tools.
 
 Component/integration tests
-    Exercise filesystem/process/parser/install boundaries with controlled
-    fixtures and fake processes where useful.
+    Exercise filesystem, process, parser and install boundaries with controlled
+    fixtures and fake processes.
 
 Real-tool integration tests
-    Execute real pinned Comet/Percolator/converter/PDV binaries on small real
-    fixtures.
+    Execute real pinned Comet, Percolator, converter and PDV binaries on small
+    real fixtures.
 
 GUI tests
-    Drive JavaFX controls and verify UI state/validation.
+    Drive JavaFX controls and verify UI state and validation.
 
 Packaged end-to-end tests
     Start the actual packaged application in a clean environment and drive a
     complete real workflow.
 
 Nightly/scientific regression tests
-    Use larger real data, broader version matrices, determinism and performance
-    checks.
+    Larger real data, broader version matrices, determinism and performance.
 
 Release acceptance tests
-    Test the exact installer/package artifacts that will be published.
+    Test the exact installer and package artefacts that will be published.
 
 JUnit and Java test practices
-```
+-----------------------------
 
-Use JUnit Jupiter (JUnit 5) for Java tests. Apply Java testing best practices:
-
-* Arrange/Act/Assert or similarly clear test structure.
-* One scientifically meaningful behavior per test when practical.
-* Descriptive test names stating condition and expected outcome.
-* Parameterized tests for boundaries/version matrices.
-* Dynamic tests where a schema defines a large set of invariant checks.
-* Temporary directories for filesystem tests.
-* No dependence on developer home-directory state.
-* Fixed seeds for randomized tests; print seed on failure.
-* Explicit timeouts for processes and deadlock-prone code.
-* Avoid arbitrary `sleep` in asynchronous/GUI tests; wait on observable
-  state/conditions.
-* Clean up processes/resources in `finally`/test extensions.
-* Make failures retain logs and diagnostic artifacts.
-* Keep scientific E2E tests serial/resource-locked when parallelism would cause
-  contention; parallelize pure unit tests where safe.
+Use JUnit Jupiter. Apply: Arrange/Act/Assert structure; one scientifically
+meaningful behaviour per test where practical; descriptive names stating
+condition and expected outcome; parameterised tests for boundaries and version
+matrices; dynamic tests where a schema defines a large set of invariant checks;
+temporary directories for filesystem tests; no dependence on developer
+home-directory state; fixed seeds for randomised tests with the seed printed on
+failure; explicit timeouts for processes and deadlock-prone code; waiting on
+observable state rather than arbitrary sleeps; resource cleanup in test
+extensions; retention of logs and diagnostic artefacts on failure; and serial
+or resource-locked execution for scientific end-to-end tests while pure unit
+tests parallelise.
 
 Unit tests: Comet parameter system
+----------------------------------
 
-```
+At minimum: parse and serialise every supported scalar type; canonical
+parse -> write -> parse equivalence; comment and unknown-parameter preservation;
+malformed lines; duplicate-parameter policy; enum mappings; numeric boundaries;
+mass tolerance units; the signed precursor tolerance pair (``R-PARAM-04``);
+two-value ranges; enzyme table parsing and serialisation; custom enzyme
+serialisation; second-enzyme consistency; static modification controls; every
+field of every variable-modification tuple across all fifteen slots; min/max
+counts; terminal modifications; required/exclusive modifications; one and two
+neutral-loss values; invalid combinations; range validation; workflow-enforced
+outputs; decoy cross-validation; version-introduced and version-removed
+parameters; presets and preset diffs; resetting a field, a category and all
+fields; deterministic serialisation including under a comma-decimal locale;
+schema migration; Expert raw round-trip; and unknown imported parameters not
+silently lost.
 
-At minimum, meaningful tests shall cover:
-
-* parse every supported scalar type;
-* serialize every supported scalar type;
-* canonical parse -> write -> parse equivalence;
-* imported comments/unknown parameter preservation policy;
-* malformed lines;
-* duplicate parameter handling policy;
-* enum mappings;
-* numeric lower/upper boundaries;
-* mass tolerance units;
-* enzyme table parsing/serialization;
-* custom enzyme serialization;
-* static modification controls;
-* every variable-modification tuple field;
-* variable modification min/max counts;
-* terminal variable modifications;
-* required/exclusive variable modifications;
-* one and two neutral-loss values;
-* invalid variable-mod combinations;
-* range validation;
-* output requirements enforced by workflow;
-* decoy cross-validation;
-* version-introduced/version-removed parameters;
-* presets and preset diffs;
-* resetting one field/category/all fields;
-* deterministic serialization;
-* schema migration behavior;
-* raw Expert mode round-trip;
-* unknown imported parameters not silently lost.
-
-Tests shall use expected serialized ``comet.params`` snippets/files and shall
-fail on semantically meaningful changes.
+``R-TEST-01``
+    The parameter round-trip suite shall include the *actual* files emitted by
+    ``comet -p`` and ``comet -q`` for every Comet version in the release
+    matrix, checked in as fixtures, and shall assert byte-stable canonical
+    output.
 
 Unit tests: Percolator
-~~~~~~~~~~~~~~~~~~~
+----------------------
 
-At minimum:
-
-* version parsing for 3.05 through current/future-looking strings;
-* capability mapping;
-* command argument construction by version;
-* PSM TSV parsing;
-* peptide TSV parsing;
-* q-value parsing and missing/NaN handling policy;
-* inclusive filter boundary at exactly 0.01;
-* filter values 0 and 1;
-* invalid filter values below 0 or above 1;
-* PSM filter independent of peptide filter;
-* train/test FDR settings independent of result filters;
-* weights file parsing;
-* three-split weight summary statistics;
-* sign consistency;
-* ranking by mean absolute weight;
-* malformed weights file;
-* missing weights file behavior;
-* 3.09 XML capability absent;
-* 3.08 XML capability present in verified registry;
-* version advisory rendering/model behavior.
+At minimum: version parsing from 3.05 through current and future-looking
+strings; capability mapping; command construction per version; PSM and peptide
+TSV parsing; q-value parsing and missing/NaN policy; the inclusive boundary at
+exactly 0.01; filter values 0 and 1; rejection of values below 0 or above 1;
+PSM filter independent of peptide filter; train/test FDR independent of result
+filters; weights-file parsing; split summary statistics with a
+non-hard-coded split count; sign consistency; ranking by mean absolute weight;
+malformed and missing weights files; ``XML_OUTPUT`` absent for 3.09; present
+for a verified XML-capable build; and advisory rendering.
 
 Unit tests: provenance
-~~~~~~~~~~~~~~~~~~~~
+----------------------
 
-At minimum:
+At minimum: known MD5 and SHA-256 vectors; single-pass dual hashing; streaming
+large files; zero-byte files; hash-cache validation and invalidation;
+file-changed-during-hash policy; deterministic manifest serialisation where
+required; argument-array preservation; environment capture; secret redaction;
+no token or password in JSON or RST output; partial, failed and cancelled
+states; atomic finalisation; manifest reopen and parse; schema-version
+migration; and all mandatory files represented.
 
-* known MD5 test vectors;
-* known SHA-256 test vectors;
-* streaming large-ish temporary files;
-* zero-byte files;
-* file changed during hash detection/handling policy;
-* deterministic manifest serialization where required;
-* command argument preservation;
-* environment override capture;
-* secret redaction;
-* no token/password leakage in JSON/RST;
-* partial output state;
-* failed process state;
-* cancelled process state;
-* finalization is atomic;
-* reopen/parse manifest;
-* schema-version migration;
-* all mandatory files represented.
+Unit tests: installation and security
+-------------------------------------
 
-Unit tests: installation/security
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-At minimum:
-
-* correct artifact selection by OS/architecture/version;
-* checksum match;
-* checksum mismatch blocks execution;
-* truncated archive;
-* missing expected executable;
-* interrupted install recovery;
-* existing valid cache hit;
-* existing corrupt cache rejected;
-* ZIP/TAR path traversal attempt rejected;
-* absolute archive path rejected;
-* unsafe symlink extraction rejected;
-* local binary version probe;
-* local binary < 3.05 rejected for Percolator;
-* local binary checksum recorded;
-* capability probe failure produces actionable state.
+At minimum: artefact selection by OS, architecture and version; checksum match;
+checksum mismatch blocks execution; truncated archive; missing expected
+executable; missing companion file suppresses the dependent capability;
+interrupted install recovery; valid cache hit; corrupt cache rejected; ZIP/TAR
+path traversal rejected; absolute archive path rejected; unsafe symlink
+rejected; decompression bomb rejected; ``.deb`` payload extraction where
+``D-002`` selects it; local binary version probe; local Percolator below 3.05
+rejected; local binary checksum recorded; loadability failure produces the
+distinct diagnostic required by ``R-PLAT-03``; and capability probe failure
+produces an actionable state.
 
 Architecture tests
-~~~~~~~~~~~~~~~~
+------------------
 
-Use ArchUnit or equivalent to enforce rules such as:
-
-* ``ui`` may depend on domain/application APIs, but domain must not depend on
-  JavaFX.
-* tool adapters must not depend on UI classes.
-* provenance/hashing must not depend on UI.
-* parameter parser/writer must not depend on JavaFX.
-* no cyclic dependencies between major modules/layers.
-* process creation is centralized through the process service rather than
-  scattered ``new ProcessBuilder`` calls.
+Use ArchUnit or equivalent: ``ui`` may depend on domain and application APIs
+but domain must not depend on JavaFX; tool adapters must not depend on UI
+classes; provenance and hashing must not depend on UI; the parameter parser and
+writer must not depend on JavaFX; no cyclic dependencies between major layers;
+and process creation is centralised in the process service rather than
+scattered ``new ProcessBuilder`` calls (``R-PROC-02``).
 
 Mutation testing
-~~~~~~~~~~~~~~
+----------------
 
-Use PIT or an equivalent Java mutation-testing system on critical pure logic.
-Mutation testing is especially important for code where superficial line
-coverage is easy to achieve but assertions may be weak.
+Use PIT or equivalent on critical pure logic: Comet parameter parsers and
+writers; validators; q-value filters; command builders; version and capability
+rules; checksum and provenance code; secret redaction; and stage invalidation
+rules.
 
-Prioritize:
-
-* Comet parameter parsers/writers;
-* parameter validators;
-* Percolator q-value filters;
-* command builders;
-* version/capability rules;
-* checksum/provenance code;
-* secret redaction;
-* stage invalidation rules.
-
-A recommended initial gate is >= 80% mutation score in these critical
-packages, with no known surviving mutation that can disable checksum
-verification, invert a q-value comparison, drop a required output, suppress a
-validation error, or leak a secret.
+``R-TEST-02``
+    The gate is >= 80% mutation score in those packages, with **no** surviving
+    mutation that can disable checksum verification, invert a q-value
+    comparison, drop a required output, suppress a validation error, pass an
+    unsupported option to a tool, or leak a secret.
 
 Coverage
-~~~~~~
+--------
 
-Use JaCoCo. Coverage is a diagnostic/gate, not the goal by itself.
+Use JaCoCo; coverage is a diagnostic and a gate, not the goal. Initial gates:
+core domain, parameter and provenance logic >= 90% line and >= 85% branch;
+UI-independent view-model and presenter logic >= 80% line; adapters covered by
+real integration tests rather than artificial line counts; JavaFX rendering
+glue has no numeric target but its primary user flows must be GUI-tested. Any
+lower threshold must be documented with the untested risk.
 
-Recommended initial gates:
+Component tests with fake executables
+-------------------------------------
 
-* core domain/parameter/provenance logic: >= 90% line and >= 85% branch;
-* UI-independent view-model/presenter logic: >= 80% line;
-* adapters: coverage supplemented by real integration tests rather than chasing
-  artificial line counts;
-* JavaFX rendering glue: no unrealistic numeric target, but primary user flows
-  must be GUI-tested.
-
-Any lower threshold must be documented with the untested risk.
-
-Component/integration tests with fake executables
-```
-
-Create tiny test executables/scripts that behave like scientific tools so the
-workflow engine can deterministically test:
-
-* stdout/stderr interleaving;
-* exit 0 with outputs;
-* exit nonzero;
-* child process creation;
-* hanging process and cancellation;
-* huge stdout/stderr volume;
-* missing output despite exit 0;
-* malformed output;
-* partial file followed by failure;
-* delayed output creation;
-* paths containing spaces and Unicode.
-
-These fakes complement, but never replace, real-tool tests.
+Create small test executables that behave like scientific tools so the workflow
+engine can deterministically test: stdout/stderr interleaving; exit 0 with
+outputs; non-zero exit; child process creation; a hanging process and
+cancellation; huge stdout/stderr volume; missing output despite exit 0;
+malformed output; a partial file followed by failure; delayed output creation;
+and paths containing spaces and Unicode. These fakes complement, never replace,
+real-tool tests.
 
 Real-tool integration tests
+---------------------------
 
-```
+The test repository shall include or fetch a small licence-compatible real
+proteomics fixture: a small FASTA suitable for target/decoy behaviour; a small
+mzML and/or MGF with enough real spectra to produce both target and decoy PIN
+rows; a stable Comet parameter preset; and expected invariants with
+version-pinned golden data. Fixture licensing is ``D-006``.
 
-The test repository shall include or fetch a small license-compatible real
-proteomics fixture:
+Real-tool tests shall: generate ``comet.params`` with the production writer;
+run the pinned real Comet binary; verify pepXML and PIN existence and
+parseability; verify the merge of multiple PIN files; verify target and decoy
+rows; run real Percolator; verify PSM, peptide and weights output; verify XML
+for XML-capable versions; run the real Limelight converter for the
+XML-capable workflow; verify a valid non-empty Limelight XML; and run PDV CLI
+figure generation for at least one selected spectrum, verifying a non-empty
+annotated figure.
 
-* small FASTA with target and decoy behavior suitable for Comet/Percolator;
-* small mzML and/or MGF containing enough real spectra to produce both target
-  and decoy PIN rows;
-* known, stable Comet parameter preset;
-* expected invariants and version-pinned golden data.
-
-Real-tool tests shall:
-
-1. Generate ``comet.params`` using the production parameter writer.
-2. Run the pinned real Comet binary.
-3. Verify pepXML and PIN existence/parseability.
-4. Verify target and decoy rows required by the configured Percolator mode.
-5. Run real Percolator.
-6. Verify PSM/peptide output and learned weights.
-7. Verify XML for XML-capable versions.
-8. Run the real Limelight converter for the 3.08 workflow.
-9. Verify a valid nonempty Limelight XML result.
-10. Run PDV CLI generation for at least one selected spectrum and verify a
-    nonempty annotated figure.
+``R-TEST-03``
+    The multi-file path shall be a first-class fixture: at least two spectrum
+    files searched in one run, exercising per-file ``-N`` invocation, output
+    containment, PIN merge, and the source-file column in results.
 
 JavaFX GUI automation
-~~~~~~~~~~~~~~~~~~~
+---------------------
 
-TestFX is a candidate because it provides a JavaFX robot/JUnit integration, but
-its compatibility with the selected JDK/JavaFX versions shall be proven in an
-early technical spike rather than assumed. If TestFX cannot reliably operate
-with JavaFX 25/JDK 23+ in CI, the project shall retain the same test semantics
-behind a small ``FxUiDriver`` abstraction and use a compatible JavaFX robot or
-native-accessibility automation mechanism.
+TestFX is a candidate because it provides a JavaFX robot and JUnit integration,
+but its compatibility with the selected JDK and JavaFX versions shall be proven
+in an early spike rather than assumed. If it cannot operate reliably in CI, the
+project shall retain the same test semantics behind a small ``FxUiDriver``
+abstraction and use a compatible robot or accessibility automation mechanism.
 
-Controls required by automated tests shall have stable semantic identifiers
-(``fx:id`` or a dedicated stable test/accessibility ID). Tests shall not locate
-important controls by pixel coordinates or brittle CSS ancestry.
+``R-TEST-04``
+    Controls required by automated tests shall have stable semantic
+    identifiers (``fx:id`` or a dedicated stable test/accessibility ID). Tests
+    shall not locate important controls by pixel coordinates or brittle CSS
+    ancestry.
 
-GUI tests shall cover at least:
+GUI tests shall cover at least: navigation to all primary sections; the file
+chooser abstraction and its test injection; Comet Essentials fields; Advanced
+category expansion; parameter search; reset of field and category; preset
+preview, diff and apply; variable modification add, edit and remove; inline
+validation and the error summary; Expert raw editor apply and reject;
+Percolator version selection and capability messaging; both default q filters
+equal to 0.01; independent q filter editing; Run button enable/disable rules;
+run progress and the state stepper; cancellation; result tables; the learned
+weights table and chart data; Limelight disabled for a Percolator without XML;
+the Limelight compatible-rerun action; the Provenance tab and checksum copying;
+keyboard focus traversal for the critical workflow; and accessible names for
+primary controls.
 
-* navigation to all primary sections;
-* file chooser abstraction/test injection;
-* Comet Essentials fields;
-* Advanced category expansion;
-* parameter search;
-* reset field/category;
-* preset preview/diff/apply;
-* variable modification add/edit/remove;
-* inline validation and error summary;
-* Expert raw editor apply/reject;
-* Percolator version selection/capability message;
-* default q filters both equal 0.01;
-* independent q filter editing;
-* run button enabled/disabled rules;
-* run progress/state stepper;
-* cancellation;
-* results tables;
-* learned weights table/chart data;
-* Limelight disabled for no-XML Percolator;
-* Limelight rerun-with-3.08 action;
-* Provenance tab and checksum copying;
-* keyboard focus traversal for critical workflow;
-* accessible names for primary controls.
+End-to-end harness: two tiers
+-----------------------------
 
-Packaged GUI end-to-end harness
-```
+Revision 1 asked for a JavaFX robot driving "the packaged application", which
+is only partly coherent: a robot runs in-process, and a packaged application is
+a separate process with its own runtime. The requirement is therefore split
+into two tiers, both mandatory.
 
-This is a mandatory release feature.
+Tier A -- assembled-application GUI E2E
+    Runs the real application module in-process with a fresh temporary home and
+    tool cache, driven through ``FxUiDriver``. It exercises the complete
+    workflow with real tools and real fixtures. This tier owns the detailed
+    scenario assertions below, because in-process access makes observable-state
+    waiting and independent recomputation practical.
 
-The harness shall test the *packaged application* with a fresh temporary home
-and tool cache. It must not call `WorkflowEngine.run()` directly and call
-that an E2E test.
+Tier B -- packaged-artefact E2E
+    Launches the exact packaged installer output as an external process with a
+    fresh home, and drives it either through an external UI automation driver
+    or through a test-only loopback control bridge. Its job is to prove that
+    *packaging* did not break the product: bundled runtime starts, tool
+    download works from the installed layout, a complete run succeeds, and
+    provenance is written. It runs the canonical scenario and the no-XML
+    scenario, and may assert a smaller set of invariants than Tier A.
 
-Preferred interaction strategy:
+``R-TEST-05``
+    Neither tier may call ``WorkflowEngine.run()`` directly and be described as
+    an end-to-end test. Both shall enter through the same commands the UI
+    issues.
 
-* JavaFX robot for in-process packaged-test builds where feasible; and/or
-* an external UI automation driver against the packaged executable;
-* optionally a test-only loopback control bridge that triggers the *same UI
-  actions/commands* as real controls and exposes observable UI state.
-
-A test bridge, if used, must be disabled or omitted in production builds and
-must not bypass parameter serialization, validation, or workflow orchestration.
-It exists to make UI interaction deterministic, not to create a hidden backend
-execution API that avoids the GUI.
+``R-TEST-06``
+    A test-only control bridge, if used, shall be built only into a
+    test-enabled build, shall trigger the same UI actions and commands as real
+    controls, and shall never bypass parameter serialisation, validation or
+    workflow orchestration. A release-pipeline check shall verify by inspecting
+    the shipped artefact that the bridge classes and its enabling flag are
+    absent from production builds.
 
 Canonical E2E scenario
-^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~
 
-The principal E2E test shall perform the following sequence.
+The principal end-to-end test shall:
 
-1. Create a brand-new temporary user home/application data directory.
-2. Ensure no Comet, Percolator, PDV, or converter is installed in that cache.
-3. Launch the exact packaged CometGUI artifact.
-4. Verify the application reaches a ready state.
-5. Create/open a test project through the UI.
-6. Choose the real spectrum fixture through the same control used by users.
-7. Choose the real FASTA fixture.
-8. Select Comet 2026.02.2.
-9. Select Percolator 3.08.0.
-10. Change at least one precursor/fragment parameter from its preset value.
-11. Add/edit at least one variable modification using the structured GUI.
-12. Verify the GUI parameter summary reflects these changes.
-13. Confirm default PSM q filter = 0.01.
-14. Confirm default peptide q filter = 0.01.
-15. Click Run using the GUI.
-16. Verify the GUI downloads required tools automatically.
-17. Verify download/checksum states become successful.
-18. Wait on observable workflow state, never a fixed sleep.
-19. Verify generated `comet.params` exactly contains the GUI-selected values.
-20. Verify workflow-required pepXML/PIN outputs were forced on.
-21. Verify Comet exits successfully and pepXML/PIN parse.
-22. Verify Percolator exits successfully and PSM, peptide, weights, and XML
-    artifacts parse.
-23. Independently calculate the number of PSMs with q <= 0.01 from the raw
-    Percolator file and compare with the GUI count.
-24. Independently calculate the number of peptides with q <= 0.01 and compare
-    with the GUI count.
-25. Change PSM filter to 0.005 through the UI and verify only the PSM count
-    changes according to independent calculation.
-26. Change peptide filter to 0.02 and verify the peptide count independently.
-27. Open Learned feature weights and compare displayed values/summary ranking
-    with the actual weights artifact.
-28. Invoke PDV integration. At minimum, run the supported PDV visualization or
-    CLI figure path on a known PSM and verify successful output.
-29. Run the real Limelight converter through the UI.
-30. Validate the resulting Limelight XML.
-31. Exercise Limelight upload against a controlled local fake endpoint or an
-    official test/sandbox endpoint; do not upload CI data to a production
-    server.
-32. Open the Provenance view.
-33. Independently recompute MD5 and SHA-256 for every declared input/output and
-    compare with the manifest.
-34. Verify tool binary/JAR checksums in provenance match files on disk.
-35. Verify exact Comet and Percolator versions and argv are present.
-36. Verify secrets are absent.
-37. Close CometGUI.
-38. Relaunch the packaged application and reopen the project.
-39. Verify results, selected run, tool versions, q-filter state, and provenance
-    remain coherent.
+#. Create a brand-new temporary user home and application data directory.
+#. Ensure no Comet, Percolator, PDV or converter is present in that cache.
+#. Launch CometGUI (Tier A: the assembled application; Tier B: the packaged
+   artefact).
+#. Verify the application reaches a ready state.
+#. Create or open a test project through the UI.
+#. Choose **two** real spectrum fixtures through the same control users use.
+#. Choose the real FASTA fixture.
+#. Select Comet 2026.02.2.
+#. Select the platform's default XML-capable Percolator, and assert that the
+   selection was resolved from the manifest rather than hard-coded.
+#. Change at least one precursor or fragment parameter from its preset value.
+#. Add or edit at least one variable modification using the structured editor.
+#. Verify the GUI parameter summary reflects those changes.
+#. Confirm the default PSM q filter is 0.01 and the peptide q filter is 0.01.
+#. Click Run.
+#. Verify the GUI downloads required tools automatically and that download,
+   checksum and probe states become successful.
+#. Wait on observable workflow state, never a fixed sleep.
+#. Verify the generated ``comet.params`` contains exactly the GUI-selected
+   values, and that ``output_pepxmlfile`` and ``output_percolatorfile`` were
+   forced on.
+#. Verify Comet was invoked once per spectrum file with distinct ``-N`` base
+   names, that no file was written next to the input spectra, and that both
+   pepXML and PIN outputs parse.
+#. Verify the merged PIN has one header and the summed row count of its
+   sources.
+#. Verify Percolator exits successfully and that PSM, peptide, weights and XML
+   artefacts parse.
+#. Independently compute the number of PSMs with q <= 0.01 from the raw
+   Percolator file and compare with the GUI count; repeat for peptides.
+#. Change the PSM filter to 0.005 through the UI and verify only the PSM count
+   changes, according to independent calculation.
+#. Change the peptide filter to 0.02 and verify the peptide count
+   independently.
+#. Open Learned feature weights and compare displayed values and ranking with
+   the weights artefact.
+#. Invoke the PDV integration and verify a successful visualisation or CLI
+   figure output for a known PSM.
+#. Run the real Limelight converter through the UI and validate the resulting
+   XML.
+#. Exercise Limelight upload against a controlled local fake endpoint or an
+   official sandbox endpoint; never upload CI data to a production server.
+#. Open the Provenance view; independently recompute MD5 and SHA-256 for every
+   declared input and output and compare with the manifest; verify tool binary
+   and JAR checksums match the files on disk; verify exact tool versions and
+   argument arrays are present; and verify no secret appears.
+#. Close CometGUI, relaunch it, reopen the project, and verify that results,
+   the selected run, tool versions, q-filter state and provenance remain
+   coherent.
 
-This test should be designed to fail if a GUI control stops affecting the
-parameter file, a downstream stage is bypassed, filtering uses `<` instead
-of `<=`, an output is omitted from provenance, or tool installation is no
-longer automatic.
+This test shall be designed to fail if a GUI control stops affecting the
+parameter file, a downstream stage is bypassed, filtering uses ``<`` instead of
+``<=``, an output is omitted from provenance, Comet writes beside its inputs,
+or tool installation stops being automatic.
 
-Second E2E scenario: newest Percolator without XML
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Second E2E scenario: Percolator without XML
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A second packaged E2E test shall:
+A second end-to-end test shall select Percolator 3.09; run Comet and Percolator
+successfully; verify standard PSM, peptide and weights viewing; verify that the
+Limelight tab explains the XML incompatibility *before* conversion is
+attempted; verify that the one-click compatible rerun installs and uses an
+XML-capable version only after the explicit action, and that where no such
+managed build exists for the platform the UI offers local-binary registration
+instead (``R-LL-02``); verify Comet is not rerun; verify the new Percolator
+execution produces XML; verify Limelight conversion then succeeds; and verify
+that provenance contains both Percolator executions with distinct versions,
+checksums and commands.
 
-1. Select Percolator 3.09.
-2. Run Comet + Percolator successfully.
-3. Verify standard PSM/peptide/weights result viewing works.
-4. Verify the Limelight tab explains XML incompatibility before conversion is
-   attempted.
-5. Verify the one-click compatible rerun selects/installs 3.08.0 only after the
-   test/user invokes that explicit action.
-6. Verify Comet is not rerun.
-7. Verify the new 3.08 Percolator execution produces XML.
-8. Verify Limelight conversion then succeeds.
-9. Verify provenance contains both Percolator executions with distinct
-   versions/checksums/commands.
+Failure-path scenarios
+~~~~~~~~~~~~~~~~~~~~~~
 
-Failure-path GUI E2E scenarios
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Separate end-to-end and integration tests shall exercise: download checksum
+mismatch; network unavailable on first install; network unavailable after tools
+are cached; a downloaded binary that cannot load on this host (``R-PLAT-03``);
+Comet exits non-zero; Comet exits zero but the PIN is missing; a FASTA with no
+decoys and ``decoy_search = 0``; a PIN containing no decoy rows; Percolator
+exits non-zero; malformed Percolator output; converter exits non-zero;
+converter returns zero but the XML is missing or empty; the user cancels Comet;
+the user cancels Percolator; a source input deleted after selection; an input
+checksum changed before a rerun; the output or project directory becoming
+unwritable; insufficient disk space where it can be simulated safely; paths
+containing spaces; paths containing Unicode; long paths on supported platforms;
+a corrupted cached tool; an interrupted tool install; a stale or partial run
+reopened; and a second CometGUI instance opening a locked project.
 
-Separate E2E/integration tests shall exercise:
-
-* download checksum mismatch;
-* network unavailable on first install;
-* network unavailable after tools are cached;
-* Comet exits nonzero;
-* Comet exits zero but required PIN missing;
-* PIN contains no decoys;
-* Percolator exits nonzero;
-* Percolator output malformed;
-* converter exits nonzero;
-* converter returns zero but XML missing/empty;
-* user cancels Comet;
-* user cancels Percolator;
-* source input is deleted after selection;
-* input checksum changes before a rerun;
-* output/project directory becomes unwritable;
-* insufficient disk space where it can be simulated safely;
-* paths containing spaces;
-* paths containing Unicode;
-* long paths on supported platforms;
-* corrupted cached tool;
-* interrupted tool install;
-* stale/partial run reopened.
-
-Scientific regression fixtures and test oracles
-
-```
+Scientific regression fixtures and oracles
+------------------------------------------
 
 Do not use one oracle type for all tests.
 
 Exact invariants
-    Format, required columns, process exit, version, command args, generated
-    params, provenance hashes, filter math, known selected fixture IDs.
+    Format, required columns, process exit, version, command arguments,
+    generated parameters, provenance hashes, filter arithmetic, known selected
+    fixture identifiers.
 
 Version-pinned golden expectations
-    Expected selected PSM IDs, stable counts/ranges, known parameter file text,
-    known weights parser output for a specific pinned tool pair.
+    Expected selected PSM identifiers, stable counts and ranges, known
+    parameter file text, known weights parser output for a specific pinned tool
+    pair.
 
 Tolerant scientific metrics
-    For larger real datasets, compare PSM counts/rank agreement/performance
-    within justified tolerance instead of requiring byte-identical float output
-    across platforms.
+    For larger real datasets, compare PSM counts, rank agreement and
+    performance within justified tolerance rather than requiring byte-identical
+    floating-point output across platforms.
 
-Goldens shall be keyed by the scientific tool pair, for example:
-
-::
+Goldens shall be keyed by the scientific tool pair::
 
     src/test/resources/goldens/
         comet-2026.02.2_percolator-3.08.0/
         comet-2026.02.2_percolator-3.09.0/
 
-Updating a golden shall require a reviewed explanation of why the scientific
-change is expected.
+``R-TEST-07``
+    Updating a golden shall require a reviewed written explanation of why the
+    scientific change is expected, recorded alongside the golden.
 
-Percolator version matrix tests
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Version matrix tests
+--------------------
 
-CI/nightly testing shall include representative versions:
+CI and nightly testing shall include representative Percolator versions --
+3.05.x, a 3.06.x with its advisory check, 3.07.1, 3.08.0, 3.09 and the newest
+verified version after a registry update -- **restricted to the
+version/platform combinations that the manifest actually provides and that pass
+their loadability probe**. For each, test the available PSM, peptide and
+weights outputs; test XML for XML-capable versions; and for 3.09 and later
+verify that the application neither requests a removed XML option nor enables
+Limelight conversion from non-existent XML.
 
-* 3.05.x.
-* 3.06.1 or later 3.06.x, plus a targeted advisory/regression check for any
-  specifically supported affected 3.06 release.
-* 3.07.1.
-* 3.08.0.
-* 3.09.
-* newest verified future version after registry update.
-
-For each version, test available PSM/peptide/weights outputs. For XML-capable
-versions, test XML. For 3.09+, verify that the app does not request a removed
-XML option and does not enable Limelight conversion from nonexistent XML.
-
-Comet regression strategy
-~~~~~~~~~~~~~~~~~~~~~~~
-
-The Comet project itself uses unit, regression, real-data, determinism, and
-performance testing patterns. CometGUI should adopt the same philosophy at its
-integration boundary.
-
-Nightly tests should include:
-
-* current default Comet;
-* at least one prior supported Comet version if the product offers it;
-* direct FASTA search;
-* relevant index-search mode if exposed in the GUI;
-* repeated run/determinism checks on pinned fixture;
-* Windows Thermo RAW smoke test where infrastructure permits;
-* mzML or mzXML cross-platform baseline;
-* a larger real dataset for result-count/rank/performance drift.
+Comet nightly tests should include the current default Comet; at least one
+prior supported version if offered; direct FASTA search; index-search mode if
+exposed; repeated-run determinism on a pinned fixture; a Windows Thermo RAW
+smoke test where infrastructure permits; an mzML or mzXML cross-platform
+baseline; and a larger real dataset for result-count, rank and performance
+drift.
 
 Performance and resource tests
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 
-Performance tests shall measure separately:
-
-* application startup;
-* parsing a large Comet params file;
-* rendering/filtering large PSM/peptide result sets;
-* hashing multi-GB files;
-* Comet execution time (informational/tool-dependent);
-* Percolator execution time;
-* peak GUI heap usage for large result tables;
-* cancellation latency;
-* project reopen time.
-
-Performance regression thresholds should be based on stable dedicated/nightly
-runners, not noisy pull-request shared runners.
+Measure separately: application startup; parsing a large Comet parameter file;
+rendering and filtering large PSM and peptide result sets; hashing multi-
+gigabyte files; Comet execution time (informational); Percolator execution
+time; peak GUI heap usage for large result tables; cancellation latency; and
+project reopen time. Thresholds shall be based on stable dedicated nightly
+runners, not noisy shared pull-request runners.
 
 Flakiness policy
-~~~~~~~~~~~~~~
+----------------
 
-A flaky test is a defect. Do not hide instability with unconditional retries.
-A temporarily quarantined flaky test must have:
-
-* an issue/owner;
-* captured diagnostics;
-* a stated reason;
-* a removal/fix plan.
-
-Release-critical scientific E2E tests may not remain quarantined at release.
+A flaky test is a defect. Do not hide instability with unconditional retries. A
+temporarily quarantined flaky test must have an issue and owner, captured
+diagnostics, a stated reason and a fix plan. Release-critical scientific
+end-to-end tests may not remain quarantined at release.
 
 CI and Release Pipeline
------------------------
+=======================
 
 Pull-request pipeline
-~~~~~~~~~~~~~~~~~~~
+---------------------
 
-At minimum:
-
-1. Compile on supported JDK.
-2. Formatting/style check.
-3. Static analysis.
-4. JUnit fast tests.
-5. JaCoCo coverage gate.
-6. ArchUnit architecture tests.
-7. PIT mutation tests for critical packages, either every PR or on a required
-   scheduled/merge gate depending on runtime.
-8. Small real-tool integration tests on Linux.
-9. RST/Sphinx docs build with warnings as errors.
-10. Dependency/security scan.
-11. SBOM generation validation.
+Compile on the supported JDK; formatting and style check; static analysis; fast
+JUnit tests; JaCoCo coverage gate; ArchUnit tests; PIT mutation tests for
+critical packages (per PR or on a required merge gate, depending on runtime);
+small real-tool integration tests on Linux; Sphinx documentation build with
+warnings as errors; traceability report generation (``R-DOC-03``); dependency
+and security scanning; and SBOM generation validation.
 
 Nightly pipeline
-~~~~~~~~~~~~~~
+----------------
 
-Add:
+Add: the broader Comet and Percolator version matrix; a larger real dataset;
+determinism comparisons; performance metrics; the headless and native GUI test
+suites; the Windows RAW search test; a documentation link check; and
+verification that every managed tool URL and checksum in the manifest is still
+reachable and unchanged.
 
-* broader Comet/Percolator version matrix;
-* larger real dataset;
-* determinism comparisons;
-* performance metrics;
-* headless and/or native GUI test suite;
-* Windows RAW-specific search test;
-* documentation link checker;
-* managed tool URL/checksum availability verification.
+``R-TEST-08``
+    The manifest verification job shall fail loudly when an upstream artefact
+    disappears, changes checksum, or a new upstream release appears -- the
+    condition that silently invalidated the PDV 2.6.0 pin in this
+    specification between drafting and verification.
 
 Release pipeline
-~~~~~~~~~~~~~~
+----------------
 
-For Windows x64, macOS arm64, and Linux x64 packages at minimum:
-
-1. Build native packaged application with bundled runtime.
-2. Produce installer/archive.
-3. Compute release checksums.
-4. Run clean-home packaged smoke test.
-5. Run canonical packaged GUI E2E on that exact artifact.
-6. Run 3.08 full Limelight-compatible E2E.
-7. Run 3.09 no-XML compatibility E2E.
-8. Verify tool download manifest.
-9. Verify RST docs release build.
-10. Generate/publish SBOM.
-11. Sign/notarize where infrastructure requires/permits.
-12. Publish only if all release gates pass.
+For each tier-1 platform: build the native packaged application with its
+bundled runtime; produce the installer or archive; compute release checksums;
+run the clean-home packaged smoke test; run Tier B canonical E2E on that exact
+artefact; run the XML-capable full Limelight E2E; run the no-XML compatibility
+E2E; verify the tool download manifest; verify the strict documentation build;
+generate and publish the SBOM; verify that no test bridge is present
+(``R-TEST-06``); sign and notarise where infrastructure permits; and publish
+only if every gate passes.
 
 Documentation
--------------
+=============
 
 All project documentation shall be authored in reStructuredText and built with
-Sphinx for Read the Docs. Avoid a second Markdown documentation system. If a
-hosting platform absolutely requires a small README file, prefer ``README.rst``
-where supported and keep substantive documentation under ``docs/``.
+Sphinx for Read the Docs. Avoid a second Markdown documentation system. Where a
+hosting or tooling platform requires a Markdown file (for example an
+agent-instruction file consumed by a coding tool), it shall be a pointer of a
+few lines to the RST documents, never a place where substantive content lives.
 
-Recommended documentation tree
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
+Recommended documentation tree::
 
     README.rst
     .readthedocs.yaml
     docs/
-        conf.py
-        index.rst
-        installation.rst
-        getting_started.rst
-        workflow.rst
-        comet_parameters.rst
-        comet_parameter_presets.rst
-        variable_modifications.rst
-        percolator.rst
-        results.rst
-        learned_feature_weights.rst
-        pdv.rst
-        limelight.rst
-        provenance.rst
-        tool_manager.rst
-        troubleshooting.rst
-        faq.rst
-        citations.rst
-        release_notes.rst
-
+        conf.py  index.rst  installation.rst  getting_started.rst
+        workflow.rst  comet_parameters.rst  comet_parameter_presets.rst
+        variable_modifications.rst  decoys.rst  percolator.rst  results.rst
+        learned_feature_weights.rst  pdv.rst  limelight.rst  provenance.rst
+        tool_manager.rst  platform_support.rst  troubleshooting.rst
+        faq.rst  citations.rst  release_notes.rst
         developer/
-            index.rst
-            architecture.rst
-            workflow_engine.rst
-            comet_parameter_schema.rst
-            tool_adapters.rst
-            tool_registry.rst
-            version_capabilities.rst
-            results_model.rst
-            provenance_schema.rst
-            security.rst
-            testing.rst
-            e2e_harness.rst
+            index.rst  architecture.rst  workflow_engine.rst
+            comet_parameter_schema.rst  tool_adapters.rst  tool_registry.rst
+            version_capabilities.rst  results_model.rst  provenance_schema.rst
+            security.rst  testing.rst  e2e_harness.rst  traceability.rst
             releasing.rst
-
         reference/
-            comet_parameters_generated.rst
-            percolator_options.rst
-            project_format.rst
-            provenance_format.rst
-            command_examples.rst
+            comet_parameters_generated.rst  percolator_options.rst
+            project_format.rst  provenance_format.rst  command_examples.rst
 
-Parameter reference generation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``R-DOC-04``
+    The Comet parameter schema shall generate
+    ``reference/comet_parameters_generated.rst`` so that user documentation and
+    GUI metadata cannot silently diverge. For every parameter the generated
+    page shall include the Comet parameter name, GUI display name, category,
+    type, default for the versioned schema, allowed values or range, scientific
+    description, serialisation form, version availability, related parameters,
+    and preset effects where useful.
 
-The Comet parameter schema shall be able to generate an RST reference page so
-user documentation and GUI metadata cannot silently diverge.
+``R-DOC-05``
+    Documentation CI shall run ``sphinx-build -n -W -b html docs docs/_build/html``.
+    A scheduled or release job shall also run link checking. Broken internal
+    cross-references are build failures.
 
-For every parameter, generated docs should include:
-
-* Comet parameter name;
-* GUI display name;
-* category;
-* type;
-* default for selected/versioned schema;
-* allowed values/range;
-* scientific description;
-* serialization form;
-* version availability;
-* related parameters;
-* preset effects where useful.
-
-Documentation CI
-~~~~~~~~~~~~~~
-
-CI shall run Sphinx in strict mode, conceptually:
-
-.. code-block:: text
-
-    sphinx-build -n -W -b html docs docs/_build/html
-
-A scheduled/release job shall also run link checking. Broken internal
-cross-references are build failures.
+``R-DOC-06``
+    ``platform_support.rst`` and ``troubleshooting.rst`` shall state plainly,
+    per platform, which Percolator versions are available as managed installs,
+    which support XML, and therefore where the Limelight path works
+    out of the box -- rather than leaving users to discover it at conversion
+    time.
 
 Implementation Sequence
------------------------
+=======================
 
-Phase 0: legal and technical feasibility gates
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The implementation is organised as gated phases. The authoritative definitions
+live in ``phases/``; ``ONBOARDING.rst`` explains how an orchestrating agent
+runs them and ``STATUS.rst`` records where the project currently is. This
+section is a summary only and must not be treated as a substitute for the phase
+documents.
 
-Before broad implementation:
+.. list-table:: Phase overview
+   :header-rows: 1
+   :widths: 12 40 48
 
-* clarify/license permission for derivative use of CasanovoGUI source;
-* verify redistribution/download rules for every managed external tool;
-* prove JavaFX 25/JDK target packaging on all supported OS targets;
-* run a TestFX/alternative JavaFX automation compatibility spike;
-* prove Comet 2026.02.2 -> PIN/pepXML -> Percolator 3.08 XML/TSV/weights ->
-  Limelight converter manually from a scripted prototype;
-* prove Percolator 3.09 path without XML;
-* prove PDV CLI/database-search visualization on a current Comet pepXML;
-* decide whether the enhanced PDV database control mode will be contributed
-  upstream or deferred to baseline integration.
+   * - Phase
+     - Title
+     - Purpose
+   * - 00
+     - Feasibility, legal and upstream verification
+     - Re-verify upstream facts; resolve licensing; prove the toolchain and the
+       scripted end-to-end scientific path; settle open decisions. No product
+       code.
+   * - 01
+     - Repository, build and quality skeleton
+     - Multi-module build, pinned toolchain, test/coverage/mutation/architecture
+       infrastructure, docs build, CI.
+   * - 02
+     - Application shell and navigation
+     - JavaFX shell, information architecture, MVVM boundary, dependency
+       injection, headless testability.
+   * - 03
+     - Process service
+     - Argv-only execution, streaming, cancellation, descendant termination,
+       log archiving, fake-tool suite.
+   * - 04
+     - Hashing and provenance core
+     - Single-pass MD5+SHA-256, hash cache, event model, schema-versioned JSON,
+       atomic finalisation, redaction, RST report.
+   * - 05
+     - Tool registry and installer
+     - Manifest, download, verification, safe extraction of every artefact
+       kind, atomic install, three-stage probing, Tool Manager UI.
+   * - 06
+     - Comet parameter model
+     - Schema from ``-q`` plus curated metadata, parser and writer, validators,
+       presets, migration, drift test, generated reference.
+   * - 07
+     - Comet parameter editor UI
+     - Essentials, Advanced and Expert modes, structured editors, search,
+       diffs, validation surfacing, accessibility.
+   * - 08
+     - Workflow engine and Comet adapter
+     - DAG and states, per-file invocation, output containment, decoy
+       validation, PIN merge, run storage and immutability.
+   * - 09
+     - Percolator adapter and versions
+     - Capability-driven command building, outputs and weights, advisories,
+       compatible-version rerun.
+   * - 10
+     - Results model and UI
+     - Parsers, disk-backed indexing, tables, independent filters, weights
+       view, export.
+   * - 11
+     - PDV integration
+     - Managed install, open-in-PDV, CLI figure test, optional enhanced control
+       mode.
+   * - 12
+     - Limelight conversion and upload
+     - Converter adapter, cutoff and decoy handling, XML validation, upload,
+       credential handling.
+   * - 13
+     - Provenance UI and reports
+     - Provenance tab, actions, JSON and RST export, diffs, timeline.
+   * - 14
+     - GUI automation and packaged E2E
+     - ``FxUiDriver``, Tier A and Tier B harnesses, packaging, failure paths,
+       bridge-absence check.
+   * - 15
+     - Matrix, performance and hardening
+     - Version matrix, nightly suites, determinism, performance thresholds,
+       chaos and security testing.
+   * - 16
+     - Documentation and release qualification
+     - Complete user and developer documentation, generated reference, Read the
+       Docs, packaging on all tier-1 platforms, SBOM, signing, licence review,
+       human UX validation.
 
-Phase 1: fork/refactor CasanovoGUI shell
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* establish CometGUI identity/package names;
-* preserve modern JavaFX/AtlantaFX styling and packaging;
-* replace Casanovo-specific workflow classes with generic tool/process APIs;
-* refactor reusable installer, runner, PDV, and Limelight patterns;
-* create project/run state model;
-* add unit/architecture test infrastructure before feature expansion.
-
-Phase 2: secure Tool Registry
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* artifact manifest;
-* downloader;
-* SHA-256 verification;
-* safe archive extraction;
-* atomic installs;
-* version/capability probes;
-* Comet managed install;
-* Percolator 3.08 and 3.09 managed installs;
-* PDV and Limelight converter managed installs;
-* local Percolator registration;
-* provenance records for tool artifacts.
-
-Phase 3: Comet parameter system
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* typed schema;
-* parser/writer;
-* schema drift tests;
-* Essentials UI;
-* Advanced categories;
-* variable modification editor;
-* enzyme/static mod editors;
-* presets/diff/reset/search;
-* Expert raw view;
-* version validation;
-* RST reference generation.
-
-This phase should be treated as the central product-design effort, not a small
-form-building task.
-
-Phase 4: core Comet -> Percolator workflow
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* workflow engine/state machine;
-* Comet adapter;
-* required pepXML/PIN outputs;
-* Percolator adapter and version capabilities;
-* result filters;
-* weights capture;
-* result parsers;
-* cancellation/retry;
-* core provenance.
-
-Phase 5: results and visualization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* scalable PSM/peptide models;
-* filter/sort/export;
-* learned weight table/chart;
-* PDV managed install/open;
-* PDV CLI test integration;
-* optional enhanced PDV row-control extension.
-
-Phase 6: Limelight and complete provenance
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* converter adapter;
-* single Limelight q cutoff UI;
-* Percolator 3.09 incompatibility handling;
-* explicit rerun with 3.08;
-* upload UI;
-* credential redaction/storage;
-* provenance UI and RST/JSON export.
-
-Phase 7: hardening and comprehensive automation
-```
-
-* complete unit tests;
-* mutation testing;
-* architecture tests;
-* GUI robot suite;
-* packaged E2E harness;
-* real fixtures;
-* cross-version matrix;
-* negative/chaos tests;
-* Windows RAW tests;
-* performance/regression jobs;
-* supply-chain/security tests.
-
-Phase 8: documentation and release qualification
-
-```
-
-* complete RST user docs;
-* complete RST developer/testing docs;
-* generated parameter reference;
-* Sphinx warning-free build;
-* Read the Docs configuration;
-* release packages;
-* clean-machine acceptance;
-* SBOM/checksum/signing/licensing review.
+.. _spec-acceptance:
 
 Acceptance Criteria
--------------------
+===================
 
-A release is not complete unless all applicable criteria below are met.
+A release is not complete unless every applicable criterion is met. Criteria
+marked |human| require human sign-off and cannot be discharged by an automated
+test.
+
+.. |human| replace:: **[human]**
 
 Installation and tool management
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* [ ] On each supported OS, a user can install/extract CometGUI without
-      installing Java separately.
-* [ ] A first real run installs required scientific tools automatically.
-* [ ] Downloaded executables/JARs are SHA-256 verified before execution.
-* [ ] Managed tool MD5 and SHA-256 are shown in provenance.
-* [ ] Corrupt/checksum-mismatched tools are never executed.
-* [ ] Percolator 3.05+ local binaries can be registered and probed.
-* [ ] Existing runs pin exact scientific tool versions.
-
-Comet parameter UI
-~~~~~~~~~~~~~~~~
-
-* [ ] Comet 2026.02.2 is fully represented by the supported parameter schema,
-      subject only to explicitly documented internal/hidden exclusions.
-* [ ] Schema drift CI detects unmodeled supported parameters.
-* [ ] Essentials mode can configure a normal tryptic DDA search without raw
-      parameter editing.
-* [ ] Advanced mode exposes all supported user-relevant parameters.
-* [ ] Variable modifications use a structured editor.
-* [ ] Imported unknown parameters are not silently dropped.
-* [ ] Expert raw mode round-trips through the typed model.
-* [ ] Preset application shows a diff.
-* [ ] Required pepXML/PIN outputs cannot be disabled accidentally.
-* [ ] Invalid cross-parameter configurations block Run with actionable errors.
-
-Percolator/results
-~~~~~~~~~~~~~~~~
-
-* [ ] Default PSM result q cutoff is 0.01.
-* [ ] Default peptide result q cutoff is 0.01.
-* [ ] These filters are independent.
-* [ ] These filters do not rerun Percolator.
-* [ ] ``trainFDR`` and ``testFDR`` are represented separately.
-* [ ] 3.08.0 can produce PSM, peptide, weights, and XML in the verified workflow.
-* [ ] 3.09 can run normal rescoring without the GUI attempting removed XML I/O.
-* [ ] Learned Percolator weights are viewable and exportable.
-* [ ] Weight summary values match the underlying artifact.
-
-PDV/Limelight
-~~~~~~~~~~~
-
-* [ ] Current verified PDV installs automatically.
-* [ ] A known Comet pepXML + spectrum can be visualized.
-* [ ] PDV CLI automated test produces a valid annotated spectrum artifact.
-* [ ] Limelight converter installs automatically.
-* [ ] Limelight conversion succeeds for the 3.08 workflow fixture.
-* [ ] Limelight controls are disabled/explained for 3.09 without XML.
-* [ ] Explicit 3.08 rerun reuses Comet output and enables conversion.
-* [ ] Limelight q cutoff is separately configurable and defaults to 0.01.
-* [ ] Credentials are not stored in provenance/logs.
-
-Provenance
-~~~~~~~~
-
-* [ ] Every input and output file has MD5 and SHA-256 where the file exists.
-* [ ] Exact tool versions and tool artifact hashes are recorded.
-* [ ] Exact command argument arrays are recorded.
-* [ ] Exact generated Comet parameter file is archived and hashed.
-* [ ] Start/end/duration/exit code are recorded for each process.
-* [ ] Failed/cancelled runs retain useful provenance.
-* [ ] Provenance is viewable in the GUI.
-* [ ] Provenance exports to JSON and RST.
-* [ ] Independent E2E hash recomputation matches the manifest.
-* [ ] Secret redaction tests pass.
-
-Testing/release
-~~~~~~~~~~~~~
-
-* [ ] Meaningful JUnit tests cover critical domain logic.
-* [ ] Core coverage gates pass.
-* [ ] Critical-package mutation score gate passes.
-* [ ] Architecture rules pass.
-* [ ] JavaFX GUI automation passes.
-* [ ] Canonical packaged 3.08 E2E passes on supported release platforms.
-* [ ] Packaged 3.09 no-XML E2E passes.
-* [ ] Failure-path E2E/integration suite passes.
-* [ ] Nightly real-data regression suite is healthy.
-* [ ] Windows Thermo RAW smoke test is healthy when that feature is released.
-* [ ] Sphinx docs build with warnings as errors.
-* [ ] Read the Docs configuration builds successfully.
-* [ ] SBOM/security/dependency checks pass.
-* [ ] CasanovoGUI derivative-source licensing issue is resolved before public
-      redistribution.
-
-Key Risks and Required Decisions
 --------------------------------
 
-CasanovoGUI source licensing
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. list-table::
+   :header-rows: 1
+   :widths: 16 84
 
-This is the highest-priority nontechnical gate. The source is public, but a
-public GitHub repository is not automatically permission to redistribute a
-derivative. Add an explicit license to the source base or obtain/document
-permission before release.
+   * - ID
+     - Criterion
+   * - ``AC-INS-01``
+     - On each tier-1 OS, a user can install or extract CometGUI without
+       installing Java separately.
+   * - ``AC-INS-02``
+     - A first real run installs the required scientific tools automatically.
+   * - ``AC-INS-03``
+     - Downloaded executables and JARs are SHA-256 verified before execution.
+   * - ``AC-INS-04``
+     - Managed tool MD5 and SHA-256 are shown in provenance.
+   * - ``AC-INS-05``
+     - Corrupt or checksum-mismatched tools are never executed.
+   * - ``AC-INS-06``
+     - Percolator 3.05+ local binaries can be registered and probed.
+   * - ``AC-INS-07``
+     - Existing runs pin exact scientific tool versions and artefact
+       checksums.
+   * - ``AC-INS-08``
+     - A tool artefact that cannot load on the host produces the diagnostic
+       required by ``R-PLAT-03``, and that tool is not offered for selection.
+   * - ``AC-INS-09``
+     - On macOS, managed tools execute on a clean machine without a Gatekeeper
+       prompt the application cannot handle.
+   * - ``AC-INS-10``
+     - The Tool Manager never offers a version/platform combination for which
+       no verified artefact exists.
 
-Percolator historical binary availability
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Comet parameters
+----------------
 
-"Support every Percolator version >= 3.05" is feasible at the adapter/schema
-level, but managed one-click installation also depends on a usable binary for
-every version/platform. The release process must either publish verified
-project-built artifacts where legally permitted or describe unsupported
-managed combinations and allow a local binary.
+.. list-table::
+   :header-rows: 1
+   :widths: 16 84
 
-Percolator XML removal
-~~~~~~~~~~~~~~~~~~~~
+   * - ID
+     - Criterion
+   * - ``AC-PAR-01``
+     - Comet 2026.02.2 is fully represented by the supported parameter schema
+       as discovered by ``-q``, subject only to documented internal exclusions.
+   * - ``AC-PAR-02``
+     - Schema drift CI detects unmodelled supported parameters.
+   * - ``AC-PAR-03``
+     - Essentials mode can configure a normal tryptic DDA search without raw
+       parameter editing.
+   * - ``AC-PAR-04``
+     - Advanced mode exposes all supported user-relevant parameters.
+   * - ``AC-PAR-05``
+     - Variable modifications use a structured editor covering all fifteen
+       slots and every tuple field.
+   * - ``AC-PAR-06``
+     - Imported unknown parameters are never silently dropped.
+   * - ``AC-PAR-07``
+     - Expert raw mode round-trips through the typed model.
+   * - ``AC-PAR-08``
+     - Preset application shows a diff before changing anything.
+   * - ``AC-PAR-09``
+     - Required pepXML and PIN outputs cannot be disabled while a dependent
+       stage is enabled.
+   * - ``AC-PAR-10``
+     - Invalid cross-parameter configurations block Run with actionable,
+       field-attached errors.
+   * - ``AC-PAR-11``
+     - Canonical serialisation is byte-identical under a comma-decimal locale.
 
-This must remain a capability, not a hack. Do not freeze the entire application
-on 3.08 merely for Limelight. Let users use newer Percolator versions and make
-the Limelight compatibility boundary explicit.
+Workflow and decoys
+-------------------
 
-PDV database-search remote control
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. list-table::
+   :header-rows: 1
+   :widths: 16 84
 
-Current PDV has the needed file-format support but its documented external
-control path is de-novo-specific. If precise click-a-Percolator-row -> update
-PDV-in-place behavior is required for version 1.0, budget an upstream PDV
-feature or small maintained fork. Do not hide this dependency behind fragile
-GUI automation.
+   * - ID
+     - Criterion
+   * - ``AC-WF-01``
+     - A run accepts multiple spectrum files, invokes Comet once per file, and
+       merges the PINs correctly.
+   * - ``AC-WF-02``
+     - No file is written next to the user's inputs; a run succeeds with the
+       input directory read-only.
+   * - ``AC-WF-03``
+     - A decoy configuration that would yield no negative examples, or double
+       decoys, blocks the run with a specific explanation.
+   * - ``AC-WF-04``
+     - The rerun preview names exactly the stages that will re-execute.
+   * - ``AC-WF-05``
+     - Cancellation terminates the stage and its descendants and leaves usable
+       logs and provenance.
+
+Percolator and results
+----------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 84
+
+   * - ID
+     - Criterion
+   * - ``AC-RES-01``
+     - The default PSM result q cutoff is 0.01.
+   * - ``AC-RES-02``
+     - The default peptide result q cutoff is 0.01.
+   * - ``AC-RES-03``
+     - The two filters are independent.
+   * - ``AC-RES-04``
+     - Changing a filter never reruns Percolator or mutates raw output.
+   * - ``AC-RES-05``
+     - ``trainFDR`` and ``testFDR`` are represented separately from the display
+       filters.
+   * - ``AC-RES-06``
+     - An XML-capable Percolator produces PSM, peptide, weights and XML in the
+       verified workflow.
+   * - ``AC-RES-07``
+     - 3.09 runs normal rescoring without the GUI attempting removed XML I/O.
+   * - ``AC-RES-08``
+     - Learned Percolator weights are viewable and exportable, with the split
+       count read from the artefact.
+   * - ``AC-RES-09``
+     - Displayed weight summary values match the underlying artefact.
+   * - ``AC-RES-10``
+     - Result tables remain responsive on the large performance fixture within
+       the documented heap budget.
+
+PDV and Limelight
+-----------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 84
+
+   * - ID
+     - Criterion
+   * - ``AC-VIS-01``
+     - The current verified PDV installs automatically on first use.
+   * - ``AC-VIS-02``
+     - A known Comet pepXML plus spectrum file can be visualised.
+   * - ``AC-VIS-03``
+     - The PDV CLI automated test produces a valid annotated spectrum artefact.
+   * - ``AC-LL-01``
+     - The Limelight converter installs automatically.
+   * - ``AC-LL-02``
+     - Limelight conversion succeeds for the XML-capable workflow fixture.
+   * - ``AC-LL-03``
+     - Limelight controls are disabled and explained for a Percolator without
+       XML, before conversion is attempted.
+   * - ``AC-LL-04``
+     - The explicit compatible rerun reuses Comet output and enables
+       conversion; where no managed XML-capable build exists for the platform,
+       local-binary registration is offered instead.
+   * - ``AC-LL-05``
+     - The Limelight q cutoff is separately configurable and defaults to 0.01.
+   * - ``AC-LL-06``
+     - Credentials never appear in provenance, logs or exports.
+
+Provenance
+----------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 84
+
+   * - ID
+     - Criterion
+   * - ``AC-PRV-01``
+     - Every input and output file that exists has both MD5 and SHA-256.
+   * - ``AC-PRV-02``
+     - Exact tool versions and tool artefact hashes are recorded.
+   * - ``AC-PRV-03``
+     - Exact command argument arrays are recorded, per spectrum file.
+   * - ``AC-PRV-04``
+     - The exact generated Comet parameter file is archived and hashed, and is
+       the file that was executed.
+   * - ``AC-PRV-05``
+     - Start, end, duration and exit code are recorded for every process.
+   * - ``AC-PRV-06``
+     - Failed and cancelled runs retain useful provenance.
+   * - ``AC-PRV-07``
+     - Provenance is viewable in the GUI and exports to JSON and RST.
+   * - ``AC-PRV-08``
+     - Independent end-to-end hash recomputation matches the manifest.
+   * - ``AC-PRV-09``
+     - Secret redaction tests pass.
+   * - ``AC-PRV-10``
+     - The effective Percolator seed and the JVM locale are recorded.
+
+Testing, documentation and release
+----------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 84
+
+   * - ID
+     - Criterion
+   * - ``AC-TST-01``
+     - Meaningful JUnit tests cover critical domain logic.
+   * - ``AC-TST-02``
+     - Coverage gates pass.
+   * - ``AC-TST-03``
+     - The critical-package mutation score gate passes with no forbidden
+       surviving mutation.
+   * - ``AC-TST-04``
+     - Architecture rules pass.
+   * - ``AC-TST-05``
+     - The JavaFX GUI automation suite passes.
+   * - ``AC-TST-06``
+     - Tier A canonical E2E passes.
+   * - ``AC-TST-07``
+     - Tier B packaged E2E passes on every tier-1 platform.
+   * - ``AC-TST-08``
+     - The no-XML compatibility E2E passes.
+   * - ``AC-TST-09``
+     - The failure-path suite passes.
+   * - ``AC-TST-10``
+     - The nightly real-data regression suite is healthy.
+   * - ``AC-TST-11``
+     - The Windows Thermo RAW smoke test is healthy when that feature ships.
+   * - ``AC-TST-12``
+     - No test bridge is present in any published artefact.
+   * - ``AC-DOC-01``
+     - Sphinx builds with warnings as errors, and Read the Docs builds
+       successfully.
+   * - ``AC-DOC-02``
+     - The traceability report shows every ``R-`` implemented and every ``AC-``
+       tested or marked for human sign-off.
+   * - ``AC-REL-01``
+     - SBOM, security and dependency checks pass.
+   * - ``AC-REL-02``
+     - The CasanovoGUI derivative-source licensing question (``D-001``) is
+       resolved before any public redistribution. |human|
+   * - ``AC-REL-03``
+     - Licence audit of all bundled and transitive components is complete.
+       |human|
+   * - ``AC-UX-01``
+     - Domain and task analysis with an experienced Comet user is complete.
+       |human|
+   * - ``AC-UX-02``
+     - Heuristic evaluation is complete and its defects are triaged. |human|
+   * - ``AC-UX-03``
+     - A cognitive walkthrough of the primary workflow is complete. |human|
+   * - ``AC-UX-04``
+     - A usability test with a routine proteomics user is complete. |human|
+   * - ``AC-UX-05``
+     - A usability test with an advanced Comet user is complete. |human|
+   * - ``AC-UX-06``
+     - A keyboard-only and accessibility review is complete. |human|
+
+.. _spec-decisions:
+
+Key Risks and Required Decisions
+================================
+
+Open decisions are tracked in ``DECISIONS.rst``; each is referenced by the
+phase whose exit gate it blocks.
+
+``D-001`` CasanovoGUI source licensing
+--------------------------------------
+
+The highest-priority non-technical gate, and still open as of 2026-08-28: the
+repository publishes no licence. A public repository is not permission to
+redistribute a derivative. Either an explicit licence is added upstream or
+written permission is obtained and recorded. Until then, no CasanovoGUI code
+may be copied (``R-SEC-01``); the architecture in this specification is
+implementable independently, so this decision gates *derivation*, not the
+project.
+
+``D-002`` XML-capable Percolator artefact strategy
+---------------------------------------------------
+
+Newly identified in Revision 2 and the largest technical risk to the product's
+central promise. No XML-capable Percolator 3.08 build is published for Windows
+or macOS, every portable archive upstream ships is a ``noxml`` build, and the
+one XML-capable 3.08 artefact requires glibc 2.38. Choose among project-built
+binaries, package-payload extraction, an older XML-capable version on some
+platforms, or a platform-scoped Limelight feature
+(:ref:`spec-percolator-artefacts`). Deciding late is expensive: it determines
+the release pipeline, the manifest, the test matrix and the promises the UI is
+allowed to make.
+
+``D-003`` Percolator historical binary availability
+----------------------------------------------------
+
+Related but broader: supporting "every Percolator >= 3.05" is feasible at the
+adapter and schema level, while managed one-click installation depends on a
+usable binary per version and platform. The release process must either publish
+verified project-built artefacts where legally permitted, or describe
+unsupported managed combinations and rely on local binaries.
+
+``D-004`` macOS architecture policy
+-----------------------------------
+
+Comet publishes native ``aarch64`` and ``x86-64`` macOS builds; Percolator's
+XML-capable macOS artefacts are ``x86-64`` only. Decide whether release 1
+requires Rosetta 2 for the Percolator stage on Apple silicon, ships a
+project-built ``arm64`` Percolator, or scopes the Limelight path off macOS.
+
+``D-005`` PDV database-search remote control
+---------------------------------------------
+
+PDV has the needed file-format support but its documented external control path
+is de novo specific. If precise click-a-row-to-update-PDV behaviour is required
+for release 1, budget an upstream PDV feature or a small maintained fork. Do
+not hide this dependency behind fragile GUI automation.
+
+``D-006`` Test fixture data and licensing
+------------------------------------------
+
+The real-tool and nightly suites need spectra and a FASTA that may be
+redistributed in a public repository or fetched reproducibly. Choose the
+source, record its licence, and decide whether fixtures are vendored or fetched
+by checksum.
+
+``D-007`` Limelight test endpoint
+----------------------------------
+
+Upload tests must not target a production Limelight server. Decide between a
+controlled local fake endpoint, a sandbox instance, or both.
+
+``D-008`` CometGUI's own licence and distribution
+--------------------------------------------------
+
+The product's licence, its publication location, and whether project-built tool
+binaries are redistributed alongside it. Constrained by ``D-001`` and
+``D-002``.
 
 Comet parameter completeness
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------
 
-Comet evolves. A hand-written static form will rot. The combination of
-versioned metadata + binary-derived supported parameter names + schema drift CI
-is required to keep the GUI credible.
+Comet evolves; a hand-written static form will rot. Versioned metadata plus
+binary-derived parameter names plus schema-drift CI is what keeps the GUI
+credible. The verified 96-versus-118 gap between ``-p`` and ``-q`` shows how
+easily a plausible-looking implementation silently loses two thirds of the
+variable-modification slots.
 
 Scientific golden tests
-~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 Exact output can change legitimately with tool versions. Goldens must be keyed
 by tool versions and reviewed when changed. Workflow correctness, provenance,
-filter math, parameter generation, and format invariants can be tested more
-strictly than all floating-point scores.
+filter arithmetic, parameter generation and format invariants can be tested far
+more strictly than floating-point scores.
 
 Large result scalability
-~~~~~~~~~~~~~~~~~~~~~~
+------------------------
 
-Do not assume result tables fit in memory. Establish a performance fixture early
-and switch to disk-backed indexing before UI architecture becomes coupled to
-``ObservableList`` containing every PSM.
+Do not assume result tables fit in memory. Establish the performance fixture
+early and adopt disk-backed indexing before the UI architecture couples itself
+to an ``ObservableList`` of every PSM.
+
+Upstream drift
+--------------
+
+Every version in this document was correct on 2026-08-28 and some were already
+stale relative to Revision 1 written the same day. The manifest verification
+job (``R-TEST-08``) exists so that drift is discovered by CI rather than by a
+user.
 
 Definition of Done
-------------------
+==================
 
 The project is done when a scientist on a clean supported computer can install
-only CometGUI, choose real spectra and FASTA, configure a scientifically valid
-Comet search through a comprehensible parameter interface, select a supported
-Percolator version, execute the real workflow, inspect 1% PSM and peptide
-results, change those filters independently, inspect learned Percolator feature
-weights, inspect spectra in PDV, produce/upload compatible Limelight XML, and
-inspect a provenance record containing exact versions, commands, and MD5 plus
-SHA-256 hashes for all inputs and outputs -- and when automated tests drive the
+only CometGUI, choose real spectra and a FASTA, configure a scientifically
+valid Comet search through a comprehensible parameter interface, select a
+supported Percolator version, execute the real workflow, inspect 1% PSM and
+peptide results, change those filters independently, inspect learned Percolator
+feature weights, inspect spectra in PDV, produce and upload compatible
+Limelight XML where the platform permits, and inspect a provenance record
+containing exact versions, commands and MD5 plus SHA-256 hashes for every input
+and output -- and when automated tests drive both the assembled and the
 packaged GUI through the same workflow and independently prove that those
-claims are true.
-```
+claims are true, with every ``AC-`` criterion either passing its named test or
+carrying a recorded human sign-off.
