@@ -390,7 +390,35 @@ Work units
        itself is falsifiable -- a control whose defect is not injected must be
        reported as a harness failure, not a pass.
      - Gates 2, 3, 4, 5, 6
-     - *pending -- not started*
+     - **ACCEPTED 2026-08-29**, commits ``068c25a``, ``b947fb9``, ``5ebe221``,
+       ``8fe9df7``. ``bash scripts/verify-all-gates.sh`` exits 0 in **4m58s**:
+       **9 controls, 123 graded checks, 0 failed**, and it prints which exit
+       gate item each control serves -- ``items covered by the controls that
+       passed: 1,2,3,4,5,6`` -- while stating on its own face that item 1 is
+       covered only in part and that item 6's "on a pull request" half needs
+       the remote ``D-008`` withholds. **I attacked the aggregator**: in a
+       sandbox I made ``verify-test-gates.sh`` mode 644 and then deleted
+       ``sbom.sh``; both times it exits **3** *before running anything*, with
+       ``NOT EXECUTABLE``/``MISSING`` and ``REFUSING TO CONTINUE. Running the
+       rest would report a green summary for a set of gates that were never
+       proved to bite``. A skipped control is never counted as a pass, which
+       is the property that makes an aggregator worth having.
+       **This unit found a real defect in my own work, which is the most
+       valuable thing it did.** My integration commit ``f71ceb4`` -- pointing
+       ``AC-TST-02..04`` at ``scripts/verify-test-gates.sh`` -- broke
+       ``scripts/ci/traceability.sh --self-test``, because that self-test
+       copied ``scripts/ci/`` and ``scripts/traceability/`` into its sandbox
+       but not ``scripts/`` itself, so the newly referenced file was absent
+       there. I confirmed it independently: ``git archive f71ceb4`` and
+       ``bash scripts/ci/traceability.sh --self-test`` exits **4** with
+       ``HARNESS FAILURE ... whose file scripts/verify-test-gates.sh does not
+       exist``. Gate item 5's falsifiability had silently stopped being
+       demonstrable and nothing in ``build.sh`` or the pull-request pipeline
+       ran ``--self-test``, so no other check would have caught it. The
+       harness itself behaved correctly -- it refused to grade rather than
+       reporting a pass. Repaired in ``068c25a``. The unit also found
+       ``scripts/verify-quality-gates.sh`` committed mode 644 and corrected
+       the mode rather than relaxing its own rule.
 
 Decisions taken by the phase orchestrator
 =========================================
