@@ -13,15 +13,20 @@
 # Usage:
 #   scripts/verify-license.sh              # check the repository's LICENSE
 #   scripts/verify-license.sh FILE         # check some other copy (negative tests)
+#   scripts/verify-license.sh --self-test  # prove this script fails when it should
 #
 # The second form exists so the script's own failure can be demonstrated
 # against a deliberately damaged copy under _build/ -- never against the real
-# file in the working tree.
+# file in the working tree. The third form automates exactly that: a gate that
+# has never been seen to fail has not been shown to work, so this one carries
+# its own negative controls.
 #
 # Exit status:
 #   0  every check passed
 #   1  at least one check failed -- the file is missing, truncated or altered
 #   2  harness misuse (too many arguments, no sha256 tool)
+#   3  --self-test only: a negative control did not behave as required, so this
+#      script's failure detection is itself broken
 #
 # Provenance of the pinned values. On 2026-08-29 the identical 35 149-byte text
 # was retrieved from two independent sources and compared byte for byte:
@@ -42,9 +47,92 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 if [ "$#" -gt 1 ]; then
-    printf 'verify-license.sh: usage: verify-license.sh [FILE]\n' >&2
+    printf 'verify-license.sh: usage: verify-license.sh [FILE | --self-test]\n' >&2
     exit 2
 fi
+
+# --- self-test ---------------------------------------------------------------
+# Damages copies of the licence under _build/ (gitignored, never the real file)
+# and requires this script to reject each one, with the right diagnostic and a
+# non-zero exit. A control whose damage did not actually take is reported as a
+# harness failure, not a pass.
+
+self_test() {
+    local real="${PROJECT_ROOT}/LICENSE"
+    local dir="${PROJECT_ROOT}/_build/license-self-test"
+    local rc=0
+
+    if [ ! -f "${real}" ]; then
+        printf 'self-test: cannot run: %s does not exist\n' "${real}" >&2
+        return 3
+    fi
+    rm -rf -- "${dir}"
+    mkdir -p -- "${dir}"
+
+    # control <name> <damaged-file> <expected diagnostic substring>
+    control() {
+        local name="$1" file="$2" want="$3" out status
+        printf '\n=== negative control: %s ===\n' "${name}"
+        if [ -e "${file}" ] && cmp -s -- "${real}" "${file}"; then
+            printf 'self-test: HARNESS FAILURE -- %s is byte-identical to the real LICENSE;\n' "${file}" >&2
+            printf 'self-test: the damage was not injected, so this control proves nothing.\n' >&2
+            rc=3
+            return
+        fi
+        out="$(bash -- "${BASH_SOURCE[0]}" "${file}" 2>&1)"
+        status=$?
+        printf '%s\n' "${out}"
+        if [ "${status}" -eq 0 ]; then
+            printf 'self-test: FAILED -- %s was ACCEPTED (exit 0); the check does not bite.\n' "${name}" >&2
+            rc=3
+        elif ! printf '%s' "${out}" | grep -q -F -- "${want}"; then
+            printf 'self-test: FAILED -- %s exited %s but never said: %s\n' "${name}" "${status}" "${want}" >&2
+            rc=3
+        else
+            printf 'self-test: OK -- %s rejected (exit %s) with the expected diagnostic.\n' "${name}" "${status}"
+        fi
+    }
+
+    head -n 200 -- "${real}" > "${dir}/LICENSE-truncated"
+    control "truncated to 200 lines" "${dir}/LICENSE-truncated" "the file is TRUNCATED"
+
+    sed '''s/^  16\. Limitation of Liability\.$/  16. Limitation of liability./''' -- "${real}" > "${dir}/LICENSE-altered"
+    control "one character altered, same size" "${dir}/LICENSE-altered" "the text has been ALTERED"
+
+    sed '''s/$/\r/''' -- "${real}" > "${dir}/LICENSE-crlf"
+    control "converted to CRLF" "${dir}/LICENSE-crlf" "CRLF line endings"
+
+    : > "${dir}/LICENSE-empty"
+    control "empty file" "${dir}/LICENSE-empty" "file is empty"
+
+    control "missing file" "${dir}/LICENSE-absent" "no such file"
+
+    # Positive control last: the real file must still pass, or the negative
+    # controls above prove only that the script rejects everything.
+    printf '\n=== positive control: the repository LICENSE ===\n'
+    if bash -- "${BASH_SOURCE[0]}" "${real}" > "${dir}/positive.log" 2>&1; then
+        printf 'self-test: OK -- %s accepted (exit 0).\n' "${real}"
+    else
+        printf 'self-test: FAILED -- the real LICENSE was REJECTED. Output:\n' >&2
+        cat -- "${dir}/positive.log" >&2
+        rc=3
+    fi
+
+    printf '\n'
+    if [ "${rc}" -ne 0 ]; then
+        printf 'verify-license.sh: SELF-TEST FAILED -- this script cannot be trusted as a gate.\n' >&2
+        return "${rc}"
+    fi
+    printf 'verify-license.sh: SELF-TEST PASSED -- 5 negative controls rejected, real LICENSE accepted.\n'
+    printf 'verify-license.sh: damaged copies kept under %s\n' "${dir}"
+    return 0
+}
+
+if [ "${1:-}" = "--self-test" ]; then
+    self_test
+    exit $?
+fi
+
 TARGET="${1:-${PROJECT_ROOT}/LICENSE}"
 
 failures=0

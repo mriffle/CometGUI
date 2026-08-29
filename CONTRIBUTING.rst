@@ -175,9 +175,13 @@ quality gate ships with a demonstration of its own failure: inject the defect
 the gate exists to catch, show the narrowest command that should catch it
 exiting non-zero with the expected diagnostic, then show it passing once the
 defect is removed. Two worked examples live in the tree already --
-``scripts/verify-license.sh`` run against a deliberately truncated copy under
-``_build/``, and Phase 01's falsifiability harness, which does this for every
-gate the phase installs. Injure a copy, never the real file.
+``bash scripts/verify-license.sh --self-test``, which damages copies of the
+licence under ``_build/`` five ways and requires each to be rejected with the
+right diagnostic before accepting the real file, and Phase 01's falsifiability
+harness, which does this for every gate the phase installs. Injure a copy,
+never the real file. Make the harness itself falsifiable too: a control whose
+defect was not actually injected must be reported as a harness failure, not a
+pass.
 
 **Numeric targets come from the specification, not from taste.** The mutation
 score gate (``R-TEST-02``) is >= 80% over the critical packages with no
