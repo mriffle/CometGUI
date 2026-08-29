@@ -19,32 +19,71 @@ Status values: ``OPEN``, ``DECIDED``, ``SUPERSEDED``.
 D-001 -- CasanovoGUI source reuse
 =================================
 
-:Status: OPEN
+:Status: OPEN -- **materially changed 2026-08-29**
 :Raised: 2026-08-28
 :Blocks: Phase 02 (derivation), Phase 16 (redistribution), ``AC-REL-02``
 :Owner: Project owner, with the CasanovoGUI copyright holders
 
-**Question.** May CometGUI be derived from ``Noble-Lab/CasanovoGUI``?
+**Question.** May CometGUI be derived from ``Noble-Lab/CasanovoGUI``, and at
+what cost to CometGUI's own licensing?
 
-**Facts.** Verified 2026-08-28: the repository is public, active (last pushed
-2026-08-21), Java, and publishes **no licence** -- GitHub reports no licence
-and no licence file is detected. A public repository is not a grant of
-redistribution rights; absent a licence, default copyright applies.
+.. important::
+
+   **Upstream published a licence during Phase 00.** ``Noble-Lab/CasanovoGUI``
+   added **GPL-3.0** in commit *"Add GNU General Public License v3.0"*, authored
+   ``2026-08-29T01:56:35Z``. The Phase 00 work unit checked the repository
+   *before* that commit and correctly recorded ``license = null``; the main
+   orchestrator's independent re-check at sign-off, roughly an hour later,
+   found the licence present. Both observations were accurate when made.
+
+**Facts, verified by the main orchestrator on 2026-08-29 at sign-off.**
+
+* ``GET /repos/Noble-Lab/CasanovoGUI`` returns
+  ``license.spdx_id = "GPL-3.0"``.
+* ``GET /repos/Noble-Lab/CasanovoGUI/license`` returns a ``LICENSE`` blob,
+  35 149 bytes, sha ``f288702d2fa16d3cdf0035b15a9fcbc552cd88e7``, whose first
+  lines are the canonical *GNU GENERAL PUBLIC LICENSE, Version 3, 29 June
+  2007*.
+* The commit list shows ``2026-08-29T01:56:35Z  Add GNU General Public License
+  v3.0`` as the most recent commit, the one before it dated 2026-08-21.
+
+**What this changes.** The question is no longer *"may we derive at all?"* --
+GPL-3.0 grants that. It is now *"do we accept GPL-3.0 on CometGUI?"*, because
+GPL-3.0 is strong copyleft: a work derived from CasanovoGUI must itself be
+distributed under GPL-3.0. **This converts ``D-001`` from a permission problem
+into a licence-choice problem, and couples it tightly to ``D-008``.** It must
+be answered together with ``D-008``, not before it.
 
 **Options.**
 
-#. Obtain an explicit licence upstream (ask the authors to add one). Best
-   outcome; costs only time and goodwill.
-#. Obtain written permission for this derivative and record it. Adequate, but
-   weaker for downstream users of CometGUI.
-#. Write CometGUI independently, using CasanovoGUI only as design reference.
-   The specification's architecture is implementable from scratch; the cost is
-   the shell, packaging and installer patterns, which are perhaps a phase of
+#. **Derive, and license CometGUI under GPL-3.0.** Now legally available and
+   costs no negotiation. *Cost:* CometGUI is GPL-3.0 for good; institutional
+   or commercial redistributors who need a permissive licence are excluded,
+   and any future proprietary packaging is foreclosed.
+#. **Write CometGUI independently and choose its licence freely.** The
+   architecture is implementable from scratch, and Phase 00 lowered this cost
+   measurably: the toolchain, packaging and GUI-automation patterns
+   (Liberica Full JDK 25 + ``jpackage`` app-image + TestFX with an injected
+   Monocle) were all established here without reference to CasanovoGUI.
+   *Cost:* the shell, packaging and installer patterns -- roughly a phase of
    work, not a project.
+#. **Ask upstream for an additional permissive licence** (dual-licensing).
+   *Cost:* an email and goodwill, and upstream may decline; GPL-3.0 remains
+   the fallback.
 
-**Recommendation.** Ask upstream now (option 1), and proceed on option 3 in the
-meantime. Do not let this block the project, and do not copy code while it is
-open (``R-SEC-01``).
+**Recommendation.** Decide ``D-001`` and ``D-008`` in one sitting. If CometGUI
+is happy to be GPL-3.0, option 1 is now the cheapest path and the blocker is
+gone. If CometGUI needs a permissive licence, option 2 remains correct and
+Phase 00's evidence says it is affordable. Until the owner answers, **do not
+copy CasanovoGUI code** (``R-SEC-01``): the constraint is no longer legality
+but the licence commitment that copying would silently make on the project's
+behalf.
+
+**Note on the fact table.** ``specification.rst``'s verified-facts row
+"CasanovoGUI licence" and Phase 00's ``docs/feasibility/upstream-facts.rst``
+both record the pre-commit ``license = null`` state. The fact-verification
+script re-run at sign-off reports this row as ``CHANGED``, which is the script
+working correctly.
 
 ----
 
@@ -89,6 +128,58 @@ source build that has been ruled out.
 package formats (``.deb`` verified, ``.pkg`` verified, NSIS to be established
 in Phase 00); installing the XSD companions with the binary; detecting and
 explaining Rosetta 2 on Apple silicon.
+
+**Phase 00 correction, 2026-08-29 -- the decision stands, its rationale does
+not.** Re-deriving *latest compatible* from live upstream data returns 3.7.1
+(``rel-3-07-01``) under both a strict and an optimistic rule, so the chosen
+version is right. But the reasoning recorded above -- that the ``noxml``
+artefacts cannot produce the XML the Limelight converter needs -- is **false
+for XML output**, verified by execution:
+
+* The 3.07.1 Linux ``noxml`` build run as ``percolator -X out.xml in.pin``
+  exits 0 and writes a well-formed ``percolator_out/15`` document whose bytes
+  differ from the XML-capable build's output in **two lines only**, both inside
+  ``<command_line>``. Confirmed independently by the main orchestrator at
+  sign-off: 200 ``<psm>`` elements from each build, ``diff`` reports 2 differing
+  lines.
+* ``XML_SUPPORT`` gates the **pin-XML input** path, not the pout-XML output
+  path. The ``noxml`` build's own message says so: ``--xml-in`` fails with
+  *"ERROR: Compiler flag XML_SUPPORT was off, you cannot use the -k flag for
+  pin-format input files"*. Comet writes tab-delimited PIN, so the product
+  never needs that input path.
+* Consequently ``--help`` text is **identical** between the twins -- both
+  advertise ``--xmloutput`` and ``--decoy-xml-output``. A capability probe that
+  greps help output discriminates nothing;
+  ``scripts/feasibility/probe_xml_capability.py`` currently returns *"NOT
+  XML-capable"* for a binary whose XML the Limelight converter consumed.
+  ``R-PERC-02`` needs a **functional** probe: run the binary with ``-X`` on a
+  tiny PIN and inspect the file it writes.
+
+What does **not** change: 3.09 genuinely cannot emit XML (executed -- no XML
+flags in help, no file written), so the ceiling remains 3.08.x; and 3.08's
+``GLIBC_2.38`` floor and arm64-only macOS build keep **3.07.1 the right
+answer**.
+
+**The open question this raises,** costed for the owner:
+
+* **A -- amend the rationale only.** *Cost:* a documentation edit. The
+  artefact set, the manifest and Phase 05's scope are unchanged.
+* **B -- also execute the Windows check.** A developer with a Windows machine
+  runs the seven-step checklist in ``docs/feasibility/windows-artefact.rst``
+  against ``percolator.exe`` sha256 ``044f3957...``; *cost:* ~15 minutes of one
+  person, and it closes gate item 8's first branch. A GitHub Actions
+  ``windows-latest`` runner is free and repeatable but is **blocked by
+  ``D-008``**, there being no remote. A cloud Windows VM is under $1/hour plus
+  credentials the project does not hold. Wine was assessed and **not
+  attempted**: it would prove nothing about Windows.
+* **C -- act on the ``noxml`` finding and re-scope Phase 05.** If the portable
+  ``noxml`` archives can feed Limelight, the NSIS and ``xar``/cpio extraction
+  paths become optional, and the Windows portable ZIP needs no installer
+  handling at all. *Cost:* re-scoping Phase 05, plus one execution each on
+  Windows and macOS to raise those halves above inference. *Benefit:* deletes
+  the most fragile code the installer was going to contain.
+
+**This is not an agent's call.** Option C changes what the product builds.
 
 ----
 
@@ -189,6 +280,24 @@ and several pairs have no published artefact.
 unsupported. The UI must not offer what the manifest does not contain
 (``R-PERC-01``), and CI must not test pairs the product does not offer.
 
+**Phase 00, 2026-08-29 -- this decision is *widened*, not narrowed.** If the
+``noxml`` builds emit pout XML (see ``D-002``), then every ``noxml`` artefact
+from 3.05 to 3.08 becomes a Limelight candidate, and 3.06.5's
+``percolator-noxml-linux-portable.zip`` carries the lowest glibc floor found
+anywhere in the release history (``GLIBC_2.14``). Two corrections to this
+entry's own text, both verified:
+
+* **3.09 publishes no Linux portable archive at all**, and its ``.deb``/
+  ``.rpm`` need Boost shared libraries they do not ship -- the extracted 3.09
+  binary fails to load here with ``libboost_filesystem.so.1.66.0: cannot open
+  shared object file``. "Its portable archives need no payload extraction" is
+  false on Linux.
+* **3.09's macOS build is arm64-only, minimum macOS 15.0**, so it reaches
+  *fewer* Macs than 3.07.1 x86-64 under Rosetta 2.
+
+Populate the matrix from the functional capability probe, never from artefact
+names.
+
 ----
 
 D-004 -- macOS architecture policy
@@ -241,6 +350,24 @@ baseline plus an upstream contribution or a small maintained fork.
 **Recommendation.** Ship baseline for release 1 and propose the enhancement
 upstream. Do not substitute screen-coordinate automation.
 
+**Phase 00, 2026-08-29 -- the fact is now sharper.** PDV 2.7.0 **does** ship a
+control server (``PDVGUI/gui/utils/PdvControlServer``, offering ``/ready``,
+``/select`` and ``/shutdown`` on ``127.0.0.1``), but it is reachable only via
+``java -jar PDV.jar denovo-gui --mztab <f> --spectrum <f>``, and
+``spectra_ref`` resolution exists only in ``MztabImport``. Comet plus
+Percolator never produces mzTab, so **there is no path from CometGUI's results
+to that server today**. The upstream contribution is therefore *cheaper than
+assumed* -- it extends an existing mechanism rather than inventing one -- but
+it remains on a third party's schedule. Recommendation unchanged: baseline for
+release 1.
+
+Two operational findings Phase 11 must plan around, both verified: PDV's CLI
+is **not headless** (it constructs a ``JFrame`` and throws
+``HeadlessException``), and it **exits 0 having written nothing** when given
+the same indexed mzML Comet searched -- msftbx numbers spectra by file
+position while pepXML refers to them by scan number. MGF is the working route.
+``-rt 6`` hangs; impose a timeout.
+
 ----
 
 D-006 -- Test fixture data and licensing
@@ -263,6 +390,20 @@ At least two spectrum files are needed to exercise the multi-file run model.
 fetched by checksum rather than vendored, with the licence recorded in
 ``docs/citations.rst``.
 
+**Phase 00, 2026-08-29.** Six costed candidates with real sizes, parsed MS2
+counts and licence URLs are in ``docs/feasibility/fixture-candidates.rst``.
+The finding that matters: **PRIDE exposes a machine-readable per-project
+``license`` field**, so "a PRIDE dataset" is not by itself a licence status --
+each candidate must be checked individually. The spectra used to prove the
+scientific path in this phase were an **ephemeral feasibility input**: they are
+not committed, not vendored, and explicitly **not** the project's chosen
+fixture. Choosing the fixture remains the owner's.
+
+Phase 00 also produced a defence this decision should carry: **the fetched
+mzML were CRLF-corrupted in transit and Comet exited 249** on them. The
+corruption was proven against the files' own ``<fileChecksum>`` element. Any
+fixture-fetching code must verify the checksum and fetch in binary mode.
+
 ----
 
 D-007 -- Limelight test endpoint
@@ -282,6 +423,14 @@ sandbox instance; or both -- the fake for every run, the sandbox nightly.
 
 **Recommendation.** Both, with the fake as the default so the suite works
 offline.
+
+**Phase 00, 2026-08-29.** No server was contacted. One enabling finding: the
+Limelight converter's XSD (65 905 bytes) lives **inside the distributed JAR**
+and there is no standalone copy, so a local fake endpoint can validate what it
+receives by extracting the schema from the JAR at build time. A caution for
+Phase 12: **the converter's exit status is unusable** -- it exits 0 with no
+arguments at all and exits 0 on unrecognised options. Success must be
+determined from the output file, never from the exit code.
 
 ----
 
@@ -303,3 +452,21 @@ one is part of this decision -- an agent must not add one.
 **Recommendation.** Decide the licence early enough for phase 01 to place the
 file; defer publication until ``D-001`` is resolved and the private-content
 scan of the repository has been re-run.
+
+**Phase 00, 2026-08-29 -- this decision now blocks something concrete.** Two
+new couplings:
+
+* **``D-001`` and ``D-008`` are now one question.** CasanovoGUI became GPL-3.0
+  today. Deriving from it commits CometGUI to GPL-3.0; declining that commits
+  the project to writing the shell independently. Answer them together.
+* **The cheapest repeatable route to Phase 00's one unmet gate item is Windows
+  CI**, and there is nowhere to run it, because there is no remote and
+  creating one is this decision. A free GitHub Actions ``windows-latest``
+  runner would close gate item 8 permanently and would re-run on every change;
+  without a remote, the only alternatives are a person with a Windows machine
+  (~15 minutes, one-off, not repeatable) or a paid cloud VM.
+
+A further input for the licence audit: **PDV's licensing is self-contradictory
+upstream** -- ``LICENSE`` at v2.7.0 is GPL-3.0 while its ``pom.xml`` declares
+Apache-2.0. Phase 16's audit must resolve which governs before PDV is
+redistributed or invoked as a bundled tool.

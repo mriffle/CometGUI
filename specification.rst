@@ -5,11 +5,11 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 2
-:Revision date: 2026-08-28
-:Supersedes: Revision 1, 2026-08-28
+:Revision: 5
+:Revision date: 2026-08-29
+:Supersedes: Revision 4, 2026-08-29
 :Target application: Cross-platform Java desktop application
-:Primary source base: Noble-Lab CasanovoGUI (licence unresolved -- see :ref:`spec-decisions`)
+:Primary source base: Noble-Lab CasanovoGUI (GPL-3.0 as of 2026-08-29; reuse and its copyleft consequence are ``D-001`` with ``D-008`` -- see :ref:`spec-decisions`)
 :Primary search engine: Comet
 :Primary post-processor: Percolator
 :Visualisation: PDV
@@ -32,6 +32,45 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 5
+     - 2026-08-29
+     - **Phase 00 verification amendment.** Recorded, without yet rewriting the
+       Percolator artefact strategy, the findings the phase established by
+       execution. (a) The ``noxml`` Percolator builds **do** emit
+       ``percolator_out`` XML: the 3.07.1 Linux ``noxml`` binary given ``-X``
+       writes a document differing from the XML-capable build's in two lines,
+       both inside ``<command_line>``. ``XML_SUPPORT`` gates the pin-XML
+       **input** path (``--xml-in``), not the pout-XML **output** path, and
+       Comet writes tab-delimited PIN, so the product never needs the input
+       path. The premise "portable archive = ``noxml`` = no XML" that underlies
+       :ref:`spec-percolator-artefacts` is therefore wrong for XML output; the
+       *choice* of 3.07.1 is unaffected and was re-derived independently from
+       live release data. Acting on this -- which would make NSIS and
+       ``xar``/cpio extraction optional -- re-scopes Phase 05 and is
+       ``D-002`` option C, an owner decision, so the strategy sections are
+       left standing and flagged rather than rewritten. (b) ``--help`` text is
+       **identical** between the twins, so a help-text capability probe is
+       invalid; ``R-PERC-02`` requires a functional probe. (c) Percolator's own
+       shipped ``percolator_out.xsd`` fixes ``majorVersion`` at ``2`` while the
+       3.07.1 binary writes ``3``, so validating correct output against the
+       shipped schema **fails**; this bears on ``R-TOOL-02``. (d) Corrections to
+       the verified-facts table: the Comet release publishes a **ninth** asset
+       (``README.md``); ``comet.macos.exe`` and ``comet.aarch64.macos.exe`` are
+       byte-for-byte the same size (3 998 328 B), which a download manifest
+       must not treat as a coincidence; the ``rel-3-09`` XML-removal quote is a
+       **reflow**, the published bytes breaking between ``toolchains`` and
+       ``. (#399)``; the Limelight converter has **twelve** options, not ten
+       (``-h/--help`` and ``-V/--version`` were omitted). (e) ``R-LL-05``'s
+       rationale is wrong in both directions: ``-Z`` without
+       ``--import-decoys`` is a hard converter failure, ``--import-decoys``
+       over a decoy-free pout succeeds silently importing none, and
+       ``--import-decoys`` is incompatible with ``decoy_search = 1`` plus a
+       target-only FASTA -- it requires an externally concatenated
+       target+decoy FASTA. (f) ``Noble-Lab/CasanovoGUI`` published **GPL-3.0**
+       at ``2026-08-29T01:56:35Z``, during this phase; the fact table's
+       "no licence" row is superseded and ``D-001`` is reframed as a copyleft
+       question coupled to ``D-008``. Evidence for every item is under
+       ``docs/feasibility/`` and re-runnable from ``scripts/feasibility/``.
    * - 1
      - 2026-08-28
      - Initial implementation-ready specification.

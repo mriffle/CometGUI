@@ -4,9 +4,10 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-08-29
-:Updated by: Main orchestrator (session start; Phase 00 dispatched)
-:Current phase: 00 -- in progress
-:Overall: Planning complete. No product code exists. Phase 00 running.
+:Updated by: Main orchestrator (Phase 00 gate re-run and signed off)
+:Current phase: 00 -- PARTIAL, signed off; 01 not started
+:Overall: Feasibility established. No product code exists yet, by design --
+   Phase 00 writes none. Phase 01 is ready to start.
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -15,9 +16,11 @@ anything else, fix it here first.
 Where we are
 ============
 
-The project has a reviewed specification, a verified set of upstream facts, a
-phase plan and an open decision list. Nothing has been implemented. The next
-action is to run **Phase 00**.
+Phase 00 ran and was signed off **PARTIAL** on 2026-08-29. The scientific path
+is proven end to end, the toolchain is installed and packaging works, and the
+upstream facts were re-verified live -- one of them changed *during* the phase.
+The residue is small and precisely named (see :ref:`status-p00`). Nothing that
+Phase 01 needs is blocked.
 
 What exists
 -----------
@@ -30,9 +33,11 @@ What exists
      - State
      - Notes
    * - ``specification.rst``
-     - Revision 2
-     - Reviewed, corrected against live upstream sources, converted to valid
-       RST; passes ``sphinx-build -n -W``.
+     - Revision 5
+     - Revision 5 records Phase 00's verification findings, including the
+       ``noxml`` discovery, without yet rewriting the artefact strategy --
+       that is ``D-002`` option C, an owner decision. Passes
+       ``sphinx-build -n -W``.
    * - ``ONBOARDING.rst``
      - Complete
      - Read-first document for any orchestrating agent.
@@ -40,14 +45,30 @@ What exists
      - Complete
      - Scope, deliverables and exit gate per phase. None started.
    * - ``DECISIONS.rst``
-     - 8 open
-     - ``D-001``..``D-008``; none decided.
+     - 6 open, 2 decided
+     - ``D-002`` and ``D-004`` decided. ``D-001`` changed materially on
+       2026-08-29 and is now coupled to ``D-008``.
    * - ``handoffs/``
-     - Empty
-     - One file per phase, written by the phase agent.
+     - Phase 00 present
+     - ``PHASE-00-worklog.rst`` (10 units, each with a sign-off entry) and
+       ``PHASE-00-handoff.rst``.
+   * - ``docs/feasibility/``
+     - 10 documents
+     - The phase's evidence. Builds clean under ``sphinx-build -n -W``
+       (13 HTML pages) via ``scripts/feasibility/check-docs.sh``.
+   * - ``scripts/feasibility/``
+     - Re-runnable
+     - Every claim above is reproducible from these scripts; the main
+       orchestrator re-ran them at sign-off rather than reading the reports.
+   * - ``tools/``
+     - Installed, gitignored
+     - Liberica JDK 25.0.4.1+1, Maven 3.9.16, OpenJFX Monocle 21.0.2, plus an
+       X11 and font stack. Provenance (URL, SHA-256, licence) is recorded in
+       the committed ``docs/feasibility/toolchain.rst``; rebuild with
+       ``scripts/feasibility/install-toolchain.sh``.
    * - Product code
      - None
-     - No build, no modules, no toolchain installed yet.
+     - Correct: Phase 00 writes none. Phase 01 creates the build skeleton.
 
 Phase board
 ===========
@@ -62,9 +83,10 @@ Phase board
      - Gate evidence
    * - 00
      - Feasibility, legal and upstream verification
-     - IN PROGRESS
-     - Started 2026-08-29 by the main orchestrator; phase orchestrator
-       spawned.
+     - PARTIAL
+     - Signed off 2026-08-29. 9 of 10 gate items PASS on the main
+       orchestrator's own re-run; item 8 passes only on its second branch.
+       See :ref:`status-p00`.
    * - 01
      - Repository, build and quality skeleton
      - NOT STARTED
@@ -134,12 +156,146 @@ Status values are ``NOT STARTED``, ``IN PROGRESS``, ``PARTIAL`` (with the
 residue named), ``BLOCKED`` (with the decision or dependency named), or
 ``PASSED`` (with the date and the evidence the orchestrator verified).
 
+
+.. _status-p00:
+
+Phase 00 sign-off (2026-08-29)
+==============================
+
+:Outcome: **PARTIAL**
+:Signed off by: Main orchestrator, by re-running every gate item itself
+:Phase records: ``handoffs/PHASE-00-worklog.rst``, ``handoffs/PHASE-00-handoff.rst``
+
+The phase orchestrator reported PARTIAL. The main orchestrator re-ran all ten
+items rather than accepting that report; the table below records what the
+re-run actually printed.
+
+.. list-table:: Gate items, as re-run at sign-off
+   :header-rows: 1
+   :widths: 5 13 82
+
+   * - #
+     - Result
+     - What was run, and what it printed
+
+   * - 1
+     - PASS
+     - ``.venv/bin/python scripts/feasibility/verify_upstream_facts.py
+       --refresh`` -> ``CHANGED=1, CONFIRMED=17, UNVERIFIED=4``. The four
+       unverified rows are artefact rows, covered by items 6-9. The one
+       ``CHANGED`` row is CasanovoGUI's licence -- the script detecting a real
+       drift, which is it working. Four differences from the specification are
+       listed and are now recorded in specification revision 5.
+
+   * - 2
+     - PASS
+     - ``bash scripts/feasibility/run_scientific_path.sh`` -> exit 0, and the
+       output was checked rather than the exit code: a 12 797 113-byte
+       Limelight XML with 3897 ``<psm>`` and 2985 ``<reported_peptide>``
+       elements. The main orchestrator validated it with its **own**
+       ``javax.xml.validation`` program (``warnings=0 errors=0 fatals=0,
+       VERDICT: VALID``) and proved that validator falsifiable: a truncated
+       copy gives ``fatals=1`` and a copy with one bogus attribute gives
+       ``cvc-complex-type.3.2.2 ... 'bogusAttr' is not allowed``.
+
+   * - 3
+     - PASS
+     - Same run, stage 11. Percolator 3.09 produced 3898-line PSM, 2986-line
+       peptide and 12-line weights files, and ``find ... -name '*.xml' | wc
+       -l`` -> ``0``. Its ``--help`` carries no XML flag at all.
+
+   * - 4
+     - PASS
+     - ``env -i PATH=/usr/bin:/bin HOME=/tmp
+       _build/jpackage-spike/dest/ToolchainProbe/bin/ToolchainProbe`` ->
+       ``java.version = 25.0.4.1``, ``self contained = true``, ``javafx
+       modules = all present``, ``PROBE RESULT = PASS`` with no JDK on PATH.
+
+   * - 5
+     - PASS
+     - ``bash scripts/feasibility/javafx-smoke.sh`` -> 7/7 stages. TestFX
+       4.0.18 works headless. Two stages are deliberate negative controls and
+       both failed as required, so the harness is falsifiable rather than
+       merely green.
+
+   * - 6
+     - PASS
+     - ``sed -n '44,84p' docs/feasibility/percolator-artefacts.rst`` -> a
+       per-platform table giving artefact, container, extraction-without-admin
+       and host requirement. Linux and macOS cells say "Verified here"; the
+       Windows cell says "Not established" in both columns.
+
+   * - 7
+     - PASS
+     - ``python3 scripts/feasibility/enumerate_percolator_releases.py`` ->
+       ``latest compatible = 3.7.1 (rel-3-07-01)`` under both a strict and an
+       optimistic rule. Because that script reads a cache by default, the main
+       orchestrator additionally queried the GitHub API directly at sign-off
+       and confirmed the inputs live.
+
+   * - 8
+     - PASS -- second branch only
+     - ``bash scripts/feasibility/windows-artefact.sh`` -> the NSIS payload
+       extracts with no elevation, yielding a PE32+ x86-64 ``percolator.exe``
+       importing 92 ``xercesc_3_1`` symbols plus both XSDs. **The binary was
+       not executed on Windows, and no Windows runner exists here.** The gate
+       item's second branch requires the blocking reason to be documented and
+       the manifest not to claim the capability: both hold. The manifest value
+       is ``xml_capability: unverified-on-windows`` and a grep of every
+       committed document for *verified*, *confirmed*, *proven* or *tested*
+       near a Windows XML claim returns nothing. New finding: both NSIS
+       installers request ``requireAdministrator``, so extraction -- not
+       installation -- is the only admin-free route.
+
+   * - 9
+     - PASS
+     - ``extract_deb.py``, ``extract_pkg.py`` and the NSIS extractor were each
+       run by the main orchestrator into a fresh directory. Each yielded its
+       platform's binary plus ``percolator_in.xsd`` and
+       ``percolator_out.xsd``. The freshly extracted Linux binary was then run
+       (``-X`` -> 200 ``<psm>`` elements, exit 0). The NSIS extractor is
+       cross-checked: its ``percolator.exe`` is byte-identical to the copy
+       taken from the portable ZIP by unrelated code. Only the Linux binary
+       was executed.
+
+   * - 10
+     - PASS
+     - ``handoffs/PHASE-00-handoff.rst`` carries a written, evidenced
+       recommendation for ``D-001`` and confirms ``D-002``'s outcome from
+       recomputed data while escalating evidence that contradicts its stated
+       rationale. Its ``D-001`` evidence was overtaken during sign-off -- see
+       below.
+
+Why PARTIAL rather than PASSED
+------------------------------
+
+#. **The Windows binary has never been executed, anywhere.** Gate item 8's
+   first branch is unmet. This is honest inference, not a verified fact, and
+   the manifest says so.
+#. **No macOS execution.** The ``.pkg`` payload was extracted and inspected;
+   Rosetta 2 (``D-004``) is untested because there is no Mac here.
+#. **The ``noxml`` finding is recorded but not acted on.** Acting on it
+   re-scopes Phase 05 and is ``D-002`` option C -- an owner decision.
+
+What the main orchestrator caught that the phase did not
+--------------------------------------------------------
+
+**``Noble-Lab/CasanovoGUI`` published GPL-3.0 at 2026-08-29T01:56:35Z, while
+Phase 00 was running.** The work unit checked before that commit and correctly
+recorded ``license = null``; the sign-off re-check about an hour later found
+the licence present, verified three ways (repository API, licence API blob sha
+``f288702d...``, and the commit list). Both observations were right when made.
+This is precisely the drift the phase exists to catch, and it is the reason
+sign-off re-runs checks instead of reading reports. ``D-001`` is rewritten
+accordingly.
+
 Open decisions
 ==============
 
 Six of eight remain open. ``D-002`` and ``D-004`` were decided on 2026-08-29.
-``D-001`` is now the only open decision that shapes the product rather than
-merely configuring it.
+Phase 00 supplied evidence and costed options for every open item; **none was
+answered by an agent.** Two now need the owner together rather than
+separately: ``D-001`` and ``D-008``.
 
 .. list-table::
    :header-rows: 1
@@ -149,14 +305,18 @@ merely configuring it.
      - Question
      - Blocks
    * - ``D-001``
-     - May CasanovoGUI source be reused? (No licence published.)
+     - **Changed 2026-08-29:** CasanovoGUI published **GPL-3.0** mid-phase, so
+       derivation is now permitted. The question became: do we accept
+       GPL-3.0's copyleft on CometGUI? Answer with ``D-008``.
      - Derivation in 02; redistribution in 16
    * - ``D-002``
      - **DECIDED**: no source builds; use 3.07.1, the newest release with
        XML-capable binaries on all three platforms.
      - --
    * - ``D-003``
-     - Narrowed: which *additional* versions beyond 3.07.1 are managed?
+     - **Widened** by the ``noxml`` finding: every ``noxml`` artefact 3.05-3.08
+       may be a Limelight candidate, and 3.06.5 has the lowest glibc floor
+       found (``GLIBC_2.14``).
      - 05, 09, 15
    * - ``D-004``
      - **DECIDED**: Percolator runs under Rosetta 2 on Apple silicon.
@@ -171,8 +331,9 @@ merely configuring it.
      - Which Limelight endpoint do tests target?
      - 12, 14
    * - ``D-008``
-     - CometGUI's own licence and distribution
-     - 01 (LICENSE file), 16
+     - CometGUI's own licence and distribution. Now also the cheapest route to
+       Phase 00's one unmet gate item: Windows CI needs a remote.
+     - 01 (LICENSE file), 16; and gate item 8 of phase 00
 
 Risks currently live
 ====================
@@ -190,25 +351,76 @@ Risks currently live
    NSIS; XSD companion installation; Rosetta 2 on Apple silicon (``D-004``).
    The accepted trade is that 3.07.1 predates 3.08's I-spline PEP default and
    the PEP-greater-than-1.0 fix, carried as advisories (``R-PERC-11``).
-#. **CasanovoGUI has no licence.** Verified 2026-08-28. The architecture is
-   implementable independently, so this blocks derivation, not the project;
-   but it must be resolved before public redistribution.
+#. **The ``noxml`` Percolator builds emit XML.** Verified by execution
+   2026-08-29 and re-verified at sign-off: the 3.07.1 Linux ``noxml`` binary
+   given ``-X`` writes a ``percolator_out/15`` document differing from the
+   XML-capable build's in two lines, both inside ``<command_line>``.
+   ``XML_SUPPORT`` gates the pin-XML *input* path, which the product never
+   uses. Two consequences. First, the NSIS and ``xar``/cpio extraction paths
+   may be unnecessary -- ``D-002`` option C, an owner decision, so nothing has
+   been re-scoped. Second, and not optional: **a capability probe that greps
+   ``--help`` for ``-X`` is invalid**, because the twins' help text is
+   identical. ``R-PERC-02`` needs a functional probe, and
+   ``scripts/feasibility/probe_xml_capability.py`` is currently wrong.
+
+#. **CasanovoGUI is now GPL-3.0** (published 2026-08-29T01:56:35Z, mid-phase).
+   Derivation is permitted; the risk changed from "no permission" to "strong
+   copyleft binds CometGUI's own licence". Resolve with ``D-008`` before
+   Phase 02 reuses anything.
 #. **Upstream drift.** PDV moved 2.6.0 -> 2.7.0 between the first and second
    drafts of the specification on the same day. Phase 00 re-verifies
    everything; phase 15 adds the CI job that catches it thereafter.
-#. **No toolchain on this machine.** No JDK, Maven, Gradle or Docker. Phase 00
-   installs them project-locally under ``tools/``; nothing goes on the host.
+#. **Percolator's own XSD rejects Percolator's own output.** The shipped
+   ``percolator_out.xsd`` fixes ``majorVersion`` at ``2``; the 3.07.1 binary
+   writes ``3``. Verified at sign-off -- validating correct output against the
+   shipped schema produces ``cvc-complex-type.3.1``. ``R-TOOL-02`` installs
+   those XSDs, so any phase that validates against them will fail on good
+   data.
+
+#. **No Windows or macOS execution is possible in this environment.** Every
+   non-Linux capability verdict in the project is currently inference from
+   byte markers. This is the single largest gap in the evidence base and it
+   will persist until either a remote enables Windows CI (``D-008``) or a
+   person runs the 15-minute checklist in
+   ``docs/feasibility/windows-artefact.rst``.
+
+#. **Toolchain installed project-locally.** No longer a risk: Liberica JDK
+   25.0.4.1+1, Maven 3.9.16 and OpenJFX Monocle live under ``tools/`` with
+   checksum-pinned provenance in ``docs/feasibility/toolchain.rst``. Nothing
+   was installed on the host. Two carried findings: **``jpackage`` strips the
+   runtime's ``bin/java``** (verified -- the app image has no ``bin``
+   directory at all), which matters because CometGUI must launch the Limelight
+   converter JAR; and the pinned JDK ships no Monocle and this host has no
+   fonts, so a ``Scene`` with any control dies on ``fontFactory is null``
+   unless both are supplied.
 
 Next action
 ===========
 
-Phase 00 (``phases/PHASE-00-feasibility.rst``) is running. It writes no
-product code. ``D-002`` is now decided, so the phase's most valuable outputs
-are (a) re-verification of every upstream fact against live sources rather
-than against the specification, and (b) confirmation -- or precise refutation
--- of the Windows ``percolator-v3-07.exe`` XML claim, which is currently
-inferred from artefact naming and size and must not reach the manifest
-unverified.
+**Take the two owner questions below to the owner, then run Phase 01**
+(``phases/PHASE-01-build-skeleton.rst``). Phase 01 is otherwise ready: its
+only dependency, Phase 00, is signed off, and the toolchain it needs is
+installed and provenanced.
+
+Phase 01 is blocked only on ``D-008`` for the ``LICENSE`` file itself. The
+rest of the build skeleton -- Maven layout, the Sphinx tree with ``conf.py``,
+quality gates -- can proceed while the licence is decided, provided the
+``LICENSE`` file is the last thing placed and is not invented.
+
+For the owner, in priority order
+--------------------------------
+
+#. **``D-001`` with ``D-008``, together.** CasanovoGUI became GPL-3.0 during
+   Phase 00. Accepting it makes CometGUI GPL-3.0 permanently; declining it
+   means writing the shell independently, which Phase 00 showed is affordable.
+   Phase 01 wants the answer for its ``LICENSE`` file.
+#. **``D-002`` option C -- act on the ``noxml`` finding, or not.** If the
+   portable ``noxml`` archives can feed Limelight, Phase 05 need not implement
+   NSIS or ``xar``/cpio extraction at all. Deciding before Phase 05 starts
+   saves building the most fragile code in the installer; deciding after wastes
+   it.
+
+Neither blocks starting Phase 01.
 
 Change log
 ==========
@@ -245,6 +457,24 @@ Change log
      - Orchestration model made explicit: three tiers (main orchestrator ->
        phase orchestrator -> phase agent), each signing off the tier below by
        running the checks itself. Added ``handoffs/WORKLOG-TEMPLATE.rst``.
+   * - 2026-08-29
+     - 00
+     - **Phase 00 run and signed off PARTIAL.** Three tiers used as designed:
+       one phase orchestrator, ten work units, each unit signed off by the tier
+       above. The main orchestrator re-ran all ten gate items itself; 9 PASS,
+       item 8 passes only on its second branch because no Windows runner
+       exists. Proven by execution: the full Comet -> Percolator -> Limelight
+       path (12.8 MB schema-valid Limelight XML, validated with an independent
+       validator shown to be falsifiable), Percolator 3.09 rescoring with zero
+       XML, a launchable ``jpackage`` bundle with no JDK on PATH, and TestFX
+       headless with working negative controls. Discovered by execution: the
+       ``noxml`` builds emit pout XML, which invalidates the help-text
+       capability probe and may remove the need for installer payload
+       extraction. Caught at sign-off: CasanovoGUI published GPL-3.0
+       mid-phase, reframing ``D-001``. Specification amended to revision 5;
+       ``D-001``, ``D-002``, ``D-003``, ``D-005``, ``D-006``, ``D-007`` and
+       ``D-008`` updated with evidence and costed options. No ``D-`` item was
+       answered by an agent.
    * - 2026-08-29
      - --
      - Owner directed that the product use the **latest compatible**
