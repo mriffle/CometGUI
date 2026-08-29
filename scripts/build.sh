@@ -627,6 +627,7 @@ stage_gates() {
         test-compile org.pitest:pitest-maven:mutationCoverage > "${ROOT}/_build/pitest.log" 2>&1 \
         || { sed -n '/ERROR/p' "${ROOT}/_build/pitest.log" | head -20; \
              die "PIT failed. Full log: _build/pitest.log"; }
+    echo "   full PIT output: _build/pitest.log"
 
     local pit_xml total killed score_x10 ran=0
     for module in "${PRODUCT_MODULES[@]}"; do
