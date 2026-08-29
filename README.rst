@@ -6,7 +6,9 @@ A cross-platform desktop application for running a complete Comet ->
 Percolator proteomics search workflow, installing every scientific tool it
 needs by itself, and recording provenance strong enough to reproduce the run.
 
-**Status: planning complete, implementation not started.** See ``STATUS.rst``.
+**Status: the build and quality skeleton exists; no application feature does
+yet.** ``STATUS.rst`` is the authoritative record and the only place to read
+for the current state.
 
 Start here
 ==========
@@ -23,7 +25,8 @@ Start here
    * - ``STATUS.rst``
      - Where the project is right now. The only authoritative state record.
    * - ``DECISIONS.rst``
-     - The eight open decisions an implementing agent must not make alone.
+     - The decisions ``D-001``..``D-008``, which an implementing agent must
+       never answer alone. Several are decided; the entry records which.
    * - ``specification.rst``
      - What to build: requirements (``R-``), acceptance criteria (``AC-``),
        architecture, testing strategy. Revision 7.

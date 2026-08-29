@@ -351,11 +351,26 @@ reach ordinary contributions:
 * **Contributions are GPL-3.0.** Do not add code under an incompatible licence
   or paste in code whose provenance you cannot state.
 * **Anything derived from CasanovoGUI keeps its copyright notices and records
-  the derivation** (``D-001`` obligation 2, which Phase 02 owns). Whether
-  source files also carry a per-file GPL header, and in what form, is not
-  settled by this page: Phase 01's Spotless configuration may enforce a header
-  template and Phase 02 owns the derivation notices. Do not invent a header
-  format ahead of them -- ask the tier above you.
+  the derivation** (``D-001`` obligation 2, which Phase 02 owns).
+* **Every Java file carries the project's GPL-3.0 header**, whose single
+  authoritative copy is ``config/license/java-header.txt``. Two tools enforce
+  it against that one file, because neither is sufficient alone: Spotless
+  checks and can apply it, but ``spotless-maven-plugin`` **excludes
+  ``package-info.java`` by name and cannot be configured out of it**, and this
+  repository has 53 of those, so Checkstyle's ``Header`` module covers every
+  ``.java`` file including them. Practical consequence: ``mvn spotless:apply``
+  formats and adds headers, but **will not add one to a new
+  ``package-info.java`` -- copy it from a sibling by hand**, or the build
+  fails with ``Missing a header - not enough lines in file``.
+* **Phase 02 extends the header configuration, it does not relax it.** A file
+  derived from CasanovoGUI keeps its upstream notice, which means a second
+  Spotless file set and a second Checkstyle execution with their own header
+  file -- never deleting, suppressing or excluding the existing check to make
+  a derived file pass.
+* **The copyright holder line reads "The CometGUI authors."** No legal entity
+  has been named. That is adjacent to ``D-001``/``D-008`` and is the owner's
+  to settle before redistribution; do not substitute a name on your own
+  authority.
 * **Third-party attribution goes in ``docs/citations.rst``** -- Comet
   (Apache-2.0 with an embedded MIT section), Percolator, the Limelight
   converter, PDV (treated as GPL-3.0 by owner direction) and the bundled
