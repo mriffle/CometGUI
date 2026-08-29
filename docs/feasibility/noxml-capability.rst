@@ -1092,12 +1092,18 @@ What remains UNVERIFIED
    is pout XML. A different Limelight importer may exist; that is a Phase 12
    question.
 #. **Releases below ``rel-3-05``** were not swept.
-#. **Observation, not a finding:** ``extract_nsis.py`` unpacks the ``rel-3-05``
-   installers into a directory whose name is the three bytes
-   ``0x03 0x9f 0x80`` rather than ``INSTDIR`` -- the files are all present and
-   correct, only the top-level directory name is mis-decoded, and only for
-   ``rel-3-05``. 3.06.5 and 3.07.1 unpack to ``INSTDIR`` correctly. That script
-   belongs to another work unit and was not modified.
+#. **Observation, not a finding:** ``extract_nsis.py`` mis-decodes the
+   destination-directory variables in the ``rel-3-05`` installers. Instead of
+   one ``INSTDIR`` tree it produces three roots -- ``INSTDIR`` and two whose
+   names are the raw byte sequences ``0x03 0x95 0x80`` and ``0x03 0x9f 0x80``
+   -- with the product payload landing under the second of those
+   (``<0x03 0x9f 0x80>/bin/percolator.exe``,
+   ``.../share/xml/percolator/...``). Every file is present and intact; only
+   the path prefixes are wrong. ``rel-3-06-05`` and ``rel-3-07-01`` unpack to
+   ``INSTDIR`` correctly, which is why work unit 4's Windows conclusions are
+   unaffected. That script belongs to another work unit and was not modified
+   here; ``rel-3-05`` is not a release the product intends to offer, so this is
+   reported rather than fixed.
 
 
 Reproducing this
