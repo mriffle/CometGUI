@@ -225,7 +225,26 @@ Work units
        ``docs/feasibility/gui-automation-spike.rst``. An unobtainable headed
        run is recorded as unverified, not as a pass. *Depends on unit 5.*
      - Gate 5
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Read commit
+       ``610d026``. **Ran ``bash scripts/feasibility/javafx-smoke.sh``
+       myself**: all 7 stages PASS. The evidence is real, not a
+       did-not-throw: from inside ``Application.start()`` the harness reports
+       FX thread ``JavaFX Application Thread``, toolkit ``QuantumToolkit``,
+       ``javafx.runtime.version = 25.0.4+1``, and -- the check that actually
+       proves rendering happened -- ``Scene.snapshot()`` pixel (2,2) =
+       ``ff204080``, matching the CSS background exactly. **Both negative
+       controls fired under my run**: stage 5 broke the expected FX version
+       and the harness exited 1; stage 7 broke the TestFX assertion and
+       Maven reported ``AssertionFailedError: expected:
+       <=NOT-WHAT-THE-HANDLER-PRODUCES> but was: <=COMET>``, ``BUILD
+       FAILURE``. **I also ran ``javafx-headed-xvfb.sh`` myself**: exit 0,
+       all 6 stages, 139 Debian packages verified and extracted
+       project-locally, Xvfb on ``:99``, JavaFX started on
+       ``GtkApplication``, 14 checks passed, TestFX green headed too. So both
+       headless AND headed are verified, not just headless. Verdict for gate
+       item 5: **TestFX 4.0.18 works**, and the named fallback (JUnit 5 +
+       ``Platform.runLater`` + ``javafx.scene.robot.Robot``) is proved
+       alongside it rather than merely proposed.
 
    * - 8
      - **Scientific path end to end, no GUI.** Comet 2026.02.2 -> pepXML +
@@ -236,7 +255,25 @@ Work units
        ``scripts/feasibility/run_scientific_path.sh`` and
        ``docs/feasibility/scientific-path.rst``. *Depends on units 3, 5, 6.*
      - Gate 2, 3; ``R-PERC-01``, ``R-LL-05``
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Read commit
+       ``68ec1b6``. **Ran ``bash scripts/feasibility/run_scientific_path.sh``
+       end to end myself**: exit 0, every stage asserted. My run reproduced
+       6670 PIN rows (3897 target / 2773 decoy), 3.07.1 giving 1026 target
+       PSMs and 603 peptides at q<0.01 with an 11-row weights file, and 3.09
+       giving the identical 1026/603 with **0 XML files written** and 0 help
+       matches for ``xmloutput|decoy-xml-output``; handed ``-X``,
+       ``--xmloutput`` or ``-Z`` anyway, 3.09 exits 1 with "is invalid".
+       **I then validated the Limelight XML MYSELF**, with my own
+       ``javax.xml.validation`` program and the ``limelight-xml.xsd`` I
+       extracted from the converter JAR by hand: 12797113 bytes, 3897
+       ``<psm``, 2985 ``<reported_peptide``, 2747 ``<matched_protein``,
+       ``errors=0 fatals=0``. **And I proved my own validator can fail**: a
+       truncated copy gave ``FATAL: XML document structures must start and
+       end within the same entity``, and a copy with one element renamed gave
+       ``cvc-complex-type.2.4.a: Invalid content was found starting with
+       element 'bogus_element_orchestrator'``. Gate items 2 and 3 PASS.
+       Nothing from the run was committed -- only the script, the document
+       and ``comet.params``.
 
    * - 9
      - **PDV CLI and converter interface capture.** Run the pinned Limelight
@@ -259,7 +296,20 @@ Work units
        a ``noxml`` build, and what it does to ``D-002``/``D-003``/``D-004``.
        Produces ``docs/feasibility/noxml-capability.rst``.
      - Gate 7, 10; ``R-PERC-02`` capability probe design
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Read commits
+       ``7d2c214`` and ``c569cf9``. This unit exists because I personally
+       verified the trigger first: the 3.07.1 Linux ``noxml`` binary
+       (2182688 B, ``Build Date Jun 20 2024 13:20:18``) run as ``-X`` on unit
+       4's PIN exits 0 and writes 143848 bytes of
+       ``percolator_out/15`` XML with 200 ``<psm>`` and 200 ``<peptide>``,
+       and ``diff`` against the XML-capable build's output with
+       ``<command_line>`` masked reports **no difference**. The sweep then
+       covered 31 binaries from 29 artefacts across rel-3-05..rel-3-09. Two
+       independent units reached the converter-acceptance answer separately
+       (unit 8 through the real Comet pepXML, unit 10 through the sweep) and
+       agree. I re-ran the full ``check-docs.sh``: 12 HTML pages, clean.
+       ``D-002``/``D-003``/``D-004`` presented as costed options and **not
+       answered** -- correct. The finding is escalated below.
 
 
 Rejections and rework
