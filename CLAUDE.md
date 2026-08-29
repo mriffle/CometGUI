@@ -9,6 +9,12 @@ file — it exists only because the coding harness reads it.
 - `specification.rst` — the requirements (revision 2)
 - `phases/index.rst` — phases 00–16 and their dependency order
 
+Work runs in three tiers: the **main orchestrator** spawns one fresh **phase
+orchestrator** per phase, which spawns one fresh **phase agent** per work unit.
+Each tier signs off the tier below — by running the checks itself, not by
+reading a report — before moving on. See "Roles" and "Sign-off" in
+`ONBOARDING.rst`.
+
 Hard rules:
 
 1. All project documentation is reStructuredText and must pass

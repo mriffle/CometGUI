@@ -59,8 +59,9 @@ Deliverables
 Exit gate
 ---------
 
-Every item is verified by the orchestrator, independently of the phase
-agent's report. An item that cannot be verified has not passed.
+The phase orchestrator verifies every item, and the main orchestrator then
+re-runs them to sign the phase off. Neither accepts a report in place of
+running the check. An item that cannot be verified has not passed.
 
 1. A clean checkout builds and tests green with one documented command,
    using only project-local tools.
@@ -85,8 +86,14 @@ Risks and notes
 Handoff
 -------
 
-Before finishing -- whether the phase passed, stalled or was abandoned --
-write ``handoffs/PHASE-01-handoff.rst`` covering: what was built and where;
-which gate items pass and the evidence for each; what is incomplete and why;
-decisions encountered; surprises a later phase must know about; and the
-first thing the next agent should do.
+The **phase orchestrator** owns both records for this phase.
+
+``handoffs/PHASE-01-worklog.rst`` is written as the phase runs: the work units,
+their acceptance conditions, which agent did each, and the sign-off entry for
+each -- what was run and what was observed.
+
+``handoffs/PHASE-01-handoff.rst`` is written before finishing, whether the phase
+passed, stalled or was abandoned: what was built and where; which gate items
+pass and the evidence for each; what is incomplete and why; decisions
+encountered; surprises a later phase must know about; and the first thing the
+next agent should do.

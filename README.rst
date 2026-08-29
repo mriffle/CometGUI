@@ -30,7 +30,8 @@ Start here
    * - ``phases/index.rst``
      - The sixteen implementation phases and their dependency order.
    * - ``handoffs/``
-     - What actually happened in each phase.
+     - Per-phase work logs and handoffs: the work units, their sign-offs, and
+       what actually happened.
 
 Conventions
 ===========

@@ -88,9 +88,12 @@ Document map
    * - ``phases/PHASE-nn-*.rst``
      - One phase's scope, deliverables and exit gate
      - What a phase agent is given.
-   * - ``handoffs/``
-     - What actually happened in each phase
-     - Written by the phase agent, verified by the orchestrator.
+   * - ``handoffs/PHASE-nn-worklog.rst``
+     - A phase's work units and their sign-offs
+     - Written by the phase orchestrator as it goes.
+   * - ``handoffs/PHASE-nn-handoff.rst``
+     - What actually happened in a phase
+     - Written by the phase orchestrator, verified by the main orchestrator.
 
 Nothing else is authoritative. If code and specification disagree, the
 specification wins or the specification gets a recorded amendment -- never a
@@ -99,66 +102,185 @@ silent divergence.
 Roles
 =====
 
-Orchestrator (you, if you are the main agent)
----------------------------------------------
+Work runs in **three tiers**. Each tier spawns the next, and each tier signs
+off the tier below it before that work is considered done. No tier does the
+tier below's job.
+
+::
+
+    Main orchestrator          one per project, top-level agent
+        |  spawns one fresh subagent per phase
+        v
+    Phase orchestrator         one fresh subagent per phase (00-16)
+        |  spawns one fresh subagent per work unit
+        v
+    Phase agent                one fresh subagent per work unit
+
+Two reasons for the shape. **Context**: a phase is far too large for one
+agent's context, so the phase orchestrator holds the phase-level picture while
+short-lived workers burn context on individual units. **Verification**: every
+piece of work is checked by someone who did not write it -- units by the phase
+orchestrator, the phase gate by the main orchestrator.
+
+Tier 1 -- main orchestrator
+---------------------------
+
+You, if you are the top-level agent in the session.
 
 * Reads this file, ``STATUS.rst``, ``DECISIONS.rst`` and ``phases/index.rst``
   at the start of every session.
-* Chooses the next phase, briefs a **fresh subagent** for it, and stays out of
-  the implementation detail.
-* **Independently verifies the exit gate.** Never accept a phase agent's
-  self-report as evidence. Run the gate commands yourself and read the output.
-* Owns ``STATUS.rst``, ``DECISIONS.rst`` and ``phases/index.rst``.
-* Is the only channel to the owner. Phase agents do not ask the owner
-  questions; they record blockers and the orchestrator escalates.
+* Selects the next ready phase or phases and **spawns one fresh phase
+  orchestrator subagent for each**. Does not implement phase work, and does not
+  spawn phase agents directly.
+* May run two phase orchestrators concurrently where the dependency graph
+  allows it (see the ordering notes in ``phases/index.rst``), provided they do
+  not touch the same files.
+* **Signs off each phase** (:ref:`sign-off`) by independently re-running the
+  exit gate. The phase orchestrator's report is a claim to be checked, not
+  evidence.
+* Owns ``STATUS.rst``, ``DECISIONS.rst`` and ``phases/index.rst``. No other
+  tier writes them.
+* Is the only channel to the owner. Escalations arrive from phase
+  orchestrators; the main orchestrator decides what reaches the owner and in
+  what form.
 * Commits at every milestone.
 
-Phase agent (one fresh subagent per phase)
--------------------------------------------
+Tier 2 -- phase orchestrator
+----------------------------
 
-* Is given, in this order: ``ONBOARDING.rst`` (this file), its own
-  ``phases/PHASE-nn-*.rst``, and the specification sections its phase names.
-* Implements only its phase's scope. Work belonging to another phase is noted
-  in the handoff, not done opportunistically.
-* Writes ``handoffs/PHASE-nn-handoff.rst`` before finishing, whether it
-  succeeded or not.
+One fresh subagent per phase, spawned by the main orchestrator. It owns exactly
+one phase, start to finish.
+
+* Reads, in this order: this file; its own ``phases/PHASE-nn-*.rst``; the
+  specification sections that phase names; and the handoffs of the phases it
+  depends on.
+* **Decomposes the phase into work units** small enough for one agent to finish
+  with context to spare -- typically a coherent module, parser, adapter, UI
+  section or test suite. Records the decomposition in the phase work log
+  before starting.
+* **Spawns one fresh phase agent per work unit.** It orchestrates; it does not
+  implement the units itself. Small integration work, wiring and repairs are
+  its own to do.
+* **Signs off every work unit before moving on** (:ref:`sign-off`). Unsigned
+  work does not accumulate: a unit is accepted, sent back for rework, or
+  explicitly recorded as deferred with a reason.
+* May run several phase agents concurrently when their units do not touch the
+  same files; serialises them when they do.
+* Maintains ``handoffs/PHASE-nn-worklog.rst`` as it goes, and writes
+  ``handoffs/PHASE-nn-handoff.rst`` before finishing -- whether the phase
+  passed, stalled or was abandoned.
+* Verifies the phase's exit gate itself, and reports to the main orchestrator
+  with the evidence, knowing it will be re-checked.
+* Escalates blockers and decisions **upward only**. It never contacts the
+  owner, never answers a ``D-`` item, never edits ``STATUS.rst`` or
+  ``DECISIONS.rst``, and never weakens a gate.
+
+Tier 3 -- phase agent
+---------------------
+
+One fresh subagent per work unit, spawned by the phase orchestrator.
+
+* Is given: this file, its phase document, the specific work unit, the
+  acceptance conditions for that unit, and the interfaces it must fit.
+* Implements exactly that unit, with its tests. Work belonging to another unit
+  or another phase is reported, not done opportunistically.
 * Commits its own work with an explicit pathspec.
+* Reports what it built, what it ran, what it saw, and what it left undone.
+  It reports honestly rather than favourably: a unit reported as working and
+  signed off on that basis is the one failure mode this structure cannot
+  absorb.
+* Does not write ``STATUS.rst``, ``DECISIONS.rst``, phase documents or
+  handoffs.
 
-A phase agent that runs out of context mid-phase is expected. That is why
-handoffs and frequent commits exist: a dead agent should cost one commit's
-worth of work, not a session's.
+An agent at any tier running out of context mid-task is expected, not
+exceptional. That is what the work log, the handoffs and frequent commits are
+for: a dead agent should cost one work unit, not a phase.
+
+.. _sign-off:
+
+Sign-off
+========
+
+Sign-off is the load-bearing part of this structure. It happens twice: the
+phase orchestrator signs off each work unit, and the main orchestrator signs
+off each phase.
+
+**A sign-off means you ran it yourself.** Reading an agent's summary and
+agreeing with it is not a sign-off. Concretely, to sign off you must:
+
+#. Read the actual diff, not the description of it.
+#. Run the tests, the build and the relevant gate checks yourself, and read the
+   output -- including what scrolled past.
+#. Check the work against the phase document and the ``R-`` rules it claims to
+   deliver, not against what the agent said it was doing.
+#. Confirm the work is inside its scope, and that nothing outside it was
+   quietly changed.
+#. Confirm no gate, checksum, validation rule or threshold was weakened to make
+   something pass. If one was, that is a rejection regardless of how green the
+   build is.
+
+Record the sign-off where the tier writes: work units in
+``handoffs/PHASE-nn-worklog.rst``, phases in ``STATUS.rst``. A sign-off entry
+names what was run and what was observed. "Agent reported success" is not an
+entry.
+
+If you cannot verify something -- a macOS-only behaviour, a check needing
+hardware you do not have -- say so explicitly and mark it unverified. An
+unverifiable item is not a passed item, and a phase resting on one is
+``PARTIAL``, not ``PASSED``.
 
 How to run a phase
 ==================
 
+For the main orchestrator
+-------------------------
+
 #. **Confirm readiness.** Read the phase's ``Depends on`` and ``Blocked by
    decisions`` fields. If a dependency phase has not passed its gate, or a
-   named ``D-`` decision is still open, do not start; pick a phase that is
-   ready, or escalate the decision to the owner.
-#. **Brief a fresh subagent.** Give it the read order above, its phase file
-   path, the gate it must pass, and the rule that it may not weaken the gate.
-   Do not paste the phase content into the brief -- point at the file so it
-   reads the current version.
-#. **Let it work.** Do not micro-manage; do answer questions about intent, and
-   re-read the specification yourself rather than guessing.
-#. **Verify the gate independently.** Run every gate check. Read failures in
-   full. A gate item you cannot verify is a gate item that has not passed.
-#. **Record.** Update ``STATUS.rst`` with the outcome, the evidence you saw,
-   and the date. File any new decisions in ``DECISIONS.rst``.
-#. **Commit.** One commit per milestone, with the phase ID in the subject.
+   named ``D-`` decision is still open, do not start it: pick a phase that is
+   ready, or escalate the decision.
+#. **Spawn a fresh phase orchestrator.** Brief it with: the read order above,
+   its phase file path, the instruction to decompose the phase into work units
+   and run them through phase agents, the sign-off duty, and the rule that it
+   may not weaken the gate. Point at the files rather than pasting their
+   contents, so it reads the current version.
+#. **Stay out of the detail.** Answer questions about intent; re-read the
+   specification yourself rather than guessing; do not start implementing.
+#. **Sign off the phase.** When the phase orchestrator reports, re-run every
+   gate check (:ref:`sign-off`).
+#. **Record and commit.** Update ``STATUS.rst`` with the outcome, the date and
+   the evidence you saw; file any new decisions; commit with the phase ID in
+   the subject.
+
+For the phase orchestrator
+--------------------------
+
+#. **Read in.** This file, your phase document, the specification sections it
+   names, and the handoffs you depend on.
+#. **Decompose and log.** Write the work units into
+   ``handoffs/PHASE-nn-worklog.rst`` with, for each, its acceptance conditions
+   and the ``R-`` rules it serves. Sequence them so that later units build on
+   signed-off work.
+#. **Run one unit at a time** -- or several in parallel where they cannot
+   collide. Spawn a fresh agent per unit; do not carry one agent across
+   several units.
+#. **Sign off each unit** before starting anything that depends on it. Rework
+   and re-sign as needed; record rejections, they are useful history.
+#. **Verify the gate**, write the handoff, and report upward with the evidence.
 
 If a gate cannot be met
 -----------------------
 
-Stop. Do not lower the bar. The options, in order of preference, are:
+Stop. Do not lower the bar. The options, in order of preference:
 
 #. Fix the work so the gate passes.
-#. Split the phase, if part of it is genuinely blocked -- record the split in
-   ``phases/index.rst`` and ``STATUS.rst``.
-#. Escalate to the owner with a specific question and the evidence.
+#. Split the phase, if part of it is genuinely blocked -- the main orchestrator
+   records the split in ``phases/index.rst`` and ``STATUS.rst``.
+#. Escalate to the owner, through the main orchestrator, with a specific
+   question and the evidence.
 
-Never mark a phase ``PASSED`` with a caveat in prose. Either it passed or it is
-``BLOCKED``/``PARTIAL`` with the residue named in ``STATUS.rst``.
+Never mark a phase ``PASSED`` with a caveat in prose. Either it passed, or it
+is ``BLOCKED``/``PARTIAL`` with the residue named in ``STATUS.rst``.
 
 Decisions
 =========
@@ -168,12 +290,17 @@ Decisions ``D-001``..``D-008`` in ``DECISIONS.rst`` are questions an agent
 product promises, whose data is used as a fixture, which server a test uploads
 to. Each names the phase it blocks.
 
-When you hit one:
+When a phase agent hits one, it reports it to its phase orchestrator. When a
+phase orchestrator hits one:
 
 * Do every part of the phase that does not depend on it.
-* Record the blocker in ``STATUS.rst`` and mark the phase ``PARTIAL``.
-* Escalate with a concrete recommendation and the cost of each option -- not an
-  open question.
+* Record the blocker in the phase work log and the handoff.
+* Escalate to the main orchestrator with a concrete recommendation and the cost
+  of each option -- not an open question.
+
+The main orchestrator then records it in ``STATUS.rst``, marks the phase
+``PARTIAL``, and decides what goes to the owner. Only the main orchestrator
+writes ``DECISIONS.rst``, and only the owner closes a ``D-`` item.
 
 An agent inventing an answer to a ``D-`` item (adding a licence, picking a
 public dataset, pointing a test at a real server) is a serious error, not a
