@@ -420,6 +420,29 @@ Work units
        ``scripts/verify-quality-gates.sh`` committed mode 644 and corrected
        the mode rather than relaxing its own rule.
 
+How to read the diagnostics in this log
+=======================================
+
+Unit 8 pointed out, correctly, that a later reader could be misled by the
+sign-off entries below, so this is stated plainly rather than left implicit.
+
+**The diagnostics quoted in each sign-off are what *my own* injections
+produced, not what the committed harnesses print.** When I proved a gate bites
+I wrote my own defect -- a different class, a different amount of damage --
+so the numbers differ from the harnesses' by design. The coverage gate failed
+at ``0.79`` for my injected class and fails at ``0.74`` for the harness's; the
+mutation gate reported ``71`` for mine and ``27`` for the harness's; I renamed
+``scripts/ci/maven-verify.sh`` where the harness renames
+``scripts/ci/traceability.sh``. Each entry is a true record of what I ran.
+**For the canonical diagnostic of each gate, read ``docs/developer/testing.rst``
+or run the harness**, not this log.
+
+Likewise, counts recorded in an entry were true when that unit was signed off
+and some have since grown: unit 2's ``Spotless 59 / Checkstyle 59 / SpotBugs
+62`` is ``63 / 63 / 66`` now that units 3 and 7 added sources, and unit 6's
+``2 partial, 68 planned`` is ``5 partial, 65 planned`` after I upgraded
+``AC-TST-02..04``. Neither is a correction; both are the tree growing.
+
 Decisions taken by the phase orchestrator
 =========================================
 
