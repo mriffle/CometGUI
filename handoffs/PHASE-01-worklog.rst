@@ -170,7 +170,40 @@ Work units
        real build. Acceptance: ``mvn verify`` runs all of them; each fails on
        its deliberate defect.
      - ``R-TEST-02``; gates 3, 4; ``AC-TST-02``, ``AC-TST-03``, ``AC-TST-04``
-     - *pending -- not started*
+     - **ACCEPTED 2026-08-29**, commits ``e1a9903`` and ``5640c0e``. ``bash
+       scripts/build.sh`` exits 0, 7/7 stages in 76 s, ``tests=54 failures=0
+       errors=0 skipped=0``. The gates stage prints what was *measured*, not
+       merely that it ran: ``cometgui-domain line 100.0% (35/35) branch 100.0%
+       (24/24)``, ``55 classes imported from org.cometgui`` broken down over
+       eleven module packages each non-zero, ``8 architecture rule(s)
+       checked``, and ``cometgui-domain 22/22 mutations killed = 100.0%``.
+       ``~/.m2`` absent before and after. **I injected all three defects
+       myself, in a ``git archive HEAD`` sandbox, rather than running the
+       unit's harness and believing it.** Gate item 3, first violation: a
+       ``javafx.scene.control.Label`` reference in ``org.cometgui.domain``
+       fails with ``Architecture Violation ... Rule 'no classes that reside in
+       a package 'org.cometgui.domain..' should depend on ... 'javafx..''
+       was violated (2 times)`` naming the offending method and line. Gate
+       item 3, second violation: ``new ProcessBuilder("/bin/true").start()``
+       in the domain fails the ``R-PROC-02`` rule, again naming the method.
+       Removing each gives a clean run. Gate item 4: an untested but genuinely
+       branchy class added to ``org.cometgui.domain.build`` fails with ``Rule
+       violated for bundle cometgui-domain: lines covered ratio is 0.79, but
+       expected minimum is 0.90`` **and** the branch rule at 0.75 against
+       0.85; deleting it returns exit 0. Mutation gate: adding untested
+       branching code takes PIT from ``Generated 22 mutations Killed 22
+       (100%)`` to ``Generated 31 mutations Killed 22 (71%)`` and the build
+       fails with ``Mutation score of 71 is below threshold of 80`` -- so
+       ``R-TEST-02``'s number is enforced, not decorative. The vacuous-pass
+       defences are real: ``ClassImportCensusTest`` holds a floor of 50
+       imported classes with a per-module census, and the gates stage fails a
+       module that has classes but no ``jacoco.xml``. The headless JavaFX test
+       asserts measured text width rather than "did not throw", and passes
+       from a bare ``mvn`` with no environment exported by the wrapper; where
+       the font stack is absent it fails **loudly** with the command that
+       fixes it, which is the right failure. PIT found a real survivor during
+       the unit (``hashCode`` replaced by a constant) and it was killed with a
+       test rather than excluded.
 
    * - 4
      - **The real Sphinx tree.** ``docs/conf.py``, the page set from the
