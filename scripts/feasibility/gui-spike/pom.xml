@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CometGUI, Phase 00, work unit 7: GUI automation spike.
+
+  THROWAWAY FEASIBILITY POM, NOT THE PRODUCT BUILD.  Phase 01 owns the real
+  build and the repository-root pom; this file lives under scripts/feasibility/
+  on purpose and must never be promoted.
+
+  Notes that matter to whoever reads this later:
+
+  * There is no org.openjfx:javafx-* dependency.  JavaFX 25.0.4+1 is bundled in
+    the pinned BellSoft Liberica JDK 25.0.4.1+1 as resolved system modules
+    (docs/feasibility/toolchain.rst).  Adding a Maven JavaFX dependency would
+    put a second copy of the javafx.* packages on the class path.
+  * org.testfx:openjfx-monocle IS needed: this JDK's javafx.graphics contains
+    no com.sun.glass.ui.monocle package at all (only .gtk and .delegate), so
+    there is no headless Glass platform in the box.  The artefact is injected
+    with the module patch option rather than left on the class path, because
+    javafx.graphics is a named system module and its PlatformFactory lookup
+    cannot see the unnamed module.
+  * The local repository must be forced with -Dmaven.repo.local=_build/m2repo;
+    nothing may be written to ~/.m2.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.cometgui.spike</groupId>
+  <artifactId>gui-automation-spike</artifactId>
+  <version>0.0.1</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!--
+      source/target rather than release: javac refuses an add-exports option against a
+      system module when the release option is in force, and HeadlessSmoke reads
+      com.sun.javafx.tk.Toolkit and com.sun.glass.ui.Application on purpose, as
+      startup evidence.
+    -->
+    <maven.compiler.source>25</maven.compiler.source>
+    <maven.compiler.target>25</maven.compiler.target>
+    <junit.version>5.14.4</junit.version>
+    <testfx.version>4.0.18</testfx.version>
+    <monocle.version>21.0.2</monocle.version>
+    <!--
+      Default (headless) JVM options for the forked test JVM.  Monocle is
+      injected into javafx.graphics because the pinned JDK ships none, and the
+      add-exports / add-opens pairs are what TestFX 4.0.18 needs: it
+      reflectively instantiates com.sun.glass.ui.monocle.MonoclePlatformFactory
+      and HeadlessPlatform, writes them into private static fields of
+      com.sun.glass.ui.PlatformFactory and NativePlatformFactory, and builds a
+      com.sun.javafx.application.ParametersImpl.  Without them TestFX dies with
+      IllegalAccessException before any test body runs.
+    -->
+    <spike.argLine>
+      --patch-module javafx.graphics=${project.build.directory}/monocle/openjfx-monocle.jar
+      --add-exports javafx.graphics/com.sun.javafx.tk=ALL-UNNAMED
+      --add-exports javafx.graphics/com.sun.glass.ui=ALL-UNNAMED
+      --add-opens javafx.graphics/com.sun.glass.ui=ALL-UNNAMED
+      --add-exports javafx.graphics/com.sun.glass.ui.monocle=ALL-UNNAMED
+      --add-opens javafx.graphics/com.sun.glass.ui.monocle=ALL-UNNAMED
+      --add-exports javafx.graphics/com.sun.javafx.application=ALL-UNNAMED
+      --add-opens javafx.graphics/com.sun.javafx.application=ALL-UNNAMED
+      --enable-native-access=javafx.graphics
+      -Dglass.platform=Monocle
+      -Dmonocle.platform=Headless
+      -Dprism.order=sw
+      -Djava.awt.headless=true
+      -Dtestfx.robot=glass
+      -Dtestfx.headless=true
+      -Dtestfx.setup.timeout=30000
+    </spike.argLine>
+    <!-- Build output stays out of the source tree; _build/ is gitignored. -->
+    <cometgui.buildDir>${project.basedir}/../../../_build/gui-spike/maven</cometgui.buildDir>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testfx</groupId>
+      <artifactId>testfx-core</artifactId>
+      <version>${testfx.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testfx</groupId>
+      <artifactId>testfx-junit5</artifactId>
+      <version>${testfx.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      org.testfx:openjfx-monocle is deliberately NOT a dependency: it must not
+      reach the test class path, because it is injected into javafx.graphics by
+      the module patch option below.  A class path copy would land in the
+      unnamed module, in a different runtime package from the patched one.
+      maven-dependency-plugin's copy goal fetches it from Maven Central into
+      the build directory instead; see the plugin section.
+    -->
+  </dependencies>
+
+  <build>
+    <directory>${cometgui.buildDir}</directory>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.15.0</version>
+        <configuration>
+          <compilerArgs>
+            <arg>--add-exports</arg>
+            <arg>javafx.graphics/com.sun.javafx.tk=ALL-UNNAMED</arg>
+            <arg>--add-exports</arg>
+            <arg>javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <execution>
+            <id>fetch-monocle</id>
+            <phase>generate-test-resources</phase>
+            <goals><goal>copy</goal></goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.testfx</groupId>
+                  <artifactId>openjfx-monocle</artifactId>
+                  <version>${monocle.version}</version>
+                  <type>jar</type>
+                  <outputDirectory>${project.build.directory}/monocle</outputDirectory>
+                  <destFileName>openjfx-monocle.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.6</version>
+        <configuration>
+          <!--
+            One forked JVM per test class.  Not a convenience: with the default
+            (a single reused fork) TestFX and ToolkitFallbackTest fight over the
+            same Monocle toolkit.  ToolkitFallbackTest calls Platform.startup()
+            and owns its own Stages; when it runs first in a shared JVM, the
+            TestFX interaction test's click no longer reaches the Button and the
+            assertion fails with output "-" instead of "=COMET".  Isolating the
+            JVMs is the fix; relaxing the assertion would not be.
+          -->
+          <reuseForks>false</reuseForks>
+          <!--
+            The forked test JVM needs exactly what the hand-run smoke needs.
+            LD_LIBRARY_PATH / FONTCONFIG_PATH / XDG_DATA_HOME are inherited
+            from the environment the script exports before calling Maven.
+          -->
+          <argLine>${spike.argLine}</argLine>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+  <!--
+    mvn -Pheaded test: the same tests against a real X server (DISPLAY must be
+    set).  No Monocle and no glass.platform override, so JavaFX uses its own
+    GTK Glass platform; prism falls back to the software pipeline because Xvfb
+    offers no GLX 1.3.  testfx.headless is deliberately false here.
+  -->
+  <profiles>
+    <profile>
+      <id>headed</id>
+      <properties>
+        <spike.argLine>
+          --add-exports javafx.graphics/com.sun.javafx.tk=ALL-UNNAMED
+          --add-exports javafx.graphics/com.sun.glass.ui=ALL-UNNAMED
+          --add-opens javafx.graphics/com.sun.glass.ui=ALL-UNNAMED
+          --add-exports javafx.graphics/com.sun.javafx.application=ALL-UNNAMED
+          --add-opens javafx.graphics/com.sun.javafx.application=ALL-UNNAMED
+          --enable-native-access=javafx.graphics
+          -Djava.awt.headless=true
+          -Dtestfx.robot=glass
+          -Dtestfx.headless=false
+          -Dtestfx.setup.timeout=30000
+        </spike.argLine>
+      </properties>
+    </profile>
+  </profiles>
+</project>
