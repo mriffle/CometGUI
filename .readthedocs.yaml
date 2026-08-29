@@ -1,0 +1,41 @@
+# Read the Docs build configuration for CometGUI -- schema version 2.
+# Reference: https://docs.readthedocs.com/platform/en/stable/config-file/v2.html
+#
+# UNVERIFIED AGAINST THE SERVICE. There is no Read the Docs project for
+# CometGUI and none can be created yet: Read the Docs builds from a git remote
+# and the project has none, which is decision D-008 and not an agent's to make.
+# What has been verified locally (Phase 01, 2026-08-29): this file is valid
+# YAML; every key used here is a documented v2 key; every value is in the
+# documented set of allowed values; and the build it describes --
+# `sphinx-build -n -W -b html docs docs/_build/html` -- passes locally. What has
+# NOT been verified is that Read the Docs accepts and builds it. AC-DOC-01
+# ("Sphinx builds with warnings as errors, and Read the Docs builds
+# successfully") is therefore only half proved until a remote exists; Phase 16
+# owns closing it.
+
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    # 3.11 to match the project virtualenv, which runs Python 3.11.2; Sphinx
+    # 9.0.4 declares Requires-Python >=3.11. Pinned rather than "latest" or
+    # "3": a documentation build that changes interpreter without anyone
+    # deciding to is not reproducible.
+    python: "3.11"
+
+python:
+  install:
+    # The full pinned closure, generated from the project virtualenv's
+    # `pip freeze`, so the hosted build runs the same Sphinx as the gate.
+    - requirements: docs/requirements.txt
+
+sphinx:
+  builder: html
+  configuration: docs/conf.py
+  # -W. R-DOC-05 requires `sphinx-build -n -W`; fail_on_warning supplies the
+  # -W half. There is no Read the Docs key for nitpicky mode, so the -n half is
+  # set as `nitpicky = True` in docs/conf.py -- which makes the hosted build as
+  # strict as the local gate, never less. Do not turn this off to make a build
+  # green.
+  fail_on_warning: true

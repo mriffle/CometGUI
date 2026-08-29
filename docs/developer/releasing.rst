@@ -1,0 +1,20 @@
+.. _dev-releasing:
+
+=========
+Releasing
+=========
+
+.. note::
+
+   **Stub page -- no content yet.** Content is owned by **Phase 16 -- Documentation and Release Qualification** (``phases/PHASE-16-release.rst``), which names this page in its deliverables.
+
+   Phase 01 created it so that the documentation tree builds strictly
+   (``sphinx-build -n -W``) from the start and so that the page has a
+   stable name to link to. It does not yet describe the product.
+
+What this page will cover
+=========================
+
+The release checklist: packaging per tier-1 platform, checksums, SBOM,
+signing and notarisation where infrastructure permits, and the gates that must
+be green before anything is published.

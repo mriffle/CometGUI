@@ -1,0 +1,50 @@
+# Pinned Python requirements for building the CometGUI documentation.
+#
+# Read the Docs installs exactly this file (see .readthedocs.yaml), and the
+# project virtualenv at .venv is created from it, so the documentation gate and
+# the hosted build run the same Sphinx.
+#
+# Generated from the project virtualenv on 2026-08-29 with
+#     .venv/bin/pip freeze
+# It is the full pinned closure, not just the top-level package: an
+# unpinned transitive dependency is how a documentation build stops being
+# reproducible. Regenerate the same way after changing a dependency, and add
+# nothing here that docs/conf.py does not actually use.
+#
+# Recreate the virtualenv from scratch (needs network, once; nothing is
+# installed on the host):
+#     python3 -m venv .venv
+#     .venv/bin/pip install -r docs/requirements.txt
+#
+# RELATIONSHIP TO requirements-dev.txt (repository root, another Phase 01 unit):
+# that file is the whole Python tooling set for the project virtualenv and will
+# grow as other gates add tools; this file is only what building the
+# documentation needs, because it is what Read the Docs installs and the hosted
+# build has no business installing lint or test tooling. They are identical
+# today. If they ever diverge, this file must stay a subset of that one, pinned
+# to the same versions -- two files pinning the same package to different
+# versions would mean the gate and the hosted build are not running the same
+# Sphinx. Whether to keep both is a phase-level call, not this unit's.
+
+alabaster==1.0.0
+babel==2.18.0
+certifi==2026.7.22
+charset-normalizer==3.5.1
+docutils==0.22.4
+idna==3.19
+imagesize==2.0.1
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+packaging==26.3
+Pygments==2.21.0
+requests==2.34.2
+roman-numerals==4.1.0
+snowballstemmer==3.1.1
+Sphinx==9.0.4
+sphinxcontrib-applehelp==2.0.0
+sphinxcontrib-devhelp==2.0.0
+sphinxcontrib-htmlhelp==2.1.0
+sphinxcontrib-jsmath==1.0.1
+sphinxcontrib-qthelp==2.0.0
+sphinxcontrib-serializinghtml==2.0.0
+urllib3==2.7.0

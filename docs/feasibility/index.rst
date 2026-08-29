@@ -18,14 +18,16 @@ warnings treated as errors), per the documentation rule in ``ONBOARDING.rst``.
 
 .. toctree::
    :maxdepth: 1
+   :glob:
 
-.. Deliberately empty for now. The build harness auto-discovers every ``.rst``
-   in this directory and puts it in a generated toctree, so a document does not
-   need to be listed here to be checked. A ``:glob:`` entry was the obvious
-   alternative but a glob that matches nothing raises
-   ``toctree glob pattern '*' didn't match any documents``, which ``-W`` turns
-   into an error while this directory holds only ``index.rst``. Phase 01, which
-   owns the real tree, can switch this to a glob once the set is populated.
+   *
+
+.. Phase 01 switched this from a deliberately empty toctree to the glob the
+   previous comment here invited, now that the set is populated: the real
+   Sphinx tree (``docs/conf.py``) builds this directory under ``-n -W``, where
+   a document in no toctree is a build failure, so the glob is what keeps
+   every evidence document in the build without a hand-maintained list. It is
+   reached from ``docs/developer/index.rst`` as an evidence appendix.
 
 Checking these documents
 ========================
