@@ -46,7 +46,22 @@ Work units
        success -- exit code 0 alone is not accepted as proof.
      - Enables the RST cleanliness requirement for every deliverable
        (``ONBOARDING`` Documentation rules)
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Ran
+       ``bash scripts/feasibility/check-docs.sh`` myself: exit 0, "build
+       succeeded.", 4 HTML pages on disk including a 12091-byte
+       ``_build/docs-check/html/feasibility/index.html``. Then wrote my OWN
+       broken RST (short title underline + ``:py:func:`` to a nonexistent
+       target + a ``list-table`` whose ``:widths:`` has 2 entries for 3
+       columns) and ran the harness on it: **exit 1**, with
+       ``ERROR: "list-table" widths do not match the number of columns in
+       table (3).``, ``WARNING: py:func reference target not found`` and
+       ``build finished with problems, 7 warnings (with warnings treated as
+       errors).`` The gate really bites. Read commit ``42feb8c`` in full (268
+       lines, 2 files, nothing else swept in). ``docs/conf.py`` confirmed
+       absent. The agent declined to use a ``:glob:`` toctree because an empty
+       glob is itself a ``-W`` error and the alternative was
+       ``suppress_warnings``, which would have weakened the gate -- correct
+       call, accepted.
 
    * - 2
      - **Upstream fact re-verification, live, today.** Re-check every row of

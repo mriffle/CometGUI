@@ -4,3 +4,4 @@ target/
 _build/
 *.class
 scratch/
+__pycache__/
