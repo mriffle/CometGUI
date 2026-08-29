@@ -1,0 +1,92 @@
+# CometGUI -- nightly pipeline.
+#
+# The specification's list, in "CI and Release Pipeline / Nightly pipeline":
+# the broader Comet and Percolator version matrix; a larger real dataset;
+# determinism comparisons; performance metrics; the headless and native GUI
+# test suites; the Windows RAW search test; a documentation link check; and
+# verification that every managed tool URL and checksum in the manifest is
+# still reachable and unchanged (R-TEST-08).
+#
+# ALMOST ALL OF IT IS A STUB TODAY, AND EVERY STUB EXITS 70, NOT 0.
+# PHASE-01's job is to install the pipeline before the work it drives exists;
+# the phase document permits nightly steps to be stubs "that fail loudly rather
+# than silently passing".  scripts/ci/stub-lib.sh is what makes that literal:
+# each stub prints which phase owns the real check and exits non-zero.  A green
+# nightly today would mean nothing; a red one names exactly what is missing.
+#
+# Two steps are real: the documentation link check, which needs nothing that
+# does not exist yet, and the provisioning steps.
+#
+# NEVER RUN ON A SCHEDULE HERE.  There is no git remote (D-008), so this file
+# has never been executed by GitHub.  scripts/ci/run-pipeline-locally.sh runs
+# every step below on this machine and requires each stub to fail and each real
+# step to pass.
+
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  linux:
+    name: Nightly (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Project-local JDK and Maven (no setup-java)
+        run: bash scripts/ci/toolchain.sh
+
+      - name: Project-local font stack for the headless JavaFX tests
+        run: bash scripts/ci/fontstack.sh
+
+      - name: Project virtualenv for the documentation toolchain
+        run: bash scripts/ci/python-env.sh
+
+      - name: Broader Comet and Percolator version matrix
+        run: bash scripts/ci/nightly-version-matrix.sh
+
+      - name: Larger real dataset regression
+        run: bash scripts/ci/nightly-large-dataset.sh
+
+      - name: Determinism comparisons
+        run: bash scripts/ci/nightly-determinism.sh
+
+      - name: Performance metrics
+        run: bash scripts/ci/nightly-performance.sh
+
+      - name: Headless and native GUI test suites
+        run: bash scripts/ci/nightly-gui-tests.sh
+
+      - name: Documentation link check
+        run: bash scripts/ci/nightly-linkcheck.sh
+
+      - name: Tool manifest verification (R-TEST-08)
+        run: bash scripts/ci/nightly-manifest-verify.sh
+
+  windows:
+    # UNVERIFIABLE IN THIS ENVIRONMENT.  There is no non-Linux machine here and
+    # no git remote, so this job has never run anywhere.  It is named rather
+    # than omitted because the specification requires the Windows Thermo RAW
+    # search test in the nightly pipeline, and a later phase should switch it on
+    # rather than discover it was never written.  PHASE-15 owns the RAW test.
+    name: Nightly (Windows RAW search)
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Windows Thermo RAW search test
+        run: bash scripts/ci/nightly-windows-raw.sh

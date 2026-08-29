@@ -1,0 +1,35 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:00000000-0000-4000-8000-000000000001",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "bom-ref": "fixture",
+      "name": "cometgui-dependency-scan-fixture",
+      "version": "0.0.0",
+      "description": "FIXTURE, NOT A DEPENDENCY OF THIS PROJECT. scripts/ci/dependency-scan.py must be seen to fail before it is trusted to pass, so this hand-written CycloneDX document names components with well-known advisories. Nothing here is on any CometGUI class path; the real SBOM is generated into _build/sbom/ by scripts/ci/sbom.sh."
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1?type=jar",
+      "group": "org.apache.logging.log4j",
+      "name": "log4j-core",
+      "version": "2.14.1",
+      "scope": "required",
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1?type=jar"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.junit.jupiter/junit-jupiter@5.14.4?type=jar",
+      "group": "org.junit.jupiter",
+      "name": "junit-jupiter",
+      "version": "5.14.4",
+      "scope": "required",
+      "purl": "pkg:maven/org.junit.jupiter/junit-jupiter@5.14.4?type=jar"
+    }
+  ]
+}

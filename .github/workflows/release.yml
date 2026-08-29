@@ -1,0 +1,99 @@
+# CometGUI -- release pipeline.
+#
+# The specification's list, in "CI and Release Pipeline / Release pipeline",
+# for each tier-1 platform: build the native packaged application with its
+# bundled runtime; produce the installer or archive; compute release checksums;
+# run the clean-home packaged smoke test; run Tier B canonical E2E on that
+# exact artefact; run the XML-capable full Limelight E2E; run the no-XML
+# compatibility E2E; verify the tool download manifest; verify the strict
+# documentation build; generate and publish the SBOM; verify that no test
+# bridge is present (R-TEST-06); sign and notarise where infrastructure
+# permits; and publish only if every gate passes.
+#
+# THIS FILE PUBLISHES NOTHING, AND CONTAINS NO PUSH, NO CREDENTIAL AND NO
+# REMOTE.  Where CometGUI is published is D-008, still open and the owner's to
+# settle, and it is coupled to the GPL-3.0 source-availability obligation.
+# scripts/ci/release-publish.sh is a stub that refuses; scripts/ci/
+# check-workflows.py fails this file if it ever grows a `secrets.` reference,
+# a `git push`, a write permission or an action other than checkout.
+#
+# Every step that would touch a real artefact is a stub that exits 70 and names
+# its owning phase.  The steps that can be honest today -- the strict
+# documentation build and the SBOM -- are real, and they are the same scripts
+# the pull-request pipeline runs.
+#
+# WINDOWS AND MACOS ARE NAMED BUT UNVERIFIABLE HERE.  This environment has one
+# Linux machine and no remote, so the two non-Linux matrix entries have never
+# executed. They are written down so that a later phase turns them on rather
+# than writes them; D-004 records that the macOS Percolator payload is x86-64
+# and runs under Rosetta 2 on Apple silicon.
+
+name: release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  qualify:
+    name: Release qualification
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Project-local JDK and Maven (no setup-java)
+        run: bash scripts/ci/toolchain.sh
+
+      - name: Project virtualenv for the documentation toolchain
+        run: bash scripts/ci/python-env.sh
+
+      - name: Build the native packaged application with its bundled runtime
+        run: bash scripts/ci/release-package.sh
+
+      - name: Compute release checksums
+        run: bash scripts/ci/release-checksums.sh
+
+      - name: Clean-home packaged smoke test
+        run: bash scripts/ci/release-smoke.sh
+
+      - name: Tier B canonical end-to-end on that exact artefact
+        run: bash scripts/ci/release-e2e-canonical.sh
+
+      - name: XML-capable full Limelight end-to-end
+        run: bash scripts/ci/release-e2e-limelight.sh
+
+      - name: No-XML compatibility end-to-end
+        run: bash scripts/ci/release-e2e-noxml.sh
+
+      - name: Verify the tool download manifest
+        run: bash scripts/ci/nightly-manifest-verify.sh
+
+      - name: Strict Sphinx documentation build (-n -W)
+        run: bash scripts/ci/docs-build.sh
+
+      - name: Generate and validate the SBOM
+        run: bash scripts/ci/sbom.sh
+
+      - name: Verify that no test bridge is present (R-TEST-06)
+        run: bash scripts/ci/release-no-test-bridge.sh
+
+      - name: Sign and notarise where infrastructure permits
+        run: bash scripts/ci/release-sign-notarise.sh
+
+      - name: Publish, only if every gate above passed
+        run: bash scripts/ci/release-publish.sh

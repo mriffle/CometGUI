@@ -11,7 +11,7 @@
 # tools/, Python tooling lives in .venv/, and the Maven local repository is
 # forced to _build/m2repo so that ~/.m2 is never written to.
 #
-# ADDING A STAGE (phase 01 units 2, 3, 6 and 7 will):
+# ADDING A STAGE:
 #   1. write a `stage_<id>` function;
 #   2. add one "<id>:<one-line description>" entry to STAGES, in order.
 # That is the whole contract.  Stages run in order, each is banner-delimited,
@@ -59,12 +59,15 @@ readonly STAGES=(
     "artefacts:Verify the build produced what it claims to have produced"
     "format:Evidence that Spotless, Checkstyle and SpotBugs inspected the code"
     "gates:JaCoCo coverage, ArchUnit and PIT mutation gates"
-    # unit 6  "docs:Strict Sphinx build and the traceability report"
-    # unit 7  "supplychain:SBOM generation and dependency vulnerability scan"
+    "integration:Real-tool integration tests on Linux"
+    "docs:Strict Sphinx build and the traceability report"
+    "supplychain:SBOM generation and dependency vulnerability scan"
+    "workflows:CI workflow definitions match the scripts they invoke"
 )
 
 # ----------------------------------------------------------------- plumbing --
 MVN_OFFLINE=""
+ONLY=""
 STAGE_RESULTS=()
 
 usage() {
@@ -78,6 +81,15 @@ Options:
   --offline        Pass -o to Maven and require .venv to exist already.  Only
                    works once a previous online run has populated
                    _build/m2repo; it resolves nothing from the network.
+  --only ID[,ID]   Run only the named stages, in the order listed below.  This
+                   exists so that the CI step scripts in scripts/ci/ can invoke
+                   THIS script rather than reimplementing a stage: the local
+                   gate and the pull-request pipeline then cannot drift into
+                   running different commands.  An unknown ID is a fatal error.
+                   Stages are not independent -- `gates` reads what `build`
+                   wrote -- so a selection that skips a producer only makes
+                   sense inside one CI job on one checkout, which is how the
+                   workflows use it.
   -h, --help       Show this message and exit.
 
 Stages (in order):
@@ -709,11 +721,36 @@ stage_gates() {
     echo "    deliberately damaged copy of the tree under _build/)."
 }
 
+# The four stages below are thin on purpose.  Each one delegates to the same
+# scripts/ci/<step>.sh that the pull-request workflow runs, so there is exactly
+# one implementation of each check and `bash scripts/build.sh` runs the whole
+# content of the pull-request pipeline locally.  See .github/workflows/ and
+# scripts/ci/check-workflows.py, which enforces that correspondence.
+
+stage_integration() {
+    bash "${ROOT}/scripts/ci/integration-tests.sh"
+}
+
+stage_docs() {
+    bash "${ROOT}/scripts/ci/docs-build.sh"
+    bash "${ROOT}/scripts/ci/traceability.sh"
+}
+
+stage_supplychain() {
+    bash "${ROOT}/scripts/ci/sbom.sh"
+    bash "${ROOT}/scripts/ci/dependency-scan.sh"
+}
+
+stage_workflows() {
+    bash "${ROOT}/scripts/ci/check-workflows.sh"
+}
+
 # -------------------------------------------------------------------- main --
 main() {
     while [ "$#" -gt 0 ]; do
         case "$1" in
             --offline) MVN_OFFLINE="-o"; shift ;;
+            --only) ONLY="${2:-}"; [ -n "${ONLY}" ] || die "--only needs a stage id"; shift 2 ;;
             -h|--help) usage; exit 0 ;;
             *) usage >&2; die "unknown option: $1" ;;
         esac
@@ -721,15 +758,48 @@ main() {
 
     cd -- "${ROOT}"
 
+    # Select the stages to run, in STAGES order.  An id that names no stage is
+    # fatal: a workflow step that quietly ran nothing because someone renamed a
+    # stage is precisely the drift these scripts exist to prevent.
+    local -a selected=()
+    if [ -n "${ONLY}" ]; then
+        local want found
+        local -a wanted=()
+        IFS=',' read -r -a wanted <<< "${ONLY}"
+        for want in "${wanted[@]}"; do
+            found=0
+            for entry in "${STAGES[@]}"; do
+                [ "${entry%%:*}" = "${want}" ] && found=1
+            done
+            [ "${found}" -eq 1 ] || die "--only: no such stage '${want}'. Stages: $(for _s in "${STAGES[@]}"; do printf '%s ' "${_s%%:*}"; done)"
+        done
+        for entry in "${STAGES[@]}"; do
+            for want in "${wanted[@]}"; do
+                [ "${entry%%:*}" = "${want}" ] && selected+=("${entry}")
+            done
+        done
+    else
+        selected=("${STAGES[@]}")
+    fi
+
+    # Every stage after `toolchain` needs the project-local JDK and Maven on
+    # PATH.  A full run gets that from stage_toolchain; a --only run that does
+    # not include it would otherwise inherit the host PATH, which has no JDK at
+    # all, and fail with a confusing "mvn: not found".
+    if [ -n "${ONLY}" ] && [[ ",${ONLY}," != *,toolchain,* ]] && [ -f "${ROOT}/tools/env.sh" ]; then
+        # shellcheck disable=SC1091
+        . "${ROOT}/tools/env.sh"
+    fi
+
     M2_STATE_BEFORE="$(m2_state)"
     readonly M2_STATE_BEFORE
 
     local started total index id description stage_started elapsed
     started="$(date +%s)"
-    total="${#STAGES[@]}"
+    total="${#selected[@]}"
     index=0
 
-    for entry in "${STAGES[@]}"; do
+    for entry in "${selected[@]}"; do
         index=$((index + 1))
         id="${entry%%:*}"
         description="${entry#*:}"

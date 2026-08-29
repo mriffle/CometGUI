@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "comment": "Accepted dependency vulnerability findings for scripts/ci/dependency-scan.py. EMPTY IS THE CORRECT STATE. Adding an entry accepts a known vulnerability into a shipped product, so it is a reviewable change to a checked-in file, never a command-line flag. Every entry needs: id (the advisory, GHSA-... or CVE-...), package (group:artifact exactly as the scanner prints it), reason (why this is acceptable HERE, in enough words to act on -- 'not exploitable' alone is not a reason), date (ISO, when it was accepted). review_by is optional and recommended: past that date the entry expires and the finding fails the build again. An entry that matches no finding fails the scan, because a stale acceptance is a place for a real finding to hide.",
+  "entries": []
+}

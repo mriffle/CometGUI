@@ -1,0 +1,114 @@
+# CometGUI -- pull-request pipeline.
+#
+# The step list is the specification's, in "CI and Release Pipeline /
+# Pull-request pipeline": compile on the supported JDK; formatting and style
+# check; static analysis; fast JUnit tests; JaCoCo coverage gate; ArchUnit
+# tests; PIT mutation tests for critical packages; small real-tool integration
+# tests on Linux; Sphinx documentation build with warnings as errors;
+# traceability report generation (R-DOC-03); dependency and security scanning;
+# and SBOM generation validation.  scripts/ci/check-workflows.py checks that
+# every one of those clauses is still in specification.rst and still has a step
+# here, so this file cannot quietly stop matching the specification.
+#
+# TWO RULES THIS FILE KEEPS.
+#
+# 1. EVERY STEP IS A scripts/ci/*.sh INVOCATION THAT A PERSON CAN RUN LOCALLY.
+#    No inline multi-line shell, ever.  A workflow with logic in it is a second
+#    build system that only exists on a runner, and it drifts from the one
+#    documented command within a week.  `bash scripts/build.sh` runs the whole
+#    content of this file; the scripts below are the same stage functions.
+#
+# 2. NO setup-java, NO setup-python, NO caching action.  The toolchain comes
+#    from scripts/feasibility/install-toolchain.sh by pinned SHA-256, into
+#    tools/, exactly as it does on a developer machine, and the Maven local
+#    repository is _build/m2repo (.mvn/maven.config).  If CI resolved its JDK
+#    from an action, CI and the local build would no longer be the same build,
+#    and this project's whole reproducibility claim rests on their being the
+#    same build.
+#
+# WHAT THIS FILE HAS NOT BEEN SEEN TO DO.  It has never run on a pull request:
+# this repository has NO GIT REMOTE, and creating one is D-008, an owner
+# decision (see CONTRIBUTING.rst, "There is no git remote").  PHASE-01 exit
+# gate item 6 is therefore only half met.  The half that IS met is that every
+# step below has been executed locally, by scripts/ci/run-pipeline-locally.sh,
+# which reads the steps out of this file rather than out of a copy of it.
+name: pull-request
+
+on:
+  pull_request:
+    branches:
+      - main
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  gate:
+    # Linux only, and that is the specification's choice, not a shortcut: the
+    # pull-request pipeline's integration tests are named "on Linux".  The
+    # Windows and macOS matrices belong to the nightly and release pipelines.
+    name: Pull-request gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      # Pinned to the commit actions/checkout v5 resolved to on 2026-08-29.
+      # A tag is mutable; the specification says pin build-plugin versions and
+      # the same argument applies to an action that can run arbitrary code.
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Project-local JDK and Maven (no setup-java)
+        run: bash scripts/ci/toolchain.sh
+
+      # NOT optional.  PHASE-00 established that the pinned JDK ships no
+      # Monocle and that a Scene containing any Control dies with
+      # "fontFactory is null" without freetype, fontconfig, pango and real font
+      # files.  A hosted runner has no more of those than this machine does, so
+      # the font stack is provisioned as a named step rather than left to luck.
+      - name: Project-local font stack for the headless JavaFX tests
+        run: bash scripts/ci/fontstack.sh
+
+      - name: Project virtualenv for the documentation toolchain
+        run: bash scripts/ci/python-env.sh
+
+      # One Maven invocation, six specification clauses: compile on the
+      # supported JDK, formatting and style check (Spotless, Checkstyle at
+      # validate), static analysis (SpotBugs at verify), fast JUnit tests,
+      # JaCoCo coverage gate and ArchUnit tests.  They are bound into the
+      # lifecycle in pom.xml, so splitting them into separate `mvn` runs would
+      # recompile the reactor several times and check exactly the same things.
+      - name: Compile, format, static analysis, unit tests, coverage, ArchUnit
+        run: bash scripts/ci/maven-verify.sh
+
+      - name: Verify the build produced what it claims to have produced
+        run: bash scripts/ci/artefacts.sh
+
+      - name: Evidence that Spotless, Checkstyle and SpotBugs inspected the code
+        run: bash scripts/ci/format-evidence.sh
+
+      - name: JaCoCo coverage gate, ArchUnit rules and PIT mutation gate
+        run: bash scripts/ci/test-gates.sh
+
+      - name: Real-tool integration tests on Linux
+        run: bash scripts/ci/integration-tests.sh
+
+      - name: Strict Sphinx documentation build (-n -W)
+        run: bash scripts/ci/docs-build.sh
+
+      - name: Traceability report (R-DOC-03)
+        run: bash scripts/ci/traceability.sh
+
+      - name: SBOM generation and validation
+        run: bash scripts/ci/sbom.sh
+
+      - name: Dependency and security scanning (OSV)
+        run: bash scripts/ci/dependency-scan.sh
+
+      - name: CI definitions match the scripts they invoke
+        run: bash scripts/ci/check-workflows.sh

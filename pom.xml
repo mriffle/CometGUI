@@ -131,6 +131,23 @@
     <openjfx-monocle.version>21.0.2</openjfx-monocle.version>
 
     <!--
+      UNIT 7: SUPPLY CHAIN.  The specification's Supply-Chain and Application
+      Security section requires an SBOM at release time and dependency
+      vulnerability scanning in CI.  CycloneDX produces the SBOM; the scan is
+      scripts/ci/dependency-scan.py, which queries OSV (https://osv.dev) from
+      the SBOM and needs no API key and no plugin.
+      2.9.3 is the version seen to run on this JDK (Liberica 25.0.4.1+1) and to
+      emit a 1.6 document listing every reactor module and every resolved
+      dependency; scripts/ci/sbom_verify.py reads this property, so the pin
+      lives here and nowhere else.
+      There is deliberately NO org.owasp:dependency-check-maven: it builds its
+      database from the NVD, which needs an API key this project does not have
+      and cannot be given by an agent, and without one it either takes hours or
+      silently reports nothing found.
+    -->
+    <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
+
+    <!--
       COVERAGE GATE SWITCHES (unit 3).  The thresholds themselves are written
       once, in the jacoco pluginManagement block below, so that no module can
       hold a different number.  A module opts in by overriding one of these to
@@ -761,10 +778,43 @@
             unit 3  DONE: JaCoCo and PIT above; archunit-junit5 and the
                     headless JavaFX recipe are in the modules that use them
                     (cometgui-archtests and cometgui-ui).
-            unit 7  SBOM and dependency scanning
-                    org.cyclonedx:cyclonedx-maven-plugin
-                    org.owasp:dependency-check-maven
+            unit 7  DONE: cyclonedx-maven-plugin below.  The reservation also
+                    named org.owasp:dependency-check-maven; it is deliberately
+                    NOT here.  dependency-check builds its database from the
+                    NVD and needs an API key to do so in any reasonable time.
+                    This project has no credentials, and a scanner that cannot
+                    reach its data source reports "no vulnerabilities" and
+                    exits 0, which is the exact vacuous pass this repository
+                    refuses.
+                    scripts/ci/dependency-scan.py queries OSV instead: no key,
+                    Maven coordinates answered directly, and a known-vulnerable
+                    canary in every batch so that an unreachable or lying
+                    endpoint fails the step instead of passing it.
         -->
+
+        <!--
+          UNIT 7.  SBOM generation (specification: Supply-Chain and Application
+          Security, "generate an SBOM at release time"; CI and Release
+          Pipeline, "SBOM generation validation").
+
+          Deliberately NOT bound to an execution in <build><plugins>.  The SBOM
+          is produced by scripts/ci/sbom.sh, which invokes this goal by its
+          pinned coordinate and then VALIDATES THE DOCUMENT, because the plugin
+          exits
+          0 whether it wrote 26 components or none, so the exit code is not the
+          gate: scripts/ci/sbom_verify.py is.  Binding it to `package` would
+          add ten seconds to every `mvn verify` and would still not check the
+          output.
+
+          includeTestScope is set by that script: JUnit and ArchUnit are test
+          scope, and a supply-chain document that omits the test dependencies
+          omits most of what this repository actually downloads.
+        -->
+        <plugin>
+          <groupId>org.cyclonedx</groupId>
+          <artifactId>cyclonedx-maven-plugin</artifactId>
+          <version>${cyclonedx-maven-plugin.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
 
