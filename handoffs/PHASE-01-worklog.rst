@@ -115,6 +115,12 @@ Work units
        unanchored ``tools/`` pattern silently matched
        ``org/cometgui/tools/`` inside three modules and would have dropped
        eight source files from git. It is now ``/tools/``.
+       **Re-verified after unit 2 reformatted all 61 Java files and added
+       licence headers** (commit ``252530d`` changed unit 1's sources): in the
+       same sandbox I re-injected the inverted blank-version guard and ``mvn
+       -pl cometgui-domain test`` still exits 1 with ``rejectsMissingVersion``
+       and ``rejectsBlankVersion`` failing, so the reformat did not blunt the
+       tests. The 39 tests still pass in the working tree.
 
    * - 2
      - **Formatting and static analysis that fail the build.** Spotless
@@ -124,7 +130,35 @@ Work units
        violation and passes when it is removed, demonstrated by the agent and
        re-run by the orchestrator.
      - Gate 1, gate 6 (PR pipeline steps)
-     - *pending -- not started*
+     - **ACCEPTED 2026-08-29**, commit ``252530d``. ``bash scripts/build.sh``
+       exits 0 in 59 s with a fifth stage: ``Spotless 59 file(s), Checkstyle
+       59 file(s), SpotBugs 62 class(es)``. That stage reads
+       ``spotless-index``, ``checkstyle-result.xml`` and ``spotbugsXml.xml``
+       and compares the counts against what is on disk, so it cannot pass on a
+       skipped tool -- the agent proved that by running ``mvn verify`` with all
+       three skipped, which Maven exits 0 on and ``build.sh`` then fails.
+       ``~/.m2`` absent before and after. Versions are pinned exactly, and both
+       analysers are pinned **separately from their plugins** (Checkstyle
+       14.0.0, SpotBugs 4.10.4) so the plugin's bundled default cannot drift.
+       **I ran my own three negative controls** in a ``git archive HEAD``
+       sandbox at ``_build/orch-q``: an unformatted, header-less class gives
+       ``spotless:check`` exit 1 naming the file; a ``package-info.java`` with
+       no header gives ``spotless:check`` **exit 0** and ``checkstyle:check``
+       exit 1 with ``Missing a header - not enough lines in file. [Header]``;
+       and a correctly formatted class with a null dereference passes Spotless
+       and Checkstyle but gives ``spotbugs:check`` exit 1 with ``High: Null
+       pointer dereference of s in ... [NP_ALWAYS_NULL]``. The three tools
+       therefore catch three different things, and each was seen to fail.
+       **The most valuable finding is the one the unit surfaced rather than
+       hid:** ``spotless-maven-plugin`` unconditionally excludes
+       ``package-info.java`` from licence-header checks, and this repository
+       has 53 of them, so Spotless alone would have left ``D-001``'s header
+       obligation unmet on most of the tree. Checkstyle's ``Header`` module
+       over the same header file closes it. I reproduced that blind spot
+       myself rather than believing the report. SpotBugs genuinely reads Java
+       25 bytecode (``major version: 69``, 62 classes, ``missingClasses=0``),
+       which was the risk I briefed it to check. Cost: about 50 s added, 47 s
+       of it SpotBugs.
 
    * - 3
      - **Test, coverage, architecture and mutation gates.** JUnit Jupiter;
