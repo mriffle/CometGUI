@@ -337,7 +337,37 @@ Work units
        loudly; the SBOM lists real components; the scanner reports a known CVE
        on a deliberately vulnerable fixture.
      - ``AC-REL-01``; gate 6 (the half that can be met without a remote)
-     - *pending -- not started*
+     - **ACCEPTED 2026-08-29**, commit ``dd254f1``. ``bash scripts/build.sh``
+       exits 0 with **11/11 stages in 86 s** (+10 s), the new stages being
+       ``integration``, ``docs``, ``supplychain`` and ``workflows``; the
+       documentation stage unit 6 reported as still commented out is now on.
+       ``git remote -v`` prints **nothing** and ``~/.m2`` still does not
+       exist. SBOM: 26 components, CycloneDX ``specVersion 1.6``, JSON and XML
+       agreeing. ``bash scripts/ci/run-pipeline-locally.sh`` exits 0 over
+       ``42 step(s) across 3 workflow(s); 37 executed on this machine; 0
+       unexpected``, and prints ``Still unmet: 'on a pull request'. No remote
+       exists (D-008)`` in its own summary rather than leaving me to notice.
+       Stubs exit **70** naming ``PHASE-14``/``15``/``16``.
+       **I attacked the dependency scanner rather than running its
+       self-test.** Against a blocked proxy it exits 4, refusing to answer.
+       Then I wrote a fake OSV endpoint that returns HTTP 200 and "no
+       vulnerabilities" for every query -- the exact way a scanner passes
+       while proving nothing -- pointed the scanner at it, and it exited **6**
+       with ``CANARY CONTROL FAILED -- THE SCAN RESULT CANNOT BE TRUSTED``. It
+       sends a known-vulnerable canary coordinate alongside the real ones and
+       requires the endpoint to find it, which is a stronger defence than the
+       brief asked for. On the real SBOM it passes with ``15 coordinate(s)
+       scanned ... the canary proves the endpoint found 7 advisory(ies)``, and
+       on the committed log4j fixture it exits 1 naming
+       ``GHSA-jfh8-c2jp-5v3q aliases: CVE-2021-44228``. **I falsified the
+       drift checker myself**: renaming ``scripts/ci/maven-verify.sh`` in a
+       sandbox takes it from exit 0 to exit 1 with ``names
+       scripts/ci/maven-verify.sh, which does not exist`` plus the
+       specification clauses that step was covering. Two honest limits the
+       unit named itself: the workflow checker is not a GitHub Actions schema
+       validator, and its stdlib YAML parser does not type scalars (verified
+       once against PyYAML in a throwaway environment, nothing added to
+       ``.venv``).
 
    * - 8
      - **The falsifiability harness.** One re-runnable script that, for each
