@@ -19,12 +19,12 @@ authoritative for its own scope and exit gate.
      - Feasibility, Legal and Upstream Verification
      - none
      - D-001, D-002, D-004, D-005, D-006, D-007
-     - NOT STARTED
+     - PARTIAL (signed off 2026-08-29)
    * - `01 <PHASE-01-build-skeleton.rst>`_
      - Repository, Build and Quality Skeleton
-     - 00
+     - 00 (met)
      - D-008 (repository licence, for the LICENSE file only)
-     - NOT STARTED
+     - READY -- next
    * - `02 <PHASE-02-app-shell.rst>`_
      - Application Shell and Navigation
      - 01
@@ -117,6 +117,26 @@ schedule. Where dependencies allow, phases may overlap:
 * 11 (PDV) is independent of 12 (Limelight) once 10 is done.
 * 16 contains human-gated work (licensing, UX sessions) that must be
   scheduled far earlier than it is executed.
+
+Phase 00's residue, for the phases that inherit it
+==================================================
+
+Phase 00 was signed off ``PARTIAL``. Three items travel forward; none blocks
+Phase 01.
+
+* **No Windows or macOS binary has ever been executed.** Every non-Linux
+  capability verdict in the project is inference from byte markers. Phases 05,
+  09 and 15 must treat platform capability as *probed at runtime*, never as
+  read from a table. Closing this needs either a remote for Windows CI
+  (``D-008``) or fifteen minutes from a person with a Windows machine, using
+  the checklist in ``docs/feasibility/windows-artefact.rst``.
+* **The ``noxml`` finding may re-scope Phase 05.** If the portable ``noxml``
+  archives can feed Limelight, the NSIS and ``xar``/cpio payload extractors
+  Phase 05 was going to build are unnecessary. This is ``D-002`` option C and
+  is an owner decision; it is cheapest to answer *before* Phase 05 starts.
+* **The capability probe must be functional, not textual.** ``--help`` is
+  identical between the XML and ``noxml`` builds, so ``R-PERC-02`` cannot be
+  satisfied by string matching. Phase 09 owns this.
 
 Phases 00-13 with their gates passed constitute a working,
 provenance-complete application. Phases 14-16 are what make it a release.
