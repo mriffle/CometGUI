@@ -82,18 +82,34 @@ HARD RULES
     Phase 00 found three tools in this project's own chain that exit 0 while
     doing nothing useful.
 
-BEFORE YOU START PHASE 01, PUT TWO QUESTIONS TO THE OWNER
-Neither blocks starting Phase 01, and neither is yours to answer.
-  1. D-001 with D-008, together. CasanovoGUI became GPL-3.0 during Phase 00, so
-     derivation is now permitted but would bind CometGUI to GPL-3.0. Phase 01
-     wants the answer for its LICENSE file; place that file last and never
-     invent it.
-  2. D-002 option C. Phase 00 proved by execution that the "noxml" Percolator
-     builds do emit Percolator XML - XML_SUPPORT gates the pin-XML input path,
-     which the product never uses. If the portable noxml archives can feed
-     Limelight, Phase 05 need not build NSIS or xar/cpio payload extraction at
-     all. Answering this before Phase 05 starts saves the most fragile code in
-     the installer; answering after wastes it.
+LICENSING IS DECIDED - DO NOT RE-ASK IT
+On 2026-08-29 the owner decided: **CometGUI is GPL-3.0**, derived from
+CasanovoGUI (D-001 DECIDED), and **PDV is to be treated as GPL-3.0**. The
+LICENSE file is therefore determined and Phase 01 is unblocked; it places the
+full, unmodified GPLv3 text at the repository root - not a paraphrase. Phase 02
+may reuse CasanovoGUI source, retaining its copyright notices and recording the
+derivation. R-SEC-01's no-copying constraint is lifted.
+Consequences already worked out, so you need not re-derive them: Apache-2.0
+(Comet, Percolator, the Limelight converter) is one-way compatible INTO GPL-3.0
+and raises no conflict; none of the three ships a NOTICE file; Comet's LICENSE
+is Apache-2.0 plus an embedded MIT section, also compatible; the bundled
+Liberica JRE is GPLv2 WITH the Classpath Exception, which permits the
+combination. See D-001 and D-008 in DECISIONS.rst.
+
+ONE OWNER QUESTION REMAINS WITH A DEADLINE, AND IT IS NOT YOURS TO ANSWER
+  D-002 option C. Phase 00 proved by execution that the "noxml" Percolator
+  builds do emit Percolator XML - XML_SUPPORT gates the pin-XML input path,
+  which the product never uses. If the portable noxml archives can feed
+  Limelight, Phase 05 need not build NSIS or xar/cpio payload extraction at
+  all. Answering before Phase 05 starts saves the most fragile code in the
+  installer; answering after wastes it. Raise it with the owner well before
+  Phase 05.
+
+ALSO STILL OPEN: the publication half of D-008 - where CometGUI is published,
+and whether tool binaries are redistributed or downloaded from upstream. There
+is STILL NO GIT REMOTE and creating one is part of that decision. This is what
+keeps Phase 00's gate item 8 open: a free GitHub Actions windows-latest runner
+would close it permanently.
 
 THEN RUN PHASE 01 (phases/PHASE-01-build-skeleton.rst)
 Its dependency is met and its toolchain is installed and provenanced under

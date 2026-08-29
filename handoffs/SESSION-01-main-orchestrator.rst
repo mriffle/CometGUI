@@ -102,3 +102,25 @@ Each was reproduced by the main orchestrator, not merely reported.
   supplied. This will hit CI too.
 * **Downloaded mzML arrived CRLF-corrupted and Comet exited 249.** Verify
   checksums and fetch in binary mode.
+
+Owner decisions taken during this session
+=========================================
+
+After Phase 00 was signed off, the owner answered the licensing question.
+
+* **``D-001`` DECIDED:** CometGUI derives from CasanovoGUI and is released
+  under **GPL-3.0**. ``R-SEC-01``'s prohibition on copying CasanovoGUI source
+  is lifted, replaced by an obligation to retain notices and record the
+  derivation.
+* **``D-008`` part decided:** the licence is GPL-3.0, which unblocks Phase 01's
+  ``LICENSE`` file. **Where CometGUI is published, and whether tool binaries
+  are redistributed, remain open. There is still no git remote and none may be
+  created.**
+* **PDV is to be treated as GPL-3.0** by owner direction, resolving its
+  upstream ``LICENSE``/``pom.xml`` contradiction conservatively. Phase 16 must
+  still obtain the real answer from upstream; the assumption is directionally
+  safe because it constrains the project more than the Apache reading would.
+
+Recorded in ``DECISIONS.rst``, ``STATUS.rst``, ``phases/index.rst`` and
+specification revision 6. The one owner question left with a deadline is
+``D-002`` option C, which should be answered before Phase 05 starts.

@@ -4,8 +4,8 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-08-29
-:Updated by: Main orchestrator (Phase 00 gate re-run and signed off)
-:Current phase: 00 -- PARTIAL, signed off; 01 not started
+:Updated by: Main orchestrator (Phase 00 signed off; D-001 decided, D-008 part-decided)
+:Current phase: 00 -- PARTIAL, signed off; 01 ready and no longer licence-blocked
 :Overall: Feasibility established. No product code exists yet, by design --
    Phase 00 writes none. Phase 01 is ready to start.
 
@@ -292,10 +292,12 @@ accordingly.
 Open decisions
 ==============
 
-Six of eight remain open. ``D-002`` and ``D-004`` were decided on 2026-08-29.
-Phase 00 supplied evidence and costed options for every open item; **none was
-answered by an agent.** Two now need the owner together rather than
-separately: ``D-001`` and ``D-008``.
+``D-001``, ``D-002`` and ``D-004`` are decided; ``D-008`` is half decided.
+Phase 00 supplied evidence and costed options for every item; **none was
+answered by an agent.** On 2026-08-29 the owner decided the licensing question:
+**CometGUI is GPL-3.0**, derived from CasanovoGUI, and **PDV is to be treated
+as GPL-3.0**. Four items remain open: ``D-003``, ``D-005``, ``D-006``,
+``D-007``, plus the publication half of ``D-008``.
 
 .. list-table::
    :header-rows: 1
@@ -305,10 +307,10 @@ separately: ``D-001`` and ``D-008``.
      - Question
      - Blocks
    * - ``D-001``
-     - **Changed 2026-08-29:** CasanovoGUI published **GPL-3.0** mid-phase, so
-       derivation is now permitted. The question became: do we accept
-       GPL-3.0's copyleft on CometGUI? Answer with ``D-008``.
-     - Derivation in 02; redistribution in 16
+     - **DECIDED**: derive from CasanovoGUI and release CometGUI under
+       **GPL-3.0**. The copyleft commitment is accepted; ``R-SEC-01``'s
+       no-copying constraint is lifted.
+     - --
    * - ``D-002``
      - **DECIDED**: no source builds; use 3.07.1, the newest release with
        XML-capable binaries on all three platforms.
@@ -331,9 +333,10 @@ separately: ``D-001`` and ``D-008``.
      - Which Limelight endpoint do tests target?
      - 12, 14
    * - ``D-008``
-     - CometGUI's own licence and distribution. Now also the cheapest route to
-       Phase 00's one unmet gate item: Windows CI needs a remote.
-     - 01 (LICENSE file), 16; and gate item 8 of phase 00
+     - **PART DECIDED**: the licence is **GPL-3.0**, so Phase 01 is unblocked.
+       Still open: where CometGUI is published (**still no remote -- do not
+       create one**) and whether tool binaries are redistributed or downloaded.
+     - 16; and gate item 8 of phase 00, whose cheapest fix needs a remote
 
 Risks currently live
 ====================
@@ -363,10 +366,18 @@ Risks currently live
    identical. ``R-PERC-02`` needs a functional probe, and
    ``scripts/feasibility/probe_xml_capability.py`` is currently wrong.
 
-#. **CasanovoGUI is now GPL-3.0** (published 2026-08-29T01:56:35Z, mid-phase).
-   Derivation is permitted; the risk changed from "no permission" to "strong
-   copyleft binds CometGUI's own licence". Resolve with ``D-008`` before
-   Phase 02 reuses anything.
+#. **Licensing is settled and is no longer a risk.** CasanovoGUI published
+   GPL-3.0 mid-phase; the owner decided on 2026-08-29 that CometGUI is
+   **GPL-3.0** and derives from it. Apache-2.0 dependencies (Comet,
+   Percolator, the Limelight converter) are compatible in that direction, and
+   the bundled Liberica JRE is GPLv2 **with the Classpath Exception**, which
+   permits the combination. What remains is compliance work, not choice:
+   the ``LICENSE`` file (Phase 01), derivation notices (Phase 02),
+   ``docs/citations.rst`` attribution, and a source-availability mechanism
+   (Phase 16, dependent on the open publication half of ``D-008``). One cheap
+   follow-up: ask the CasanovoGUI authors to confirm the grant covers the
+   repository's existing history, since it carries a merged outside
+   contribution.
 #. **Upstream drift.** PDV moved 2.6.0 -> 2.7.0 between the first and second
    drafts of the specification on the same day. Phase 00 re-verifies
    everything; phase 15 adds the CI job that catches it thereafter.
@@ -397,30 +408,30 @@ Risks currently live
 Next action
 ===========
 
-**Take the two owner questions below to the owner, then run Phase 01**
-(``phases/PHASE-01-build-skeleton.rst``). Phase 01 is otherwise ready: its
-only dependency, Phase 00, is signed off, and the toolchain it needs is
-installed and provenanced.
-
-Phase 01 is blocked only on ``D-008`` for the ``LICENSE`` file itself. The
-rest of the build skeleton -- Maven layout, the Sphinx tree with ``conf.py``,
-quality gates -- can proceed while the licence is decided, provided the
-``LICENSE`` file is the last thing placed and is not invented.
+**Run Phase 01** (``phases/PHASE-01-build-skeleton.rst``). It is ready and no
+longer blocked in any part: its only dependency, Phase 00, is signed off; the
+toolchain it needs is installed and provenanced; and its ``LICENSE`` file is
+now determined -- the full, unmodified GNU General Public License version 3
+text at the repository root. Phase 01 must place the real GPLv3 text, not a
+paraphrase or a summary.
 
 For the owner, in priority order
 --------------------------------
 
-#. **``D-001`` with ``D-008``, together.** CasanovoGUI became GPL-3.0 during
-   Phase 00. Accepting it makes CometGUI GPL-3.0 permanently; declining it
-   means writing the shell independently, which Phase 00 showed is affordable.
-   Phase 01 wants the answer for its ``LICENSE`` file.
 #. **``D-002`` option C -- act on the ``noxml`` finding, or not.** If the
    portable ``noxml`` archives can feed Limelight, Phase 05 need not implement
    NSIS or ``xar``/cpio extraction at all. Deciding before Phase 05 starts
    saves building the most fragile code in the installer; deciding after wastes
-   it.
+   it. **This is now the only decision with a deadline.**
+#. **The publication half of ``D-008``.** Where CometGUI is published, and
+   whether tool binaries are redistributed or downloaded from upstream. The
+   remote question is what keeps Phase 00's gate item 8 open: a free GitHub
+   Actions ``windows-latest`` runner would close it permanently and re-run on
+   every change.
 
-Neither blocks starting Phase 01.
+*Answered on 2026-08-29:* ``D-001`` and the licence half of ``D-008`` --
+CometGUI is GPL-3.0, derived from CasanovoGUI, with PDV treated as GPL-3.0.
+Neither open item blocks starting Phase 01.
 
 Change log
 ==========
@@ -457,6 +468,23 @@ Change log
      - Orchestration model made explicit: three tiers (main orchestrator ->
        phase orchestrator -> phase agent), each signing off the tier below by
        running the checks itself. Added ``handoffs/WORKLOG-TEMPLATE.rst``.
+   * - 2026-08-29
+     - --
+     - **Owner decided the licensing question.** ``D-001`` DECIDED: derive from
+       CasanovoGUI and release CometGUI under **GPL-3.0**, accepting the
+       copyleft commitment; ``R-SEC-01``'s no-copying constraint is lifted and
+       Phase 02 may reuse CasanovoGUI source with derivation notices. ``D-008``
+       part decided: the licence is GPL-3.0, unblocking Phase 01's ``LICENSE``
+       file; **where CometGUI is published, and whether tool binaries are
+       redistributed, remain open -- there is still no remote and none may be
+       created.** The owner also directed that **PDV be treated as GPL-3.0**,
+       resolving its upstream ``LICENSE``/``pom.xml`` contradiction
+       conservatively for now; Phase 16 must still get the real answer from
+       upstream. Compatibility consequence recorded: Apache-2.0 (Comet,
+       Percolator, Limelight converter) is one-way compatible into GPL-3.0, and
+       the bundled Liberica JRE is GPLv2 **with the Classpath Exception**, so
+       the dependency set raises no conflict. Specification amended to revision
+       6.
    * - 2026-08-29
      - 00
      - **Phase 00 run and signed off PARTIAL.** Three tiers used as designed:

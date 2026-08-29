@@ -19,10 +19,11 @@ Status values: ``OPEN``, ``DECIDED``, ``SUPERSEDED``.
 D-001 -- CasanovoGUI source reuse
 =================================
 
-:Status: OPEN -- **materially changed 2026-08-29**
+:Status: **DECIDED 2026-08-29**
 :Raised: 2026-08-28
-:Blocks: Phase 02 (derivation), Phase 16 (redistribution), ``AC-REL-02``
+:Blocks: nothing further; phases 01, 02 and 16 implement it
 :Owner: Project owner, with the CasanovoGUI copyright holders
+:Decided by: Project owner, 2026-08-29, in session with the main orchestrator
 
 **Question.** May CometGUI be derived from ``Noble-Lab/CasanovoGUI``, and at
 what cost to CometGUI's own licensing?
@@ -71,13 +72,45 @@ be answered together with ``D-008``, not before it.
    *Cost:* an email and goodwill, and upstream may decline; GPL-3.0 remains
    the fallback.
 
-**Recommendation.** Decide ``D-001`` and ``D-008`` in one sitting. If CometGUI
-is happy to be GPL-3.0, option 1 is now the cheapest path and the blocker is
-gone. If CometGUI needs a permissive licence, option 2 remains correct and
-Phase 00's evidence says it is affordable. Until the owner answers, **do not
-copy CasanovoGUI code** (``R-SEC-01``): the constraint is no longer legality
-but the licence commitment that copying would silently make on the project's
-behalf.
+**DECISION (2026-08-29). Option 1: derive from CasanovoGUI, and release
+CometGUI under GPL-3.0.** The owner accepted the copyleft commitment. The
+derivation prohibition in ``R-SEC-01`` is lifted: Phase 02 may reuse
+CasanovoGUI source, subject to the obligations below.
+
+**Obligations this creates, which the implementing phases must honour.**
+
+#. **``LICENSE``** at the repository root carries the full, unmodified GNU
+   General Public License version 3 text. Phase 01 places it; it is no longer
+   blocked. Do not paraphrase or truncate it.
+#. **Attribution to CasanovoGUI is required, not optional.** Any file derived
+   from ``Noble-Lab/CasanovoGUI`` retains its copyright notices and records the
+   derivation. Phase 02 owns this.
+#. **Source availability.** Every recipient of a CometGUI installer must be
+   able to obtain the corresponding source. Phase 16 owns the mechanism, which
+   depends on the still-open publication half of ``D-008``.
+#. **Third-party attribution still applies.** Apache-2.0 is compatible with
+   GPL-3.0 in this direction, so Comet, Percolator and the Limelight converter
+   pose no compatibility problem; but if their binaries are *redistributed*
+   rather than downloaded from upstream, Apache-2.0 s4 requires notices and a
+   licence copy. None of the three ships a ``NOTICE`` file, which lightens
+   this. Comet's ``LICENSE`` is Apache-2.0 plus an embedded MIT section (Gygi
+   Lab, 2022), also GPL-3.0-compatible. Record all of it in
+   ``docs/citations.rst``.
+#. **The bundled JRE is unaffected.** Liberica is GPLv2 **with the Classpath
+   Exception**, which exists precisely to permit this combination. GPLv2 alone
+   would have been incompatible with the Apache-2.0 dependencies; GPL-3.0 is
+   not.
+
+**Still to confirm with upstream, and cheap.** Ask the CasanovoGUI authors to
+confirm the grant covers the repository's **existing history** and not only
+commits after ``2026-08-29T01:56:35Z``. The repository carries a merged
+outside contribution, so the party adding the ``LICENSE`` file should confirm
+the grant reaches prior contributions. This is a tidying action, not a blocker;
+proceed while it is outstanding.
+
+**``AC-REL-02``.** This entry is the recorded human sign-off for the licensing
+criterion, per ``ONBOARDING.rst``'s finished condition. Phase 16's licence
+audit still runs; it now verifies compliance rather than choosing a licence.
 
 **Note on the fact table.** ``specification.rst``'s verified-facts row
 "CasanovoGUI licence" and Phase 00's ``docs/feasibility/upstream-facts.rst``
@@ -437,10 +470,38 @@ determined from the output file, never from the exit code.
 D-008 -- CometGUI licence and distribution
 ==========================================
 
-:Status: OPEN
+:Status: **PARTLY DECIDED 2026-08-29** -- licence settled, publication still OPEN
 :Raised: 2026-08-28
-:Blocks: Phase 01 (``LICENSE`` file), Phase 16
+:Blocks: Phase 16, and Windows CI for phase 00's gate item 8. **No longer
+   blocks Phase 01**, whose ``LICENSE`` file is now determined.
 :Owner: Project owner
+
+**DECIDED -- the licence.** CometGUI is released under **GPL-3.0**, following
+from ``D-001``'s decision to derive from CasanovoGUI. Phase 01 places the full
+GPLv3 text at the repository root and is unblocked for that deliverable.
+
+**STILL OPEN -- publication and redistribution.** The owner has not answered,
+and an agent must not infer:
+
+* **Where CometGUI is published.** There is still **no git remote, and creating
+  one remains part of this decision -- do not create one.** This is not
+  academic: the cheapest repeatable route to Phase 00's one unmet gate item is
+  a GitHub Actions ``windows-latest`` runner, which needs a remote. Until then
+  the alternatives are a person with a Windows machine (~15 minutes, one-off,
+  not repeatable) or a paid cloud VM.
+* **Whether tool binaries are redistributed alongside CometGUI**, or downloaded
+  from upstream at install time. This changes the project's obligations
+  materially: downloading from upstream incurs almost none, while
+  redistributing makes CometGUI an Apache-2.0 redistributor of Comet,
+  Percolator and the Limelight converter, with s4 notice obligations. It also
+  interacts with ``D-002`` option C, since the artefact chosen per platform
+  determines what there is to redistribute.
+
+**Recommendation for the open half.** Decide the remote early -- it is the only
+thing standing between the project and a permanently closed gate item 8 -- and
+default to *downloading from upstream by checksum* rather than redistributing,
+which keeps the licence surface small and matches the specification's existing
+tool-registry design.
 
 **Question.** Under what licence is CometGUI released, where is it published,
 and are project-built tool binaries distributed alongside it?
@@ -466,7 +527,19 @@ new couplings:
   without a remote, the only alternatives are a person with a Windows machine
   (~15 minutes, one-off, not repeatable) or a paid cloud VM.
 
-A further input for the licence audit: **PDV's licensing is self-contradictory
-upstream** -- ``LICENSE`` at v2.7.0 is GPL-3.0 while its ``pom.xml`` declares
-Apache-2.0. Phase 16's audit must resolve which governs before PDV is
-redistributed or invoked as a bundled tool.
+**PDV, by owner direction 2026-08-29: treat it as GPL-3.0.** Its licensing is
+self-contradictory upstream -- ``LICENSE`` at v2.7.0 is GPL-3.0 while its
+``pom.xml`` declares Apache-2.0. The owner directed that the project proceed on
+the assumption that **GPL-3.0 governs**, which is the conservative reading and
+is now harmless: with CometGUI itself GPL-3.0, a GPL-3.0 PDV raises no
+compatibility question in either direction.
+
+Two things this assumption does **not** do, and which Phase 16 must still
+close. It does not resolve the upstream contradiction -- ask the PDV authors
+which licence governs, and record the answer. And it does not licence
+redistribution of PDV under Apache terms: if the project ever needs the
+permissive reading (for example to relicense or to redistribute PDV inside a
+non-GPL artefact), that requires the upstream answer, not this assumption. Note
+the assumption is directionally safe: assuming GPL-3.0 constrains the project
+*more* than the Apache reading would, so acting on it cannot create a
+violation.

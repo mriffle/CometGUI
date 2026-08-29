@@ -23,12 +23,12 @@ authoritative for its own scope and exit gate.
    * - `01 <PHASE-01-build-skeleton.rst>`_
      - Repository, Build and Quality Skeleton
      - 00 (met)
-     - D-008 (repository licence, for the LICENSE file only)
-     - READY -- next
+     - none outstanding -- the LICENSE file is GPL-3.0 (``D-001``, ``D-008``)
+     - READY -- next, unblocked
    * - `02 <PHASE-02-app-shell.rst>`_
      - Application Shell and Navigation
      - 01
-     - D-001 (only if CasanovoGUI code is to be reused)
+     - D-001 DECIDED -- reuse permitted; retain notices, record derivation
      - NOT STARTED
    * - `03 <PHASE-03-process-service.rst>`_
      - Process Service

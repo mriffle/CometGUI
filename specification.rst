@@ -5,11 +5,12 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 5
+:Revision: 6
 :Revision date: 2026-08-29
-:Supersedes: Revision 4, 2026-08-29
+:Supersedes: Revision 5, 2026-08-29
 :Target application: Cross-platform Java desktop application
-:Primary source base: Noble-Lab CasanovoGUI (GPL-3.0 as of 2026-08-29; reuse and its copyleft consequence are ``D-001`` with ``D-008`` -- see :ref:`spec-decisions`)
+:Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
+:Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
 :Primary search engine: Comet
 :Primary post-processor: Percolator
 :Visualisation: PDV
@@ -32,6 +33,32 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 6
+     - 2026-08-29
+     - **Licensing decided.** ``Noble-Lab/CasanovoGUI`` published GPL-3.0 on
+       2026-08-29, and the owner decided that CometGUI **derives from it and is
+       released under GPL-3.0** (``D-001``). The derivation gate throughout this
+       document is therefore met: the Executive Summary's "shall be derived from
+       the CasanovoGUI code base" is now authorised rather than conditional, and
+       ``R-SEC-01``'s prohibition on copying CasanovoGUI source is lifted,
+       replaced by an obligation to retain its copyright notices and record the
+       derivation. Consequences recorded rather than assumed: Apache-2.0 (Comet,
+       Percolator, the Limelight converter) is one-way compatible **into**
+       GPL-3.0, so those dependencies raise no conflict -- GPLv2 would have,
+       which is why the version matters; none of the three ships a ``NOTICE``
+       file, so Apache-2.0 s4(d) does not bite; Comet's ``LICENSE`` is
+       Apache-2.0 plus an embedded MIT section (Gygi Lab, 2022), also
+       compatible; and the bundled Liberica JRE is GPLv2 **with the Classpath
+       Exception**, which exists to permit exactly this combination. **PDV is to
+       be treated as GPL-3.0** by owner direction, resolving its upstream
+       ``LICENSE``/``pom.xml`` contradiction conservatively -- the assumption
+       constrains the project more than the Apache reading would, so it cannot
+       create a violation, but Phase 16 must still obtain the real answer
+       upstream. New obligations for the implementing phases: the full
+       unmodified GPLv3 text at the repository root (phase 01), derivation
+       notices (phase 02), third-party attribution in ``docs/citations.rst``,
+       and a source-availability mechanism for installer recipients (phase 16),
+       which depends on the still-open publication half of ``D-008``.
    * - 5
      - 2026-08-29
      - **Phase 00 verification amendment.** Recorded, without yet rewriting the
