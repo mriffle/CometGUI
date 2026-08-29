@@ -21,6 +21,18 @@
     dependency on everything, and it is allowed it because it ships nothing.
   -->
   <dependencies>
+    <!--
+      ArchUnit itself (phase 01 unit 3).  Version pinned in the parent's
+      dependencyManagement.  The rules are plain JUnit tests calling
+      rule.check(...) rather than the @AnalyzeClasses annotation, because this
+      module has to assert the size and composition of the class import BEFORE
+      any rule is evaluated: an import that comes back empty makes every
+      noClasses() rule pass.  See ClassImportCensusTest.
+    -->
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.cometgui</groupId>
       <artifactId>cometgui-domain</artifactId>

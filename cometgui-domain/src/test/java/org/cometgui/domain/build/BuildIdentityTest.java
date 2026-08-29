@@ -306,6 +306,35 @@ class BuildIdentityTest {
         }
 
         @Test
+        @DisplayName("hash codes differ when the values differ, so the hash is not a constant")
+        void hashCodeDistinguishesUnequalValues() {
+            String otherCommit = "89abcdef0123456789abcdef0123456789abcdef";
+
+            /*
+             * Added by phase 01 unit 3 to kill the one mutation that survived the first PIT run:
+             * PrimitiveReturnsMutator replaced hashCode()'s return value with 0, which keeps the
+             * equals/hashCode contract and so passed every test there was. A hash that is the same
+             * for every identity turns any HashMap of provenance values into a linked list, and
+             * nothing else in the suite could see it. The three values below are fixed, so
+             * Objects.hash is deterministic and this is an assertion, not a probability.
+             */
+            assertAll(
+                    () ->
+                            assertNotEquals(
+                                    identity.hashCode(),
+                                    BuildIdentity.of("0.1.1", COMMIT, BUILT_AT).hashCode()),
+                    () ->
+                            assertNotEquals(
+                                    identity.hashCode(),
+                                    BuildIdentity.of("0.1.0", otherCommit, BUILT_AT).hashCode()),
+                    () ->
+                            assertNotEquals(
+                                    identity.hashCode(),
+                                    BuildIdentity.of("0.1.0", COMMIT, BUILT_AT.plusSeconds(1))
+                                            .hashCode()));
+        }
+
+        @Test
         @DisplayName("is not equal to null or to a different type")
         void unequalToNullAndOtherTypes() {
             assertAll(

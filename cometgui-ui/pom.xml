@@ -15,6 +15,67 @@
   <name>CometGUI :: User interface</name>
   <description>JavaFX views, view-models and controls. No scientific, hashing, download or parsing logic lives here.</description>
 
+  <properties>
+    <!--
+      COVERAGE: the specification gives "UI-independent view-model and presenter
+      logic" a 80% line target and deliberately gives the JavaFX rendering glue
+      no numeric target at all, so the rule this switch turns on is scoped to
+      the view-model packages rather than to the module (parent POM,
+      coverage-check-viewmodel).  It is on and inert today: there is no
+      view-model yet.  Phase 02 writes the first one and inherits the gate.
+    -->
+    <cometgui.coverage.viewmodel.skip>false</cometgui.coverage.viewmodel.skip>
+
+    <!--
+      HEADLESS JAVAFX, the recipe Phase 00 unit 7 proved
+      (scripts/feasibility/javafx-smoke.sh; docs/feasibility/).  Do not
+      rediscover any of this, and do not simplify it without re-running that
+      script.
+
+      patch-module: the pinned Liberica JDK bundles JavaFX 25.0.4+1 but its
+      javafx.graphics contains no Monocle at all (only com.sun.glass.ui.gtk and
+      .delegate), and this host has no libX11, so the GTK platform cannot even
+      load libglass.so.  org.testfx:openjfx-monocle supplies a headless Glass
+      platform.  It is patched INTO javafx.graphics rather than put on the class
+      path because javafx.graphics is a named system module and its
+      PlatformFactory lookup cannot see the unnamed module; a class path copy
+      lands in a different runtime package and is never found.
+
+      The add-exports and add-opens pairs are what TestFX 4.0.18 needs: it
+      reflectively instantiates MonoclePlatformFactory and HeadlessPlatform and
+      writes them into private static fields.  Phase 02 adds TestFX, so the set
+      is kept whole here rather than trimmed to what this one test needs and
+      then rediscovered later.
+
+      LD_LIBRARY_PATH, FONTCONFIG_PATH and XDG_DATA_HOME (in the surefire block
+      below) point at the project-local font stack.  Without them a Scene
+      containing any Control dies with "fontFactory is null".
+
+      PLATFORM SCOPE, stated honestly: this is the Linux headless recipe, and
+      the library directory below is amd64-specific.  The project's macOS and
+      Windows CI runners are deferred with the rest of gate item 6 (no remote,
+      D-008); the phase that adds them owns splitting this into OS-activated
+      profiles.  It is not written as if it already worked everywhere.
+    -->
+    <cometgui.monocleJar>${project.build.directory}/monocle/openjfx-monocle.jar</cometgui.monocleJar>
+    <cometgui.fontstackRoot>${maven.multiModuleProjectDirectory}/tools/fontstack-bookworm-20260829/root</cometgui.fontstackRoot>
+    <cometgui.surefire.extraArgLine>
+      --patch-module javafx.graphics=${cometgui.monocleJar}
+      --add-exports javafx.graphics/com.sun.javafx.tk=ALL-UNNAMED
+      --add-exports javafx.graphics/com.sun.glass.ui=ALL-UNNAMED
+      --add-opens javafx.graphics/com.sun.glass.ui=ALL-UNNAMED
+      --add-exports javafx.graphics/com.sun.glass.ui.monocle=ALL-UNNAMED
+      --add-opens javafx.graphics/com.sun.glass.ui.monocle=ALL-UNNAMED
+      --add-exports javafx.graphics/com.sun.javafx.application=ALL-UNNAMED
+      --add-opens javafx.graphics/com.sun.javafx.application=ALL-UNNAMED
+      --enable-native-access=javafx.graphics
+      -Dglass.platform=Monocle
+      -Dmonocle.platform=Headless
+      -Dprism.order=sw
+      -Djava.awt.headless=true
+    </cometgui.surefire.extraArgLine>
+  </properties>
+
   <!--
     Only the edges the specification's layering permits are declared here.
     Adding one is an architectural change: say so in the phase handoff, and
@@ -46,4 +107,68 @@
       <artifactId>cometgui-params-percolator</artifactId>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <!--
+        Monocle is fetched into the build directory and injected with
+        patch-module; it is deliberately NOT a <dependency>, because anything on
+        the test class path lands in the unnamed module where javafx.graphics
+        cannot see it.  The version is pinned in the parent POM.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>fetch-monocle</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.testfx</groupId>
+                  <artifactId>openjfx-monocle</artifactId>
+                  <version>${openjfx-monocle.version}</version>
+                  <type>jar</type>
+                  <outputDirectory>${project.build.directory}/monocle</outputDirectory>
+                  <destFileName>openjfx-monocle.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!--
+            One JVM per test class.  Phase 00 found that a shared fork lets one
+            toolkit-owning test break the next one's robot input; isolating the
+            JVMs is the fix, and relaxing the assertion would not have been.
+          -->
+          <reuseForks>false</reuseForks>
+          <!--
+            The forked JVM's environment, not system properties: the dynamic
+            linker and fontconfig read these at process start, so setting them
+            with -D would be too late and would do nothing.
+          -->
+          <environmentVariables>
+            <LD_LIBRARY_PATH>${cometgui.fontstackRoot}/usr/lib/x86_64-linux-gnu</LD_LIBRARY_PATH>
+            <FONTCONFIG_PATH>${cometgui.fontstackRoot}/etc/fonts</FONTCONFIG_PATH>
+            <XDG_DATA_HOME>${cometgui.fontstackRoot}/usr/share</XDG_DATA_HOME>
+            <!-- fontconfig's cache belongs in the build directory, not in the
+                 developer's home: no test may depend on home-directory state. -->
+            <XDG_CACHE_HOME>${project.build.directory}/fontconfig-cache</XDG_CACHE_HOME>
+          </environmentVariables>
+          <systemPropertyVariables>
+            <cometgui.fontstackRoot>${cometgui.fontstackRoot}</cometgui.fontstackRoot>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

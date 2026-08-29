@@ -14,4 +14,19 @@
   <packaging>jar</packaging>
   <name>CometGUI :: Domain</name>
   <description>Framework-free domain model: projects, runs, tool identities, parameters, results and provenance values.</description>
+
+  <!--
+    COVERAGE AND MUTATION GATES ARE ON IN THIS MODULE (phase 01 unit 3).
+    The specification gates "core domain ... logic" at >= 90% line and >= 85%
+    branch, and R-TEST-02 gates the critical packages at >= 80% mutation score;
+    the numbers themselves are in the parent POM so that every gated module
+    uses the same pair.  This is the only module in the reactor where both
+    currently bite, because it is the only one with behaviour.
+    Setting either of these back to true to make a build pass is a weakening of
+    a gate and is rejected at sign-off.
+  -->
+  <properties>
+    <cometgui.coverage.core.skip>false</cometgui.coverage.core.skip>
+    <cometgui.mutation.skip>false</cometgui.mutation.skip>
+  </properties>
 </project>

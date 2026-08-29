@@ -108,6 +108,66 @@
     <spotbugs-core.version>4.10.4</spotbugs-core.version>
 
     <!--
+      UNIT 3: TEST, COVERAGE, ARCHITECTURE AND MUTATION GATES.  Each version
+      below was chosen by running it on this JDK (Liberica 25.0.4.1+1, class
+      file major version 69) and reading its output, not from a changelog.
+      A coverage or mutation tool that cannot read a class file reports an
+      empty analysis and exits 0, which is the exact failure this project
+      calls a vacuous pass.
+    -->
+    <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
+    <pitest-maven.version>1.30.0</pitest-maven.version>
+    <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
+    <archunit.version>1.5.0</archunit.version>
+    <!--
+      Headless JavaFX.  The pinned Liberica JDK bundles JavaFX 25.0.4+1 but
+      ships NO Monocle: com.sun.glass.ui contains only .gtk and .delegate, and
+      this host has no libX11, so there is no usable Glass platform in the box.
+      org.testfx:openjfx-monocle supplies one; it is fetched by
+      maven-dependency-plugin and injected with the patch-module option in
+      cometgui-ui, never placed on the class path.  Phase 00 unit 7 proved this
+      exact pair (scripts/feasibility/javafx-smoke.sh).
+    -->
+    <openjfx-monocle.version>21.0.2</openjfx-monocle.version>
+
+    <!--
+      COVERAGE GATE SWITCHES (unit 3).  The thresholds themselves are written
+      once, in the jacoco pluginManagement block below, so that no module can
+      hold a different number.  A module opts in by overriding one of these to
+      false in its own POM; the default is "no numeric gate", which is what the
+      specification says for adapters and for JavaFX rendering glue.
+
+        cometgui.coverage.core.skip       the specification's "core domain,
+                                          parameter and provenance logic":
+                                          90% line, 85% branch, whole module.
+        cometgui.coverage.viewmodel.skip  "UI-independent view-model and
+                                          presenter logic": 80% line, scoped
+                                          to the view-model packages.
+        cometgui.mutation.skip            R-TEST-02: 80% mutation score over
+                                          the critical packages.
+
+      scripts/build.sh re-derives which modules SHOULD be opted in from the
+      classes actually compiled, and fails if a module grows gated code while
+      its switch is still true.  Flipping a switch back to true to make a build
+      pass is a weakening of a gate.
+    -->
+    <cometgui.coverage.core.skip>true</cometgui.coverage.core.skip>
+    <cometgui.coverage.viewmodel.skip>true</cometgui.coverage.viewmodel.skip>
+    <cometgui.mutation.skip>true</cometgui.mutation.skip>
+
+    <!--
+      Surefire argument plumbing.  jacoco:prepare-agent writes the agent option
+      into cometgui.jacocoArgLine (renamed from the default argLine so that a
+      module setting its own argLine cannot silently drop the coverage agent -
+      an agent-less test run produces no execution data and JaCoCo then reports
+      100% of nothing).  Surefire reads it back late, with the at-sign form, so
+      the value exists by the time tests fork.  The empty defaults here are
+      what makes the late reference resolvable when a goal is skipped.
+    -->
+    <cometgui.jacocoArgLine/>
+    <cometgui.surefire.extraArgLine/>
+
+    <!--
       Where the hand-written rule sets live.  maven.multiModuleProjectDirectory
       is the repository root for every module in the reactor (Maven sets it
       because .mvn/ exists here); a plain relative path would resolve against
@@ -145,6 +205,22 @@
         <version>${junit.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+
+      <!--
+        Architecture tests.  Only cometgui-archtests declares it; it is managed
+        here so the version is pinned in the same place as everything else.
+        1.5.0 is the version seen to import Java 25 class files (major version
+        69) in this reactor: an ArchUnit that cannot read a class file imports
+        nothing and every rule then passes vacuously, which is why
+        cometgui-archtests asserts the size and the composition of its import
+        before it checks a single rule.
+      -->
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit-junit5</artifactId>
+        <version>${archunit.version}</version>
+        <scope>test</scope>
       </dependency>
 
       <!--
@@ -279,6 +355,32 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <version>${maven-surefire-plugin.version}</version>
+          <configuration>
+            <!--
+              UNIT 3.  Two things, both of which exist to stop a test run that
+              proves nothing.
+
+              argLine: the at-sign form is surefire's LATE property reference,
+              resolved when the fork is created rather than when the POM is
+              read, which is the only form that can pick up the value
+              jacoco:prepare-agent writes during the build.  A module that needs
+              its own JVM options sets cometgui.surefire.extraArgLine (see
+              cometgui-ui) instead of overriding argLine, so that the coverage
+              agent can never be dropped by accident.  Drop the agent and every
+              module reports no execution data, and JaCoCo passes a rule it
+              never evaluated.
+
+              cometgui.buildDirectory: tests that must leave evidence on disk
+              for scripts/build.sh to read (the ArchUnit import census) need the
+              module's target directory; surefire's working directory is the
+              module basedir, and hard-coding "target" in a test would break the
+              moment a module moved its build output.
+            -->
+            <argLine>@{cometgui.jacocoArgLine} ${cometgui.surefire.extraArgLine}</argLine>
+            <systemPropertyVariables>
+              <cometgui.buildDirectory>${project.build.directory}</cometgui.buildDirectory>
+            </systemPropertyVariables>
+          </configuration>
         </plugin>
 
         <!--
@@ -440,20 +542,225 @@
         </plugin>
 
         <!--
+          UNIT 3: COVERAGE.  JaCoCo measures every module (coverage is a
+          diagnostic everywhere) and gates the modules the specification names.
+
+          THE NUMBERS ARE THE SPECIFICATION'S, and they are written here once so
+          that no module can hold a different pair.  specification.rst, Testing
+          Strategy / Coverage: "core domain, parameter and provenance logic
+          >= 90% line and >= 85% branch; UI-independent view-model and presenter
+          logic >= 80% line; adapters covered by real integration tests rather
+          than artificial line counts; JavaFX rendering glue has no numeric
+          target".  That is why there are exactly two check executions and why
+          the adapter, install, workflow and app modules have neither.
+
+          WHICH RULES BITE TODAY.  Only cometgui-domain has behaviour, so only
+          its BUNDLE rule can currently fail.  The same rule is switched on in
+          cometgui-provenance, cometgui-params-comet and cometgui-params-
+          percolator, where it is INERT until those modules have classes: a
+          module whose only classes are package-info carries no LINE or BRANCH
+          counters at all, and JaCoCo cannot violate a ratio it cannot compute.
+          An inert rule is not a passing rule.  scripts/build.sh prints the
+          measured counters per module so the difference is visible, and fails
+          if a module grows gated code with its switch still off.
+
+          NO EXCLUSIONS.  There is no <excludes> here and adding one to make a
+          module pass is a weakening of a gate.  If a class genuinely cannot be
+          covered (a main method, a JavaFX bootstrap), that is an argument for
+          moving the logic out of it, which is what the layering already
+          requires.
+        -->
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco-maven-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>coverage-agent</id>
+              <phase>initialize</phase>
+              <goals>
+                <goal>prepare-agent</goal>
+              </goals>
+              <configuration>
+                <!-- Not the default "argLine" property: see the surefire block
+                     above for why the indirection matters. -->
+                <propertyName>cometgui.jacocoArgLine</propertyName>
+              </configuration>
+            </execution>
+            <execution>
+              <!-- Declared before the two checks and in the same phase, so the
+                   XML report the checks and scripts/build.sh read is always the
+                   one this build produced. -->
+              <id>coverage-report</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>report</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>coverage-check-core</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>check</goal>
+              </goals>
+              <configuration>
+                <skip>${cometgui.coverage.core.skip}</skip>
+                <haltOnFailure>true</haltOnFailure>
+                <rules>
+                  <rule>
+                    <element>BUNDLE</element>
+                    <limits>
+                      <limit>
+                        <counter>LINE</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>0.90</minimum>
+                      </limit>
+                      <limit>
+                        <counter>BRANCH</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>0.85</minimum>
+                      </limit>
+                    </limits>
+                  </rule>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>coverage-check-viewmodel</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>check</goal>
+              </goals>
+              <configuration>
+                <skip>${cometgui.coverage.viewmodel.skip}</skip>
+                <haltOnFailure>true</haltOnFailure>
+                <rules>
+                  <rule>
+                    <!--
+                      PACKAGE, not BUNDLE: the specification gives the 80% line
+                      target to "UI-independent view-model and presenter logic",
+                      not to the whole UI module, and the same module also holds
+                      the JavaFX rendering glue the specification deliberately
+                      leaves without a numeric target.  A BUNDLE rule here would
+                      invent a number for the glue.
+
+                      The pattern is matched against the name JaCoCo's check
+                      goal gives the element, which for a package uses DOTS.
+                      This was written with slashes first, on the reasonable
+                      assumption that report element names are VM names; the
+                      rule then matched nothing and passed over an uncovered
+                      class without a word.  What caught it was the view-model
+                      control in scripts/verify-test-gates.sh, which is the
+                      whole argument for making an inert rule fail on purpose
+                      before believing it.
+                    -->
+                    <element>PACKAGE</element>
+                    <includes>
+                      <include>org.cometgui.ui.viewmodel*</include>
+                    </includes>
+                    <limits>
+                      <limit>
+                        <counter>LINE</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>0.80</minimum>
+                      </limit>
+                    </limits>
+                  </rule>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+
+        <!--
+          UNIT 3: MUTATION TESTING (R-TEST-02).  "The gate is >= 80% mutation
+          score in those packages, with no surviving mutation that can disable
+          checksum verification, invert a q-value comparison, drop a required
+          output, suppress a validation error, pass an unsupported option to a
+          tool, or leak a secret."
+
+          WHY PIT IS NOT IN THE DEFAULT `mvn verify`.  PIT re-runs the test
+          suite once per mutation; on a full parameter parser that is minutes,
+          not seconds, and a gate people are tempted to skip is a gate that
+          rots.  It therefore has its own profile (-Pmutation, at the end of
+          this POM), and scripts/build.sh runs the goal directly in its `gates`
+          stage.  It is not optional: the build script fails if the run does not
+          produce a report with real mutations in it.
+
+          failWhenNoMutations IS LEFT AT ITS DEFAULT (true) ON PURPOSE.  Turning
+          it off is the classic vacuous pass: PIT finds nothing to mutate, exits
+          0, and the 80% gate is never evaluated.  The per-module switch
+          cometgui.mutation.skip is how a module that genuinely has no critical
+          code yet stays out, and scripts/build.sh re-derives from the compiled
+          classes which modules should have it switched on.
+
+          TARGET CLASSES: the specification's list of critical pure logic, in
+          package terms.  A later phase adds its packages here and flips its own
+          module's switch; it does not narrow this list.
+        -->
+        <plugin>
+          <groupId>org.pitest</groupId>
+          <artifactId>pitest-maven</artifactId>
+          <version>${pitest-maven.version}</version>
+          <dependencies>
+            <!-- Without this PIT finds the JUnit 5 tests but cannot run them,
+                 and reports every mutation as NO_COVERAGE. -->
+            <dependency>
+              <groupId>org.pitest</groupId>
+              <artifactId>pitest-junit5-plugin</artifactId>
+              <version>${pitest-junit5-plugin.version}</version>
+            </dependency>
+          </dependencies>
+          <configuration>
+            <skip>${cometgui.mutation.skip}</skip>
+            <mutationThreshold>80</mutationThreshold>
+            <targetClasses>
+              <!-- domain model: value objects, run and project state -->
+              <param>org.cometgui.domain.*</param>
+              <!-- Comet parameter schema, parser, writer, validation, presets,
+                   migration -->
+              <param>org.cometgui.params.comet.*</param>
+              <!-- Percolator parameter schema and validation -->
+              <param>org.cometgui.params.percolator.*</param>
+              <!-- checksum and provenance code, secret redaction in reports -->
+              <param>org.cometgui.provenance.*</param>
+              <!-- q-value filters and result parsing -->
+              <param>org.cometgui.results.filtering.*</param>
+              <param>org.cometgui.results.parser.*</param>
+              <!-- command builders, version and capability rules, secret
+                   redaction in the process service -->
+              <param>org.cometgui.tools.*</param>
+              <!-- artefact selection, checksum verification, capability probe -->
+              <param>org.cometgui.install.registry.*</param>
+              <param>org.cometgui.install.verify.*</param>
+              <param>org.cometgui.install.probe.*</param>
+              <!-- stage invalidation rules -->
+              <param>org.cometgui.workflow.state.*</param>
+            </targetClasses>
+            <targetTests>
+              <param>org.cometgui.*</param>
+            </targetTests>
+            <outputFormats>
+              <!-- XML because scripts/build.sh reads the mutation counts out of
+                   it; HTML because a survivor has to be readable to be fixed. -->
+              <param>XML</param>
+              <param>HTML</param>
+            </outputFormats>
+            <timestampedReports>false</timestampedReports>
+            <threads>4</threads>
+          </configuration>
+        </plugin>
+
+        <!--
           ROOM RESERVED FOR LATER PHASE 01 WORK UNITS.  Add the plugin here,
           pinned by a property above, and its <executions> in <build><plugins>
           below.  Keeping the additions in separate blocks is deliberate: two
           agents can work on this file without colliding.
 
             unit 2  DONE: the three blocks above.
-            unit 3  test, coverage, architecture and mutation gates
-                    org.jacoco:jacoco-maven-plugin  (thresholds: core domain,
-                      parameter and provenance >= 90% line / >= 85% branch;
-                      view-model and presenter >= 80% line)
-                    org.pitest:pitest-maven + pitest-junit5-plugin
-                      (>= 80% mutation score, R-TEST-02)
-                    extra maven-surefire-plugin configuration
-                    com.tngtech.archunit:archunit-junit5 in cometgui-archtests
+            unit 3  DONE: JaCoCo and PIT above; archunit-junit5 and the
+                    headless JavaFX recipe are in the modules that use them
+                    (cometgui-archtests and cometgui-ui).
             unit 7  SBOM and dependency scanning
                     org.cyclonedx:cyclonedx-maven-plugin
                     org.owasp:dependency-check-maven
@@ -545,7 +852,52 @@
           </execution>
         </executions>
       </plugin>
-      <!-- unit 3 / unit 7 executions belong here. -->
+      <!--
+        UNIT 3 executions.  The plugin is listed with no <executions> of its
+        own: they come from pluginManagement above, which is where the
+        thresholds live.  Coverage runs in every module (prepare-agent at
+        initialize, report and the two checks at verify), so `mvn verify` is
+        the whole local gate and no separate command is needed to enforce it.
+
+        PIT is NOT here.  It is bound to verify only under -Pmutation, at the
+        bottom of this file, and scripts/build.sh invokes its goal directly.
+      -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+      </plugin>
+      <!-- unit 7 executions belong here. -->
     </plugins>
   </build>
+
+  <!--
+    UNIT 3.  `mvn -Pmutation verify` runs the whole build and then the mutation
+    gate; that is the form a CI pipeline invokes.  scripts/build.sh instead
+    calls org.pitest:pitest-maven:mutationCoverage directly against the classes
+    the build already produced, because re-running verify to get to PIT would
+    double the build.  Both paths read the same configuration from
+    pluginManagement, so neither can drift into being the lenient one.
+  -->
+  <profiles>
+    <profile>
+      <id>mutation</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-maven</artifactId>
+            <executions>
+              <execution>
+                <id>mutation-coverage</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>mutationCoverage</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

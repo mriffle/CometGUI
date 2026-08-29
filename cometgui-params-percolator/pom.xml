@@ -16,6 +16,20 @@
   <description>Typed model and validation of the Percolator options CometGUI exposes.</description>
 
   <!--
+    COVERAGE GATE ON, CURRENTLY INERT (phase 01 unit 3).  The specification
+    gates "parameter ... logic" at >= 90% line and >= 85% branch.  The module holds only
+    package-info classes today, which carry no LINE or BRANCH counters, so
+    JaCoCo has no ratio to violate and the rule cannot fail: it is switched on
+    and inert, which is not the same as passing.  The phase that fills this
+    module inherits a live gate rather than having to remember to add one, and
+    scripts/build.sh fails the build if real classes appear here while the
+    switch is still true.
+  -->
+  <properties>
+    <cometgui.coverage.core.skip>false</cometgui.coverage.core.skip>
+  </properties>
+
+  <!--
     Only the edges the specification's layering permits are declared here.
     Adding one is an architectural change: say so in the phase handoff, and
     expect the ArchUnit rules in cometgui-archtests to have an opinion.

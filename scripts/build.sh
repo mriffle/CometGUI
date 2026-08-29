@@ -53,11 +53,12 @@ readonly PRODUCT_MODULES=(
 # The ordered stage list.  "<id>:<description>".
 readonly STAGES=(
     "toolchain:Project-local JDK and Maven"
+    "fontstack:Project-local font stack for the headless JavaFX tests"
     "python:Project virtualenv for the documentation toolchain"
     "build:Maven clean verify -- compile, unit tests, package"
     "artefacts:Verify the build produced what it claims to have produced"
     "format:Evidence that Spotless, Checkstyle and SpotBugs inspected the code"
-    # unit 3  "gates:JaCoCo coverage, ArchUnit and PIT mutation gates"
+    "gates:JaCoCo coverage, ArchUnit and PIT mutation gates"
     # unit 6  "docs:Strict Sphinx build and the traceability report"
     # unit 7  "supplychain:SBOM generation and dependency vulnerability scan"
 )
@@ -148,6 +149,23 @@ stage_toolchain() {
         || die "the JDK at ${JAVA_HOME} does not bundle javafx.controls; the Full JDK is required."
 
     echo "OK: Maven ${mvn_version}, Java ${java_version}, JavaFX bundled in the JDK image."
+}
+
+stage_fontstack() {
+    # The headless JavaFX test in cometgui-ui builds a real Scene, and the first
+    # Node in a Scene initialises CSS, which calls Font.getDefault().  With no
+    # freetype, no fontconfig and no font files that call fails with
+    # "fontFactory is null" and the test dies before its first assertion.  This
+    # host has none of them and nothing may be installed on it, so the stack is
+    # fetched from the Debian archive by pinned SHA-256 and extracted into
+    # tools/ (gitignored) -- see scripts/fetch-fontstack.sh, which is idempotent
+    # and verifies rather than refetches when the files are already there.
+    if [ -n "${MVN_OFFLINE}" ]; then
+        echo "--offline: verifying the existing font stack rather than fetching."
+        bash "${ROOT}/scripts/fetch-fontstack.sh" --verify
+    else
+        bash "${ROOT}/scripts/fetch-fontstack.sh"
+    fi
 }
 
 stage_python() {
@@ -413,6 +431,280 @@ stage_format() {
         "${total_spotless}" "${total_checkstyle}" "${total_classes}"
     echo "    The gates themselves are proved to fail on the defects they catch by"
     echo "    bash scripts/verify-quality-gates.sh (run separately: it rebuilds a"
+    echo "    deliberately damaged copy of the tree under _build/)."
+}
+
+# The report-level counters of a JaCoCo XML report are the last <counter/>
+# element of each type in the document, after the last </package>.  Taking the
+# last match is exact rather than a heuristic, and it avoids parsing XML in
+# bash.  Prints "<covered> <missed>", or nothing if the counter is absent --
+# which is the normal case for a module whose only classes are package-info,
+# since those carry no lines and no branches at all.
+jacoco_counter() {
+    local file="$1" type="$2" match
+    match="$(grep -o "<counter type=\"${type}\" missed=\"[0-9]*\" covered=\"[0-9]*\"/>" \
+        "${file}" 2>/dev/null | tail -1)" || true
+    [ -n "${match}" ] || return 0
+    printf '%s %s\n' \
+        "$(printf '%s' "${match}" | sed 's/.*covered="\([0-9]*\)".*/\1/')" \
+        "$(printf '%s' "${match}" | sed 's/.*missed="\([0-9]*\)".*/\1/')"
+}
+
+# Percentage to one decimal place, without bc (which this host does not have).
+percent_of() {
+    local covered="$1" total="$2"
+    [ "${total}" -gt 0 ] || { printf 'n/a'; return 0; }
+    printf '%d.%d%%' $(( covered * 100 / total )) $(( covered * 1000 / total % 10 ))
+}
+
+# Class files a module actually compiled, excluding package-info: a package-info
+# class has no methods, no lines and no branches, so a module that has only
+# those has nothing for a coverage or mutation gate to measure.  Prints paths
+# relative to target/classes.
+real_classes_of() {
+    local module="$1" dir="${ROOT}/$1/target/classes"
+    [ -d "${dir}" ] || return 0
+    ( cd "${dir}" && find . -name '*.class' -type f ! -name 'package-info.class' \
+        | sed 's|^\./||' | sort )
+}
+
+# True when a module's POM opts into one of the gate switches.
+module_opts_in() {
+    local module="$1" property="$2"
+    grep -qF "<${property}>false</${property}>" "${ROOT}/${module}/pom.xml" 2>/dev/null
+}
+
+# The package prefixes the coverage gate covers, from the specification's
+# sentence "core domain, parameter and provenance logic".  They are named here
+# and not derived from the POMs on purpose: this check exists to catch a POM
+# whose switch was turned off, so it must not read its answer from the POMs.
+readonly COVERAGE_GATED_PREFIXES=(
+    org/cometgui/domain
+    org/cometgui/params
+    org/cometgui/provenance
+)
+
+stage_gates() {
+    # Everything the main build already ran is READ here, not re-run: JaCoCo's
+    # agent, report and two check executions are bound into `mvn verify`, and
+    # the ArchUnit rules are ordinary tests in cometgui-archtests.  What this
+    # stage adds is the evidence that they were not vacuous -- JaCoCo passes a
+    # module with no execution data, ArchUnit passes every rule when its import
+    # comes back empty, and both exit 0 while proving nothing.  PIT is the one
+    # gate that is genuinely run here, because it is deliberately not part of
+    # `mvn verify`.
+    local failures=0 module
+
+    echo "-- JaCoCo: what was measured, per module"
+    local xml covered missed line_pair branch_pair gated real_count measured=0
+    for module in "${PRODUCT_MODULES[@]}"; do
+        real_count="$(real_classes_of "${module}" | wc -l)"
+        xml="${ROOT}/${module}/target/site/jacoco/jacoco.xml"
+        gated="no gate"
+        module_opts_in "${module}" "cometgui.coverage.core.skip" \
+            && gated="core >=90% line >=85% branch"
+        module_opts_in "${module}" "cometgui.coverage.viewmodel.skip" \
+            && gated="view-model >=80% line"
+
+        if [ ! -f "${xml}" ]; then
+            if [ "${real_count}" -eq 0 ]; then
+                printf '   inert    %-28s no classes with code yet   [%s]\n' "${module}" "${gated}"
+            else
+                echo "   MISSING  ${module}: ${real_count} class(es) with code but no jacoco.xml;"
+                echo "            the coverage agent did not run, so nothing was measured."
+                failures=$((failures + 1))
+            fi
+            continue
+        fi
+
+        line_pair="$(jacoco_counter "${xml}" LINE)"
+        branch_pair="$(jacoco_counter "${xml}" BRANCH)"
+        if [ -z "${line_pair}" ]; then
+            printf '   inert    %-28s report has no LINE counter [%s]\n' "${module}" "${gated}"
+            continue
+        fi
+        covered="${line_pair% *}"
+        missed="${line_pair#* }"
+        local lines=$(( covered + missed ))
+        printf '   ok       %-28s line %s (%s/%s)' \
+            "${module}" "$(percent_of "${covered}" "${lines}")" "${covered}" "${lines}"
+        if [ -n "${branch_pair}" ]; then
+            local branch_covered="${branch_pair% *}"
+            local branch_missed="${branch_pair#* }"
+            local branches=$(( branch_covered + branch_missed ))
+            printf '  branch %s (%s/%s)' \
+                "$(percent_of "${branch_covered}" "${branches}")" \
+                "${branch_covered}" "${branches}"
+        fi
+        printf '  [%s]\n' "${gated}"
+        measured=$(( measured + lines ))
+    done
+    [ "${measured}" -gt 0 ] \
+        || { echo "   JACOCO MEASURED NO LINES AT ALL IN ANY MODULE"; failures=$((failures + 1)); }
+
+    echo "-- JaCoCo: a module holding gated code must have its gate switched on"
+    local class_file prefix hit coverage_drift=0
+    for module in "${PRODUCT_MODULES[@]}"; do
+        module_opts_in "${module}" "cometgui.coverage.core.skip" && continue
+        hit=""
+        while IFS= read -r class_file; do
+            [ -n "${class_file}" ] || continue
+            for prefix in "${COVERAGE_GATED_PREFIXES[@]}"; do
+                case "${class_file}" in
+                    "${prefix}"/*) hit="${class_file}" ;;
+                esac
+            done
+        done < <(real_classes_of "${module}")
+        if [ -n "${hit}" ]; then
+            echo "   OFF      ${module} compiles ${hit}, which the specification gates at"
+            echo "            90% line / 85% branch, but its POM does not set"
+            echo "            <cometgui.coverage.core.skip>false</cometgui.coverage.core.skip>."
+            coverage_drift=$((coverage_drift + 1))
+        fi
+    done
+    failures=$(( failures + coverage_drift ))
+    if [ "${coverage_drift}" -eq 0 ]; then
+        echo "   ok       every module with gated code has its coverage gate on"
+    fi
+
+    echo "-- ArchUnit: the class import the rules were actually checked against"
+    local census="${ROOT}/cometgui-archtests/target/archunit-import.txt"
+    if [ ! -f "${census}" ]; then
+        echo "   MISSING  cometgui-archtests/target/archunit-import.txt."
+        echo "            ClassImportCensusTest did not run, so no rule in that module is"
+        echo "            known to have had anything to check."
+        failures=$((failures + 1))
+    else
+        local imported empty_modules=0 name count
+        imported="$(sed -n 's/^imported-classes \([0-9]*\)$/\1/p' "${census}")"
+        if [ -z "${imported}" ] || [ "${imported}" -eq 0 ]; then
+            echo "   VACUOUS  ArchUnit imported ${imported:-no} classes. Every noClasses() rule in"
+            echo "            cometgui-archtests passes when the import is empty."
+            failures=$((failures + 1))
+        else
+            printf '   ok       %d classes imported from org.cometgui\n' "${imported}"
+        fi
+        while read -r name count; do
+            case "${name}" in
+                imported-classes|"") continue ;;
+            esac
+            if [ "${count}" -eq 0 ]; then
+                echo "   EMPTY    no classes imported from ${name}; that module is missing from"
+                echo "            the cometgui-archtests class path and its rules check nothing."
+                empty_modules=$((empty_modules + 1))
+            else
+                printf '            %-34s %3d class(es)\n' "${name}" "${count}"
+            fi
+        done < "${census}"
+        failures=$(( failures + empty_modules ))
+    fi
+
+    local arch_report="${ROOT}/cometgui-archtests/target/surefire-reports/TEST-org.cometgui.archtests.LayeringRulesTest.xml"
+    if [ -f "${arch_report}" ]; then
+        local arch_tests arch_fail arch_err
+        arch_tests="$(sed -n 's/.*<testsuite [^>]*tests="\([0-9]*\)".*/\1/p' "${arch_report}" | head -1)"
+        arch_fail="$(sed -n 's/.*<testsuite [^>]*failures="\([0-9]*\)".*/\1/p' "${arch_report}" | head -1)"
+        arch_err="$(sed -n 's/.*<testsuite [^>]*errors="\([0-9]*\)".*/\1/p' "${arch_report}" | head -1)"
+        if [ "${arch_tests:-0}" -lt 1 ] || [ "${arch_fail:-1}" -ne 0 ] || [ "${arch_err:-1}" -ne 0 ]; then
+            echo "   BAD      LayeringRulesTest: tests=${arch_tests} failures=${arch_fail} errors=${arch_err}"
+            failures=$((failures + 1))
+        else
+            printf '   ok       %d architecture rule(s) checked, 0 failures\n' "${arch_tests}"
+        fi
+    else
+        echo "   MISSING  no surefire report for LayeringRulesTest; the rules did not run."
+        failures=$((failures + 1))
+    fi
+
+    echo "-- PIT: mutation testing over the critical packages (R-TEST-02, >= 80%)"
+    # Not part of `mvn verify` on purpose (see the pitest block in pom.xml), so
+    # it is run here, against the classes the build stage already produced.  The
+    # test-compile prefix is needed rather than the bare goal: a goal-only
+    # invocation cannot resolve reactor dependencies to their target/classes and
+    # fails on the first module that has a sibling dependency.
+    echo "+ mvn -B ${MVN_OFFLINE} -Dmaven.repo.local=${M2REPO} test-compile org.pitest:pitest-maven:mutationCoverage"
+    mvn -B ${MVN_OFFLINE} -Dmaven.repo.local="${M2REPO}" \
+        test-compile org.pitest:pitest-maven:mutationCoverage > "${ROOT}/_build/pitest.log" 2>&1 \
+        || { sed -n '/ERROR/p' "${ROOT}/_build/pitest.log" | head -20; \
+             die "PIT failed. Full log: _build/pitest.log"; }
+
+    local pit_xml total killed score_x10 ran=0
+    for module in "${PRODUCT_MODULES[@]}"; do
+        pit_xml="${ROOT}/${module}/target/pit-reports/mutations.xml"
+        if ! module_opts_in "${module}" "cometgui.mutation.skip"; then
+            if [ -f "${pit_xml}" ]; then
+                echo "   UNEXPECTED ${module} produced a PIT report but its POM does not switch"
+                echo "            the mutation gate on; one of the two is wrong."
+                failures=$((failures + 1))
+            fi
+            continue
+        fi
+        if [ ! -f "${pit_xml}" ]; then
+            echo "   MISSING  ${module} switches the mutation gate on but produced no"
+            echo "            target/pit-reports/mutations.xml. PIT did not run there."
+            failures=$((failures + 1))
+            continue
+        fi
+        total="$(grep -c '<mutation ' "${pit_xml}" || true)"
+        killed="$(grep -c "status='KILLED'" "${pit_xml}" || true)"
+        if [ "${total}" -eq 0 ]; then
+            echo "   VACUOUS  ${module}: PIT generated 0 mutations and still exited 0."
+            echo "            A mutation score over an empty run is not a score."
+            failures=$((failures + 1))
+            continue
+        fi
+        score_x10=$(( killed * 1000 / total ))
+        printf '   ok       %-28s %d/%d mutations killed = %d.%d%%\n' \
+            "${module}" "${killed}" "${total}" $(( score_x10 / 10 )) $(( score_x10 % 10 ))
+        if [ "${score_x10}" -lt 800 ]; then
+            echo "   BELOW    ${module} is under the R-TEST-02 threshold of 80%."
+            failures=$((failures + 1))
+        fi
+        ran=$((ran + 1))
+    done
+    [ "${ran}" -gt 0 ] \
+        || { echo "   NO MODULE RAN A MUTATION ANALYSIS AT ALL"; failures=$((failures + 1)); }
+
+    echo "-- PIT: a module holding critical-package code must have its gate switched on"
+    # The target packages are read out of pom.xml rather than repeated here, so
+    # that extending the list in the POM extends this check with it.
+    local -a mutation_prefixes=()
+    local mutation_drift=0
+    while IFS= read -r prefix; do
+        mutation_prefixes+=("$(printf '%s' "${prefix%.\*}" | tr '.' '/')")
+    done < <(sed -n '/<targetClasses>/,/<\/targetClasses>/p' "${ROOT}/pom.xml" \
+        | grep -o '<param>[^<]*</param>' | sed 's|</\?param>||g')
+    [ "${#mutation_prefixes[@]}" -gt 0 ] \
+        || die "could not read <targetClasses> out of pom.xml; this check would pass vacuously."
+    printf '   %d critical package prefix(es) read from pom.xml\n' "${#mutation_prefixes[@]}"
+    for module in "${PRODUCT_MODULES[@]}"; do
+        module_opts_in "${module}" "cometgui.mutation.skip" && continue
+        hit=""
+        while IFS= read -r class_file; do
+            [ -n "${class_file}" ] || continue
+            for prefix in "${mutation_prefixes[@]}"; do
+                case "${class_file}" in
+                    "${prefix}"/*) hit="${class_file}" ;;
+                esac
+            done
+        done < <(real_classes_of "${module}")
+        if [ -n "${hit}" ]; then
+            echo "   OFF      ${module} compiles ${hit}, which is inside a package R-TEST-02"
+            echo "            calls critical, but its POM does not set"
+            echo "            <cometgui.mutation.skip>false</cometgui.mutation.skip>."
+            mutation_drift=$((mutation_drift + 1))
+        fi
+    done
+    failures=$(( failures + mutation_drift ))
+    if [ "${mutation_drift}" -eq 0 ]; then
+        echo "   ok       every module with critical-package code has its mutation gate on"
+    fi
+
+    [ "${failures}" -eq 0 ] || die "${failures} test-gate evidence check(s) failed."
+    echo "OK: coverage measured and gated, architecture rules checked against a real import,"
+    echo "    mutation score above the R-TEST-02 threshold."
+    echo "    The gates themselves are proved to fail on the defects they catch by"
+    echo "    bash scripts/verify-test-gates.sh (run separately: it builds a"
     echo "    deliberately damaged copy of the tree under _build/)."
 }
 
