@@ -136,7 +136,26 @@ Work units
        Acceptance: the licence text is byte-identical to the canonical GPL-3.0
        and the check is scripted, not asserted.
      - ``D-001`` obligation 1; phase deliverables
-     - *pending -- not started*
+     - **ACCEPTED 2026-08-29**, commit ``d182895``. I did not read the agent's
+       claim about the licence text -- I fetched both sources myself.
+       ``curl https://www.gnu.org/licenses/gpl-3.0.txt`` and ``curl
+       https://raw.githubusercontent.com/Noble-Lab/CasanovoGUI/main/LICENSE``
+       are byte-identical to the committed ``LICENSE`` (``cmp`` silent both
+       times), sha256 ``3972dc97...``, 35 149 bytes, 674 lines, and ``git
+       hash-object LICENSE`` prints
+       ``f288702d2fa16d3cdf0035b15a9fcbc552cd88e7`` -- the exact blob sha
+       ``DECISIONS.rst`` records for CasanovoGUI. ``bash
+       scripts/verify-license.sh`` printed 17 PASS lines and exit 0; I then
+       built four damaged copies under ``_build/orch-check/`` myself and it
+       exited 1 on each with the right diagnosis (truncated: "TRUNCATED by
+       30196 bytes"; altered title: "the text has been ALTERED" plus the blob
+       mismatch; CRLF: "GROWN by 674 bytes"; missing: "LICENSE is a D-001
+       obligation"). ``check-docs.sh`` builds ``CONTRIBUTING.rst``,
+       ``handoffs/BRIEF-TEMPLATE.rst`` and ``README.rst`` clean under
+       ``-n -W``. I read ``CONTRIBUTING.rst`` (393 lines) against
+       ``ONBOARDING.rst`` and found no contradiction; it points rather than
+       restates, and states the no-remote rule with the ``D-008`` reason. Diff
+       is five files, all owned by the unit.
 
    * - 6
      - **Traceability report generator.** Reads the phase documents for
