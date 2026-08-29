@@ -314,19 +314,40 @@ kind = "planned"
 phase = "15"
 
 [[ac."AC-TST-02".evidence]]
+kind = "check"
+command = "bash scripts/verify-test-gates.sh"
+file = "scripts/verify-test-gates.sh"
+contains = "verify-test-gates"
+note = "The JaCoCo gate. The specification's initial thresholds (>= 90% line, >= 85% branch on core domain, parameter and provenance logic; >= 80% line on view-model logic) are configured in pom.xml and enforced by mvn verify; scripts/verify-test-gates.sh proves the gate fails when an untested class is added to a gated package."
+
+[[ac."AC-TST-02".evidence]]
 kind = "planned"
 phase = "15"
-note = "Foundations are laid earlier, in phase 01."
+note = "Phase 15 closes the criterion when the gates cover the whole implemented system rather than the packages that exist in phase 01."
+
+[[ac."AC-TST-03".evidence]]
+kind = "check"
+command = "bash scripts/verify-test-gates.sh"
+file = "scripts/verify-test-gates.sh"
+contains = "verify-test-gates"
+note = "The PIT gate. R-TEST-02's >= 80% mutation score is configured over the critical packages with failWhenNoMutations left on; scripts/verify-test-gates.sh proves the gate fails when a mutation survives."
 
 [[ac."AC-TST-03".evidence]]
 kind = "planned"
 phase = "15"
-note = "Foundations are laid earlier, in phase 01."
+note = "Phase 15 closes the criterion when the gates cover the whole implemented system rather than the packages that exist in phase 01."
+
+[[ac."AC-TST-04".evidence]]
+kind = "check"
+command = "bash scripts/verify-test-gates.sh"
+file = "scripts/verify-test-gates.sh"
+contains = "verify-test-gates"
+note = "The ArchUnit suite in cometgui-archtests, checked against a class import whose size and per-module composition are themselves asserted; scripts/verify-test-gates.sh proves the rules fail on a JavaFX dependency in the domain and on a ProcessBuilder outside the process service."
 
 [[ac."AC-TST-04".evidence]]
 kind = "planned"
 phase = "15"
-note = "Foundations are laid earlier, in phase 01."
+note = "Phase 15 closes the criterion when the gates cover the whole implemented system rather than the packages that exist in phase 01."
 
 [[ac."AC-TST-05".evidence]]
 kind = "planned"
