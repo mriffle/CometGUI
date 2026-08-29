@@ -26,12 +26,19 @@ Start here
      - The eight open decisions an implementing agent must not make alone.
    * - ``specification.rst``
      - What to build: requirements (``R-``), acceptance criteria (``AC-``),
-       architecture, testing strategy. Revision 2.
+       architecture, testing strategy. Revision 7.
    * - ``phases/index.rst``
      - The sixteen implementation phases and their dependency order.
    * - ``handoffs/``
      - Per-phase work logs and handoffs: the work units, their sign-offs, and
        what actually happened.
+   * - ``CONTRIBUTING.rst``
+     - The working conventions: environment, the one build command, commits,
+       gates, documentation, handoffs and the licence obligations that reach
+       contributors.
+   * - ``LICENSE``
+     - The full GNU General Public License version 3. CometGUI is GPL-3.0
+       (``D-001``); ``scripts/verify-license.sh`` checks the file is intact.
 
 Conventions
 ===========
