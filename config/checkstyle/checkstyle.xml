@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  CometGUI Checkstyle rule set (phase 01, work unit 2).
+
+  WHY THIS FILE EXISTS RATHER THAN sun_checks.xml OR google_checks.xml.
+  Layout in this repository is owned by Spotless (google-java-format, AOSP
+  style: 4-space indent, 100 columns).  A stock rule set brings its own,
+  different, layout opinions, so a file could be simultaneously correct for
+  the formatter and wrong for Checkstyle with no way to satisfy both.  This
+  rule set therefore contains **no rule the formatter already decides**: no
+  Indentation, no WhitespaceAround/Before/After, no LeftCurly/RightCurly, no
+  OperatorWrap, no import *ordering* (Spotless orders them).  What is left is
+  the part a formatter cannot know: defects, naming, and the small number of
+  layout invariants that are cheap cross-checks proving Spotless really ran.
+
+  EVERY MODULE BELOW IS GROUPED AND JUSTIFIED.  A future phase that finds a
+  rule wrong argues with the justification and changes the rule deliberately;
+  it does not lower `severity`, add a blanket suppression filter, or exclude a
+  module to make a build pass.  There is deliberately no SuppressionFilter,
+  no SuppressionCommentFilter and no SuppressWarningsFilter in this file: an
+  escape hatch that needs no justification is how a gate quietly dies.
+
+  Severity is `error` for every module (set once, on Checker) and the Maven
+  plugin runs with failOnViolation=true and violationSeverity=error, so any
+  violation fails `mvn verify`.
+-->
+<module name="Checker">
+  <property name="severity" value="error"/>
+  <property name="charset" value="UTF-8"/>
+  <property name="fileExtensions" value="java"/>
+
+  <!--
+    GROUP 0 - the GPL-3.0 licence header, on every Java file without exception.
+
+    D-001 put CometGUI under GPL-3.0, and every file this project authors
+    carries the short notice in config/license/java-header.txt - the same file
+    Spotless inserts, passed in by the Maven plugin as ${checkstyle.header.file}.
+
+    WHY CHECKSTYLE CHECKS IT AS WELL AS SPOTLESS.  Spotless cannot put a header
+    on package-info.java or module-info.java: LicenseHeaderStep applies
+    unsupportedJvmFilesFilter(), which excludes those names by construction, so
+    `mvn spotless:apply` silently leaves them bare.  This repository has one
+    package-info.java per package.  Checkstyle has no such blind spot, so it is
+    the tool that actually guarantees the obligation, and it independently
+    catches a Spotless execution that has been removed or skipped.
+
+    CONSEQUENCE FOR ANYONE ADDING A PACKAGE: `mvn spotless:apply` will not add
+    the header to a new package-info.java.  Copy it from a sibling.
+
+    PHASE 02 MUST EXTEND THIS, NOT DELETE IT.  Files derived from
+    Noble-Lab/CasanovoGUI keep their upstream copyright notices (D-001
+    obligation 2) and so cannot match this header.  Give them their own check:
+    a second maven-checkstyle-plugin <execution> with its own <headerLocation>
+    and <sourceDirectories> covering the derived tree, and narrow this one's
+    <sourceDirectories> to exclude it.  Deleting this module, or suppressing it
+    for the derived tree with nothing put in its place, is a weakening of a
+    gate and is rejected at sign-off.
+  -->
+  <module name="Header">
+    <property name="headerFile" value="${checkstyle.header.file}"/>
+    <property name="fileExtensions" value="java"/>
+  </module>
+
+  <!--
+    GROUP 1 - file invariants that cross-check the formatter.
+    Spotless already guarantees each of these (endWithNewline,
+    trimTrailingWhitespace, and google-java-format's 100-column AOSP layout).
+    Keeping an independent check of the same property is deliberate: if the
+    Spotless execution is ever removed, disabled or skipped, these fail and
+    say so, instead of the build going quietly green with unformatted code.
+  -->
+  <module name="NewlineAtEndOfFile"/>
+  <module name="FileTabCharacter">
+    <property name="eachLine" value="true"/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="[ \t]+$"/>
+    <property name="message" value="Trailing whitespace (Spotless trimTrailingWhitespace should have removed this; run mvn spotless:apply)."/>
+  </module>
+  <module name="LineLength">
+    <!--
+      100 columns, matching google-java-format's AOSP style.  The formatter
+      cannot break an import statement or a long URL inside a Javadoc link, so
+      those two forms are exempt; nothing else is.
+    -->
+    <property name="max" value="100"/>
+    <property name="ignorePattern" value="^import\s|^package\s|\{@link\s+\S+\}|https?://\S+"/>
+  </module>
+
+  <module name="TreeWalker">
+
+    <!--
+      GROUP 2 - defects.  Each of these has been a real, shipped bug in real
+      Java code, and none of them is a matter of taste.
+    -->
+    <!-- equals/hashCode contract: BuildIdentity already depends on it, and every
+         provenance and parameter value type in later phases will too. -->
+    <module name="EqualsHashCode"/>
+    <module name="CovariantEquals"/>
+    <!-- "literal".equals(x) rather than x.equals("literal"): a null-guarded
+         idiom this project's parsers will need constantly. -->
+    <module name="EqualsAvoidNull"/>
+    <!-- == on strings.  A parser comparing an interned token by reference works
+         until the token arrives from a file instead of a constant pool. -->
+    <module name="StringLiteralEquality"/>
+    <!-- Braces on every conditional body.  Apple's "goto fail" TLS bug was a
+         brace-less if; the formatter will not add them for you. -->
+    <module name="NeedBraces">
+      <property name="allowSingleLineStatement" value="false"/>
+    </module>
+    <!-- Unbraced or mis-ordered switch arms silently changing behaviour. -->
+    <module name="FallThrough"/>
+    <module name="DefaultComesLast"/>
+    <!-- A caught exception that is neither handled, rethrown, nor named as
+         deliberately ignored is exactly the "catching an exception the gate was
+         there to surface" failure CONTRIBUTING.rst forbids. -->
+    <module name="EmptyCatchBlock">
+      <property name="exceptionVariableName" value="expected|ignored"/>
+    </module>
+    <!-- An empty if/for/while/try body is either dead code or a missing line. -->
+    <module name="EmptyBlock">
+      <property name="option" value="text"/>
+      <property name="tokens" value="LITERAL_DO,LITERAL_ELSE,LITERAL_FINALLY,LITERAL_IF,LITERAL_FOR,LITERAL_TRY,LITERAL_WHILE,INSTANCE_INIT,STATIC_INIT"/>
+    </module>
+    <module name="EmptyStatement"/>
+    <!-- Reassigning a for-loop control variable inside the body. -->
+    <module name="ModifiedControlVariable"/>
+    <!-- if (x) return true; else return false; and friends: not style, but a
+         reliable marker that the condition was not thought through. -->
+    <module name="SimplifyBooleanExpression"/>
+    <module name="SimplifyBooleanReturn"/>
+    <!-- One statement per line, one variable per declaration: both hide a
+         second effect on a line a reviewer reads as having one. -->
+    <module name="OneStatementPerLine"/>
+    <module name="MultipleVariableDeclarations"/>
+    <!-- A local or parameter shadowing a field is how an assignment silently
+         stops updating the object.  Constructor parameters and setters are the
+         accepted idiom (this.x = x) and are exempt. -->
+    <module name="HiddenField">
+      <property name="ignoreConstructorParameter" value="true"/>
+      <property name="ignoreSetter" value="true"/>
+      <property name="ignoreAbstractMethods" value="true"/>
+    </module>
+    <!-- Deprecated and unreliable object protocol. -->
+    <module name="NoFinalizer"/>
+    <module name="NoClone"/>
+    <!-- String[] args, not String args[]: the C form hides the type. -->
+    <module name="ArrayTypeStyle"/>
+    <module name="UpperEll"/>
+    <!-- Stack traces printed straight to stderr bypass the project's logging,
+         so they never reach a run's archived log, and they are one of the ways
+         a secret escapes into terminal output.  Report the failure through the
+         layer that owns it instead. -->
+    <module name="RegexpSinglelineJava">
+      <property name="format" value="\.printStackTrace\s*\("/>
+      <property name="message" value="printStackTrace() bypasses the project's logging and archived run logs; propagate or log the exception instead."/>
+      <property name="ignoreComments" value="true"/>
+    </module>
+
+    <!--
+      GROUP 3 - imports.  Not ordering (Spotless owns that), but the two
+      import-level facts that matter.
+    -->
+    <!-- Cross-check on Spotless removeUnusedImports, for the same reason as
+         group 1: if that step disappears, this notices. -->
+    <module name="UnusedImports"/>
+    <module name="RedundantImport"/>
+    <!-- JDK internals.  This project pins a Full JDK and compiles with
+         maven.compiler.release=25 precisely so that it depends on no internal
+         API; reaching into sun.*, com.sun.* or jdk.internal.* would break that
+         and would need add.exports options at run time (google-java-format needs
+         such exports itself, see .mvn/jvm.config, but that is the *build*
+         JVM, not this product's code.) -->
+    <module name="IllegalImport">
+      <property name="illegalPkgs" value="sun, com.sun, jdk.internal"/>
+    </module>
+
+    <!--
+      GROUP 4 - encapsulation and class design.  These keep the domain model
+      the immutable-value shape the specification assumes when it says a
+      provenance record can be re-read and re-verified later.
+    -->
+    <module name="VisibilityModifier">
+      <property name="protectedAllowed" value="false"/>
+      <property name="packageAllowed" value="false"/>
+      <property name="allowPublicFinalFields" value="false"/>
+      <property name="allowPublicImmutableFields" value="false"/>
+    </module>
+    <module name="FinalClass"/>
+    <module name="HideUtilityClassConstructor"/>
+    <module name="OneTopLevelClass"/>
+
+    <!--
+      GROUP 5 - naming.  Consistency only, but consistency that makes a
+      constant, a field and a local distinguishable at a glance in code that
+      mixes scientific abbreviations (PSM, q-value, m/z) with Java names.
+      The patterns are Checkstyle's defaults, stated explicitly so that a later
+      change is visible in the diff.
+    -->
+    <module name="PackageName">
+      <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+    </module>
+    <module name="TypeName"/>
+    <module name="MethodName"/>
+    <module name="MemberName"/>
+    <module name="ParameterName"/>
+    <module name="LocalVariableName"/>
+    <module name="LocalFinalVariableName"/>
+    <module name="ConstantName"/>
+    <module name="StaticVariableName"/>
+    <module name="ClassTypeParameterName"/>
+    <module name="MethodTypeParameterName"/>
+    <module name="LambdaParameterName"/>
+    <module name="PatternVariableName"/>
+    <module name="RecordComponentName"/>
+
+    <!--
+      GROUP 6 - Javadoc on the published API.  R-DOC-* makes the documentation
+      a deliverable, and docs/developer/ is generated partly from the code, so
+      a public type with no Javadoc is a hole in a deliverable.  Scope is
+      `public` deliberately: package-private and private members are not part
+      of the API and are not required to carry Javadoc.  Tests are exempt for
+      the same reason - their classes are package-private by convention.
+    -->
+    <module name="MissingJavadocType">
+      <property name="scope" value="public"/>
+    </module>
+    <module name="MissingJavadocMethod">
+      <property name="scope" value="public"/>
+      <property name="allowMissingPropertyJavadoc" value="false"/>
+      <property name="minLineCount" value="-1"/>
+    </module>
+    <!-- Every package documents itself.  docs/developer/ is written against
+         these package descriptions, and an undocumented package is a hole in a
+         deliverable rather than a matter of taste. -->
+    <module name="MissingJavadocPackage"/>
+    <!-- Javadoc that is silently ignored because it sits somewhere javadoc does
+         not read (between annotations, after the modifiers, inside a method).
+         This is the worst kind of documentation defect: it looks present in the
+         source and is absent from the output. -->
+    <module name="InvalidJavadocPosition"/>
+    <!-- A continuation line with no leading asterisk drops out of the rendered
+         Javadoc without warning. -->
+    <module name="JavadocMissingLeadingAsterisk"/>
+    <!-- An @param/@return/@throws with no description says nothing but looks
+         like documentation. -->
+    <module name="NonEmptyAtclauseDescription"/>
+  </module>
+</module>

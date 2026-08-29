@@ -94,6 +94,26 @@
     <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
     <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
     <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+
+    <!--
+      Formatting and static analysis (unit 2).  Three tools, six pins: the
+      Maven plugin and the analyser it drives are versioned independently, and
+      pinning only the plugin would let the analyser float.
+    -->
+    <spotless-maven-plugin.version>3.10.1</spotless-maven-plugin.version>
+    <google-java-format.version>1.36.1</google-java-format.version>
+    <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
+    <puppycrawl-checkstyle.version>14.0.0</puppycrawl-checkstyle.version>
+    <spotbugs-maven-plugin.version>4.10.4.0</spotbugs-maven-plugin.version>
+    <spotbugs-core.version>4.10.4</spotbugs-core.version>
+
+    <!--
+      Where the hand-written rule sets live.  maven.multiModuleProjectDirectory
+      is the repository root for every module in the reactor (Maven sets it
+      because .mvn/ exists here); a plain relative path would resolve against
+      each module's own basedir and only work in the parent.
+    -->
+    <cometgui.configDirectory>${maven.multiModuleProjectDirectory}/config</cometgui.configDirectory>
   </properties>
 
   <!--
@@ -262,15 +282,170 @@
         </plugin>
 
         <!--
+          UNIT 2: FORMATTING AND STATIC ANALYSIS.  All three fail `mvn verify`
+          on a violation; none of them is advisory.  Their executions are in
+          <build><plugins> below.
+        -->
+
+        <!--
+          Spotless owns layout, imports, whitespace and the licence header.
+
+          FORMATTER CHOICE (google-java-format 1.36.1, AOSP style), and how it
+          was chosen: by running it on this JDK, not by reputation.
+          google-java-format reaches into jdk.compiler internals, which are not
+          exported on JDK 25.  Spotless can force them open itself, but it does
+          so through sun.misc.Unsafe::staticFieldBase, which this JVM reports as
+          terminally deprecated and slated for removal: a build that would one
+          day break for a reason nobody would connect to the formatter.  So the
+          five add.exports options it needs are declared in .mvn/jvm.config
+          instead (XML comments cannot contain a double hyphen, hence the dot);
+          Spotless then sees the packages are already open, takes the supported
+          path, and the deprecation warning disappears.  AOSP style (4-space
+          indent, 100 columns) was chosen because it is what the phase 00 and
+          unit 1 sources were already written in, so adopting the formatter
+          reflowed Javadoc but changed no code layout.
+          The Eclipse JDT formatter was the fallback if that had failed: it
+          needs no JDK internals, but it would have needed its own exported
+          configuration file to maintain.  It was not needed.
+        -->
+        <plugin>
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>${spotless-maven-plugin.version}</version>
+          <configuration>
+            <java>
+              <!--
+                PHASE 02 MUST EXTEND THIS, NOT RELAX IT.  Phase 02 adds files
+                derived from Noble.Lab/CasanovoGUI, which by D-001 obligation 2
+                must keep their upstream copyright notices.  Those files
+                therefore need a *second* file set: exclude their paths from
+                this <java> block and add a <formats><format> entry that
+                includes them, with its own <licenseHeader> carrying the
+                upstream notice plus CometGUI's derivation record.  Deleting
+                the licenseHeader step, widening this header until it matches
+                both, or excluding the derived tree from the check entirely are
+                all weakenings of a gate and are rejected at sign-off.
+              -->
+              <includes>
+                <include>src/main/java/**/*.java</include>
+                <include>src/test/java/**/*.java</include>
+              </includes>
+              <googleJavaFormat>
+                <version>${google-java-format.version}</version>
+                <style>AOSP</style>
+              </googleJavaFormat>
+              <!-- Static imports first, then everything else, each group
+                   alphabetical: the order the phase 00 sources already use. -->
+              <importOrder>
+                <order>\#,</order>
+              </importOrder>
+              <removeUnusedImports/>
+              <trimTrailingWhitespace/>
+              <endWithNewline/>
+              <!--
+                GPL-3.0 notice on every file this project authors (D-001).  A
+                short notice naming the project and pointing at LICENSE, as the
+                GPL's own "How to Apply These Terms" section describes, and not
+                the full licence text, which lives once, at the repository root.
+                The delimiter matches either `package` or the start of a Javadoc
+                block, so that package-info.java keeps its Javadoc: with the
+                default `package` delimiter Spotless replaces everything before
+                the package statement, which would delete it.
+              -->
+              <licenseHeader>
+                <file>${cometgui.configDirectory}/license/java-header.txt</file>
+                <delimiter>(package|/\*\*)</delimiter>
+              </licenseHeader>
+            </java>
+          </configuration>
+        </plugin>
+
+        <!--
+          Checkstyle: the defects and naming rules a formatter cannot know.  The
+          rule set is this project's own (config/checkstyle/checkstyle.xml) and
+          every module in it is justified there; sun_checks.xml was rejected
+          because its layout rules contradict google-java-format.
+        -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <version>${maven-checkstyle-plugin.version}</version>
+          <dependencies>
+            <!-- The plugin ships an older Checkstyle; pin the analyser too, or
+                 the rules are graded by whatever version happens to be
+                 bundled. -->
+            <dependency>
+              <groupId>com.puppycrawl.tools</groupId>
+              <artifactId>checkstyle</artifactId>
+              <version>${puppycrawl-checkstyle.version}</version>
+            </dependency>
+          </dependencies>
+          <configuration>
+            <configLocation>${cometgui.configDirectory}/checkstyle/checkstyle.xml</configLocation>
+            <!-- Exposed to the rule set as ${checkstyle.header.file}; the same
+                 file Spotless inserts, so the two tools cannot disagree about
+                 what the licence header is. -->
+            <headerLocation>${cometgui.configDirectory}/license/java-header.txt</headerLocation>
+            <includeTestSourceDirectory>true</includeTestSourceDirectory>
+            <consoleOutput>true</consoleOutput>
+            <failOnViolation>true</failOnViolation>
+            <violationSeverity>error</violationSeverity>
+            <failsOnError>true</failsOnError>
+            <linkXRef>false</linkXRef>
+            <inputEncoding>UTF-8</inputEncoding>
+            <!-- checkstyle-result.xml names every file inspected;
+                 scripts/build.sh reads it to prove the analysis was not
+                 vacuous. -->
+            <outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
+            <outputFileFormat>xml</outputFileFormat>
+          </configuration>
+        </plugin>
+
+        <!--
+          SpotBugs reads bytecode, and this project compiles to Java 25 class
+          files (major version 69).  4.10.4 reads them: verified on
+          cometgui-domain, which reported total_classes=8, missingClasses=0,
+          errors=0.  That is the check that matters, because an analyser that
+          cannot read a class file quietly analyses nothing and exits 0.
+          scripts/build.sh re-checks those numbers on every build for that
+          reason.  If a future JDK bump ever outruns SpotBugs, the answer is to
+          leave SpotBugs out with a comment and report it, never to lower
+          maven.compiler.release to give the analyser something older to read.
+
+          effort=Max, threshold=Low: the strictest pair SpotBugs offers, chosen
+          while the tree is nearly empty so that no later phase inherits a bug
+          the gate was never sensitive enough to see.  A finding that is wrong
+          about this code becomes a narrow, justified entry in
+          config/spotbugs/exclude.xml; raising the threshold is a weakening.
+        -->
+        <plugin>
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs-maven-plugin</artifactId>
+          <version>${spotbugs-maven-plugin.version}</version>
+          <dependencies>
+            <dependency>
+              <groupId>com.github.spotbugs</groupId>
+              <artifactId>spotbugs</artifactId>
+              <version>${spotbugs-core.version}</version>
+            </dependency>
+          </dependencies>
+          <configuration>
+            <effort>Max</effort>
+            <threshold>Low</threshold>
+            <failOnError>true</failOnError>
+            <includeTests>true</includeTests>
+            <xmlOutput>true</xmlOutput>
+            <excludeFilterFile>${cometgui.configDirectory}/spotbugs/exclude.xml</excludeFilterFile>
+          </configuration>
+        </plugin>
+
+        <!--
           ROOM RESERVED FOR LATER PHASE 01 WORK UNITS.  Add the plugin here,
           pinned by a property above, and its <executions> in <build><plugins>
           below.  Keeping the additions in separate blocks is deliberate: two
           agents can work on this file without colliding.
 
-            unit 2  formatting and static analysis
-                    com.diffplug.spotless:spotless-maven-plugin
-                    org.apache.maven.plugins:maven-checkstyle-plugin
-                    com.github.spotbugs:spotbugs-maven-plugin
+            unit 2  DONE: the three blocks above.
             unit 3  test, coverage, architecture and mutation gates
                     org.jacoco:jacoco-maven-plugin  (thresholds: core domain,
                       parameter and provenance >= 90% line / >= 85% branch;
@@ -318,7 +493,59 @@
           </execution>
         </executions>
       </plugin>
-      <!-- unit 2 / unit 3 / unit 7 executions belong here. -->
+      <!--
+        UNIT 2 executions.  Spotless and Checkstyle run at `validate`, before a
+        single class is compiled, so a formatting or style failure costs
+        seconds rather than a full build; SpotBugs runs at `verify`, because it
+        needs the compiled classes.  All three therefore run inside
+        `mvn verify`, which is what `bash scripts/build.sh` runs: no extra
+        build stage invokes them, and none of them is optional.
+        `mvn spotless:apply` fixes formatting and inserts the licence header.
+      -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>spotless-check</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>checkstyle-check</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>spotbugs-analyse-and-check</id>
+            <phase>verify</phase>
+            <goals>
+              <!-- `spotbugs` writes target/spotbugsXml.xml, which is the
+                   evidence that classes were really analysed; `check` reads it
+                   and fails the build on any reported bug. -->
+              <goal>spotbugs</goal>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- unit 3 / unit 7 executions belong here. -->
     </plugins>
   </build>
 </project>

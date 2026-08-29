@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CometGUI SpotBugs exclusion filter (phase 01, work unit 2).
+
+  POLICY, which is the point of this file existing while empty:
+
+  * SpotBugs runs at effort=Max, threshold=Low - the most sensitive setting it
+    has.  That is deliberate: the gate was installed while the tree was almost
+    empty, so no later phase inherits a defect the analyser was never tuned to
+    see.
+  * A SpotBugs finding is fixed in the code by default.  An exclusion is the
+    last resort, not the first, and it is for findings that are *wrong about
+    this code*, never for findings that are inconvenient.
+  * Every <Match> below must carry a comment giving: the bug pattern, the exact
+    class or method it applies to, why the finding does not hold here, and the
+    date and phase that added it.  A Match with no such comment is a defect in
+    this file.
+  * Exclusions are narrow.  Match on <Bug pattern="..."/> AND <Class .../> (or
+    a specific <Method .../>).  A bare <Bug pattern=".."/> that silences a
+    pattern across the whole product is a weakening of a gate, and so is
+    raising <threshold> to make findings disappear.
+
+  As of 2026-08-29 there is exactly one exclusion, below.
+-->
+<FindBugsFilter
+    xmlns="https://github.com/spotbugs/filter/3.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+  <!--
+    NP_NULL_PARAM_DEREF_NONVIRTUAL / NP_NULL_PARAM_DEREF /
+    NP_NONNULL_PARAM_VIOLATION, in test sources only.  Added 2026-08-29,
+    phase 01 unit 2.
+
+    WHY IT DOES NOT HOLD HERE.  A test that proves a method rejects null has to
+    pass it null.  BuildIdentityTest.FromProperties.rejectsNullProperties does
+    exactly that and asserts on the resulting NullPointerException message;
+    SpotBugs reports the test's whole purpose as the bug.  There is no
+    annotation or code change that removes the finding without removing the
+    test, and CONTRIBUTING.rst requires the rejected input to be proved rather
+    than assumed.
+
+    WHY IT IS NARROW ENOUGH.  It is confined to source files named *Test.java,
+    and to the three patterns that describe a deliberately-null argument.  It
+    does not touch main sources, where a null passed to a non-null parameter is
+    a real defect and still fails the build.  SpotBugs still analyses test code
+    for everything else; includeTests stays true.
+
+    IF YOU ARE HERE TO ADD A SECOND EXCLUSION: read the policy above first.  A
+    finding on main sources is fixed in the code.
+  -->
+  <Match>
+    <Source name="~.*Test\.java"/>
+    <Or>
+      <Bug pattern="NP_NULL_PARAM_DEREF_NONVIRTUAL"/>
+      <Bug pattern="NP_NULL_PARAM_DEREF"/>
+      <Bug pattern="NP_NONNULL_PARAM_VIOLATION"/>
+    </Or>
+  </Match>
+</FindBugsFilter>

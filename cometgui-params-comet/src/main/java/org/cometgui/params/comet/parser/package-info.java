@@ -1,6 +1,23 @@
-/**
- * Reading comet.params files: scalar types, enzyme table, variable-modification tuples, comments, unknown parameters, duplicates and malformed lines. Nothing imported may be silently lost.
+/*
+ * CometGUI -- Comet to Percolator proteomics search workflow with provenance.
+ * Copyright (C) 2026 The CometGUI authors.
  *
- * <p>Filled by phase 06 (Comet parameter model).</p>
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License, version 3, as published
+ * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ * PARTICULAR PURPOSE. See the GNU General Public License for details.
+ *
+ * The full licence is the LICENSE file at the root of this repository. If it
+ * is missing, see <https://www.gnu.org/licenses/gpl-3.0.html>.
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+/**
+ * Reading comet.params files: scalar types, enzyme table, variable-modification tuples, comments,
+ * unknown parameters, duplicates and malformed lines. Nothing imported may be silently lost.
+ *
+ * <p>Filled by phase 06 (Comet parameter model).
  */
 package org.cometgui.params.comet.parser;

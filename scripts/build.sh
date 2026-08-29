@@ -56,7 +56,7 @@ readonly STAGES=(
     "python:Project virtualenv for the documentation toolchain"
     "build:Maven clean verify -- compile, unit tests, package"
     "artefacts:Verify the build produced what it claims to have produced"
-    # unit 2  "format:Spotless, Checkstyle and SpotBugs"
+    "format:Evidence that Spotless, Checkstyle and SpotBugs inspected the code"
     # unit 3  "gates:JaCoCo coverage, ArchUnit and PIT mutation gates"
     # unit 6  "docs:Strict Sphinx build and the traceability report"
     # unit 7  "supplychain:SBOM generation and dependency vulnerability scan"
@@ -253,6 +253,167 @@ stage_artefacts() {
 
     [ "${failures}" -eq 0 ] || die "${failures} artefact check(s) failed. Exit code 0 would have lied."
     echo "OK: every expected artefact exists and every test report is clean."
+}
+
+
+# Every .java file under a module's main and test source roots.  This is the
+# denominator for "did the analyser really look at everything?".
+count_java_sources() {
+    local module="$1" total=0 root
+    for root in "${ROOT}/${module}/src/main/java" "${ROOT}/${module}/src/test/java"; do
+        [ -d "${root}" ] || continue
+        total=$(( total + $(find "${root}" -name '*.java' -type f | wc -l) ))
+    done
+    printf '%s' "${total}"
+}
+
+# Every compiled class under a module's main and test output directories.
+# Written as a loop rather than `find dirA dirB | grep -q .`: with pipefail, a
+# find over a directory that does not exist returns non-zero even when the other
+# directory matched, which silently reported eight modules as having no classes
+# and skipped their SpotBugs evidence check entirely.
+count_class_files() {
+    local module="$1" total=0 dir
+    for dir in "${ROOT}/${module}/target/classes" "${ROOT}/${module}/target/test-classes"; do
+        [ -d "${dir}" ] || continue
+        total=$(( total + $(find "${dir}" -name '*.class' -type f | wc -l) ))
+    done
+    printf '%s' "${total}"
+}
+
+# Count occurrences (not lines) of a fixed string in a file.  Zero matches is a
+# legitimate answer here (no violations), so the non-zero grep exit that
+# pipefail would otherwise turn into a script abort is absorbed.
+count_occurrences() {
+    local count
+    count="$(grep -o -- "$2" "$1" 2>/dev/null | wc -l)" || count=0
+    printf '%s' "${count}"
+}
+
+stage_format() {
+    # Spotless, Checkstyle and SpotBugs all run inside `mvn verify`, which the
+    # build stage above already ran: Spotless and Checkstyle bound to validate,
+    # SpotBugs to verify (see the parent POM).  This stage deliberately does NOT
+    # re-run them.  It reads what they left behind in each module's target/ and
+    # checks they really inspected this tree, because a static-analysis plugin
+    # that is silently misconfigured exits 0 having analysed nothing, and the
+    # build would be just as green.
+    local failures=0 module expected
+    local index result xml compiled
+    local listed found errors classes missing bugs
+    local total_spotless=0 total_checkstyle=0 total_classes=0
+
+    # google-java-format reads jdk.compiler internals.  Without these exports
+    # Spotless forces the packages open itself through sun.misc.Unsafe, which is
+    # terminally deprecated and will be removed; the build would still pass
+    # today and break on a later JDK for a reason nobody would connect to the
+    # formatter.  .mvn/jvm.config holds nothing else and cannot hold a comment:
+    # Maven 3.9 splits it on whitespace and hands every token to the JVM, so a
+    # "#" line becomes an unloadable main class.
+    echo "-- .mvn/jvm.config exports the jdk.compiler packages google-java-format needs"
+    local pkg missing_exports=0
+    for pkg in api file parser tree util; do
+        if ! grep -q -- "--add-exports jdk.compiler/com.sun.tools.javac.${pkg}=ALL-UNNAMED" \
+                "${ROOT}/.mvn/jvm.config" 2>/dev/null; then
+            echo "   MISSING  add-exports for com.sun.tools.javac.${pkg}"
+            missing_exports=$((missing_exports + 1))
+        fi
+    done
+    if [ "${missing_exports}" -eq 0 ]; then
+        echo "   ok       all five exports present"
+    else
+        failures=$((failures + missing_exports))
+    fi
+
+    echo "-- Spotless: target/spotless-index names every file it certified clean"
+    for module in "${PRODUCT_MODULES[@]}" cometgui-archtests; do
+        expected="$(count_java_sources "${module}")"
+        index="${ROOT}/${module}/target/spotless-index"
+        if [ ! -f "${index}" ]; then
+            echo "   MISSING  ${module}/target/spotless-index (did spotless:check run?)"
+            failures=$((failures + 1))
+            continue
+        fi
+        # First line is the formatter's state hash; one line per file after it.
+        listed=$(( $(wc -l < "${index}") - 1 ))
+        if [ "${listed}" -ne "${expected}" ]; then
+            echo "   MISMATCH ${module}: ${expected} .java source(s) on disk, ${listed} in spotless-index"
+            failures=$((failures + 1))
+        else
+            printf '   ok       %-28s %2d file(s) formatted and header-checked\n' "${module}" "${listed}"
+            total_spotless=$((total_spotless + listed))
+        fi
+    done
+
+    echo "-- Checkstyle: target/checkstyle-result.xml names every file it parsed"
+    for module in "${PRODUCT_MODULES[@]}" cometgui-archtests; do
+        expected="$(count_java_sources "${module}")"
+        result="${ROOT}/${module}/target/checkstyle-result.xml"
+        if [ ! -f "${result}" ]; then
+            echo "   MISSING  ${module}/target/checkstyle-result.xml (did checkstyle:check run?)"
+            failures=$((failures + 1))
+            continue
+        fi
+        found="$(count_occurrences "${result}" '<file name=')"
+        errors="$(count_occurrences "${result}" '<error ')"
+        if [ "${found}" -ne "${expected}" ]; then
+            echo "   MISMATCH ${module}: ${expected} .java source(s) on disk, ${found} in checkstyle-result.xml"
+            failures=$((failures + 1))
+        elif [ "${errors}" -ne 0 ]; then
+            echo "   VIOLATIONS ${module}: ${errors} Checkstyle error(s) in a build that passed"
+            failures=$((failures + 1))
+        else
+            printf '   ok       %-28s %2d file(s) checked, 0 violations\n' "${module}" "${found}"
+            total_checkstyle=$((total_checkstyle + found))
+        fi
+    done
+
+    echo "-- SpotBugs: target/spotbugsXml.xml reports how many classes it read"
+    for module in "${PRODUCT_MODULES[@]}" cometgui-archtests; do
+        # A module that compiles to no class file at all gives SpotBugs nothing
+        # to do; that is reported, not silently counted as a pass.
+        compiled="$(count_class_files "${module}")"
+        if [ "${compiled}" -eq 0 ]; then
+            printf '   skip     %-28s no compiled classes to analyse\n' "${module}"
+            continue
+        fi
+        xml="${ROOT}/${module}/target/spotbugsXml.xml"
+        if [ ! -f "${xml}" ]; then
+            echo "   MISSING  ${module}/target/spotbugsXml.xml, but the module has classes"
+            failures=$((failures + 1))
+            continue
+        fi
+        classes="$(sed -n "s/.*total_classes='\([0-9]*\)'.*/\1/p" "${xml}" | head -1)"
+        missing="$(sed -n "s/.*missingClasses='\([0-9]*\)'.*/\1/p" "${xml}" | head -1)"
+        errors="$(sed -n "s/.*<Errors[^>]*errors='\([0-9]*\)'.*/\1/p" "${xml}" | head -1)"
+        bugs="$(count_occurrences "${xml}" '<BugInstance ')"
+        if [ -z "${classes}" ] || [ "${classes}" -eq 0 ]; then
+            echo "   VACUOUS  ${module}: SpotBugs analysed 0 classes. Java ${EXPECTED_JAVA_VERSION}"
+            echo "            emits class file major version 69; an analyser that cannot read it"
+            echo "            reports nothing and exits 0.  Do NOT lower maven.compiler.release."
+            failures=$((failures + 1))
+        elif [ "${missing:-0}" -ne 0 ] || [ "${errors:-0}" -ne 0 ]; then
+            echo "   ERRORS   ${module}: missingClasses=${missing} errors=${errors} in the SpotBugs run"
+            failures=$((failures + 1))
+        elif [ "${bugs}" -ne 0 ]; then
+            echo "   BUGS     ${module}: ${bugs} SpotBugs finding(s) in a build that passed"
+            failures=$((failures + 1))
+        else
+            printf '   ok       %-28s %2d class(es) analysed, 0 findings\n' "${module}" "${classes}"
+            total_classes=$((total_classes + classes))
+        fi
+    done
+
+    [ "${total_spotless}" -gt 0 ] || { echo "   SPOTLESS FORMATTED NOTHING"; failures=$((failures + 1)); }
+    [ "${total_checkstyle}" -gt 0 ] || { echo "   CHECKSTYLE CHECKED NOTHING"; failures=$((failures + 1)); }
+    [ "${total_classes}" -gt 0 ] || { echo "   SPOTBUGS ANALYSED NOTHING"; failures=$((failures + 1)); }
+
+    [ "${failures}" -eq 0 ] || die "${failures} quality-gate evidence check(s) failed."
+    printf 'OK: Spotless %d file(s), Checkstyle %d file(s), SpotBugs %d class(es).\n' \
+        "${total_spotless}" "${total_checkstyle}" "${total_classes}"
+    echo "    The gates themselves are proved to fail on the defects they catch by"
+    echo "    bash scripts/verify-quality-gates.sh (run separately: it rebuilds a"
+    echo "    deliberately damaged copy of the tree under _build/)."
 }
 
 # -------------------------------------------------------------------- main --
