@@ -91,7 +91,30 @@ Work units
        ``_build/``; no write to ``~/.m2``; ``mvn -v`` reports the pinned Maven
        and JDK.
      - Gate 1; foundation for all others
-     - *pending -- not started*
+     - **ACCEPTED 2026-08-29**, commit ``c808f81``. I ran ``bash
+       scripts/build.sh`` myself after deleting the build output: 4/4 stages
+       OK in 7 seconds, eleven jars written, ``BuildIdentity.class`` present
+       in the domain jar, three surefire report sets totalling ``tests=39
+       failures=0 errors=0 skipped=0``. ``ls -la ~/.m2`` says *no such
+       directory* both before and after -- the host repository was never
+       created. ``.mvn/maven.config`` carries
+       ``-Dmaven.repo.local=_build/m2repo`` so a bare ``mvn`` from the root is
+       protected too, which I used for every command below without passing
+       ``-D`` and ``~/.m2`` still does not exist. Twelve module directories,
+       53 ``package-info.java`` files, and the module edges are the ones the
+       layering permits (``cometgui-ui`` depends on domain, workflow, results,
+       provenance and both parameter modules and nothing else). ``grep -rn
+       openjfx --include=pom.xml`` finds only comments in the product build --
+       JavaFX comes from the Liberica JDK, as Phase 00 established. **I did
+       not take the tests on trust:** I inverted the blank-version guard in
+       ``BuildIdentity`` and ran ``mvn -pl cometgui-domain test``, which exited
+       1 with ``rejectsMissingVersion`` and ``rejectsBlankVersion`` failing and
+       the diagnostic ``expected: <IllegalArgumentException> but was:
+       <NullPointerException>``; restoring the file gives exit 0 and a clean
+       ``git status``. The unit also found a real trap: ``.gitignore``'s
+       unanchored ``tools/`` pattern silently matched
+       ``org/cometgui/tools/`` inside three modules and would have dropped
+       eight source files from git. It is now ``/tools/``.
 
    * - 2
      - **Formatting and static analysis that fail the build.** Spotless
