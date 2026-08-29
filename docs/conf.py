@@ -61,23 +61,98 @@ html_title = "CometGUI documentation"
 
 # -- Extension points --------------------------------------------------------
 #
-# HOOK POINT FOR PHASE 01 UNIT 6 (R-DOC-03), NOT IMPLEMENTED HERE.
+# R-DOC-03: the traceability report is generated here, during the documentation
+# build, so that an incomplete map is a documentation build failure rather than
+# something noticed later. The generator lives in scripts/traceability (standard
+# library only, so it adds nothing to docs/requirements.txt) and is also
+# runnable on its own as `bash scripts/ci/traceability.sh`.
 #
-# Unit 6 adds the traceability report generator and wires it in here as:
-#
-#     def setup(app):
-#         app.connect("builder-inited", <generate developer/traceability.rst>)
-#         return {"parallel_read_safe": True}
-#
-# It must generate docs/developer/traceability.rst before Sphinx reads the
-# source tree, and must fail the build (raise, so -W-style failure is not even
-# needed) when an R- has no implementing phase or an AC- has no test and no
-# human-sign-off mark.
-#
-# Until that hook exists there is a real gap, recorded here rather than hidden:
-# docs/developer/traceability.rst is listed in the developer toctree and is
-# gitignored, so unit 4 could only leave a placeholder in the working tree, not
-# commit one. A fresh clone therefore has no such file and this build fails with
-#     toctree contains reference to nonexisting document
-#         'developer/traceability'
-# until unit 6 lands the generator. Unit 6 closes it; nothing else should.
+# The gap this closes: developer/traceability.rst is gitignored and generated,
+# so a fresh clone has no such file and the developer toctree would fail with
+#     toctree contains reference to nonexisting document 'developer/traceability'
+# The builder-inited handler below writes the page before Sphinx reads the
+# source tree, which is why a fresh extraction of HEAD now builds.
+
+import sys
+from pathlib import Path
+
+from sphinx.errors import ExtensionError
+from sphinx.util import logging as sphinx_logging
+
+_LOGGER = sphinx_logging.getLogger(__name__)
+_CONF_DIR = Path(__file__).resolve().parent
+
+
+def _project_root(start):
+    """The directory holding specification.rst and phases/, at or above ``start``.
+
+    Walked rather than assumed to be ``_CONF_DIR.parent``: this configuration is
+    also read from copies of the documentation tree -- scripts/ci/docs-build.sh
+    makes one under _build/ for its self-test -- and the generator's inputs live
+    in the real repository either way.
+    """
+    for candidate in (start, *start.parents):
+        if (candidate / "specification.rst").is_file() and (candidate / "phases").is_dir():
+            return candidate
+    return None
+
+
+def _generate_traceability_report(app):
+    """builder-inited handler: write developer/traceability.rst or fail the build."""
+    root = _project_root(_CONF_DIR)
+    if root is None:
+        raise ExtensionError(
+            f"traceability: no project root at or above {_CONF_DIR} (looked for a "
+            "directory holding both specification.rst and phases/). The "
+            "traceability report required by R-DOC-03 cannot be generated."
+        )
+    scripts_dir = str(root / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        import traceability
+    except ImportError as error:  # pragma: no cover - environment failure
+        raise ExtensionError(
+            f"traceability: cannot import the report generator from {scripts_dir}: "
+            f"{error}"
+        ) from None
+
+    target = Path(app.srcdir) / traceability.REPORT_RELATIVE_PATH
+    try:
+        written, project = traceability.generate(root, target)
+    except traceability.TraceabilityError as error:
+        raise ExtensionError(
+            "traceability: the traceability report is not complete, so the "
+            "documentation build fails (R-DOC-03).\n\n"
+            f"{error}\n\n"
+            "Fix docs/traceability-map.toml, or the phase document it disagrees "
+            "with, and run `bash scripts/ci/traceability.sh`."
+        ) from None
+
+    # Exit code 0 proves nothing, and neither does "no exception": check the page.
+    if not written.is_file() or written.stat().st_size == 0:
+        raise ExtensionError(
+            f"traceability: the generator reported success but {written} is missing "
+            "or empty."
+        )
+    tally = traceability.counts(project)
+    _LOGGER.info(
+        "[traceability] wrote %s: %d R- rules, %d AC- criteria "
+        "(%d automated, %d partial, %d planned, %d human sign-off)",
+        written.relative_to(Path(app.srcdir)),
+        tally["rules"],
+        tally["criteria"],
+        tally["automated"],
+        tally["partial"],
+        tally["planned"],
+        tally["human sign-off"],
+    )
+
+
+def setup(app):
+    app.connect("builder-inited", _generate_traceability_report)
+    return {
+        "version": "1.0",
+        "parallel_read_safe": True,
+        "parallel_write_safe": True,
+    }

@@ -1,0 +1,477 @@
+# CometGUI traceability map -- the AC- half of the report R-DOC-03 requires.
+#
+# WHAT THIS FILE IS
+# -----------------
+# R-DOC-03 lets the traceability report be generated "from source annotations or
+# a checked-in mapping file". The R- half needs no map: R-DOC-01 already fixes
+# ownership in each phase document's :Delivers: field, and the generator reads it
+# from there. This file is the AC- half, which has no such home -- an acceptance
+# criterion's evidence is a test name, a human sign-off, or a phase that has not
+# run yet.
+#
+# WHAT THE GENERATOR DOES WITH IT
+# -------------------------------
+# scripts/traceability verifies every entry rather than believing it, and the
+# documentation build fails on any of these:
+#
+#   * an R- rule with no owning phase, or with more than one
+#   * an AC- with no evidence at all
+#   * a "test" entry whose class or method is not in cometgui-*/src/test/java
+#   * a "check" entry whose file is gone or no longer contains its marker
+#   * a human-sign-off claim the specification does not mark |human|, or a
+#     |human| criterion this file does not claim
+#   * an identifier here that specification.rst does not define, or one it
+#     defines that is missing here
+#   * a "planned" entry naming a phase that does not exist, a phase whose
+#     :Proves: field does not claim the criterion, or a phase the STATUS.rst
+#     phase board already records as PASSED
+#
+# EVIDENCE KINDS
+# --------------
+#   kind = "test"     class = "org.cometgui...Test"   [method = "..."]
+#   kind = "check"    command = "..."  file = "..."  contains = "..."
+#   kind = "human"    reference = "..."  record = "<path that must exist>"
+#   kind = "planned"  phase = "nn"
+#
+# A criterion may carry several entries. One with a "check" today and a
+# "planned" for the phase that finishes the job is reported as "partial", which
+# is the honest description of, for example, AC-DOC-01: the strict Sphinx build
+# runs now, but Read the Docs cannot build anything until there is a remote
+# (D-008).
+#
+# HONEST STATE OF THIS FILE, 2026-08-29 (Phase 01, unit 6)
+# --------------------------------------------------------
+# Phases 02-16 have not run, so almost every criterion is "planned". Exactly two
+# criteria have an automated check in the tree today, and NO criterion is yet
+# backed by a named JUnit test -- the four test classes that exist prove build
+# identity and JavaFX availability, neither of which is an acceptance criterion.
+# The "test" kind is therefore fully implemented and unit-tested but currently
+# unused; the first real entry arrives with Phase 04.
+#
+# Phase 01 is also installing the JaCoCo coverage gate, the PIT mutation gate
+# and the ArchUnit rules (unit 3). They were not in the tree when this file was
+# written, so AC-TST-02, AC-TST-03 and AC-TST-04 are mapped "planned" against
+# Phase 15 rather than to a pom.xml that does not yet configure them. Upgrade
+# them to "check" entries once those gates exist -- that is a real improvement
+# to make, not a defect to hide.
+#
+# Keep entries in specification order. Run `bash scripts/ci/traceability.sh`
+# after editing.
+
+[meta]
+owner = "phase 01, unit 6 (R-DOC-03)"
+generator = "scripts/traceability"
+check = "bash scripts/ci/traceability.sh"
+
+# --- AC-INS -----------------------------------------------------------------
+
+[[ac."AC-INS-01".evidence]]
+kind = "planned"
+phase = "14"
+note = "Foundations are laid earlier, in phase 05."
+
+[[ac."AC-INS-02".evidence]]
+kind = "planned"
+phase = "05"
+
+[[ac."AC-INS-03".evidence]]
+kind = "planned"
+phase = "05"
+
+[[ac."AC-INS-04".evidence]]
+kind = "planned"
+phase = "05"
+
+[[ac."AC-INS-05".evidence]]
+kind = "planned"
+phase = "05"
+
+[[ac."AC-INS-06".evidence]]
+kind = "planned"
+phase = "05"
+
+[[ac."AC-INS-07".evidence]]
+kind = "planned"
+phase = "05"
+
+[[ac."AC-INS-08".evidence]]
+kind = "planned"
+phase = "05"
+
+[[ac."AC-INS-09".evidence]]
+kind = "planned"
+phase = "05"
+
+[[ac."AC-INS-10".evidence]]
+kind = "planned"
+phase = "05"
+
+# --- AC-PAR -----------------------------------------------------------------
+
+[[ac."AC-PAR-01".evidence]]
+kind = "planned"
+phase = "06"
+
+[[ac."AC-PAR-02".evidence]]
+kind = "planned"
+phase = "06"
+
+[[ac."AC-PAR-03".evidence]]
+kind = "planned"
+phase = "07"
+
+[[ac."AC-PAR-04".evidence]]
+kind = "planned"
+phase = "07"
+
+[[ac."AC-PAR-05".evidence]]
+kind = "planned"
+phase = "07"
+
+[[ac."AC-PAR-06".evidence]]
+kind = "planned"
+phase = "06"
+
+[[ac."AC-PAR-07".evidence]]
+kind = "planned"
+phase = "07"
+
+[[ac."AC-PAR-08".evidence]]
+kind = "planned"
+phase = "07"
+
+[[ac."AC-PAR-09".evidence]]
+kind = "planned"
+phase = "07"
+
+[[ac."AC-PAR-10".evidence]]
+kind = "planned"
+phase = "07"
+
+[[ac."AC-PAR-11".evidence]]
+kind = "planned"
+phase = "06"
+
+# --- AC-WF ------------------------------------------------------------------
+
+[[ac."AC-WF-01".evidence]]
+kind = "planned"
+phase = "08"
+
+[[ac."AC-WF-02".evidence]]
+kind = "planned"
+phase = "08"
+
+[[ac."AC-WF-03".evidence]]
+kind = "planned"
+phase = "08"
+
+[[ac."AC-WF-04".evidence]]
+kind = "planned"
+phase = "08"
+
+[[ac."AC-WF-05".evidence]]
+kind = "planned"
+phase = "08"
+note = "Foundations are laid earlier, in phase 03."
+
+# --- AC-RES -----------------------------------------------------------------
+
+[[ac."AC-RES-01".evidence]]
+kind = "planned"
+phase = "10"
+
+[[ac."AC-RES-02".evidence]]
+kind = "planned"
+phase = "10"
+
+[[ac."AC-RES-03".evidence]]
+kind = "planned"
+phase = "10"
+
+[[ac."AC-RES-04".evidence]]
+kind = "planned"
+phase = "10"
+
+[[ac."AC-RES-05".evidence]]
+kind = "planned"
+phase = "09"
+
+[[ac."AC-RES-06".evidence]]
+kind = "planned"
+phase = "09"
+
+[[ac."AC-RES-07".evidence]]
+kind = "planned"
+phase = "09"
+
+[[ac."AC-RES-08".evidence]]
+kind = "planned"
+phase = "10"
+
+[[ac."AC-RES-09".evidence]]
+kind = "planned"
+phase = "10"
+
+[[ac."AC-RES-10".evidence]]
+kind = "planned"
+phase = "15"
+note = "Foundations are laid earlier, in phase 10."
+
+# --- AC-VIS -----------------------------------------------------------------
+
+[[ac."AC-VIS-01".evidence]]
+kind = "planned"
+phase = "11"
+
+[[ac."AC-VIS-02".evidence]]
+kind = "planned"
+phase = "11"
+
+[[ac."AC-VIS-03".evidence]]
+kind = "planned"
+phase = "11"
+
+# --- AC-LL ------------------------------------------------------------------
+
+[[ac."AC-LL-01".evidence]]
+kind = "planned"
+phase = "12"
+
+[[ac."AC-LL-02".evidence]]
+kind = "planned"
+phase = "12"
+
+[[ac."AC-LL-03".evidence]]
+kind = "planned"
+phase = "12"
+
+[[ac."AC-LL-04".evidence]]
+kind = "planned"
+phase = "12"
+
+[[ac."AC-LL-05".evidence]]
+kind = "planned"
+phase = "12"
+
+[[ac."AC-LL-06".evidence]]
+kind = "planned"
+phase = "12"
+
+# --- AC-PRV -----------------------------------------------------------------
+
+[[ac."AC-PRV-01".evidence]]
+kind = "planned"
+phase = "13"
+note = "Foundations are laid earlier, in phase 04."
+
+[[ac."AC-PRV-02".evidence]]
+kind = "planned"
+phase = "13"
+
+[[ac."AC-PRV-03".evidence]]
+kind = "planned"
+phase = "13"
+note = "Foundations are laid earlier, in phase 08."
+
+[[ac."AC-PRV-04".evidence]]
+kind = "planned"
+phase = "13"
+note = "Foundations are laid earlier, in phase 08."
+
+[[ac."AC-PRV-05".evidence]]
+kind = "planned"
+phase = "13"
+note = "Foundations are laid earlier, in phase 04."
+
+[[ac."AC-PRV-06".evidence]]
+kind = "planned"
+phase = "13"
+note = "Foundations are laid earlier, in phase 04."
+
+[[ac."AC-PRV-07".evidence]]
+kind = "planned"
+phase = "13"
+
+[[ac."AC-PRV-08".evidence]]
+kind = "planned"
+phase = "13"
+
+[[ac."AC-PRV-09".evidence]]
+kind = "planned"
+phase = "13"
+note = "Foundations are laid earlier, in phase 04."
+
+[[ac."AC-PRV-10".evidence]]
+kind = "planned"
+phase = "09"
+note = "Foundations are laid earlier, in phase 04."
+
+# --- AC-TST -----------------------------------------------------------------
+
+[[ac."AC-TST-01".evidence]]
+kind = "planned"
+phase = "15"
+
+[[ac."AC-TST-02".evidence]]
+kind = "planned"
+phase = "15"
+note = "Foundations are laid earlier, in phase 01."
+
+[[ac."AC-TST-03".evidence]]
+kind = "planned"
+phase = "15"
+note = "Foundations are laid earlier, in phase 01."
+
+[[ac."AC-TST-04".evidence]]
+kind = "planned"
+phase = "15"
+note = "Foundations are laid earlier, in phase 01."
+
+[[ac."AC-TST-05".evidence]]
+kind = "planned"
+phase = "14"
+note = "Foundations are laid earlier, in phase 02."
+
+[[ac."AC-TST-06".evidence]]
+kind = "planned"
+phase = "14"
+
+[[ac."AC-TST-07".evidence]]
+kind = "planned"
+phase = "16"
+note = "Foundations are laid earlier, in phase 14."
+
+[[ac."AC-TST-08".evidence]]
+kind = "planned"
+phase = "14"
+
+[[ac."AC-TST-09".evidence]]
+kind = "planned"
+phase = "14"
+
+[[ac."AC-TST-10".evidence]]
+kind = "planned"
+phase = "15"
+
+[[ac."AC-TST-11".evidence]]
+kind = "planned"
+phase = "15"
+
+[[ac."AC-TST-12".evidence]]
+kind = "planned"
+phase = "14"
+
+# --- AC-DOC -----------------------------------------------------------------
+
+[[ac."AC-DOC-01".evidence]]
+kind = "check"
+command = "bash scripts/ci/docs-build.sh"
+file = "scripts/ci/docs-build.sh"
+contains = "-n -W -b html docs docs/_build/html"
+note = "The documentation gate. It runs R-DOC-05's exact command line over docs/ and a second strict build over the project documents outside it, and verifies the HTML exists rather than trusting the exit code."
+
+[[ac."AC-DOC-01".evidence]]
+kind = "planned"
+phase = "16"
+note = "The Read the Docs half is unproved and cannot be proved yet: Read the Docs builds from a git remote and D-008 withholds one. .readthedocs.yaml records this openly."
+
+[[ac."AC-DOC-02".evidence]]
+kind = "check"
+command = "bash scripts/ci/traceability.sh"
+file = "scripts/ci/traceability.sh"
+contains = "--check"
+note = "This report. It already shows every R- with exactly one owning phase and every AC- with evidence, and fails the documentation build otherwise."
+
+[[ac."AC-DOC-02".evidence]]
+kind = "planned"
+phase = "16"
+note = "Phase 16 signs the criterion off when \"evidence\" means a passing test or a recorded sign-off for every criterion, not a planned phase."
+
+# --- AC-REL -----------------------------------------------------------------
+
+[[ac."AC-REL-01".evidence]]
+kind = "planned"
+phase = "15"
+
+[[ac."AC-REL-02".evidence]]
+kind = "human"
+reference = "DECISIONS.rst, D-001 -- CasanovoGUI derivative-source licensing"
+record = "DECISIONS.rst"
+note = "specification.rst marks this criterion [human]; it cannot be discharged by an automated test."
+
+[[ac."AC-REL-02".evidence]]
+kind = "planned"
+phase = "16"
+
+[[ac."AC-REL-03".evidence]]
+kind = "human"
+reference = "DECISIONS.rst -- licence audit of bundled and transitive components"
+record = "DECISIONS.rst"
+note = "specification.rst marks this criterion [human]; it cannot be discharged by an automated test."
+
+[[ac."AC-REL-03".evidence]]
+kind = "planned"
+phase = "16"
+
+# --- AC-UX ------------------------------------------------------------------
+
+[[ac."AC-UX-01".evidence]]
+kind = "human"
+reference = "DECISIONS.rst -- UX validation: domain and task analysis"
+record = "DECISIONS.rst"
+note = "specification.rst marks this criterion [human]; it cannot be discharged by an automated test."
+
+[[ac."AC-UX-01".evidence]]
+kind = "planned"
+phase = "16"
+
+[[ac."AC-UX-02".evidence]]
+kind = "human"
+reference = "DECISIONS.rst -- UX validation: heuristic evaluation"
+record = "DECISIONS.rst"
+note = "specification.rst marks this criterion [human]; it cannot be discharged by an automated test."
+
+[[ac."AC-UX-02".evidence]]
+kind = "planned"
+phase = "16"
+
+[[ac."AC-UX-03".evidence]]
+kind = "human"
+reference = "DECISIONS.rst -- UX validation: cognitive walkthrough"
+record = "DECISIONS.rst"
+note = "specification.rst marks this criterion [human]; it cannot be discharged by an automated test."
+
+[[ac."AC-UX-03".evidence]]
+kind = "planned"
+phase = "16"
+
+[[ac."AC-UX-04".evidence]]
+kind = "human"
+reference = "DECISIONS.rst -- UX validation: usability test, routine user"
+record = "DECISIONS.rst"
+note = "specification.rst marks this criterion [human]; it cannot be discharged by an automated test."
+
+[[ac."AC-UX-04".evidence]]
+kind = "planned"
+phase = "16"
+
+[[ac."AC-UX-05".evidence]]
+kind = "human"
+reference = "DECISIONS.rst -- UX validation: usability test, advanced Comet user"
+record = "DECISIONS.rst"
+note = "specification.rst marks this criterion [human]; it cannot be discharged by an automated test."
+
+[[ac."AC-UX-05".evidence]]
+kind = "planned"
+phase = "16"
+
+[[ac."AC-UX-06".evidence]]
+kind = "human"
+reference = "DECISIONS.rst -- UX validation: keyboard-only and accessibility review"
+record = "DECISIONS.rst"
+note = "specification.rst marks this criterion [human]; it cannot be discharged by an automated test."
+
+[[ac."AC-UX-06".evidence]]
+kind = "planned"
+phase = "16"
