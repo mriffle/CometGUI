@@ -139,7 +139,26 @@ Work units
        ``docs/feasibility/windows-artefact.rst`` including the cost of a
        Windows runner.
      - Gate 8, 9 (NSIS)
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Read commit
+       ``12be584``. Deleted the extraction output and **re-ran
+       ``scripts/feasibility/windows-artefact.sh`` myself** from clean: exit 0,
+       all sections reproduced. **The extractor is proved by an independent
+       route, which I re-checked myself**: the ``percolator.exe`` the pure-
+       Python NSIS extractor pulls out of the ``noxml`` installer is
+       byte-identical to the one Python's ``zipfile`` pulls out of
+       ``percolator-noxml-windows-portable.zip`` -- both sha256
+       ``b9d9bbe82bc4a68d367a8cb00a0a22892b0b1cb516510fd0459d1df6805f059f``,
+       707072 bytes. Ran ``pe_info.py`` on the XML build: PE32+, machine
+       ``0x8664``, console subsystem, imports ``xerces-c_3_1.dll``; both XSDs
+       are in the payload. **Overclaim audit: I grepped the document for
+       verified/confirmed/proven/tested near any XML-capability claim and found
+       none** -- the manifest wording it prescribes is
+       ``xml_capability: unverified-on-windows`` and the sentence "The binary
+       was not executed on Windows" appears four times. Gate item 8 therefore
+       takes its SECOND branch, correctly. **The unit also produced the phase's
+       most consequential finding** (see "Blockers escalated"): the ``noxml``
+       twin is not distinguishable by the ``-X`` help text, which is what gate
+       item 8's own suggested test relies on.
 
    * - 5
      - **Project-local toolchain and jpackage.** JDK and build tool under
@@ -182,7 +201,21 @@ Work units
        document states plainly that the ephemeral input is not the project's
        fixture.
      - ``D-006`` deliverable; unblocks gate 2 and 3
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Read commits
+       ``f5def32`` and ``b06c1d3``. **Deleted ``scratch/fixture`` entirely and
+       re-ran ``python3 scripts/feasibility/fetch_ephemeral_input.py``
+       myself**: 2.6 s, all four files re-downloaded, every SHA-256 and byte
+       size re-verified, and the script's own content checks re-run. **I then
+       parsed the mzML myself** rather than trusting its counts: 728 and 610
+       ``ms level value="2"`` spectra against declared ``spectrumList``
+       counts of 801 and 671, and 20652 ``>`` records in the FASTA -- matching
+       the agent's figures exactly. Six candidates with per-file sizes,
+       parsed MS2 counts and licence URLs; the strongest licence finding is
+       that PRIDE exposes a machine-readable per-project ``license`` field, so
+       "a PRIDE dataset" is not a licence status. **D-006 is not answered**:
+       the document says so in three places and the ephemeral input is labelled
+       a feasibility input throughout. Nothing under ``scratch/`` is tracked by
+       git -- checked with ``git ls-files``.
 
    * - 7
      - **JavaFX startup smoke and GUI automation spike.** JavaFX startup on
@@ -215,6 +248,19 @@ Work units
      - In-scope bullets "Limelight converter JAR help" and "PDV CLI figure
        generation"; ``D-005`` evidence
      - PENDING
+
+   * - 10
+     - **Does the ``noxml`` build emit Percolator XML? A per-release,
+       per-platform sweep.** Created mid-phase, after the orchestrator
+       personally verified that the 3.07.1 Linux ``noxml`` binary emits
+       ``percolator_out`` XML under ``-X`` byte-identically to the
+       XML-capable build. Establishes which releases and platforms this holds
+       for, whether the XML validates against the XSD, whether ``-Z`` works on
+       a ``noxml`` build, and what it does to ``D-002``/``D-003``/``D-004``.
+       Produces ``docs/feasibility/noxml-capability.rst``.
+     - Gate 7, 10; ``R-PERC-02`` capability probe design
+     - PENDING
+
 
 Rejections and rework
 =====================
