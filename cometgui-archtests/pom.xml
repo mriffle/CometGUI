@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.cometgui</groupId>
+    <artifactId>cometgui-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>cometgui-archtests</artifactId>
+  <packaging>jar</packaging>
+  <name>CometGUI :: Architecture tests</name>
+  <description>ArchUnit rules over the whole product. Test sources only; it deliberately produces no main classes.</description>
+
+  <!--
+    Every product module, test-scoped: ArchUnit has to see all of them to prove
+    anything about the layering between them.  This is the one module allowed a
+    dependency on everything, and it is allowed it because it ships nothing.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-domain</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-provenance</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-process</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-tools</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-install</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-params-comet</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-params-percolator</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-results</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-workflow</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-ui</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-app</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+  <!--
+    Test sources only: this module deliberately has no src/main/java, so there is
+    nothing to package.  skipIfEmpty keeps the reactor from producing (and later
+    phases from consuming) a jar containing only a manifest.
+  -->
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <skipIfEmpty>true</skipIfEmpty>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

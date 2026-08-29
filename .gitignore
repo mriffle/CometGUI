@@ -1,7 +1,18 @@
+# Project-local toolchains and build output. Nothing here is committed:
+# tools/ is rebuilt by scripts/feasibility/install-toolchain.sh and .venv/ by
+# scripts/build.sh from requirements-dev.txt (which IS committed).
 .venv/
-tools/
+# Anchored: an unanchored "tools/" also matches org/cometgui/tools/ and
+# org/cometgui/domain/tools/ inside the modules, which silently made eight
+# committed-by-intent source files unaddable.
+/tools/
 target/
 _build/
 *.class
 scratch/
 __pycache__/
+
+# Sphinx output, and the traceability report, which phase 01 unit 6 generates
+# at build time from the checked-in mapping file rather than by hand.
+docs/_build/
+docs/developer/traceability.rst

@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CometGUI - parent POM (Phase 01, work unit 1).
+
+  This is the real product build.  The throwaway feasibility POMs under
+  scripts/feasibility/ are not, and must never be promoted into it.
+
+  Two facts inherited from Phase 00 that must not be undone:
+
+  * There is NO org.openjfx:javafx-* dependency anywhere.  JavaFX 25.0.4+1 is
+    bundled in the pinned BellSoft Liberica JDK 25.0.4.1+1 as resolved system
+    modules; a Maven JavaFX dependency would put a second copy of the javafx.*
+    packages on the class path.  cometgui-ui and cometgui-app compile against
+    the bundled modules with no extra compiler argument - verified in this
+    unit, see cometgui-ui/.../JavaFxAvailability.java.
+  * The local repository is forced to _build/m2repo by .mvn/maven.config, so
+    that no mvn invocation from this repository writes to the host's ~/.m2.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.cometgui</groupId>
+  <artifactId>cometgui-parent</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>CometGUI</name>
+  <description>
+    Cross-platform JavaFX desktop application that runs a complete
+    Comet to Percolator proteomics search workflow, installs every scientific
+    tool it needs by itself, and produces a provenance record strong enough to
+    reproduce the run later.
+  </description>
+  <inceptionYear>2026</inceptionYear>
+
+  <!--
+    Licence declaration only.  The LICENSE file itself is placed by another
+    Phase 01 work unit; D-001 records the decision (GPL-3.0-only, derived from
+    CasanovoGUI).
+  -->
+  <licenses>
+    <license>
+      <name>GNU General Public License v3.0 only</name>
+      <url>https://www.gnu.org/licenses/gpl-3.0.txt</url>
+      <distribution>repo</distribution>
+      <comments>SPDX-License-Identifier: GPL-3.0-only (see DECISIONS.rst, D-001)</comments>
+    </license>
+  </licenses>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!--
+      maven.compiler.release, not source/target: it is the stricter of the two
+      and this unit verified that javac still resolves the JDK-bundled javafx.*
+      system modules under it, with no extra add-modules argument.  (XML
+      comments cannot contain a double hyphen, so javac option names appear
+      here without their leading hyphens.)  The feasibility gui-spike needed
+      source/target only because it also passes add-exports at internal
+      com.sun.* packages, which the release option forbids.  A module that
+      later needs add-exports must override these properties locally and say
+      why in its own POM.
+    -->
+    <maven.compiler.release>25</maven.compiler.release>
+
+    <!-- Minimum toolchain, enforced at validate by maven-enforcer-plugin. -->
+    <cometgui.minimumMavenVersion>3.9.16</cometgui.minimumMavenVersion>
+    <cometgui.minimumJavaVersion>25</cometgui.minimumJavaVersion>
+
+    <!--
+      Test libraries.  JUnit 5.14.4 is the version Phase 00 proved on this JDK
+      (scripts/feasibility/gui-spike).  Do not move to JUnit 6 without
+      re-proving the pitest JUnit 5 plugin against it first - unit 3 gates on
+      PIT.
+    -->
+    <junit.version>5.14.4</junit.version>
+
+    <!--
+      Build-plugin versions.  Every plugin used anywhere in this build is
+      pinned to an exact version here; no ranges, no reliance on the Maven
+      defaults.  Versions were checked against Maven Central metadata on
+      2026-08-29 and each is exercised by `bash scripts/build.sh`.
+    -->
+    <maven-clean-plugin.version>3.5.0</maven-clean-plugin.version>
+    <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+    <maven-dependency-plugin.version>3.11.0</maven-dependency-plugin.version>
+    <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
+    <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+    <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
+    <maven-install-plugin.version>3.1.4</maven-install-plugin.version>
+    <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
+    <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
+    <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+  </properties>
+
+  <!--
+    Module order is dependency order: a module never appears before something
+    it depends on.  Maven would reorder anyway; keeping it readable is for the
+    humans and agents who have to reason about the layering.
+  -->
+  <modules>
+    <module>cometgui-domain</module>
+    <module>cometgui-provenance</module>
+    <module>cometgui-process</module>
+    <module>cometgui-tools</module>
+    <module>cometgui-install</module>
+    <module>cometgui-params-comet</module>
+    <module>cometgui-params-percolator</module>
+    <module>cometgui-results</module>
+    <module>cometgui-workflow</module>
+    <module>cometgui-ui</module>
+    <module>cometgui-app</module>
+    <module>cometgui-archtests</module>
+  </modules>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Test stack. -->
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!--
+        Reactor modules, so that a child declares a sibling without repeating
+        a version.  The permitted edges are listed in each child POM; the
+        layering they encode becomes an enforced ArchUnit rule in unit 3.
+      -->
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-domain</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-provenance</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-process</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-tools</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-install</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-params-comet</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-params-percolator</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-results</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-workflow</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-ui</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.cometgui</groupId>
+        <artifactId>cometgui-app</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!--
+      Every module gets JUnit Jupiter: a module with no test is a module with
+      no gate, and this project does not accept one.
+    -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-clean-plugin</artifactId>
+          <version>${maven-clean-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven-compiler-plugin.version}</version>
+          <configuration>
+            <compilerArgs>
+              <arg>-Xlint:all</arg>
+            </compilerArgs>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>${maven-dependency-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-deploy-plugin</artifactId>
+          <version>${maven-deploy-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${maven-enforcer-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>${maven-failsafe-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-install-plugin</artifactId>
+          <version>${maven-install-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>${maven-jar-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>${maven-resources-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${maven-surefire-plugin.version}</version>
+        </plugin>
+
+        <!--
+          ROOM RESERVED FOR LATER PHASE 01 WORK UNITS.  Add the plugin here,
+          pinned by a property above, and its <executions> in <build><plugins>
+          below.  Keeping the additions in separate blocks is deliberate: two
+          agents can work on this file without colliding.
+
+            unit 2  formatting and static analysis
+                    com.diffplug.spotless:spotless-maven-plugin
+                    org.apache.maven.plugins:maven-checkstyle-plugin
+                    com.github.spotbugs:spotbugs-maven-plugin
+            unit 3  test, coverage, architecture and mutation gates
+                    org.jacoco:jacoco-maven-plugin  (thresholds: core domain,
+                      parameter and provenance >= 90% line / >= 85% branch;
+                      view-model and presenter >= 80% line)
+                    org.pitest:pitest-maven + pitest-junit5-plugin
+                      (>= 80% mutation score, R-TEST-02)
+                    extra maven-surefire-plugin configuration
+                    com.tngtech.archunit:archunit-junit5 in cometgui-archtests
+            unit 7  SBOM and dependency scanning
+                    org.cyclonedx:cyclonedx-maven-plugin
+                    org.owasp:dependency-check-maven
+        -->
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <!--
+        A wrong toolchain must fail immediately and say so, not fail later
+        with a confusing class-file or API error.  Bound to validate, so it is
+        the first thing that runs in every module.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-toolchain</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireMavenVersion>
+                  <version>[${cometgui.minimumMavenVersion},)</version>
+                  <message>CometGUI requires Apache Maven ${cometgui.minimumMavenVersion} or newer. Source tools/env.sh, or run scripts/feasibility/install-toolchain.sh if tools/ is missing.</message>
+                </requireMavenVersion>
+                <requireJavaVersion>
+                  <version>[${cometgui.minimumJavaVersion},)</version>
+                  <message>CometGUI requires a Java ${cometgui.minimumJavaVersion} JDK (pinned: BellSoft Liberica JDK 25.0.4.1+1, which bundles JavaFX). Source tools/env.sh.</message>
+                </requireJavaVersion>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- unit 2 / unit 3 / unit 7 executions belong here. -->
+    </plugins>
+  </build>
+</project>
