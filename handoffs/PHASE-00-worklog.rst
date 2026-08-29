@@ -107,7 +107,26 @@ Work units
        ``docs/feasibility/percolator-artefacts.rst``.
      - Gate 6, 7, 9 (``.deb`` and ``.pkg``); ``R-PERC-01``, ``R-PERC-02``,
        ``R-TOOL-02``; ``D-002``/``D-003`` evidence
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Read commit
+       ``a677e09``. **Executed the extracted binaries myself**, not through the
+       agent's scripts: ``scratch/percolator/3.07.1-linux-x86_64/usr/bin/
+       percolator -h`` prints ``Percolator version 3.07.1, Build Date Jun 20
+       2024 13:21:20`` and its help carries ``-X <filename> / --xmloutput
+       <filename>  Path to xml-output (pout) file.`` and ``-Z /
+       --decoy-xml-output ... Only available if -X is set.`` Both XSDs are in
+       the payload (``percolator_out.xsd`` 10388 B, ``percolator_in.xsd``
+       15457 B). Ran the 3.08.0 binary myself: it fails at the loader with
+       ``version `GLIBCXX_3.4.32' not found`` and ``version `GLIBC_2.38' not
+       found`` -- the specification's claim, reproduced. Ran the 3.09 wrapper:
+       ``Percolator version 3.09.0, Build Date May 21 2026``, and grepping its
+       help for ``xmloutput|decoy-xml`` returns **0** matches. Parsed the macOS
+       Mach-O header myself: magic ``0xfeedfacf`` (MH_MAGIC_64), cputype
+       ``0x1000007`` = x86-64 only, with both XSDs beside it. Re-ran
+       ``enumerate_percolator_releases.py``: latest compatible computes to
+       **3.7.1 (rel-3-07-01)** under both the strict and the optimistic
+       variant, from 28 releases -- confirms the specification rather than
+       assuming it. ``check-docs.sh`` clean. D-003 presented as five costed
+       options and not answered -- correct.
 
    * - 4
      - **Windows NSIS artefact: strongest obtainable evidence.** Decompress
@@ -133,7 +152,25 @@ Work units
        (URL, version, date, SHA-256, licence per tool) and the Windows/macOS
        runner requirements.
      - Gate 4; ``R-PLAT-02``, ``R-PLAT-03``
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Read commit
+       ``5b4482e`` (1470 lines, 5 files). **Moved the installed toolchain
+       aside and re-ran the installer cold**
+       (``COMETGUI_TOOLCHAIN_NO_CACHE=1 bash scripts/feasibility/
+       install-toolchain.sh``): re-downloaded 388 MB + 9 MB, verified both
+       SHA-256s against the pins, installed, and self-verified
+       ``java.version = 25.0.4.1``, ``jpackage --version = 25.0.4.1``, all
+       seven JavaFX modules, ``Apache Maven 3.9.16`` -- 13 s. **I then tested
+       the checksum gate myself** by copying the script with Maven's pin
+       replaced by ``deadbeef...``: it printed ``FATAL: maven: SHA-256
+       MISMATCH``, exited 1, did **not** create ``tools/apache-maven-3.9.16``,
+       and deleted the bad archive. Ran ``jpackage-proof.sh`` from a deleted
+       ``dest/`` and then **launched the produced bundle myself** with
+       ``env -i PATH=/usr/bin:/bin`` (no ``java`` on that PATH, verified):
+       ``java.version = 25.0.4.1``, ``java.vendor = BellSoft``, ``java.home =
+       .../ToolchainProbe/lib/runtime``, ``self contained = true``,
+       ``PROBE RESULT = PASS``, exit 0. ``deb`` fails for want of ``fakeroot``
+       and ``rpm`` is not offered at all -- recorded as a host constraint, not
+       worked around. Gate item 4 PASSES for ``app-image`` on Linux.
 
    * - 6
      - **Fixture candidates and ephemeral proof input.** Costed shortlist of
