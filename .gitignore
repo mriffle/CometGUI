@@ -3,3 +3,4 @@ tools/
 target/
 _build/
 *.class
+scratch/
