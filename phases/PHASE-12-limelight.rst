@@ -6,7 +6,7 @@ PHASE-12: Limelight Conversion and Upload
 :Status: NOT STARTED
 :Depends on: 09, 10
 :Blocked by decisions: D-002, D-007
-:Delivers: R-LL-01..04, R-SEC-03, R-SEC-04
+:Delivers: R-LL-01..05, R-SEC-03, R-SEC-04
 :Proves: AC-LL-01..06
 
 Purpose
@@ -68,6 +68,8 @@ agent's report. An item that cannot be verified has not passed.
    first, and targets the fake or sandbox endpoint in tests.
 7. A seeded credential appears in no log, no provenance record and no
    export; the test greps every artefact the run produced.
+8. Selecting Limelight decoy import against a Percolator run that had no decoy
+   output is prevented at configuration time, not at conversion time.
 
 Risks and notes
 ---------------

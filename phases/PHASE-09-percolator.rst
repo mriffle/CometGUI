@@ -6,7 +6,7 @@ PHASE-09: Percolator Adapter and Version Capabilities
 :Status: NOT STARTED
 :Depends on: 05, 08
 :Blocked by decisions: D-002, D-003
-:Delivers: R-PERC-01..09
+:Delivers: R-PERC-01..10
 :Proves: AC-RES-05, AC-RES-06, AC-RES-07, AC-PRV-10
 
 Purpose
@@ -21,8 +21,12 @@ In scope
 * Version parsing and the capability model, driven by probe results from
   phase 05.
 * Per-version command construction that emits only advertised options.
-* Platform-aware default version resolution from the manifest
-  (``R-PERC-02``), never a hard-coded 3.08.
+* *Latest compatible* resolution (``R-PERC-02``): the highest manifest
+  version with a verified artefact for this platform, a passing loadability
+  probe, and a capability set satisfying the enabled downstream stages. Never
+  hard-coded, and re-evaluated when the enabled stages change.
+* Recording why a newer version was not selected (``R-PERC-10``), in the UI
+  and in provenance.
 * PIN validation before invocation, including the decoy-row check.
 * Output handling: PSM and peptide TSV, optional decoy TSVs, weights, XML
   when capable and needed, logs.
@@ -58,18 +62,22 @@ agent's report. An item that cannot be verified has not passed.
 2. With an XML-capable version, XML is produced and parses; with 3.09, no
    XML option is passed and none is expected -- asserted on the recorded
    argument array, not only on the outcome.
-3. The default version is resolved from the manifest; a test with a
-   manifest lacking any XML-capable build for the platform yields a default
-   that is not XML-capable and a Limelight stage marked unavailable.
-4. A PIN with zero decoy rows fails the stage before Percolator is
+3. The default version is resolved, not hard-coded: with Limelight enabled
+   the resolver returns the newest XML-capable entry, with Limelight disabled
+   the newest entry overall, and toggling the stage re-evaluates it and tells
+   the user. A manifest with no XML-capable build for the platform yields a
+   non-XML default and a Limelight stage marked unavailable.
+4. When the resolver skips a newer version, the reason it gives names that
+   version and the missing capability, in the UI and in provenance.
+5. A PIN with zero decoy rows fails the stage before Percolator is
    launched.
-5. The compatible-version rerun produces a second execution record with a
+6. The compatible-version rerun produces a second execution record with a
    different version, checksum and argument array, and the recorded Comet
    stage is untouched.
-6. The effective seed appears in provenance for every run.
-7. Weights parsing reads the split count from the artefact; a two-split and
+7. The effective seed appears in provenance for every run.
+8. Weights parsing reads the split count from the artefact; a two-split and
    a three-split fixture both parse.
-8. Raw Percolator outputs are byte-identical before and after any filtering
+9. Raw Percolator outputs are byte-identical before and after any filtering
    or export operation.
 
 Risks and notes

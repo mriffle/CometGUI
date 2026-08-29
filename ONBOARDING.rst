@@ -46,15 +46,19 @@ is run*.
 
 .. warning::
 
-   **The single most important verified fact.** No XML-capable Percolator 3.08
-   build is published for Windows or macOS; every portable archive upstream
-   ships is a ``noxml`` build; and the one XML-capable 3.08 artefact is a Linux
-   ``.deb`` whose binary needs glibc 2.38 (so it will not run on Ubuntu 22.04,
-   Debian 12 or RHEL 9). The Limelight path therefore is **not** obtainable
-   from upstream artefacts on most platforms until decision ``D-002`` is made
-   and executed. Do not let any phase build a UI, a manifest or a test that
-   assumes "select 3.08 and XML appears". See ``specification.rst``,
-   *Percolator versions and artefact availability*.
+   **The single most important verified fact.** The product uses the *latest
+   compatible* Percolator, computed from probed capability. With Limelight
+   enabled that resolves to **3.08.1** -- the newest version that can emit the
+   XML the converter requires, since 3.09 removed XML/XSD I/O -- and 3.08.1 is
+   a git tag with **no published binary on any platform**. The newest published
+   XML-capable artefact is 3.08.0's Linux ``.deb``, which needs glibc 2.38 (so
+   it will not run on Ubuntu 22.04, Debian 12 or RHEL 9) and carries a defect
+   3.08.1 fixes. Every portable upstream archive is a ``noxml`` build; XML is
+   an opt-in compile flag; Bioconda's builds are XML-free and skip macOS.
+   Using the latest compatible version therefore means **building Percolator
+   from source** (``D-002``). Do not let any phase hard-code a version, or
+   build a UI, manifest or test that assumes "select 3.08 and XML appears".
+   See ``specification.rst``, *Percolator versions and artefact availability*.
 
 Document map
 ============

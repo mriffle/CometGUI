@@ -174,13 +174,19 @@ rather than merely configure it.
 Risks currently live
 ====================
 
-#. **No XML-capable Percolator on Windows or macOS.** Verified 2026-08-28.
-   Every portable upstream archive is a ``noxml`` build; the sole XML-capable
-   3.08 artefact is a Linux ``.deb`` requiring glibc 2.38. Until ``D-002`` is
-   decided and executed, the Limelight path is Linux-only and only on
-   sufficiently recent Linux. Everything downstream of that -- the manifest,
-   the release matrix, the UI's promises, the test matrix -- depends on the
-   answer.
+#. **The latest compatible Percolator has no published binary anywhere.**
+   Verified 2026-08-29. The product's policy is to run the latest compatible
+   version; with Limelight enabled that resolves to **3.08.1**
+   (``rel-3-08-01``), the newest release that can emit the XML the converter
+   requires -- and it is a tag with no GitHub release. The newest *published*
+   XML-capable artefact is 3.08.0's Linux ``.deb``, which needs glibc 2.38 and
+   carries a PEP-greater-than-1.0 defect that 3.08.1 fixes. Every portable
+   upstream archive is ``noxml``, XML is an opt-in compile flag, and Bioconda's
+   builds are XML-free and skip macOS. Using the latest compatible version
+   therefore means **building Percolator from source with
+   ``-DXML_SUPPORT=ON``** (``D-002``, recommendation: option 1). Everything
+   downstream -- the manifest, the release matrix, the UI's promises, the test
+   matrix -- depends on that decision.
 #. **CasanovoGUI has no licence.** Verified 2026-08-28. The architecture is
    implementable independently, so this blocks derivation, not the project;
    but it must be resolved before public redistribution.
@@ -220,3 +226,14 @@ Change log
      - --
      - Phases 00-16 defined with exit gates; ``ONBOARDING.rst``,
        ``STATUS.rst`` and ``DECISIONS.rst`` created. Project not yet started.
+   * - 2026-08-29
+     - --
+     - Owner directed that the product use the **latest compatible**
+       Percolator rather than a pinned 3.08. Verified that this resolves to
+       3.08.1 (``rel-3-08-01``), which has no published binary on any platform;
+       that XML is an opt-in compile flag removed in 3.09; that the Limelight
+       converter has no non-XML path; and that Bioconda cannot supply an
+       XML-capable build. Specification revision 3 replaces pinned defaults
+       with computed resolution (``R-PERC-02``, ``R-PERC-10``) and records the
+       converter's verified interface (``R-LL-05``). ``D-002``'s recommendation
+       changes to building from source.

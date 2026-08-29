@@ -42,6 +42,14 @@ In scope
 * Determine, per tier-1 platform, exactly which Percolator versions can be
   obtained and executed without administrative rights, and cost each option
   in D-002.
+* Resolve *latest compatible* from first principles rather than accepting the
+  specification's answer: enumerate Percolator releases **and tags**,
+  establish the newest that can emit XML, and confirm it against the
+  converter's actual input requirement.
+* Prove the source build: compile the latest compatible tag with
+  ``-DXML_SUPPORT=ON`` on Linux at minimum, recording the toolchain, the
+  Xerces-C/XSD dependencies, the build time and the resulting binary's dynamic
+  dependencies. This is the feasibility question behind ``D-002`` option 1.
 * Run the pinned Limelight converter JAR's help output and record its real
   argument names.
 * Prove PDV CLI figure generation on a Comet pepXML plus spectrum file.
@@ -94,7 +102,12 @@ agent's report. An item that cannot be verified has not passed.
 6. ``docs/feasibility/percolator-artefacts.rst`` states, per tier-1
    platform, whether an XML-capable Percolator can be installed without
    admin rights, and what each remedy costs.
-7. ``D-001`` and ``D-002`` each have a written recommendation with
+7. The latest compatible Percolator version is established from upstream data
+   with the evidence recorded, not assumed from the specification.
+8. An XML-capable Percolator has been built from source on at least one
+   platform, and its output is accepted by the pinned converter. If it cannot
+   be built, the blocking reason is documented precisely.
+9. ``D-001`` and ``D-002`` each have a written recommendation with
    evidence, ready for the owner.
 
 Risks and notes

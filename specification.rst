@@ -35,6 +35,18 @@ Revision History
    * - 1
      - 2026-08-28
      - Initial implementation-ready specification.
+   * - 3
+     - 2026-08-29
+     - Percolator version policy rewritten around *latest compatible* rather
+       than a pinned 3.08.0. Verified that the newest XML-capable Percolator is
+       the ``rel-3-08-01`` **tag** (3.08.1, 2025-07-08), which has no published
+       binaries on any platform, and that XML is a compile-time option
+       (``XML_SUPPORT``, default OFF) removed outright in 3.09. Verified that
+       the Limelight converter still hard-requires Percolator XML and recorded
+       its real command-line arguments and its ``-Z`` decoy dependency.
+       Verified that Bioconda's Percolator builds are explicitly XML-free and
+       skip macOS, closing that option. ``D-002``'s recommendation changes
+       accordingly: build 3.08.1 from source with ``XML_SUPPORT=ON``.
    * - 2
      - 2026-08-28
      - Upstream release facts verified against live sources (see
@@ -120,6 +132,39 @@ each release.
        ``GLIBCXX_3.4.32``**; it fails to load on a glibc 2.36 host with a
        loader error, not a tool error.
      - Downloaded, extracted, executed
+   * - **Newest XML-capable Percolator**
+     - **``rel-3-08-01`` (3.08.1, tagged 2025-07-08), commit "Fixing a PEP>1.0
+       bug (#394)" -- a point release on the XML-capable 3.08 line. It has
+       no GitHub release and therefore no published binary for any platform.**
+       Its ``CMakeLists.txt`` still carries the XML machinery; ``rel-3-09``'s
+       does not.
+     - Tag list, tag commit, ``CMakeLists.txt`` at each tag
+   * - Percolator XML is a build option
+     - ``option(XML_SUPPORT "Choose to support xml input (slower
+       compilation)." OFF)`` -- XML is opt-in at compile time and pulls in
+       Xerces-C and XSD. Upstream's ``noxml`` artefacts are simply the default
+       build; the XML-capable ones are ``-DXML_SUPPORT=ON`` builds. In 3.09 the
+       option and its code are gone entirely.
+     - ``CMakeLists.txt`` at ``rel-3-08``, ``rel-3-08-01``, ``rel-3-09``
+   * - Bioconda Percolator
+     - Provides 3.9 for ``linux-64`` and ``linux-aarch64`` only, skips macOS
+       (``skip: True  # [osx]``), and its build script states that the XSD/
+       Xerces path is deliberately not built. **Not a source of XML-capable
+       binaries.**
+     - Anaconda API and the Bioconda recipe
+   * - Limelight converter input
+     - Still hard-requires Percolator XML: *"Requires that the Percolator
+       output be represented as XML (see -X option in Percolator)"*, and
+       ``-p, --percolator-file`` is documented as "Full path to percolator
+       output XML file". No tab-delimited path exists; the repository's last
+       substantive change predates the 3.09 removal.
+     - Converter README and its ``--help`` output
+   * - Converter arguments
+     - ``-c/--comet-params``, ``-f/--fasta-file``, ``-p/--percolator-file``,
+       ``-d/--pepxml-directory``, ``-q/--q-value``, ``-o/--out-file``,
+       ``--import-decoys`` (which *requires* Percolator to have been run with
+       ``-Z``), ``--independent-decoy-prefix``, ``--open-mod``, ``-v``.
+     - Converter ``--help`` output
    * - Percolator XML on Windows/macOS
      - The newest XML-capable published builds for those platforms are
        ``percolator-v3-07.exe`` and ``percolator-v3-07-osx-x86_64.pkg``
@@ -142,10 +187,12 @@ each release.
 
 .. warning::
 
-   The third and seventh rows invalidate the assumption, held throughout
-   Revision 1, that selecting "Percolator 3.08.0" delivers the complete
-   Comet -> Percolator -> Limelight workflow on every supported platform. It
-   does not. See :ref:`spec-percolator-artefacts` and decision ``D-002``.
+   Taken together, the Percolator rows invalidate the assumption, held
+   throughout Revision 1, that selecting "Percolator 3.08.0" delivers the
+   complete Comet -> Percolator -> Limelight workflow on every supported
+   platform. It does not, and 3.08.0 is not even the latest compatible
+   version: 3.08.1 is, and it has no published binary anywhere. See
+   :ref:`spec-percolator-artefacts` and decision ``D-002``.
 
 Executive Summary
 =================
@@ -174,14 +221,17 @@ controls for structured values, version-matched help, cross-parameter
 validation, presets, search, reset/diff operations, and an Expert raw-parameter
 view that round-trips without silently dropping unknown settings.
 
-The second difficulty, newly quantified in Revision 2, is **obtaining an
-XML-capable Percolator at all**. Percolator 3.09 removed XML/XSD I/O, and the
-Limelight converter consumes Percolator XML; but the only XML-capable 3.08
-artefact upstream is a Linux x86-64 ``.deb`` whose binary requires glibc 2.38.
-The full Limelight-compatible workflow is therefore **not** obtainable from
-upstream artefacts on Windows, on macOS, or on Linux hosts older than roughly
-Ubuntu 24.04, and the project must choose and execute an explicit artefact
-strategy before promising one-click Limelight conversion on those platforms
+The second difficulty is **obtaining an XML-capable Percolator at all**. The
+product's policy is to use the *latest compatible* Percolator, resolved from
+probed capability rather than pinned in code. Today that resolves to **3.08.1**
+for a run with Limelight enabled -- 3.09 removed XML/XSD I/O and the Limelight
+converter hard-requires Percolator XML -- and 3.08.1 exists only as the
+``rel-3-08-01`` tag, with no published binary on any platform. The newest
+published XML-capable artefact is 3.08.0's Linux x86-64 ``.deb``, whose binary
+needs glibc 2.38, and every portable archive upstream ships is a ``noxml``
+build. Using the latest compatible version therefore requires building
+Percolator from source with ``-DXML_SUPPORT=ON``; the project must choose and
+execute that strategy before promising one-click Limelight conversion
 (:ref:`spec-percolator-artefacts`, ``D-002``).
 
 Percolator support shall be capability-driven rather than version-number
@@ -470,11 +520,21 @@ to the selected Comet version.
 Percolator versions and artefact availability
 ---------------------------------------------
 
-Percolator 3.09 (2026-05-21) removed XML/XSD I/O. Percolator 3.08.0 supports
-XML. The Limelight converter consumes Percolator XML. Revision 1 concluded from
-this that 3.08.0 should be the default for the complete workflow. That
-conclusion is correct in the abstract and **unachievable as stated on two of
-the three tier-1 platforms**, because of what upstream actually publishes:
+The product shall use the **latest compatible** Percolator, not a pinned
+version. This section establishes what "latest compatible" resolves to and why
+it is not simply "the newest release".
+
+Percolator 3.09 (2026-05-21) removed XML/XSD I/O, and the Limelight converter
+hard-requires Percolator XML. XML has never been unconditional: it is the
+compile-time option ``XML_SUPPORT``, default ``OFF``, pulling in Xerces-C and
+XSD. Upstream's ``noxml`` artefacts are the default build; the XML-capable ones
+are ``-DXML_SUPPORT=ON`` builds. In 3.09 the option and its code are gone.
+
+The newest version that can emit XML is therefore **3.08.1**, tagged
+``rel-3-08-01`` on 2025-07-08, a point release whose single commit fixes a
+PEP-greater-than-1.0 bug. It is a *tag with no GitHub release*: there is no
+published binary for it on any platform. The newest *published* XML-capable
+artefacts are these:
 
 .. list-table:: Published Percolator artefacts relevant to the Limelight path
    :header-rows: 1
@@ -488,6 +548,10 @@ the three tier-1 platforms**, because of what upstream actually publishes:
      - ``.deb``, ``.rpm`` -- no XML
      - ``percolator.exe`` -- no XML
      - ``percolator-osx-portable.zip`` -- no XML
+   * - ``rel-3-08-01``
+     - **no release published** (tag only)
+     - **no release published**
+     - **no release published**
    * - ``rel-3-08``
      - ``percolator-v3-08-linux-amd64.deb`` -- **XML**; needs glibc >= 2.38
      - ``percolator-noxml-windows-portable.zip`` -- **no XML build published**
@@ -510,9 +574,17 @@ Consequences that the implementation must respect:
   ``.rpm``, ``.pkg``, NSIS-style ``.exe``), designed to be installed with
   administrative rights, which the zero-manual-install requirement forbids.
 * The ``.deb`` payload is extractable without root -- verified -- but the
-  extracted 3.08 binary is dynamically linked against glibc 2.38 and
+  extracted 3.08.0 binary is dynamically linked against glibc 2.38 and
   ``GLIBCXX_3.4.32``, so it will not run on Ubuntu 22.04, Debian 12, RHEL 9 or
   any comparable long-term-support host.
+* Bioconda is not a way out: its Percolator package is built without the
+  XSD/Xerces path by explicit decision, and it skips macOS entirely.
+* Consequently, **using the latest compatible Percolator requires building it**
+  -- from ``rel-3-08-01`` with ``-DXML_SUPPORT=ON``. The alternative, shipping
+  the published 3.08.0 ``.deb``, means shipping Linux-only *and* shipping a
+  version with a known PEP-greater-than-1.0 defect that 3.08.1 fixes; PEP is a
+  probability the product displays and passes to Limelight, so that defect is
+  user-visible, not cosmetic.
 
 ``R-PERC-01``
     The application shall not present a Percolator version/platform
@@ -522,9 +594,27 @@ Consequences that the implementation must respect:
     that does not exist or cannot run.
 
 ``R-PERC-02``
-    The default selected Percolator version shall be resolved *per platform*
-    from the manifest as "the newest verified version whose capability set
-    satisfies the enabled downstream stages", not hard-coded to 3.08.0.
+    **Latest compatible.** The default selected Percolator version shall be
+    computed, never hard-coded. It is the highest version in the manifest that
+    (a) has a verified artefact for the host platform, (b) passed its
+    loadability probe, and (c) has a probed capability set satisfying every
+    *enabled* downstream stage. A version number shall never appear in code as
+    a default; ``3.08.1`` appears in this document only as the value that
+    resolution returns today, for a run with Limelight enabled.
+
+    The rule is evaluated against the enabled stages, so it has more than one
+    answer at a time. With Limelight disabled, the newest verified Percolator
+    wins even though it cannot emit XML; with Limelight enabled, the newest
+    XML-capable one wins. Changing which downstream stages are enabled shall
+    therefore re-evaluate the default and tell the user it changed.
+
+``R-PERC-10``
+    When resolution selects a version that is not the newest one the manifest
+    knows about, the UI and the run's provenance shall record *why* -- naming
+    the newer version and the capability it lacks. "Using 3.08.1 rather than
+    3.09 because 3.09 cannot emit the XML the Limelight stage needs" is
+    information the user needs at configuration time, and a reviewer needs a
+    year later.
 
 ``R-PERC-03``
     When no XML-capable Percolator is available for the host platform, the
@@ -533,24 +623,34 @@ Consequences that the implementation must respect:
     conversion on a supported platform), rather than being silently absent or
     failing at conversion time.
 
-``D-002`` shall choose, before Phase 09 completes, one or more of these
-strategies for obtaining an XML-capable Percolator on each tier-1 platform:
+``D-002`` shall choose, before Phase 09 completes, how an XML-capable
+Percolator is obtained on each tier-1 platform. Because the latest compatible
+version has no published binary anywhere, the realistic options are:
 
-#. **Project-built companion binaries.** Percolator is Apache-2.0 licensed and
-   redistributable. Build XML-enabled Percolator from a pinned upstream tag in
-   CometGUI CI for each tier-1 platform, statically linking or targeting an old
-   glibc, publish as CometGUI release artefacts with checksums, and register
-   them in the manifest as ``project-built``. Highest cost, best user outcome,
-   and it also solves the glibc floor.
+#. **Project-built companion binaries -- the only option that delivers the
+   latest compatible version.** Percolator is Apache-2.0 licensed and
+   redistributable. Build ``rel-3-08-01`` with ``-DXML_SUPPORT=ON`` in CometGUI
+   CI for each tier-1 platform, statically linked or targeting an old glibc,
+   publish as CometGUI release artefacts with checksums, and register them in
+   the manifest as ``project-built``. Cost: a Xerces-C/XSD build on three
+   platforms and its maintenance. It is simultaneously the only way to get
+   3.08.1 at all, the only way to cover Windows and macOS, and the only way to
+   remove the glibc floor.
 #. **Payload extraction from upstream packages.** Extract ``.deb``/``.rpm``/
    ``.pkg`` payloads in-process without root. Verified feasible for ``.deb``
-   with pure-JDK code (``ar`` + ``tar.gz``). Cheapest, but inherits the glibc
-   floor and does not help Windows, whose XML-capable artefact is an installer.
-#. **Older XML-capable version as the Limelight default.** Use 3.07.1 on
-   Windows/macOS from its installer artefacts, accepting the extraction problem
-   and macOS x86-64/Rosetta constraint.
+   with pure-JDK code (``ar`` + ``tar.gz``). Cheapest, but it can only ever
+   deliver **3.08.0**, keeps the glibc floor, and does not help Windows, whose
+   XML-capable artefact is an installer.
+#. **Older XML-capable version where nothing else exists.** Use 3.07.1 on
+   Windows/macOS from its installer artefacts, accepting the extraction
+   problem, the macOS x86-64/Rosetta constraint and a two-year-old Percolator.
 #. **Platform-scoped feature.** Ship Limelight conversion as Linux-first,
    documented as such, with local-binary registration everywhere else.
+
+Options 2--4 are all *older than latest compatible*. If the product is to use
+the latest compatible Percolator as a matter of policy, option 1 is not the
+aspirational choice -- it is the requirement, and the others are fallbacks for
+platforms where it has not yet been done.
 
 Whichever is chosen, the capability model, the manifest and the UI messaging
 described in this specification are unchanged; only the manifest contents and
@@ -564,13 +664,45 @@ Limelight converter
 -------------------
 
 The required ``limelight-import-comet-percolator`` converter (Apache-2.0,
-release ``v2.8.1``, asset ``cometPercolator2LimelightXML.jar``) consumes:
+release ``v2.8.1``, asset ``cometPercolator2LimelightXML.jar``) consumes the
+Comet parameter file, Comet pepXML, **Percolator XML**, optionally the FASTA,
+and one optional q-value override. Its verified interface is:
 
-* the Comet parameter file;
-* Comet pepXML output;
-* Percolator XML output;
-* optionally the FASTA file;
-* one optional converter q-value override.
+.. list-table:: Converter arguments, verified 2026-08-29
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Argument
+     - Meaning
+   * - ``-c, --comet-params``
+     - Path to the Comet parameter file. Required.
+   * - ``-p, --percolator-file``
+     - Path to the Percolator output **XML** file. Required.
+   * - ``-o, --out-file``
+     - Path for the generated Limelight XML. Required.
+   * - ``-d, --pepxml-directory``
+     - Directory holding the pepXML files. Defaults to the Percolator file's
+       own directory, which the run layout must satisfy or override.
+   * - ``-f, --fasta-file``
+     - FASTA used in the experiment; falls back to the Comet params file.
+   * - ``-q, --q-value``
+     - The single converter q-value override.
+   * - ``--import-decoys``
+     - Import decoys. **Requires that Percolator was run with ``-Z``.**
+   * - ``--independent-decoy-prefix``
+     - Treat hits to proteins with this prefix as independent decoys.
+   * - ``--open-mod``
+     - Treat mass diffs as unlocalised modification masses.
+   * - ``-v, --verbose``
+     - Full stack traces on error.
+
+``R-LL-05``
+    ``--import-decoys`` is only valid if the Percolator execution that produced
+    the XML was run with decoy output enabled. The application shall either
+    enable Percolator's decoy output whenever Limelight decoy import is
+    selected, or shall disable the decoy-import control with that explanation.
+    It shall not pass ``--import-decoys`` against a Percolator run that had no
+    decoy output, which fails late and obscurely.
 
 Because the converter has one q-value override, the GUI shall not pretend that
 its independent PSM and peptide display filters map one-to-one onto Limelight
@@ -578,9 +710,11 @@ conversion. Limelight conversion shall have its own explicitly labelled
 **Limelight q-value cutoff**, default 0.01.
 
 The converter is a JAR and runs on the bundled Java runtime, so it has no
-native-artefact problem. Its exact accepted argument names shall be verified by
-running the pinned JAR's help output during Phase 00 and encoded in the
-adapter, not guessed.
+native-artefact problem -- it is the *input* it demands that constrains the
+product. The converter has had no substantive change since before Percolator
+removed XML, and offers no tab-delimited path, so there is no version of it
+that unblocks 3.09. Phase 00 shall re-run the pinned JAR's help output and
+confirm the table above rather than trusting it.
 
 PDV
 ---
@@ -873,7 +1007,7 @@ cache, for example::
     ~/.comet-gui/
         tools/
             comet/2026.02.2/{linux-x64,windows-x64,macos-arm64}/
-            percolator/{3.08.0,3.09.0}/<platform>/
+            percolator/{3.08.1,3.09.0}/<platform>/
             pdv/2.7.0/
             limelight-converter/2.8.1/
         cache/downloads/
@@ -1793,8 +1927,9 @@ directory is writable.
 ``R-LL-01``
     If the selected Percolator lacks ``XML_OUTPUT``, conversion controls shall
     be disabled with an explanation and an explicit action, labelled with the
-    version that will actually be used, for example ``Rerun Percolator with
-    3.08.0 for Limelight``. The action shall preserve the original Percolator
+    version resolution actually returns for a Limelight-enabled run -- today
+    ``Rerun Percolator with 3.08.1 for Limelight``, never a literal baked into
+    the message. The action shall preserve the original Percolator
     run and create a distinct Percolator-stage execution and provenance record.
     It shall reuse the merged PIN and shall not rerun Comet unless the PIN
     fails checksum or prerequisite validation.
@@ -2339,7 +2474,7 @@ Tolerant scientific metrics
 Goldens shall be keyed by the scientific tool pair::
 
     src/test/resources/goldens/
-        comet-2026.02.2_percolator-3.08.0/
+        comet-2026.02.2_percolator-3.08.1/
         comet-2026.02.2_percolator-3.09.0/
 
 ``R-TEST-07``
@@ -2350,8 +2485,9 @@ Version matrix tests
 --------------------
 
 CI and nightly testing shall include representative Percolator versions --
-3.05.x, a 3.06.x with its advisory check, 3.07.1, 3.08.0, 3.09 and the newest
-verified version after a registry update -- **restricted to the
+3.05.x, a 3.06.x with its advisory check, 3.07.1, the latest compatible
+XML-capable version (3.08.1 today), 3.09 and the newest verified version after
+a registry update -- **restricted to the
 version/platform combinations that the manifest actually provides and that pass
 their loadability probe**. For each, test the available PSM, peptide and
 weights outputs; test XML for XML-capable versions; and for 3.09 and later
@@ -2847,12 +2983,15 @@ project.
 ``D-002`` XML-capable Percolator artefact strategy
 ---------------------------------------------------
 
-Newly identified in Revision 2 and the largest technical risk to the product's
-central promise. No XML-capable Percolator 3.08 build is published for Windows
-or macOS, every portable archive upstream ships is a ``noxml`` build, and the
-one XML-capable 3.08 artefact requires glibc 2.38. Choose among project-built
-binaries, package-payload extraction, an older XML-capable version on some
-platforms, or a platform-scoped Limelight feature
+The largest technical risk to the product's central promise. The latest
+compatible Percolator -- 3.08.1, the newest version that can emit the XML the
+Limelight converter requires -- has **no published binary on any platform**.
+The newest published XML-capable artefact is 3.08.0's Linux ``.deb``, which
+needs glibc 2.38 and carries a PEP-greater-than-1.0 defect that 3.08.1 fixes.
+Every portable upstream archive is a ``noxml`` build, XML is an opt-in compile
+flag, and Bioconda's builds are XML-free and skip macOS. Using the latest
+compatible version means building it (``rel-3-08-01`` with
+``-DXML_SUPPORT=ON``); the alternatives all ship something older
 (:ref:`spec-percolator-artefacts`). Deciding late is expensive: it determines
 the release pipeline, the manifest, the test matrix and the promises the UI is
 allowed to make.

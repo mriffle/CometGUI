@@ -34,6 +34,10 @@ In scope
   failure states and the actionable diagnostic for loader failures.
 * Managed installs for Comet, Percolator, PDV 2.7.0 and the Limelight
   converter JAR.
+* ``project-built`` as a first-class manifest artefact source, since the
+  latest compatible Percolator has no upstream binary and must be built and
+  published by the project (``D-002``); such artefacts carry their upstream
+  licence, source tag and build provenance.
 * Local Percolator binary registration with a >= 3.05 check and capability
   probe.
 * The Tool Manager UI showing installed, available, unavailable-on-this-

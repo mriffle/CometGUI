@@ -56,12 +56,28 @@ D-002 -- XML-capable Percolator artefact strategy
 :Blocks: Phases 05, 09, 12, 15, 16; the product's Limelight promise
 :Owner: Project owner, with the engineering team
 
-**Question.** How does CometGUI obtain a Percolator that can emit XML, on each
-tier-1 platform, without administrative rights?
+**Question.** The product's policy is to use the **latest compatible**
+Percolator. How does CometGUI obtain that version -- one that can emit the XML
+the Limelight converter requires -- on each tier-1 platform, without
+administrative rights?
 
 **Facts.** Verified 2026-08-28 from the upstream release assets:
 
-* Percolator 3.09 removed XML/XSD I/O (stated verbatim in its release notes).
+* **The latest compatible version is 3.08.1** (tag ``rel-3-08-01``,
+  2025-07-08), whose one commit fixes a PEP-greater-than-1.0 bug. It is a tag
+  with no GitHub release: **no published binary exists for it on any
+  platform**.
+* Percolator 3.09 removed XML/XSD I/O (stated verbatim in its release notes),
+  so no version newer than 3.08.1 can serve the Limelight path.
+* XML has always been opt-in at build time:
+  ``option(XML_SUPPORT ... OFF)``, pulling in Xerces-C and XSD. Upstream's
+  ``noxml`` artefacts are just the default build. The option and its code are
+  gone in 3.09.
+* The Limelight converter still hard-requires Percolator XML -- its README and
+  ``--help`` both say so -- and has had no substantive change since before the
+  removal. There is no converter version that unblocks 3.09.
+* Bioconda is not a way out: its Percolator package is deliberately built
+  without the XSD/Xerces path and skips macOS entirely.
 * ``rel-3-08`` publishes exactly five assets. The only XML-capable one is
   ``percolator-v3-08-linux-amd64.deb``. The macOS and Windows portable archives
   are ``percolator-noxml-*``.
@@ -76,30 +92,35 @@ tier-1 platform, without administrative rights?
 
 **Options.**
 
-#. **Project-built companion binaries.** Build XML-enabled Percolator from a
-   pinned upstream tag in CometGUI CI for each tier-1 platform, statically
-   linked or against an old glibc; publish as CometGUI release artefacts.
-   Percolator is Apache-2.0, so redistribution is permitted. *Cost:* a real
-   build pipeline with XercesC/XSD dependencies on three platforms, and
-   ongoing maintenance. *Benefit:* the only option that delivers the promise
-   everywhere and also removes the glibc floor.
-#. **Package-payload extraction.** Extract ``.deb``/``.rpm``/``.pkg`` payloads
-   in-process. *Cost:* modest for ``.deb`` (verified feasible in pure JDK
-   code); harder for ``.pkg``; Windows' XML-capable artefact is an installer,
-   so this does not solve Windows. Inherits the glibc floor. *Benefit:*
-   cheapest path to a working Linux story.
-#. **Older XML-capable version where necessary.** Use 3.07.1 on Windows and
-   macOS. *Cost:* still installer extraction, macOS x86-64 only, and the
-   product ships a two-year-old Percolator on two platforms.
-#. **Platform-scoped feature.** Limelight conversion is Linux-first and
-   documented as such; elsewhere the user registers a local binary. *Cost:*
-   the zero-manual-install promise is not met for Limelight on two platforms.
-   *Benefit:* honest, cheap, and shippable now.
+#. **Build it (``rel-3-08-01`` with ``-DXML_SUPPORT=ON``).** Percolator is
+   Apache-2.0, so redistribution is permitted. Build in CometGUI CI for each
+   tier-1 platform, statically linked or against an old glibc, publish as
+   CometGUI release artefacts with checksums, register as ``project-built``.
+   *Cost:* a Xerces-C/XSD build on three platforms plus maintenance.
+   *Benefit:* the **only** option that delivers the latest compatible version
+   at all; it also covers Windows and macOS and removes the glibc floor.
+#. **Package-payload extraction.** Extract the upstream ``.deb``/``.rpm``/
+   ``.pkg`` payloads in-process. *Cost:* modest for ``.deb`` (verified feasible
+   in pure JDK code); harder for ``.pkg``; Windows' XML-capable artefact is an
+   installer, so it does not solve Windows. *Ceiling:* 3.08.0 -- one release
+   behind latest compatible, carrying the PEP-greater-than-1.0 defect -- and it
+   inherits the glibc 2.38 floor.
+#. **Older XML-capable version where nothing else exists.** 3.07.1 on Windows
+   and macOS. *Cost:* installer extraction, macOS x86-64 only, and a two-year-
+   old Percolator on two platforms.
+#. **Platform-scoped feature.** Limelight conversion Linux-first, documented as
+   such; local-binary registration elsewhere. *Cost:* the zero-manual-install
+   promise is not met for Limelight on two platforms.
 
-**Recommendation.** Ship option 4 as the release-1 baseline so the product is
-honest and deliverable, and fund option 1 as the path to the full promise. Do
-not build the manifest or the UI around an assumption that "3.08 means XML"; the
-capability model in the specification already supports the honest behaviour.
+**Recommendation.** **Option 1**, because the instruction to use the latest
+compatible Percolator cannot be satisfied any other way -- 3.08.1 has no binary
+to download on any platform, so the choice is to build it or to ship something
+older. Option 4 remains the honest interim state for platforms where the build
+is not yet done: the UI says the Limelight path is unavailable there rather
+than pretending. Options 2 and 3 are worth taking only as a stop-gap on a
+single platform, and both mean shipping a Percolator with a known invalid-PEP
+defect. Do not build the manifest or the UI around "3.08 means XML"; version
+selection is computed from probed capability (``R-PERC-02``).
 
 ----
 
