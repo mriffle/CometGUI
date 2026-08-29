@@ -3,7 +3,7 @@ PHASE-00: Feasibility, Legal and Upstream Verification
 ======================================================
 
 :Phase: 00
-:Status: NOT STARTED
+:Status: PARTIAL -- signed off 2026-08-29 by the main orchestrator (see ../STATUS.rst)
 :Depends on: none
 :Blocked by decisions: D-001, D-002, D-004, D-005, D-006, D-007
 :Delivers: Evidence only -- this phase owns no ``R-`` rule

@@ -5,11 +5,11 @@ Project Status
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-08-29
 :Updated by: Main orchestrator, session 02 (D-002 option C and the D-008 tool
-   distribution half decided; Phase 01 dispatched)
-:Current phase: 01 -- IN PROGRESS. Phase 00 is PARTIAL, signed off.
-:Overall: Feasibility established and the artefact strategy settled. No product
-   code exists yet, by design -- Phase 00 writes none. Phase 01 is running and
-   creates the build skeleton.
+   distribution half decided; Phase 01 run and signed off PARTIAL; D-009 raised)
+:Current phase: 01 -- PARTIAL, signed off. Phase 02 is next and unblocked.
+:Overall: The repository, build and every quality gate now exist and have each
+   been seen to fail on a deliberate defect. Phases 00 and 01 are both PARTIAL
+   for the same reason: there is no git remote.
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -32,13 +32,20 @@ code the installer was going to contain is now unwritten rather than written.
 by pinned URL and SHA-256, never redistributed. Specification revision 7 and
 ``phases/PHASE-05-tool-registry.rst`` carry the consequences.
 
-**Phase 01 is running.** It was dispatched to a fresh phase orchestrator on
-2026-08-29. One thing about it is known in advance: its gate item 6 requires
-the pull-request pipeline to run on an actual pull request, there is no remote,
-and ``D-008`` still withholds one. The owner directed that the phase run anyway
-and record that item unmet, so **Phase 01 is expected to sign off PARTIAL**.
-That is a decision taken with the evidence in hand, not a gate quietly
-lowered.
+**Phase 01 ran and was signed off ``PARTIAL`` on 2026-08-29** (see
+:ref:`status-p01`). Eight work units, each signed off by the phase orchestrator
+after it re-ran the checks itself. Five of six gate items pass on the main
+orchestrator's own re-run; item 6's "on a pull request" half is unmet because
+there is no remote, exactly as the owner directed before the phase started.
+
+What the project now has that it did not: a twelve-module Maven build that a
+clean clone takes from nothing to green with one command, the full GPLv3
+``LICENSE``, a Sphinx tree that fails on a broken cross-reference, ArchUnit
+layering rules, JaCoCo and PIT gates at the specification's own thresholds, a
+traceability report that fails the documentation build, three CI pipelines, an
+SBOM and a dependency scanner with a working canary. **Every one of those gates
+has been seen to fail on a deliberate defect**, most of them injected by the
+main orchestrator rather than by the phase.
 
 What exists
 -----------
@@ -62,14 +69,15 @@ What exists
      - Read-first document for any orchestrating agent.
    * - ``phases/`` (00-16)
      - Complete
-     - Scope, deliverables and exit gate per phase. 00 signed off PARTIAL,
-       01 running, 05 re-scoped by ``D-002`` option C.
+     - Scope, deliverables and exit gate per phase. 00 and 01 signed off
+       PARTIAL, 05 re-scoped by ``D-002`` option C.
    * - ``DECISIONS.rst``
-     - 4 open, 3 decided, 1 part decided
+     - 5 open, 3 decided, 1 part decided
      - ``D-001``, ``D-002`` (including option C) and ``D-004`` decided.
        ``D-008`` is decided on licence and on tool distribution; only the
-       publication location remains. ``D-003``, ``D-005``, ``D-006`` and
-       ``D-007`` are open.
+       publication location remains. ``D-003``, ``D-005``, ``D-006``,
+       ``D-007`` and the new ``D-009`` (whose name is on the copyright line)
+       are open.
    * - ``handoffs/``
      - Phase 00 present
      - ``PHASE-00-worklog.rst`` (10 units, each with a sign-off entry) and
@@ -89,8 +97,21 @@ What exists
        the committed ``docs/feasibility/toolchain.rst``; rebuild with
        ``scripts/feasibility/install-toolchain.sh``.
    * - Product code
-     - None
-     - Correct: Phase 00 writes none. Phase 01 creates the build skeleton.
+     - Skeleton only
+     - Twelve Maven modules matching the specification's package structure,
+       61 Java files, 54 tests. The only real logic is ``BuildIdentity`` and
+       two headless JavaFX probes -- deliberately, so the coverage, mutation
+       and architecture gates measure something rather than an empty reactor.
+       Nine of twelve modules hold only ``package-info.java``; the build
+       prints them as ``inert`` rather than letting an unevaluated rule read
+       as a passing one.
+   * - ``scripts/`` (product)
+     - Re-runnable
+     - ``build.sh`` (11 stages, the one documented command),
+       ``verify-all-gates.sh`` (9 controls, 123 checks) and four gate
+       harnesses. ``verify-all-gates.sh`` belongs in the nightly pipeline:
+       it exists because a gate that is never run stopped working during
+       this very phase.
 
 Phase board
 ===========
@@ -111,9 +132,11 @@ Phase board
        See :ref:`status-p00`.
    * - 01
      - Repository, build and quality skeleton
-     - IN PROGRESS
-     - Dispatched 2026-08-29 to a fresh phase orchestrator. Gate item 6 is
-       unmeetable without a remote (``D-008``); expected outcome PARTIAL.
+     - PARTIAL
+     - Signed off 2026-08-29. Items 1-5 PASS on the main orchestrator's own
+       re-run and its own defect injections; item 6 is half met -- no remote
+       exists, so no pipeline has run on a pull request. See
+       :ref:`status-p01`.
    * - 02
      - Application shell and navigation
      - NOT STARTED
@@ -312,6 +335,165 @@ This is precisely the drift the phase exists to catch, and it is the reason
 sign-off re-runs checks instead of reading reports. ``D-001`` is rewritten
 accordingly.
 
+.. _status-p01:
+
+Phase 01 sign-off (2026-08-29)
+==============================
+
+:Outcome: **PARTIAL**
+:Signed off by: Main orchestrator, by re-running every gate item itself
+:Phase records: ``handoffs/PHASE-01-worklog.rst``, ``handoffs/PHASE-01-handoff.rst``
+
+The phase orchestrator reported PARTIAL. The main orchestrator re-ran all six
+items rather than accepting that report, and **injected its own defects rather
+than re-running the phase's negative controls** -- a harness that only fails on
+the defect its author chose proves less than one that fails on a defect it has
+never seen. The table records what the re-run actually printed.
+
+.. list-table:: Gate items, as re-run at sign-off
+   :header-rows: 1
+   :widths: 5 13 82
+
+   * - #
+     - Result
+     - What was run, and what it printed
+
+   * - 1
+     - PASS
+     - ``git clone /workspace`` into a scratch directory -- verified to contain
+       **no** ``tools/`` and **no** ``.venv`` -- then ``bash scripts/build.sh``:
+       ``11/11 stages OK in 151 seconds. BUILD OK``, ``6 report file(s):
+       tests=54 failures=0 errors=0 skipped=0``. It bootstrapped its own JDK,
+       Maven and font stack under its own ``tools/``. ``~/.m2`` did not exist
+       before and does not exist after. This also independently disproves any
+       missing-source worry from the ``.gitignore`` trap below: a clone that
+       builds cannot be missing files.
+
+   * - 2
+     - PASS
+     - ``bash scripts/ci/docs-build.sh`` -> ``PASSED``, two strict builds.
+       Falsified with my own defect: appending
+       ``:ref:`a-label-the-main-orchestrator-invented-that-does-not-exist``` to
+       ``docs/installation.rst`` gives exit 1, ``WARNING: undefined label``,
+       ``warnings treated as errors``; restoring the file returns it to
+       ``PASSED``.
+
+   * - 3
+     - PASS
+     - My own violation -- a ``javafx.beans.property.SimpleStringProperty``
+       field in ``org.cometgui.domain`` -- produced ``Architecture Violation
+       ... was violated (3 times)`` naming the field, the constructor, the
+       method and the line, and quoting the specification rationale in the rule
+       text. Deleting it returns ``Tests run: 13, Failures: 0``. I then
+       attacked the rule's own weak point: removing ``cometgui-app`` from the
+       archtests dependencies left **the layering rules passing 8/8 while
+       checking nothing**, and ``ClassImportCensusTest`` failed with *"no
+       classes were imported from org.cometgui.app; that module is missing from
+       the archtests class path and its rules check nothing"*. The vacuous pass
+       is defended, and the defence works.
+
+   * - 4
+     - PASS
+     - My own untested branchy class in ``org.cometgui.domain.build`` ->
+       ``Rule violated for bundle cometgui-domain: lines covered ratio is 0.61,
+       but expected minimum is 0.90``, and PIT fell to a mutation score of 5.
+       Thresholds were checked against the specification rather than assumed:
+       ``0.90`` line / ``0.85`` branch core, ``0.80`` line view-model,
+       ``mutationThreshold 80``, and ``failWhenNoMutations`` left at its
+       default -- none weakened. On a clean tree ``bash
+       scripts/verify-test-gates.sh`` exits 0 with every control PASS,
+       including two that check the harness itself refuses to grade a control
+       whose defect never reached the sandbox.
+
+   * - 5
+     - PASS
+     - Three defects of my own, each caught with its own diagnostic code:
+       removing ``AC-DOC-02``'s evidence entirely -> ``[MAP-MISSING-ID]``;
+       pointing it at a JUnit class that does not exist ->
+       ``[TEST-MISSING]``; removing ``R-DOC-05`` from Phase 01's
+       ``:Delivers:`` -> ``[R-UNOWNED] R-DOC-05: no implementing phase``. Each
+       also fails the **documentation build**, which is what ``R-DOC-03``
+       actually requires: ``sphinx.errors.ExtensionError: traceability: the
+       traceability report is not complete``. ``bash
+       scripts/ci/traceability.sh --self-test`` exits 0 over 8 injected
+       defects and 48 unit tests.
+
+   * - 6
+     - **PARTIAL -- second half only**
+     - ``bash scripts/ci/run-pipeline-locally.sh`` -> ``42 step(s) across 3
+       workflow(s); 37 executed on this machine; 0 unexpected``, exit 0, and it
+       prints its own limitation: ``Still unmet: 'on a pull request'. No remote
+       exists (D-008)``. ``git remote -v`` is empty; none was created. Stub
+       steps exit **70** naming their owning phase, so a later pipeline cannot
+       read as green while doing nothing. I confirmed the checker parses the
+       workflow files rather than a hardcoded list by adding a step naming a
+       script that does not exist: ``check-workflows: FAILED ... names
+       scripts/ci/this-script-does-not-exist.sh, which does not exist``.
+       **GitHub has never executed these files, and cannot until ``D-008``
+       says where CometGUI is published.**
+
+Also verified at sign-off, beyond the gate
+-------------------------------------------
+
+* **The ``LICENSE`` is the real thing.** 674 lines, 35 149 bytes, sha256
+  ``3972dc9744f6...``, and ``diff`` against the canonical
+  ``https://www.gnu.org/licenses/gpl-3.0.txt`` reports **no differences**. The
+  byte count also matches CasanovoGUI's own ``LICENSE`` blob. ``D-001``'s first
+  obligation is met exactly, with no paraphrase.
+* **The dependency scanner gives a real answer.** Its canary -- a known
+  vulnerable ``log4j-core 2.14.1`` sent with every batch -- came back with 7
+  advisories, so the endpoint demonstrably can find a vulnerability when there
+  is one. A scanner that reports "no vulnerabilities" because it is broken is
+  the failure mode, and it is defended.
+* **The SBOM describes the real project**: 26 purls, XML and JSON agreeing,
+  every build plugin carrying an exact pinned version.
+* **The PIT target list covers every package the specification names as
+  critical logic** -- q-value filters, command builders, capability rules,
+  checksum and provenance code, stage invalidation -- not merely the packages
+  that have code today.
+
+What the main orchestrator caught that the phase did not
+--------------------------------------------------------
+
+**Handoff surprise 6 is wrong.** It states that "a JavaFX layering violation in
+the domain does not even compile in this build", concluding the ArchUnit rule is
+a second line of defence. It is not: ``javafx.scene.control.Label`` -- the very
+class the handoff names -- compiles cleanly in ``cometgui-domain`` (``mvn
+compile`` exit 0), because the Liberica Full JDK carries JavaFX in the JDK
+itself. My ``SimpleStringProperty`` injection compiled too, and ArchUnit is what
+caught both. The rule is the **first** line of defence and is genuinely
+load-bearing. Left uncorrected, this would have told a later phase that the rule
+is hard to exercise, which is the opposite of true.
+
+Why PARTIAL rather than PASSED
+------------------------------
+
+One reason only: **no pipeline has ever run on a pull request, because there is
+no git remote.** Everything else in the gate passes. This is the same blocker
+that holds Phase 00's item 8 open, and one owner decision closes both.
+
+What the phase found in its own work, and reported
+---------------------------------------------------
+
+Recorded because it is the behaviour this structure depends on. The phase
+orchestrator discovered that **its own integration commit** (``f71ceb4``) broke
+the traceability self-test: the self-test's sandbox copied ``scripts/ci`` and
+``scripts/traceability`` but not ``scripts/``, so once ``AC-TST-02..04`` pointed
+at ``scripts/verify-test-gates.sh`` the harness exited 4 -- and **nothing in the
+build ran the self-test, so gate item 5's falsifiability silently stopped being
+demonstrable while every other check stayed green.** It reported this rather
+than quietly repairing it. I confirmed the repair (``_COPY_TREES`` now copies
+``scripts`` whole) and that ``--self-test`` exits 0 today. The lesson is
+generalised in ``scripts/verify-all-gates.sh``, which belongs in the nightly
+pipeline: *a gate that is never run stops working without anyone noticing.*
+
+Two other traps worth carrying forward: ``.gitignore``'s unanchored ``tools/``
+also matched ``org/cometgui/tools/`` and silently dropped eight source files
+from ``git add`` (now ``/tools/``); and **Spotless cannot check licence headers
+on ``package-info.java`` at all** -- 53 files, 87% of the tree -- so Checkstyle
+carries that obligation and ``mvn spotless:apply`` will not add a header to a
+new ``package-info.java``.
+
 Open decisions
 ==============
 
@@ -437,34 +619,43 @@ Risks currently live
 Next action
 ===========
 
-**Phase 01 is running** (``phases/PHASE-01-build-skeleton.rst``), dispatched
-2026-08-29 to a fresh phase orchestrator. When it reports, the main
-orchestrator re-runs every gate item itself before signing it off -- the
-phase's report is a claim, not evidence. Expect ``PARTIAL``: gate item 6 needs
-a pull request and there is no remote.
+**Run Phase 02** (``phases/PHASE-02-app-shell.rst``). Its dependency, Phase 01,
+is signed off; nothing else blocks it. It is the only phase whose dependencies
+are currently met -- 03 needs 01 and 02, 04 needs 01 and 03.
 
-After Phase 01 signs off, **02 (application shell) is the only phase whose
-dependencies are met**. 03 depends on 01 and 02; 04 on 01 and 03. Phase 02 now
-carries a real obligation from ``D-001``: any file derived from CasanovoGUI
-retains its copyright notices and records the derivation.
+Two obligations Phase 02 inherits and must not drop:
 
-For the owner, one item
-------------------------
+* **``D-001``'s attribution duty.** Any file derived from
+  ``Noble-Lab/CasanovoGUI`` retains its copyright notices and records the
+  derivation. ``CONTRIBUTING.rst`` already says how: a second Spotless file set
+  and a second Checkstyle execution with their own header file -- **extending**
+  the header configuration, never relaxing or excluding it to make a derived
+  file pass.
+* **The copyright placeholder stays a placeholder.** Every Java file reads
+  ``Copyright (C) 2026 The CometGUI authors.`` No agent substitutes a name;
+  that is ``D-009``.
 
-**The publication half of ``D-008``: where CometGUI is published.** It is the
-last open part of that decision and the only one with a compounding cost. It
-gates the GPL-3.0 source-availability mechanism (phase 16), and it is what
-holds two gate items open -- Phase 00's item 8 (no Windows execution anywhere
-in this project) and Phase 01's item 6 (no pull-request pipeline run). A free
-GitHub Actions ``windows-latest`` runner would close both permanently and
-re-verify them on every change. Until it is answered there is **no git remote
-and none may be created**.
+For the owner, two items
+-------------------------
+
+#. **The publication half of ``D-008``: where CometGUI is published.** This is
+   now the project's only compounding cost. It holds **two** gate items open --
+   Phase 00's item 8 (no Windows binary has ever been executed anywhere in this
+   project) and Phase 01's item 6 (no pipeline has ever run on a pull request)
+   -- and it gates the GPL-3.0 source-availability mechanism in Phase 16. A
+   free GitHub Actions ``windows-latest`` runner would close both permanently
+   and re-verify them on every change. Until it is answered there is **no git
+   remote and none may be created.**
+#. **``D-009``: whose name goes on the copyright line.** Raised by Phase 01.
+   No deadline before Phase 16 and nothing is blocked meanwhile, but it is
+   answered by the same fact as ``D-008`` -- who is publishing this, and on
+   whose behalf -- so the two are cheapest decided together.
 
 *Answered on 2026-08-29:* ``D-001`` (GPL-3.0, derived from CasanovoGUI, PDV
 treated as GPL-3.0); ``D-002`` option C (portable ``noxml`` archives; Phase 05
 re-scoped); the ``D-008`` tool-distribution half (downloaded from upstream, not
-redistributed); and the direction that Phase 01 runs without a remote and
-accepts ``PARTIAL``.
+redistributed); and the direction that Phase 01 run without a remote and accept
+``PARTIAL``.
 
 Change log
 ==========
@@ -476,6 +667,28 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-08-29
+     - 01
+     - **Phase 01 run and signed off PARTIAL.** Three tiers as designed: one
+       phase orchestrator, eight work units, each unit signed off by the tier
+       above after re-running its checks. The main orchestrator re-ran all six
+       gate items and **injected its own defects rather than re-running the
+       phase's negative controls**; items 1-5 PASS, item 6 is half met because
+       no git remote exists. Delivered: a twelve-module Maven build a clean
+       clone takes to ``11/11 stages OK`` with one command; the full unmodified
+       GPLv3 ``LICENSE`` (verified byte-identical to the FSF text); a strict
+       Sphinx tree; ArchUnit layering rules with a class census that defeats
+       the vacuous pass; JaCoCo and PIT at the specification's own thresholds;
+       a traceability report that fails the documentation build; three CI
+       pipelines whose stubs exit 70 rather than passing silently; an SBOM; and
+       a dependency scanner with a working canary. Caught at sign-off: handoff
+       surprise 6 is wrong -- a JavaFX violation in the domain **does** compile,
+       so ArchUnit is the first line of defence, not the second. Reported by
+       the phase against itself: its own integration commit silently disabled
+       the traceability self-test, which nothing in the build ran --
+       ``scripts/verify-all-gates.sh`` now exists so it cannot recur, and
+       belongs in the nightly pipeline. ``D-009`` raised: no legal entity is
+       named on the copyright line, and no agent may choose one.
    * - 2026-08-29
      - 01
      - **Session 02 opened. Two owner decisions taken, then Phase 01

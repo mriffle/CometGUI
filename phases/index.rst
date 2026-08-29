@@ -23,14 +23,14 @@ authoritative for its own scope and exit gate.
    * - `01 <PHASE-01-build-skeleton.rst>`_
      - Repository, Build and Quality Skeleton
      - 00 (met)
-     - LICENSE is GPL-3.0 (``D-001``). Gate item 6 needs a remote, which
-       ``D-008`` still withholds -- run anyway and accept PARTIAL
-     - IN PROGRESS
+     - none outstanding; ``D-008`` capped the outcome at PARTIAL
+     - PARTIAL (signed off 2026-08-29)
    * - `02 <PHASE-02-app-shell.rst>`_
      - Application Shell and Navigation
-     - 01
-     - D-001 DECIDED -- reuse permitted; retain notices, record derivation
-     - NOT STARTED
+     - 01 (met)
+     - D-001 DECIDED -- reuse permitted; retain notices, record derivation.
+       Keep the ``D-009`` copyright placeholder; do not name an entity
+     - READY -- next, unblocked
    * - `03 <PHASE-03-process-service.rst>`_
      - Process Service
      - 01, 02
@@ -143,12 +143,14 @@ Phase 01 from running, but the fourth caps the grade it can reach.
   identical between the XML and ``noxml`` builds, so ``R-PERC-02`` cannot be
   satisfied by string matching. Phase 09 owns the rule; Phase 05 owns the
   post-install probe that first applies it.
-* **There is no git remote, and ``D-008`` still withholds one.** That leaves
-  Phase 00's gate item 8 open and makes Phase 01's gate item 6 -- the
-  pull-request pipeline running on an actual pull request -- unmeetable. The
-  owner directed on 2026-08-29 that Phase 01 run anyway, prove every pipeline
-  step locally, and record item 6 unmet. Both items close the day a publication
-  location is decided.
+* **There is no git remote, and ``D-008`` still withholds one.** This is now
+  the residue two phases share. It left Phase 00's gate item 8 open and, as
+  foreseen, capped Phase 01 at ``PARTIAL`` on gate item 6 -- the pull-request
+  pipeline has never run on a pull request, and Read the Docs has never built
+  the tree. Phase 01 proved every pipeline step locally instead (42 steps, 3
+  workflows) and named the Windows and macOS matrix entries so a later phase
+  turns them on rather than writing them. Both gate items close the day a
+  publication location is decided.
 
 Phases 00-13 with their gates passed constitute a working,
 provenance-complete application. Phases 14-16 are what make it a release.

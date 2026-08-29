@@ -6,7 +6,7 @@ CometGUI -- Orchestrator Onboarding
 
 :Audience: Any main/orchestrating agent picking up this project
 :Read first: yes -- before any other document, and before any code
-:Last updated: 2026-08-28
+:Last updated: 2026-08-29
 
 If you read nothing else, read this page and then ``STATUS.rst``.
 
@@ -40,7 +40,7 @@ Three things make this harder than "shell out to a binary":
    checksum is recorded, and the test suite must independently prove the
    application's claims rather than assert that nothing threw.
 
-The full requirements live in ``specification.rst`` (revision 2). It is the
+The full requirements live in ``specification.rst`` (revision 7). It is the
 authority on *what* to build. This document is the authority on *how the work
 is run*.
 
@@ -83,7 +83,7 @@ Document map
      - Open decisions block the phases that name them.
    * - ``specification.rst``
      - What to build (``R-`` rules, ``AC-`` criteria)
-     - Revision 2. Amend by revision, never silently.
+     - Revision 7. Amend by revision, never silently.
    * - ``phases/index.rst``
      - The phase list and dependency order
      - Summary table; the phase files hold the detail.

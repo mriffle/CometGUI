@@ -3,7 +3,7 @@ PHASE-01: Repository, Build and Quality Skeleton
 ================================================
 
 :Phase: 01
-:Status: NOT STARTED
+:Status: PARTIAL -- signed off 2026-08-29 by the main orchestrator (see ../STATUS.rst)
 :Depends on: 00
 :Blocked by decisions: D-008 (repository licence, for the LICENSE file only)
 :Delivers: R-DOC-03, R-DOC-05

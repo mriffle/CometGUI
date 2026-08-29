@@ -2,10 +2,13 @@
 Decisions
 =========
 
-:Updated: 2026-08-29 (D-002 option C, D-008 tool distribution)
+:Updated: 2026-08-29 (D-002 option C, D-008 tool distribution, D-009 raised)
 
 Decisions an implementing agent **must not make on its own**. Each names what
-it blocks, the options with their costs, and a recommendation. When the owner
+it blocks, the options with their costs, and a recommendation. ``D-009`` was
+raised by Phase 01 on 2026-08-29; the numbering is open-ended, and a phase that
+uncovers a question only the owner can answer gets a new entry rather than a
+guess. When the owner
 answers, record the answer, the date and the reasoning in the entry, set its
 status to ``DECIDED``, and update ``STATUS.rst``.
 
@@ -628,3 +631,42 @@ non-GPL artefact), that requires the upstream answer, not this assumption. Note
 the assumption is directionally safe: assuming GPL-3.0 constrains the project
 *more* than the Apache reading would, so acting on it cannot create a
 violation.
+
+----
+
+D-009 -- The copyright holder named in every source file
+=========================================================
+
+:Status: OPEN
+:Raised: 2026-08-29, by Phase 01, at the main orchestrator's sign-off
+:Blocks: nothing yet; Phase 16 cannot complete the licence audit without it,
+   and it must be settled **before any public redistribution**
+:Owner: Project owner
+
+**Question.** Whose name goes on the copyright line of every CometGUI source
+file?
+
+**What exists today.** Phase 01 placed a GPL-3.0 header on all 61 Java files,
+reading ``Copyright (C) 2026 The CometGUI authors.`` That is a deliberate
+placeholder, not an answer: no legal entity is named anywhere in the project.
+The phase orchestrator correctly declined to substitute a name and escalated
+it, which is the behaviour ``ONBOARDING.rst`` asks for.
+
+**Why an agent may not answer it.** A copyright line asserts who owns the work.
+It is a legal claim about a real person or institution, it interacts with
+``D-001`` (the project is a GPL-3.0 derivative of ``Noble-Lab/CasanovoGUI``,
+whose own notices must be retained in any derived file) and with ``D-008``
+(source availability follows from where the work is published), and it cannot
+be inferred from anything in the repository.
+
+**Options.** Named individual author(s); an institution or laboratory; or a
+project-collective form such as "The CometGUI authors" made real by a
+``CONTRIBUTORS`` file that lists who that is. The third is the cheapest and is
+what the placeholder already assumes -- but it is only honest once the file
+exists and is accurate.
+
+**Recommendation.** Decide it with the ``D-008`` publication question, since
+both are answered by the same fact: who is publishing this and on whose behalf.
+There is no deadline before Phase 16, and no phase is blocked meanwhile --
+Phase 02 must simply keep the placeholder rather than inventing a name, and
+must retain CasanovoGUI's own notices in anything derived from it.
