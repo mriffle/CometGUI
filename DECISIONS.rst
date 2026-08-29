@@ -2,7 +2,7 @@
 Decisions
 =========
 
-:Updated: 2026-08-28
+:Updated: 2026-08-29
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. When the owner

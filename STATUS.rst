@@ -3,10 +3,10 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-08-28
-:Updated by: Planning session (specification review and phase organisation)
-:Current phase: 00 -- not started
-:Overall: Planning complete. No product code exists.
+:Updated: 2026-08-29
+:Updated by: Main orchestrator (session start; Phase 00 dispatched)
+:Current phase: 00 -- in progress
+:Overall: Planning complete. No product code exists. Phase 00 running.
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -62,8 +62,9 @@ Phase board
      - Gate evidence
    * - 00
      - Feasibility, legal and upstream verification
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Started 2026-08-29 by the main orchestrator; phase orchestrator
+       spawned.
    * - 01
      - Repository, build and quality skeleton
      - NOT STARTED
@@ -201,10 +202,13 @@ Risks currently live
 Next action
 ===========
 
-Run **Phase 00** (``phases/PHASE-00-feasibility.rst``). It writes no product
-code. Its most valuable output is a costed recommendation for ``D-002``,
-because that decision determines the manifest, the release pipeline, the test
-matrix and what the user interface is allowed to promise.
+Phase 00 (``phases/PHASE-00-feasibility.rst``) is running. It writes no
+product code. ``D-002`` is now decided, so the phase's most valuable outputs
+are (a) re-verification of every upstream fact against live sources rather
+than against the specification, and (b) confirmation -- or precise refutation
+-- of the Windows ``percolator-v3-07.exe`` XML claim, which is currently
+inferred from artefact naming and size and must not reach the manifest
+unverified.
 
 Change log
 ==========
