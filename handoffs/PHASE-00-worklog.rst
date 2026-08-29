@@ -284,7 +284,21 @@ Work units
        units 5 and 8.*
      - In-scope bullets "Limelight converter JAR help" and "PDV CLI figure
        generation"; ``D-005`` evidence
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Read commit
+       ``a3130a1``. **Re-ran ``bash scripts/feasibility/pdv_spike.sh``
+       myself**: all 10 stages PASS, exit 0. The figures are real and I saw
+       the header parse: five PNGs ``format=PNG width=800 height=400``,
+       8-bit truecolour, IDAT inflated to 479-623 distinct colours and
+       ~2.2-2.9% non-white pixels; four PDFs ``%PDF-1.4`` with ``/MediaBox``
+       576x288 pt. **Stage 6 is the one that matters and it also reproduced:
+       PDV exits 0 on mzML input having written no figure** -- the exact
+       "exit code 0 proves nothing" trap this project warns about, traced to
+       msftbx numbering spectra by file position while pepXML carries the
+       instrument scan number. Converter ``--help`` confirms all ten
+       specification options plus ``-h/--help`` and ``-V/--version``.
+       ``check-docs.sh`` over the whole directory: 10 documents, 13 HTML
+       pages, clean. ``D-005`` presented as costed options and **not
+       answered**.
 
    * - 10
      - **Does the ``noxml`` build emit Percolator XML? A per-release,
