@@ -41,8 +41,15 @@ from .model import SourceError
 
 # What a copy needs to be a checkable project. Deliberately not the whole tree:
 # _build/, .venv/, tools/ and target/ are large and irrelevant here.
+#
+# scripts/ IS COPIED WHOLE, not scripts/ci plus scripts/traceability. The map's
+# ``file =`` entries name automated checks anywhere under scripts/, and the
+# CHECK-MISSING rule resolves them against the copy: a copy that omits one
+# reports the real map as broken and the harness then -- correctly -- refuses to
+# grade any case. That is exactly what happened when AC-TST-02..04 were pointed
+# at scripts/verify-test-gates.sh, which is not under scripts/ci.
 _COPY_FILES = ("specification.rst", "STATUS.rst", "DECISIONS.rst")
-_COPY_TREES = ("phases", "docs", "scripts/ci", "scripts/traceability")
+_COPY_TREES = ("phases", "docs", "scripts")
 _IGNORE = shutil.ignore_patterns("_build", "__pycache__", "*.pyc")
 
 
