@@ -8,7 +8,7 @@
 # failure. `scripts/ci/docs-build.sh` enforces that during the Sphinx build,
 # through the builder-inited hook in docs/conf.py. This script is the same
 # check without Sphinx: cheap enough to run on every pull request and on every
-# edit to docs/traceability-map.toml, and it takes no arguments.
+# edit to docs/traceability-map.toml. The gate itself takes no arguments.
 #
 # It does three things, and verifies the result of each rather than trusting an
 # exit code:
@@ -28,14 +28,26 @@
 #
 # Usage:
 #   bash scripts/ci/traceability.sh
+#   bash scripts/ci/traceability.sh --self-test   # the gate, then prove it can fail
 #   bash scripts/ci/traceability.sh --help
+#
+# --self-test adds step 4: eight defects injected into copies of the project
+# under _build/traceability/negative/, each of which must be caught with its own
+# diagnostic -- a rule no phase delivers, a rule two phases deliver, an AC- with
+# no test reference (PHASE-01 exit gate item 5), a named test that does not
+# exist, both directions of a human-sign-off mismatch, and an identifier the
+# specification does not define or that the map leaves out. It then shows the
+# real strict Sphinx build failing on the third of those and passing once it is
+# removed, because R-DOC-03 makes an incomplete map a *documentation build*
+# failure, not merely a script failure. The working tree is never touched.
 #
 # Exit status:
 #   0  the map validates, the suite passes, and the report renders completely
 #   1  the map did not validate -- every problem is printed
 #   2  harness misuse or a broken environment (no usable Python, no sources)
 #   3  a step exited 0 but produced no or incomplete output
-#   4  the generator's unit test suite failed
+#   4  the generator's unit test suite failed, or --self-test found the gate
+#      unfalsifiable: an injected defect that the check did not catch
 #
 # Needs no network access.
 
@@ -54,13 +66,16 @@ RENDERED="${OUT_DIR}/traceability.rst"
 
 die() { printf 'traceability.sh: %s\n' "$1" >&2; exit "${2:-2}"; }
 
-usage() { sed -n '3,42p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,52p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
+SELF_TEST=0
 case "${1:-}" in
     "")            ;;
+    --self-test)   SELF_TEST=1 ;;
     -h|--help)     usage; exit 0 ;;
-    *)             die "unknown argument: $1 (this gate takes none; try --help)" ;;
+    *)             die "unknown argument: $1 (try --help)" ;;
 esac
+[ "$#" -le 1 ] || die "too many arguments (try --help)"
 
 [ -d "${PACKAGE_DIR}" ] || die "no generator at ${PACKAGE_DIR}"
 [ -f "${PROJECT_ROOT}/docs/traceability-map.toml" ] \
@@ -183,6 +198,84 @@ for marker in '.. _dev-traceability:' 'Requirement rules' 'Acceptance criteria' 
         || die "the rendered report is missing the section marker '${marker}'" 3
 done
 
+# ---------------------------------------------------------------------------
+# 4. --self-test -- prove the gate can fail (CONTRIBUTING.rst, gate conventions)
+# ---------------------------------------------------------------------------
+
+NEGATIVE_DIR="${OUT_DIR}/negative"
+GATE_CASE="criterion-with-no-test-reference"
+
+if [ "${SELF_TEST}" -eq 1 ]; then
+    SPHINX_BUILD="${PROJECT_ROOT}/.venv/bin/sphinx-build"
+    [ -x "${SPHINX_BUILD}" ] || die "--self-test needs ${SPHINX_BUILD}; create the
+project virtualenv first (nothing may be installed on the host):
+    python3 -m venv ${PROJECT_ROOT}/.venv
+    ${PROJECT_ROOT}/.venv/bin/pip install -r ${PROJECT_ROOT}/docs/requirements.txt"
+
+    printf '\n=== 4/5  injected defects: each must be caught, and only by itself ===\n'
+    self_status=0
+    run_tee "${OUT_DIR}/selftest.log" "${PYTHON}" -m traceability.selftest \
+        --root "${PROJECT_ROOT}" --work "${NEGATIVE_DIR}" || self_status=$?
+    if [ "${self_status}" -ne 0 ]; then
+        printf '\ntraceability.sh: SELF-TEST FAILED -- see %s\n' "${OUT_DIR}/selftest.log" >&2
+        exit 4
+    fi
+    grep -q '^selftest: OK' -- "${OUT_DIR}/selftest.log" \
+        || die "the self-test exited 0 without reporting OK" 3
+
+    # The same defect, through the real documentation build. R-DOC-03 says an
+    # AC- with no test and no human-sign-off mark "is a documentation build
+    # failure" -- so showing the script exiting non-zero is not enough.
+    printf '\n=== 5/5  the same defect must fail the strict Sphinx build ===\n'
+    CASE_DIR="${NEGATIVE_DIR}/${GATE_CASE}"
+    NEG_LOG="${OUT_DIR}/sphinx-broken.log"
+    POS_LOG="${OUT_DIR}/sphinx-clean.log"
+
+    "${PYTHON}" -m traceability.selftest --root "${PROJECT_ROOT}" \
+        --work "${NEGATIVE_DIR}" --case "${GATE_CASE}" --keep > /dev/null \
+        || die "could not re-create the ${GATE_CASE} copy" 4
+    # A fresh clone has no generated page either; remove the copied one so the
+    # only thing that can fail this build is the map.
+    rm -f -- "${CASE_DIR}/docs/developer/traceability.rst"
+    rm -rf -- "${CASE_DIR}/docs/_build"
+
+    printf 'traceability.sh: running the R-DOC-05 command line over the injured copy:\n'
+    printf '    %s -n -W -b html %s/docs %s/docs/_build/html\n\n' \
+        "${SPHINX_BUILD}" "${CASE_DIR}" "${CASE_DIR}"
+    neg_status=0
+    run_tee "${NEG_LOG}" "${SPHINX_BUILD}" -n -W -b html \
+        "${CASE_DIR}/docs" "${CASE_DIR}/docs/_build/html" || neg_status=$?
+    if [ "${neg_status}" -eq 0 ]; then
+        printf '\ntraceability.sh: SELF-TEST FAILED -- an AC- with no test reference did\n' >&2
+        printf 'traceability.sh: NOT fail the documentation build. R-DOC-03 is not enforced.\n' >&2
+        exit 4
+    fi
+    for needed in 'AC-NO-EVIDENCE' 'no test reference and no human-sign-off mark'; do
+        grep -qF -- "${needed}" "${NEG_LOG}" \
+            || die "the build failed, but not on the injected defect (no '${needed}' in ${NEG_LOG})" 4
+    done
+    printf '\ntraceability.sh: the documentation build failed as required (exit %s):\n' "${neg_status}"
+    grep -F -- 'no test reference and no human-sign-off mark' "${NEG_LOG}" | sed 's/^/    /'
+
+    printf '\n--- removing the injection and rebuilding the same tree ---\n'
+    "${PYTHON}" -m traceability.selftest --root "${PROJECT_ROOT}" \
+        --work "${NEGATIVE_DIR}" --case "${GATE_CASE}" > /dev/null \
+        || die "could not restore the ${GATE_CASE} copy" 4
+    rm -f -- "${CASE_DIR}/docs/developer/traceability.rst"
+    rm -rf -- "${CASE_DIR}/docs/_build"
+    pos_status=0
+    run_tee "${POS_LOG}" "${SPHINX_BUILD}" -n -W -b html \
+        "${CASE_DIR}/docs" "${CASE_DIR}/docs/_build/html" || pos_status=$?
+    [ "${pos_status}" -eq 0 ] \
+        || die "the copy does not build clean once the defect is removed; see ${POS_LOG}" 1
+    [ -s "${CASE_DIR}/docs/developer/traceability.rst" ] \
+        || die "the clean build exited 0 but generated no traceability page" 3
+    [ -s "${CASE_DIR}/docs/_build/html/developer/traceability.html" ] \
+        || die "the clean build exited 0 but published no traceability HTML" 3
+    printf '\ntraceability.sh: self-test OK -- the gate fails on every injected defect\n'
+    printf 'traceability.sh: and the documentation build passes once they are removed.\n'
+fi
+
 printf '\ntraceability.sh: PASSED.\n'
 printf 'traceability.sh: %s R- rules, %s AC- criteria, all mapped and verified\n' \
     "${RULES}" "${CRITERIA}"
@@ -193,6 +286,11 @@ printf 'traceability.sh: unit tests    %s passed\n' "${RAN}"
 printf 'traceability.sh: rendered      %s (%s R- rows, %s AC- rows)\n' \
     "${RENDERED}" "${RENDERED_RULES}" "${RENDERED_CRITERIA}"
 printf 'traceability.sh: logs          %s, %s, %s\n' "${CHECK_LOG}" "${TESTS_LOG}" "${RENDER_LOG}"
+if [ "${SELF_TEST}" -eq 1 ]; then
+    printf 'traceability.sh: self-test    8 injected defects, all caught; strict Sphinx\n'
+    printf 'traceability.sh:              build fails on gate item 5 and passes without it\n'
+    printf 'traceability.sh: copies       %s\n' "${NEGATIVE_DIR}"
+fi
 printf 'traceability.sh: the published page is generated by the documentation build\n'
 printf 'traceability.sh: (docs/conf.py -> builder-inited), not by this script.\n'
 exit 0
