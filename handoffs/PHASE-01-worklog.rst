@@ -125,7 +125,36 @@ Work units
        Acceptance: both builds clean; a deliberate broken cross-reference
        fails the build.
      - ``R-DOC-05``; gate 2; ``AC-DOC-01``
-     - *pending -- not started*
+     - **ACCEPTED 2026-08-29**, commit ``c0e2aa8``. ``bash
+       scripts/ci/docs-build.sh`` exits 0 with two builds: build 1 is
+       literally ``sphinx-build -n -W -b html docs docs/_build/html`` (I read
+       the script to confirm the command is not paraphrased) over 49 source
+       documents producing 51 HTML pages, 10 of them the Phase 00 feasibility
+       set; build 2 covers the 31 project documents outside ``docs/`` in a
+       generated throwaway tree, 34 pages. ``grep -ic warning`` over the build
+       log returns 0. **I did not rely on the unit's own negative control.** I
+       copied ``docs/`` to ``_build/orch-docs/``, appended
+       ``:ref:`this-label-does-not-exist-anywhere``` to ``installation.rst``
+       and ran the same sphinx command: exit 1, ``WARNING: undefined label``,
+       ``warnings treated as errors``. Removing the line gives exit 0. I then
+       added an orphan document and got exit 1 with ``document isn't included
+       in any toctree``, so the "every page in a toctree" claim is enforced
+       rather than asserted. The unit's own ``--self-test`` also passes.
+       ``conf.py`` has no ``suppress_warnings`` and no ``nitpick_ignore``, and
+       sets ``nitpicky = True`` because Read the Docs has a key for ``-W`` and
+       none for ``-n``. A script comparing the page set to the
+       specification's recommended tree reports no missing and no extra page.
+       **Two findings the unit reported honestly and did not paper over:**
+       ``.readthedocs.yaml`` is unverified against the service (no remote,
+       ``D-008``), which the file says on its face; and
+       ``docs/developer/traceability.rst`` is gitignored, so until unit 6
+       lands its generator a *fresh clone* fails build 1 with ``toctree
+       contains reference to nonexisting document``. That gap is real, is
+       recorded in ``conf.py``, and is re-checked at the phase gate. The unit
+       also caught two RST defects in my own ``PHASE-01-worklog.rst`` (short
+       title overline, a stray ``</content>`` line I left in it); I fixed both
+       in ``81ec08e``, which is the gate finding a defect in the orchestrator's
+       work rather than only in the agents'.
 
    * - 5
      - **Legal and process documents.** ``LICENSE`` -- the full unmodified
