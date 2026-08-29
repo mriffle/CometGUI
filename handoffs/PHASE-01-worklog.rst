@@ -155,7 +155,15 @@ Work units
        ``-n -W``. I read ``CONTRIBUTING.rst`` (393 lines) against
        ``ONBOARDING.rst`` and found no contradiction; it points rather than
        restates, and states the no-remote rule with the ``D-008`` reason. Diff
-       is five files, all owned by the unit.
+       is five files, all owned by the unit. **Follow-up commit ``6d12561``
+       re-verified**: it adds a ``--self-test`` mode that damages copies under
+       ``_build/`` and requires each to be rejected; I ran ``bash
+       scripts/verify-license.sh --self-test`` myself and saw ``SELF-TEST
+       PASSED -- 5 negative controls rejected, real LICENSE accepted``, exit
+       0. The agent also reported catching a real defect in its own harness
+       through a sabotage control (the self-test depended on the executable
+       bit and every control silently returned 126), which is the harness
+       being falsifiable rather than merely green.
 
    * - 6
      - **Traceability report generator.** Reads the phase documents for
