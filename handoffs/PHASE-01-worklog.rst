@@ -115,6 +115,16 @@ Work units
        unanchored ``tools/`` pattern silently matched
        ``org/cometgui/tools/`` inside three modules and would have dropped
        eight source files from git. It is now ``/tools/``.
+       **Gate item 1's "clean checkout" clause proven at the end of the
+       phase**, which no single unit could do: ``git clone /workspace
+       /tmp/clean-clone`` produced a tree with **no** ``tools/`` and **no**
+       ``.venv``, and one command -- ``bash scripts/build.sh`` -- took it to
+       ``11/11 stages OK in 138 seconds. BUILD OK``, bootstrapping the JDK and
+       Maven (777 MB under its own ``tools/``), creating the virtualenv from
+       ``requirements-dev.txt`` and downloading 698 artefacts into its own
+       ``_build/m2repo``. ``~/.m2`` still does not exist afterwards. That also
+       exercises the two bootstrap paths unit 1 honestly reported it had never
+       run.
        **Re-verified after unit 2 reformatted all 61 Java files and added
        licence headers** (commit ``252530d`` changed unit 1's sources): in the
        same sandbox I re-injected the inverted blank-version guard and ``mvn
