@@ -51,10 +51,49 @@ open (``R-SEC-01``).
 D-002 -- XML-capable Percolator artefact strategy
 =================================================
 
-:Status: OPEN
+:Status: **DECIDED 2026-08-29**
 :Raised: 2026-08-28
-:Blocks: Phases 05, 09, 12, 15, 16; the product's Limelight promise
+:Blocks: nothing further; phases 05, 09, 12, 15, 16 implement it
 :Owner: Project owner, with the engineering team
+
+**Decision.** Do not build Percolator from source. Use the most recent version
+that publishes binaries for macOS, Windows and Linux *and* satisfies the XML
+requirement. That version is **3.07.1** (``rel-3-07-01``, 2024-06-20).
+
+**Verification of the decision (2026-08-29).**
+
+* Linux: ``percolator-v3-07-linux-amd64.deb`` extracted without root and
+  **executed** -- reports "Percolator version 3.07.1, Build Date Jun 20 2024";
+  help lists ``-X, --xmloutput`` and ``-Z, --decoy-xml-output``. Highest
+  required symbol version ``GLIBC_2.34``, so it runs on RHEL 9, Ubuntu 22.04
+  and Debian 12 -- strictly better than 3.08.0's ``GLIBC_2.38``.
+* macOS: ``percolator-v3-07-osx-x86_64.pkg`` is ``xar!`` + gzip + ``070707``
+  cpio, extracted without root. Contains ``./usr/local/bin/percolator``
+  (64-bit Mach-O), ``percolator_out.xsd`` and ``percolator_in.xsd``, and the
+  strings ``xerces``, ``xmloutput``, ``pout.xml``, ``decoy-xml-output``.
+  **x86-64 only** -- see ``D-004``.
+* Windows: ``percolator-v3-07.exe`` is a valid NSIS installer (firstheader
+  ``0xdeadbeef``). Its payload was not decompressed here, so XML capability is
+  **inferred** from the naming A/B and from size (1776 KB versus the ``noxml``
+  twin's 1193 KB, +49%, matching the pattern verified directly on the other
+  two platforms). **Phase 00 must confirm this on a Windows runner** before
+  the manifest claims it.
+
+**Accepted trade.** 3.07.1 predates 3.08's change of default PEP regressor to
+I-splines and predates the fix for PEP values exceeding 1.0 (#394, fixed in
+3.08.1 and 3.09). Carried as version advisories (``R-PERC-11``) rather than
+hidden. The alternatives were a version that cannot emit XML at all, or a
+source build that has been ruled out.
+
+**What remains engineering, not decision.** Payload extraction for three
+package formats (``.deb`` verified, ``.pkg`` verified, NSIS to be established
+in Phase 00); installing the XSD companions with the binary; detecting and
+explaining Rosetta 2 on Apple silicon.
+
+----
+
+Original analysis, retained
+---------------------------
 
 **Question.** The product's policy is to use the **latest compatible**
 Percolator. How does CometGUI obtain that version -- one that can emit the XML
@@ -127,17 +166,23 @@ selection is computed from probed capability (``R-PERC-02``).
 D-003 -- Managed Percolator version/platform coverage
 =====================================================
 
-:Status: OPEN
+:Status: OPEN -- narrowed by ``D-002``
 :Raised: 2026-08-28 (carried from specification revision 1)
 :Blocks: Phases 05, 09, 15
 :Owner: Project owner
 
-**Question.** Which Percolator version and platform pairs does the product
-offer as managed one-click installs, given ``D-002``?
+**Question.** Beyond 3.07.1, which Percolator version and platform pairs does
+the product offer as managed one-click installs?
 
-**Facts.** Adapter- and schema-level support for >= 3.05 is feasible. Managed
-installation depends on a usable binary existing per pair. Some pairs have no
-published artefact at all.
+**Settled by ``D-002``.** 3.07.1 is offered on all three tier-1 platforms as
+the XML-capable default. That is the pair set the Limelight path needs.
+
+**Still open.** Which *additional* versions to carry for users who do not need
+Limelight -- 3.09 is the obvious candidate, since it is current and its
+portable archives need no payload extraction -- and whether to carry any
+version below 3.07.1 at all. Adapter- and schema-level support for >= 3.05 is
+feasible; managed installation depends on a usable binary existing per pair,
+and several pairs have no published artefact.
 
 **Recommendation.** Publish the matrix explicitly in
 ``docs/platform_support.rst``: for each pair, managed / local-binary-only /
@@ -149,10 +194,18 @@ unsupported. The UI must not offer what the manifest does not contain
 D-004 -- macOS architecture policy
 ==================================
 
-:Status: OPEN
+:Status: **DECIDED 2026-08-29**, as a consequence of ``D-002``
 :Raised: 2026-08-28
-:Blocks: Phases 05, 16
+:Blocks: nothing further; phases 05 and 16 implement it
 :Owner: Project owner
+
+**Decision.** The Percolator stage runs under **Rosetta 2** on Apple silicon.
+Ruling out source builds leaves no ``arm64`` XML-capable Percolator: the only
+XML-capable macOS artefact for 3.07.1 is ``osx-x86_64``. Comet still runs
+natively (it publishes an ``aarch64`` macOS build), so only the Percolator
+stage is translated. The application shall detect Apple silicon, verify Rosetta
+2 is present before the stage runs, and explain the requirement rather than
+failing with an exec-format error.
 
 **Question.** On Apple silicon, how does the Percolator stage run?
 

@@ -42,14 +42,23 @@ In scope
 * Determine, per tier-1 platform, exactly which Percolator versions can be
   obtained and executed without administrative rights, and cost each option
   in D-002.
-* Resolve *latest compatible* from first principles rather than accepting the
-  specification's answer: enumerate Percolator releases **and tags**,
-  establish the newest that can emit XML, and confirm it against the
-  converter's actual input requirement.
-* Prove the source build: compile the latest compatible tag with
-  ``-DXML_SUPPORT=ON`` on Linux at minimum, recording the toolchain, the
-  Xerces-C/XSD dependencies, the build time and the resulting binary's dynamic
-  dependencies. This is the feasibility question behind ``D-002`` option 1.
+* Re-derive *latest compatible* rather than accepting the specification's
+  answer: enumerate Percolator releases, establish the newest one publishing
+  an XML-capable binary for **all three** tier-1 platforms, and confirm it
+  against the converter's actual input requirement. The project does not build
+  Percolator from source, so a version without a published binary is not a
+  candidate.
+* **Confirm the Windows artefact.** ``percolator-v3-07.exe`` is an NSIS
+  installer whose XML capability is currently inferred from naming and size,
+  not verified. On a Windows runner: obtain the payload without administrative
+  rights, run ``percolator --help``, and confirm ``-X/--xmloutput`` and
+  ``-Z/--decoy-xml-output`` are present. Establish and document the extraction
+  mechanism the product will use.
+* Establish payload extraction for the other two package formats against the
+  real artefacts: ``ar`` + ``data.tar.gz`` for the ``.deb``, ``xar!`` + gzip +
+  ``070707`` cpio for the ``.pkg``, including the XSD companion files.
+* On Apple silicon, confirm the x86-64 Percolator runs under Rosetta 2 and
+  determine how the application detects its absence.
 * Run the pinned Limelight converter JAR's help output and record its real
   argument names.
 * Prove PDV CLI figure generation on a Comet pepXML plus spectrum file.
@@ -101,15 +110,18 @@ running the check. An item that cannot be verified has not passed.
 5. The GUI automation spike has a written verdict: TestFX works, or the
    named fallback does.
 6. ``docs/feasibility/percolator-artefacts.rst`` states, per tier-1
-   platform, whether an XML-capable Percolator can be installed without
-   admin rights, and what each remedy costs.
+   platform, which XML-capable Percolator artefact is used, how its payload is
+   extracted without admin rights, and what its host requirements are.
 7. The latest compatible Percolator version is established from upstream data
    with the evidence recorded, not assumed from the specification.
-8. An XML-capable Percolator has been built from source on at least one
-   platform, and its output is accepted by the pinned converter. If it cannot
-   be built, the blocking reason is documented precisely.
-9. ``D-001`` and ``D-002`` each have a written recommendation with
-   evidence, ready for the owner.
+8. The Windows XML-capable Percolator artefact is confirmed on a Windows
+   runner -- payload obtained without admin rights, ``-X`` present -- or the
+   blocking reason is documented precisely and the manifest does not claim it.
+9. Payload extraction is demonstrated for ``.deb``, ``.pkg`` and the NSIS
+   ``.exe``, each yielding a runnable binary plus its XSD companions.
+10. ``D-001`` has a written recommendation with evidence, ready for the owner,
+    and ``D-002``'s decided outcome is confirmed rather than assumed -- or the
+    evidence that contradicts it is escalated.
 
 Risks and notes
 ---------------

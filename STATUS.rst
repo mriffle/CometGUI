@@ -136,8 +136,9 @@ residue named), ``BLOCKED`` (with the decision or dependency named), or
 Open decisions
 ==============
 
-All eight are open. ``D-001`` and ``D-002`` are the two that shape the product
-rather than merely configure it.
+Six of eight remain open. ``D-002`` and ``D-004`` were decided on 2026-08-29.
+``D-001`` is now the only open decision that shapes the product rather than
+merely configuring it.
 
 .. list-table::
    :header-rows: 1
@@ -150,14 +151,15 @@ rather than merely configure it.
      - May CasanovoGUI source be reused? (No licence published.)
      - Derivation in 02; redistribution in 16
    * - ``D-002``
-     - How is an XML-capable Percolator obtained per platform?
-     - 05, 09, 12; the Limelight promise
+     - **DECIDED**: no source builds; use 3.07.1, the newest release with
+       XML-capable binaries on all three platforms.
+     - --
    * - ``D-003``
-     - Which Percolator version/platform pairs are managed?
+     - Narrowed: which *additional* versions beyond 3.07.1 are managed?
      - 05, 09, 15
    * - ``D-004``
-     - macOS architecture policy for the Percolator stage
-     - 05, 16
+     - **DECIDED**: Percolator runs under Rosetta 2 on Apple silicon.
+     - --
    * - ``D-005``
      - PDV baseline only, or enhanced control mode?
      - 11
@@ -174,19 +176,19 @@ rather than merely configure it.
 Risks currently live
 ====================
 
-#. **The latest compatible Percolator has no published binary anywhere.**
-   Verified 2026-08-29. The product's policy is to run the latest compatible
-   version; with Limelight enabled that resolves to **3.08.1**
-   (``rel-3-08-01``), the newest release that can emit the XML the converter
-   requires -- and it is a tag with no GitHub release. The newest *published*
-   XML-capable artefact is 3.08.0's Linux ``.deb``, which needs glibc 2.38 and
-   carries a PEP-greater-than-1.0 defect that 3.08.1 fixes. Every portable
-   upstream archive is ``noxml``, XML is an opt-in compile flag, and Bioconda's
-   builds are XML-free and skip macOS. Using the latest compatible version
-   therefore means **building Percolator from source with
-   ``-DXML_SUPPORT=ON``** (``D-002``, recommendation: option 1). Everything
-   downstream -- the manifest, the release matrix, the UI's promises, the test
-   matrix -- depends on that decision.
+#. **Percolator 3.07.1 is the product's XML-capable default** -- resolved
+   2026-08-29 (``D-002``). The owner ruled out source builds and required
+   published binaries on all three tier-1 platforms; 3.07.1
+   (``rel-3-07-01``, 2024-06-20) is the newest release meeting both. The Linux
+   build was extracted and executed here (``-X/--xmloutput`` present, needs
+   only ``GLIBC_2.34``); the macOS payload was extracted and inspected
+   (Mach-O binary plus the XSDs, x86-64 only). **The Windows artefact's XML
+   capability is inferred, not verified** -- Phase 00 must confirm it on a
+   Windows runner before the manifest claims it. Residual risk is now
+   engineering, not strategy: payload extraction for ``.deb``, ``.pkg`` and
+   NSIS; XSD companion installation; Rosetta 2 on Apple silicon (``D-004``).
+   The accepted trade is that 3.07.1 predates 3.08's I-spline PEP default and
+   the PEP-greater-than-1.0 fix, carried as advisories (``R-PERC-11``).
 #. **CasanovoGUI has no licence.** Verified 2026-08-28. The architecture is
    implementable independently, so this blocks derivation, not the project;
    but it must be resolved before public redistribution.
@@ -226,6 +228,19 @@ Change log
      - --
      - Phases 00-16 defined with exit gates; ``ONBOARDING.rst``,
        ``STATUS.rst`` and ``DECISIONS.rst`` created. Project not yet started.
+   * - 2026-08-29
+     - --
+     - Owner ruled out building Percolator from source and required published
+       binaries on macOS, Windows and Linux. Verified that **3.07.1**
+       (``rel-3-07-01``) is the newest release meeting that with XML: Linux
+       build executed here, macOS payload extracted, Windows inferred and
+       flagged for Phase 00. ``D-002`` and ``D-004`` decided; ``D-003``
+       narrowed. Specification revision 4.
+   * - 2026-08-29
+     - --
+     - Orchestration model made explicit: three tiers (main orchestrator ->
+       phase orchestrator -> phase agent), each signing off the tier below by
+       running the checks itself. Added ``handoffs/WORKLOG-TEMPLATE.rst``.
    * - 2026-08-29
      - --
      - Owner directed that the product use the **latest compatible**

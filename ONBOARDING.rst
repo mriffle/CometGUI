@@ -47,18 +47,20 @@ is run*.
 .. warning::
 
    **The single most important verified fact.** The product uses the *latest
-   compatible* Percolator, computed from probed capability. With Limelight
-   enabled that resolves to **3.08.1** -- the newest version that can emit the
-   XML the converter requires, since 3.09 removed XML/XSD I/O -- and 3.08.1 is
-   a git tag with **no published binary on any platform**. The newest published
-   XML-capable artefact is 3.08.0's Linux ``.deb``, which needs glibc 2.38 (so
-   it will not run on Ubuntu 22.04, Debian 12 or RHEL 9) and carries a defect
-   3.08.1 fixes. Every portable upstream archive is a ``noxml`` build; XML is
-   an opt-in compile flag; Bioconda's builds are XML-free and skip macOS.
-   Using the latest compatible version therefore means **building Percolator
-   from source** (``D-002``). Do not let any phase hard-code a version, or
-   build a UI, manifest or test that assumes "select 3.08 and XML appears".
-   See ``specification.rst``, *Percolator versions and artefact availability*.
+   compatible* Percolator, computed from probed capability -- subject to two
+   fixed constraints: **the project does not build Percolator from source**,
+   and a version is offered only where upstream publishes a binary for that
+   platform. Percolator 3.09 removed XML/XSD I/O and the Limelight converter
+   hard-requires Percolator XML, so for a Limelight-enabled run resolution
+   returns **3.07.1** -- the newest release publishing XML-capable binaries for
+   Linux, macOS and Windows alike (``D-002``, decided). Every XML-capable
+   artefact is an OS package, so the installer extracts payloads rather than
+   running installers; the macOS one is x86-64, so that stage runs under
+   Rosetta 2 on Apple silicon (``D-004``). Newer Percolator versions stay fully
+   usable for rescoring and results -- they simply cannot feed Limelight. Do
+   not let any phase hard-code a version, or build a UI, manifest or test that
+   assumes a particular version implies XML. See ``specification.rst``,
+   *Percolator versions and artefact availability*.
 
 Document map
 ============

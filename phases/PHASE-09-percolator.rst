@@ -6,7 +6,7 @@ PHASE-09: Percolator Adapter and Version Capabilities
 :Status: NOT STARTED
 :Depends on: 05, 08
 :Blocked by decisions: D-002, D-003
-:Delivers: R-PERC-01..10
+:Delivers: R-PERC-01..11
 :Proves: AC-RES-05, AC-RES-06, AC-RES-07, AC-PRV-10
 
 Purpose
@@ -31,7 +31,10 @@ In scope
 * Output handling: PSM and peptide TSV, optional decoy TSVs, weights, XML
   when capable and needed, logs.
 * Effective random seed defaulting and recording.
-* Advisory model for known version defects.
+* Advisory model for known version defects, including 3.07.1's: it predates
+  3.08's I-spline PEP default and the fix for PEP values exceeding 1.0
+  (``R-PERC-11``). Advisories are shown at selection time and recorded in
+  provenance.
 * The compatible-version rerun action: preserve the original run, create a
   distinct execution record, reuse the merged PIN, do not rerun Comet -- and
   offer local-binary registration instead where no managed XML-capable build

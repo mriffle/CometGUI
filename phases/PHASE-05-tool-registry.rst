@@ -34,10 +34,14 @@ In scope
   failure states and the actionable diagnostic for loader failures.
 * Managed installs for Comet, Percolator, PDV 2.7.0 and the Limelight
   converter JAR.
-* ``project-built`` as a first-class manifest artefact source, since the
-  latest compatible Percolator has no upstream binary and must be built and
-  published by the project (``D-002``); such artefacts carry their upstream
-  licence, source tag and build provenance.
+* Payload extraction for the three package formats Percolator 3.07.1 requires,
+  one per tier-1 platform: ``DEB_PAYLOAD`` (``ar`` + ``data.tar.gz``),
+  ``PKG_PAYLOAD`` (``xar!`` + gzip + ``070707`` cpio) and ``NSIS_PAYLOAD``.
+  Installers are never executed; their payloads are extracted.
+* The XSD companion files that ship with Percolator's XML builds, installed
+  atomically with the binary and gating the ``XML_OUTPUT`` capability.
+* Rosetta 2 detection on Apple silicon, since the XML-capable macOS Percolator
+  is x86-64 (``D-004``): verify before the stage runs and explain if absent.
 * Local Percolator binary registration with a >= 3.05 check and capability
   probe.
 * The Tool Manager UI showing installed, available, unavailable-on-this-
