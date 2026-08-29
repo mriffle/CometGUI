@@ -73,7 +73,27 @@ Work units
        Accept when every row has a fresh evidence line and no row is copied
        from the specification.
      - Gate 1; feeds gate 7 and 10
-     - PENDING
+     - Signed off 2026-08-29 by the phase orchestrator. Read commit
+       ``cc2ac06`` (1615 lines, 2 files, nothing else swept in). Re-ran
+       ``python3 scripts/feasibility/verify_upstream_facts.py``: 22 facts, 18
+       CONFIRMED / 0 CHANGED / 4 UNVERIFIED (the four artefact rows delegated
+       to units 3 and 4). Then checked five rows against live sources MYSELF,
+       not through the agent's script: PDV ``releases.atom`` returns v2.7.0 /
+       2026-08-14T19:55:27Z; ``rel-3-09``'s ``CMakeLists.txt`` fetched raw is
+       3541 bytes with **0** occurrences of ``XML_SUPPORT`` and **0** of
+       ``xerces``, while ``rel-3-08``'s carries ``option(XML_SUPPORT ... OFF)``
+       at line 23; the CasanovoGUI repository API still returns
+       ``license = None``, pushed 2026-08-21. I also executed
+       ``comet.linux.exe`` myself: banner ``Comet version "2026.02 rev. 2
+       (6edec91)"``, ``readelf -d`` says "There is no dynamic section in this
+       file", and ``-p`` / ``-q`` emit **96** and **118** parameters with
+       exactly the 22 extra names the specification lists and none removed.
+       ``check-docs.sh`` on the document exits 0. Three specification
+       differences escalated, none patched by the agent -- correct.
+       **I found one thing the agent did not:** ``releases.atom`` lists
+       ``rel-3-08-01``, but ``GET /releases/tags/rel-3-08-01`` returns
+       **HTTP 404**, so the tag-with-no-release claim holds AND the atom
+       fallback must never be used alone to enumerate releases.
 
    * - 3
      - **Percolator artefact enumeration and payload extraction (Linux,
