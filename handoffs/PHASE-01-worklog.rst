@@ -229,7 +229,33 @@ Work units
        Acceptance: the four failure modes are demonstrated; the generated page
        builds under ``-n -W``.
      - ``R-DOC-03``, ``R-DOC-02``; gate 5; ``AC-DOC-02``
-     - *pending -- not started*
+     - **ACCEPTED 2026-08-29**, commit ``b2b8924``. ``bash
+       scripts/ci/traceability.sh`` exits 0: 48 stdlib ``unittest`` tests pass,
+       and the check reports ``94 R- rules, 78 AC- criteria, 17 phase
+       documents`` with ``0 automated, 2 partial, 68 planned, 8 human
+       sign-off``. The 94/78 counts match what I computed independently from
+       ``specification.rst`` before the phase started, and the eight human
+       criteria are exactly the eight the specification marks ``|human|``.
+       **I ran my own negative controls** in a clean ``git archive HEAD``
+       extraction under ``_build/orch-trace``: deleting the ``AC-DOC-02``
+       entry gives exit 1 and ``[MAP-MISSING-ID] AC-DOC-02: defined in
+       specification.rst but absent from traceability-map.toml`` -- that is
+       gate item 5, demonstrated by me and not by the agent; pointing an
+       evidence entry at ``scripts/ci/no-such-script.sh`` gives
+       ``[CHECK-MISSING] ... whose file ... does not exist``, so a renamed
+       check cannot rot silently; and claiming a human sign-off for
+       ``AC-TST-02``, which the specification does not mark ``|human|``, gives
+       exit 1 with ``[AC-NO-EVIDENCE]``. Restoring the map gives exit 0 each
+       time. **The fresh-clone gap unit 4 recorded is closed**: the same clean
+       extraction has no ``docs/developer/traceability.rst``, and
+       ``sphinx-build -n -W -b html docs docs/_build/html`` there exits 0
+       after the ``builder-inited`` hook writes a 29 644-byte page --
+       ``[traceability] wrote developer/traceability.rst``. Stdlib only. One
+       item of follow-up integration is mine, not a defect in the unit:
+       ``AC-TST-02``, ``AC-TST-03`` and ``AC-TST-04`` are mapped ``planned``
+       against phase 15 because when this unit ran the coverage, mutation and
+       architecture gates did not yet exist. Once unit 3 lands they become
+       real checks and the map must be upgraded rather than left understated.
 
    * - 7
      - **CI definitions, SBOM and dependency scanning.** Three workflow files
