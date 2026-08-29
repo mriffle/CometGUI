@@ -2,7 +2,7 @@
 Decisions
 =========
 
-:Updated: 2026-08-29
+:Updated: 2026-08-29 (D-002 option C, D-008 tool distribution)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. When the owner
@@ -214,6 +214,61 @@ answer**.
 
 **This is not an agent's call.** Option C changes what the product builds.
 
+DECISION on the open question, 2026-08-29: **option C**
+--------------------------------------------------------
+
+:Decided by: Project owner, 2026-08-29, in session with the main orchestrator
+
+**The product obtains Percolator from the portable ``noxml`` archives.** The
+selected version is unchanged -- 3.07.1 remains the answer *latest compatible*
+returns for a Limelight-enabled run -- but the artefact the installer fetches
+changes from the operating-system package to the portable zip, on all three
+tier-1 platforms.
+
+**Why.** The premise that made package-payload extraction necessary is false.
+``XML_SUPPORT`` gates the pin-XML **reader** (``--xml-in``), which Comet never
+produces and the product never uses; the pout-XML **writer** is present in
+every published 3.05--3.08 artefact, both twins, all three platforms, proven by
+execution on Linux and by writer-literal byte markers elsewhere. A portable zip
+needs no administrative rights, no installer execution and no payload
+extraction anywhere.
+
+**What this deletes.** Phase 05 does **not** implement ``NSIS_PAYLOAD`` and
+does not extract the macOS ``.pkg`` for the binary. That was the most fragile
+code the installer was going to contain, and it is now unwritten rather than
+written and maintained.
+
+**What this costs, carried explicitly rather than discovered in phase 05.**
+
+#. **No portable archive ships an XSD.** Every portable zip upstream
+   publishes -- Linux, macOS and Windows, 3.06.5 through 3.09 -- contains
+   exactly one member: the bare executable. ``R-TOOL-02`` requires the XSD
+   companions, so they come from the matching ``noxml`` ``.deb`` (Linux) or
+   ``.pkg`` (macOS) as a second small download, using extraction code phase 00
+   already proved and signed off. ``DEB_PAYLOAD`` and ``PKG_PAYLOAD`` therefore
+   survive in ``R-TOOL-01``; ``NSIS_PAYLOAD`` does not. Vendoring the two XSDs
+   in the repository would remove that download but is a redistribution
+   question, which is **not decided** and which no agent may settle.
+#. **The Windows portable zip is the bare ``percolator.exe`` and needs a
+   Visual C++ runtime** -- ``MSVCP140.dll``, ``VCRUNTIME140.dll``,
+   ``VCRUNTIME140_1.dll``, ``VCOMP140.DLL``. The NSIS installer ships nine such
+   DLLs beside the binary; the zip ships none. Phase 05 must declare the
+   runtime as a companion requirement and report its absence as a **loader**
+   failure naming the DLL (``R-PLAT-03``), never as "not XML-capable". The NSIS
+   installer's ``percolator.exe`` is byte-identical to the zip's (sha256
+   ``b9d9bbe82bc4...f059f``, 707072 bytes), so extracting the DLLs from it is
+   the fallback if shipping or requiring the redistributable proves
+   unacceptable.
+#. **The inference gap is unchanged.** No Windows or macOS Percolator binary
+   has been executed anywhere in this project. Option C does not close that and
+   was not chosen as if it did; it removes code, not uncertainty. Phases 05, 09
+   and 15 must treat capability as probed on the host at runtime.
+
+**Consequential edits made by the main orchestrator on taking this decision:**
+``specification.rst`` revision 7 (the artefact section rewritten, ``R-TOOL-01``,
+``R-TOOL-02`` and ``R-PERC-02`` amended), ``phases/PHASE-05-tool-registry.rst``
+re-scoped, ``phases/index.rst`` and ``STATUS.rst`` updated.
+
 ----
 
 Original analysis, retained
@@ -302,9 +357,11 @@ the product offer as managed one-click installs?
 the XML-capable default. That is the pair set the Limelight path needs.
 
 **Still open.** Which *additional* versions to carry for users who do not need
-Limelight -- 3.09 is the obvious candidate, since it is current and its
-portable archives need no payload extraction -- and whether to carry any
-version below 3.07.1 at all. Adapter- and schema-level support for >= 3.05 is
+Limelight -- 3.09 is the obvious candidate, since it is current -- and whether
+to carry any version below 3.07.1 at all. (The reason once given for 3.09,
+that "its portable archives need no payload extraction", is now both corrected
+and moot: it publishes no Linux portable archive, and since ``D-002`` option C
+*no* Percolator artefact needs payload extraction for its binary.) Adapter- and schema-level support for >= 3.05 is
 feasible; managed installation depends on a usable binary existing per pair,
 and several pairs have no published artefact.
 
@@ -313,12 +370,17 @@ and several pairs have no published artefact.
 unsupported. The UI must not offer what the manifest does not contain
 (``R-PERC-01``), and CI must not test pairs the product does not offer.
 
-**Phase 00, 2026-08-29 -- this decision is *widened*, not narrowed.** If the
-``noxml`` builds emit pout XML (see ``D-002``), then every ``noxml`` artefact
-from 3.05 to 3.08 becomes a Limelight candidate, and 3.06.5's
+**Phase 00, 2026-08-29 -- this decision is *widened*, not narrowed.** The
+``noxml`` builds do emit pout XML, and ``D-002`` option C is now decided on
+that basis, so every ``noxml`` artefact from 3.05 to 3.08 **is** a Limelight
+candidate rather than a possible one -- and 3.06.5's
 ``percolator-noxml-linux-portable.zip`` carries the lowest glibc floor found
-anywhere in the release history (``GLIBC_2.14``). Two corrections to this
-entry's own text, both verified:
+anywhere in the release history (``GLIBC_2.14``), which makes it the obvious
+candidate for users on older Linux distributions that 3.07.1's ``GLIBC_2.34``
+excludes. That is a widening of the matrix this decision must set, not a
+change to the default: ``R-PERC-02`` still computes the default, and 3.07.1
+still wins for a Limelight-enabled run on a current host. Two corrections to
+this entry's own text, both verified:
 
 * **3.09 publishes no Linux portable archive at all**, and its ``.deb``/
   ``.rpm`` need Boost shared libraries they do not ship -- the extracted 3.09
@@ -470,38 +532,61 @@ determined from the output file, never from the exit code.
 D-008 -- CometGUI licence and distribution
 ==========================================
 
-:Status: **PARTLY DECIDED 2026-08-29** -- licence settled, publication still OPEN
+:Status: **PARTLY DECIDED 2026-08-29** -- licence and tool distribution settled;
+   **publication location still OPEN**
 :Raised: 2026-08-28
-:Blocks: Phase 16, and Windows CI for phase 00's gate item 8. **No longer
-   blocks Phase 01**, whose ``LICENSE`` file is now determined.
+:Blocks: Phase 16, and Windows CI for phase 00's gate item 8, and gate item 6
+   of phase 01. **Does not block Phase 01 from running** -- see the note under
+   the open half.
 :Owner: Project owner
 
 **DECIDED -- the licence.** CometGUI is released under **GPL-3.0**, following
 from ``D-001``'s decision to derive from CasanovoGUI. Phase 01 places the full
 GPLv3 text at the repository root and is unblocked for that deliverable.
 
-**STILL OPEN -- publication and redistribution.** The owner has not answered,
-and an agent must not infer:
+**DECIDED 2026-08-29 -- tool binaries are downloaded, not redistributed.**
+Comet, Percolator, PDV and the Limelight converter are fetched from upstream at
+install time by **pinned URL and SHA-256**, as the specification's tool-registry
+design already assumed. CometGUI's release artefacts contain none of them.
 
-* **Where CometGUI is published.** There is still **no git remote, and creating
-  one remains part of this decision -- do not create one.** This is not
-  academic: the cheapest repeatable route to Phase 00's one unmet gate item is
-  a GitHub Actions ``windows-latest`` runner, which needs a remote. Until then
-  the alternatives are a person with a Windows machine (~15 minutes, one-off,
-  not repeatable) or a paid cloud VM.
-* **Whether tool binaries are redistributed alongside CometGUI**, or downloaded
-  from upstream at install time. This changes the project's obligations
-  materially: downloading from upstream incurs almost none, while
-  redistributing makes CometGUI an Apache-2.0 redistributor of Comet,
-  Percolator and the Limelight converter, with s4 notice obligations. It also
-  interacts with ``D-002`` option C, since the artefact chosen per platform
-  determines what there is to redistribute.
+*What this settles.* CometGUI does not become an Apache-2.0 redistributor of
+Comet, Percolator or the converter, so s4 notice obligations do not attach to
+its release artefacts; PDV's unresolved upstream ``LICENSE``/``pom.xml``
+contradiction cannot become a distribution problem, only a documentation one;
+and the release artefacts stay small.
 
-**Recommendation for the open half.** Decide the remote early -- it is the only
-thing standing between the project and a permanently closed gate item 8 -- and
-default to *downloading from upstream by checksum* rather than redistributing,
-which keeps the licence surface small and matches the specification's existing
-tool-registry design.
+*What this costs, and it is not free.* Installation requires network access,
+and **an upstream deletion or a re-tagged asset breaks installation for every
+new user**. ``R-TEST-08``'s nightly manifest-verification job is therefore
+load-bearing rather than advisory: it is the only thing that detects the
+breakage before a user does. Phase 05 must also make the failure legible --
+a vanished artefact is reported as an upstream availability failure with the
+URL and expected checksum, never as a corrupt download or a probe failure.
+Phase 16 should record a documented recovery path for a user whose artefact has
+disappeared upstream, since the project holds no copy.
+
+*Note on ``D-002`` option C.* The two decisions were taken together and are
+consistent: the portable zips chosen there are downloaded by checksum like
+everything else, and no artefact this project ships contains a third-party
+binary.
+
+**STILL OPEN -- where CometGUI is published.** This is the only open half, and
+an agent must not infer it. There is still **no git remote, and creating one
+remains part of this decision -- do not create one.** It gates the GPL-3.0 source-availability mechanism (phase 16), phase 00's
+unmet gate item 8, and **gate item 6 of phase 01**, which requires the
+pull-request pipeline to run on an actual pull request. On 2026-08-29 the owner
+directed that phase 01 proceed **without** a remote and accept the resulting
+``PARTIAL``: the workflow files are written and every pipeline step is proved
+by running the same commands locally, including the deliberate-failure
+demonstrations, and the "on a pull request" half is recorded unmet. Nothing is
+weakened; the gap is named, as phase 00's item 8 was. **There is still no git
+remote and none may be created.**
+
+**Recommendation for the remaining half.** Decide the publication location
+early. It is the one thing standing between the project and two permanently
+closed gate items -- phase 00's item 8 and phase 01's item 6 -- both of which a
+free GitHub Actions ``windows-latest`` runner would close and then re-verify on
+every change.
 
 **Question.** Under what licence is CometGUI released, where is it published,
 and are project-built tool binaries distributed alongside it?

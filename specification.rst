@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 6
+:Revision: 7
 :Revision date: 2026-08-29
-:Supersedes: Revision 5, 2026-08-29
+:Supersedes: Revision 6, 2026-08-29
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,30 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 7
+     - 2026-08-29
+     - **Percolator artefact strategy decided (``D-002`` option C), and the
+       managed-tool distribution model decided (``D-008``, second half).** The
+       owner acted on Phase 00's ``noxml`` finding. The premise this document
+       carried from revision 1 -- that every portable archive is a ``noxml``
+       build and therefore every XML-capable artefact is an operating-system
+       package whose payload must be extracted -- is **withdrawn**. It is true
+       about the *build* and false about the *capability the Limelight stage
+       needs*: ``XML_SUPPORT`` gates the pin-XML **reader** (``--xml-in``),
+       which Comet never produces and the product never uses, while the
+       pout-XML **writer** is present in every published 3.05--3.08 artefact,
+       both twins, all three tier-1 platforms. The product therefore obtains
+       Percolator from the **portable ``noxml`` archives**, and phase 05 does
+       **not** implement NSIS or ``xar``/cpio payload extraction. Two costs are
+       carried explicitly rather than discovered later: no portable archive
+       ships the XSD companion files ``R-TOOL-02`` requires, and the Windows
+       portable zip contains ``percolator.exe`` alone without the nine Visual
+       C++ runtime DLLs the NSIS installer places beside it. Separately, the
+       owner decided that managed tool binaries are **downloaded from upstream
+       by pinned URL and checksum, not redistributed** with CometGUI, which
+       keeps Apache-2.0 s4 notice obligations off the release artefacts and
+       makes ``R-TEST-08``'s manifest-verification job load-bearing rather than
+       advisory.
    * - 6
      - 2026-08-29
      - **Licensing decided.** ``Noble-Lab/CasanovoGUI`` published GPL-3.0 on
@@ -637,71 +661,126 @@ it is not simply "the newest release".
 Percolator 3.09 (2026-05-21) removed XML/XSD I/O, and the Limelight converter
 hard-requires Percolator XML. XML has never been unconditional: it is the
 compile-time option ``XML_SUPPORT``, default ``OFF``, pulling in Xerces-C and
-XSD. Upstream's ``noxml`` artefacts are the default build; the XML-capable ones
-are ``-DXML_SUPPORT=ON`` builds. In 3.09 the option and its code are gone.
+XSD. Upstream's ``noxml`` artefacts are the default build; the ones named
+without ``noxml`` are ``-DXML_SUPPORT=ON`` builds. In 3.09 the option and its
+code are gone.
+
+.. important::
+
+   **``XML_SUPPORT`` gates the pin-XML reader, not the pout-XML writer.** This
+   was established by execution in phase 00 and it corrects a premise this
+   document carried through revision 5. Running the 3.07.1 Linux ``noxml``
+   binary as ``percolator -X out.xml pin`` exits 0 and writes a
+   ``percolator_out/15`` document that differs from the ``XML_SUPPORT=ON``
+   twin's output in two lines, both inside ``<command_line>``; the Limelight
+   converter consumed that document and produced a schema-valid Limelight file.
+   What ``XML_SUPPORT=OFF`` actually removes is ``--xml-in``, the deprecated
+   pin-XML *input* path -- and Comet writes tab-delimited PIN, so **the product
+   never needs it**. Two consequences run through the rest of this
+   specification. Artefact selection is no longer restricted to operating-system
+   packages (see below). And **a capability probe may not be textual**: both
+   twins print identical ``--help`` listing ``-X`` and ``-Z``, so the probe
+   required by ``R-PERC-02`` must be functional.
 
 Two project constraints then bound the search. **The product does not build
 Percolator from source**, and **a version is offered only where upstream
 publishes a binary for that platform**. So "latest compatible" means: the
-newest release whose published artefacts include an XML-capable build for
-every tier-1 platform.
+newest release whose published artefacts include a build that can *write pout
+XML* on every tier-1 platform.
 
-That is **3.07.1** (``rel-3-07-01``, 2024-06-20). Each release publishes an XML
-build and a ``noxml`` twin of the same artefact, which makes the naming an
-explicit A/B:
+That is **3.07.1** (``rel-3-07-01``, 2024-06-20) -- not because 3.08 lacks the
+writer, but because 3.08 does not publish a usable artefact set: it ships no
+Linux portable archive at all, both its Linux ``.deb`` payloads demand
+``GLIBC_2.38``, and its only macOS artefact is **arm64 with a macOS 15.0
+floor**, reaching fewer Macs than 3.07.1's x86-64 build under Rosetta 2. 3.09
+genuinely cannot write pout XML -- verified by execution, ``-X`` rejected with
+exit 1 -- so the ceiling for a Limelight-enabled run is 3.08.x and the choice
+within it is 3.07.1.
 
-.. list-table:: Published Percolator artefacts relevant to the Limelight path
+.. list-table:: Published Percolator artefacts, and which can write pout XML
    :header-rows: 1
-   :widths: 14 30 28 28
+   :widths: 12 30 29 29
 
    * - Release
      - Linux x86-64
      - Windows x64
      - macOS
    * - ``rel-3-09``
-     - ``.deb``, ``.rpm`` -- no XML
-     - ``percolator.exe`` -- no XML
-     - ``percolator-osx-portable.zip`` -- no XML
+     - ``.deb``, ``.rpm`` -- **no writer**
+     - ``percolator.exe`` -- **no writer**
+     - ``percolator-osx-portable.zip`` -- **no writer**, arm64, minos 15.0
    * - ``rel-3-08-01``
      - **no release published** (tag only)
      - **no release published**
      - **no release published**
    * - ``rel-3-08``
-     - ``percolator-v3-08-linux-amd64.deb`` -- **XML**; needs glibc >= 2.38
-     - ``percolator-noxml-windows-portable.zip`` -- **no XML build published**
-     - ``percolator-noxml-osx-portable.zip`` -- **no XML build published**
+     - **no portable archive**; two ``.deb`` files, both ``GLIBC_2.38``
+     - ``percolator-noxml-windows-portable.zip`` -- writer present
+     - ``percolator-noxml-osx-portable.zip`` -- writer present, **arm64**,
+       minos 15.0
    * - ``rel-3-07-01``
-     - ``percolator-v3-07-linux-amd64.deb`` -- XML
-     - ``percolator-v3-07.exe`` -- XML, installer
-     - ``percolator-v3-07-osx-x86_64.pkg`` -- XML, installer, x86-64 only
+     - ``percolator-noxml-ubuntu-portable.zip`` -- writer present,
+       ``GLIBC_2.34``, **executed**
+     - ``percolator-noxml-windows-portable.zip`` -- writer present, PE32+
+       x86-64
+     - ``percolator-noxml-osx-portable.zip`` -- writer present, Mach-O
+       **x86-64**, minos 12.7
    * - ``rel-3-06-05``
-     - ``.deb``/``.rpm`` -- XML
-     - ``percolator-v3-06.exe`` -- XML, installer
-     - ``percolator-v3-06-osx-x86_64.pkg`` -- XML, installer, x86-64 only
+     - ``percolator-noxml-linux-portable.zip`` -- writer present,
+       ``GLIBC_2.14`` (the lowest floor found anywhere)
+     - ``percolator-noxml-windows-portable.zip`` -- writer present
+     - ``percolator-noxml-osx-portable.zip`` -- writer present, x86-64
+
+Every ``.deb``, ``.rpm``, ``.pkg`` and NSIS ``.exe`` in 3.05--3.08 also carries
+the writer, in both twins. They are not needed for the writer; two of them are
+needed for the XSDs, below.
 
 Consequences that the implementation must respect:
 
-* Every portable archive upstream publishes is a ``noxml`` build. "Portable"
-  and "XML-capable" have not coexisted in a Percolator release since at least
-  3.06, so the XML-capable artefacts are all operating-system *packages*
-  (``.deb``, ``.rpm``, ``.pkg``, NSIS ``.exe``) intended for administrative
-  installation. **The installer must extract their payloads rather than run
-  them**, which has been verified feasible without root for the ``.deb`` (an
-  ``ar`` archive containing ``data.tar.gz``) and for the ``.pkg`` (a ``xar!``
-  archive whose payload is gzip-compressed ``070707`` cpio). The Windows
-  artefact is an NSIS installer; it supports silent extraction, and Phase 00
-  must establish the mechanism the product will use.
-* 3.07.1 is markedly *more* portable than 3.08.0, not less: its Linux binary's
-  highest required symbol version is ``GLIBC_2.34``, so it runs on RHEL 9,
-  Ubuntu 22.04 and Debian 12, where the 3.08.0 build's ``GLIBC_2.38``
-  requirement fails at the dynamic loader.
-* The macOS artefact is **x86-64 only**. On Apple silicon the Percolator stage
-  runs under Rosetta 2, which the application must detect and explain
-  (``D-004``).
-* The XML builds ship XSD companion files --
+* **The product obtains Percolator from the portable ``noxml`` archives**
+  (``D-002`` option C, decided 2026-08-29). A portable zip needs no
+  administrative rights, no installer execution and no payload extraction on
+  any platform. Phase 05 therefore implements ``ZIP`` extraction and does
+  **not** implement ``NSIS_PAYLOAD`` or ``PKG_PAYLOAD``. The ``.deb``, ``.pkg``
+  and NSIS extractors written in phase 00 are retained as feasibility evidence
+  and for the XSD problem below, not as product code.
+* **No portable archive ships an XSD.** Every portable zip upstream publishes,
+  3.06.5 through 3.09 and on all three platforms, contains exactly one member:
+  the bare executable. ``R-TOOL-02`` requires the XSD companions to be
+  installed with the binary, so they must come from the matching ``noxml``
+  ``.deb`` or ``.pkg`` -- both of which do ship
   ``share/xml/percolator/xml-pout-1-5/percolator_out.xsd`` and
-  ``xml-pin-1-3/percolator_in.xsd`` -- which must be installed with the binary
-  (``R-TOOL-02``).
+  ``xml-pin-1-3/percolator_in.xsd``. This is a second, small download per
+  platform, using the extraction code phase 00 already proved; it is not a
+  reason to reinstate package-payload installs. Vendoring the two XSDs in the
+  repository instead is a redistribution question and would need an owner
+  decision, which has not been taken.
+* **The Windows portable zip is the bare executable and needs a Visual C++
+  runtime.** ``percolator.exe`` imports ``MSVCP140.dll``,
+  ``VCRUNTIME140.dll``, ``VCRUNTIME140_1.dll`` and ``VCOMP140.DLL``; the NSIS
+  installer ships nine such DLLs beside it and the zip ships none. The product
+  must satisfy this dependency explicitly -- the Windows registry entry
+  declares the runtime as a companion requirement, the loadability probe
+  (``R-PLAT-03``) must report a missing runtime as a *loader* failure with the
+  named DLL rather than as "not capable", and the manifest must not offer the
+  Windows artefact as installable until that path is settled. The 3.07.1 NSIS
+  installer's ``percolator.exe`` is byte-identical to the portable zip's
+  (sha256 ``b9d9bbe82bc4...f059f``, 707072 bytes), so extracting the DLLs from
+  it remains available as the fallback.
+* 3.07.1 is markedly *more* portable than 3.08.0, not less: its Linux binary's
+  highest required symbol version is ``GLIBC_2.34`` in both the portable
+  archive and the ``.deb``, so it runs on RHEL 9, Ubuntu 22.04 and Debian 12,
+  where the 3.08.0 build's ``GLIBC_2.38`` requirement fails at the dynamic
+  loader.
+* The macOS 3.07.1 artefact is **x86-64 only**. On Apple silicon the Percolator
+  stage runs under Rosetta 2, which the application must detect and explain
+  (``D-004``). Moving to 3.08 does not avoid this: its macOS build is arm64
+  with a macOS 15.0 floor, which trades a Rosetta dependency for a narrower
+  hardware and OS reach.
+* **Capability is probed, never read from this table.** No Windows or macOS
+  Percolator binary has been executed anywhere in this project; every non-Linux
+  row above is a byte-marker inference and the manifest must say so. The rows
+  are a statement of what upstream publishes, not a grant of capability.
 * 3.07.1 predates 3.08's change of default PEP regressor to I-splines and
   predates the fix for PEP values exceeding 1.0 (#394, fixed in 3.08.1 and
   3.09). These are version advisories to carry in the registry
@@ -728,6 +807,18 @@ Consequences that the implementation must respect:
     stage. A version number shall never appear in code as a default;
     ``3.07.1`` appears in this document only as the value that resolution
     returns today, for a run with Limelight enabled.
+
+    **The capability set shall be established functionally.** The ``noxml`` and
+    ``XML_SUPPORT=ON`` builds print identical ``--help``, both listing ``-X``
+    and ``-Z``, so a text probe cannot discriminate and shall not be used. The
+    ``XML_OUTPUT`` capability is proved by running the binary over a small
+    synthetic PIN with ``-X`` and requiring the file to exist, to carry the
+    ``percolator_out/15`` namespace and to contain the expected ``<psm>``
+    count. The fixture shall be large enough that a capable binary does not
+    abort on "median decoy score <= score at 1% FDR" -- 64 target and 64 decoy
+    rows is proven sufficient, 8 and 8 is not, and an over-small fixture makes
+    the probe report a false negative. A binary that fails to load is reported
+    as a loader failure (``R-PLAT-03``), never as "not capable".
 
     The rule is evaluated against the enabled stages, so it has more than one
     answer at a time. With Limelight disabled, the newest verified Percolator
@@ -757,16 +848,24 @@ Consequences that the implementation must respect:
     conversion on a supported platform), rather than being silently absent or
     failing at conversion time.
 
-``D-002`` is resolved: the project does not build Percolator, and takes
-3.07.1's published artefacts. What remains is engineering, recorded here so no
-phase rediscovers it:
+``D-002`` is resolved in two steps. The owner ruled out source builds and
+required published binaries on all three tier-1 platforms (2026-08-29), which
+selects 3.07.1; the owner then took **option C** (2026-08-29), acting on phase
+00's finding that the pout-XML writer is present in every 3.05--3.08 artefact,
+which selects the *portable* form of those binaries. What remains is
+engineering, recorded here so no phase rediscovers it:
 
-#. Extract package payloads rather than running installers -- ``ar`` +
-   ``data.tar.gz`` for the ``.deb``, ``xar!`` + gzip + ``070707`` cpio for the
-   ``.pkg``, and the mechanism Phase 00 establishes for the NSIS ``.exe``.
-#. Install the XSD companion files alongside the binary.
+#. Install Percolator from the platform's ``noxml`` **portable zip**. Do not
+   run installers and do not extract package payloads for the binary.
+#. Obtain the two XSD companion files from the matching ``noxml`` ``.deb``
+   (Linux) or ``.pkg`` (macOS) -- no portable archive ships them -- and install
+   them atomically with the binary (``R-TOOL-02``).
+#. Satisfy the Windows Visual C++ runtime dependency the portable zip does not
+   carry, and report its absence as a loader failure naming the DLL.
 #. Detect and explain Rosetta 2 on Apple silicon.
 #. Carry 3.07.1's advisories in the registry.
+#. Probe capability functionally on the host after install. Never infer it from
+   an artefact name, a file size, a byte marker or ``--help`` text.
 
 If a future Percolator release restores XML output, or the Limelight converter
 gains a tab-delimited input path, resolution picks the newer version up
@@ -1155,12 +1254,17 @@ minimum compatible CometGUI version.
 
 ``R-TOOL-01``
     Artefact kind shall be an explicit enumeration covering at least
-    ``BARE_EXECUTABLE`` (Comet), ``ZIP``, ``TAR_GZ``, ``JAR`` (PDV, Limelight
-    converter), ``DEB_PAYLOAD`` (``ar`` + ``data.tar.*``), ``PKG_PAYLOAD``
-    (``xar!`` + gzip + ``070707`` cpio) and ``NSIS_PAYLOAD``. The extractor for
-    each kind shall be selected from this field, never inferred from the URL
-    suffix alone. All three package kinds are required by Percolator 3.07.1,
-    one per tier-1 platform.
+    ``BARE_EXECUTABLE`` (Comet), ``ZIP`` (Percolator, all three platforms),
+    ``TAR_GZ``, ``JAR`` (PDV, Limelight converter) and ``DEB_PAYLOAD``
+    (``ar`` + ``data.tar.*``, used for the Percolator XSD companions on Linux)
+    and ``PKG_PAYLOAD`` (``xar!`` + gzip + ``070707`` cpio, the same on macOS).
+    The extractor for each kind shall be selected from this field, never
+    inferred from the URL suffix alone.
+
+    Since ``D-002`` option C the Percolator **binary** comes from a portable
+    zip on every tier-1 platform, so ``NSIS_PAYLOAD`` is **not required** and
+    shall not be implemented. ``DEB_PAYLOAD`` and ``PKG_PAYLOAD`` survive only
+    to fetch the XSD companion files, which no portable archive ships.
 
 ``R-TOOL-02``
     Companion files shall be modelled as part of the artefact record and
@@ -1170,9 +1274,16 @@ minimum compatible CometGUI version.
     ``comet.win64.exe``; a Comet install missing them shall not advertise the
     ``THERMO_RAW_WINDOWS`` capability. Percolator's XML builds ship
     ``share/xml/percolator/xml-pout-1-5/percolator_out.xsd`` and
-    ``xml-pin-1-3/percolator_in.xsd``; an install missing them shall not
-    advertise ``XML_OUTPUT`` until a probe proves XML output works without
-    them.
+    ``xml-pin-1-3/percolator_in.xsd`` -- but **the portable archive the product
+    installs the binary from ships neither**, so they are a separately sourced
+    companion pair taken from the matching ``noxml`` ``.deb`` or ``.pkg``. An
+    install missing them shall not advertise ``XML_OUTPUT`` until a probe
+    proves XML output works without them; phase 00 established by execution
+    that it does, so the XSDs are a provenance and validation asset rather than
+    a runtime prerequisite, and that distinction shall be recorded in the
+    registry rather than left implicit. Note also that the shipped
+    ``percolator_out.xsd`` fixes ``majorVersion`` at ``2`` while the 3.07.1
+    binary writes ``3``: it cannot be used unmodified as a validation gate.
 
 ``R-TOOL-03``
     Manifest records shall carry ``minimumHostRequirements`` (for example a
@@ -3167,9 +3278,16 @@ controlled local fake endpoint, a sandbox instance, or both.
 ``D-008`` CometGUI's own licence and distribution
 --------------------------------------------------
 
-The product's licence, its publication location, and whether project-built tool
-binaries are redistributed alongside it. Constrained by ``D-001`` and
-``D-002``.
+Two thirds decided. The **licence is GPL-3.0** (2026-08-29, with ``D-001``).
+Managed tool binaries are **downloaded from upstream by pinned URL and
+SHA-256, not redistributed** with CometGUI (2026-08-29): the release artefacts
+therefore carry no Comet, Percolator, PDV or converter binary, Apache-2.0 s4
+notice obligations do not attach to them, and ``R-TEST-08``'s job -- failing
+loudly when an upstream artefact disappears or changes checksum -- becomes
+load-bearing rather than advisory, because an upstream deletion breaks
+installation for every new user. **Still open:** where CometGUI is published,
+which the GPL-3.0 source-availability obligation depends on. There is no git
+remote and none may be created until that is answered.
 
 Comet parameter completeness
 ----------------------------

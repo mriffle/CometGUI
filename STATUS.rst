@@ -4,10 +4,12 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-08-29
-:Updated by: Main orchestrator (Phase 00 signed off; D-001 decided, D-008 part-decided)
-:Current phase: 00 -- PARTIAL, signed off; 01 ready and no longer licence-blocked
-:Overall: Feasibility established. No product code exists yet, by design --
-   Phase 00 writes none. Phase 01 is ready to start.
+:Updated by: Main orchestrator, session 02 (D-002 option C and the D-008 tool
+   distribution half decided; Phase 01 dispatched)
+:Current phase: 01 -- IN PROGRESS. Phase 00 is PARTIAL, signed off.
+:Overall: Feasibility established and the artefact strategy settled. No product
+   code exists yet, by design -- Phase 00 writes none. Phase 01 is running and
+   creates the build skeleton.
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -19,8 +21,24 @@ Where we are
 Phase 00 ran and was signed off **PARTIAL** on 2026-08-29. The scientific path
 is proven end to end, the toolchain is installed and packaging works, and the
 upstream facts were re-verified live -- one of them changed *during* the phase.
-The residue is small and precisely named (see :ref:`status-p00`). Nothing that
-Phase 01 needs is blocked.
+The residue is small and precisely named (see :ref:`status-p00`).
+
+On 2026-08-29 the owner then took the two decisions Phase 00 had costed and
+left open, and both change what later phases build. **``D-002`` option C:** the
+product installs Percolator from the portable ``noxml`` archives, so Phase 05
+never writes the NSIS or ``xar``/cpio payload extractors -- the most fragile
+code the installer was going to contain is now unwritten rather than written.
+**``D-008``, second half:** managed tool binaries are downloaded from upstream
+by pinned URL and SHA-256, never redistributed. Specification revision 7 and
+``phases/PHASE-05-tool-registry.rst`` carry the consequences.
+
+**Phase 01 is running.** It was dispatched to a fresh phase orchestrator on
+2026-08-29. One thing about it is known in advance: its gate item 6 requires
+the pull-request pipeline to run on an actual pull request, there is no remote,
+and ``D-008`` still withholds one. The owner directed that the phase run anyway
+and record that item unmet, so **Phase 01 is expected to sign off PARTIAL**.
+That is a decision taken with the evidence in hand, not a gate quietly
+lowered.
 
 What exists
 -----------
@@ -33,21 +51,25 @@ What exists
      - State
      - Notes
    * - ``specification.rst``
-     - Revision 5
-     - Revision 5 records Phase 00's verification findings, including the
-       ``noxml`` discovery, without yet rewriting the artefact strategy --
-       that is ``D-002`` option C, an owner decision. Passes
-       ``sphinx-build -n -W``.
+     - Revision 7
+     - Revision 7 acts on the ``noxml`` discovery: the artefact section is
+       rewritten around portable archives, and ``R-TOOL-01``, ``R-TOOL-02``,
+       ``R-PERC-02`` and the ``D-008`` entry are amended. Revision 6 decided
+       licensing; revision 5 recorded Phase 00's findings without acting on
+       them. Passes ``sphinx-build -n -W``.
    * - ``ONBOARDING.rst``
      - Complete
      - Read-first document for any orchestrating agent.
    * - ``phases/`` (00-16)
      - Complete
-     - Scope, deliverables and exit gate per phase. None started.
+     - Scope, deliverables and exit gate per phase. 00 signed off PARTIAL,
+       01 running, 05 re-scoped by ``D-002`` option C.
    * - ``DECISIONS.rst``
-     - 6 open, 2 decided
-     - ``D-002`` and ``D-004`` decided. ``D-001`` changed materially on
-       2026-08-29 and is now coupled to ``D-008``.
+     - 4 open, 3 decided, 1 part decided
+     - ``D-001``, ``D-002`` (including option C) and ``D-004`` decided.
+       ``D-008`` is decided on licence and on tool distribution; only the
+       publication location remains. ``D-003``, ``D-005``, ``D-006`` and
+       ``D-007`` are open.
    * - ``handoffs/``
      - Phase 00 present
      - ``PHASE-00-worklog.rst`` (10 units, each with a sign-off entry) and
@@ -89,8 +111,9 @@ Phase board
        See :ref:`status-p00`.
    * - 01
      - Repository, build and quality skeleton
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-08-29 to a fresh phase orchestrator. Gate item 6 is
+       unmeetable without a remote (``D-008``); expected outcome PARTIAL.
    * - 02
      - Application shell and navigation
      - NOT STARTED
@@ -292,12 +315,13 @@ accordingly.
 Open decisions
 ==============
 
-``D-001``, ``D-002`` and ``D-004`` are decided; ``D-008`` is half decided.
-Phase 00 supplied evidence and costed options for every item; **none was
-answered by an agent.** On 2026-08-29 the owner decided the licensing question:
-**CometGUI is GPL-3.0**, derived from CasanovoGUI, and **PDV is to be treated
-as GPL-3.0**. Four items remain open: ``D-003``, ``D-005``, ``D-006``,
-``D-007``, plus the publication half of ``D-008``.
+Four items are open -- ``D-003``, ``D-005``, ``D-006``, ``D-007`` -- plus the
+publication half of ``D-008``. Everything else is decided. **No ``D-`` item has
+ever been answered by an agent**, and none may be.
+
+On 2026-08-29 the owner answered three questions this session put to them:
+``D-002`` **option C**, the ``D-008`` **tool-distribution** half, and the
+direction that **Phase 01 runs without a remote and accepts PARTIAL**.
 
 .. list-table::
    :header-rows: 1
@@ -312,13 +336,16 @@ as GPL-3.0**. Four items remain open: ``D-003``, ``D-005``, ``D-006``,
        no-copying constraint is lifted.
      - --
    * - ``D-002``
-     - **DECIDED**: no source builds; use 3.07.1, the newest release with
-       XML-capable binaries on all three platforms.
+     - **DECIDED, including option C**: no source builds; 3.07.1; and the
+       binary comes from the **portable ``noxml`` archive** on every tier-1
+       platform, because the pout-XML writer is in every 3.05-3.08 artefact.
+       Phase 05 does not implement NSIS or ``xar``/cpio payload extraction.
      - --
    * - ``D-003``
-     - **Widened** by the ``noxml`` finding: every ``noxml`` artefact 3.05-3.08
-       may be a Limelight candidate, and 3.06.5 has the lowest glibc floor
-       found (``GLIBC_2.14``).
+     - Which *additional* Percolator versions to carry beyond 3.07.1, for
+       users who do not need Limelight. Widened by the ``noxml`` finding:
+       3.06.5's portable Linux archive has the lowest glibc floor found
+       anywhere (``GLIBC_2.14``) and would reach hosts 3.07.1 cannot.
      - 05, 09, 15
    * - ``D-004``
      - **DECIDED**: Percolator runs under Rosetta 2 on Apple silicon.
@@ -328,43 +355,45 @@ as GPL-3.0**. Four items remain open: ``D-003``, ``D-005``, ``D-006``,
      - 11
    * - ``D-006``
      - Which fixture data, under which licence?
-     - 00, 14, 16
+     - 14, 16
    * - ``D-007``
      - Which Limelight endpoint do tests target?
      - 12, 14
    * - ``D-008``
-     - **PART DECIDED**: the licence is **GPL-3.0**, so Phase 01 is unblocked.
-       Still open: where CometGUI is published (**still no remote -- do not
-       create one**) and whether tool binaries are redistributed or downloaded.
-     - 16; and gate item 8 of phase 00, whose cheapest fix needs a remote
+     - **DECIDED** on two of three: the licence is **GPL-3.0**, and tool
+       binaries are **downloaded from upstream by pinned URL and SHA-256,
+       never redistributed**. **Still open: where CometGUI is published.
+       There is still no remote and none may be created.**
+     - 16; phase 00 gate item 8; phase 01 gate item 6
 
 Risks currently live
 ====================
 
-#. **Percolator 3.07.1 is the product's XML-capable default** -- resolved
-   2026-08-29 (``D-002``). The owner ruled out source builds and required
-   published binaries on all three tier-1 platforms; 3.07.1
-   (``rel-3-07-01``, 2024-06-20) is the newest release meeting both. The Linux
-   build was extracted and executed here (``-X/--xmloutput`` present, needs
-   only ``GLIBC_2.34``); the macOS payload was extracted and inspected
-   (Mach-O binary plus the XSDs, x86-64 only). **The Windows artefact's XML
-   capability is inferred, not verified** -- Phase 00 must confirm it on a
-   Windows runner before the manifest claims it. Residual risk is now
-   engineering, not strategy: payload extraction for ``.deb``, ``.pkg`` and
-   NSIS; XSD companion installation; Rosetta 2 on Apple silicon (``D-004``).
-   The accepted trade is that 3.07.1 predates 3.08's I-spline PEP default and
-   the PEP-greater-than-1.0 fix, carried as advisories (``R-PERC-11``).
-#. **The ``noxml`` Percolator builds emit XML.** Verified by execution
-   2026-08-29 and re-verified at sign-off: the 3.07.1 Linux ``noxml`` binary
-   given ``-X`` writes a ``percolator_out/15`` document differing from the
-   XML-capable build's in two lines, both inside ``<command_line>``.
-   ``XML_SUPPORT`` gates the pin-XML *input* path, which the product never
-   uses. Two consequences. First, the NSIS and ``xar``/cpio extraction paths
-   may be unnecessary -- ``D-002`` option C, an owner decision, so nothing has
-   been re-scoped. Second, and not optional: **a capability probe that greps
-   ``--help`` for ``-X`` is invalid**, because the twins' help text is
-   identical. ``R-PERC-02`` needs a functional probe, and
-   ``scripts/feasibility/probe_xml_capability.py`` is currently wrong.
+#. **Percolator 3.07.1 is the product's default, installed from the portable
+   ``noxml`` archive** -- resolved 2026-08-29 (``D-002``, including option C).
+   The owner ruled out source builds and required published binaries on all
+   three tier-1 platforms; 3.07.1 (``rel-3-07-01``, 2024-06-20) is the newest
+   release meeting both. What changed on 2026-08-29 is *which artefact*: the
+   pout-XML writer is present in every published 3.05-3.08 build, both twins,
+   all three platforms, so the product takes the portable zip and Phase 05
+   never writes the NSIS or ``xar``/cpio extractors. Residual risk is now two
+   named, bounded engineering items rather than a strategy question: **no
+   portable archive ships the XSD companions** (fetch them from the matching
+   ``noxml`` ``.deb`` or ``.pkg``), and **the Windows portable zip is the bare
+   ``percolator.exe``** and needs a Visual C++ runtime the NSIS installer ships
+   and the zip does not. The accepted trade is unchanged: 3.07.1 predates
+   3.08's I-spline PEP default and the PEP-greater-than-1.0 fix, carried as
+   advisories (``R-PERC-11``).
+
+#. **A capability probe that greps ``--help`` is invalid, and this is not
+   optional.** The XML and ``noxml`` twins print identical help text, both
+   listing ``-X`` and ``-Z``. ``R-PERC-02`` needs a **functional** probe: run
+   the binary over a synthetic PIN of at least 64 target and 64 decoy rows and
+   inspect the file it writes. A smaller fixture makes a fully capable binary
+   abort on "median decoy score <= score at 1% FDR" and produces a false
+   negative. ``scripts/feasibility/probe_xml_capability.py`` is wrong for
+   exactly this reason -- it reports "NOT XML-capable" for a binary whose XML
+   the Limelight converter consumed -- and must not be copied into the product.
 
 #. **Licensing is settled and is no longer a risk.** CasanovoGUI published
    GPL-3.0 mid-phase; the owner decided on 2026-08-29 that CometGUI is
@@ -408,30 +437,34 @@ Risks currently live
 Next action
 ===========
 
-**Run Phase 01** (``phases/PHASE-01-build-skeleton.rst``). It is ready and no
-longer blocked in any part: its only dependency, Phase 00, is signed off; the
-toolchain it needs is installed and provenanced; and its ``LICENSE`` file is
-now determined -- the full, unmodified GNU General Public License version 3
-text at the repository root. Phase 01 must place the real GPLv3 text, not a
-paraphrase or a summary.
+**Phase 01 is running** (``phases/PHASE-01-build-skeleton.rst``), dispatched
+2026-08-29 to a fresh phase orchestrator. When it reports, the main
+orchestrator re-runs every gate item itself before signing it off -- the
+phase's report is a claim, not evidence. Expect ``PARTIAL``: gate item 6 needs
+a pull request and there is no remote.
 
-For the owner, in priority order
---------------------------------
+After Phase 01 signs off, **02 (application shell) is the only phase whose
+dependencies are met**. 03 depends on 01 and 02; 04 on 01 and 03. Phase 02 now
+carries a real obligation from ``D-001``: any file derived from CasanovoGUI
+retains its copyright notices and records the derivation.
 
-#. **``D-002`` option C -- act on the ``noxml`` finding, or not.** If the
-   portable ``noxml`` archives can feed Limelight, Phase 05 need not implement
-   NSIS or ``xar``/cpio extraction at all. Deciding before Phase 05 starts
-   saves building the most fragile code in the installer; deciding after wastes
-   it. **This is now the only decision with a deadline.**
-#. **The publication half of ``D-008``.** Where CometGUI is published, and
-   whether tool binaries are redistributed or downloaded from upstream. The
-   remote question is what keeps Phase 00's gate item 8 open: a free GitHub
-   Actions ``windows-latest`` runner would close it permanently and re-run on
-   every change.
+For the owner, one item
+------------------------
 
-*Answered on 2026-08-29:* ``D-001`` and the licence half of ``D-008`` --
-CometGUI is GPL-3.0, derived from CasanovoGUI, with PDV treated as GPL-3.0.
-Neither open item blocks starting Phase 01.
+**The publication half of ``D-008``: where CometGUI is published.** It is the
+last open part of that decision and the only one with a compounding cost. It
+gates the GPL-3.0 source-availability mechanism (phase 16), and it is what
+holds two gate items open -- Phase 00's item 8 (no Windows execution anywhere
+in this project) and Phase 01's item 6 (no pull-request pipeline run). A free
+GitHub Actions ``windows-latest`` runner would close both permanently and
+re-verify them on every change. Until it is answered there is **no git remote
+and none may be created**.
+
+*Answered on 2026-08-29:* ``D-001`` (GPL-3.0, derived from CasanovoGUI, PDV
+treated as GPL-3.0); ``D-002`` option C (portable ``noxml`` archives; Phase 05
+re-scoped); the ``D-008`` tool-distribution half (downloaded from upstream, not
+redistributed); and the direction that Phase 01 runs without a remote and
+accepts ``PARTIAL``.
 
 Change log
 ==========
@@ -443,6 +476,30 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-08-29
+     - 01
+     - **Session 02 opened. Two owner decisions taken, then Phase 01
+       dispatched.** ``D-002`` **option C**: the product installs Percolator
+       from the portable ``noxml`` archives on all three tier-1 platforms,
+       because Phase 00 proved the pout-XML writer is present in every
+       published 3.05-3.08 artefact and that ``XML_SUPPORT`` gates only the
+       pin-XML reader the product never uses. Phase 05 therefore does **not**
+       implement ``NSIS_PAYLOAD`` or ``.pkg`` extraction for the binary -- the
+       most fragile code the installer was going to contain is unwritten rather
+       than written. Two costs replace it and are recorded rather than left to
+       be discovered: no portable archive ships the XSD companions, which must
+       come from the matching ``noxml`` ``.deb`` or ``.pkg``; and the Windows
+       portable zip is the bare ``percolator.exe``, needing a Visual C++
+       runtime the NSIS installer ships and the zip does not, whose absence
+       must be reported as a loader failure and never as "not XML-capable".
+       ``D-008`` **second half**: managed tool binaries are **downloaded from
+       upstream by pinned URL and SHA-256, never redistributed**, which keeps
+       Apache-2.0 s4 obligations off the release artefacts and makes
+       ``R-TEST-08``'s manifest job load-bearing. The owner also directed that
+       **Phase 01 run without a remote and accept ``PARTIAL``** on gate item 6.
+       Specification amended to revision 7; ``DECISIONS.rst``,
+       ``phases/index.rst`` and ``phases/PHASE-05-tool-registry.rst`` updated.
+       Phase 01 dispatched to a fresh phase orchestrator.
    * - 2026-08-28
      - --
      - Specification received (revision 1) and committed as the baseline.

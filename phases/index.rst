@@ -23,8 +23,9 @@ authoritative for its own scope and exit gate.
    * - `01 <PHASE-01-build-skeleton.rst>`_
      - Repository, Build and Quality Skeleton
      - 00 (met)
-     - none outstanding -- the LICENSE file is GPL-3.0 (``D-001``, ``D-008``)
-     - READY -- next, unblocked
+     - LICENSE is GPL-3.0 (``D-001``). Gate item 6 needs a remote, which
+       ``D-008`` still withholds -- run anyway and accept PARTIAL
+     - IN PROGRESS
    * - `02 <PHASE-02-app-shell.rst>`_
      - Application Shell and Navigation
      - 01
@@ -43,7 +44,7 @@ authoritative for its own scope and exit gate.
    * - `05 <PHASE-05-tool-registry.rst>`_
      - Tool Registry and Installer
      - 01, 03, 04
-     - D-002, D-003, D-004
+     - D-003 only. D-002 (option C) and D-004 DECIDED -- phase re-scoped
      - NOT STARTED
    * - `06 <PHASE-06-comet-param-model.rst>`_
      - Comet Parameter Model
@@ -63,7 +64,7 @@ authoritative for its own scope and exit gate.
    * - `09 <PHASE-09-percolator.rst>`_
      - Percolator Adapter and Version Capabilities
      - 05, 08
-     - D-002, D-003
+     - D-003 only; D-002 DECIDED (option C)
      - NOT STARTED
    * - `10 <PHASE-10-results.rst>`_
      - Results Model and UI
@@ -78,7 +79,7 @@ authoritative for its own scope and exit gate.
    * - `12 <PHASE-12-limelight.rst>`_
      - Limelight Conversion and Upload
      - 09, 10
-     - D-002, D-007
+     - D-007 only; D-002 DECIDED (option C)
      - NOT STARTED
    * - `13 <PHASE-13-provenance-ui.rst>`_
      - Provenance UI and Reports
@@ -93,7 +94,7 @@ authoritative for its own scope and exit gate.
    * - `15 <PHASE-15-hardening.rst>`_
      - Version Matrix, Performance and Hardening
      - 14
-     - D-002, D-003
+     - D-003 only; D-002 DECIDED (option C)
      - NOT STARTED
    * - `16 <PHASE-16-release.rst>`_
      - Documentation and Release Qualification
@@ -121,8 +122,8 @@ schedule. Where dependencies allow, phases may overlap:
 Phase 00's residue, for the phases that inherit it
 ==================================================
 
-Phase 00 was signed off ``PARTIAL``. Three items travel forward; none blocks
-Phase 01.
+Phase 00 was signed off ``PARTIAL``. Four items travel forward. None stops
+Phase 01 from running, but the fourth caps the grade it can reach.
 
 * **No Windows or macOS binary has ever been executed.** Every non-Linux
   capability verdict in the project is inference from byte markers. Phases 05,
@@ -130,13 +131,24 @@ Phase 01.
   read from a table. Closing this needs either a remote for Windows CI
   (``D-008``) or fifteen minutes from a person with a Windows machine, using
   the checklist in ``docs/feasibility/windows-artefact.rst``.
-* **The ``noxml`` finding may re-scope Phase 05.** If the portable ``noxml``
-  archives can feed Limelight, the NSIS and ``xar``/cpio payload extractors
-  Phase 05 was going to build are unnecessary. This is ``D-002`` option C and
-  is an owner decision; it is cheapest to answer *before* Phase 05 starts.
+* **The ``noxml`` finding re-scoped Phase 05 -- settled 2026-08-29.** The owner
+  took ``D-002`` **option C**: Percolator's binary comes from the portable
+  ``noxml`` zip on every tier-1 platform, and the NSIS and ``xar``/cpio payload
+  extractors Phase 05 was going to build are **not built**. Two costs replaced
+  them and are now in Phase 05's scope: the XSD companions must be fetched
+  separately, because no portable archive ships them, and the Windows portable
+  zip needs a Visual C++ runtime it does not carry. Specification revision 7
+  and ``phases/PHASE-05-tool-registry.rst`` carry the detail.
 * **The capability probe must be functional, not textual.** ``--help`` is
   identical between the XML and ``noxml`` builds, so ``R-PERC-02`` cannot be
-  satisfied by string matching. Phase 09 owns this.
+  satisfied by string matching. Phase 09 owns the rule; Phase 05 owns the
+  post-install probe that first applies it.
+* **There is no git remote, and ``D-008`` still withholds one.** That leaves
+  Phase 00's gate item 8 open and makes Phase 01's gate item 6 -- the
+  pull-request pipeline running on an actual pull request -- unmeetable. The
+  owner directed on 2026-08-29 that Phase 01 run anyway, prove every pipeline
+  step locally, and record item 6 unmet. Both items close the day a publication
+  location is decided.
 
 Phases 00-13 with their gates passed constitute a working,
 provenance-complete application. Phases 14-16 are what make it a release.
