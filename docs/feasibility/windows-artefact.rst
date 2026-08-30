@@ -790,7 +790,10 @@ Windows machine, ideally from a standard user account:
    ``a9860e02a7e78b9bc069438e6564eb20e90bb46244aa628d567e4b69fe1ea348``
    (``certutil -hashfile percolator-v3-07.exe SHA256``).
 #. **Do not run it.** Extract the payload instead. The extractor in this
-   repository is pure Python and runs on Windows unchanged::
+   repository is pure Python and needs nothing installed. Its path handling
+   was audited against Win32 semantics on 2026-08-30 and hardened where the
+   two platforms disagreed; ``--self-test`` checks that safety net under both
+   POSIX and Windows semantics. It has still never been executed on Windows::
 
        python scripts\feasibility\extract_nsis.py percolator-v3-07.exe -o out
 
@@ -956,8 +959,10 @@ The pieces are usable on their own:
    * - Script
      - What it does
    * - ``scripts/feasibility/extract_nsis.py``
-     - Extracts any NSIS installer's payload. Standard library only; runs on
-       Windows and macOS unchanged. ``--list`` inspects without writing.
+     - Extracts any NSIS installer's payload. Standard library only. Its
+       path safety net is checked against both POSIX and Win32 semantics by
+       ``--self-test``; it has not been executed on Windows or macOS.
+       ``--list`` inspects without writing.
    * - ``scripts/feasibility/pe_info.py``
      - Reports PE header, sections and import table. ``--imports`` lists the
        imported symbols.
