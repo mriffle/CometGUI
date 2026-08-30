@@ -264,8 +264,10 @@ WHAT IT DOES NOT COVER.  Exit gate item 1 -- "a clean checkout builds and tests
 green with one documented command" -- is bash scripts/build.sh, and is not
 repeated here; the quality control proves only the half of item 1 that consists
 of gates failing the build.  The "on a pull request" half of exit gate item 6
-needs a git remote, which D-008 withholds; the pipeline control proves every
-step locally instead and says so.
+needs GitHub to run the pipeline, and GitHub has never run anything in this
+repository -- 0 workflow runs as of 2026-08-30, on a remote that has existed
+since D-008 was decided that day.  The pipeline control proves every step on
+this machine instead, and says so.
 USAGE
 }
 
@@ -492,8 +494,9 @@ main() {
     printf '  Item 1 is covered only in part: these controls prove that the gates which\n'
     printf '  FAIL the build still bite. That a clean checkout BUILDS green is\n'
     printf '  bash scripts/build.sh, and is not repeated here.\n'
-    printf '  The "on a pull request" half of item 6 needs a git remote, which D-008\n'
-    printf '  withholds; the pipeline control proves every step on this machine instead.\n'
+    printf '  The "on a pull request" half of item 6 needs GitHub to run the pipeline,\n'
+    printf '  and GitHub has run nothing in this repository yet; the pipeline control\n'
+    printf '  proves every step on this machine instead.\n'
 
     printf '\n  %d control(s) passed, %d failed, in %d seconds (%dm%02ds).\n' \
         "${PASSED}" "${FAILED}" "${total}" "$((total / 60))" "$((total % 60))"
