@@ -112,6 +112,7 @@ class ShellViewTest {
                     () -> assertNotNull(pane, "no pane with id " + UiIds.sectionPane(section)),
                     () -> assertSame(shell.paneFor(section), pane),
                     () -> assertInstanceOf(SectionPane.class, pane),
+                    () -> assertEquals(section, ((SectionPane) pane).section()),
                     () ->
                             assertNotNull(
                                     entry, "no entry with id " + UiIds.navigationEntry(section)),
