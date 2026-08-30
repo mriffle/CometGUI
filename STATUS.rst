@@ -73,10 +73,10 @@ What exists
      - Scope, deliverables and exit gate per phase. 00 and 01 signed off
        PARTIAL, 05 re-scoped by ``D-002`` option C.
    * - ``DECISIONS.rst``
-     - 3 open, 4 decided, 2 partial/provisional
+     - 2 open, 5 decided, 2 partial/provisional
      - ``D-001``, ``D-002`` (including option C), ``D-004`` and ``D-008``
-       (all three parts) decided; ``D-009`` provisional and ``D-006`` partly
-       decided. ``D-003``, ``D-005`` and ``D-007`` remain open.
+       (all three parts) and ``D-007`` decided; ``D-009`` provisional and
+       ``D-006`` partly decided. ``D-003`` and ``D-005`` remain open.
    * - ``handoffs/``
      - Phase 00 present
      - ``PHASE-00-worklog.rst`` (10 units, each with a sign-off entry) and
@@ -501,8 +501,8 @@ new ``package-info.java``.
 Open decisions
 ==============
 
-Three items are open: ``D-003``, ``D-005`` and ``D-007``. ``D-008`` is closed in
-full. ``D-009`` is answered **provisionally** -- the wording stands, the
+Two items are open: ``D-003`` and ``D-005``. ``D-007`` and ``D-008`` are closed
+in full. ``D-009`` is answered **provisionally** -- the wording stands, the
 underlying question does not -- and ``D-006`` is **partly** answered: the data
 is not redistributed and the local fixture is chosen, but the CI fixture set is
 deliberately deferred. **No ``D-`` item has
@@ -552,8 +552,13 @@ and accept PARTIAL**. On 2026-08-30 the owner answered the last of ``D-008``:
        DDA mzML set for CI**, which the owner deferred.
      - 14 (CI fixture only)
    * - ``D-007``
-     - Which Limelight endpoint do tests target?
-     - 12, 14
+     - **DECIDED (2026-08-30)**: a local fake endpoint is the default and every
+       run uses it, so the suite works offline and never depends on a third
+       party being up. It validates uploads against the converter's **real**
+       XSD, extracted from inside the JAR. A nightly sandbox slot is wired but
+       has no endpoint named; it skips with a stated reason rather than passing
+       silently. No test ever touches production.
+     - --
    * - ``D-008``
      - **DECIDED, all three parts.** GPL-3.0; tool binaries downloaded from
        upstream by pinned URL and SHA-256, never redistributed; and published
@@ -675,11 +680,18 @@ drop:
 For the owner
 --------------
 
-``D-003``, ``D-005`` and ``D-007`` are open, and each blocks a phase that has
-not started. ``D-006``'s remaining half -- the trimmed-down DDA mzML set for
-CI -- is deferred by the owner and belongs before Phase 14, not now. ``D-009`` is answered for now -- the copyright line stays
-as written -- but the institutional question behind it is deferred, not closed,
-and Phase 16 must raise it again before release.
+Two items are genuinely open, and each blocks a phase that has not started:
+``D-003`` (which additional Percolator versions to carry) and ``D-005`` (how
+deep the PDV integration goes).
+
+Two more are answered but not closed, and both are deferrals the owner made
+deliberately rather than gaps:
+
+* ``D-006``'s remaining half -- the trimmed-down DDA mzML set for CI -- belongs
+  before Phase 14. The local fixture is settled and does not substitute for it.
+* ``D-009`` -- the copyright line stays as written for now, but the
+  institutional question behind it is deferred, not closed, and Phase 16 must
+  raise it again before release, while changing it is still cheap.
 
 *Answered so far:* ``D-001`` (GPL-3.0, derived from CasanovoGUI, PDV treated as
 GPL-3.0); ``D-002`` including option C (portable ``noxml`` archives; Phase 05
@@ -697,6 +709,24 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-08-30
+     - --
+     - **``D-007`` decided: a local fake endpoint, and no test ever touches
+       production.** The owner accepted the recommendation. Every run uses a
+       local fake, so the suite works offline and never depends on a third
+       party being up. What makes it credible rather than a stub is a Phase 00
+       finding: the Limelight converter's XSD (65 905 bytes) lives **inside
+       the distributed JAR** with no standalone copy, so the fake extracts that
+       schema at build time and validates uploads against the **real** one --
+       a fake that accepted anything would test nothing. A nightly sandbox slot
+       is wired but has no endpoint named; it skips with a stated reason rather
+       than passing silently, so supplying a URL later is configuration, not
+       authorship. Two cautions Phase 12 inherits, both verified by execution:
+       the converter's **exit status is unusable** (it exits 0 with no
+       arguments and on unrecognised options), so success is judged from the
+       output file; and Percolator's own XSD rejects Percolator's own output,
+       which is the general warning that a schema must be proven to accept
+       known-good output before it is used as a gate.
    * - 2026-08-30
      - --
      - **``D-006`` partly decided: no data redistribution, and a local fixture

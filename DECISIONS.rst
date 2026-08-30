@@ -2,7 +2,7 @@
 Decisions
 =========
 
-:Updated: 2026-08-30 (D-008 fully decided; D-006 and D-009 partly decided)
+:Updated: 2026-08-30 (D-006, D-007, D-008, D-009 answered)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -575,28 +575,51 @@ fixture-fetching code must verify the checksum and fetch in binary mode.
 D-007 -- Limelight test endpoint
 ================================
 
-:Status: OPEN
+:Status: **DECIDED 2026-08-30** -- local fake is the default and is mandatory;
+   the sandbox slot exists but has no endpoint named
 :Raised: 2026-08-28
-:Blocks: Phases 12, 14
+:Blocks: nothing further. Phase 12 builds the fake; Phase 14 wires the nightly
+   slot. Pointing that slot at a real sandbox stays an owner input.
 :Owner: Project owner
+:Decided by: Project owner, 2026-08-30, accepting the main orchestrator's
+   recommendation
 
 **Question.** What do upload tests talk to?
 
-**Constraint.** No automated test uploads to a production Limelight server.
+**Constraint, unchanged and absolute.** No automated test uploads to a
+production Limelight server.
 
-**Options.** A local fake endpoint implementing the upload API; an official
-sandbox instance; or both -- the fake for every run, the sandbox nightly.
+**DECISION. A local fake endpoint is the default, and every run uses it.** The
+suite must work offline and must never depend on a third party being up. A
+**nightly sandbox run is provisioned for but not configured**: no sandbox
+instance has been named, and naming one is the owner's, not an agent's. Phase
+14 leaves the slot wired and skipping with a stated reason -- not silently
+passing -- so that supplying a URL later is configuration rather than
+authorship.
 
-**Recommendation.** Both, with the fake as the default so the suite works
-offline.
+**What makes the fake credible rather than a stub.** Phase 00 established that
+the Limelight converter's XSD (65 905 bytes) lives **inside the distributed
+JAR**, with no standalone copy in ``limelight-import-api`` or
+``limelight-core``. The fake therefore extracts that schema at build time and
+**validates what it receives against the real one**. A fake that accepts
+anything would test nothing; this one can reject a malformed upload for the
+same reason the real server would.
 
-**Phase 00, 2026-08-29.** No server was contacted. One enabling finding: the
-Limelight converter's XSD (65 905 bytes) lives **inside the distributed JAR**
-and there is no standalone copy, so a local fake endpoint can validate what it
-receives by extracting the schema from the JAR at build time. A caution for
-Phase 12: **the converter's exit status is unusable** -- it exits 0 with no
-arguments at all and exits 0 on unrecognised options. Success must be
-determined from the output file, never from the exit code.
+**Two cautions Phase 12 inherits, both verified by execution in Phase 00.**
+
+* **The converter's exit status is unusable as a success signal.** It exits 0
+  with no arguments at all, and exits 0 on an unrecognised option; it returns 1
+  only when required options are present and the files behind them are missing.
+  Judge it by its output file, never by its return code.
+* **Percolator's own ``percolator_out.xsd`` rejects Percolator's own output**
+  -- it fixes ``majorVersion`` at ``2`` while the binary writes ``3``. That is a
+  different schema from the converter's, but the lesson transfers: validate
+  against a schema only after proving the schema accepts known-good output.
+
+**If a sandbox is wanted later**, the owner supplies the URL and whatever
+credentials it needs, and the credentials never reach a log, a provenance
+record or an export (``R-SEC-``). Until then the absence is recorded rather
+than worked around.
 
 ----
 
