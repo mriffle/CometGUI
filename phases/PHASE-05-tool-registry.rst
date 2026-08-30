@@ -5,8 +5,8 @@ PHASE-05: Tool Registry and Installer
 :Phase: 05
 :Status: NOT STARTED
 :Depends on: 01, 03, 04
-:Blocked by decisions: D-003 (which *additional* versions to carry). D-002
-   and D-004 are DECIDED -- see In scope.
+:Blocked by decisions: none. D-002, D-003 and D-004 are all DECIDED --
+   see In scope.
 :Delivers: R-TOOL-01..09, R-PLAT-02, R-PLAT-03, R-PLAT-04, R-PLAT-05, R-SEC-02, R-SEC-05, R-SEC-06
 :Contributes to: R-PERC-01
 :Proves: AC-INS-01..10
@@ -44,6 +44,14 @@ In scope
   failure states and the actionable diagnostic for loader failures.
 * Managed installs for Comet, Percolator, PDV 2.7.0 and the Limelight
   converter JAR.
+* **Three managed Percolator versions** (``D-003``, decided 2026-08-30):
+  3.07.1 (default for Limelight runs), 3.09 (current, no Limelight) and
+  3.06.5 (reach -- ``GLIBC_2.14``, the lowest floor in the release history).
+  That set is what the project *attempts* to offer; ``R-PERC-01``'s
+  artefact-plus-probe test decides what each platform actually gets. **Expect
+  3.09 on Linux to be difficult or absent**: it publishes no portable archive,
+  its ``.deb`` needs ``GLIBC_2.38`` and its ``.rpm`` needs Boost libraries it
+  does not ship. Absent is honest; a fabricated manifest entry is not.
 * Percolator installed from the platform's portable ``noxml`` zip -- kind
   ``ZIP`` -- on Linux, macOS and Windows. **``NSIS_PAYLOAD`` is not
   implemented.** ``DEB_PAYLOAD`` (``ar`` + ``data.tar.gz``) and ``PKG_PAYLOAD``

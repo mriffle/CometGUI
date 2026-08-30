@@ -2,7 +2,7 @@
 Decisions
 =========
 
-:Updated: 2026-08-30 (D-005, D-006, D-007, D-008, D-009 answered)
+:Updated: 2026-08-30 (D-003 answered; no decision now open)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -348,53 +348,77 @@ selection is computed from probed capability (``R-PERC-02``).
 D-003 -- Managed Percolator version/platform coverage
 =====================================================
 
-:Status: OPEN -- narrowed by ``D-002``
+:Status: **DECIDED 2026-08-30** -- carry three versions; let the probe decide
+   each platform
 :Raised: 2026-08-28 (carried from specification revision 1)
-:Blocks: Phases 05, 09, 15
+:Blocks: nothing further; Phases 05, 09 and 15 implement it
 :Owner: Project owner
+:Decided by: Project owner, 2026-08-30, accepting the main orchestrator's
+   recommendation
 
 **Question.** Beyond 3.07.1, which Percolator version and platform pairs does
 the product offer as managed one-click installs?
 
-**Settled by ``D-002``.** 3.07.1 is offered on all three tier-1 platforms as
-the XML-capable default. That is the pair set the Limelight path needs.
+**DECISION. Three versions are carried in the manifest.**
 
-**Still open.** Which *additional* versions to carry for users who do not need
-Limelight -- 3.09 is the obvious candidate, since it is current -- and whether
-to carry any version below 3.07.1 at all. (The reason once given for 3.09,
-that "its portable archives need no payload extraction", is now both corrected
-and moot: it publishes no Linux portable archive, and since ``D-002`` option C
-*no* Percolator artefact needs payload extraction for its binary.) Adapter- and schema-level support for >= 3.05 is
-feasible; managed installation depends on a usable binary existing per pair,
-and several pairs have no published artefact.
+.. list-table::
+   :header-rows: 1
+   :widths: 14 26 60
 
-**Recommendation.** Publish the matrix explicitly in
-``docs/platform_support.rst``: for each pair, managed / local-binary-only /
-unsupported. The UI must not offer what the manifest does not contain
-(``R-PERC-01``), and CI must not test pairs the product does not offer.
+   * - Version
+     - Role
+     - Why it is carried
+   * - **3.07.1**
+     - Default for a Limelight-enabled run
+     - The newest release whose artefacts can write pout XML on all three
+       tier-1 platforms. ``GLIBC_2.34`` on Linux. Already settled by
+       ``D-002``.
+   * - **3.09**
+     - Current, for runs that do not need Limelight
+     - The newest release. It cannot write pout XML at all -- verified by
+       execution -- so it is never eligible for the Limelight path, but it is
+       the right default for rescoring and results.
+   * - **3.06.5**
+     - Reach
+     - Its ``noxml-linux-portable.zip`` requires only ``GLIBC_2.14``, the
+       lowest floor found anywhere in the release history. It reaches older
+       institutional Linux machines that 3.07.1's ``GLIBC_2.34`` excludes,
+       which matters for a tool scientists run on whatever hardware the lab
+       has.
 
-**Phase 00, 2026-08-29 -- this decision is *widened*, not narrowed.** The
-``noxml`` builds do emit pout XML, and ``D-002`` option C is now decided on
-that basis, so every ``noxml`` artefact from 3.05 to 3.08 **is** a Limelight
-candidate rather than a possible one -- and 3.06.5's
-``percolator-noxml-linux-portable.zip`` carries the lowest glibc floor found
-anywhere in the release history (``GLIBC_2.14``), which makes it the obvious
-candidate for users on older Linux distributions that 3.07.1's ``GLIBC_2.34``
-excludes. That is a widening of the matrix this decision must set, not a
-change to the default: ``R-PERC-02`` still computes the default, and 3.07.1
-still wins for a Limelight-enabled run on a current host. Two corrections to
-this entry's own text, both verified:
+**The set is an intent, not a promise per platform.** ``R-PERC-01`` already
+governs: no version/platform pair is offered as a managed install unless a
+verified artefact exists in the manifest **and** its post-install runtime probe
+has passed on that platform. The three versions above say what the project
+tries to offer; the probe says what it actually offers on the machine in front
+of the user.
 
-* **3.09 publishes no Linux portable archive at all**, and its ``.deb``/
-  ``.rpm`` need Boost shared libraries they do not ship -- the extracted 3.09
-  binary fails to load here with ``libboost_filesystem.so.1.66.0: cannot open
-  shared object file``. "Its portable archives need no payload extraction" is
-  false on Linux.
-* **3.09's macOS build is arm64-only, minimum macOS 15.0**, so it reaches
+**Where that bites, from Phase 00's own findings -- do not let this surprise
+Phase 05.**
+
+* **3.09 on Linux is awkward and may end up unoffered.** It publishes **no
+  Linux portable archive at all**. Its ``.deb`` requires ``GLIBC_2.38``, which
+  excludes RHEL 9, Ubuntu 22.04 and Debian 12. Its ``.rpm`` has a
+  ``GLIBC_2.14`` floor but needs Boost shared libraries it does not ship -- the
+  extracted binary failed to load here with ``libboost_filesystem.so.1.66.0:
+  cannot open shared object file`` and ran only once Boost 1.66 was supplied.
+  Offering 3.09 on Linux therefore means either a glibc-2.38 host or solving
+  the Boost dependency, and if neither holds the honest outcome is that Linux
+  gets no 3.09 entry.
+* **3.09 on macOS is arm64-only with a macOS 15.0 floor**, so it reaches
   *fewer* Macs than 3.07.1 x86-64 under Rosetta 2.
+* **3.06.5 carries its own advisories.** It is two release lines old; known
+  3.06-era behaviour around peptide protein IDs must be carried as a version
+  advisory (``R-PERC-11``), not hidden. It is offered for reach, not
+  recommended as a default.
 
-Populate the matrix from the functional capability probe, never from artefact
-names.
+**Populate the matrix from the functional probe, never from artefact names.**
+This is not a style preference. Phase 00 proved the names lie: the ``noxml``
+builds emit pout XML, both twins print identical ``--help``, and a probe that
+greps for ``-X`` reports the wrong answer on a binary whose XML the Limelight
+converter consumed. ``docs/platform_support.rst`` (``R-DOC-06``) publishes the
+resulting matrix -- managed, local-binary-only, or unsupported -- per pair, and
+CI does not test pairs the product does not offer.
 
 ----
 

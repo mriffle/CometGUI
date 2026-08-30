@@ -5,7 +5,7 @@ PHASE-15: Version Matrix, Performance and Hardening
 :Phase: 15
 :Status: NOT STARTED
 :Depends on: 14
-:Blocked by decisions: D-002, D-003
+:Blocked by decisions: none -- D-002 and D-003 both DECIDED
 :Delivers: R-TEST-02, R-TEST-07, R-TEST-08
 :Proves: AC-TST-01..04, AC-TST-10, AC-TST-11, AC-RES-10, AC-REL-01
 

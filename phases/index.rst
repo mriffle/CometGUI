@@ -45,7 +45,7 @@ authoritative for its own scope and exit gate.
    * - `05 <PHASE-05-tool-registry.rst>`_
      - Tool Registry and Installer
      - 01, 03, 04
-     - D-003 only. D-002 (option C) and D-004 DECIDED -- phase re-scoped
+     - none open. D-002 (option C), D-003 and D-004 all DECIDED
      - NOT STARTED
    * - `06 <PHASE-06-comet-param-model.rst>`_
      - Comet Parameter Model
@@ -65,7 +65,7 @@ authoritative for its own scope and exit gate.
    * - `09 <PHASE-09-percolator.rst>`_
      - Percolator Adapter and Version Capabilities
      - 05, 08
-     - D-003 only; D-002 DECIDED (option C)
+     - none open; D-002 and D-003 both DECIDED
      - NOT STARTED
    * - `10 <PHASE-10-results.rst>`_
      - Results Model and UI
@@ -80,7 +80,7 @@ authoritative for its own scope and exit gate.
    * - `12 <PHASE-12-limelight.rst>`_
      - Limelight Conversion and Upload
      - 09, 10
-     - D-007 only; D-002 DECIDED (option C)
+     - none open; D-002 and D-007 both DECIDED
      - NOT STARTED
    * - `13 <PHASE-13-provenance-ui.rst>`_
      - Provenance UI and Reports
@@ -90,12 +90,12 @@ authoritative for its own scope and exit gate.
    * - `14 <PHASE-14-e2e.rst>`_
      - GUI Automation and Packaged End-to-End Harness
      - 07, 10, 11, 12, 13
-     - D-006, D-007
+     - D-006's CI-fixture half only; D-007 DECIDED
      - NOT STARTED
    * - `15 <PHASE-15-hardening.rst>`_
      - Version Matrix, Performance and Hardening
      - 14
-     - D-003 only; D-002 DECIDED (option C)
+     - none open; D-002 and D-003 both DECIDED
      - NOT STARTED
    * - `16 <PHASE-16-release.rst>`_
      - Documentation and Release Qualification

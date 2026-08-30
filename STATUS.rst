@@ -59,11 +59,12 @@ What exists
      - State
      - Notes
    * - ``specification.rst``
-     - Revision 8
-     - Revision 8 records ``D-005``: CometGUI drives PDV through a generated
-       mzTab, adding ``R-PDV-02``..``R-PDV-05`` and ``AC-VIS-04``/``05``.
-       Revision 7 acted on the ``noxml`` discovery, rewriting the artefact
-       section around portable archives. Passes ``sphinx-build -n -W``.
+     - Revision 9
+     - Revision 9 records ``D-003`` (three managed Percolator versions,
+       ``R-PERC-12``); revision 8 recorded ``D-005`` (drive PDV through a
+       generated mzTab, ``R-PDV-02``..``R-PDV-05``, ``AC-VIS-04``/``05``);
+       revision 7 acted on the ``noxml`` discovery. Passes
+       ``sphinx-build -n -W``.
    * - ``ONBOARDING.rst``
      - Complete
      - Read-first document for any orchestrating agent.
@@ -72,10 +73,11 @@ What exists
      - Scope, deliverables and exit gate per phase. 00 and 01 signed off
        PARTIAL, 05 re-scoped by ``D-002`` option C.
    * - ``DECISIONS.rst``
-     - 1 open, 6 decided, 2 partial/provisional
+     - 0 open, 7 decided, 2 partial/provisional
      - ``D-001``, ``D-002`` (including option C), ``D-004`` and ``D-008``
-       (all three parts), ``D-005`` and ``D-007`` decided; ``D-009``
-       provisional and ``D-006`` partly decided. Only ``D-003`` remains open.
+       (all three parts), ``D-003``, ``D-005`` and ``D-007`` decided;
+       ``D-009`` provisional and ``D-006`` partly decided. **No ``D-`` item is
+       open.**
    * - ``handoffs/``
      - Phase 00 present
      - ``PHASE-00-worklog.rst`` (10 units, each with a sign-off entry) and
@@ -500,8 +502,9 @@ new ``package-info.java``.
 Open decisions
 ==============
 
-One item is open: ``D-003``. ``D-005``, ``D-007`` and ``D-008`` are closed in
-full. ``D-009`` is answered **provisionally** -- the wording stands, the
+**No decision is open.** ``D-001``..``D-005``, ``D-007`` and ``D-008`` are
+closed in full; ``D-006`` and ``D-009`` are answered with a named, deliberate
+deferral each. ``D-009`` is answered **provisionally** -- the wording stands, the
 underlying question does not -- and ``D-006`` is **partly** answered: the data
 is not redistributed and the local fixture is chosen, but the CI fixture set is
 deliberately deferred. **No ``D-`` item has
@@ -531,11 +534,13 @@ and accept PARTIAL**. On 2026-08-30 the owner answered the last of ``D-008``:
        Phase 05 does not implement NSIS or ``xar``/cpio payload extraction.
      - --
    * - ``D-003``
-     - Which *additional* Percolator versions to carry beyond 3.07.1, for
-       users who do not need Limelight. Widened by the ``noxml`` finding:
-       3.06.5's portable Linux archive has the lowest glibc floor found
-       anywhere (``GLIBC_2.14``) and would reach hosts 3.07.1 cannot.
-     - 05, 09, 15
+     - **DECIDED (2026-08-30)**: carry three -- **3.07.1** (default for
+       Limelight runs), **3.09** (current, no Limelight) and **3.06.5**
+       (reach; ``GLIBC_2.14``, the lowest floor in the release history). The
+       set is an intent, not a per-platform promise: ``R-PERC-01``'s
+       artefact-plus-probe test decides what each machine is actually offered,
+       and 3.09 on Linux may end up unoffered.
+     - --
    * - ``D-004``
      - **DECIDED**: Percolator runs under Rosetta 2 on Apple silicon.
      - --
@@ -682,9 +687,14 @@ drop:
 For the owner
 --------------
 
-One item is genuinely open: ``D-003`` -- which additional Percolator versions
-to carry beyond 3.07.1, for users who do not need Limelight. It blocks Phases
-05, 09 and 15, none of which has started.
+**Nothing is waiting on the owner.** Every ``D-`` item is answered. Two carry a
+deliberate deferral, and each has a named owner and moment:
+
+* ``D-006``'s CI half -- the trimmed-down DDA mzML set -- belongs before Phase
+  14. The local fixture is settled and does not substitute for it.
+* ``D-009`` -- the copyright line stays as written, but whether an institution
+  has a claim is deferred, not closed, and Phase 16 must raise it again before
+  release while changing it is still cheap.
 
 Two more are answered but not closed, and both are deferrals the owner made
 deliberately rather than gaps:
@@ -711,6 +721,24 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-08-30
+     - --
+     - **``D-003`` decided, and with it every open decision is answered.**
+       Three managed Percolator versions: **3.07.1** (the computed default for
+       a Limelight-enabled run), **3.09** (current, for runs needing no
+       Limelight) and **3.06.5** (reach -- its portable Linux build needs only
+       ``GLIBC_2.14``, the lowest floor in the release history, so it runs on
+       older institutional machines 3.07.1's ``GLIBC_2.34`` excludes).
+       Recorded as an *intent*, not a per-platform promise: ``R-PERC-01``
+       already forbids offering any pair without a verified artefact and a
+       passed runtime probe, and Phase 00's evidence says **3.09 on Linux may
+       end up unoffered** -- no portable archive is published, the ``.deb``
+       needs ``GLIBC_2.38`` and the ``.rpm`` needs Boost libraries it does not
+       ship. Absent is honest; a fabricated manifest entry is not. The matrix
+       is populated from the functional probe and never from artefact names,
+       because Phase 00 proved the names lie. Specification revision 9 adds
+       ``R-PERC-12``; Phases 05, 09 and 15 are no longer blocked by any
+       decision.
    * - 2026-08-30
      - --
      - **``D-005`` decided: CometGUI drives PDV properly, via a generated

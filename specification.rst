@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 8
+:Revision: 9
 :Revision date: 2026-08-30
-:Supersedes: Revision 7, 2026-08-29
+:Supersedes: Revision 8, 2026-08-30
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,19 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 9
+     - 2026-08-30
+     - **``D-003`` decided: three managed Percolator versions.** 3.07.1 (the
+       computed default for a Limelight-enabled run), 3.09 (current, for runs
+       that do not need Limelight) and 3.06.5 (reach -- its portable Linux
+       build needs only ``GLIBC_2.14``, the lowest floor in the release
+       history). The set is an intent, not a per-platform promise:
+       ``R-PERC-01`` still requires a verified artefact **and** a passed
+       runtime probe before any pair is offered, and Phase 00's findings mean
+       3.09 on Linux may end up unoffered -- it publishes no portable archive,
+       its ``.deb`` needs ``GLIBC_2.38``, and its ``.rpm`` needs Boost
+       libraries it does not ship. With this, **no ``D-`` decision remains
+       open.**
    * - 8
      - 2026-08-30
      - **``D-005`` decided: CometGUI drives PDV exactly as CasanovoGUI does,
@@ -808,6 +821,19 @@ Consequences that the implementation must respect:
 * Newer Percolator versions are not excluded from the product. They remain
   selectable for rescoring, result viewing and learned weights; they are
   simply not eligible to feed Limelight.
+
+``R-PERC-12``
+    **The managed version set.** The manifest shall carry Percolator 3.07.1,
+    3.09 and 3.06.5 (``D-003``, decided 2026-08-30): the computed default for a
+    Limelight-enabled run, the current release for runs that do not need
+    Limelight, and the lowest-glibc build for reach on older hosts. This names
+    what the project *attempts* to offer. What it actually offers on a given
+    machine is decided by ``R-PERC-01``'s artefact-plus-probe test, so a
+    version may legitimately be absent on a platform -- 3.09 on Linux
+    especially, which publishes no portable archive, whose ``.deb`` requires
+    ``GLIBC_2.38`` and whose ``.rpm`` needs Boost libraries it does not ship.
+    Absent is honest; a fabricated entry is not. Adding a version to this set
+    is a manifest change plus a probe result, never a code change.
 
 ``R-PERC-01``
     The application shall not present a Percolator version/platform
