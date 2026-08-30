@@ -59,6 +59,17 @@ fi
 declare -a SRC_FILES=()   # absolute path of each source file
 declare -a REL_PATHS=()   # path relative to the copy root, e.g. upstream-facts.rst
 
+FOCUS=""
+
+# Single-file mode still copies EVERY discovered document into the sandbox, and
+# only the reporting narrows to the named one.  Before 2026-08-30 it copied the
+# named file alone, which made every cross-document `:ref:` in it undefined by
+# construction: a page that correctly links to another page failed here while
+# passing the real gate, and the obvious way to "fix" that is to delete the
+# hyperlinks -- weakening a document to satisfy a convenience harness.  Found
+# when docs/feasibility/windows-ci-verification.rst, which references
+# windows-artefact.rst seven times, produced eleven `undefined label` errors
+# that scripts/ci/docs-build.sh does not produce.
 if [ "$#" -eq 1 ]; then
     single="$1"
     [ -f "${single}" ] || die "no such file: ${single}"
@@ -66,16 +77,24 @@ if [ "$#" -eq 1 ]; then
         *.rst) : ;;
         *) die "not a .rst file: ${single}" ;;
     esac
-    SRC_FILES+=("$(cd -- "$(dirname -- "${single}")" && pwd)/$(basename -- "${single}")")
-    REL_PATHS+=("$(basename -- "${single}")")
-    MODE_DESC="single file: ${single}"
+    FOCUS="$(basename -- "${single}")"
+    MODE_DESC="single file: ${single} (the whole directory is built, so that its cross-references resolve)"
 else
-    [ -d "${DOCS_DIR}" ] || die "no such directory: ${DOCS_DIR}"
-    while IFS= read -r -d '' f; do
-        SRC_FILES+=("${f}")
-        REL_PATHS+=("${f#"${DOCS_DIR}"/}")
-    done < <(find "${DOCS_DIR}" -type f -name '*.rst' -print0 | sort -z)
     MODE_DESC="all of ${DOCS_DIR}"
+fi
+
+[ -d "${DOCS_DIR}" ] || die "no such directory: ${DOCS_DIR}"
+while IFS= read -r -d '' f; do
+    SRC_FILES+=("${f}")
+    REL_PATHS+=("${f#"${DOCS_DIR}"/}")
+done < <(find "${DOCS_DIR}" -type f -name '*.rst' -print0 | sort -z)
+
+if [ -n "${FOCUS}" ]; then
+    found=0
+    for rel in "${REL_PATHS[@]}"; do
+        [ "${rel}" = "${FOCUS}" ] && found=1
+    done
+    [ "${found}" -eq 1 ] || die "${FOCUS} is not under ${DOCS_DIR}"
 fi
 
 if [ "${#SRC_FILES[@]}" -eq 0 ]; then
@@ -158,6 +177,11 @@ for rel in "${REL_PATHS[@]}"; do
         missing=1
     fi
 done
+if [ -n "${FOCUS}" ] && [ ! -s "${HTML_DIR}/feasibility/${FOCUS%.rst}.html" ]; then
+    printf 'check-docs.sh: the named document produced no HTML: %s\n' \
+        "${HTML_DIR}/feasibility/${FOCUS%.rst}.html" >&2
+    missing=1
+fi
 if [ ! -s "${HTML_DIR}/index.html" ]; then
     printf 'check-docs.sh: expected HTML missing or empty: %s\n' "${HTML_DIR}/index.html" >&2
     missing=1
