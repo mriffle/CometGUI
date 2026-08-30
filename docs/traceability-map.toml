@@ -360,9 +360,29 @@ phase = "15"
 note = "Phase 15 closes the criterion when the gates cover the whole implemented system rather than the packages that exist in phase 01."
 
 [[ac."AC-TST-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.SectionNavigationUiTest"
+note = "Phase 02: the headless GUI suite navigates every primary section of the running application and asserts each by stable identifier (R-TEST-04), driven through FxUiDriver by both a TestFX robot and a plain javafx.scene.robot.Robot."
+
+[[ac."AC-TST-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.KeyboardOnlyNavigationUiTest"
+note = "Phase 02: every primary section reached with key presses alone, no mouse on the code path."
+
+[[ac."AC-TST-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.AccessibleNameEnumerationUiTest"
+note = "Phase 02: enumerates every Control in the launched application after applyCss and layout, and fails naming any with no accessible name."
+
+[[ac."AC-TST-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.ConsoleFloodUiTest"
+note = "Phase 02: the console pane under a 250,000-message flood -- oldest discarded, both caps held, retained heap measured."
+
+[[ac."AC-TST-05".evidence]]
 kind = "planned"
 phase = "14"
-note = "Foundations are laid earlier, in phase 02."
+note = "Phase 02 lays the foundations above; phase 14 closes the criterion when the suite covers the whole GUI list in the specification's JavaFX GUI automation section, not only navigation, accessibility and the console."
 
 [[ac."AC-TST-06".evidence]]
 kind = "planned"
