@@ -262,7 +262,64 @@ Work units
        ``.java`` file was inspected by exactly one of the two regimes; a
        negative control showing an unattributed derived file is rejected.
      - ``R-SEC-01``, ``D-001``
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commits ``7517d3d``, ``33f7b3a``,
+       ``5d9904f``, ``4d6674f``, plus my own ``6c1fdd7``. I read all four
+       diffs. ``git diff --name-only`` over the range lists eleven files and
+       nothing under ``.github/``, ``scripts/ci/``, ``docs/feasibility/``,
+       ``STATUS.rst``, ``DECISIONS.rst``, ``specification.rst``, ``phases/``
+       or ``handoffs/``. **The ordinary header check was not deleted, relaxed
+       or suppressed**: ``config/license/java-header.txt`` and the ``Header``
+       module in ``checkstyle.xml`` are byte-for-byte unchanged, the ordinary
+       Spotless and Checkstyle executions still run over every non-derived
+       file, and the derived paths they now exclude are covered by a second
+       Spotless execution (``spotless-check-derived``, carrying
+       google-java-format, so formatting was not quietly dropped) and a second
+       Checkstyle execution (``checkstyle-check-derived``) against a rule set
+       that is a **superset** of the ordinary one. The D-009 line
+       ``Copyright (C) 2026 The CometGUI authors.`` appears verbatim in both
+       header files -- I grepped for the exact line and got 1 in each.
+       ``bash scripts/build.sh``: ``11/11 stages OK in 112 seconds. BUILD OK``,
+       and the new census prints
+       ``ok cometgui-app  Spotless 6 ordinary + 2 derived = 8 file(s) on disk``
+       and the same for Checkstyle, over all twelve modules.
+       ``bash scripts/verify-quality-gates.sh``:
+       ``SUMMARY: 42 control(s) passed, 0 failed, in 120 seconds`` and
+       ``Every gate rejected its defect and accepted the clean tree.``
+       ``bash scripts/ci/docs-build.sh``: ``PASSED``.
+       **Two falsifications of my own**, in ``git archive`` sandboxes and
+       distinct from the agent's seven controls. (a) Deleting the derivation
+       record from the **real** derived file
+       (``AtlantaFxThemes.java``) and running
+       ``mvn -pl cometgui-app checkstyle:check@checkstyle-check-derived``
+       gives ``BUILD FAILURE`` and
+       ``AtlantaFxThemes.java:1: Required pattern 'the derivation record ...'
+       missing in file. [Regexp]``. (b) Deleting the whole
+       ``checkstyle-check-derived`` execution from ``pom.xml`` -- the exact
+       move someone would make to get a stubborn derived file through --
+       leaves ``mvn clean validate`` **green, exit 0**, and the census catches
+       it: ``UNCHECKED cometgui-app: Checkstyle inspected NEITHER file set
+       for: .../derived/AtlantaFxThemes.java .../derived/package-info.java``,
+       ``MISMATCH cometgui-app: 8 .java source(s) on disk, 6 ordinary + 0
+       derived = 6 seen by Checkstyle``, ``FATAL: 2 file-set census check(s)
+       failed``. That is the "excluded from set 1 and missed by set 2" hole
+       closed and demonstrated.
+       **A defect of my own, found and fixed by this sign-off**: my edit to
+       ``checkstyle.xml``'s GROUP 0 comment introduced a literal ``--`` inside
+       an XML comment, which is illegal and made Checkstyle fail to load the
+       rule set. The census reported ``FATAL: 24 file-set census check(s)
+       failed`` and Maven printed ``MojoExecutionException``; fixed in
+       ``6c1fdd7`` and both rule sets now parse
+       (``xml.dom.minidom.parse`` on each). Recorded because the project's own
+       rule sets deliberately use single hyphens in prose for this reason.
+       **Accepted with a caveat, reported upward**: a bare
+       ``mvn checkstyle:check`` from the command line now fails on derived
+       files, because the include/exclude split lives on the executions and
+       the CLI invocation uses the plugin-level configuration. ``mvn verify``
+       and ``bash scripts/build.sh`` are unaffected. The alternative -- moving
+       the excludes into ``<pluginManagement>`` -- would make the derived
+       execution inherit them and check **nothing** while exiting 0, which is
+       strictly worse. ``CONTRIBUTING.rst`` documents ``mvn -pl <module>
+       validate`` as the command to use instead.
 
    * - 5
      - **View-models.** ``org.cometgui.ui.viewmodel``: navigation over the
