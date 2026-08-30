@@ -15,9 +15,14 @@
  */
 
 /**
- * Application configuration and the application data directory layout, including the tool cache
- * location.
+ * The composition root, and the application data directory layout.
  *
- * <p>Filled by phase 02 (application shell and navigation).
+ * <p>This package holds the real implementation of every injectable seam {@code R-PROC-01} names,
+ * and {@link org.cometgui.app.config.ApplicationServices} is where they are chosen and handed out.
+ *
+ * <p><strong>It is the only package in the product that may call {@code System.getenv} or {@code
+ * System.getProperty}.</strong> Everywhere else reads the environment through {@link
+ * org.cometgui.domain.ports.EnvironmentReader}, which is what makes the host-dependent behaviour of
+ * {@code R-PLAT-01} testable on a machine that is not the host in question.
  */
 package org.cometgui.app.config;

@@ -39,10 +39,11 @@ import org.junit.jupiter.params.provider.EnumSource;
  * and carries the ordinary CometGUI header. The convention is the path, and a test of derived code
  * is not itself derived material.
  *
- * <p>Nothing here starts a JavaFX toolkit. cometgui-app has no headless surefire configuration yet
- * (a later work unit adds Monocle here as cometgui-ui already has it), so {@code
- * applyAsUserAgentStylesheet()} -- the one method that needs a display -- is deliberately not
- * exercised.
+ * <p>Nothing here starts a JavaFX toolkit, and that is now a choice rather than a limitation:
+ * cometgui-app has the headless Monocle surefire configuration since phase 02's bootstrap unit, and
+ * {@code applyAsUserAgentStylesheet()} -- the one method that needs a display -- is driven for real
+ * by {@link AtlantaFxThemeApplicationTest}. Keeping the two apart means the assertions here still
+ * cost no toolkit.
  */
 class AtlantaFxThemesTest {
 

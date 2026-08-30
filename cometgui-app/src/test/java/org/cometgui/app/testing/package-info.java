@@ -15,12 +15,11 @@
  */
 
 /**
- * Application startup: the {@code javafx.application.Application} subclass and the {@code main}
- * method that launches it.
+ * Test-only helpers shared by this module's tests: the headless JavaFX toolkit and a controllable
+ * environment reader.
  *
- * <p>{@link org.cometgui.app.bootstrap.CometGuiApplication} builds the composition root, runs the
- * host-baseline check of {@code R-PLAT-01}, applies the theme, and shows the shell. {@link
- * org.cometgui.app.bootstrap.CometGuiLauncher} is the entry point {@code jpackage} names. The seams
- * themselves are chosen in {@link org.cometgui.app.config}, not here.
+ * <p>Nothing here ships. It is a package rather than a set of nested classes because the
+ * composition-root tests and the bootstrap tests live in different packages and need the same
+ * helpers.
  */
-package org.cometgui.app.bootstrap;
+package org.cometgui.app.testing;
