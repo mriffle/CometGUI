@@ -5,7 +5,8 @@ PHASE-02: Application Shell and Navigation
 :Phase: 02
 :Status: NOT STARTED
 :Depends on: 01
-:Blocked by decisions: D-001 (only if CasanovoGUI code is to be reused)
+:Blocked by decisions: none -- D-001 DECIDED 2026-08-29: reuse permitted,
+   with notices retained and the derivation recorded
 :Delivers: R-PLAT-01, R-PROC-01, R-SEC-01, R-TEST-04
 :Proves: Foundations for AC-TST-05
 
