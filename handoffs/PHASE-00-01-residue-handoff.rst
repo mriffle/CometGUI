@@ -204,6 +204,74 @@ Traps and findings worth carrying forward
        Anything written later that mentions that filename in prose hits the
        same trap.
 
+What is on the branch
+=====================
+
+Eleven files. The branch is ``windows-percolator-verification``, based on
+``main`` at ``82609f0``, and it was built in a separate ``git worktree`` so
+that a second phase orchestrator working on ``main`` in ``/workspace`` was
+never disturbed: ``/workspace``'s working tree was clean throughout and no
+commit of this work landed on ``main`` except the two records in ``handoffs/``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 42 58
+
+   * - File
+     - What it is
+
+   * - ``.github/workflows/windows-percolator.yml``
+     - New. ``pull_request`` to ``main`` plus ``workflow_dispatch``, on
+       ``windows-latest``, three steps: checkout, the checklist, and the
+       transcript upload. Both actions pinned to full commit SHAs. The upload
+       carries ``if: always()`` so that a *failing* run is not the one run
+       whose evidence never leaves the runner.
+
+   * - ``scripts/ci/windows-percolator-verify.sh``
+     - New. A thin wrapper: it finds a Python by RUNNING each candidate
+       (``python3``, ``python``, ``py -3``) rather than trusting
+       ``command -v``, because a Microsoft Store alias answers ``command -v``
+       and then does nothing.
+
+   * - ``scripts/ci/windows_percolator_verify.py``
+     - New, and the substance: the seven checklist steps, a section 8, the
+       transcript, the verdict block and a 34-case self-test.
+
+   * - ``scripts/feasibility/make_synthetic_pin.py``
+     - New. The 400-PSM PIN generator, factored out of a heredoc inside
+       ``windows-artefact.sh`` so that both platforms call one generator.
+       Byte-identical to what the heredoc produced.
+
+   * - ``scripts/feasibility/windows-artefact.sh``
+     - Call site only: it now calls that generator and asserts its SHA-256.
+
+   * - ``scripts/feasibility/extract_nsis.py``
+     - Made genuinely Windows-safe, with a ``--self-test`` that drives its
+       path safety net under both POSIX and Win32 semantics.
+
+   * - ``scripts/ci/check-workflows.py``
+     - Extended so that a fourth workflow file cannot escape the gate: it now
+       DISCOVERS every file in ``.github/workflows/`` instead of iterating
+       three names, and the relaxations the new file needs are narrow
+       allowlists with their own self-test cases.
+
+   * - ``scripts/ci/run-pipeline-locally.sh``
+     - Covers the fourth workflow, and its summary no longer says a remote
+       does not exist.
+
+   * - ``.gitattributes``
+     - New. ``*.sh`` and ``*.py`` pinned to LF. See the traps table.
+
+   * - ``docs/feasibility/windows-ci-verification.rst``
+     - New. What the harness is, what a pass would and would not establish,
+       and its status: a harness, not a result.
+
+   * - ``docs/feasibility/windows-artefact.rst``
+     - Three corrections, each a fact that changed: the extractor's
+       portability claim (twice) and the cost table's "blocked by ``D-008``"
+       cell. **Its warning, its "Not established" list, its gate item 8 status
+       and its manifest wording are untouched.**
+
 What cannot be known until a runner executes it
 ===============================================
 
