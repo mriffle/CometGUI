@@ -430,6 +430,15 @@ that would contradict the premise ``D-002`` option C rests on.
 ``check-workflows.py`` permits only the pinned checkout and artifact-upload
 actions, so that advice walks into the gate. Reworded.
 
+* Forced the whole Windows path to execute on this Linux host, by importing
+  the driver and setting ``os.name = "nt"`` after its imports, so that every
+  branch ``--check-only`` skips actually ran. Every Windows-binary launch
+  failed, as it must here, and the driver reported ``verdict: INCONCLUSIVE``,
+  ``exit code: 2``, with ``the binary could not be launched at all
+  (PermissionError...)`` on each step and a section 8 note that a real missing
+  DLL on Windows would instead show as ``0xC0000135``. It cannot go green
+  while doing nothing.
+
 **What cannot be exercised here, and first executes on the runner:** steps 3,
 5 and 6 in full, the ``-X`` run of step 4, and section 8's execution half --
 everything, in other words, that requires the binary to run. ``--check-only``
