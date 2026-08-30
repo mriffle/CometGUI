@@ -61,5 +61,45 @@
       <groupId>org.cometgui</groupId>
       <artifactId>cometgui-ui</artifactId>
     </dependency>
+
+    <!--
+      AtlantaFX (phase 02): the JavaFX theme stylesheets the CasanovoGUI base
+      uses, driven from org.cometgui.app.config.derived.AtlantaFxThemes.  The
+      version is pinned in the parent's <dependencyManagement>.
+
+      THE EXCLUSION IS NOT OPTIONAL.  atlantafx-base declares
+      org.openjfx:javafx-controls at COMPILE scope.  Without the exclusion
+      `mvn -pl cometgui-app dependency:tree` reports six extra artefacts:
+
+          io.github.mkpaz:atlantafx-base:jar:2.1.0:compile
+          \- org.openjfx:javafx-controls:jar:23:compile
+             +- org.openjfx:javafx-controls:jar:linux:23:compile
+             \- org.openjfx:javafx-graphics:jar:23:compile
+                +- org.openjfx:javafx-graphics:jar:linux:23:compile
+                \- org.openjfx:javafx-base:jar:23:compile
+                   \- org.openjfx:javafx-base:jar:linux:23:compile
+
+      This project has NO org.openjfx dependency anywhere: JavaFX 25.0.4+1
+      comes from the pinned Liberica Full JDK as resolved system modules, and a
+      second (here: JavaFX 23) copy of the javafx.* packages on the class path
+      is exactly the breakage the parent POM's opening comment forbids.
+
+      JUNIT DOES NOT NEED EXCLUDING, checked rather than assumed.
+      atlantafx-base also declares junit-jupiter-api, junit-jupiter-engine and
+      assertj-core, but its own parent manages all three to <scope>test</scope>,
+      so none of them is transitive and none appears on this module's tree.  An
+      exclusion for them would be inert; if a future AtlantaFX changes that, the
+      tree will show it.
+    -->
+    <dependency>
+      <groupId>io.github.mkpaz</groupId>
+      <artifactId>atlantafx-base</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.openjfx</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
   </dependencies>
 </project>
