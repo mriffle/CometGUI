@@ -281,4 +281,45 @@ Sign-offs
 Recorded as each unit is accepted, rejected or deferred. Each entry names what
 the phase orchestrator ran itself and what it observed.
 
-*(none yet)*
+U1 -- ACCEPTED WITH A REPAIR, 2026-08-30
+----------------------------------------
+
+:Agent commit: ``403f330``
+:Orchestrator repair: ``4f93cda``
+
+What the phase orchestrator ran itself, and what it printed:
+
+* Generated a PIN with the new
+  ``scripts/feasibility/make_synthetic_pin.py`` and compared it with ``cmp``
+  against a file the orchestrator had produced **before the unit started**, by
+  extracting the original heredoc from ``windows-artefact.sh`` verbatim and
+  running it. Identical, byte for byte: ``sha256
+  6643ede48534fcd28c90a1d4e53781e47ba39b0523e9f907ea8e1a63b15af61e  32466
+  bytes  401 lines``. The same SHA-256 is on the ``test.pin`` that Phase 00
+  left in ``scratch/windows/linuxcontrol/``, so the pinned constant is the
+  input the recorded evidence was actually measured with.
+* ``--expect-sha256 deadbeef`` -> exit 1, both hashes named.
+* ``--rounding-margin`` -> ``worst relative margin 1.8435426727402975e-09 at
+  value 2.5073499953775933``, ``ratio margin/eps 8.3e+06``, verdict ``SAFE``.
+  The orchestrator had measured the same worst case independently, in floating
+  point, before the unit started (1.844e-09); the unit's measurement is exact,
+  through ``Fraction``, and agrees. Eight million ULPs of headroom is what
+  makes byte-identity across glibc and MSVC a measured property rather than a
+  hope.
+* Read the diff. The call site in ``windows-artefact.sh`` is the only change
+  to that file, and it asserts the SHA-256 on the call.
+
+**The defect the sign-off caught.** ``--expect-sha256`` hashed the in-memory
+string rather than the file on disk, so the one hazard the unit exists to
+prevent was the one hazard it could not see. Demonstrated rather than
+argued: a copy of the generator damaged to ``newline="\r\n"`` -- exactly what
+``open(path, "w")`` does on Windows -- reported ``sha256 6643ede4... 32466
+bytes`` and **exit 0**, while what it had written to disk was 32 867 bytes of
+``9465459cff07cb59aa91c88c7190072cbcc677656d2693dcf9fcee6a38653278``. The
+orchestrator repaired it (read the file back, hash those bytes, take the line
+count from them) and re-ran the same damage: exit 1, ``expected 6643ede4...
+got 9465459c...``. Clean run unchanged and still identical to the baseline.
+
+Not verified: any behaviour on Windows, or on any CPython other than 3.11.2.
+The rounding measurement bounds ``libm``; it does not bound a future CPython
+changing ``random.gauss``, which is what the pinned SHA-256 is for.
