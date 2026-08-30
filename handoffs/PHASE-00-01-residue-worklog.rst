@@ -537,3 +537,19 @@ What the phase orchestrator ran itself, and what it printed:
 
 Not verified: nothing on the page is a claim about the Windows binary, so
 there was nothing to verify beyond that it does not become one.
+
+Outcome
+-------
+
+All five units accepted, four of them after a repair the sign-off found rather
+than the unit reported: a SHA-256 check that hashed the wrong bytes, a message
+pointing a reader at an action the project's own gate forbids, two stale
+"nine damaged copies" descriptions, and a documentation harness that failed a
+page for correctly linking to another page.
+
+**Neither gate item is closed by this work, and neither may be recorded as
+closed.** PHASE-00 gate item 8's first branch is closed by a Windows runner
+executing the checklist and returning a transcript; PHASE-01 gate item 6 is
+closed by GitHub running the pull-request pipeline on a real pull request.
+Both now need a push this session cannot perform. What the branch changes is
+that nothing else is in the way.
