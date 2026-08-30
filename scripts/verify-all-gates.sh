@@ -6,10 +6,13 @@
 #
 # A gate that has never been seen to fail has not been shown to work
 # (CONTRIBUTING.rst, "Gate conventions").  Phase 01 installs eleven quality
-# gates and each of them ships with its own demonstration of failure.  This
+# gates and each of them ships with its own demonstration of failure; Phase 02
+# adds the application-shell gates, which are five claims about a running
+# JavaFX application and ship with their own harness in the same shape.  This
 # script is the aggregate: it runs every one of those demonstrations, maps each
-# to the PHASE-01 exit gate item it serves, and exits non-zero if any control
-# fails to bite.
+# to the exit gate item it serves -- naming the phase, because two phases'
+# items are now in play and both are numbered from one -- and exits non-zero if
+# any control fails to bite.
 #
 # IT DELEGATES.  It injects no defect of its own and re-implements no gate.
 # Every control below is somebody else's harness -- scripts/verify-*.sh and the
@@ -33,12 +36,14 @@
 #      that grades fewer controls than it used to has had controls removed,
 #      skipped or silently short-circuited, and that is a FAILURE, not a pass.
 #
-# COST.  About seven minutes on the 2026-08-29 development machine, almost all
+# COST.  About twelve minutes on the 2026-08-30 development machine, almost all
 # of it Maven: the coverage/architecture/mutation harness rebuilds a damaged
-# copy of the reactor nine times and runs PIT.  It is far too slow to be a
-# stage of scripts/build.sh and is deliberately NOT wired into it.  Run it
-# before signing off a phase, after touching anything under config/, pom.xml or
-# scripts/, and from the nightly pipeline.
+# copy of the reactor nine times and runs PIT, and the shell harness rebuilds
+# and re-runs a damaged copy seventeen times under the headless JavaFX
+# platform.  It is far too slow to be a stage of scripts/build.sh and is
+# deliberately NOT wired into it.  Run it before signing off a phase, after
+# touching anything under config/, pom.xml or scripts/, and from the nightly
+# pipeline.
 #
 # NETWORK.  The dependency-scan control needs https://api.osv.dev.  That is
 # deliberate and is not an offline mode waiting to be added: an offline
@@ -76,6 +81,7 @@ readonly -a ALL_GATES=(
     depscan
     pipeline
     quality
+    shell
     tests
 )
 
@@ -88,7 +94,13 @@ declare -a COVERED=()
 # ------------------------------------------------------------- the controls --
 #
 # gate_spec NAME populates, for one control:
-#   GATE_ITEMS   the PHASE-01 exit gate item(s) it serves, for the summary
+#   GATE_PHASE   the phase whose exit gate those items belong to.  Two phases
+#                now install gates and both number their items from one, so the
+#                phase is carried explicitly rather than inferred -- renumbering
+#                one phase's items to make them unique would be a silent lie
+#                about which document a reader should check
+#   GATE_ITEMS   the exit gate item(s) it serves, within GATE_PHASE, for the
+#                summary
 #   GATE_DEFECT  what is deliberately broken, in one line
 #   GATE_SCRIPT  the sub-harness, relative to the repository root
 #   GATE_ARGS    its arguments
@@ -102,13 +114,15 @@ declare -a COVERED=()
 #                2026-08-29, 33 on 2026-08-30 when phase 02 unit 11 re-sized the
 #                coverage and mutation injections against the grown tree and
 #                added control 6's proof that the coverage gate accepts the
-#                defect the mutation gate rejects.)
+#                defect the mutation gate rejects.  shell: 30 on 2026-08-30,
+#                when phase 02 unit 10 first shipped it.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
 # nothing if it reported none in the expected form.
 
 gate_spec() {
+    GATE_PHASE="01"
     GATE_ITEMS=""; GATE_DEFECT=""; GATE_SCRIPT=""; GATE_ARGS=()
     GATE_PROOF=(); GATE_FLOOR=0; GATE_UNIT="control(s)"
     case "$1" in
@@ -191,6 +205,20 @@ gate_spec() {
             GATE_FLOOR=42
             GATE_UNIT="controls"
             ;;
+        shell)
+            GATE_PHASE="02"
+            GATE_ITEMS="1,2,4,5"
+            GATE_DEFECT="a shell whose every navigation entry selects the same section, arrow keys that move two sections at a time so a section cannot be reached by keyboard alone, section panes with no stable identifier, a content area that shows every pane at once while every identifier stays in place, an accessible name removed where it is assigned once -- and, as a control on the harness itself, the same name removed at the site showStage() re-assigns, which the harness must report as a HARNESS FAILURE rather than as a gate that did not bite; then the console's rendered-document window removed, and the eviction removed from BoundedMessageLog.append so the retained heap grows past its documented cap"
+            GATE_SCRIPT="scripts/verify-shell-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-02 exit gate items 1, 2, 4 and 5 were proved here"
+                "the harness reports an injection that reached the file but not the behaviour as a HARNESS FAILURE, not as a pass"
+            )
+            GATE_FLOOR=30
+            GATE_UNIT="controls"
+            ;;
         tests)
             GATE_ITEMS="3, 4"
             GATE_DEFECT="a JavaFX import in the domain, a ProcessBuilder outside the process service, a truncated ArchUnit import, an untested class in a gated package sized so the ratio really falls below 0.90, an untested view-model sized against the package rule, a covered class whose test asserts nothing so its mutations survive, and a module whose coverage was never measured"
@@ -226,6 +254,8 @@ gate_count() {
             sed -n 's/.*workflow(s); \([0-9][0-9]*\) executed on this machine; 0 unexpected.*/\1/p' -- "${log}" | head -1 ;;
         quality)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        shell)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         tests)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) assertion(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
@@ -235,7 +265,8 @@ gate_count() {
 usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
-that every PHASE-01 quality gate still fails on the defect it exists to catch.
+that every PHASE-01 and PHASE-02 gate still fails on the defect it exists to
+catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -298,14 +329,22 @@ list_gates() {
     for name in "${ALL_GATES[@]}"; do
         gate_spec "${name}"
         printf '  %-13s %-9s bash %s%s\n' \
-            "${name}" "${GATE_ITEMS}" "${GATE_SCRIPT}" \
+            "${name}" "${GATE_PHASE}:${GATE_ITEMS}" "${GATE_SCRIPT}" \
             "$([ "${#GATE_ARGS[@]}" -gt 0 ] && printf ' %s' "${GATE_ARGS[*]}")"
         printf '  %-13s %-9s injects: %s\n\n' "" "" "${GATE_DEFECT}"
     done
-    printf '  Gate items: 1 one documented build command; 2 strict documentation build;\n'
-    printf '  3 ArchUnit layering; 4 coverage; 5 traceability; 6 CI pipelines.\n'
+    printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
+    printf '  PHASE-02.  Both phases number their items from one, so the phase is always\n'
+    printf '  named rather than inferred.\n'
+    printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
+    printf '  build; 3 ArchUnit layering; 4 coverage; 5 traceability; 6 CI pipelines.\n'
+    printf '  PHASE-02 items: 1 every section reachable by mouse and by keyboard alone;\n'
+    printf '  2 a headless GUI test navigating all sections by stable identifier;\n'
+    printf '  3 ArchUnit proving the domain has no JavaFX dependency; 4 an accessible\n'
+    printf '  name on every control; 5 a bounded console under a flood test.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
-    printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst.\n\n'
+    printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst and\n'
+    printf '  phases/PHASE-02-app-shell.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -354,7 +393,7 @@ run_gate() {
     local cmd="bash ${GATE_SCRIPT}"
     [ "${#GATE_ARGS[@]}" -gt 0 ] && cmd="${cmd} ${GATE_ARGS[*]}"
 
-    banner "CONTROL ${name}  --  PHASE-01 exit gate item ${GATE_ITEMS}"
+    banner "CONTROL ${name}  --  PHASE-${GATE_PHASE} exit gate item ${GATE_ITEMS}"
     printf '  injects  %s\n' "${GATE_DEFECT}"
     printf '  proved by %s\n' "${cmd}"
     printf '  log       %s\n\n' "${rel}"
@@ -405,7 +444,7 @@ run_gate() {
         printf '  PASS  %s: %s %s in %ds\n' "${name}" "${count}" "${GATE_UNIT}" "${elapsed}"
         [ "${count}" -gt "${GATE_FLOOR}" ] \
             && printf '        (the floor recorded here is %d; the harness has grown)\n' "${GATE_FLOOR}"
-        COVERED+=("${GATE_ITEMS}")
+        COVERED+=("${GATE_PHASE} ${GATE_ITEMS}")
     else
         FAILED=$((FAILED + 1))
         FAILURES+=("${name}: ${why}")
@@ -416,7 +455,8 @@ run_gate() {
     fi
 
     ROWS+=("$(printf '  %-4s  %-13s %-9s %-6s %5ds  %s' \
-        "${verdict}" "${name}" "${GATE_ITEMS}" "${count:-?}" "${elapsed}" "${cmd}")")
+        "${verdict}" "${name}" "${GATE_PHASE}:${GATE_ITEMS}" "${count:-?}" \
+        "${elapsed}" "${cmd}")")
     ROWS+=("$(printf '        injected: %s' "${GATE_DEFECT}")")
 }
 
@@ -466,7 +506,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01 gate must be seen to fail on its own defect\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01 and PHASE-02 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -491,17 +531,30 @@ main() {
         "" "GATE" "ITEM" "GRADED" "TIME" "COMMAND THAT PROVES IT"
     printf '%s\n' "${ROWS[@]}"
 
-    # Which exit gate items this run covered, deduplicated and sorted.
-    local items
-    items="$(printf '%s\n' "${COVERED[@]}" | tr ',' '\n' | tr -d ' ' \
-        | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"
-    printf '\n  PHASE-01 exit gate items covered by the controls that passed: %s\n' \
-        "${items:-none}"
-    printf '  Item 1 is covered only in part: these controls prove that the gates which\n'
-    printf '  FAIL the build still bite. That a clean checkout BUILDS green is\n'
-    printf '  bash scripts/build.sh, and is not repeated here.\n'
-    printf '  The "on a pull request" half of item 6 needs a git remote, which D-008\n'
-    printf '  withholds; the pipeline control proves every step on this machine instead.\n'
+    # Which exit gate items this run covered, per phase, deduplicated and
+    # sorted.  Per phase and not pooled: both phases number their items from
+    # one, so a pooled list would silently credit one phase with the other's
+    # coverage -- which is exactly the kind of quiet lie these controls exist
+    # to prevent.
+    local phase items
+    printf '\n'
+    for phase in 01 02; do
+        items="$(printf '%s\n' "${COVERED[@]}" \
+            | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
+            | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"
+        printf '  PHASE-%s exit gate items covered by the controls that passed: %s\n' \
+            "${phase}" "${items:-none}"
+    done
+    printf '  PHASE-01 item 1 is covered only in part: these controls prove that the\n'
+    printf '  gates which FAIL the build still bite. That a clean checkout BUILDS green\n'
+    printf '  is bash scripts/build.sh, and is not repeated here.\n'
+    printf '  The "on a pull request" half of PHASE-01 item 6 needs a git remote, which\n'
+    printf '  D-008 withholds; the pipeline control proves every step on this machine\n'
+    printf '  instead.\n'
+    printf '  PHASE-02 item 3 -- an ArchUnit test proving the domain module has no JavaFX\n'
+    printf '  dependency -- is the same rule PHASE-01 item 3 installs, so it is proved by\n'
+    printf '  the tests control rather than injected twice; the shell control fails if\n'
+    printf '  that harness ever loses it.\n'
 
     printf '\n  %d control(s) passed, %d failed, in %d seconds (%dm%02ds).\n' \
         "${PASSED}" "${FAILED}" "${total}" "$((total / 60))" "$((total % 60))"
