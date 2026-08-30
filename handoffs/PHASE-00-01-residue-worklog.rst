@@ -444,3 +444,32 @@ actions, so that advice walks into the gate. Reworded.
 everything, in other words, that requires the binary to run. ``--check-only``
 covers the download, the checksums, the extraction, the payload checksums and
 the PIN. That is the harness, not the finding.
+
+U5 -- ACCEPTED, 2026-08-30
+--------------------------
+
+:Agent commit: ``8b93de2``
+
+``docs/feasibility/windows-ci-verification.rst``, 576 lines: what the harness
+is, what runs and where, how the seven steps map to the checklist, section 8
+and why it is separate, the falsifiability argument at length, the four
+verdicts, what a pass would and would not establish, how to run it locally,
+and a status table.
+
+What the phase orchestrator ran itself, and what it printed:
+
+* ``bash scripts/ci/docs-build.sh`` -> ``PASSED``, both strict builds, with
+  ``reading sources... feasibility/windows-ci-verification`` in the log and a
+  59 675-byte HTML page written. Under ``-n -W`` that also means every
+  ``:ref:`` in it resolves and the page is reachable from a toctree.
+* ``grep -nE "\b(verified|confirmed|proven|tested)\b"`` over the page ->
+  **no matches at all**. The only near-miss anywhere is the manifest value
+  ``unverified-on-windows``, quoted as a value.
+* Read the page. Its opening warning says the harness "has itself never been
+  started"; its status table answers "Has GitHub ever run it?" with the
+  observed ``total_count = 0``; and its "Would not be established" list is
+  longer than its "Would be established" list, which is the right shape for
+  this document.
+
+Not verified: nothing on the page is a claim about the Windows binary, so
+there was nothing to verify beyond that it does not become one.
