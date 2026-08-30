@@ -371,3 +371,67 @@ machine at, and it is now safe to point.
 Not verified: the extractor has still never run on Windows. The self-test
 models Win32 canonicalisation rather than executing it. That model is
 falsifiable and was falsified, which is the most that can be had here.
+
+U3 -- ACCEPTED WITH A SMALL REPAIR, 2026-08-30
+----------------------------------------------
+
+:Agent commit: ``639674c``
+:Orchestrator repair: ``aa04d7a``
+
+Two files: ``scripts/ci/windows-percolator-verify.sh`` (a wrapper that finds a
+Python and execs the driver, so no logic depends on Git Bash) and
+``scripts/ci/windows_percolator_verify.py`` (1641 lines: the seven checklist
+steps, a section 8, the transcript, the verdict block and a self-test).
+
+What the phase orchestrator ran itself, and what it printed:
+
+* ``bash scripts/ci/windows-percolator-verify.sh`` on this Linux host ->
+  ``REFUSED -- this is not a Windows host``, naming ``os.name``,
+  ``sys.platform`` and the platform string, exit **4**. It does not pretend.
+* ``--self-test`` -> ``34 case(s), 0 failed. Every damaged case was rejected
+  and every control accepted``, exit 0. The cases are the ones that matter:
+  a wrong expected SHA-256 and a corrupted download both give HARNESS FAILURE
+  with **both** hashes named; the real ``noxml`` diagnostic gives NEGATIVE;
+  empty output, a truncated capture, a binary that never launched, a timeout
+  and a ``0xC0000005`` crash all give INCONCLUSIVE rather than PASS; ``-X``
+  writing no file, an empty file, a non-zero exit or zero ``<psm>`` elements
+  each give NEGATIVE; and only PASS maps to exit 0.
+* The case that matters most, **E4**: step 5's ``OK`` is *downgraded* to
+  INCONCLUSIVE when section 8's positive control fails. Step 5 tests for the
+  ABSENCE of ``Compiler flag XML_SUPPORT was off``; section 8 runs the same
+  test on the ``noxml`` build, where the string MUST appear. If the detector
+  cannot see it there, its absence on the XML build establishes nothing, and
+  the harness says so instead of claiming a result.
+* ``--check-only`` from a **deleted** ``_build/windows-verify`` -> exit 0,
+  with every pinned identity observed rather than assumed: installer
+  ``a9860e02...`` 1 818 841 B; 22 distinct payload files; payload
+  ``percolator.exe`` ``044f3957...`` 804 864 B; both XSDs ``fc3c95e0...`` and
+  ``c4c664ea...``; PIN ``6643ede4...``; portable ZIP ``1510c2cf...`` and its
+  ``percolator.exe`` ``b9d9bbe8...``. A 20 954-byte transcript was written and
+  printed, and its verdict block says in terms: ``CHECK-ONLY ... NO WINDOWS
+  BINARY WAS EXECUTED. This is not a pass.``
+* Corrupted the cached installer by appending bytes and re-ran: the cache was
+  detected as hashing something else and re-downloaded, with the observed
+  hash printed. Honest, and not a silent reuse.
+
+**Section 8, added mid-unit on this orchestrator's instruction.** After
+briefing U3 the orchestrator found in ``phases/index.rst`` that the owner took
+``D-002`` **option C** on 2026-08-29: the product now takes Percolator from the
+portable ``noxml`` ZIP on every tier-1 platform. The seven-step checklist --
+written the day before -- verifies an artefact the product no longer ships.
+The checklist is still the gate and is implemented exactly as written; section
+8 additionally runs the ZIP's ``percolator.exe`` through ``-X`` and
+``--xml-in``. It is reported separately and does not gate the job, except that
+a ``noxml`` binary which runs and writes no XML would be a loud NEGATIVE --
+that would contradict the premise ``D-002`` option C rests on.
+
+**The repair.** The wrapper's "no Python found" message told the reader to add
+``actions/setup-python``. This project's CI contract forbids setup actions and
+``check-workflows.py`` permits only the pinned checkout and artifact-upload
+actions, so that advice walks into the gate. Reworded.
+
+**What cannot be exercised here, and first executes on the runner:** steps 3,
+5 and 6 in full, the ``-X`` run of step 4, and section 8's execution half --
+everything, in other words, that requires the binary to run. ``--check-only``
+covers the download, the checksums, the extraction, the payload checksums and
+the PIN. That is the harness, not the finding.
