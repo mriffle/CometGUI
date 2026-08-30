@@ -417,14 +417,113 @@ block at the end is the thing to read. It says one of:
 A red Windows job is therefore not automatically a defect to fix: read which
 of the four it is first.
 
-Two documents this work could not correct
-=========================================
+What was verified here, and with what output
+============================================
 
-Both belong to tier 1, and both are now factually stale:
+Every line below was run by the phase orchestrator itself, on the branch, not
+read from a report.
 
-* ``phases/index.rst`` says PHASE-01 "proved every pipeline step locally (42
-  steps, 3 workflows)". The branch adds a fourth workflow.
-* ``CONTRIBUTING.rst`` still refers in places to "the open publication half of
-  ``D-008``", which the owner closed on 2026-08-30.
+.. list-table::
+   :header-rows: 1
+   :widths: 46 54
 
-Neither is a phase orchestrator's file to edit.
+   * - Command
+     - What it printed
+
+   * - ``bash scripts/build.sh``
+     - ``11/11 stages OK in 89 seconds. BUILD OK`` -- the baseline, intact.
+
+   * - ``bash scripts/ci/check-workflows.sh``
+     - ``PASSED``, with ``4 workflow file(s) discovered`` and the new file's
+       required content named.
+
+   * - ``bash scripts/ci/check-workflows.sh --self-test``
+     - ``self-test OK -- 19 damaged copies rejected, the undamaged one
+       accepted`` (nine before this work).
+
+   * - Ten injected defects of the orchestrator's own, in a sandbox copy
+     - All ten rejected, each with a message naming the cause, including an
+       action outside a workflow's allowlist and the ``if: always()`` removed
+       from the transcript upload.
+
+   * - ``bash scripts/ci/run-pipeline-locally.sh``
+     - ``45 step(s) across 4 workflow(s); 37 executed on this machine; 0
+       unexpected``, exit 0. The executed count did not move: every step of
+       the new workflow is ``NOT RUN`` here, honestly recorded.
+
+   * - ``bash scripts/ci/windows-percolator-verify.sh``
+     - ``REFUSED -- this is not a Windows host``, exit 4.
+
+   * - ``bash scripts/ci/windows-percolator-verify.sh --self-test``
+     - ``34 case(s), 0 failed. Every damaged case was rejected and every
+       control accepted.``
+
+   * - ``bash scripts/ci/windows-percolator-verify.sh --check-only``, from a
+       deleted work directory
+     - exit 0, every pinned identity observed rather than assumed, a
+       20 954-byte transcript, and a verdict block saying ``CHECK-ONLY ... NO
+       WINDOWS BINARY WAS EXECUTED. This is not a pass.``
+
+   * - The whole Windows path forced on Linux (``os.name = "nt"`` after
+       import)
+     - ``verdict: INCONCLUSIVE``, ``exit code: 2``, every launch reported as
+       ``could not be launched at all``. It cannot go green while doing
+       nothing.
+
+   * - ``python3 scripts/feasibility/extract_nsis.py --self-test``
+     - ``27 checks``, exit 0; reverting the single changed line makes ``10 of
+       27`` fail, including a Windows-only escape from the output directory.
+
+   * - A fresh extraction of ``percolator-v3-07.exe``, diffed against the tree
+       Phase 00 produced with the original extractor
+     - No differences at all; 22 payload files; ``044f3957...``,
+       ``fc3c95e0...``, ``c4c664ea...`` unchanged.
+
+   * - ``bash scripts/feasibility/windows-artefact.sh`` end to end
+     - Reproduces the recorded Linux control exactly: 143 729 and 143 733
+       bytes, 200 ``<psm>`` elements each, the ``XML_SUPPORT was off``
+       diagnostic on the ``noxml`` build only.
+
+   * - ``bash scripts/ci/docs-build.sh``
+     - ``PASSED``, both strict builds, with the new page among them.
+
+Where the branch is
+===================
+
+The work was done in a **separate git worktree** so that the phase
+orchestrator running Phase 02 on ``main`` in ``/workspace`` was never
+disturbed. The branch itself lives in ``/workspace``'s repository and is
+visible there::
+
+    git branch -v
+    git worktree list
+
+If the scratch worktree has been cleaned up, ``git worktree prune`` tidies the
+metadata and the branch is unaffected. To re-create a place to inspect it::
+
+    git worktree add /some/path windows-percolator-verification
+
+Residue for tier 1
+==================
+
+Five things this orchestrator could not do, none of which blocks the push:
+
+#. **Gate item 8's wording.** See :ref:`residue-e1`. Its test does not
+   discriminate, and after ``D-002`` option C it names an artefact the product
+   no longer ships. A gate is tier 1's to amend.
+#. **The open half of E2.** Whether the Limelight converter accepts a
+   ``noxml`` build's ``-X`` output. ``D-002`` option C rests on the answer
+   being yes; a JVM has existed under ``tools/`` since Phase 01; nobody has
+   run it. Small, self-contained, and a Phase 05/09 input.
+#. **``phases/index.rst``** says PHASE-01 proved "42 steps, 3 workflows".
+   There are 45 across 4 now.
+#. **``STATUS.rst`` and ``DECISIONS.rst``** each speak of "the three workflow
+   files".
+#. **``docs/developer/testing.rst``** repeats "Nine damaged copies of
+   ``.github/``", which is nineteen now. That file belongs to the Phase 02
+   orchestrator's paths and was deliberately not touched.
+#. **``CONTRIBUTING.rst``** still refers in places to "the open publication
+   half of ``D-008``", which the owner closed on 2026-08-30.
+
+None of them is a phase orchestrator's file to edit.
+
