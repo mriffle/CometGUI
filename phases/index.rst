@@ -152,11 +152,12 @@ Phase 01 from running, but the fourth caps the grade it can reach.
   ``https://github.com/mriffle/CometGUI.git`` (``D-008``). This was the residue
   Phases 00 and 01 shared: it left Phase 00's gate item 8 open and capped Phase
   01 at ``PARTIAL`` on gate item 6. **Both are now ordinary phase work.** Phase
-  01 proved every pipeline step locally (42 steps, 3 workflows) and named the
-  Windows and macOS matrix entries so that turning them on is configuration
-  rather than authorship. Two standing constraints follow: the repository may
-  move, so its URL lives in one place; and its history is published, so it is
-  never force-pushed or rewritten.
+  01 proved every pipeline step locally -- 42 steps across 3 workflows then,
+  45 across 4 since the Windows Percolator verification workflow was added on
+  2026-08-30 -- and named the Windows and macOS matrix entries so that turning
+  them on is configuration rather than authorship. Two standing constraints
+  follow: the repository may move, so its URL lives in one place; and its
+  history is published, so it is never force-pushed or rewritten.
 
 Phases 00-13 with their gates passed constitute a working,
 provenance-complete application. Phases 14-16 are what make it a release.

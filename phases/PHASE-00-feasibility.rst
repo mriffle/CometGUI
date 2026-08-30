@@ -114,9 +114,47 @@ running the check. An item that cannot be verified has not passed.
    extracted without admin rights, and what its host requirements are.
 7. The latest compatible Percolator version is established from upstream data
    with the evidence recorded, not assumed from the specification.
-8. The Windows XML-capable Percolator artefact is confirmed on a Windows
-   runner -- payload obtained without admin rights, ``-X`` present -- or the
-   blocking reason is documented precisely and the manifest does not claim it.
+8. The Windows Percolator artefact is confirmed on a Windows runner -- payload
+   obtained without admin rights; the binary **observed to start**, evidenced
+   by its own version banner rather than by an exit code; and ``--xml-in``
+   **not** answering ``Compiler flag XML_SUPPORT was off`` -- or the blocking
+   reason is documented precisely and the manifest does not claim it. Because
+   ``D-002`` option C ships the portable ``noxml`` archive, the same
+   observations are additionally required of **that** binary, which is the one
+   the product actually installs.
+
+   .. note::
+
+      **Amended 2026-08-30 by the main orchestrator; strictly stronger than
+      the original, and deliberately so.** As first written this item asked
+      for "the Windows XML-capable artefact ... ``-X`` present", which fails
+      to discriminate in two ways that Phase 00's own evidence exposed and
+      that its work unit escalated as ``E1``.
+
+      First, ``-X`` is **not** a discriminating test. Both halves of the
+      3.07.1 A/B pair accept ``-X`` and both write a ``percolator_out`` XML;
+      that was executed on Linux during Phase 00 and reproduced on 2026-08-30.
+      What ``XML_SUPPORT`` gates is the pin-XML *input* path, so only
+      ``--xml-in`` -- which the ``noxml`` build refuses **by name** --
+      separates the twins. An item satisfied by the build it is meant to rule
+      out is not a gate.
+
+      Second, an *absent* diagnostic proves nothing on its own: a binary that
+      never started also prints no diagnostic. The item therefore now requires
+      positive evidence that the process ran, which is why the banner is named
+      explicitly.
+
+      Third, the item asked only about the XML-capable installer, but the
+      owner took ``D-002`` **option C** later the same day and the product now
+      installs the portable ``noxml`` binary. A gate that interrogates an
+      artefact the product does not ship would pass while saying nothing about
+      the software users receive, so the shipped artefact is added rather than
+      substituted.
+
+      Nothing here lowers the bar: every original requirement is retained, and
+      each addition narrows what may count as a pass. The blocking-reason
+      branch is unchanged, and remains the branch this item currently rests
+      on -- no Windows binary has been executed as of this amendment.
 9. Payload extraction is demonstrated for ``.deb``, ``.pkg`` and the NSIS
    ``.exe``, each yielding a runnable binary plus its XSD companions.
 10. ``D-001`` has a written recommendation with evidence, ready for the owner,

@@ -743,7 +743,7 @@ items this decision has been holding open:
   in this project. A ``windows-latest`` runner executes the checklist in
   ``docs/feasibility/windows-artefact.rst`` and re-runs it on every change.
 * **Phase 01 gate item 6** -- no pipeline has ever run on a pull request. The
-  three workflow files exist and every step is proven locally; they have simply
+  four workflow files exist and every step is proven locally; they have simply
   never been executed by GitHub.
 
 Read the Docs also becomes buildable, which is ``AC-DOC-01``'s second clause.

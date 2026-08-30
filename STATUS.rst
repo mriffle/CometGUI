@@ -4,13 +4,17 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-08-30
-:Updated by: Main orchestrator, session 02 (D-002 option C and all of D-008
-   decided; Phase 01 run and signed off PARTIAL; D-009 raised)
-:Current phase: 01 -- PARTIAL, signed off. Phase 02 is next and unblocked.
-:Overall: The repository, build and every quality gate now exist and have each
-   been seen to fail on a deliberate defect. Phases 00 and 01 are both PARTIAL
-   for the same reason -- no git remote -- which ``D-008`` resolved on
-   2026-08-30. Both residues are now closable by phase work.
+:Updated by: Main orchestrator, session 03 (specification revision 10; Phase 00
+   gate item 8 amended and strengthened; the Windows verification harness
+   prepared and signed off; Phase 02 dispatched and in progress)
+:Current phase: 02 -- IN PROGRESS. Phases 00 and 01 remain PARTIAL.
+:Overall: The repository, build and every quality gate exist and have each been
+   seen to fail on a deliberate defect. Phases 00 and 01 stay PARTIAL for the
+   same reason they always were, but the reason has changed shape: ``D-008``
+   supplied a remote on 2026-08-30, and what now blocks both is simply that **no
+   session has had a push credential**. The Windows verification harness is
+   written, falsifiable and locally verified; GitHub has still executed nothing
+   in this repository. See :ref:`status-residue-01`.
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -139,8 +143,9 @@ Phase board
        :ref:`status-p01`.
    * - 02
      - Application shell and navigation
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-08-30 to a fresh phase orchestrator; units landing on
+       ``main``. Not yet signed off.
    * - 03
      - Process service
      - NOT STARTED
@@ -499,6 +504,125 @@ on ``package-info.java`` at all** -- 53 files, 87% of the tree -- so Checkstyle
 carries that obligation and ``mvn spotless:apply`` will not add a header to a
 new ``package-info.java``.
 
+.. _status-residue-01:
+
+Phase 00 item 8 and Phase 01 item 6 -- preparation signed off (2026-08-30)
+==========================================================================
+
+:Outcome: **PREPARED, NEITHER ITEM CLOSED**
+:Signed off by: Main orchestrator, session 03, by re-running the work itself
+   and injecting its own defects
+:Phase records: ``handoffs/PHASE-00-01-residue-worklog.rst``,
+   ``handoffs/PHASE-00-01-residue-handoff.rst``
+:Branch: ``windows-percolator-verification``, 13 commits, based on ``82609f0``
+
+Both items were held open only by the absence of a remote. A remote exists, but
+**this session has no push credential** -- no ``gh``, no token, no SSH key, no
+credential helper; ``git push`` fails with ``could not read Username``. So the
+work was prepared and verified locally and **neither gate item is closed**.
+Closing them needs the owner to push and GitHub to execute something.
+
+What is now true: the harness exists, is falsifiable, and refuses to report a
+pass it has not earned. What is still not true: no Windows binary has been
+executed, and GitHub has run no workflow in this repository at all -- the
+Actions API reported ``total_count = 0`` on 2026-08-30.
+
+.. list-table:: What the main orchestrator ran at sign-off
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Check
+     - What was run, and what it printed
+
+   * - The harness cannot go green while doing nothing
+     - **My own defect, not one its author chose.** This project's recurring
+       trap is a tool that exits 0 having done nothing, so I forced the Windows
+       branch and replaced every Percolator launch with a process that exits 0,
+       prints nothing and writes nothing, leaving download and extraction
+       genuinely working. Verdict ``INCONCLUSIVE``, exit 2 -- never ``PASS``.
+       The discriminating step reasoned correctly: *"the diagnostic is absent,
+       but so is the 'Percolator version' banner in the 0 bytes captured. There
+       is no positive proof the binary started, so the absence establishes
+       nothing."* That is the dangerous false positive in this checklist --
+       reading a missing ``XML_SUPPORT was off`` as proof of capability -- and
+       it is closed.
+
+   * - The workflow gate discovers files rather than listing names
+     - I added a workflow the gate had never seen, carrying two defects of my
+       own. It reported ``5 workflow file(s) discovered`` and failed both:
+       ``uses 'actions/checkout@v5', which is not OWNER/REPO pinned to a full
+       40-character commit SHA`` and ``names scripts/ci/mo-not-a-real-script.sh,
+       which does not exist``. Removing my file returned ``PASSED`` with ``4
+       workflow file(s) discovered``. It also refused my YAML flow-collection
+       syntax rather than guessing at it.
+
+   * - The path-traversal finding is real, and the fix generalises
+     - Five traversal cases of my own -- none in the author's table -- all
+       contained: two-space ``..``, dot-space-dot, a lowercase ``nul`` device,
+       a space-dot-space shadow, and a plain four-level climb. Against the old
+       extractor I confirmed the escape was genuine: its filter matched only
+       exact ``".."``, so ``.. `` passed through, and Win32 strips the trailing
+       space. The case that matters most here is ``percolator.exe `` resolving
+       to ``percolator.exe`` -- silently replacing the very file whose SHA-256
+       the checklist pins.
+
+   * - One PIN generator, not two that can drift
+     - ``windows-artefact.sh`` and the Windows driver both call
+       ``make_synthetic_pin.py``. Generated twice: byte-identical, 32 466 bytes,
+       sha256 ``6643ede4...``, matching the value pinned in both files.
+
+   * - The aggregate gates still hold
+     - ``bash scripts/build.sh`` -> ``11/11 stages OK in 88 seconds. BUILD OK``.
+       ``bash scripts/verify-all-gates.sh`` -> ``9 control(s) passed, 0 failed,
+       in 302 seconds``, ``Every gate was seen to reject its defect and accept
+       the clean tree.`` ``run-pipeline-locally.sh`` -> ``45 step(s) across 4
+       workflow(s); 37 executed on this machine; 0 unexpected``.
+
+   * - Nothing was weakened to make this pass
+     - ``docs/feasibility/windows-artefact.rst`` still carries
+       ``xml_capability: unverified-on-windows``, still carries the sentence
+       "The binary was not executed on Windows." (4 occurrences), and its
+       central warning is unchanged. Its edits move in the honest direction:
+       the claim that the extractor "runs on Windows unchanged" is **removed**
+       and replaced with "it has still never been executed on Windows".
+       ``run-pipeline-locally.sh`` still prints ``Still unmet: 'on a pull
+       request'`` rather than quietly claiming item 6.
+
+Gate item 8 amended, and strictly strengthened
+-----------------------------------------------
+
+Phase 00's work unit escalated ``E1``: gate item 8's own test, "``-X``
+present", is satisfied by the ``noxml`` build it is meant to exclude -- both
+twins accept ``-X`` and both write a ``percolator_out`` XML, executed on Linux
+and reproduced on 2026-08-30. A gate an excluded build passes is not a gate.
+Two further problems: an *absent* diagnostic proves nothing when the binary may
+never have started, and ``D-002`` option C means the item interrogated an
+artefact the product no longer ships.
+
+The item now requires the binary to be **observed to start** (its own version
+banner, not an exit code), requires ``--xml-in`` **not** to answer ``Compiler
+flag XML_SUPPORT was off``, and requires the same observations of the portable
+``noxml`` binary the product actually installs. **Every original requirement is
+retained and each addition narrows what may count as a pass**; the
+blocking-reason branch is untouched, and remains the branch the item rests on.
+
+``E2`` is closed as an escalation -- the owner went further than it recommended
+when taking ``D-002`` option C. One half of it survives as work, is cheap, and
+is recorded below.
+
+What the owner must do, and what nobody can yet know
+-----------------------------------------------------
+
+The push sequence is in :ref:`status-next-action`. Until a runner executes it,
+these stay unknown: whether ``percolator.exe`` starts on Windows at all, its
+real ``--help`` text, whether ``-X`` writes XML there, and whether ``--xml-in``
+prints the diagnostic. Never answerable by this job at all: standard
+(non-administrator) users, consumer Windows 10/11, Windows on ARM, and macOS.
+
+A red Windows job is not automatically a defect. The driver exits 0 for PASS,
+1 for a NEGATIVE finding about the binary, 2 for INCONCLUSIVE and 3 for a
+harness failure, and the transcript names the value it observed in every case.
+
 Open decisions
 ==============
 
@@ -649,6 +773,8 @@ Risks currently live
    fonts, so a ``Scene`` with any control dies on ``fontFactory is null``
    unless both are supplied.
 
+.. _status-next-action:
+
 Next action
 ===========
 
@@ -663,9 +789,11 @@ items:
   binary in this project will have been run rather than inferred from byte
   markers. Until it passes, every non-Linux capability claim stays inference and
   the manifest must keep saying so.
-* **Phase 01 item 6** -- the three workflow files run on a real pull request.
-  They exist and every step is proven locally; GitHub has simply never executed
-  them.
+* **Phase 01 item 6** -- the four workflow files run on a real pull request.
+  They exist and every step is proven locally -- 45 steps across 4 workflows,
+  37 executed on this machine -- but GitHub has executed nothing in this
+  repository at all: the Actions API reported ``total_count = 0`` runs on
+  2026-08-30.
 
 Both are re-verified on every change thereafter, which is why a runner was worth
 more than one person spending fifteen minutes.
@@ -687,23 +815,51 @@ drop:
 For the owner
 --------------
 
-**Nothing is waiting on the owner.** Every ``D-`` item is answered. Two carry a
-deliberate deferral, and each has a named owner and moment:
+**One thing is waiting on the owner: a push.** This session has no GitHub
+credential -- no ``gh``, no token, no SSH key, no credential helper -- so
+``git push`` fails here with ``could not read Username``, exactly as in session
+02. Both remaining gate items need GitHub to *execute* something, so neither can
+close from inside a session that cannot reach it.
+
+Push ``main`` at ``82609f0`` first, then the branch. ``82609f0`` is the
+branch's base and the last commit the main orchestrator verified green
+(``11/11 stages OK``); ``main`` has since advanced with Phase 02 work still in
+flight, and holding the first-ever pipeline run to a verified commit keeps a
+Phase 02 failure from being mistaken for a pipeline failure. Type::
+
+    cd /workspace
+    git push origin 82609f0:main
+    git push origin windows-percolator-verification
+
+Then open this in a browser and press "Create pull request"::
+
+    https://github.com/mriffle/CometGUI/compare/main...windows-percolator-verification?expand=1
+
+Runs appear at ``https://github.com/mriffle/CometGUI/actions``. Actions is
+already enabled -- the API lists the existing workflows as ``active`` -- but it
+has executed nothing yet.
+
+.. warning::
+
+   **The second push is the one that fails if the token lacks ``workflow``
+   scope.** The whole deliverable lives under ``.github/workflows/``, and a
+   Personal Access Token cannot create or update anything there without it. The
+   rejection names the file and nothing else -- not the token, not the account,
+   not the fix -- which is what sent session 02 chasing git identity for several
+   exchanges. Remedy: a classic PAT needs the ``workflow`` box ticked; a
+   fine-grained token needs *Repository permissions -> Workflows: Read and
+   write*. SSH keys and ``gh`` credentials are unaffected, and
+   ``git push origin 82609f0:main`` is unaffected -- no commit in it touches
+   ``.github/``.
+
+Nothing else is waiting. Every ``D-`` item is answered; two carry a deliberate
+deferral, each with a named owner and moment:
 
 * ``D-006``'s CI half -- the trimmed-down DDA mzML set -- belongs before Phase
   14. The local fixture is settled and does not substitute for it.
 * ``D-009`` -- the copyright line stays as written, but whether an institution
   has a claim is deferred, not closed, and Phase 16 must raise it again before
   release while changing it is still cheap.
-
-Two more are answered but not closed, and both are deferrals the owner made
-deliberately rather than gaps:
-
-* ``D-006``'s remaining half -- the trimmed-down DDA mzML set for CI -- belongs
-  before Phase 14. The local fixture is settled and does not substitute for it.
-* ``D-009`` -- the copyright line stays as written for now, but the
-  institutional question behind it is deferred, not closed, and Phase 16 must
-  raise it again before release, while changing it is still cheap.
 
 *Answered so far:* ``D-001`` (GPL-3.0, derived from CasanovoGUI, PDV treated as
 GPL-3.0); ``D-002`` including option C (portable ``noxml`` archives; Phase 05
