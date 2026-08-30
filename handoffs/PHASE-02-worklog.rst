@@ -158,7 +158,30 @@ Work units
        Accepted only with cometgui-domain still at >= 0.90 line / 0.85 branch
        and PIT >= 80%, no JavaFX and no ``ProcessBuilder``.
      - ``R-PROC-01``, ``R-PLAT-01``
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commits ``f34db9d`` and ``9835ae1``. I read
+       both diffs in full. ``git show --name-only`` over the two commits lists
+       nothing outside ``cometgui-domain/``, and
+       ``git log 57964e7..HEAD -- pom.xml config/ scripts/ .mvn/`` is empty, so
+       no gate, threshold or exclusion was touched. I ran
+       ``mvn -B -pl cometgui-domain -am verify``: ``BUILD SUCCESS``,
+       ``0 Checkstyle violations``, ``BugInstance size is 0``,
+       ``All coverage checks have been met``. Reading the reports myself:
+       194 tests, 0 failures, 0 errors, 0 skipped across eight classes;
+       ``jacoco.xml`` final counters ``LINE missed=0 covered=237`` and
+       ``BRANCH missed=0 covered=124`` -- 100% against the 0.90/0.85 gate. I
+       ran PIT myself and counted ``mutations.xml`` rather than trusting the
+       exit code: ``total=129 killed=129 survived=0``, 100% against the 80%
+       threshold. **Falsification of my own**, in a ``git archive`` sandbox
+       under ``_build/``: inverting one character in
+       ``HostBaselineVerifier`` (``!sixtyFourBit.get()`` to
+       ``sixtyFourBit.get()``) turned 11 tests red across three nested
+       classes, naming ``theBlockingArchitectureOutranksTheBlockingGlibc``,
+       ``aKnownThirtyTwoBitArchitectureBlocks`` and both warning cases; the
+       sandbox was deleted afterwards and the working tree never carried the
+       defect. No ``assertDoesNotThrow`` and no bare ``assertNotNull`` appears
+       in the unit's tests. Every new ``.java`` file carries the exact D-009
+       header line. ``bash scripts/build.sh``: ``11/11 stages OK in 99
+       seconds. BUILD OK``.
 
    * - 2
      - **Bounded console message model.** ``org.cometgui.domain.log`` with a
