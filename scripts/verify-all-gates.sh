@@ -193,7 +193,7 @@ gate_spec() {
             ;;
         tests)
             GATE_ITEMS="3, 4"
-            GATE_DEFECT="a JavaFX import in the domain, a ProcessBuilder outside the process service, a truncated ArchUnit import, an untested class in a gated package, an untested view-model, a weakened test suite, a module whose coverage was never measured"
+            GATE_DEFECT="a JavaFX import in the domain, a ProcessBuilder outside the process service, a truncated ArchUnit import, an untested class in a gated package sized so the ratio really falls below 0.90, an untested view-model sized against the package rule, a covered class whose test asserts nothing so its mutations survive, and a module whose coverage was never measured"
             GATE_SCRIPT="scripts/verify-test-gates.sh"
             GATE_ARGS=()
             GATE_PROOF=("Every gate rejected its defect and accepted the clean tree.")
