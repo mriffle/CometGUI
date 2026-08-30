@@ -232,12 +232,22 @@ def main(argv=None):
     text = render(lines)
     write_pin(args.output, text)
 
-    data = text.encode("ascii")
+    # Hash the bytes that REACHED THE DISK, never the string we meant to
+    # write.  HAZARD (a) is exactly a difference between those two: a text-mode
+    # handle rewrites "\n" as "\r\n" after this function has already decided
+    # what it thinks the content is.  Hashing `text` would describe the
+    # intended file and miss the real one -- checked by damaging write_pin to
+    # newline="\r\n", which the string-hashing version reported as
+    # 6643ede4... and exit 0 while writing 32 867 bytes of 9465459c... to
+    # disk.  Reading it back is what makes --expect-sha256 a check on the
+    # artefact rather than on this program's opinion of it.
+    with open(args.output, "rb") as fh:
+        data = fh.read()
     digest = hashlib.sha256(data).hexdigest()
     print("  wrote a %d-PSM synthetic PIN" % args.rows)
     if args.print_sha256:
         print("  sha256 %s  %d bytes  %d lines"
-              % (digest, len(data), len(lines)))
+              % (digest, len(data), data.count(b"\n")))
 
     if args.expect_sha256 is not None:
         want = args.expect_sha256.strip().lower()
