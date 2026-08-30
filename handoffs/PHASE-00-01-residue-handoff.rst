@@ -193,6 +193,115 @@ Traps and findings worth carrying forward
        have reported the intended PIN while a CRLF-translated one sat on disk.
        Caught at sign-off by damaging the writer and watching the check pass.
 
+   * - **A comment can turn a real check into a "stub"**
+     - ``scripts/ci/run-pipeline-locally.sh`` decides whether a step is an
+       unimplemented stub -- one that MUST exit 70 -- by grepping the script
+       file for the literal string ``stub-lib.sh``. The new verification
+       wrapper's header comment originally *named* that file in order to say
+       "this is not a stub", which would have made a real check be classified
+       as a stub by the very mechanism it was disclaiming. The literal is
+       absent from both new files and the comment explains the circumlocution.
+       Anything written later that mentions that filename in prose hits the
+       same trap.
+
+What the owner has to do
+========================
+
+Nothing below can be done from this session: there is no credential here. All
+of it is plain shell, to be typed on the machine that holds ``/workspace``,
+where the branch lives.
+
+**Push ``main`` first, then the branch.** The order matters. The branch is
+based on ``main`` as it stood at ``82609f0``. If the branch is pushed while
+``origin/main`` is still at ``9115b1c``, GitHub computes the pull request
+against that older commit and the diff will carry a handful of unrelated
+commits as well. Push ``main`` first and the pull request contains only this
+work.
+
+.. code-block:: text
+
+    cd /workspace
+    git status
+    git push origin main
+    git push origin windows-percolator-verification
+
+Then open the pull request in the browser:
+
+.. code-block:: text
+
+    https://github.com/mriffle/CometGUI/compare/main...windows-percolator-verification?expand=1
+
+and press "Create pull request". Opening it starts both pipelines: the
+existing ``pull-request`` workflow (which is what PHASE-01 gate item 6 has been
+waiting for) and the new ``windows-percolator`` job.
+
+Watch them at:
+
+.. code-block:: text
+
+    https://github.com/mriffle/CometGUI/actions
+
+**The trap that will cost an hour if it is not expected.** A GitHub Personal
+Access Token cannot create or update anything under ``.github/workflows/``
+unless it carries the **workflow** scope. This branch's whole point is a file
+in that directory, so the second push is exactly where it bites. The failure
+looks like this, and it names no account, no token and no fix:
+
+.. code-block:: text
+
+    ! [remote rejected] windows-percolator-verification -> windows-percolator-verification
+      (refusing to allow a Personal Access Token to create or update workflow
+      `.github/workflows/windows-percolator.yml` without `workflow` scope)
+
+The remedy is on the token, not in the repository: a **classic** PAT needs the
+``workflow`` checkbox; a **fine-grained** PAT needs *Repository permissions ->
+Workflows: Read and write*. Then push again -- nothing here needs changing.
+The first push, ``git push origin main``, is not affected: none of the
+unpushed ``main`` commits touches ``.github/``, which was checked.
+
+**GitHub Actions appears to be enabled already.** The Actions API lists all
+three existing workflows as ``active``, which a repository with Actions
+disabled does not do. If a run does not start anyway, it is *Settings ->
+Actions -> General -> Allow all actions and reusable workflows*.
+
+**Reading the result.** The Windows job uploads its transcript as an artifact
+called by the workflow's ``name``, and also prints the whole of it into the job
+log, so the evidence survives even if the upload does not happen. The verdict
+block at the end is the thing to read. It says one of:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 12 66
+
+   * - Verdict
+     - Exit
+     - What it means
+
+   * - ``PASS``
+     - 0
+     - Every checklist assertion held on a Windows runner, each naming the
+       value it observed. This is what closes PHASE-00 gate item 8's first
+       branch.
+
+   * - ``NEGATIVE``
+     - 1
+     - The binary ran and the evidence contradicts something this project
+       currently infers. **This is a real finding, not a bug in the job.** It
+       goes to tier 1 and probably to ``D-002``.
+
+   * - ``INCONCLUSIVE``
+     - 2
+     - The binary did not run far enough for the test to mean anything.
+       Nothing is established either way.
+
+   * - ``HARNESS FAILURE``
+     - 3
+     - A download, a checksum, the extraction or Python failed. Nothing was
+       learned about the binary.
+
+A red Windows job is therefore not automatically a defect to fix: read which
+of the four it is first.
+
 Two documents this work could not correct
 =========================================
 
