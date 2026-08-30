@@ -545,7 +545,35 @@ Work units
      - **``docs/developer/architecture.rst``** describing the layering as
        built, and the traceability map updated to name the new evidence.
      - ``R-DOC-03``
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commits ``2c62be7`` and ``420e8cf``. The
+       page is 1,154 lines over eleven top-level sections, and I read it. It
+       describes the tree as built rather than the specification's intent, and
+       it is honest where the two differ. ``bash scripts/ci/docs-build.sh``
+       run by me: ``build 1 OK -- 51 HTML page(s)``,
+       ``build 2 OK -- 39 HTML page(s)``, ``PASSED``, and
+       ``docs/_build/html/developer/architecture.html`` is 133,884 bytes on
+       disk -- the page exists, not merely the exit code.
+       **I re-verified the page's load-bearing claim myself** rather than
+       taking it: a class in ``org.cometgui.domain`` importing
+       ``javafx.scene.control.Label``, compiled with the module's own settings
+       (``javac --release 25``, no dependencies, no ``--add-modules``), exits
+       **0** and produces ``Probe.class``. The Liberica *Full* JDK supplies
+       ``javafx.*`` as system modules, so the Maven graph cannot forbid it and
+       ArchUnit really is the only thing that refuses it. Phase 01's handoff
+       surprise 6 says the opposite, and this page corrects it.
+       The page also carries the two corrections I asked for after my own
+       sign-offs -- why the bundle figure (176/176) and the gated package
+       figure (175/175) differ and which one to read, and the
+       double-assignment property of accessible text that made one of my
+       injections ineffective.
+       ``scripts/feasibility/check-docs.sh`` reports two ``unknown document``
+       warnings on this page. I checked rather than accepted the explanation:
+       that harness builds one file in a throwaway tree with no siblings, so
+       an inter-document ``:doc:`` reference cannot resolve there by
+       construction, and both targets do resolve in the real gate -- the
+       rendered HTML carries ``href="testing.html"`` and
+       ``href="../feasibility/gui-automation-spike.html"``. No cross-reference
+       was removed to make a check pass.
 
    * - 10
      - **``scripts/verify-shell-gates.sh``**: for each of the five exit-gate
