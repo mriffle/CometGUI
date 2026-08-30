@@ -115,7 +115,7 @@ gate_spec() {
             ;;
         workflows)
             GATE_ITEMS="6"
-            GATE_DEFECT="nine damaged copies of .github/ -- a renamed step script, a dropped required step, continue-on-error, a trailing || true, a git push added to release.yml"
+            GATE_DEFECT="nineteen damaged copies of .github/ -- a renamed step script, a dropped required step, continue-on-error, a trailing || true, a git push added to release.yml, an unknown workflow naming a missing script, an action outside a workflow allowlist, an action pinned to a tag, and the if: always() dropped from the transcript upload"
             GATE_SCRIPT="scripts/ci/check-workflows.sh"
             GATE_ARGS=(--self-test)
             GATE_PROOF=("self-test OK" "the undamaged one accepted")
