@@ -503,6 +503,14 @@ read from a report.
    * - ``bash scripts/ci/docs-build.sh``
      - ``PASSED``, both strict builds, with the new page among them.
 
+   * - ``bash scripts/verify-all-gates.sh`` -- the aggregate falsifiability
+       harness, deliberately not part of ``build.sh``
+     - ``9 control(s) passed, 0 failed, in 304 seconds``, ``Every gate was
+       seen to reject its defect and accept the clean tree.`` The
+       ``workflows`` control reports ``19 damaged copies rejected`` against a
+       recorded floor of 9, and the ``pipeline`` control's 24 steps are
+       unchanged.
+
 Where the branch is
 ===================
 
