@@ -3,13 +3,14 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-08-29
-:Updated by: Main orchestrator, session 02 (D-002 option C and the D-008 tool
-   distribution half decided; Phase 01 run and signed off PARTIAL; D-009 raised)
+:Updated: 2026-08-30
+:Updated by: Main orchestrator, session 02 (D-002 option C and all of D-008
+   decided; Phase 01 run and signed off PARTIAL; D-009 raised)
 :Current phase: 01 -- PARTIAL, signed off. Phase 02 is next and unblocked.
 :Overall: The repository, build and every quality gate now exist and have each
    been seen to fail on a deliberate defect. Phases 00 and 01 are both PARTIAL
-   for the same reason: there is no git remote.
+   for the same reason -- no git remote -- which ``D-008`` resolved on
+   2026-08-30. Both residues are now closable by phase work.
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -72,7 +73,7 @@ What exists
      - Scope, deliverables and exit gate per phase. 00 and 01 signed off
        PARTIAL, 05 re-scoped by ``D-002`` option C.
    * - ``DECISIONS.rst``
-     - 5 open, 3 decided, 1 part decided
+     - 5 open, 4 decided
      - ``D-001``, ``D-002`` (including option C) and ``D-004`` decided.
        ``D-008`` is decided on licence and on tool distribution; only the
        publication location remains. ``D-003``, ``D-005``, ``D-006``,
@@ -470,7 +471,12 @@ Why PARTIAL rather than PASSED
 
 One reason only: **no pipeline has ever run on a pull request, because there is
 no git remote.** Everything else in the gate passes. This is the same blocker
-that holds Phase 00's item 8 open, and one owner decision closes both.
+that held Phase 00's item 8 open.
+
+*Resolved the next day.* ``D-008`` was decided on 2026-08-30 and the remote
+exists. This sign-off stands as recorded -- the item was genuinely unmet when
+it was signed -- but it is now closable by running the pipeline on a pull
+request, with no further decision needed.
 
 What the phase found in its own work, and reported
 ---------------------------------------------------
@@ -497,13 +503,14 @@ new ``package-info.java``.
 Open decisions
 ==============
 
-Four items are open -- ``D-003``, ``D-005``, ``D-006``, ``D-007`` -- plus the
-publication half of ``D-008``. Everything else is decided. **No ``D-`` item has
+Four items are open -- ``D-003``, ``D-005``, ``D-006``, ``D-007`` -- plus
+``D-009``. ``D-008`` is now closed in full. **No ``D-`` item has
 ever been answered by an agent**, and none may be.
 
-On 2026-08-29 the owner answered three questions this session put to them:
-``D-002`` **option C**, the ``D-008`` **tool-distribution** half, and the
-direction that **Phase 01 runs without a remote and accepts PARTIAL**.
+On 2026-08-29 the owner answered ``D-002`` **option C**, the ``D-008``
+**tool-distribution** half, and directed that **Phase 01 run without a remote
+and accept PARTIAL**. On 2026-08-30 the owner answered the last of ``D-008``:
+**CometGUI is published at** ``https://github.com/mriffle/CometGUI.git``.
 
 .. list-table::
    :header-rows: 1
@@ -542,11 +549,12 @@ direction that **Phase 01 runs without a remote and accepts PARTIAL**.
      - Which Limelight endpoint do tests target?
      - 12, 14
    * - ``D-008``
-     - **DECIDED** on two of three: the licence is **GPL-3.0**, and tool
-       binaries are **downloaded from upstream by pinned URL and SHA-256,
-       never redistributed**. **Still open: where CometGUI is published.
-       There is still no remote and none may be created.**
-     - 16; phase 00 gate item 8; phase 01 gate item 6
+     - **DECIDED, all three parts.** GPL-3.0; tool binaries downloaded from
+       upstream by pinned URL and SHA-256, never redistributed; and published
+       at ``https://github.com/mriffle/CometGUI.git`` (2026-08-30), which may
+       move before release but will always be a GitHub repository the owner
+       controls.
+     - --
 
 Risks currently live
 ====================
@@ -619,43 +627,50 @@ Risks currently live
 Next action
 ===========
 
-**Run Phase 02** (``phases/PHASE-02-app-shell.rst``). Its dependency, Phase 01,
-is signed off; nothing else blocks it. It is the only phase whose dependencies
-are currently met -- 03 needs 01 and 02, 04 needs 01 and 03.
+Two things are now ready, and they are independent of each other.
 
-Two obligations Phase 02 inherits and must not drop:
+**1. Close the two gate items ``D-008`` was holding open.** The remote exists as
+of 2026-08-30, so both residues are ordinary phase work rather than blocked
+items:
+
+* **Phase 00 item 8** -- a ``windows-latest`` runner executes the checklist in
+  ``docs/feasibility/windows-artefact.rst``, which is the first time any Windows
+  binary in this project will have been run rather than inferred from byte
+  markers. Until it passes, every non-Linux capability claim stays inference and
+  the manifest must keep saying so.
+* **Phase 01 item 6** -- the three workflow files run on a real pull request.
+  They exist and every step is proven locally; GitHub has simply never executed
+  them.
+
+Both are re-verified on every change thereafter, which is why a runner was worth
+more than one person spending fifteen minutes.
+
+**2. Run Phase 02** (``phases/PHASE-02-app-shell.rst``). Its dependency, Phase
+01, is signed off; nothing blocks it. Two obligations it inherits and must not
+drop:
 
 * **``D-001``'s attribution duty.** Any file derived from
   ``Noble-Lab/CasanovoGUI`` retains its copyright notices and records the
-  derivation. ``CONTRIBUTING.rst`` already says how: a second Spotless file set
-  and a second Checkstyle execution with their own header file -- **extending**
-  the header configuration, never relaxing or excluding it to make a derived
-  file pass.
+  derivation. ``CONTRIBUTING.rst`` says how: a second Spotless file set and a
+  second Checkstyle execution with their own header file -- **extending** the
+  header configuration, never relaxing or excluding it to make a derived file
+  pass.
 * **The copyright placeholder stays a placeholder.** Every Java file reads
   ``Copyright (C) 2026 The CometGUI authors.`` No agent substitutes a name;
   that is ``D-009``.
 
-For the owner, two items
--------------------------
+For the owner
+--------------
 
-#. **The publication half of ``D-008``: where CometGUI is published.** This is
-   now the project's only compounding cost. It holds **two** gate items open --
-   Phase 00's item 8 (no Windows binary has ever been executed anywhere in this
-   project) and Phase 01's item 6 (no pipeline has ever run on a pull request)
-   -- and it gates the GPL-3.0 source-availability mechanism in Phase 16. A
-   free GitHub Actions ``windows-latest`` runner would close both permanently
-   and re-verify them on every change. Until it is answered there is **no git
-   remote and none may be created.**
-#. **``D-009``: whose name goes on the copyright line.** Raised by Phase 01.
-   No deadline before Phase 16 and nothing is blocked meanwhile, but it is
-   answered by the same fact as ``D-008`` -- who is publishing this, and on
-   whose behalf -- so the two are cheapest decided together.
+``D-009`` -- whose name goes on the copyright line -- is the only item with any
+urgency, and it has none before Phase 16. ``D-003``, ``D-005``, ``D-006`` and
+``D-007`` are open and each blocks a phase that has not started.
 
-*Answered on 2026-08-29:* ``D-001`` (GPL-3.0, derived from CasanovoGUI, PDV
-treated as GPL-3.0); ``D-002`` option C (portable ``noxml`` archives; Phase 05
-re-scoped); the ``D-008`` tool-distribution half (downloaded from upstream, not
-redistributed); and the direction that Phase 01 run without a remote and accept
-``PARTIAL``.
+*Answered so far:* ``D-001`` (GPL-3.0, derived from CasanovoGUI, PDV treated as
+GPL-3.0); ``D-002`` including option C (portable ``noxml`` archives; Phase 05
+re-scoped); ``D-004`` (Rosetta 2); and ``D-008`` in full (GPL-3.0; tools
+downloaded not redistributed; published at
+``https://github.com/mriffle/CometGUI.git``).
 
 Change log
 ==========
@@ -667,6 +682,23 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-08-30
+     - --
+     - **``D-008`` decided in full: CometGUI is published at**
+       ``https://github.com/mriffle/CometGUI.git``. The owner created the
+       repository and recorded two qualifications -- it may move before
+       release, and it will always be a GitHub repository under the owner's
+       control. Two consequences bind every later phase: **the URL is kept in
+       one place** rather than scattered through scripts and configuration, so
+       a move costs an edit and not a day; and **history is never force-pushed
+       or rewritten**, because it is now published. The prohibition on creating
+       a remote is lifted, and the rule was corrected in ``CLAUDE.md``,
+       ``ONBOARDING.rst`` and ``CONTRIBUTING.rst``, which all stated it
+       absolutely. This unblocks the two gate items it had been holding open --
+       phase 00 item 8 (no Windows binary has ever been executed anywhere in
+       this project) and phase 01 item 6 (no pipeline has ever run on a pull
+       request) -- and Read the Docs, which is ``AC-DOC-01``'s second clause.
+       Closing them is now phase work, not a decision.
    * - 2026-08-29
      - 01
      - **Phase 01 run and signed off PARTIAL.** Three tiers as designed: one

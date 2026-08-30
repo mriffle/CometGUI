@@ -2,7 +2,7 @@
 Decisions
 =========
 
-:Updated: 2026-08-29 (D-002 option C, D-008 tool distribution, D-009 raised)
+:Updated: 2026-08-30 (D-008 fully decided -- publication location)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -535,8 +535,8 @@ determined from the output file, never from the exit code.
 D-008 -- CometGUI licence and distribution
 ==========================================
 
-:Status: **PARTLY DECIDED 2026-08-29** -- licence and tool distribution settled;
-   **publication location still OPEN**
+:Status: **DECIDED** -- licence and tool distribution 2026-08-29, publication
+   location 2026-08-30. All three parts are now answered.
 :Raised: 2026-08-28
 :Blocks: Phase 16, and Windows CI for phase 00's gate item 8, and gate item 6
    of phase 01. **Does not block Phase 01 from running** -- see the note under
@@ -573,37 +573,49 @@ consistent: the portable zips chosen there are downloaded by checksum like
 everything else, and no artefact this project ships contains a third-party
 binary.
 
-**STILL OPEN -- where CometGUI is published.** This is the only open half, and
-an agent must not infer it. There is still **no git remote, and creating one
-remains part of this decision -- do not create one.** It gates the GPL-3.0 source-availability mechanism (phase 16), phase 00's
-unmet gate item 8, and **gate item 6 of phase 01**, which requires the
-pull-request pipeline to run on an actual pull request. On 2026-08-29 the owner
-directed that phase 01 proceed **without** a remote and accept the resulting
-``PARTIAL``: the workflow files are written and every pipeline step is proved
-by running the same commands locally, including the deliberate-failure
-demonstrations, and the "on a pull request" half is recorded unmet. Nothing is
-weakened; the gap is named, as phase 00's item 8 was. **There is still no git
-remote and none may be created.**
+**DECIDED 2026-08-30 -- CometGUI is published on GitHub, in a repository the
+owner controls.** The repository is ``https://github.com/mriffle/CometGUI.git``.
+The owner recorded two qualifications: it **may move before release**, and it
+will **always be a GitHub repository under the owner's control**.
 
-**Recommendation for the remaining half.** Decide the publication location
-early. It is the one thing standing between the project and two permanently
-closed gate items -- phase 00's item 8 and phase 01's item 6 -- both of which a
-free GitHub Actions ``windows-latest`` runner would close and then re-verify on
-every change.
+*What this settles.* The GPL-3.0 source-availability obligation has a mechanism:
+recipients of an installer can obtain the corresponding source from the public
+repository (Phase 16 still implements and documents the link). The prohibition
+on creating a remote is **lifted**.
+
+*What it unblocks, and this is the whole point of answering it.* GitHub Actions
+runners become available, which is the only repeatable way to close the two gate
+items this decision has been holding open:
+
+* **Phase 00 gate item 8** -- no Windows binary has ever been executed anywhere
+  in this project. A ``windows-latest`` runner executes the checklist in
+  ``docs/feasibility/windows-artefact.rst`` and re-runs it on every change.
+* **Phase 01 gate item 6** -- no pipeline has ever run on a pull request. The
+  three workflow files exist and every step is proven locally; they have simply
+  never been executed by GitHub.
+
+Read the Docs also becomes buildable, which is ``AC-DOC-01``'s second clause.
+
+*Constraints that follow, binding on every phase.* Because the location may
+change, **the URL is kept in one place rather than scattered** through scripts,
+POMs and configuration. Because the history is now published, **it is never
+force-pushed and never rewritten**. Neither is a matter of taste: a moved
+repository with the URL hard-coded in twenty files is a day of work, and a
+rewritten public history breaks every clone.
 
 **Question.** Under what licence is CometGUI released, where is it published,
 and are project-built tool binaries distributed alongside it?
 
 **Constraints.** Constrained by ``D-001`` (derivation) and ``D-002``
-(redistributed binaries). There is currently **no git remote**, and creating
-one is part of this decision -- an agent must not add one.
+(redistributed binaries). *Superseded:* while this was open there was no git
+remote and no agent could add one. Both halves are now answered above.
 
-**Recommendation.** Decide the licence early enough for phase 01 to place the
-file; defer publication until ``D-001`` is resolved and the private-content
-scan of the repository has been re-run.
+**Recommendation, as it stood.** Decide the licence early enough for phase 01
+to place the file; defer publication until ``D-001`` is resolved and the
+repository has been re-read for anything that should not be public.
 
-**Phase 00, 2026-08-29 -- this decision now blocks something concrete.** Two
-new couplings:
+**Phase 00, 2026-08-29 -- this decision then blocked something concrete.** Two
+couplings, both now resolved:
 
 * **``D-001`` and ``D-008`` are now one question.** CasanovoGUI became GPL-3.0
   today. Deriving from it commits CometGUI to GPL-3.0; declining that commits

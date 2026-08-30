@@ -130,14 +130,10 @@ when a reviewer reads a diff that spans two units. Name your paths.
 decision identifier when you are recording one -- ``D-001 DECIDED: ...``.
 Subjects are read as a phase timeline.
 
-**There is no git remote, and none may be created.** Where CometGUI is
-published is the still-open half of ``D-008``: an owner decision, coupled to
-the GPL-3.0 source-availability obligation, and not something an agent may
-settle by running ``git remote add``. Do not create one, and do not add a
-push step to a script or a workflow that assumes one. The cost is known and
-recorded: Phase 00 gate item 8 and Phase 01 gate item 6 (*CI runs on a pull
-request*) stay unmet until the owner decides, and both phases record that
-openly rather than pretending otherwise.
+**The remote is** ``https://github.com/mriffle/CometGUI.git`` (``D-008``,
+decided 2026-08-30). It may move before release, so keep the URL in one place
+rather than scattering it through scripts and configuration. Never force-push,
+and never rewrite history that has been published.
 
 Gate conventions
 ================

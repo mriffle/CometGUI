@@ -26,5 +26,7 @@ Hard rules:
    coverage threshold to make something pass.
 4. Commit at every milestone with an explicit pathspec. Never `git add -A` —
    other agents may be live in the same tree.
-5. There is no git remote. Do not create one (`D-008`).
+5. The remote is `https://github.com/mriffle/CometGUI.git` (`D-008`, decided
+   2026-08-30). It may move before release; keep the URL in one place. Never
+   force-push and never rewrite published history.
 6. Exit code 0 proves nothing. Verify that output exists and is correct.

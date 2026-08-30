@@ -331,9 +331,10 @@ access to GitHub and PyPI. It has **no** JDK, Maven, Gradle or Docker.
 Repository
 ----------
 
-* Git is initialised here and history is the durability record. **There is no
-  remote, and adding one is an owner decision (``D-008``) -- do not create
-  one.**
+* Git is initialised here and history is the durability record. The remote is
+  ``https://github.com/mriffle/CometGUI.git`` (``D-008``, decided 2026-08-30).
+  It may move before release, so keep the URL in one place rather than
+  scattering it. **Never force-push and never rewrite published history.**
 * Commit at every milestone: a passed gate, a landed repair, an amended phase
   document. Do not batch.
 * Commit with an explicit pathspec (``git commit -- path/...``). Never

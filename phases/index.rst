@@ -23,7 +23,8 @@ authoritative for its own scope and exit gate.
    * - `01 <PHASE-01-build-skeleton.rst>`_
      - Repository, Build and Quality Skeleton
      - 00 (met)
-     - none outstanding; ``D-008`` capped the outcome at PARTIAL
+     - none outstanding; ``D-008`` capped the outcome at PARTIAL, and is now
+       decided -- item 6 is closable
      - PARTIAL (signed off 2026-08-29)
    * - `02 <PHASE-02-app-shell.rst>`_
      - Application Shell and Navigation
@@ -99,7 +100,7 @@ authoritative for its own scope and exit gate.
    * - `16 <PHASE-16-release.rst>`_
      - Documentation and Release Qualification
      - 15
-     - D-001, D-004, D-006, D-008
+     - D-006, D-009. D-001, D-004 and D-008 DECIDED
      - NOT STARTED
 
 Ordering notes
@@ -143,14 +144,15 @@ Phase 01 from running, but the fourth caps the grade it can reach.
   identical between the XML and ``noxml`` builds, so ``R-PERC-02`` cannot be
   satisfied by string matching. Phase 09 owns the rule; Phase 05 owns the
   post-install probe that first applies it.
-* **There is no git remote, and ``D-008`` still withholds one.** This is now
-  the residue two phases share. It left Phase 00's gate item 8 open and, as
-  foreseen, capped Phase 01 at ``PARTIAL`` on gate item 6 -- the pull-request
-  pipeline has never run on a pull request, and Read the Docs has never built
-  the tree. Phase 01 proved every pipeline step locally instead (42 steps, 3
-  workflows) and named the Windows and macOS matrix entries so a later phase
-  turns them on rather than writing them. Both gate items close the day a
-  publication location is decided.
+* **The remote exists as of 2026-08-30** --
+  ``https://github.com/mriffle/CometGUI.git`` (``D-008``). This was the residue
+  Phases 00 and 01 shared: it left Phase 00's gate item 8 open and capped Phase
+  01 at ``PARTIAL`` on gate item 6. **Both are now ordinary phase work.** Phase
+  01 proved every pipeline step locally (42 steps, 3 workflows) and named the
+  Windows and macOS matrix entries so that turning them on is configuration
+  rather than authorship. Two standing constraints follow: the repository may
+  move, so its URL lives in one place; and its history is published, so it is
+  never force-pushed or rewritten.
 
 Phases 00-13 with their gates passed constitute a working,
 provenance-complete application. Phases 14-16 are what make it a release.
