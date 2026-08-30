@@ -131,6 +131,19 @@
     <openjfx-monocle.version>21.0.2</openjfx-monocle.version>
 
     <!--
+      PHASE 02, WORK UNIT 8: the GUI robot behind the FxUiDriver abstraction.
+      4.0.18 is the newest release on Maven Central (lastUpdated 2024-02-11)
+      and is the version phase 00's spike proved against this exact JDK and
+      JavaFX pair, headless under Monocle and headed under GTK
+      (docs/feasibility/gui-automation-spike.rst, "TestFX verdict").  It is
+      declared TEST SCOPE in cometgui-app and nowhere else, so it reaches no
+      published artefact: R-TEST-06 is about exactly that, and the licence
+      audit should note that testfx-core and testfx-junit5 declare EUPL 1.1 in
+      their POMs.
+    -->
+    <testfx.version>4.0.18</testfx.version>
+
+    <!--
       PHASE 02: AtlantaFX, the JavaFX theme library the CasanovoGUI base uses
       (specification.rst, "CasanovoGUI base": the base "targets Java 23+ and
       JavaFX 25.x and uses AtlantaFX", and the new project preserves that stack).
@@ -330,6 +343,27 @@
         <groupId>io.github.mkpaz</groupId>
         <artifactId>atlantafx-base</artifactId>
         <version>${atlantafx-base.version}</version>
+      </dependency>
+
+      <!--
+        GUI automation (phase 02, unit 8).  Only cometgui-app declares these,
+        at TEST scope, behind the FxUiDriver abstraction; the version is pinned
+        here with everything else.  The scope is repeated at the declaration
+        site as well, deliberately: a managed scope is easy to lose sight of,
+        and a robot library that reached compile scope would be shipped inside
+        the application.
+      -->
+      <dependency>
+        <groupId>org.testfx</groupId>
+        <artifactId>testfx-core</artifactId>
+        <version>${testfx.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testfx</groupId>
+        <artifactId>testfx-junit5</artifactId>
+        <version>${testfx.version}</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
