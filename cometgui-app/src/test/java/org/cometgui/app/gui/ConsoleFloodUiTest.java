@@ -20,9 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeoutException;
 import javafx.stage.Stage;
 import org.cometgui.app.bootstrap.CometGuiApplication;
 import org.cometgui.app.config.ApplicationServices;
@@ -103,18 +106,20 @@ class ConsoleFloodUiTest {
      * {@code Text} node per paragraph, and {@code setText} records an undoable change holding the
      * previous document as well, so several megabytes is expected rather than surprising.
      *
-     * <p><strong>Why 16 MB is the number.</strong> The measured growth on this build is 7,798,688
-     * bytes (7.4 MB), which the failure message prints if this ever trips, so the bound is a little
-     * over twice what is actually retained -- enough headroom for garbage-collection and
+     * <p><strong>Why 20 MB is the number.</strong> The measured growth on this build is 8,595,680
+     * bytes (8.2 MB), which the failure message prints if this ever trips, so the bound is about
+     * two and a half times what is actually retained -- enough headroom for garbage-collection and
      * just-in-time-compilation noise, and no more.
      *
-     * <p>It is also decisively below what an <em>unbounded</em> console would cost for the same
-     * flood: 250,001 retained messages at the same 88 bytes is 21 MB of model alone, and 250,001
-     * rendered lines is 10 MB of characters plus a quarter of a million {@code Text} nodes, which
-     * is well over 100 MB. So this assertion distinguishes a bounded console from an unbounded one,
-     * which is what the gate item is for, rather than merely recording today's number.
+     * <p>It is also decisively below what an <em>unbounded</em> console costs for the same flood.
+     * That is not a calculation: deleting the eviction from {@code BoundedMessageLog.append} and
+     * running this test again gives 38,078,880 bytes (36 MB) of retained growth, and it is 36 MB
+     * only because the document cap is still holding the rendered text down -- 250,001 rendered
+     * lines would be 10 MB of characters plus a quarter of a million {@code Text} nodes on top. So
+     * this assertion distinguishes a bounded console from an unbounded one, which is what the gate
+     * item is for, rather than merely recording today's number.
      */
-    private static final long HEAP_GROWTH_BOUND_BYTES = 16L * 1024 * 1024;
+    private static final long HEAP_GROWTH_BOUND_BYTES = 20L * 1024 * 1024;
 
     /** A fixed instant, so that no message carries a value that changes between runs. */
     private static final Instant FIXED = Instant.parse("2026-08-30T00:00:00Z");
@@ -130,7 +135,8 @@ class ConsoleFloodUiTest {
     private static long heapGrowthBytes;
 
     @BeforeAll
-    static void startTheApplicationWithATestOwnedLog() throws Exception {
+    static void startTheApplicationWithATestOwnedLog()
+            throws TimeoutException, InterruptedException {
         log = new BoundedMessageLog();
         Stage primary = FxToolkit.registerPrimaryStage();
         FxToolkit.setupApplication(
@@ -352,13 +358,23 @@ class ConsoleFloodUiTest {
      * The heap in use, after asking for a collection twice so that the flood's garbage -- every
      * discarded message and every superseded document -- is not counted as retained.
      *
+     * <p><strong>Why the management bean and not {@code System.gc()}.</strong> The measurement
+     * needs a collection to have happened, or it would report garbage as retention and the bound
+     * below would mean nothing. {@code System.gc()} is what SpotBugs reports as {@code DM_GC} --
+     * "extremely dubious except in benchmarking code" -- and this project does not answer a
+     * SpotBugs finding with an exclusion. {@link MemoryMXBean#gc()} is the platform's own
+     * management operation for the same request, meant for monitoring and measurement code, and
+     * {@link MemoryMXBean#getHeapMemoryUsage()} reports the heap directly rather than by
+     * subtracting {@code freeMemory} from {@code totalMemory}. Two rounds, because the first can
+     * leave objects that only became unreachable during it.
+     *
      * @return used heap in bytes
      */
     private static long usedHeapBytes() {
-        Runtime runtime = Runtime.getRuntime();
-        for (int attempt = 0; attempt < 2; attempt++) {
-            System.gc();
+        MemoryMXBean memory = ManagementFactory.getMemoryMXBean();
+        for (int round = 0; round < 2; round++) {
+            memory.gc();
         }
-        return runtime.totalMemory() - runtime.freeMemory();
+        return memory.getHeapMemoryUsage().getUsed();
     }
 }
