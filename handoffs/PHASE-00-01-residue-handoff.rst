@@ -376,9 +376,17 @@ looks like this, and it names no account, no token and no fix:
       (refusing to allow a Personal Access Token to create or update workflow
       `.github/workflows/windows-percolator.yml` without `workflow` scope)
 
+A fine-grained token gives the same refusal with "a fine-grained personal
+access token" and "``workflows`` permission" in place of those words. Either
+way the message names the file and the missing permission and **nothing
+else** -- not the token, not the account, not the remedy -- which is why it
+costs an hour to the person who has not seen it before.
+
 The remedy is on the token, not in the repository: a **classic** PAT needs the
 ``workflow`` checkbox; a **fine-grained** PAT needs *Repository permissions ->
 Workflows: Read and write*. Then push again -- nothing here needs changing.
+A push made over SSH with a key, or with GitHub CLI credentials, is not
+subject to this at all.
 The first push, ``git push origin main``, is not affected: none of the
 unpushed ``main`` commits touches ``.github/``, which was checked.
 
