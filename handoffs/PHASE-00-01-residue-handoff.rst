@@ -1,0 +1,206 @@
+=====================================================================
+PHASE-00/01 residue handoff -- the branch the owner has to push
+=====================================================================
+
+:Scope: PHASE-00 exit gate item 8 (first branch) and PHASE-01 exit gate item 6
+:Phase orchestrator: residue orchestrator subagent (session 02)
+:Date: 2026-08-30
+:Work log: ``handoffs/PHASE-00-01-residue-worklog.rst``
+:Branch: ``windows-percolator-verification`` (local only -- **not pushed**)
+
+.. contents:: Contents
+   :depth: 2
+   :local:
+
+The one-paragraph version
+=========================
+
+Two gate items were held open by a missing git remote. The remote exists now,
+so both are ordinary work again -- but *this session cannot close either one*,
+because closing them requires GitHub to execute something, and this session has
+no credential that can push. What it produced instead is a branch that makes
+closure a matter of the owner running four commands: a Windows verification
+job that executes the seven-step checklist in
+``docs/feasibility/windows-artefact.rst`` against ``percolator-v3-07.exe`` on a
+``windows-latest`` runner, carried by a pull request whose existence is itself
+what PHASE-01 gate item 6 has been waiting for.
+
+**Nothing in this branch claims the Windows binary has been executed.** It has
+not. The manifest wording rules in ``windows-artefact.rst`` are untouched:
+``xml_capability`` stays ``unverified-on-windows``, the basis keeps the
+sentence "The binary was not executed on Windows.", and no document says
+*verified*, *confirmed*, *proven* or *tested* of the Windows binary.
+
+What could not be done here, and how that was checked
+=====================================================
+
+Not asserted from the brief -- checked:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 38 62
+
+   * - Check
+     - Result
+
+   * - ``command -v gh``
+     - not installed
+
+   * - ``GH_TOKEN`` / ``GITHUB_TOKEN``
+     - both unset
+
+   * - ``git config --get credential.helper``
+     - none
+
+   * - ``~/.ssh``
+     - does not exist
+
+   * - ``GIT_TERMINAL_PROMPT=0 git push --dry-run origin ...``
+     - ``fatal: could not read Username for 'https://github.com': terminal
+       prompts disabled``
+
+The remote itself was queried anonymously and is real:
+``mriffle/CometGUI``, public, default branch ``main`` at ``9115b1c``.
+``/actions/workflows`` lists ``nightly``, ``pull-request`` and ``release``, all
+``active`` -- so **GitHub Actions is already enabled on the repository** -- and
+``/actions/runs`` reports ``total_count = 0``. GitHub has therefore still never
+executed anything in this project, which is exactly what PHASE-01 gate item 6
+says, confirmed from the live remote rather than from the local repository.
+
+The two escalations the brief asked about
+=========================================
+
+.. _residue-e1:
+
+E1 -- "``-X`` present" does not discriminate. Agreed, and it is worse than that
+-------------------------------------------------------------------------------
+
+Gate item 8's first branch reads: the Windows artefact "is confirmed on a
+Windows runner -- payload obtained without admin rights, ``-X`` present".
+``windows-artefact.rst``'s escalation E1 says "``-X`` present" is satisfied by
+the ``noxml`` build too, so it discriminates nothing. **That is right**, and
+Phase 00's own executed Linux control is the proof: both builds advertise
+``-X``/``--xmloutput`` in ``--help``, and both actually wrote a Percolator XML
+file with 200 ``<psm>`` elements -- 143 729 bytes from the XML build, 143 733
+from the ``noxml`` one, differing only in ``<command_line>``. This
+orchestrator re-ran that control today; the numbers reproduce exactly.
+
+Two different claims are being run together in that wording:
+
+#. **"This binary can write the Percolator XML the Limelight converter
+   consumes."** True of *both* builds. ``-X`` proves it, and it is the property
+   the product actually needs.
+#. **"This binary is an ``XML_SUPPORT=ON`` build."** What ``XML_SUPPORT`` gates
+   is the pin-XML *input* path. The discriminating test is ``--xml-in``, which
+   the ``noxml`` build refuses by name (``ERROR: Compiler flag XML_SUPPORT was
+   off``), or the Xerces linkage.
+
+"``-X`` present" tests neither: it is satisfied by an artefact that fails claim
+2, and it is weaker than an actual run for claim 1.
+
+**And the wording is stale in a second way that E1 could not have known.**
+E1 was written on 2026-08-29. Later that day the owner took ``D-002`` **option
+C**: Percolator's binary now comes from the portable ``noxml`` ZIP on every
+tier-1 platform, and the NSIS payload extractor the product was going to build
+is not built (``phases/index.rst``, "Phase 00's residue"). So gate item 8's
+first branch now asks for confirmation of an artefact **the product does not
+ship**. Closing it on its own terms is still worth doing -- it is the last
+piece of Phase 00's evidence and the checklist is written -- but it is no
+longer the most useful thing a Windows runner could do.
+
+*This is a gate wording problem and gates are not a phase orchestrator's to
+change.* Recommendation for tier 1, to weigh rather than adopt: amend gate item
+8's first branch to name the artefact and the test, along the lines of --
+*executed on a Windows runner: the payload is obtained without administrative
+rights; the binary starts; ``-X`` on a real PIN writes a Percolator XML file
+whose ``<psm>`` count matches the Linux control; and, where an
+``XML_SUPPORT=ON`` claim is made, ``--xml-in`` does not print "Compiler flag
+XML_SUPPORT was off"* -- and to say which artefact, now that ``D-002`` option C
+has changed the answer.
+
+Rather than wait for that, the job on this branch does both: it executes the
+seven-step checklist against ``percolator-v3-07.exe`` exactly as written, so
+the gate can be closed on its own terms, **and** it runs the same tests against
+the ``noxml`` portable ZIP's ``percolator.exe`` -- the binary the product will
+actually ship -- as a clearly separated section that is reported but does not
+redefine the gate.
+
+.. _residue-e2:
+
+E2 -- the executed evidence bearing on ``D-002``
+------------------------------------------------
+
+E2 recommended keeping ``D-002`` as decided and raising a narrow question
+later. **It has been overtaken: the owner went further than E2 recommended**
+and took option C on 2026-08-29. As an escalation E2 is closed.
+
+What E2 listed as *not established* is a different matter, and most of it is
+still not established:
+
+* *Whether a ``noxml`` build's ``-X`` output validates against
+  ``percolator_out.xsd``.* Partly answered, and the answer makes the question
+  moot: ``DECISIONS.rst`` records that ``percolator_out.xsd`` rejects
+  Percolator's own output regardless of build -- the schema fixes
+  ``majorVersion`` at ``2`` and the binary writes ``3``. The schema therefore
+  cannot be the discriminator for either build.
+* *Whether the Limelight converter accepts it.* **Still open, and now cheap.**
+  E2 said this needed a JVM; there has been one under ``tools/`` since Phase
+  01. Nobody has run it. It is a Phase 05/09 input and it is the question that
+  actually matters, because ``D-002`` option C rests on the answer being yes.
+  Recommending it to tier 1 as a small, self-contained piece of work.
+* *Whether the Windows and macOS ``noxml`` builds behave as the Linux one
+  does.* Windows is addressed by section 8 of the job on this branch, once a
+  runner executes it. **macOS remains entirely untested and no work here
+  changes that.**
+* *Whether 3.09 behaves differently again.* Unchanged.
+
+Traps and findings worth carrying forward
+=========================================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Finding
+     - Why it matters
+
+   * - **The extractor was not Windows-safe**
+     - ``docs/feasibility/windows-artefact.rst`` said
+       ``scripts/feasibility/extract_nsis.py`` "runs on Windows unchanged".
+       The audit found a Windows-only path traversal past its own containment
+       check: Win32 strips trailing dots and spaces from every path component,
+       so a member named ``$INSTDIR\.. \.. \evil.txt`` passed the ``".."``
+       filter and would have been written outside the output directory -- and
+       ``percolator.exe`` with a trailing space would have silently replaced
+       ``percolator.exe``, the file whose SHA-256 the checklist pins. Fixed
+       and proved falsifiable. See the U2 sign-off in the work log.
+
+   * - **A checked-out shell script is CRLF on a Windows runner**
+     - The runner image installs Git for Windows with ``/VERYSILENT`` and no
+       ``CRLFOption`` override (``images/windows/scripts/build/Install-Git.ps1``
+       sets only ``safe.directory``), so the installer default --
+       ``core.autocrlf=true`` -- applies. Every ``scripts/ci/*.sh`` in this
+       project starts with ``set -Eeuo pipefail``, and a CRLF copy of that line
+       fails immediately: ``set: pipefail: invalid option name``, exit 2.
+       Demonstrated here on a deliberately CRLF file. A ``.gitattributes``
+       pinning ``eol=lf`` removes the dependency on that setting either way.
+       **The existing nightly Windows job has the same latent failure**, and
+       nobody would have found out until it first ran.
+
+   * - **A SHA-256 check can hash the wrong thing**
+     - The PIN generator's ``--expect-sha256`` originally hashed the string it
+       meant to write rather than the file it wrote, so on Windows it would
+       have reported the intended PIN while a CRLF-translated one sat on disk.
+       Caught at sign-off by damaging the writer and watching the check pass.
+
+Two documents this work could not correct
+=========================================
+
+Both belong to tier 1, and both are now factually stale:
+
+* ``phases/index.rst`` says PHASE-01 "proved every pipeline step locally (42
+  steps, 3 workflows)". The branch adds a fourth workflow.
+* ``CONTRIBUTING.rst`` still refers in places to "the open publication half of
+  ``D-008``", which the owner closed on 2026-08-30.
+
+Neither is a phase orchestrator's file to edit.
