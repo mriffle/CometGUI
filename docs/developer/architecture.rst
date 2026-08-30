@@ -12,8 +12,9 @@ something is deferred, it names the phase that owns it.
 .. note::
 
    **State after Phase 02 -- Application Shell and Navigation**, written on
-   2026-08-30 against the tree as committed. Phase 02 builds the frame and
-   deliberately contains no scientific behaviour: seven of the twelve Maven
+   2026-08-30 against the tree as committed, and amended the same day once the
+   GUI test harness landed (`The GUI test harness`_). Phase 02 builds the frame
+   and deliberately contains no scientific behaviour: seven of the twelve Maven
    modules still hold nothing but ``package-info.java``, and
    `What Phase 02 deliberately did not build`_ collects what a later phase must
    not assume exists.
@@ -387,10 +388,19 @@ The rule was inert until work unit 5 landed. At its sign-off on 2026-08-30
 ``ok cometgui-ui line 100.0% (176/176) branch 100.0% (40/40) [view-model >=80%
 line]``, and the phase orchestrator separately read the
 ``<package name="org/cometgui/ui/viewmodel">`` element of ``jacoco.xml`` --
-``LINE missed=0 covered=175``, ``BRANCH missed=0 covered=40``. Work unit 6 added
-seventeen files of views and controls and left those package counters
-unchanged, which is the evidence that the views did not dilute the gated
-package.
+``LINE missed=0 covered=175``, ``BRANCH missed=0 covered=40``.
+
+**The two line counts differ because they measure different report elements,
+not because either is wrong.** ``scripts/build.sh`` reports the ``cometgui-ui``
+**bundle**; the gate's own rule is ``PACKAGE``-scoped on
+``org.cometgui.ui.viewmodel``. Both are 100%, and it is the package figure the
+rule is evaluated against. Anyone reading a coverage number for this gate should
+read the package element, because a bundle figure would go on looking healthy
+while the gated package rotted underneath it.
+
+Work unit 6 added seventeen files of views and controls and left those package
+counters unchanged, which is the evidence that the views did not dilute the
+gated package.
 
 The injection seams (``R-PROC-01``)
 ===================================
@@ -732,6 +742,23 @@ a layout pane, not a descendant of a named control, so it is never reached and
 fails the enumeration exactly as it should. A sweep over the whole scene would
 have made the gate unfailable, which is worse than not having it.
 
+**A control whose accessible text is assigned in more than one place needs every
+assignment considered.** ``StageStepper`` names each stage-state label twice:
+once at construction through ``named(...)``, and again in ``showStage()``, which
+rewrites the text from the view-model whenever the state changes. Both
+assignments are correct and both are wanted -- the second is what keeps a screen
+reader hearing the *state* rather than the stage name twice -- but the pattern
+has a consequence the Phase 02 orchestrator found by injecting a defect at the
+sign-off of work unit 8: nulling the accessible text at the construction site
+alone left the enumeration **green**, because ``showStage()`` put it back a few
+lines later. That was an ineffective injection rather than a hole in the gate,
+and re-injecting at a single-assignment site failed it as it should. The general
+point is worth writing down: an injection that does not reach the code is a
+harness failure, never a pass, which is why this project's harnesses carry
+``assert_injected``. The enumeration test is what makes multiple assignment safe
+in the first place -- it reads the *final* state of every control in the scene,
+so it cannot be fooled by which of several assignments ran last.
+
 Why a keyboard test must assert on the selected entry
 ------------------------------------------------------
 
@@ -918,6 +945,136 @@ carry ``tools/`` (it is gitignored), so a sandbox must symlink it before the
 JavaFX tests can run. Without it they fail loudly with ``the project-local font
 stack is missing ... Run: bash scripts/fetch-fontstack.sh``, which is the
 designed behaviour and not a defect.
+
+The GUI test harness
+====================
+
+Everything in this section lives in ``cometgui-app/src/test/java`` and in no
+other source root. That is ``R-TEST-06`` taken literally: test-only machinery
+must never reach a shipped artefact, and the cheapest way to keep that true is
+for the machinery to live where it cannot be packaged. Nothing here is compiled
+into ``cometgui-app.jar``.
+
+The ``FxUiDriver`` abstraction, and why there are two of them
+-------------------------------------------------------------
+
+``org.cometgui.app.uidriver`` holds ``FxUiDriver`` (the interface),
+``AbstractFxUiDriver`` (package-private: thread marshalling and every read of
+scene-graph state, so the two implementations differ *only* in how input is
+made), ``TestFxUiDriver``, ``RobotFxUiDriver`` and ``RunningApplication``.
+
+The specification's *JavaFX GUI automation* clause is why the interface exists:
+TestFX's compatibility "shall be proven in an early spike rather than assumed.
+If it cannot operate reliably in CI, the project shall retain the same test
+semantics behind a small ``FxUiDriver`` abstraction and use a compatible robot
+or accessibility automation mechanism." Phase 00's spike found TestFX 4.0.18
+does work on the pinned JDK/JavaFX pair and recommended keeping the fallback as
+a first-class citizen.
+
+So there are two implementations, and **both are exercised on every build**:
+
+* ``TestFxUiDriver`` -- on TestFX 4.0.18, using ``FxRobot`` and nothing else.
+  TestFX's own ``FxToolkit`` does *not* start the application, which is what
+  keeps the two drivers comparable.
+* ``RobotFxUiDriver`` -- on ``javafx.scene.robot.Robot`` alone, finding nodes
+  with ``Scene.lookup`` and computing a pointer target from the node's own
+  screen bounds. **There is no TestFX on this class's code path.**
+
+``SectionNavigationUiTest`` and ``KeyboardOnlyNavigationUiTest`` are
+``@ParameterizedTest``\ s over ``Stream.of(new TestFxUiDriver(application), new
+RobotFxUiDriver(application))``, so the same walk runs through both. That is
+what makes the abstraction worth having rather than a layer of indirection: a
+fallback that had never been run would not be a fallback, and the day TestFX
+breaks against a new JavaFX the alternative is already proved rather than
+proposed.
+
+No TestFX type appears in ``FxUiDriver``. The interface offers no method taking
+a pixel coordinate and none taking a CSS selector beyond an identifier, because
+``R-TEST-04`` forbids exactly those; a test says
+``clickOn(UiIds.navigationEntry(SectionId.RESULTS))``. Nor is there any method
+that reaches into a view-model or fires an ``ActionEvent``: input is synthetic,
+the way a user's is, which is what makes "reachable by mouse and by keyboard
+alone" mean anything. *Reading* is deliberately different -- assertions read
+scene-graph state directly, because a test that could only read through the
+robot it typed with would be asserting its own echo.
+
+``RunningApplication.launchedByMain()`` starts the real product through
+``CometGuiLauncher.main`` on a background thread and then waits on two
+observable facts -- whether the toolkit accepts work, and whether a showing
+stage exists -- never on a sleep. Nothing is hand-built: no test constructs a
+``ShellView``, and the composition root is the real one.
+``RunningApplication.showing(stage)`` wraps a stage a test started itself, which
+is what the console flood test needs in order to supply the log it floods.
+``Application.launch`` may be called at most once per JVM, so
+``reuseForks=false`` in ``cometgui-app/pom.xml`` gives each GUI test class its
+own JVM and its own application.
+
+The four tests that carry the exit gate
+----------------------------------------
+
+``org.cometgui.app.gui``, one class per gate item, each driving the launched
+application:
+
+* ``SectionNavigationUiTest`` -- **items 1 (by mouse) and 2**: a synthetic click
+  on each of the ten navigation entries, then that section's pane asserted
+  showing *by its stable identifier* while the other nine are not. Both drivers.
+* ``KeyboardOnlyNavigationUiTest`` -- **item 1 (by keyboard alone)**: no
+  ``clickOn`` is called anywhere in the class. Tab into the navigation, then
+  every section reached with arrow keys, reading back the focus owner's
+  identifier, which entries are traversable and which pane is showing. Both
+  drivers. Method order is declared, because the first test is about a *fresh*
+  application.
+* ``AccessibleNameEnumerationUiTest`` -- **item 4**: walks the whole scene graph
+  after ``applyCss()`` and ``layout()`` and requires a non-blank accessible name
+  on every ``Control`` found. Not a list of identifiers to check, which would
+  pass on the one day it matters. It also asserts a *floor* on how many controls
+  were seen -- derived at 65, with this build's walk finding **91** -- so a walk
+  that found three and named all three cannot pass.
+* ``ConsoleFloodUiTest`` -- **item 5**: the console *pane* inside the running
+  application, flooded from a producer thread through the same path the process
+  service will use. It asserts the retained model equals the log's capacity, the
+  document is within ``DEFAULT_MAX_RENDERED_LINES``, the messages that are gone
+  are the *oldest* (by a sequence number carried in each line, not by counting),
+  the summary line states the discard in text, and the retained heap growth is
+  inside a documented bound. No sleep, no timeout, no retry: the producer thread
+  is joined and ``refreshNow()`` is a barrier.
+
+Measured at the unit 8 sign-off on 2026-08-30:
+``Tests run: 16, Failures: 0, Errors: 0, Skipped: 0`` across the four classes,
+and ``bash scripts/build.sh`` reporting ``11/11 stages OK in 173 seconds. BUILD
+OK`` with ``46 report file(s): tests=693 failures=0 errors=0 skipped=0``.
+
+TestFX: EUPL 1.1, and the AssertJ it drags in
+----------------------------------------------
+
+TestFX 4.0.18 is pinned in the parent POM (``testfx.version``) and declared, at
+**test** scope, in ``cometgui-app`` and nowhere else. The scope is repeated at
+the declaration site as well as being managed, deliberately: a managed scope is
+easy to lose sight of, and a robot library at compile scope would be shipped
+inside the application.
+
+Two facts a reader needs.
+
+**``testfx-core`` and ``testfx-junit5`` declare EUPL 1.1** in their POMs. That
+is not GPL-3.0, and it is recorded here and in the phase handoff so the licence
+audit is told rather than left to discover it. Nothing about it is redistributed
+with CometGUI -- test scope, one module, no release artefact.
+
+**Its transitive ``org.assertj:assertj-core`` 3.13.2 carries
+GHSA-rqfh-9r24-8c9r / CVE-2026-24400** (XML external entity processing in
+``isXmlEqualTo``), and ``scripts/ci/dependency-scan.py`` genuinely failed the
+supply-chain stage on it -- correctly. It is **excluded** on both TestFX
+coordinates, which *removes the component from the graph* rather than accepting
+it. That distinction is the point: an allowlist entry would accept a known
+advisory for no benefit, and ``scripts/ci/security/allowlist.json`` is still
+``"entries": []``, which is its correct state. The exclusion is safe because
+AssertJ is used by exactly one part of TestFX -- ``javap`` over the 4.0.18 jar
+shows references to ``org/assertj`` only from ``org/testfx/assertions/**``, and
+nothing here imports that package; if that ever stops being true the tests fail
+with ``NoClassDefFoundError``, loudly, which is the right failure.
+``org.hamcrest:hamcrest`` and ``org.osgi:org.osgi.core`` arrive the same way and
+are **not** excluded: neither carries an advisory, and both are part of the
+library proper.
 
 What Phase 02 deliberately did not build
 ========================================
