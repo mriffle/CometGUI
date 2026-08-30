@@ -225,7 +225,34 @@ Work units
        mutation gate switched on because ``org.cometgui.workflow.state.*`` is
        a PIT target package.
      - stage stepper
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commit ``f981b71``. Diff read in full: ten
+       paths, all under ``cometgui-workflow/``, and
+       ``git log 57964e7..HEAD -- pom.xml config/ scripts/ .mvn/`` is still
+       empty, so the parent POM's thresholds and PIT ``<targetClasses>`` were
+       not touched. The module POM change is a gate being switched **on**
+       (``<cometgui.mutation.skip>false</cometgui.mutation.skip>``), which is
+       what the drift guard requires once ``org.cometgui.workflow.state`` has
+       classes. ``mvn -B -pl cometgui-workflow -am verify``:
+       ``Tests run: 134, Failures: 0, Errors: 0, Skipped: 0``,
+       ``BugInstance size is 0``, ``BUILD SUCCESS``. ``jacoco.xml`` bundle
+       totals ``LINE missed=0 covered=115`` and ``BRANCH missed=0 covered=48``.
+       PIT counted by me from ``mutations.xml``: ``total=43 killed=43
+       survived=0``. ``bash scripts/build.sh --only gates`` prints
+       ``ok  cometgui-workflow  43/43 mutations killed = 100.0%`` and
+       ``ok  every module with critical-package code has its mutation gate
+       on`` -- neither ``OFF`` nor ``MISSING``, which is the drift guard
+       confirming the switch is real. **Falsification of my own**, distinct
+       from the agent's six, in a ``git archive`` sandbox: making
+       ``WorkflowStage.isCore()`` return true for ``PDV`` -- one added clause,
+       reclassifying an optional stage as core -- produced errors or failures
+       in 45 tests across seven nested classes, including the exact-message
+       assertion ``expected: <... missing: comet> but was: <... missing: comet,
+       pdv>``. The core/downstream distinction the run-state derivation rests
+       on is therefore load-bearing and tested. ``bash scripts/build.sh``:
+       ``11/11 stages OK in 108 seconds. BUILD OK``. Decision I accepted and
+       am recording: a ``FAILED`` optional downstream stage does **not** make
+       the run ``FAILED``; it is documented in ``RunState``'s Javadoc and
+       tested both ways.
 
    * - 4
      - **Derived-file attribution machinery, and the first derived file.** A
