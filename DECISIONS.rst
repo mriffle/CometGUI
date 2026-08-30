@@ -2,7 +2,7 @@
 Decisions
 =========
 
-:Updated: 2026-08-30 (D-008 fully decided; D-009 decided provisionally)
+:Updated: 2026-08-30 (D-008 fully decided; D-006 and D-009 partly decided)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -471,7 +471,8 @@ position while pepXML refers to them by scan number. MGF is the working route.
 D-006 -- Test fixture data and licensing
 ========================================
 
-:Status: OPEN
+:Status: **PARTLY DECIDED 2026-08-30.** Redistribution ruled out and the
+   local-testing fixture delegated; the CI fixture set is explicitly deferred
 :Raised: 2026-08-28
 :Blocks: Phases 00, 14, 16
 :Owner: Project owner
@@ -487,6 +488,73 @@ At least two spectrum files are needed to exercise the multi-file run model.
 **Recommendation.** Prefer a small, explicitly licensed public dataset,
 fetched by checksum rather than vendored, with the licence recorded in
 ``docs/citations.rst``.
+
+**DECISION (2026-08-30), in three parts.**
+
+#. **CometGUI does not redistribute spectrum or FASTA data.** The owner:
+   *"We won't be redistributing the data in this project."* This removes the
+   constraint the whole decision turned on. Phase 00 found the licence risk in
+   every candidate was **vendoring**, never use: of the Crux spectra it wrote
+   that "using them, and fetching them by checksum, is not in any practical
+   doubt", and that only vendoring rested on an undocumented right. With
+   redistribution off the table, that risk does not arise.
+
+#. **The local-testing fixture is the implementer's choice**, delegated by the
+   owner: *"for now, use whatever dataset you think is appropriate for local
+   testing."* Recorded below, so it is a documented choice rather than a
+   silent one.
+
+#. **The CI fixture set is deferred, deliberately.** The owner intends "a
+   trimmed down DDA set of mzML files that we can use to do automated testing
+   via CI later" but declined to decide it now. **That half of ``D-006`` stays
+   OPEN** and Phase 14 must not treat the local fixture below as if it were
+   the CI fixture.
+
+**The local fixture chosen under that delegation.** The input Phase 00 already
+proved the whole scientific path with, unchanged:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - File
+     - Provenance
+   * - ``20100614_Velos1_TaGe_SA_K562_3.mzML``
+     - ``crux-toolkit/crux-toolkit``, ``test/smoke-tests/``, pinned at commit
+       ``fc6335cc817c8629aac07c27f2ab4584ba10930f``. Human K562, LTQ Orbitrap
+       Velos, DDA, HCD.
+   * - ``20100614_Velos1_TaGe_SA_K562_4.mzML``
+     - The same, and a second file so the multi-file run model is exercised.
+   * - ``UP000005640_9606.fasta``
+     - UniProt human reference proteome, 20 652 records, CC BY 4.0.
+
+**Why this one.** It is the only candidate whose sole objection was
+redistribution, and it produces the strongest search of the six -- Phase 00 took
+it end to end to a 12.8 MB schema-valid Limelight XML with 3897 PSMs and 2985
+reported peptides. The CC0 PRIDE alternative is licence-cleaner but pTyr
+enriched, so a plain tryptic search finds little and the end-to-end test proves
+correspondingly less. There is also a pleasing alignment: Crux is University of
+Washington code from the same group as Comet.
+
+**Conditions this choice carries, none optional.**
+
+* **Fetched by checksum into gitignored ``scratch/``, never committed.** The
+  moment a spectrum file is committed, this becomes a redistribution decision
+  again and the owner's answer above no longer covers it.
+* **The UniProt URL is not immutable** -- it is served from
+  ``current_release/`` and the checksum changes at each UniProt release. The
+  fetcher must fail loudly on a checksum mismatch rather than silently taking
+  the new file.
+* **Guard the CRLF corruption.** Phase 00 found these very mzML files arrive
+  CRLF-corrupted, and Comet then exits **249** with ``parseOffset() 2: Syntax
+  error parsing XML``. The corruption is provable against each file's own
+  ``<fileChecksum>`` and ``<indexListOffset>``, and
+  ``scripts/feasibility/run_scientific_path.sh`` already repairs a copy and
+  refuses to proceed unless both invariants hold. Any phase that ingests
+  indexed mzML needs the same defence.
+* **Phase 16's licence audit still records what the tests fetch**, with URL,
+  licence and checksum. Not redistributing lightens the obligation; it does
+  not remove the need to say where the data came from.
 
 **Phase 00, 2026-08-29.** Six costed candidates with real sizes, parsed MS2
 counts and licence URLs are in ``docs/feasibility/fixture-candidates.rst``.

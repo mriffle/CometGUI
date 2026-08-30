@@ -73,10 +73,10 @@ What exists
      - Scope, deliverables and exit gate per phase. 00 and 01 signed off
        PARTIAL, 05 re-scoped by ``D-002`` option C.
    * - ``DECISIONS.rst``
-     - 4 open, 4 decided, 1 provisional
+     - 3 open, 4 decided, 2 partial/provisional
      - ``D-001``, ``D-002`` (including option C), ``D-004`` and ``D-008``
-       (all three parts) decided; ``D-009`` decided **provisionally**.
-       ``D-003``, ``D-005``, ``D-006`` and ``D-007`` remain open.
+       (all three parts) decided; ``D-009`` provisional and ``D-006`` partly
+       decided. ``D-003``, ``D-005`` and ``D-007`` remain open.
    * - ``handoffs/``
      - Phase 00 present
      - ``PHASE-00-worklog.rst`` (10 units, each with a sign-off entry) and
@@ -501,9 +501,11 @@ new ``package-info.java``.
 Open decisions
 ==============
 
-Four items are open: ``D-003``, ``D-005``, ``D-006`` and ``D-007``. ``D-008``
-is closed in full, and ``D-009`` is answered **provisionally** -- the wording
-stands, the underlying question does not. **No ``D-`` item has
+Three items are open: ``D-003``, ``D-005`` and ``D-007``. ``D-008`` is closed in
+full. ``D-009`` is answered **provisionally** -- the wording stands, the
+underlying question does not -- and ``D-006`` is **partly** answered: the data
+is not redistributed and the local fixture is chosen, but the CI fixture set is
+deliberately deferred. **No ``D-`` item has
 ever been answered by an agent**, and none may be.
 
 On 2026-08-29 the owner answered ``D-002`` **option C**, the ``D-008``
@@ -542,8 +544,13 @@ and accept PARTIAL**. On 2026-08-30 the owner answered the last of ``D-008``:
      - PDV baseline only, or enhanced control mode?
      - 11
    * - ``D-006``
-     - Which fixture data, under which licence?
-     - 14, 16
+     - **PARTLY DECIDED (2026-08-30)**: CometGUI redistributes no spectrum or
+       FASTA data, which removes the licence risk in every candidate -- Phase
+       00 found it lay in vendoring, never in use. The local fixture is the
+       Crux K562 smoke-test pair plus the UniProt human proteome, fetched by
+       checksum into gitignored ``scratch/``. **Still open: the trimmed-down
+       DDA mzML set for CI**, which the owner deferred.
+     - 14 (CI fixture only)
    * - ``D-007``
      - Which Limelight endpoint do tests target?
      - 12, 14
@@ -668,8 +675,9 @@ drop:
 For the owner
 --------------
 
-``D-003``, ``D-005``, ``D-006`` and ``D-007`` are open, and each blocks a phase
-that has not started. ``D-009`` is answered for now -- the copyright line stays
+``D-003``, ``D-005`` and ``D-007`` are open, and each blocks a phase that has
+not started. ``D-006``'s remaining half -- the trimmed-down DDA mzML set for
+CI -- is deferred by the owner and belongs before Phase 14, not now. ``D-009`` is answered for now -- the copyright line stays
 as written -- but the institutional question behind it is deferred, not closed,
 and Phase 16 must raise it again before release.
 
@@ -689,6 +697,27 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-08-30
+     - --
+     - **``D-006`` partly decided: no data redistribution, and a local fixture
+       chosen.** The owner ruled out redistributing spectrum or FASTA data,
+       which dissolves the licence question the decision turned on -- Phase 00
+       had found the risk in every candidate lay in **vendoring**, never in
+       use. The owner then delegated the local-testing fixture and explicitly
+       deferred the CI set: *"eventually ... a trimmed down DDA set of mzML
+       files ... but I don't want to decide that now."* Chosen under that
+       delegation, and recorded rather than left implicit: the two Crux K562
+       smoke-test mzML files (pinned by commit) plus the UniProt human
+       reference proteome, **fetched by checksum into gitignored** ``scratch/``
+       **and never committed** -- the moment one is committed this becomes a
+       redistribution decision again. It is the strongest search of the six
+       candidates, and the one Phase 00 already drove end to end to a 12.8 MB
+       schema-valid Limelight XML. Conditions carried forward: the UniProt URL
+       is not immutable, so a checksum mismatch must fail loudly; and these
+       very files arrive CRLF-corrupted, on which Comet exits 249, so the
+       ``<fileChecksum>`` guard is mandatory for any phase ingesting indexed
+       mzML. **The CI fixture half of ``D-006`` stays open** and belongs before
+       Phase 14.
    * - 2026-08-30
      - --
      - **History pushed, and ``D-009`` answered provisionally.** All 64 commits
