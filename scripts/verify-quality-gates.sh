@@ -19,9 +19,13 @@
 # it runs the clean baseline first.  A control whose defect was not injected, or
 # whose baseline does not pass, is reported as a harness failure, not a pass.
 #
-# SCOPE.  This covers phase 01 unit 2: Spotless (formatting, import order,
-# licence header), Checkstyle (the project rule set) and SpotBugs (bug
-# patterns).  The aggregate falsifiability harness for every phase 01 gate is
+# SCOPE.  Controls 0-5 cover phase 01 unit 2: Spotless (formatting, import
+# order, licence header), Checkstyle (the project rule set) and SpotBugs (bug
+# patterns).  Controls 6-12 cover phase 02 unit 4: the derived-file attribution
+# machinery that discharges D-001 obligation 2 and R-SEC-01 -- two licence
+# headers, two Spotless file sets, two Checkstyle executions with two rule sets,
+# and the census in scripts/build.sh that proves the two sets are exhaustive and
+# disjoint.  The aggregate falsifiability harness for every phase 01 gate is
 # scripts/ci/negative-controls.sh, owned by unit 8; this script is meant to be
 # called from it, and to be usable on its own while iterating.
 
@@ -40,6 +44,27 @@ readonly LOGS="${ROOT}/_build/quality-gate-logs"
 # and tests in about a second, so each control costs one short Maven run.
 readonly MODULE="cometgui-domain"
 readonly PKG_DIR="${MODULE}/src/main/java/org/cometgui/domain/build"
+
+# PHASE 02.  A file is DERIVED if and only if its path contains a `/derived/`
+# segment: it is reused from Noble-Lab/CasanovoGUI, it keeps upstream's notices
+# (D-001 obligation 2, R-SEC-01) and it therefore carries a different licence
+# header and is graded by a different rule set.  Controls 6-12 inject into this
+# package, in the same module, for the same reason: it is the cheapest module to
+# build.
+readonly DERIVED_PKG_DIR="${PKG_DIR}/derived"
+readonly UPSTREAM_COMMIT="480b3013e7f8fb51a2b8c58681043821e3e7f865"
+readonly UPSTREAM_FILE="src/main/java/org/casanovo/gui/ui/Themes.java"
+
+# The four gates the derived machinery adds, each named by its Maven execution.
+# A bare `spotless:check` or `checkstyle:check` runs the plugin-level
+# configuration, which is NOT what the build runs: the file-set split lives in
+# the executions.  Naming the execution is therefore the narrowest command that
+# exercises the real gate, and the only one that can distinguish the two
+# regimes.
+readonly SPOTLESS_ORDINARY="spotless:check@spotless-check"
+readonly SPOTLESS_DERIVED="spotless:check@spotless-check-derived"
+readonly CHECKSTYLE_ORDINARY="checkstyle:check@checkstyle-check"
+readonly CHECKSTYLE_DERIVED="checkstyle:check@checkstyle-check-derived"
 
 PASSED=0
 FAILED=0
@@ -121,6 +146,43 @@ assert_passes() {
     if [ "${rc}" -ne 0 ]; then
         record_fail "${label}: the gate still fails after the defect was removed (log: ${log#"${ROOT}/"})"
         printf '         %s\n' "$(grep -m3 '^\[ERROR\]' "${log}" | head -3 | cut -c1-140)"
+        return
+    fi
+    record_pass "${label}: exit 0"
+}
+
+# The same two assertions for a control whose gate is a script rather than a
+# Maven goal -- the file-set census and the rule-set drift check in
+# scripts/build.sh.  Written as separate functions rather than by generalising
+# run_mvn, so that the Maven controls keep their one obvious way of running.
+
+# assert_cmd_fails <label> <expected diagnostic> <log> <command...>
+assert_cmd_fails() {
+    local label="$1" expected="$2" log="$3"
+    shift 3
+    local rc=0
+    "$@" >"${log}" 2>&1 || rc=$?
+    if [ "${rc}" -eq 0 ]; then
+        record_fail "${label}: the gate exited 0 with the defect present (log: ${log#"${ROOT}/"})"
+        return
+    fi
+    if ! grep -qF -- "${expected}" "${log}"; then
+        record_fail "${label}: failed, but without the expected diagnostic '${expected}' (log: ${log#"${ROOT}/"})"
+        return
+    fi
+    record_pass "${label}: rejected, exit ${rc}"
+    printf '         %s\n' "$(grep -F -- "${expected}" "${log}" | head -1 | cut -c1-140)"
+}
+
+# assert_cmd_passes <label> <log> <command...>
+assert_cmd_passes() {
+    local label="$1" log="$2"
+    shift 2
+    local rc=0
+    "$@" >"${log}" 2>&1 || rc=$?
+    if [ "${rc}" -ne 0 ]; then
+        record_fail "${label}: the gate still fails after the defect was removed (log: ${log#"${ROOT}/"})"
+        printf '         %s\n' "$(grep -m3 -E 'FATAL|DRIFT|UNCHECKED|OVERLAP|MISMATCH' "${log}" | head -3 | cut -c1-140)"
         return
     fi
     record_pass "${label}: exit 0"
@@ -376,6 +438,324 @@ control_spotbugs() {
         "${LOGS}/05-bug-clean.log" clean test-compile spotbugs:check -pl "${MODULE}"
 }
 
+
+# ------------------------------------------- the derived-file controls (02) --
+#
+# THE OBLIGATION.  D-001 obligation 2 and R-SEC-01: a file reused from
+# Noble-Lab/CasanovoGUI keeps upstream's copyright notices and records its
+# derivation, and the obligation is enforced by the BUILD rather than by review.
+# The machinery is two licence headers, two Spotless file sets and two
+# Checkstyle executions, split on one mechanical rule -- a file is derived if
+# and only if its path contains a `/derived/` segment.
+#
+# WHAT MUST BE PROVED, and what each control below proves:
+#
+#   6   the scaffolding these controls use is itself clean, so that a later
+#       failure is the injected defect and not the harness;
+#   7   a derived file with no upstream attribution is REJECTED, by Spotless and
+#       by Checkstyle -- the obligation itself;
+#   8   a derived file whose per-file derivation record is missing is REJECTED
+#       by Checkstyle, which is the only tool that can see it;
+#   9   a NON-derived file carrying the derived header is REJECTED by the
+#       ordinary checks: nobody claims a derivation they did not make;
+#  10   google-java-format still applies to the derived file set.  Splitting the
+#       file set is only legitimate if the second set keeps every step of the
+#       first, and the obvious wrong way to build it (Spotless's generic
+#       <formats><format>) cannot run google-java-format at all;
+#  11   a derived file that neither file set matches is caught.  This is the
+#       failure mode that makes an exclusion dangerous: the build stays GREEN;
+#  12   the derived rule set cannot quietly stop being a superset of the
+#       ordinary one.
+
+# A file in the derived tree that is clean for every gate: the derived header,
+# the derivation record, and google-java-format's own layout.  Each control
+# damages exactly one thing about it, so a failure names one cause.
+#   $1  the licence header to prepend (default: the derived one)
+#   $2  "record" to include the derivation record, anything else to omit it
+#
+# THE CLASS BODY IS PADDED ON PURPOSE.  Checkstyle's Header module compares the
+# first N lines of the header file literally, and reports "Missing a header -
+# not enough lines in file" when the file is SHORTER than the header rather than
+# naming the line that differs.  The derived header is 31 lines, so a file with
+# the 16-line ordinary header must be at least 31 lines long or control 7 would
+# be proving the file's length rather than the header's content.
+#
+# THE JAVADOC SHAPE IS ALSO ON PURPOSE.  google-java-format collapses a
+# single-paragraph documentation comment onto one line and keeps a multi-
+# paragraph one expanded, so the two variants below are written the way the
+# formatter would write them.  A control file that Spotless legitimately
+# rejects would make every other assertion about it meaningless.
+write_derived_control_class() {
+    local header="${1:-${ROOT}/config/license/java-header-derived.txt}"
+    local record="${2:-record}"
+    mkdir -p "${SANDBOX}/${DERIVED_PKG_DIR}"
+    {
+        cat "${header}"
+        printf 'package org.cometgui.domain.build.derived;\n\n'
+        if [ "${record}" = "record" ]; then
+            printf '/**\n'
+            printf ' * Temporary class written by scripts/verify-quality-gates.sh. Never committed.\n'
+            printf ' *\n'
+            printf ' * <p>Derived from Noble-Lab/CasanovoGUI %s at commit\n' "${UPSTREAM_FILE}"
+            printf ' * %s, GPL-3.0, modified.\n' "${UPSTREAM_COMMIT}"
+            printf ' */\n'
+        else
+            printf '/** Temporary class written by scripts/verify-quality-gates.sh. Never committed. */\n'
+        fi
+        cat <<'JAVA'
+public final class DerivedControl {
+
+    private DerivedControl() {}
+
+    /**
+     * @return a fixed string
+     */
+    public static String text() {
+        return "negative control";
+    }
+}
+JAVA
+    } >"${SANDBOX}/${DERIVED_PKG_DIR}/DerivedControl.java"
+}
+
+control_derived_baseline() {
+    banner "6  the derived scaffolding itself: a properly attributed derived file passes"
+    # Without this, controls 7-10 could all be passing for the wrong reason --
+    # a file that no gate accepts proves nothing when one of them rejects it.
+    write_derived_control_class
+    assert_injected "derived baseline" "${DERIVED_PKG_DIR}/DerivedControl.java"
+
+    assert_passes "spotless accepts a derived file with the derived header" \
+        "${LOGS}/06-derived-baseline-spotless.log" "${SPOTLESS_DERIVED}" -pl "${MODULE}"
+    assert_passes "checkstyle accepts a derived file with header and derivation record" \
+        "${LOGS}/06-derived-baseline-checkstyle.log" "${CHECKSTYLE_DERIVED}" -pl "${MODULE}"
+
+    rm -rf "${SANDBOX}/${DERIVED_PKG_DIR}"
+    assert_removed "derived baseline" "${DERIVED_PKG_DIR}"
+}
+
+control_derived_ordinary_header() {
+    banner "7  a derived file carrying the ORDINARY CometGUI header, with no attribution"
+    # The defect a copy-paste actually produces: upstream's code, presented as
+    # this project's own work.  This is the D-001 obligation the whole machinery
+    # exists to enforce, and both tools must refuse it.
+    write_derived_control_class "${ROOT}/config/license/java-header.txt"
+    assert_injected "derived file, ordinary header" "${DERIVED_PKG_DIR}/DerivedControl.java"
+
+    assert_fails "spotless rejects a derived file with no upstream attribution" \
+        "DerivedControl.java" \
+        "${LOGS}/07-derived-ordinary-header-spotless.log" \
+        "${SPOTLESS_DERIVED}" -pl "${MODULE}"
+    assert_fails "checkstyle rejects a derived file with no upstream attribution" \
+        "Line does not match expected header line" \
+        "${LOGS}/07-derived-ordinary-header-checkstyle.log" \
+        "${CHECKSTYLE_DERIVED}" -pl "${MODULE}"
+
+    rm -rf "${SANDBOX}/${DERIVED_PKG_DIR}"
+    assert_removed "derived file, ordinary header" "${DERIVED_PKG_DIR}"
+    assert_passes "spotless accepts the tree once the file is gone" \
+        "${LOGS}/07-derived-ordinary-header-clean-spotless.log" \
+        "${SPOTLESS_DERIVED}" -pl "${MODULE}"
+    assert_passes "checkstyle accepts the tree once the file is gone" \
+        "${LOGS}/07-derived-ordinary-header-clean-checkstyle.log" \
+        "${CHECKSTYLE_DERIVED}" -pl "${MODULE}"
+}
+
+control_derived_missing_record() {
+    banner "8  a derived file with the right header but NO per-file derivation record"
+    # The header is fixed and identical in every derived file, so it cannot say
+    # WHICH upstream file this is or at which commit.  That is what the record
+    # in the documentation comment is for, and Checkstyle is the only tool that
+    # can require it.  Spotless must pass here: if it failed, this control would
+    # not be testing the rule it claims to test.
+    write_derived_control_class "" "no-record"
+    assert_injected "derived file, no record" "${DERIVED_PKG_DIR}/DerivedControl.java"
+
+    assert_passes "spotless is blind to a missing derivation record (the reason Checkstyle requires it)" \
+        "${LOGS}/08-derived-no-record-spotless.log" "${SPOTLESS_DERIVED}" -pl "${MODULE}"
+    assert_fails "checkstyle rejects a derived file with no derivation record" \
+        "Required pattern 'the derivation record." \
+        "${LOGS}/08-derived-no-record-checkstyle.log" \
+        "${CHECKSTYLE_DERIVED}" -pl "${MODULE}"
+
+    rm -rf "${SANDBOX}/${DERIVED_PKG_DIR}"
+    assert_removed "derived file, no record" "${DERIVED_PKG_DIR}"
+    assert_passes "checkstyle accepts the tree once the file is gone" \
+        "${LOGS}/08-derived-no-record-clean.log" "${CHECKSTYLE_DERIVED}" -pl "${MODULE}"
+}
+
+control_derived_header_on_ordinary_file() {
+    banner "9  a NON-derived file carrying the DERIVED header"
+    # The converse obligation, and the one that keeps the derived header from
+    # becoming a way out of anything: nobody claims a derivation they did not
+    # make.  The file below is CometGUI's own work in an ordinary package, and
+    # the ordinary checks must refuse the upstream attribution it asserts.
+    {
+        cat "${ROOT}/config/license/java-header-derived.txt"
+        cat <<'JAVA'
+package org.cometgui.domain.build;
+
+/** Temporary class written by scripts/verify-quality-gates.sh. Never committed. */
+public final class NegativeControl {
+
+    private NegativeControl() {}
+}
+JAVA
+    } >"${SANDBOX}/${PKG_DIR}/NegativeControl.java"
+    assert_injected "derived header, ordinary file" "${PKG_DIR}/NegativeControl.java"
+
+    assert_fails "spotless rejects an unearned upstream attribution" \
+        "NegativeControl.java" \
+        "${LOGS}/09-derived-header-elsewhere-spotless.log" \
+        "${SPOTLESS_ORDINARY}" -pl "${MODULE}"
+    assert_fails "checkstyle rejects an unearned upstream attribution" \
+        "Line does not match expected header line" \
+        "${LOGS}/09-derived-header-elsewhere-checkstyle.log" \
+        "${CHECKSTYLE_ORDINARY}" -pl "${MODULE}"
+
+    rm -f "${SANDBOX}/${PKG_DIR}/NegativeControl.java"
+    assert_removed "derived header, ordinary file" "${PKG_DIR}/NegativeControl.java"
+    assert_passes "spotless accepts the tree once the file is gone" \
+        "${LOGS}/09-derived-header-elsewhere-clean-spotless.log" \
+        "${SPOTLESS_ORDINARY}" -pl "${MODULE}"
+    assert_passes "checkstyle accepts the tree once the file is gone" \
+        "${LOGS}/09-derived-header-elsewhere-clean-checkstyle.log" \
+        "${CHECKSTYLE_ORDINARY}" -pl "${MODULE}"
+}
+
+control_derived_formatting() {
+    banner "10  a badly formatted derived file: google-java-format must still apply"
+    # THE WEAKENING THIS CONTROL EXISTS TO CATCH.  The obvious way to give
+    # derived files their own header is Spotless's generic <formats><format>
+    # block -- and a <format> block cannot run google-java-format, so the
+    # derived files would keep a header check and silently lose the formatter.
+    # The defects below (2-space indent, imports in the wrong order) are
+    # invisible to Checkstyle by design, so only the formatter can reject them.
+    mkdir -p "${SANDBOX}/${DERIVED_PKG_DIR}"
+    {
+        cat "${ROOT}/config/license/java-header-derived.txt"
+        cat <<'JAVA'
+package org.cometgui.domain.build.derived;
+
+import java.util.Objects;
+import java.time.Instant;
+
+/**
+ * Temporary class written by scripts/verify-quality-gates.sh. Never committed.
+ *
+ * <p>Derived from Noble-Lab/CasanovoGUI src/main/java/org/casanovo/gui/ui/Themes.java at commit
+ * 480b3013e7f8fb51a2b8c58681043821e3e7f865, GPL-3.0, modified.
+ */
+public final class DerivedControl {
+  private DerivedControl() {}
+
+  /**
+   * @return a string
+   */
+  public static String badlyFormatted() {
+    return Objects.toString(Instant.EPOCH);
+  }
+}
+JAVA
+    } >"${SANDBOX}/${DERIVED_PKG_DIR}/DerivedControl.java"
+    assert_injected "derived formatting" "${DERIVED_PKG_DIR}/DerivedControl.java"
+
+    assert_fails "spotless still formats the derived file set" \
+        "DerivedControl.java" \
+        "${LOGS}/10-derived-format-spotless.log" \
+        "${SPOTLESS_DERIVED}" -pl "${MODULE}"
+    assert_passes "checkstyle accepts it (the defect is a layout defect, and only the formatter sees it)" \
+        "${LOGS}/10-derived-format-checkstyle.log" "${CHECKSTYLE_DERIVED}" -pl "${MODULE}"
+
+    rm -rf "${SANDBOX}/${DERIVED_PKG_DIR}"
+    assert_removed "derived formatting" "${DERIVED_PKG_DIR}"
+    assert_passes "spotless accepts the tree once the file is gone" \
+        "${LOGS}/10-derived-format-clean.log" "${SPOTLESS_DERIVED}" -pl "${MODULE}"
+}
+
+control_census_hole() {
+    banner "11  a derived file that NEITHER file set matches -- and the build stays green"
+    # THE HOLE THAT MAKES AN EXCLUSION DANGEROUS.  The ordinary executions
+    # exclude `**/derived/**`.  If the derived executions' include pattern ever
+    # fails to match something that exclusion drops, the file is checked by
+    # nothing at all -- no header check, no formatter, no rule set -- and `mvn
+    # verify` is GREEN and says so.  No Maven command can catch that; only a
+    # census of what the tools actually reported against what is on disk.
+    #
+    # The injection is a plausible typo: `**/derived/*.java` instead of
+    # `**/derived/**/*.java` in the two derived includes, which still matches a
+    # file directly under derived/ but misses one in a nested package.
+    sed -i \
+        -e 's|<include>src/main/java/\*\*/derived/\*\*/\*\.java</include>|<include>src/main/java/**/derived/*.java</include>|' \
+        -e 's|<includes>\*\*/derived/\*\*/\*\.java</includes>|<includes>**/derived/*.java</includes>|' \
+        "${SANDBOX}/pom.xml"
+    grep -qF '<include>src/main/java/**/derived/*.java</include>' "${SANDBOX}/pom.xml" \
+        || die "HARNESS ERROR (census hole): the sandbox POM's spotless include was not narrowed."
+    grep -qF '<includes>**/derived/*.java</includes>' "${SANDBOX}/pom.xml" \
+        || die "HARNESS ERROR (census hole): the sandbox POM's checkstyle include was not narrowed."
+
+    mkdir -p "${SANDBOX}/${DERIVED_PKG_DIR}/nested"
+    {
+        cat "${ROOT}/config/license/java-header-derived.txt"
+        cat <<'JAVA'
+package org.cometgui.domain.build.derived.nested;
+
+/** Temporary class written by scripts/verify-quality-gates.sh. Never committed. */
+public final class NestedControl {
+
+    private NestedControl() {}
+}
+JAVA
+    } >"${SANDBOX}/${DERIVED_PKG_DIR}/nested/NestedControl.java"
+    assert_injected "census hole" "${DERIVED_PKG_DIR}/nested/NestedControl.java"
+    # Deliberately WITHOUT a derivation record: nothing is going to check it.
+
+    assert_passes "the Maven build is GREEN with a file no gate inspects -- which is the point" \
+        "${LOGS}/11-census-hole-maven.log" clean validate -pl "${MODULE}"
+    assert_cmd_fails "the census catches the file no file set covers" \
+        "UNCHECKED" \
+        "${LOGS}/11-census-hole-census.log" \
+        bash "${ROOT}/scripts/build.sh" --census-root "${SANDBOX}"
+
+    rm -rf "${SANDBOX}/${DERIVED_PKG_DIR}"
+    cp "${ROOT}/pom.xml" "${SANDBOX}/pom.xml"
+    assert_removed "census hole" "${DERIVED_PKG_DIR}"
+    assert_passes "the sandbox rebuilds once the pattern and the file are restored" \
+        "${LOGS}/11-census-hole-clean-maven.log" clean validate -pl "${MODULE}"
+    assert_cmd_passes "the census accepts the restored tree" \
+        "${LOGS}/11-census-hole-clean-census.log" \
+        bash "${ROOT}/scripts/build.sh" --census-root "${SANDBOX}"
+}
+
+control_ruleset_drift() {
+    banner "12  a module removed from checkstyle-derived.xml: the two rule sets drifting apart"
+    # checkstyle-derived.xml must stay a SUPERSET of checkstyle.xml, or derived
+    # files end up held to a shorter list of rules than every other file while
+    # the build stays green.  Two rule sets that must stay in step drift; the
+    # census checks the superset property on every build, and this proves it
+    # bites.
+    sed -i '/<module name="StringLiteralEquality"\/>/d' \
+        "${SANDBOX}/config/checkstyle/checkstyle-derived.xml"
+    if grep -qF '<module name="StringLiteralEquality"/>' \
+            "${SANDBOX}/config/checkstyle/checkstyle-derived.xml"; then
+        die "HARNESS ERROR (rule-set drift): the module was not removed from the sandbox rule set."
+    fi
+    grep -qF '<module name="StringLiteralEquality"/>' \
+        "${SANDBOX}/config/checkstyle/checkstyle.xml" \
+        || die "HARNESS ERROR (rule-set drift): the ordinary rule set no longer has the module either."
+
+    assert_cmd_fails "the drift check catches a rule dropped from the derived rule set" \
+        "DRIFT" \
+        "${LOGS}/12-ruleset-drift.log" \
+        bash "${ROOT}/scripts/build.sh" --census-root "${SANDBOX}"
+
+    cp "${ROOT}/config/checkstyle/checkstyle-derived.xml" \
+        "${SANDBOX}/config/checkstyle/checkstyle-derived.xml"
+    assert_cmd_passes "the drift check accepts the restored rule set" \
+        "${LOGS}/12-ruleset-drift-clean.log" \
+        bash "${ROOT}/scripts/build.sh" --census-root "${SANDBOX}"
+}
+
 # -------------------------------------------------------------------- main --
 main() {
     case "${1:-}" in
@@ -404,6 +784,13 @@ main() {
     control_missing_header_package_info
     control_checkstyle_rule
     control_spotbugs
+    control_derived_baseline
+    control_derived_ordinary_header
+    control_derived_missing_record
+    control_derived_header_on_ordinary_file
+    control_derived_formatting
+    control_census_hole
+    control_ruleset_drift
 
     printf '\n===============================================================================\n'
     printf ' SUMMARY: %d control(s) passed, %d failed, in %d seconds\n' \

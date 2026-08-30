@@ -94,7 +94,11 @@ declare -a COVERED=()
 #   GATE_ARGS    its arguments
 #   GATE_PROOF   literal strings that MUST appear in the output; their absence
 #                means the harness ended without doing its job
-#   GATE_FLOOR   the number of controls it reported on 2026-08-29
+#   GATE_FLOOR   the number of controls it reported when last recorded.  It is
+#                RAISED whenever a harness grows: a floor left behind lets a
+#                later removal go unnoticed, which is the whole point of having
+#                one.  (quality: 20 on 2026-08-29, 42 on 2026-08-30 when phase
+#                02 unit 4 added the seven derived-file controls.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -176,11 +180,11 @@ gate_spec() {
             ;;
         quality)
             GATE_ITEMS="1, 6"
-            GATE_DEFECT="misformatted source, an MIT header on a GPL-3.0 file, a package-info.java with no header at all, string comparison by reference, a brace-less conditional, a guaranteed null dereference"
+            GATE_DEFECT="misformatted source, an MIT header on a GPL-3.0 file, a package-info.java with no header at all, string comparison by reference, a brace-less conditional, a guaranteed null dereference; and for the derived-file attribution machinery (D-001 obligation 2, R-SEC-01): a derived file with the ordinary header and no upstream attribution, a derived file with no per-file derivation record, an unearned derivation claimed by a non-derived file, a badly formatted derived file proving google-java-format still applies to that file set, a derived file that neither file set matches and that a GREEN build therefore checks with nothing, and a module dropped from checkstyle-derived.xml"
             GATE_SCRIPT="scripts/verify-quality-gates.sh"
             GATE_ARGS=()
             GATE_PROOF=("Every gate rejected its defect and accepted the clean tree.")
-            GATE_FLOOR=20
+            GATE_FLOOR=42
             GATE_UNIT="controls"
             ;;
         tests)
