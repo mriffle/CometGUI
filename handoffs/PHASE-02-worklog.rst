@@ -190,7 +190,33 @@ Work units
        size, that the *oldest* were the ones discarded, and that retained heap
        stays inside a documented bound.
      - ``R-PROC-03``, gate 5
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commit ``b75ee48``. Diff read in full; nine
+       files, all under ``cometgui-domain/src``, nothing else touched and no
+       file from unit 1 modified. ``mvn -B -pl cometgui-domain -am verify``:
+       ``0 Checkstyle violations``, ``BugInstance size is 0``,
+       ``All coverage checks have been met``, and my own count over the
+       surefire XML gives ``tests=256 failures=0 errors=0 skipped=0``.
+       ``jacoco.xml`` bundle totals ``LINE missed=0 covered=301`` and
+       ``BRANCH missed=0 covered=144``. PIT counted by me from
+       ``mutations.xml``: ``total=152 killed=152 survived=0``, 100%. The flood
+       test's own printed line, from the surefire report of my run:
+       ``flood: appended=1000000 capacity=10000 size=10000 discarded=990000
+       heapBefore=5116176 heapAfter=7238864 growth=2122688 limit=33554432
+       elapsedMillis=497`` -- a real measurement, 16x inside its documented
+       bound. **Falsification of my own**, distinct from the agent's and run in
+       a ``git archive`` sandbox: changing the discard test from
+       ``messages.size() == capacity`` to ``messages.size() > capacity`` -- a
+       single character, leaving discarding switched on -- fails five
+       assertions in the flood test, including
+       ``size is exactly the capacity ==> expected: <10000> but was: <10001>``
+       and ``discarded is appended minus capacity ==> expected: <990000> but
+       was: <989999>``. The cap is therefore proved exact rather than
+       approximate. ``bash scripts/build.sh``: ``11/11 stages OK in 100
+       seconds. BUILD OK``. Judgement call I accepted: the agent replaced
+       ``System.gc()`` with ``ManagementFactory.getMemoryMXBean().gc()``
+       because SpotBugs rejects ``DM_GC`` at ``threshold=Low``; that is a fix
+       in the code rather than the forbidden exclusion, and the measurement
+       itself is unchanged.
 
    * - 3
      - **Workflow stage and state model.** ``org.cometgui.workflow.state``
