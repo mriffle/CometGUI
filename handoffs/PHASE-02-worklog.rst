@@ -417,7 +417,58 @@ Work units
        the composition root wiring every seam, and the host-baseline result
        reported at startup rather than discovered by a later crash.
      - ``R-PLAT-01``, ``R-PROC-01``
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commit ``b7a3b8f``. Diff read; every path is
+       under ``cometgui-app/``, and the POM diff adds only the headless test
+       recipe -- no ``skip``, no ``exclude``, no ``failIf`` appears anywhere in
+       it (I grepped the added lines for those words and got nothing).
+       ``bash scripts/build.sh``: ``11/11 stages OK in 155 seconds. BUILD OK``,
+       ``42 report file(s): tests=677 failures=0 errors=0 skipped=0``,
+       ``ok cometgui-app 28 class(es) analysed, 0 findings``,
+       ``ok 106 classes imported from org.cometgui`` (up from 75 -- the
+       ArchUnit census is growing with the product, not standing still), and
+       ``ok 8 architecture rule(s) checked, 0 failures``. The derived-file
+       count for ``cometgui-app`` is still ``25 ordinary + 2 derived = 27``,
+       so this unit added no derived file and did not disturb the two that
+       exist. The FFM probe's own evidence file,
+       ``cometgui-app/target/glibc-probe.txt``, reads
+       ``symbol gnu_get_libc_version text 2.36 parsed 2.36.0`` -- a real
+       native call, no subprocess, matching what I measured by hand before the
+       unit was written.
+       **I started the application myself**, outside any test: built a class
+       path from the twelve ``target/classes`` directories plus
+       ``atlantafx-base-2.1.0.jar``, and ran
+       ``org.cometgui.app.bootstrap.CometGuiLauncher`` under the Monocle
+       headless recipe with the project-local font stack. It ran for the full
+       25-second timeout with **no output on stdout or stderr and no
+       exception** -- the JVM had to be killed by the timeout, which is what a
+       showing window does. On its own that is only "it did not crash"; it is
+       recorded because it is independent of the test harness, and the scene
+       contents are asserted by the smoke test.
+       **Falsification of my own**: raising ``STARTUP_GLIBC_FLOOR`` from
+       ``2.14.0`` to ``9.99.0`` -- so this host's real 2.36 no longer meets it
+       -- fails six tests across the two bootstrap test classes, with
+       ``Cannot continue: This host has glibc 2.36, but the selected tools
+       require glibc 9.99.0 or newer. Select tool versions built for an older
+       glibc, or run CometGUI on a distribution with glibc 9.99.0 or newer.``
+       That is R-PLAT-01 verified at startup against a real probe, and the
+       diagnostic names the host's version and the required version as
+       ``R-PLAT-03`` asks.
+       **Note for a sandboxed re-run**: ``git archive`` does not carry
+       ``tools/`` (it is gitignored), so a sandbox must symlink
+       ``/workspace/tools`` before the JavaFX tests can run; without it they
+       fail loudly with ``the project-local font stack is missing ... Run:
+       bash scripts/fetch-fontstack.sh``, which is the designed behaviour, not
+       a defect.
+       **Accepted judgement calls, recorded**: the three seams with no
+       implementation yet (``ProcessRunner``, ``HashService``, ``Downloader``)
+       are modelled as ``Optional`` accessors plus ``require*`` forms that
+       throw naming the owning phase, rather than as fakes or null fields --
+       a no-op hash service would let Phase 04 build a provenance record out
+       of fiction and stay green. The shared ``BoundedMessageLog`` is injected
+       into ``CometGuiApplication`` rather than held by the composition root,
+       because SpotBugs is right that a composition root handing out mutable
+       shared state is ``EI_EXPOSE_REP``; **Phase 03 must decide where the
+       shared log lives** when the process service needs to write to it.
 
    * - 8
      - **FxUiDriver and the headless GUI suite.** The driver abstraction with
