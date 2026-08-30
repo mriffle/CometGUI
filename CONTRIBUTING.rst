@@ -358,11 +358,12 @@ reach ordinary contributions:
   formats and adds headers, but **will not add one to a new
   ``package-info.java`` -- copy it from a sibling by hand**, or the build
   fails with ``Missing a header - not enough lines in file``.
-* **Phase 02 extends the header configuration, it does not relax it.** A file
+* **Phase 02 extended the header configuration, it did not relax it.** A file
   derived from CasanovoGUI keeps its upstream notice, which means a second
   Spotless file set and a second Checkstyle execution with their own header
   file -- never deleting, suppressing or excluding the existing check to make
-  a derived file pass.
+  a derived file pass. `Files derived from CasanovoGUI`_ below is how that
+  lands on disk, and what you do when you add one.
 * **The copyright holder line reads "The CometGUI authors."** No legal entity
   has been named. That is adjacent to ``D-001``/``D-008`` and is the owner's
   to settle before redistribution; do not substitute a name on your own
@@ -378,6 +379,83 @@ reach ordinary contributions:
   contains one, so do not add a step that bundles one.
 * **Source availability** for installer recipients is a GPL-3.0 obligation
   Phase 16 owns, and it depends on the open publication half of ``D-008``.
+
+Files derived from CasanovoGUI
+------------------------------
+
+**A file is derived if and only if its path contains a ``/derived/``
+segment.** That is the whole convention, and it is mechanical on purpose:
+which files carry an upstream notice must not depend on anyone remembering.
+Copy upstream material into a ``derived`` package; write your own code
+anywhere else. A *test* of derived code is not itself derived material, so it
+lives outside that path and carries the ordinary header.
+
+There are therefore **two licence headers, and two of every check**:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 37 37
+
+   * - What
+     - Ordinary files
+     - Files under a ``/derived/`` path
+
+   * - Licence header
+     - ``config/license/java-header.txt``
+     - ``config/license/java-header-derived.txt``
+
+   * - Spotless execution
+     - ``spotless-check``, which excludes ``**/derived/**``
+     - ``spotless-check-derived``, which includes only those, with the same
+       google-java-format step
+
+   * - Checkstyle execution
+     - ``checkstyle-check``, which excludes the same paths
+     - ``checkstyle-check-derived``
+
+   * - Checkstyle rule set
+     - ``config/checkstyle/checkstyle.xml``
+     - ``config/checkstyle/checkstyle-derived.xml``, a **superset** of it
+
+The derived rule set adds one rule the ordinary one does not have: the
+**per-file derivation record**, a paragraph of the file's documentation
+comment reading ::
+
+    * <p>Derived from Noble-Lab/CasanovoGUI <upstream path> at commit
+    * <40-hex commit sha>, GPL-3.0, modified.
+
+The header block is fixed and identical in every derived file, so it cannot
+name either the upstream file or the commit; that is what the record is for.
+It is required of every file under a ``/derived/`` path, ``package-info.java``
+included -- there is no suppression filter and no exemption for a file name.
+
+**``mvn spotless:apply`` applies only the ORDINARY header.** The derived paths
+are excluded from the execution that inserts it, so a derived file's header is
+copied in by hand -- exactly as a new ``package-info.java``'s is, and for a
+related reason: the tool that would write it does not look at that file. Copy
+``config/license/java-header-derived.txt`` in verbatim and unaltered. The line
+``Copyright (C) 2026 The CometGUI authors.`` stays on a derived file as on
+every other file (``D-009``); upstream is attributed alongside it, not instead
+of it.
+
+**To check a derived file, one line**::
+
+    mvn -pl <module> validate
+
+which runs all four executions -- both Spotless file sets and both Checkstyle
+file sets -- and nothing else.
+
+**Neither file set may shrink without the other growing.** Excluding a file
+from a gate is only legitimate while something else covers it, so
+``scripts/build.sh`` proves after every build that the two sets are disjoint,
+that together they cover exactly the ``.java`` files on disk, and that
+``checkstyle-derived.xml`` still contains every module ``checkstyle.xml``
+does. A file excluded from one set whose path the other's include pattern
+misses would be checked by nothing at all, and the build would stay green and
+say so -- which is precisely why the census exists.
+``bash scripts/verify-quality-gates.sh`` proves every one of these checks
+fails on the defect it exists to catch.
+
 
 Standing quality rules
 ======================
