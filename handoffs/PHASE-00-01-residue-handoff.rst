@@ -207,11 +207,19 @@ Traps and findings worth carrying forward
 What is on the branch
 =====================
 
-Eleven files. The branch is ``windows-percolator-verification``, based on
-``main`` at ``82609f0``, and it was built in a separate ``git worktree`` so
-that a second phase orchestrator working on ``main`` in ``/workspace`` was
-never disturbed: ``/workspace``'s working tree was clean throughout and no
-commit of this work landed on ``main`` except the two records in ``handoffs/``.
+Seventeen files across twelve commits, ``+3502 / -114``. The branch is
+``windows-percolator-verification``, based on ``main`` at ``82609f0``, and it
+was built in a separate ``git worktree`` so that a second phase orchestrator
+working on ``main`` in ``/workspace`` was never disturbed: ``/workspace``'s
+working tree was clean throughout and no commit of this work landed on
+``main`` except the records in ``handoffs/``. The eleven that carry the work
+are below; the other six are corrections of statements that went stale --
+``.github/workflows/{pull-request,nightly,release}.yml`` no longer say the
+repository has no remote, ``scripts/ci/check-workflows.sh`` and
+``scripts/verify-all-gates.sh`` no longer say the self-test damages nine
+copies when it damages nineteen, and
+``scripts/feasibility/check-docs.sh``'s single-file mode no longer fails a
+page for correctly linking to another page.
 
 .. list-table::
    :header-rows: 1
