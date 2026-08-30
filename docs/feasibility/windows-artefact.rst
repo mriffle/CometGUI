@@ -730,8 +730,12 @@ Four realistic options. None was taken; each is priced.
    * - GitHub Actions ``windows-latest``
      - Money: none in practice (a public repository is free; a private one
        bills Windows at 2x, and the job is ~3 minutes). Effort: ~1 hour to
-       write the workflow. **Blocked**: there is no git remote and creating
-       one is ``D-008``, an owner decision.
+       write the workflow. **No longer blocked**: ``D-008`` was decided on
+       2026-08-30 and the remote exists. The workflow is written --
+       ``.github/workflows/windows-percolator.yml``, driving
+       ``scripts/ci/windows-percolator-verify.sh``, which automates the
+       checklist below -- and **it has never been executed**: nothing has been
+       pushed and GitHub has run no workflow in this repository at all.
      - The binary starts on Windows Server 2022; the real ``--help`` text;
        ``-X`` on a real PIN; ``--xml-in`` behaviour, which is the
        discriminating test. Repeatable on every change.
