@@ -204,6 +204,53 @@ Traps and findings worth carrying forward
        Anything written later that mentions that filename in prose hits the
        same trap.
 
+What cannot be known until a runner executes it
+===============================================
+
+Everything below is unknown today and this session cannot make it known. It is
+listed so that nobody reads the branch as evidence.
+
+**About the Windows binary** -- the whole point of the job:
+
+* whether ``percolator.exe`` starts at all on Windows Server;
+* its real ``--help`` text and exit code (the harness pins the expectation to
+  the Linux value, 0, and reports a difference rather than hiding it);
+* whether ``-X`` writes a Percolator XML file there, and with how many
+  ``<psm>`` elements;
+* whether ``--xml-in`` prints ``Compiler flag XML_SUPPORT was off`` -- the
+  discriminating test, and the one that decides whether the project's
+  inference about this artefact holds;
+* whether the MSVC runtime DLLs shipped in the payload are found by the
+  loader from the directory the harness extracts them into. The symptom of a
+  failure would be exit ``0xC0000135`` and an INCONCLUSIVE verdict, not a
+  false pass;
+* whether the portable ``noxml`` ZIP's binary -- the one the product ships
+  after ``D-002`` option C -- runs on the runner at all.
+
+**About the harness itself**, which has only ever run on Linux:
+
+* whether Git Bash finds a Python (the wrapper *runs* each of ``python3``,
+  ``python`` and ``py -3`` rather than trusting ``command -v``, because a
+  Microsoft Store alias answers ``command -v`` and then does nothing);
+* whether MSYS leaves a relative script path and the flags unrewritten. The
+  wrapper changes directory to the project root and passes a relative path precisely so
+  there is no absolute POSIX path for MSYS to rewrite; that reasoning is
+  argued, not observed;
+* whether the ``.gitattributes`` does what it is there for -- a checkout with
+  LF endings under ``core.autocrlf=true``;
+* Windows exit-code formatting against a real ``0xC0000005``.
+
+**About the pull-request pipeline**, which has also never run anywhere but
+here: whether a hosted ``ubuntu-latest`` runner can complete it inside its
+90-minute timeout, with its own JDK, Maven and font stack downloaded from
+scratch and PIT mutation testing on four cores. Every step passes on this
+machine; nothing more than that is known.
+
+**Never answerable by this job, whatever it returns:** behaviour for a
+standard, non-administrator user (a hosted runner is an administrator);
+consumer Windows 10 and 11; Windows on ARM; a clean machine without Visual
+Studio's redistributables; and anything at all about macOS.
+
 What the owner has to do
 ========================
 
