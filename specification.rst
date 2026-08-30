@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 9
+:Revision: 10
 :Revision date: 2026-08-30
-:Supersedes: Revision 8, 2026-08-30
+:Supersedes: Revision 9, 2026-08-30
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,25 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 10
+     - 2026-08-30
+     - **``R-SEC-01`` amended to match ``D-001``, which decided it on
+       2026-08-29.** The rule still read as a prohibition on copying
+       CasanovoGUI source "until ``D-001`` is resolved", and the paragraph
+       above it still asserted as present fact that upstream "still exposes
+       **no licence** -- verified 2026-08-28". Both were overtaken by
+       CasanovoGUI publishing GPL-3.0 at ``2026-08-29T01:56:35Z`` and by the
+       owner's decision to derive from it. Revision 6's change-log entry
+       recorded the lift; the normative text was never amended to match, so
+       this document contradicted both ``DECISIONS.rst`` and its own change
+       log for four revisions. Found while the Phase 02 orchestrator was
+       reading it -- Phase 02 is the first phase to reuse CasanovoGUI source in
+       earnest, and an agent grepping the rule rather than the change log would
+       have concluded that reuse was forbidden and written the shell
+       independently. ``R-SEC-01`` now states the **obligation** the decision
+       created: derived files retain upstream copyright notices, record the
+       derivation, and are held to header checks that are extended to cover
+       them and never relaxed or bypassed. No other rule changes.
    * - 9
      - 2026-08-30
      - **``D-003`` decided: three managed Percolator versions.** 3.07.1 (the
@@ -631,17 +650,34 @@ foundation, cross-platform packaging, a bundled Java runtime, managed
 first-run installation of scientific software, live process output, PDV launch
 support, and Limelight-related integration patterns.
 
-However, ``Noble-Lab/CasanovoGUI`` still exposes **no licence** -- verified
-2026-08-28, with the repository last pushed 2026-08-21. A public GitHub
-repository is not a grant of redistribution rights.
+``Noble-Lab/CasanovoGUI`` published **GPL-3.0** on ``2026-08-29T01:56:35Z``,
+during Phase 00 and between that phase's work unit and its sign-off. It had
+exposed no licence when checked on 2026-08-28, and a public GitHub repository
+is not a grant of redistribution rights; that is why this document carried a
+derivation prohibition through revision 9. The licence is now present and was
+verified three ways at Phase 00 sign-off -- repository API, licence-blob sha
+``f288702d2fa16d3cdf0035b15a9fcbc552cd88e7``, and the commit list. On
+2026-08-29 the owner accepted the copyleft commitment and decided that CometGUI
+**derives from CasanovoGUI and is released under GPL-3.0** (``D-001``).
 
 ``R-SEC-01``
-    No CasanovoGUI source shall be copied into the CometGUI repository until
-    ``D-001`` is resolved by an explicit licence added upstream or written
-    permission from the copyright holders, recorded in ``DECISIONS.rst``. Until
-    then, CasanovoGUI may be *read* for design guidance, and CometGUI code
-    shall be written independently. This is a release gate and an early
-    implementation gate, not a documentation nicety.
+    CasanovoGUI source **may** be reused in CometGUI, and every file so derived
+    shall retain its upstream copyright notices and shall record its
+    derivation -- the upstream file it came from and the fact that it was
+    modified. The obligation shall be enforced by the build rather than by
+    review: a derived file that carries no attribution shall fail the header
+    checks. Those checks shall be **extended** to cover derived files; they
+    shall never be relaxed, and a derived file shall never be excluded from
+    them in order to pass. This is a release gate and an early implementation
+    gate, not a documentation nicety.
+
+    *Amended in revision 10.* Through revision 9 this rule prohibited copying
+    CasanovoGUI source until ``D-001`` resolved. ``D-001`` resolved on
+    2026-08-29 and lifted that prohibition, replacing it with the attribution
+    obligation above; revision 6's change-log entry recorded the lift but the
+    rule text was not amended to match, so the rule contradicted both the
+    decision and its own change log until revision 10. Phase 02 owns the
+    obligation and the machinery that enforces it.
 
 The base targets Java 23+ and JavaFX 25.x and uses AtlantaFX. The new project
 should initially preserve that stack so the work focuses on the workflow and
