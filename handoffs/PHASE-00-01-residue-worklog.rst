@@ -445,6 +445,70 @@ everything, in other words, that requires the binary to run. ``--check-only``
 covers the download, the checksums, the extraction, the payload checksums and
 the PIN. That is the harness, not the finding.
 
+U4 -- ACCEPTED, 2026-08-30
+--------------------------
+
+:Agent commit: ``98c0095``
+
+``.github/workflows/windows-percolator.yml`` (new), ``.gitattributes`` (new),
+and the two files that keep a workflow honest:
+``scripts/ci/check-workflows.py`` and ``scripts/ci/run-pipeline-locally.sh``.
+
+What the phase orchestrator ran itself, and what it printed:
+
+* ``bash scripts/ci/check-workflows.sh`` -> ``PASSED``, and it now reports
+  ``4 workflow file(s) discovered``, ``windows-percolator.yml: 3 step(s), 1
+  run + 2 uses (raw text agrees)``, ``runs on ['windows-latest'], runs
+  scripts/ci/windows-percolator-verify.sh, uploads its transcript with `if:
+  always()`, permissions {'contents': 'read'}``, and ``4 workflow(s) scanned
+  for a credential ... release.yml is checkout-only``.
+* ``--self-test`` -> ``self-test OK -- 19 damaged copies rejected, the
+  undamaged one accepted``, exit 0. Nine before, nineteen now; the floor in
+  ``scripts/verify-all-gates.sh`` is 9 and it is a floor, so this can only be
+  a strengthening.
+* **Injected ten defects of my own rather than re-running the author's.** All
+  in a sandbox copy, so the live tree was never damaged. Every one was
+  rejected with a message naming the cause: a fifth workflow file naming a
+  script that does not exist (``rogue.yml ... which does not exist`` --
+  discovery works); ``actions/upload-artifact`` used in ``release.yml``
+  (``not in this workflow's allowlist ['actions/checkout']``); the upload
+  action pinned to ``@v7`` instead of a SHA; ``if: always()`` moved onto the
+  ``run:`` step (``permitted only on a step that uses
+  actions/upload-artifact``); ``if: always()`` deleted from the upload
+  (``without it, a FAILING run is the one run whose transcript is never
+  uploaded``); the verification step repointed at another real script; the
+  Windows job moved to ``ubuntu-latest``; a secret added to the new workflow;
+  ``pull-request.yml`` deleted; and the control accepted before and after.
+  One expectation of mine was wrong in the safe direction: deleting
+  ``windows-percolator.yml`` is **rejected**, because U4 made its presence
+  required, not only its content.
+* ``bash scripts/ci/run-pipeline-locally.sh`` -> ``45 step(s) across 4
+  workflow(s); 37 executed on this machine; 0 unexpected``, exit 0. The step
+  total rose from 42 and the executed count did **not** move, which is what
+  it should do: every step of the new workflow is on a Windows runner and is
+  recorded ``NOT RUN``. The nightly Windows stub is still classified and
+  still recorded the same way, so nothing here makes that job read as green.
+* ``bash scripts/build.sh`` -> ``11/11 stages OK in 89 seconds. BUILD OK``,
+  exit 0. The baseline is intact.
+* ``git ls-files --eol -- '*.sh' '*.py'`` -> all 75 files ``i/lf``, so
+  ``.gitattributes`` renormalises nothing here; it changes only what a
+  Windows checkout produces.
+* Read every removed line in the diff. The ``git push`` and ``git remote``
+  forbidden tokens survive with new reasons; the release-only publish scan
+  became an every-workflow scan; ``ACTION_SHA_RE`` became a general
+  ``OWNER/REPO@<40 hex>`` pattern plus a per-file allowlist. Nothing that was
+  checked before is unchecked now.
+
+**Orchestrator repairs alongside this unit.** ``check-workflows.sh``'s own
+``--help`` and ``verify-all-gates.sh``'s ``GATE_DEFECT`` line both still said
+"nine ways" (``516d812``); the three older workflow headers still said the
+repository has no remote and ``D-008`` is open (``07f5713``, comments only,
+re-checked); and ``scripts/feasibility/check-docs.sh``'s single-file mode
+built one document, so a page that correctly cross-references another failed
+there while passing the real gate -- an invitation to delete hyperlinks to
+satisfy a harness (``d8ae3aa``, still falsifiable: a temporary document with a
+broken ``:ref:`` makes it exit 1).
+
 U5 -- ACCEPTED, 2026-08-30
 --------------------------
 
