@@ -139,7 +139,7 @@ Acceptance conditions
 #. No project gate, checksum or rule is weakened.
 
 U2 -- does ``extract_nsis.py`` really run on Windows unchanged?
-==============================================================
+===============================================================
 
 :Serves: PHASE-00 gate item 8, step 2 of the checklist
 :Wave: A
