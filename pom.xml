@@ -131,6 +131,27 @@
     <openjfx-monocle.version>21.0.2</openjfx-monocle.version>
 
     <!--
+      PHASE 02: AtlantaFX, the JavaFX theme library the CasanovoGUI base uses
+      (specification.rst, "CasanovoGUI base": the base "targets Java 23+ and
+      JavaFX 25.x and uses AtlantaFX", and the new project preserves that stack).
+      2.1.0 is the version CasanovoGUI itself pins against JavaFX 25.
+
+      It is a plain stylesheet library: the artefact contributes only CSS
+      resources and a handful of theme classes, and CometGUI touches it through
+      org.cometgui.app.config.derived.AtlantaFxThemes and nowhere else.
+
+      IT DECLARES org.openjfx:javafx-controls AND JUNIT AS ITS OWN
+      DEPENDENCIES, AND BOTH ARE EXCLUDED where it is declared
+      (cometgui-app/pom.xml).  This project takes JavaFX from the pinned
+      Liberica Full JDK as resolved system modules and has no org.openjfx
+      dependency anywhere - see the note at the top of this file - and a
+      transitive javafx-controls would put a second copy of the javafx.*
+      packages on the class path.  `mvn -pl cometgui-app dependency:tree` must
+      keep showing no org.openjfx artefact.
+    -->
+    <atlantafx-base.version>2.1.0</atlantafx-base.version>
+
+    <!--
       UNIT 7: SUPPLY CHAIN.  The specification's Supply-Chain and Application
       Security section requires an SBOM at release time and dependency
       vulnerability scanning in CI.  CycloneDX produces the SBOM; the scan is
@@ -300,6 +321,16 @@
         <artifactId>cometgui-app</artifactId>
         <version>${project.version}</version>
       </dependency>
+
+      <!--
+        UI theming (phase 02).  Only cometgui-app declares it, and it declares
+        it with <exclusions>; the version is pinned here with everything else.
+      -->
+      <dependency>
+        <groupId>io.github.mkpaz</groupId>
+        <artifactId>atlantafx-base</artifactId>
+        <version>${atlantafx-base.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -434,21 +465,39 @@
           <configuration>
             <java>
               <!--
-                PHASE 02 MUST EXTEND THIS, NOT RELAX IT.  Phase 02 adds files
-                derived from Noble.Lab/CasanovoGUI, which by D-001 obligation 2
-                must keep their upstream copyright notices.  Those files
-                therefore need a *second* file set: exclude their paths from
-                this <java> block and add a <formats><format> entry that
-                includes them, with its own <licenseHeader> carrying the
-                upstream notice plus CometGUI's derivation record.  Deleting
-                the licenseHeader step, widening this header until it matches
-                both, or excluding the derived tree from the check entirely are
-                all weakenings of a gate and are rejected at sign-off.
+                PHASE 02 EXTENDED THIS, IT DID NOT RELAX IT (work unit 4).
+                Files derived from Noble.Lab/CasanovoGUI must keep their
+                upstream copyright notices (D-001 obligation 2, R-SEC-01), so
+                they carry a different header and need a SECOND file set.  The
+                convention is mechanical: a file is derived if and only if its
+                path contains a `/derived/` segment.  Those paths are excluded
+                here and included by the `spotless-check-derived` execution in
+                <build><plugins> below, which repeats every formatter step in
+                this block and differs only in its <licenseHeader>.
+
+                THE SECOND SET IS AN EXECUTION, NOT A <formats><format>.  An
+                earlier note here suggested <format>; that would have been a
+                weakening, because a generic <format> block cannot run
+                google-java-format, so derived files would have kept a header
+                check and silently lost the formatter.  Two <java> file sets in
+                two executions keep both.
+
+                Deleting the licenseHeader step, widening this header until it
+                matches both, or excluding the derived tree from the check
+                entirely are all weakenings of a gate and are rejected at
+                sign-off.  The exclusion below is legitimate only because the
+                second execution covers exactly what it drops, and
+                scripts/build.sh proves after every build that the two file
+                sets are disjoint and together cover every .java file on disk.
               -->
               <includes>
                 <include>src/main/java/**/*.java</include>
                 <include>src/test/java/**/*.java</include>
               </includes>
+              <excludes>
+                <exclude>src/main/java/**/derived/**/*.java</exclude>
+                <exclude>src/test/java/**/derived/**/*.java</exclude>
+              </excludes>
               <googleJavaFormat>
                 <version>${google-java-format.version}</version>
                 <style>AOSP</style>
@@ -500,7 +549,17 @@
             </dependency>
           </dependencies>
           <configuration>
-            <configLocation>${cometgui.configDirectory}/checkstyle/checkstyle.xml</configLocation>
+            <!--
+            The ORDINARY rule set and the ORDINARY header.  Phase 02 unit 4
+            added a second execution, `checkstyle-check-derived` in
+            <build><plugins> below, which overrides both with the derived rule
+            set and the derived header for files under a `/derived/` path; this
+            execution excludes exactly those paths.  Neither execution may be
+            deleted, skipped or narrowed without the other growing to match:
+            scripts/build.sh fails the build if the two sets stop covering
+            every .java file on disk, or start overlapping.
+          -->
+          <configLocation>${cometgui.configDirectory}/checkstyle/checkstyle.xml</configLocation>
             <!-- Exposed to the rule set as ${checkstyle.header.file}; the same
                  file Spotless inserts, so the two tools cannot disagree about
                  what the licence header is. -->
@@ -864,11 +923,73 @@
         <artifactId>spotless-maven-plugin</artifactId>
         <executions>
           <execution>
+            <!-- Every .java file EXCEPT those under a `/derived/` path: the
+                 includes and the excludes are in pluginManagement above. -->
             <id>spotless-check</id>
             <phase>validate</phase>
             <goals>
               <goal>check</goal>
             </goals>
+          </execution>
+          <execution>
+            <!--
+              THE DERIVED FILE SET (phase 02 unit 4).  Exactly the files the
+              execution above excludes, held to exactly the same formatter and
+              a DIFFERENT licence header, the one that keeps CasanovoGUI's
+              notices.
+
+              combine.self="override" on <java> is load-bearing, and what it
+              defends against is not what one would guess.  Maven merges the
+              plugin's <configuration> into every execution's.  OBSERVED, by
+              deleting the attribute and reading `mvn help:effective-pom -pl
+              cometgui-app`: the child's <includes> WINS outright (lists are
+              not appended when the child declares the element), but the
+              parent's <excludes> is INHERITED, because this execution declares
+              none.  That exclusion is `**/derived/**`, so without the attribute
+              this execution would have included the derived files and then
+              excluded every one of them, formatting and header-checking
+              NOTHING while exiting 0.  With the attribute the effective
+              execution configuration contains this block and nothing else.
+              scripts/build.sh's census is the backstop that would notice such
+              an empty file set even if this comment were ignored.
+
+              <indexFile> is also load-bearing.  Spotless writes an incremental
+              index that scripts/build.sh counts as proof that it inspected
+              every file; two executions in one module would otherwise both
+              write target/spotless-index and the second would overwrite the
+              first, destroying the evidence for the first.
+            -->
+            <id>spotless-check-derived</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <java combine.self="override">
+                <includes>
+                  <include>src/main/java/**/derived/**/*.java</include>
+                  <include>src/test/java/**/derived/**/*.java</include>
+                </includes>
+                <googleJavaFormat>
+                  <version>${google-java-format.version}</version>
+                  <style>AOSP</style>
+                </googleJavaFormat>
+                <importOrder>
+                  <order>\#,</order>
+                </importOrder>
+                <removeUnusedImports/>
+                <trimTrailingWhitespace/>
+                <endWithNewline/>
+                <licenseHeader>
+                  <file>${cometgui.configDirectory}/license/java-header-derived.txt</file>
+                  <delimiter>(package|/\*\*)</delimiter>
+                </licenseHeader>
+              </java>
+              <upToDateChecking>
+                <enabled>true</enabled>
+                <indexFile>${project.build.directory}/spotless-index-derived</indexFile>
+              </upToDateChecking>
+            </configuration>
           </execution>
         </executions>
       </plugin>
@@ -877,11 +998,43 @@
         <artifactId>maven-checkstyle-plugin</artifactId>
         <executions>
           <execution>
+            <!-- The ordinary rule set and the ordinary header, over every
+                 .java file EXCEPT those under a `/derived/` path. -->
             <id>checkstyle-check</id>
             <phase>validate</phase>
             <goals>
               <goal>check</goal>
             </goals>
+            <configuration>
+              <excludes>**/derived/**/*.java</excludes>
+            </configuration>
+          </execution>
+          <execution>
+            <!--
+              THE DERIVED FILE SET (phase 02 unit 4).  Exactly the files the
+              execution above excludes, graded by a rule set that is a SUPERSET
+              of the ordinary one (every module of checkstyle.xml, plus the
+              required per-file derivation record) against the derived header.
+
+              <outputFile> is load-bearing: without its own file this execution
+              would overwrite target/checkstyle-result.xml, which
+              scripts/build.sh reads as the evidence that the ordinary
+              execution inspected the ordinary file set.  <cacheFile> likewise:
+              two rule sets sharing one cache would each invalidate the other's
+              entries on every build.
+            -->
+            <id>checkstyle-check-derived</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <configLocation>${cometgui.configDirectory}/checkstyle/checkstyle-derived.xml</configLocation>
+              <headerLocation>${cometgui.configDirectory}/license/java-header-derived.txt</headerLocation>
+              <includes>**/derived/**/*.java</includes>
+              <outputFile>${project.build.directory}/checkstyle-result-derived.xml</outputFile>
+              <cacheFile>${project.build.directory}/checkstyle-cachefile-derived</cacheFile>
+            </configuration>
           </execution>
         </executions>
       </plugin>
