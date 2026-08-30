@@ -11,8 +11,10 @@
 # permits; and publish only if every gate passes.
 #
 # THIS FILE PUBLISHES NOTHING, AND CONTAINS NO PUSH, NO CREDENTIAL AND NO
-# REMOTE.  Where CometGUI is published is D-008, still open and the owner's to
-# settle, and it is coupled to the GPL-3.0 source-availability obligation.
+# REMOTE.  D-008 settled where CometGUI is published on 2026-08-30, but that is
+# a decision about a repository, not a licence for a job to publish from: this
+# file still holds no credential, names no remote and pushes nothing, and the
+# GPL-3.0 source-availability obligation is Phase 16's to discharge.
 # scripts/ci/release-publish.sh is a stub that refuses; scripts/ci/
 # check-workflows.py fails this file if it ever grows a `secrets.` reference,
 # a `git push`, a write permission or an action other than checkout.
@@ -23,8 +25,8 @@
 # the pull-request pipeline runs.
 #
 # WINDOWS AND MACOS ARE NAMED BUT UNVERIFIABLE HERE.  This environment has one
-# Linux machine and no remote, so the two non-Linux matrix entries have never
-# executed. They are written down so that a later phase turns them on rather
+# Linux machine, and GitHub has never executed anything in this repository, so
+# the two non-Linux matrix entries have never run. They are written down so that a later phase turns them on rather
 # than writes them; D-004 records that the macOS Percolator payload is x86-64
 # and runs under Rosetta 2 on Apple silicon.
 
