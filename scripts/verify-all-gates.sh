@@ -98,7 +98,11 @@ declare -a COVERED=()
 #                RAISED whenever a harness grows: a floor left behind lets a
 #                later removal go unnoticed, which is the whole point of having
 #                one.  (quality: 20 on 2026-08-29, 42 on 2026-08-30 when phase
-#                02 unit 4 added the seven derived-file controls.)
+#                02 unit 4 added the seven derived-file controls.  tests: 32 on
+#                2026-08-29, 33 on 2026-08-30 when phase 02 unit 11 re-sized the
+#                coverage and mutation injections against the grown tree and
+#                added control 6's proof that the coverage gate accepts the
+#                defect the mutation gate rejects.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -193,7 +197,7 @@ gate_spec() {
             GATE_SCRIPT="scripts/verify-test-gates.sh"
             GATE_ARGS=()
             GATE_PROOF=("Every gate rejected its defect and accepted the clean tree.")
-            GATE_FLOOR=32
+            GATE_FLOOR=33
             GATE_UNIT="assertions"
             ;;
         *)
