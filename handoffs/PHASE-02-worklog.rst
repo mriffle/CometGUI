@@ -477,7 +477,69 @@ Work units
        enumerates every control and fails on a missing accessible name; a
        pane-level console flood test.
      - ``R-TEST-04``, ``AC-TST-05``, gates 1, 2, 4, 5
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commits ``ca4b22f``, ``fa05644``,
+       ``23f10e0``, ``bd8adc3``. Diff read: thirteen files, all under
+       ``cometgui-app/src/test/java`` except the two POMs, whose only change
+       is the TestFX declaration (test scope in both places) and the AssertJ
+       exclusion. I ran the four gate tests myself:
+       ``Tests run: 16, Failures: 0, Errors: 0, Skipped: 0`` across
+       ``SectionNavigationUiTest`` (4), ``KeyboardOnlyNavigationUiTest`` (4),
+       ``AccessibleNameEnumerationUiTest`` (3) and ``ConsoleFloodUiTest`` (5).
+       ``bash scripts/build.sh``: ``11/11 stages OK in 173 seconds. BUILD OK``
+       with ``46 report file(s): tests=693 failures=0 errors=0 skipped=0``.
+       **Four falsifications of my own**, each different from the agent's and
+       each run in a ``git archive`` sandbox with ``tools/`` symlinked:
+       *gate 1, mouse* -- making every navigation entry select ``RUN``
+       (``entry.setOnAction(event -> select(SectionId.RUN))``) fails with
+       ``the header's echo of the selected section ==> expected: <Comet
+       Parameters> but was: <Run>`` and ``#section-run should not be showing
+       while comet-parameters is selected``;
+       *gate 1, keyboard* -- making Down move two sections at a time fails
+       three tests with ``the walk starts with the focus on the first
+       section's entry ==> expected: <nav-run> but was: <nav-percolator>``;
+       *gate 2* -- ``SectionPane.setId(null)``, so no pane carries its stable
+       identifier, fails the navigation walk under both drivers;
+       *gate 4* -- removing the accessible name from the stage-NAME labels
+       fails with ``8 of 91 controls have none: Label with id
+       #stage-inputs-name under #stage-inputs; ...`` naming every one;
+       *gate 5* -- replacing the console's document window with ``int from =
+       0`` fails with ``the document must hold exactly its cap of lines, not
+       10000 ==> expected: <5000> but was: <10000>`` and with the summary
+       string changing to ``Showing 10,000 matching lines.``.
+       **A failed injection of my own, recorded because it matters.** My first
+       gate-4 attempt nulled the accessible text of the stage *state* labels
+       at their construction site and the test still passed -- not a hole in
+       the gate, but an ineffective injection: ``StageStepper.showStage()``
+       legitimately re-sets that text from the view-model a few lines later.
+       I re-injected at a single-assignment site and it failed as it should.
+       An injection that does not reach the code is a harness failure, not a
+       pass, and this is why the project's harnesses carry
+       ``assert_injected``.
+       **Judgement calls accepted.** The ``assertj-core`` exclusion is a
+       removal, not an acceptance: ``scripts/ci/security/allowlist.json`` is
+       still ``"entries": []``, so CVE-2026-24400 was taken out of the
+       dependency graph rather than allowlisted, which is the stronger of the
+       two options. ``MemoryMXBean.gc()`` in place of ``System.gc()`` is the
+       same fix-in-code that unit 2 made for the same SpotBugs rule.
+       **For the licence audit**: ``org.testfx:testfx-core`` and
+       ``testfx-junit5`` 4.0.18 declare **EUPL 1.1**; test scope, in
+       ``cometgui-app`` only, never redistributed.
+       **A regression this sign-off found, which is NOT unit 8's**: running
+       ``bash scripts/verify-all-gates.sh`` for the first time since Phase 02
+       began gives ``8 control(s) passed, 1 failed`` -- the ``tests`` control
+       (``scripts/verify-test-gates.sh``) reports ``24 assertion(s) passed, 8
+       failed``. Its ArchUnit controls 1-3 still pass, so **gate item 3's
+       falsifiability is intact**; what has broken is Phase 01's
+       coverage/mutation injections, because Phase 02 grew the tree they were
+       sized against. ``cometgui-domain`` now has 301 covered lines, so an
+       injected class with ten uncovered lines leaves the ratio at 0.97 and
+       the 0.90 gate correctly does not fire; PIT now generates 152 mutations
+       there, so weakening one test class leaves the score at 96%. The gates
+       are unchanged and still correct -- **the controls no longer reach
+       them**. That is exactly the drift Phase 01's own handoff warned about,
+       and it is mine to repair: see unit 11. It should have been caught
+       earlier: I ran the aggregate harness at unit 8 rather than after unit
+       1, and I am recording that as my own process lapse.
 
    * - 9
      - **``docs/developer/architecture.rst``** describing the layering as
