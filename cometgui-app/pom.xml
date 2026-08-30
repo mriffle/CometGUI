@@ -200,11 +200,55 @@
       <groupId>org.testfx</groupId>
       <artifactId>testfx-core</artifactId>
       <scope>test</scope>
+      <exclusions>
+        <!--
+          THE ASSERTJ EXCLUSION IS NOT OPTIONAL, and it is not a way of
+          quietening a gate.
+
+          testfx-core declares org.assertj:assertj-core 3.13.2 at RUNTIME
+          scope, which Maven narrows to test scope here.  That version carries
+          GHSA-rqfh-9r24-8c9r / CVE-2026-24400 (XML external entity processing
+          in `isXmlEqualTo`), and scripts/ci/dependency-scan.py fails the
+          supplychain stage on it, correctly.
+
+          Excluding it REMOVES the component rather than accepting it.  AssertJ
+          is used by exactly one part of TestFX, its optional assertion API:
+          `javap` over the 4.0.18 jar shows references to org/assertj only from
+          org/testfx/assertions/**, and nothing in this project imports that
+          package.  The FxUiDriver implementations use org.testfx.api.FxRobot
+          and JUnit's own assertions.  If that ever stops being true the tests
+          fail with NoClassDefFoundError, loudly, which is the right failure.
+
+          The alternatives were worse: an allowlist entry accepts a known
+          advisory for no benefit, and managing assertj-core to a fixed version
+          would add a dependency this project does not otherwise have.
+
+          org.hamcrest:hamcrest and org.osgi:org.osgi.core come the same way and
+          are NOT excluded: neither carries an advisory today, and TestFX's
+          matcher API and its OSGi activator are part of the library proper.
+        -->
+        <exclusion>
+          <groupId>org.assertj</groupId>
+          <artifactId>assertj-core</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.testfx</groupId>
       <artifactId>testfx-junit5</artifactId>
       <scope>test</scope>
+      <exclusions>
+        <!--
+          The same exclusion, for the same reason, on the other coordinate that
+          brings assertj-core in: see the block above.  Checked rather than
+          assumed here too, `javap` over testfx-junit5 4.0.18 shows no class in
+          it referencing org/assertj at all.
+        -->
+        <exclusion>
+          <groupId>org.assertj</groupId>
+          <artifactId>assertj-core</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
   <build>
