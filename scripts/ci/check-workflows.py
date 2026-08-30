@@ -24,15 +24,31 @@ What it verifies
    the stage ids come out of ``build.sh``'s STAGES array, and each workflow
    step's script is read to see which stage it runs.  Add a stage to the local
    gate without adding it to CI and this fails.
-5. **The release pipeline cannot publish anything.**  No ``secrets.``, no
-   ``git push``, no ``git remote``, no write permission, no action other than
-   the pinned checkout.  D-008 is open and this repository has no remote; a
-   release workflow that could push is a way for that decision to be made by
-   accident.
-6. **Actions are pinned to a commit SHA**, for the same reason build plugins
-   are pinned to a version.
+5. **No workflow can publish anything.**  No ``secrets.``, no ``GITHUB_TOKEN``,
+   no ``gh release``, no ``id-token``, no write permission, no ``git push`` and
+   no ``git remote`` -- in ANY workflow file.  That scan used to be applied to
+   ``release.yml`` alone, which made "the release pipeline cannot publish" a
+   property of one file while every other file was free to grow the same
+   credential.  ``release.yml`` additionally may use no action but the pinned
+   checkout.  Where CometGUI is published is not a decision a workflow may make
+   by accident.
+6. **Actions are pinned to a full 40-character commit SHA**, with no exception,
+   for the same reason build plugins are pinned to a version -- and each
+   workflow may use only the actions its own allowlist names.  Today that is
+   ``actions/checkout`` everywhere and ``actions/upload-artifact`` in
+   ``windows-percolator.yml`` and nowhere else.
 7. **Windows and macOS matrix entries are present where the specification
-   requires them**, and are the only place non-Linux runners appear.
+   requires them**, and never in the pull-request pipeline.
+8. **Every file in ``.github/workflows/`` is checked**, discovered by listing
+   the directory rather than by matching a list of names: a workflow added
+   later must not be the one file nobody checks.  The three the specification
+   names must still be PRESENT and keep their clause tables; a file with no
+   table is fine and still gets every generic check above; a file named in
+   ``REQUIRED_CONTENT`` must additionally still do the thing it exists to do.
+9. **``if:`` is an allowlist of one.**  ``if: always()``, on a step that uploads
+   an artifact, and nowhere else.  An ``if`` on a check is a way to switch that
+   check off without deleting it.  On an upload it is the opposite: it is what
+   makes a FAILING job still hand back its evidence.
 
 The YAML parser
 ---------------
@@ -40,7 +56,7 @@ PyYAML is NOT used, and must not be added: the project virtualenv is what Read
 the Docs installs from ``docs/requirements.txt``, and a documentation
 environment has no business growing a YAML parser so that a build script can
 lint a workflow.  Instead this file contains a parser for the small, explicit
-subset of YAML these three workflows are written in:
+subset of YAML these workflows are written in:
 
     block mappings, block sequences, plain and quoted scalars, comments on
     their own line.
@@ -59,8 +75,8 @@ the counts are required to match what the parser produced.
 The parser was cross-checked once, on 2026-08-29, against PyYAML 6.0.3 in a
 THROWAWAY virtualenv under ``_build/`` (created, used and deleted; nothing was
 added to ``.venv`` or to ``docs/requirements.txt``).  All three workflow files
-parsed to structures identical to ``yaml.safe_load``'s, with one documented
-difference: **this parser does not type scalars.**  ``timeout-minutes: 90`` is
+that existed on that date parsed to structures identical to ``yaml.safe_load``'s,
+with one documented difference: **this parser does not type scalars.**  ``timeout-minutes: 90`` is
 the string ``"90"`` here and the integer ``90`` in PyYAML, and ``fail-fast:
 false`` is ``"false"`` rather than ``False``.  Nothing in this file compares a
 scalar to a number or a boolean, so that difference does not affect any check;
@@ -69,8 +85,10 @@ it is written down because a future check that did compare one would be wrong.
 WHAT THIS DOES NOT VERIFY.  It is not a GitHub Actions schema validator: it
 does not know whether ``runs-on: ubuntu-latest`` is a real runner label, that
 ``timeout-minutes`` accepts an integer, or that an expression like
-``${{ matrix.os }}`` resolves.  It has never seen GitHub execute these files,
-because this repository has no remote (D-008).  It checks the correspondence
+``${{ matrix.os }}`` resolves.  It has never seen GitHub execute these files:
+a remote exists (D-008, decided 2026-08-30) but nothing has been pushed to it,
+and GitHub has executed nothing at all in this repository -- the Actions API
+reported 0 workflow runs on 2026-08-30.  It checks the correspondence
 between the workflows, the scripts and the specification -- which is the part
 that rots -- and says nothing about the rest.
 
@@ -87,11 +105,20 @@ workflows on this machine, so the transcript is produced from the workflow
 files themselves rather than from a hand-written copy of them.
 
 ``--self-test`` copies the workflows and scripts under ``_build/``, damages the
-copy nine ways -- renaming a script, removing its executable bit, deleting a
-required step, adding ``continue-on-error``, adding ``|| true``, putting a stub
-in the pull-request pipeline, adding a secret to the release pipeline, adding a
-``git push``, and writing a construct the parser refuses -- and requires each
-to be rejected.  The working tree is never touched.
+copy nineteen ways and requires each damaged copy to be rejected and the
+undamaged one accepted.  Nine damages are the original ones: renaming a script,
+removing its executable bit, deleting a required step, adding
+``continue-on-error``, adding ``|| true``, putting a stub in the pull-request
+pipeline, adding a secret to the release pipeline, adding a ``git push``, and
+writing a construct the parser refuses.  Ten more came with discovery and the
+two allowlists: a workflow file no table knows about naming a script that does
+not exist; ``actions/upload-artifact`` used where it is not allowlisted; that
+action pinned to a tag rather than a SHA; an ``if:`` whose value is not
+``always()``; an ``if: always()`` moved from the upload onto a ``run:`` step;
+a secret added to the Windows workflow; and four ways of quietly making that
+workflow pointless -- deleting its upload step, moving it off a Windows runner,
+pointing it at a different script, and dropping the ``if: always()`` that makes
+a failed run still return its transcript.  The working tree is never touched.
 
 Exit status
 -----------
@@ -115,7 +142,29 @@ from pathlib import Path
 
 EXIT_OK, EXIT_PROBLEMS, EXIT_MISUSE, EXIT_PARSE, EXIT_UNFALSIFIABLE = 0, 1, 2, 3, 4
 
-WORKFLOWS = ("pull-request.yml", "nightly.yml", "release.yml")
+# The three workflows the specification describes.  Each MUST be present -- a
+# deleted pull-request.yml is a failure, not an empty check -- and each keeps
+# its own specification-clause table below, keyed by file name.
+REQUIRED_WORKFLOWS = ("pull-request.yml", "nightly.yml", "release.yml")
+
+WORKFLOW_SUFFIXES = (".yml", ".yaml")
+
+
+def discover_workflows(workflow_dir: Path) -> list[str]:
+    """Every workflow file in the directory, the three named ones first.
+
+    Checking a FIXED LIST of names is the hole this closes: a fourth workflow
+    file was checked by nothing at all, so it could name a script that does not
+    exist, use an unpinned action or carry `continue-on-error` and this gate
+    would stay green.  Everything found here gets every generic check; only the
+    clause tables are keyed by name, and a file without one is fine.
+    """
+    found = sorted(
+        path.name for path in workflow_dir.iterdir()
+        if path.is_file() and path.suffix in WORKFLOW_SUFFIXES
+    )
+    known = [name for name in REQUIRED_WORKFLOWS if name in found]
+    return known + [name for name in found if name not in REQUIRED_WORKFLOWS]
 
 
 class ParseError(Exception):
@@ -352,15 +401,23 @@ FORBIDDEN_IN_RUN = [
     ("|| :", "swallows a failure"),
     ("; true", "swallows a failure"),
     ("set +e", "disables failure propagation"),
-    ("git push", "this repository has no remote and none may be created (D-008)"),
-    ("git remote", "this repository has no remote and none may be created (D-008)"),
+    ("git push", "a workflow that can push can publish, and what CometGUI publishes "
+                 "is not a decision a workflow may make on its own (D-008)"),
+    ("git remote", "same: the remote is configured by a person, not by a job"),
     ("|", "a pipeline hides the exit status of everything but the last command"),
     ("&&", "chained commands belong in a script"),
     (">", "redirection belongs in a script"),
 ]
 
-RELEASE_FORBIDDEN_TOKENS = [
-    ("secrets.", "a release workflow with a credential can publish; D-008 is open"),
+# Tokens no workflow file may contain, comment lines excluded.  Applied to
+# release.yml alone until 2026-08-30, which made "the release pipeline cannot
+# publish" a property of one file: any other workflow could be handed the same
+# credential and this gate would not have looked.  All three pre-existing
+# workflows were checked against the widened scan before it was widened, and
+# all three passed unchanged.
+FORBIDDEN_TOKENS = [
+    ("secrets.", "a workflow with a credential can publish, and where CometGUI is "
+                 "published is a decision for a person (D-008), not for a job"),
     ("GITHUB_TOKEN", "same"),
     ("gh release", "same"),
     ("permissions: write", "same"),
@@ -368,7 +425,51 @@ RELEASE_FORBIDDEN_TOKENS = [
     ("id-token", "same"),
 ]
 
-ACTION_SHA_RE = re.compile(r"^actions/checkout@[0-9a-f]{40}$")
+CHECKOUT_ACTION = "actions/checkout"
+UPLOAD_ACTION = "actions/upload-artifact"
+
+# `uses:` must be OWNER/REPO@<40 hex>.  The SHA half of this has NO exception:
+# a tag is mutable and an action runs arbitrary code inside the job, which is
+# the same argument that pins every build plugin to a version.
+ACTION_PINNED_RE = re.compile(
+    r"^([A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*)@([0-9a-f]{40})$")
+
+# Which actions a given workflow may use AT ALL, before pinning is considered.
+# The default is checkout and nothing else; a file gets more only by being
+# named here.  release.yml is deliberately absent: "checkout only, no secret,
+# no push" is what stops that pipeline publishing by accident, and the second
+# entry below must not become a precedent for relaxing it.
+DEFAULT_ALLOWED_ACTIONS = (CHECKOUT_ACTION,)
+ALLOWED_ACTIONS = {
+    "windows-percolator.yml": (CHECKOUT_ACTION, UPLOAD_ACTION),
+}
+
+# Step keys, and the one condition any step may carry.  `if` was not permitted
+# at all until 2026-08-30; it is permitted now with exactly one value, on
+# exactly one kind of step (see the check for why).
+STEP_KEYS = ("name", "run", "uses", "with", "env", "working-directory", "if")
+ALLOWED_IF = "always()"
+
+# Workflows the specification does not describe clause by clause still must not
+# be able to become no-ops.  A file named here must exist and must still do the
+# thing it exists to do; a workflow file NOT named here is fine and simply gets
+# the generic checks.
+REQUIRED_CONTENT = {
+    "windows-percolator.yml": {
+        "runner": "windows",
+        "script": "scripts/ci/windows-percolator-verify.sh",
+        "uploads": True,
+        "permissions": {"contents": "read"},
+        "why": "PHASE-00 gate item 8: no Windows binary in this project has ever been "
+               "executed, and this workflow is the only thing that can put the checklist "
+               "in docs/feasibility/windows-artefact.rst on a Windows machine.",
+    },
+}
+
+
+def is_upload(uses) -> bool:
+    """True for a step that uses the artifact-upload action, pinned or not."""
+    return uses is not None and str(uses).split("@")[0] == UPLOAD_ACTION
 
 
 # ==========================================================================
@@ -410,13 +511,30 @@ def check(root: Path, verbose: bool = True) -> int:
         if verbose:
             print(*args)
 
-    documents, all_steps = {}, {}
-    for name in WORKFLOWS:
+    if not workflow_dir.is_dir():
+        print(f"check-workflows: no {workflow_dir}", file=sys.stderr)
+        return EXIT_MISUSE
+    discovered = discover_workflows(workflow_dir)
+
+    # Discovery must not turn "the pipeline was deleted" into "there is nothing
+    # to check", so presence is still required by name: the three the
+    # specification describes, and any workflow with a required-content table.
+    for name in REQUIRED_WORKFLOWS:
+        if name not in discovered:
+            problems.append(f"{name}: missing from .github/workflows/. The specification "
+                            f"describes this pipeline; deleting the file is not a way to "
+                            f"stop checking it.")
+    for name, want in REQUIRED_CONTENT.items():
+        if name not in discovered:
+            problems.append(f"{name}: missing from .github/workflows/. {want['why']}")
+
+    say(f"check-workflows: {len(discovered)} workflow file(s) discovered in "
+        f".github/workflows/: {', '.join(discovered)}")
+
+    documents, all_steps, texts = {}, {}, {}
+    for name in discovered:
         path = workflow_dir / name
-        if not path.is_file():
-            problems.append(f"{name}: missing from .github/workflows/")
-            continue
-        text = path.read_text(encoding="utf-8")
+        text = texts[name] = path.read_text(encoding="utf-8")
         try:
             documents[name] = parse_yaml_subset(text)
             all_steps[name] = collect_steps(documents[name], path)
@@ -455,15 +573,46 @@ def check(root: Path, verbose: bool = True) -> int:
             if not step_name:
                 problems.append(f"{name}/{job}: a step has no name")
             for key in step:
-                if key not in ("name", "run", "uses", "with", "env", "working-directory"):
+                if key not in STEP_KEYS:
                     problems.append(f"{name}/{job}/{step_name}: unexpected step key {key!r}")
-            if uses is not None:
-                if not ACTION_SHA_RE.match(str(uses)):
+
+            # An `if` on a check is a way to switch that check off without
+            # deleting it, so there is exactly one permitted value and exactly
+            # one kind of step that may carry it.  On an upload it does the
+            # opposite of switching a check off: it makes a FAILING job still
+            # hand back its evidence.
+            if "if" in step:
+                condition = "" if step["if"] is None else str(step["if"]).strip()
+                if condition != ALLOWED_IF:
                     problems.append(
-                        f"{name}/{job}/{step_name}: uses {uses!r}. Only actions/checkout pinned to a "
-                        f"40-character commit SHA is allowed: a tag is mutable, and any other action "
-                        f"would mean CI and the local build are not the same build."
+                        f"{name}/{job}/{step_name}: if is {condition!r}. The only condition any step "
+                        f"may carry is {ALLOWED_IF!r}; anything else is a way to stop a check being "
+                        f"able to fail the job without deleting the step."
                     )
+                elif not is_upload(uses):
+                    problems.append(
+                        f"{name}/{job}/{step_name}: {ALLOWED_IF!r} is permitted only on a step that "
+                        f"uses {UPLOAD_ACTION}, where it makes a failing job still upload its "
+                        f"evidence. Here it would only make a check unable to fail the job."
+                    )
+
+            if uses is not None:
+                pinned = ACTION_PINNED_RE.match(str(uses))
+                if not pinned:
+                    problems.append(
+                        f"{name}/{job}/{step_name}: uses {uses!r}, which is not OWNER/REPO pinned to "
+                        f"a full 40-character commit SHA. A tag is mutable and an action runs "
+                        f"arbitrary code inside the job; there is no exception to this."
+                    )
+                else:
+                    allowed = ALLOWED_ACTIONS.get(name, DEFAULT_ALLOWED_ACTIONS)
+                    if pinned.group(1) not in allowed:
+                        problems.append(
+                            f"{name}/{job}/{step_name}: uses {pinned.group(1)}, which is not in this "
+                            f"workflow's allowlist {list(allowed)}. Every action is a third party "
+                            f"with a shell in the job, and release.yml in particular may use nothing "
+                            f"but the pinned checkout."
+                        )
                 continue
             if run is None:
                 problems.append(f"{name}/{job}/{step_name}: neither run: nor uses:")
@@ -515,6 +664,45 @@ def check(root: Path, verbose: bool = True) -> int:
         if f"scripts/ci/{script}" not in scripts_used.get("pull-request.yml", set()):
             problems.append(f"pull-request pipeline: no step runs scripts/ci/{script} ({why})")
 
+    # --- a workflow with no clause table still cannot become a no-op -------
+    for name, want in REQUIRED_CONTENT.items():
+        if name not in documents:
+            continue                       # already reported as missing above
+        before = len(problems)
+        rows = all_steps.get(name, [])
+        runners = {str(row[1]) for row in rows}
+        if not any(want["runner"] in runner for runner in runners):
+            problems.append(
+                f"{name}: no job runs on a {want['runner']} runner; the runners are "
+                f"{sorted(runners)}. {want['why']}"
+            )
+        if want["script"] not in scripts_used.get(name, set()):
+            problems.append(
+                f"{name}: no step runs {want['script']}. {want['why']}"
+            )
+        uploads = [row for row in rows if is_upload(row[4])]
+        if want["uploads"] and not uploads:
+            problems.append(
+                f"{name}: no step uploads an artifact. A verification whose transcript never "
+                f"leaves the runner is not evidence of anything."
+            )
+        for row in uploads:
+            condition = row[5].get("if")
+            if condition is None or str(condition).strip() != ALLOWED_IF:
+                problems.append(
+                    f"{name}/{row[0]}/{row[2]}: the upload step's condition is {condition!r}, not "
+                    f"{ALLOWED_IF!r}. Without it, a FAILING run is the one run whose transcript is "
+                    f"never uploaded -- which is exactly the evidence a negative result needs."
+                )
+        permissions = (documents.get(name) or {}).get("permissions")
+        if permissions != want["permissions"]:
+            problems.append(
+                f"{name}: permissions is {permissions!r}, expected {want['permissions']!r}"
+            )
+        if len(problems) == before:
+            say(f"check-workflows: {name}: runs on {sorted(runners)}, runs {want['script']}, "
+                f"uploads its transcript with `if: {ALLOWED_IF}`, permissions {permissions!r}")
+
     # --- stubs are for nightly and release only ----------------------------
     def is_stub(script: str) -> bool:
         path = root / script
@@ -547,18 +735,23 @@ def check(root: Path, verbose: bool = True) -> int:
     say(f"check-workflows: scripts/build.sh has {len(stage_ids)} stage(s); the pull-request "
         f"pipeline covers {sorted(covered & set(stage_ids))}")
 
-    # --- the release pipeline must not be able to publish ------------------
-    release_path = workflow_dir / "release.yml"
-    if release_path.is_file():
-        release_text = release_path.read_text(encoding="utf-8")
-        body = "\n".join(line for line in release_text.splitlines() if not line.lstrip().startswith("#"))
-        for token, why in RELEASE_FORBIDDEN_TOKENS:
+    # --- no workflow at all may be able to publish -------------------------
+    # Comment lines are excluded so that a file may still EXPLAIN why it holds
+    # no credential.  The scan is applied to every discovered workflow: a rule
+    # that only release.yml has no secret says nothing about the file next to
+    # it, which could be handed the same one.
+    for name in sorted(documents):
+        body = "\n".join(line for line in texts[name].splitlines()
+                         if not line.lstrip().startswith("#"))
+        for token, why in FORBIDDEN_TOKENS:
             if token in body:
-                problems.append(f"release.yml: contains {token!r} -- {why}")
+                problems.append(f"{name}: contains {token!r} -- {why}")
+    if "release.yml" in documents:
         permissions = (documents.get("release.yml") or {}).get("permissions")
         if permissions != {"contents": "read"}:
             problems.append(f"release.yml: permissions is {permissions!r}, expected {{contents: read}}")
-        say("check-workflows: release.yml has no secret, no push, no remote and read-only permissions")
+    say(f"check-workflows: {len(documents)} workflow(s) scanned for a credential, a token, a write "
+        f"permission or a publish command -- none carries one; release.yml is checkout-only")
 
     # --- the non-Linux runners are named where the specification wants them
     nightly_runners = {row[1] for row in all_steps.get("nightly.yml", [])}
@@ -624,8 +817,11 @@ def self_test(root: Path) -> int:
 
     pr = tree / ".github" / "workflows" / "pull-request.yml"
     rel = tree / ".github" / "workflows" / "release.yml"
+    wp = tree / ".github" / "workflows" / "windows-percolator.yml"
+    unknown = tree / ".github" / "workflows" / "an-unknown-workflow.yml"
     pristine_pr = pr.read_text(encoding="utf-8")
     pristine_rel = rel.read_text(encoding="utf-8")
+    pristine_wp = wp.read_text(encoding="utf-8")
 
     results = []
 
@@ -635,11 +831,14 @@ def self_test(root: Path) -> int:
         undo()
         ok = code == expected
         results.append(ok)
-        print(f"  {'ok  ' if ok else 'FAIL'} {label:<34} exit {code} (expected {expected})")
+        print(f"  {'ok  ' if ok else 'FAIL'} {label:<38} exit {code} (expected {expected})")
 
     def restore():
         pr.write_text(pristine_pr, encoding="utf-8")
         rel.write_text(pristine_rel, encoding="utf-8")
+        wp.write_text(pristine_wp, encoding="utf-8")
+        if unknown.exists():
+            unknown.unlink()
 
     target = tree / "scripts" / "ci" / "traceability.sh"
     case("renamed script",
@@ -704,10 +903,123 @@ def self_test(root: Path) -> int:
              encoding="utf-8"),
          restore, EXIT_PARSE)
 
+    # ------------------------------------------------------------------
+    # Discovery.  Before .github/workflows/ was listed rather than named, a
+    # file like this one was read by nothing: every check below it could be
+    # broken and this gate stayed green.
+    # ------------------------------------------------------------------
+    unknown_yaml = (
+        "# A workflow no table in check-workflows.py knows about.\n"
+        "name: an-unknown-workflow\n"
+        "\n"
+        "on:\n"
+        "  workflow_dispatch:\n"
+        "\n"
+        "permissions:\n"
+        "  contents: read\n"
+        "\n"
+        "jobs:\n"
+        "  extra:\n"
+        "    name: Extra\n"
+        "    runs-on: ubuntu-latest\n"
+        "    timeout-minutes: 10\n"
+        "    steps:\n"
+        "      - name: Run a script that does not exist\n"
+        "        run: bash scripts/ci/no-such-script-at-all.sh\n"
+    )
+    case("unknown workflow, absent script",
+         lambda: unknown.write_text(unknown_yaml, encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    # ------------------------------------------------------------------
+    # The per-file action allowlist, and pinning with no exception.
+    # ------------------------------------------------------------------
+    case("upload-artifact used in release.yml",
+         lambda: rel.write_text(
+             pristine_rel.replace(
+                 "      - name: Compute release checksums",
+                 "      - name: Upload the release artefacts\n"
+                 "        uses: actions/upload-artifact"
+                 "@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a\n"
+                 "\n"
+                 "      - name: Compute release checksums"),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    case("upload action pinned to a tag",
+         lambda: wp.write_text(
+             pristine_wp.replace(
+                 "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+                 "uses: actions/upload-artifact@v7"),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    # ------------------------------------------------------------------
+    # The `if:` allowlist: one value, one kind of step.
+    # ------------------------------------------------------------------
+    case("if: with a value other than always()",
+         lambda: wp.write_text(
+             pristine_wp.replace("        if: always()", "        if: false"),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    case("if: always() moved onto a run step",
+         lambda: wp.write_text(
+             pristine_wp.replace("        if: always()\n", "").replace(
+                 "        run: bash scripts/ci/windows-percolator-verify.sh",
+                 "        if: always()\n"
+                 "        run: bash scripts/ci/windows-percolator-verify.sh"),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    # ------------------------------------------------------------------
+    # The publish scan, now applied to every workflow rather than to
+    # release.yml alone.
+    # ------------------------------------------------------------------
+    case("secret added to the Windows workflow",
+         lambda: wp.write_text(
+             pristine_wp.replace(
+                 "        run: bash scripts/ci/windows-percolator-verify.sh",
+                 "        env:\n"
+                 "          TOKEN: ${{ secrets.PUBLISH_TOKEN }}\n"
+                 "        run: bash scripts/ci/windows-percolator-verify.sh"),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    # ------------------------------------------------------------------
+    # Four ways to leave the Windows workflow in place while making it
+    # prove nothing.  REQUIRED_CONTENT exists for exactly these.
+    # ------------------------------------------------------------------
+    case("transcript upload step deleted",
+         lambda: wp.write_text(
+             pristine_wp[:pristine_wp.index(
+                 "      - name: Upload the transcript")].rstrip() + "\n",
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    case("if: always() dropped from the upload",
+         lambda: wp.write_text(
+             pristine_wp.replace("        if: always()\n", ""),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    case("Windows job moved to ubuntu-latest",
+         lambda: wp.write_text(
+             pristine_wp.replace("runs-on: windows-latest", "runs-on: ubuntu-latest"),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    case("verification step points elsewhere",
+         lambda: wp.write_text(
+             pristine_wp.replace("run: bash scripts/ci/windows-percolator-verify.sh",
+                                 "run: bash scripts/ci/docs-build.sh"),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
     control = check(tree, verbose=False)
     control_ok = control == EXIT_OK
     results.append(control_ok)
-    print(f"  {'ok  ' if control_ok else 'FAIL'} {'control-undamaged-copy':<34} exit {control} (expected 0)")
+    print(f"  {'ok  ' if control_ok else 'FAIL'} {'control-undamaged-copy':<38} exit {control} (expected 0)")
 
     if all(results):
         print(f"\ncheck-workflows: self-test OK -- {len(results) - 1} damaged copies rejected, "

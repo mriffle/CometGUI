@@ -5,10 +5,12 @@
 #
 # WHY THIS EXISTS.  PHASE-01 exit gate item 6 is "CI runs the pull-request
 # pipeline on a pull request and its failure modes are demonstrated, not
-# assumed."  Half of that cannot be met here and must not be faked: this
-# repository has NO GIT REMOTE, creating one is D-008 (open, the owner's
-# decision), and pointing a workflow at a repository that does not exist would
-# be worse than an honest gap.  So GitHub has never executed these files.
+# assumed."  Half of that cannot be met here and must not be faked: GITHUB HAS
+# NEVER EXECUTED ANYTHING IN THIS REPOSITORY.  A remote does exist now -- D-008
+# was decided on 2026-08-30 -- but nothing has been pushed to it: the Actions
+# API reported 0 workflow runs on 2026-08-30, and this environment holds no
+# push credential of any kind.  A local transcript is evidence that the steps
+# work on a machine, and it is not evidence that a runner ever ran them.
 #
 # The other half is met literally.  This script reads the steps OUT OF THE
 # WORKFLOW FILES -- via `check-workflows.py --list-steps`, not out of a copy of
@@ -26,15 +28,19 @@
 #     working tree);
 #   * a Windows or macOS matrix entry is recorded as NOT RUN: this environment
 #     has one Linux machine.  Naming them is deliberate -- a later phase turns
-#     them on rather than discovering they were never written.
+#     them on rather than discovering they were never written.  EVERY step of
+#     windows-percolator.yml is in that class: the whole point of that workflow
+#     is the one platform nothing here can execute, so this script can show
+#     that its steps are well-formed and nothing more.
 #
 # Anything else -- a stub that passed, a real step that failed -- fails this
 # script, and it says which.
 #
 # Usage:
-#   bash scripts/ci/run-pipeline-locally.sh                 # all three
+#   bash scripts/ci/run-pipeline-locally.sh                 # all four
 #   bash scripts/ci/run-pipeline-locally.sh pull-request
 #   bash scripts/ci/run-pipeline-locally.sh nightly release
+#   bash scripts/ci/run-pipeline-locally.sh windows-percolator
 #   bash scripts/ci/run-pipeline-locally.sh --help
 #
 # Output: _build/ci-transcript/<workflow>/ per-step logs, and
@@ -55,17 +61,18 @@ TRANSCRIPT="${OUT}/transcript.txt"
 STUB_EXIT=70
 
 die() { printf 'run-pipeline-locally.sh: %s\n' "$1" >&2; exit "${2:-2}"; }
-usage() { sed -n '3,47p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,53p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 declare -a WORKFLOWS=()
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -h|--help) usage; exit 0 ;;
-        pull-request|nightly|release) WORKFLOWS+=("$1.yml"); shift ;;
+        pull-request|nightly|release|windows-percolator) WORKFLOWS+=("$1.yml"); shift ;;
         *) die "unknown argument: $1 (try --help)" ;;
     esac
 done
-[ "${#WORKFLOWS[@]}" -gt 0 ] || WORKFLOWS=(pull-request.yml nightly.yml release.yml)
+[ "${#WORKFLOWS[@]}" -gt 0 ] || \
+    WORKFLOWS=(pull-request.yml nightly.yml release.yml windows-percolator.yml)
 
 PYTHON=""
 for candidate in "${PROJECT_ROOT}/.venv/bin/python" "$(command -v python3 || true)"; do
@@ -101,15 +108,20 @@ RAN=0
     printf ' PHASE-01 exit gate item 6 reads: "CI runs the pull-request pipeline on a pull\n'
     printf ' request and its failure modes are demonstrated, not assumed."\n'
     printf '\n'
-    printf '   NOT MET   "on a pull request". This repository has no git remote, and\n'
-    printf '             creating one is D-008, an owner decision coupled to the GPL-3.0\n'
-    printf '             source-availability obligation. GitHub has never executed these\n'
-    printf '             workflow files, and no step, script or configuration here points\n'
-    printf '             at a repository that does not exist.\n'
+    printf '   NOT MET   "on a pull request". GitHub has never executed these workflow\n'
+    printf '             files. A remote exists -- D-008 was decided on 2026-08-30, and\n'
+    printf '             the git remote line above is it -- but nothing has been pushed\n'
+    printf '             to it: the Actions API reported 0 workflow runs on 2026-08-30,\n'
+    printf '             and this environment holds no push credential of any kind. The\n'
+    printf '             item closes when a branch is pushed, a pull request is opened,\n'
+    printf '             and a runner executes these files. Not before.\n'
     printf '\n'
-    printf '   MET       Every step in every pipeline has been executed on this machine,\n'
+    printf '   MET       Every step that CAN run here has been executed on this machine,\n'
     printf '             with its exact command, and each behaved as it must: real steps\n'
     printf '             passed, stubs failed with exit %d naming the phase that owns them.\n' "${STUB_EXIT}"
+    printf '             The rest are listed below and marked NOT RUN: every Windows and\n'
+    printf '             macOS entry, which is the whole of windows-percolator.yml. This\n'
+    printf '             environment has one Linux machine. Unverified is not passed.\n'
     printf '             The steps below were read out of .github/workflows/*.yml at run\n'
     printf '             time, so this transcript cannot describe a pipeline other than\n'
     printf '             the one in the repository.\n'
@@ -143,8 +155,16 @@ for workflow in "${WORKFLOWS[@]}"; do
             emit ""
             emit "  step ${index}  [${job} / ${runner}]  ${name}"
             emit "    uses:  ${value}"
-            emit "    SKIPPED  a GitHub action; not runnable locally. The checkout that this"
-            emit "             step would perform is the working tree this script is running in."
+            case "${value}" in
+                actions/checkout@*)
+                    emit "    SKIPPED  a GitHub action; not runnable locally. The checkout that this"
+                    emit "             step would perform is the working tree this script is running in."
+                    ;;
+                *)
+                    emit "    SKIPPED  a GitHub action; not runnable locally. It does something only"
+                    emit "             inside a GitHub-hosted run, and there has never been one."
+                    ;;
+            esac
             continue
         fi
 
@@ -219,7 +239,9 @@ if [ "${FAILURES}" -ne 0 ]; then
     exit 1
 fi
 emit "  OK -- every executed step behaved as its classification requires."
-emit "  Still unmet: 'on a pull request'. No remote exists (D-008)."
+emit "  Still unmet: 'on a pull request'. A remote exists (D-008, decided 2026-08-30),"
+emit "  but GitHub has executed nothing in this repository -- 0 workflow runs as of"
+emit "  2026-08-30 -- and every step above ran on this machine, not on a runner."
 emit ""
 printf '\nrun-pipeline-locally.sh: transcript at %s\n' "${TRANSCRIPT#"${PROJECT_ROOT}/"}"
 exit 0

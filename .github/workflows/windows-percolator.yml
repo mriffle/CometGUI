@@ -1,0 +1,100 @@
+# CometGUI -- Windows Percolator verification.
+#
+# WHY THIS FILE EXISTS.  No Windows binary in this project has ever been
+# executed.  Every statement about percolator.exe -- that the v3.07 installer
+# payload is the XML-capable build, that `-X pout.xml` writes an XML output,
+# that `--xml-in` does not answer "Compiler flag XML_SUPPORT was off" -- is
+# inference from byte markers in a file read on Linux, and
+# docs/feasibility/windows-artefact.rst says exactly that in its opening
+# warning.  That document ends with a seven-step checklist for a Windows
+# machine whose last line is the instruction this job serves: "Return the
+# transcript. It replaces this document's central caveat with a fact, either
+# way."  scripts/ci/windows-percolator-verify.sh is that checklist; this file
+# is the only thing in the repository that can put it on a Windows machine.
+#
+# WHAT THIS FILE HAS NOT BEEN SEEN TO DO: anything at all.  GitHub has never
+# executed ANY workflow in this repository -- the Actions API reported
+# total_count = 0 runs on 2026-08-30, the day this file was written.  A remote
+# exists (D-008, decided 2026-08-30), but nothing has been pushed to it and no
+# runner has ever started.  So this file is a proposal, not evidence.  Until a
+# runner has executed it and returned a transcript, the tool manifest's
+# xml_capability stays `unverified-on-windows`, the feasibility basis keeps the
+# sentence "The binary was not executed on Windows.", and the words verified,
+# confirmed, proven and tested are not used of the Windows binary anywhere.
+#
+# HOW IT IS TRIGGERED.  `pull_request` is the trigger that matters: opening the
+# branch that carries this file as a pull request against main is what runs it
+# the first time, and that same pull request exercises pull-request.yml, which
+# has also never run.  `workflow_dispatch` is declared as well, but GitHub only
+# offers the "Run workflow" button for a workflow file that is already on the
+# default branch, so until this merges the pull request is the only way it can
+# be started.
+#
+# THE JOB MUST BE ABLE TO FAIL, AND SAY WHY.  The driver exits 1 for a negative
+# finding about the binary, 2 for an inconclusive run and 3 for a harness
+# failure, and every assertion names the value it observed rather than relying
+# on an exit code.  A job engineered to go green would be worthless: the point
+# is a transcript that can say "no" as clearly as "yes".  That is why the
+# upload carries `if: always()` -- the ONLY `if:` in this repository's
+# workflows.  Without it, a failing verification is the one case whose
+# transcript never leaves the runner, which is precisely the evidence a
+# negative result needs.  The driver also prints the transcript to stdout, so
+# the job log carries it whether the upload runs or not.
+#
+# ONE STEP, ONE SCRIPT -- pull-request.yml's first rule, and it holds here.
+# Every `run:` is a single `bash scripts/...` invocation a person can run on
+# their own machine.  There is no setup-python: the wrapper finds an
+# interpreter by RUNNING each candidate (a Microsoft Store alias answers
+# `command -v` and then does nothing), and the windows-latest image ships one.
+# scripts/ci/check-workflows.py checks this file the same way it checks the
+# other three -- it discovers every workflow in this directory rather than
+# iterating a list of names -- and it permits actions/upload-artifact here and
+# in no other workflow.
+
+name: windows-percolator
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  verify:
+    # windows-latest, and there is no matrix: the whole point of this job is
+    # the one platform this project has never been able to observe.  The
+    # timeout is generous for a 2.1 MB download and a 400-PSM Percolator run;
+    # the driver imposes its own per-process timeouts, so a hung binary is
+    # recorded as a timeout rather than left to be killed by the runner.
+    name: Percolator 3.07 checklist on Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      # Pinned to the commit actions/checkout v5 resolved to on 2026-08-29 --
+      # the same commit the other three workflows pin.  A tag is mutable, and
+      # an action runs arbitrary code inside the job.
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Windows Percolator checklist (docs/feasibility/windows-artefact.rst)
+        run: bash scripts/ci/windows-percolator-verify.sh
+
+      # actions/upload-artifact v7.0.1, pinned to the commit that tag resolved
+      # to on 2026-08-30.  `if: always()` is deliberate and is checked: see the
+      # note above about the one result that would otherwise be lost.
+      # if-no-files-found: error, because an empty artifact would look like a
+      # clean run to anyone reading the run summary later.
+      - name: Upload the transcript, whether the checklist passed or failed
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: windows-percolator-transcript
+          path: _build/windows-verify/
+          if-no-files-found: error
