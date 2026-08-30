@@ -327,7 +327,37 @@ Work units
        and the stage stepper view-model. >= 0.80 line coverage on the
        package.
      - ``R-PROC-01``
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commit ``9a2e9d9``. Diff read; every path is
+       under ``cometgui-ui/src/``, and no gate configuration changed.
+       ``mvn -B -pl cometgui-ui -am verify``:
+       ``Tests run: 156, Failures: 0, Errors: 0, Skipped: 0``,
+       ``BugInstance size is 0``, ``All coverage checks have been met``,
+       ``BUILD SUCCESS``. I read the coverage the rule actually measures --
+       the ``<package name="org/cometgui/ui/viewmodel">`` element of
+       ``jacoco.xml``, not the bundle -- and it is ``LINE missed=0
+       covered=175`` and ``BRANCH missed=0 covered=40``, so 100% against the
+       live 0.80 line gate that had been inert until this unit.
+       ``bash scripts/build.sh``: ``11/11 stages OK in 123 seconds. BUILD
+       OK``, with ``ok cometgui-ui line 100.0% (176/176) branch 100.0%
+       (40/40) [view-model >=80% line]`` and Spotless and Checkstyle each
+       reporting ``24 ordinary + 0 derived = 24 file(s) on disk``.
+       **Falsification of my own**, distinct from the agent's three: flipping
+       ``CONSOLE`` from primary to secondary in ``SectionId`` -- one boolean,
+       quietly demoting a section the Information Architecture names -- fails
+       three assertions, ``expected: <8> but was: <7>``,
+       ``expected: <[RUN, ... PROVENANCE, CONSOLE]> but was: <[RUN, ...
+       PROVENANCE]>`` and ``expected: <[TOOL_MANAGER, SETTINGS]> but was:
+       <[CONSOLE, TOOL_MANAGER, SETTINGS]>``. The eight primary sections are
+       therefore pinned by test, not by intent. Contracts the view unit
+       inherits, recorded here because unit 6 must honour them: the ten stable
+       ids are ``run comet-parameters percolator results visualisation
+       limelight provenance console`` then ``tool-manager settings``;
+       navigation does **not** wrap and ``selectNext``/``selectPrevious``
+       return ``false`` at the ends; every published property is read-only, so
+       a view listens and calls ``select(...)`` rather than binding
+       bidirectionally, and must filter the ``null`` a cleared selection model
+       reports; ``ConsoleViewModel.refresh()`` is the only thing that moves
+       messages into the view and the view must call it on the FX thread.
 
    * - 6
      - **Views and controls.** The shell, the eight section panes, the
