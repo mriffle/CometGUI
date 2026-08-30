@@ -514,10 +514,19 @@ visible there::
     git branch -v
     git worktree list
 
-If the scratch worktree has been cleaned up, ``git worktree prune`` tidies the
-metadata and the branch is unaffected. To re-create a place to inspect it::
+The worktree is still registered, which has a consequence worth knowing: git
+refuses to check the same branch out twice, so ``git checkout
+windows-percolator-verification`` in ``/workspace`` will fail with "already
+checked out at ...". **That refusal is doing the right thing** -- checking this
+branch out in ``/workspace`` would swap the working tree under the phase
+orchestrator running Phase 02 there. Verify it in the worktree, or add another
+one::
 
     git worktree add /some/path windows-percolator-verification
+
+If the scratch worktree has been cleaned up, ``git worktree prune`` tidies the
+metadata; the branch is unaffected either way, because it lives in
+``/workspace``'s repository and not in the worktree.
 
 Residue for tier 1
 ==================
