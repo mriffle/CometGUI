@@ -15,9 +15,21 @@
  */
 
 /**
- * Reusable controls, notably the structured parameter editors. Controls required by automated tests
- * carry stable semantic identifiers (R-TEST-04); tests never locate them by pixel position.
+ * Reusable controls, and the two conventions every view in this module depends on.
  *
- * <p>Filled by phase 07 (Comet parameter editor UI).
+ * <p>{@link org.cometgui.ui.controls.UiIds} holds every stable identifier the interface sets, so
+ * that the views which set them and the tests which look them up cannot drift apart ({@code
+ * R-TEST-04}). {@link org.cometgui.ui.controls.AccessibleControls} is the only way a control is
+ * given an accessible name, and it refuses a blank one.
+ *
+ * <p>{@link org.cometgui.ui.controls.StageStepper} draws the Run screen's workflow diagram with
+ * every stage's state in words rather than in colour. {@code
+ * org.cometgui.ui.controls.derived.ConsolePane} is the live console; it is derived from
+ * Noble-Lab/CasanovoGUI and lives in the {@code derived} sub-package for that reason.
+ *
+ * <p>Controls required by automated tests carry stable semantic identifiers (R-TEST-04); tests
+ * never locate them by pixel position.
+ *
+ * <p>Extended by phase 07 (Comet parameter editor UI) with the structured parameter editors.
  */
 package org.cometgui.ui.controls;
