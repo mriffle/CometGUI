@@ -555,6 +555,20 @@ Work units
      - all five gate items
      - PENDING
 
+   * - 11
+     - **Repair ``scripts/verify-test-gates.sh``.** Added after unit 8's
+       sign-off, when the first full run of ``scripts/verify-all-gates.sh``
+       since the phase began reported ``8 control(s) passed, 1 failed``. Phase
+       02 grew ``cometgui-domain`` from 35 covered lines to 301 and from 22
+       mutations to 152, so Phase 01's coverage and mutation injections are no
+       longer large enough to move either ratio past its threshold, and three
+       hard-coded diagnostic strings no longer match. Accepted only when every
+       injection is sized from the module as it is, not from a constant; when
+       no threshold, rule or exclusion has changed; and when
+       ``verify-all-gates.sh`` reports every control passing.
+     - gate 3, ``R-TEST-02``, ``AC-TST-02``--``AC-TST-04``
+     - PENDING
+
 Rejections and rework
 =====================
 
