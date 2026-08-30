@@ -595,7 +595,44 @@ Work units
        no threshold, rule or exclusion has changed; and when
        ``verify-all-gates.sh`` reports every control passing.
      - gate 3, ``R-TEST-02``, ``AC-TST-02``--``AC-TST-04``
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commit ``b891ec5``, plus my own ``ca27d6f``.
+       Diff read: two files, ``scripts/verify-test-gates.sh`` and the ``tests``
+       control's floor and floor-history comment in
+       ``scripts/verify-all-gates.sh``. **Nothing was weakened, and I checked
+       the ways it could have been**: ``git diff`` over the range touches no
+       POM, no ``config/``, no ``.java`` and no ``.rst``; the coverage rule is
+       still 0.90 line / 0.85 branch, the view-model rule still 0.80, the PIT
+       threshold still 80; no control, assertion or guard was deleted; the
+       assertion count went **up**, 32 to 33, and ``GATE_FLOOR`` was raised to
+       match rather than left behind. The injections are now sized from the
+       module's own reports each run instead of from constants, which is the
+       repair that stops this recurring.
+       ``bash scripts/verify-all-gates.sh`` run by me end to end: **exit 0**,
+       ``9 control(s) passed, 0 failed, in 535 seconds (8m55s)``, with
+       ``PASS tests 3, 4 33 366s``. The ``tests`` harness itself reports
+       ``SUMMARY: 33 assertion(s) passed, 0 failed`` and ``Every gate rejected
+       its defect and accepted the clean tree.``
+       I read the gate diagnostics out of ``_build/test-gate-logs/`` rather
+       than trusting the summary, and they carry real numbers:
+       ``Rule violated for bundle cometgui-domain: lines covered ratio is
+       0.81, but expected minimum is 0.90``;
+       ``Rule violated for package org.cometgui.ui.viewmodel: lines covered
+       ratio is 0.66, but expected minimum is 0.80``;
+       ``Generated 231 mutations Killed 152 (66%)`` with
+       ``Mutation score of 66 is below threshold of 80``; and the clean
+       baseline at ``Generated 152 mutations Killed 152 (100%)``.
+       **Why I am satisfied the repaired harness would still notice a gate
+       that stopped biting**: that is precisely the assertion form it uses --
+       "the gate exited 0 with the defect present" -- and I watched it fire
+       for real earlier today, when the un-repaired controls reported
+       ``24 assertion(s) passed, 8 failed`` against gates that were themselves
+       perfectly healthy. A harness that can be seen distinguishing "the gate
+       did not fire" from "the gate fired" is the thing being asked for, and
+       it was seen doing exactly that.
+       My own commit ``ca27d6f`` corrects the one-line prose in
+       ``verify-all-gates.sh`` that still described control 6 as injecting "a
+       weakened test suite"; it now injects a covered class whose test asserts
+       nothing.
 
 Rejections and rework
 =====================
