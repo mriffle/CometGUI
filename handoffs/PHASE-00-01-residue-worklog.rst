@@ -323,3 +323,51 @@ got 9465459c...``. Clean run unchanged and still identical to the baseline.
 Not verified: any behaviour on Windows, or on any CPython other than 3.11.2.
 The rounding measurement bounds ``libm``; it does not bound a future CPython
 changing ``random.gauss``, which is what the pinned SHA-256 is for.
+
+U2 -- ACCEPTED, 2026-08-30
+--------------------------
+
+:Agent commit: ``83ee605``
+
+The claim under audit was that ``extract_nsis.py`` "is pure Python and runs on
+Windows unchanged". **It was true of the language and false of the path
+handling**, and the difference is not cosmetic.
+
+What the phase orchestrator ran itself, and what it printed:
+
+* ``python3 scripts/feasibility/extract_nsis.py --self-test`` -> ``self-test
+  OK -- 27 checks, every path contained under both POSIX and Windows
+  semantics``, exit 0.
+* Falsified it rather than trusting it: reverted the single line
+  ``parts = [_safe_segment(seg) for seg in ...]`` back to its old form in a
+  copy and re-ran. ``SELF-TEST FAILED -- 10 of 27 checks did not hold``, exit
+  1, including ``trailing-space dot-dot  out/INSTDIR/.. /.. /evil.txt ...
+  ESCAPES the output directory on Windows`` and ``trailing space shadows a
+  file  out/INSTDIR/bin/percolator.exe``.
+* Regression on the real artefact: extracted ``percolator-v3-07.exe``
+  (``a9860e02...``) with the modified extractor into a fresh directory and
+  ``diff -r`` against the tree Phase 00 produced with the **original**
+  extractor -- no differences at all, 22 payload files, and the three pinned
+  hashes still ``044f3957...``, ``fc3c95e0...`` and ``c4c664ea...``.
+* Read every removed line in the diff. Three: the ``parts = ...`` line, an
+  ``ap.add_argument("installer")`` that became optional so ``--self-test`` can
+  run without one, and ``open(args.json, "w")`` which now pins UTF-8 and LF.
+  Nothing else was removed.
+* Checked the argument validation still refuses a missing installer (exit 2)
+  and that ``sys.stdout.reconfigure`` is wrapped in ``try/except
+  (AttributeError, ValueError)``.
+
+**The finding that matters.** Win32 strips trailing dots and spaces from every
+path component before the filesystem sees it, so a payload member named
+``$INSTDIR\.. \.. \evil.txt`` passed the old ``".."`` filter and would have
+been written outside the output directory *on Windows only*; and
+``percolator.exe `` -- with a trailing space -- would have silently replaced
+``percolator.exe``, the file whose SHA-256 the checklist pins. The
+containment check is now strictly stronger on both platforms and identical in
+its output for this payload. The percolator payload does not contain such a
+name; the extractor is nevertheless the thing the checklist points a Windows
+machine at, and it is now safe to point.
+
+Not verified: the extractor has still never run on Windows. The self-test
+models Win32 canonicalisation rather than executing it. That model is
+falsifiable and was falsified, which is the most that can be had here.
