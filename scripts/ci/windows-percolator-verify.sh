@@ -95,9 +95,11 @@ if [ "${#PYTHON[@]}" -eq 0 ] && command -v -- py >/dev/null 2>&1 && usable_pytho
     PYTHON=(py -3)
 fi
 [ "${#PYTHON[@]}" -gt 0 ] || die \
-    "no usable Python 3.8+ found: tried python3, python and 'py -3'. On a
-Windows runner add actions/setup-python, or install Python and make sure it is
-on PATH. Nothing is installed by this script."
+    "no usable Python 3.8+ found: tried python3, python and 'py -3'. Install a
+Python 3.8 or newer and make sure it is on PATH. NOT by adding a setup-python
+action: this project's CI contract forbids setup actions, and
+scripts/ci/check-workflows.py permits only the pinned checkout and
+artifact-upload actions. Nothing is installed by this script."
 
 printf 'windows-percolator-verify.sh: using %s (%s)\n' \
     "${PYTHON[*]}" "$("${PYTHON[@]}" -c 'import sys; print(sys.version.split()[0])')"
