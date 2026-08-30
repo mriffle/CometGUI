@@ -73,12 +73,10 @@ What exists
      - Scope, deliverables and exit gate per phase. 00 and 01 signed off
        PARTIAL, 05 re-scoped by ``D-002`` option C.
    * - ``DECISIONS.rst``
-     - 5 open, 4 decided
-     - ``D-001``, ``D-002`` (including option C) and ``D-004`` decided.
-       ``D-008`` is decided on licence and on tool distribution; only the
-       publication location remains. ``D-003``, ``D-005``, ``D-006``,
-       ``D-007`` and the new ``D-009`` (whose name is on the copyright line)
-       are open.
+     - 4 open, 4 decided, 1 provisional
+     - ``D-001``, ``D-002`` (including option C), ``D-004`` and ``D-008``
+       (all three parts) decided; ``D-009`` decided **provisionally**.
+       ``D-003``, ``D-005``, ``D-006`` and ``D-007`` remain open.
    * - ``handoffs/``
      - Phase 00 present
      - ``PHASE-00-worklog.rst`` (10 units, each with a sign-off entry) and
@@ -503,8 +501,9 @@ new ``package-info.java``.
 Open decisions
 ==============
 
-Four items are open -- ``D-003``, ``D-005``, ``D-006``, ``D-007`` -- plus
-``D-009``. ``D-008`` is now closed in full. **No ``D-`` item has
+Four items are open: ``D-003``, ``D-005``, ``D-006`` and ``D-007``. ``D-008``
+is closed in full, and ``D-009`` is answered **provisionally** -- the wording
+stands, the underlying question does not. **No ``D-`` item has
 ever been answered by an agent**, and none may be.
 
 On 2026-08-29 the owner answered ``D-002`` **option C**, the ``D-008``
@@ -555,6 +554,13 @@ and accept PARTIAL**. On 2026-08-30 the owner answered the last of ``D-008``:
        move before release but will always be a GitHub repository the owner
        controls.
      - --
+   * - ``D-009``
+     - **PROVISIONAL (2026-08-30)**: the line stays ``Copyright (C) 2026 The
+       CometGUI authors.`` on every source file. The institutional question --
+       whether the University of Washington has a claim on work done there --
+       is deferred, not answered. Phase 16 must put it back to the owner
+       before release, while changing it is still cheap.
+     - 16, before release only
 
 Risks currently live
 ====================
@@ -662,9 +668,10 @@ drop:
 For the owner
 --------------
 
-``D-009`` -- whose name goes on the copyright line -- is the only item with any
-urgency, and it has none before Phase 16. ``D-003``, ``D-005``, ``D-006`` and
-``D-007`` are open and each blocks a phase that has not started.
+``D-003``, ``D-005``, ``D-006`` and ``D-007`` are open, and each blocks a phase
+that has not started. ``D-009`` is answered for now -- the copyright line stays
+as written -- but the institutional question behind it is deferred, not closed,
+and Phase 16 must raise it again before release.
 
 *Answered so far:* ``D-001`` (GPL-3.0, derived from CasanovoGUI, PDV treated as
 GPL-3.0); ``D-002`` including option C (portable ``noxml`` archives; Phase 05
@@ -682,6 +689,23 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-08-30
+     - --
+     - **History pushed, and ``D-009`` answered provisionally.** All 64 commits
+       are on ``https://github.com/mriffle/CometGUI.git`` at ``9115b1c``. The
+       push initially failed on a token scope, not on identity: a Personal
+       Access Token may not create files under ``.github/workflows/`` without
+       the ``workflow`` scope, and Phase 01 added three. Recorded because it
+       will recur whenever the workflow files change and the message names
+       identity nowhere. **``D-009``:** the owner directed *"for now, just say
+       The CometGUI authors"*, so the copyright line is unchanged on all 61
+       Java files -- but the institutional question behind it is deferred
+       rather than settled, and Phase 16 owns raising it again before release.
+       Noted for the record: the published history carries 57 commits authored
+       by ``CometGUI spec <claude@ogdb.com>``, the coding harness's injected
+       git identity, and 7 by ``Michael Riffle <mriffle@uw.edu>``. Rewriting
+       that is now excluded by ``D-008``'s no-rewrite constraint; 37 of the
+       commits carry a ``Co-Authored-By: Claude`` trailer.
    * - 2026-08-30
      - --
      - **``D-008`` decided in full: CometGUI is published at**

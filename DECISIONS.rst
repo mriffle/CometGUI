@@ -2,7 +2,7 @@
 Decisions
 =========
 
-:Updated: 2026-08-30 (D-008 fully decided -- publication location)
+:Updated: 2026-08-30 (D-008 fully decided; D-009 decided provisionally)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -649,7 +649,8 @@ violation.
 D-009 -- The copyright holder named in every source file
 =========================================================
 
-:Status: OPEN
+:Status: **DECIDED PROVISIONALLY 2026-08-30** -- keep the current wording;
+   revisit before release
 :Raised: 2026-08-29, by Phase 01, at the main orchestrator's sign-off
 :Blocks: nothing yet; Phase 16 cannot complete the licence audit without it,
    and it must be settled **before any public redistribution**
@@ -677,8 +678,28 @@ project-collective form such as "The CometGUI authors" made real by a
 what the placeholder already assumes -- but it is only honest once the file
 exists and is accurate.
 
-**Recommendation.** Decide it with the ``D-008`` publication question, since
-both are answered by the same fact: who is publishing this and on whose behalf.
-There is no deadline before Phase 16, and no phase is blocked meanwhile --
-Phase 02 must simply keep the placeholder rather than inventing a name, and
-must retain CasanovoGUI's own notices in anything derived from it.
+**Recommendation, as it stood.** Decide it with the ``D-008`` publication
+question, since both are answered by the same fact: who is publishing this and
+on whose behalf.
+
+**DECISION (2026-08-30), provisional.** The owner directed: *"For now, just say
+The CometGUI authors."* The placeholder wording therefore becomes the answer,
+unchanged, on every source file.
+
+**What "for now" means, and why it is recorded rather than smoothed over.** This
+is a deliberate deferral, not a settled legal position. The owner's git identity
+is ``Michael Riffle <mriffle@uw.edu>``, and work carried out at a university
+often carries an institutional copyright claim. That question is untouched. It
+is free to answer today and tedious later -- retrofitting an institutional line
+across every source file once there are hundreds of them is real work -- so
+**Phase 16 must put this back to the owner before any public release** rather
+than treating the placeholder as settled.
+
+**What this does not authorise.** No agent substitutes a personal or
+institutional name on the strength of this entry. The wording stays exactly
+``Copyright (C) 2026 The CometGUI authors.`` until the owner says otherwise.
+
+**Still worth doing, cheaply.** "The authors" currently names nobody. A
+``CONTRIBUTORS`` file listing who they are would make the line true rather than
+merely conventional. Not done here because the owner asked only for the wording;
+Phase 16 owns it alongside the licence audit.
