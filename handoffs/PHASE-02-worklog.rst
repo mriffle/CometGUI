@@ -365,7 +365,52 @@ Work units
        stable identifiers for every control a test needs and an accessible
        name on every control that exists.
      - ``R-TEST-04``, gates 1, 4
-     - PENDING
+     - **SIGNED OFF 2026-08-30**, commits ``40a696a`` and ``0d42ef5``. Diff
+       read: seventeen files, every one under ``cometgui-ui/src/``, no gate
+       configuration touched. **The second derived file landed in the derived
+       file set, and I checked that rather than believing it**:
+       ``mvn -pl cometgui-ui checkstyle:check@checkstyle-check-derived``
+       reports ``0 Checkstyle violations``,
+       ``spotless:check@spotless-check-derived`` reports
+       ``Spotless.Java is keeping 2 files clean``, and ``scripts/build.sh``'s
+       census prints ``ok cometgui-ui Spotless 37 ordinary + 2 derived = 39
+       file(s) on disk`` and the same for Checkstyle -- so ``ConsolePane`` and
+       its ``package-info`` are checked by the derived regime and not by the
+       ordinary one. Their header is byte-identical to
+       ``config/license/java-header-derived.txt`` and each carries the
+       per-file record naming
+       ``src/main/java/org/casanovo/gui/ui/ConsoleView.java`` at commit
+       ``480b3013e7f8fb51a2b8c58681043821e3e7f865``.
+       ``bash scripts/build.sh``: ``11/11 stages OK in 137 seconds. BUILD
+       OK``, ``34 report file(s): tests=623 failures=0 errors=0 skipped=0``,
+       ``ok 8 architecture rule(s) checked, 0 failures``,
+       ``ok cometgui-ui 65 class(es) analysed, 0 findings``. The view-model
+       package is still at ``LINE missed=0 covered=175`` /
+       ``BRANCH missed=0 covered=40``, read from ``jacoco.xml`` -- this unit
+       did not dilute the gated package.
+       **Two falsifications of my own**, in a ``git archive`` sandbox.
+       (a) Skipping ``SectionId.CONSOLE`` when the content area is built --
+       one section quietly absent -- turns all 13 ``ShellViewTest`` tests into
+       errors. (b) The subtler one: changing
+       ``pane.getValue().setVisible(isSelected)`` to ``setVisible(true)``, so
+       every section renders at once instead of only the selected one, gives
+       four named failures including
+       ``theContentAreaShowsExactlyTheSelectedPane ... visibility of
+       comet-parameters ==> expected: <false> but was: <true>`` and
+       ``arrowKeysWalkThroughEverySectionIncludingTheSecondaryOnes ...
+       visibility of run ==> expected: <false> but was: <true>``. The tests
+       are about the rendered scene graph, not about construction.
+       **Escalated upward, not decided here**: the ``Settings`` section has no
+       owning phase anywhere in ``phases/index.rst`` or
+       ``specification.rst``. The agent declined to guess a number and wrote a
+       note saying so, pinned by a test. See *Blockers escalated* below.
+       **Recorded for later phases**: ``#navigation`` is a ``VBox`` and is
+       deliberately NOT focus-traversable -- only the selected entry is, a
+       roving tab stop -- so a test must assert traversability on the selected
+       entry, never on the container; and
+       ``mvn -pl <module> spotless:apply@spotless-check-derived`` does apply
+       the derived header, which is a useful thing the next agent to add a
+       derived file should know.
 
    * - 7
      - **Application bootstrap.** ``CometGuiApplication``, AtlantaFX applied,
