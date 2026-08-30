@@ -2,7 +2,7 @@
 Decisions
 =========
 
-:Updated: 2026-08-30 (D-006, D-007, D-008, D-009 answered)
+:Updated: 2026-08-30 (D-005, D-006, D-007, D-008, D-009 answered)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -431,40 +431,77 @@ path off macOS for release 1.
 D-005 -- PDV integration level
 ==============================
 
-:Status: OPEN
+:Status: **DECIDED 2026-08-30** -- enhanced control mode, reached by generating
+   mzTab from Comet + Percolator results
 :Raised: 2026-08-28
-:Blocks: Phase 11
+:Blocks: nothing further; Phase 11 implements it
 :Owner: Project owner
+:Decided by: Project owner, 2026-08-30, after the main orchestrator inspected
+   ``Noble-Lab/CasanovoGUI``
 
-**Question.** Does release 1 need exact click-a-row-to-update-PDV selection?
+**Question.** Baseline open-in-PDV, or drive PDV so that selecting a PSM shows
+its spectrum?
 
-**Facts.** PDV supports the needed file formats, but its documented external
-control server is de novo specific. A generalised database-search control mode
-does not exist upstream.
+**DECISION. Drive PDV properly, as CasanovoGUI does, and build the mzTab
+converter that makes it possible.** The owner: *"I want to drive PDV properly,
+like CasanovoGUI does. If you need to make a mzTab converter for
+comet+percolator results, do it. That will be a bit of a lift with its own
+tests. It is essential this is accurate and true to the original results."*
 
-**Options.** Baseline only (open-in-PDV plus CLI figure generation); or
-baseline plus an upstream contribution or a small maintained fork.
+**What the CasanovoGUI inspection established**, and it changed the shape of
+this decision. That project drives PDV in production through
+``PdvLauncher.java`` and ``PdvController.java``: the controller keeps a map of
+*mzTab path to running PDV instance*, reserves an ephemeral loopback port,
+polls ``/ready``, and sends a debounced ``/select?ref=<spectra_ref>`` when the
+user clicks a peptide. Every launch is::
 
-**Recommendation.** Ship baseline for release 1 and propose the enhancement
-upstream. Do not substitute screen-coordinate automation.
+    java -jar PDV.jar denovo-gui --mztab <f> --spectrum <f> --port <n> [--hide-psm-table]
 
-**Phase 00, 2026-08-29 -- the fact is now sharper.** PDV 2.7.0 **does** ship a
-control server (``PDVGUI/gui/utils/PdvControlServer``, offering ``/ready``,
-``/select`` and ``/shutdown`` on ``127.0.0.1``), but it is reachable only via
-``java -jar PDV.jar denovo-gui --mztab <f> --spectrum <f>``, and
-``spectra_ref`` resolution exists only in ``MztabImport``. Comet plus
-Percolator never produces mzTab, so **there is no path from CometGUI's results
-to that server today**. The upstream contribution is therefore *cheaper than
-assumed* -- it extends an existing mechanism rather than inventing one -- but
-it remains on a third party's schedule. Recommendation unchanged: baseline for
-release 1.
+Their launcher has **no pepXML or mzID path at all**. So the control server is
+real and proven, and the only door into it is mzTab. Casanovo emits mzTab
+natively -- hence their ``MzTabScores.java`` -- and Comet plus Percolator does
+not. That is the entire gap, and it is closable by generating the mzTab
+ourselves.
 
-Two operational findings Phase 11 must plan around, both verified: PDV's CLI
-is **not headless** (it constructs a ``JFrame`` and throws
-``HeadlessException``), and it **exits 0 having written nothing** when given
-the same indexed mzML Comet searched -- msftbx numbers spectra by file
-position while pepXML refers to them by scan number. MGF is the working route.
-``-rt 6`` hangs; impose a timeout.
+**Why this beats both options the specification previously offered.** Revision 7
+contemplated either a baseline-only integration or *a PDV fork* carrying a
+database-search launcher. The mzTab route needs **no fork** -- so no divergent
+binary to checksum, maintain and upstream -- and puts **no upstream
+contribution on the critical path**, so release 1 does not wait on a third
+party's schedule. It also lets CometGUI reuse CasanovoGUI's launcher and
+controller wholesale, which ``D-001`` permits: what we supply is the input and
+the results binding, not the machinery.
+
+**The cost, accepted with eyes open.** An mzTab exporter is a real component
+with its own test suite, and the owner said so when choosing it. The governing
+constraint is fidelity, written into ``R-PDV-03`` as a falsifiable gate:
+completeness and uniqueness asserted on both sides; values transcribed rather
+than recomputed; a field mzTab wants and the source lacks left explicitly null
+rather than defaulted or invented; modifications compared as parsed values
+including position and mass; and export failing loudly, naming the PSM, if
+anything cannot be represented faithfully. A partial mzTab presented as
+complete is precisely the failure this rule exists to prevent.
+
+**The landmine, named in advance.** ``spectra_ref`` must resolve to the spectrum
+that actually produced the PSM. Phase 00 established that PDV, through
+``msftbx``, numbers spectra by **1-based file position** while pepXML carries
+the **instrument scan number**, and the two diverge for any scan-range subset --
+this is exactly why PDV exited 0 having written nothing during Phase 00. A test
+run on a file where the two orderings coincide proves nothing; ``R-PDV-03``
+requires one where they differ.
+
+**Sequencing Phase 11 should honour.** Spike the import first: prove PDV's
+``MztabImport`` accepts an mzTab CometGUI generates rather than Casanovo's,
+before building the exporter out. If it does not, the route needs rethinking,
+and that is far cheaper to learn in a day than after the fidelity suite is
+written. Build the baseline (open-in-PDV, CLI figures) alongside it, since it
+satisfies four gate items independently.
+
+**Unchanged from the original recommendation:** do not fork PDV, and never
+automate screen coordinates -- in production or in tests.
+
+**Recorded in:** specification revision 8 (``R-PDV-02``..``R-PDV-05``,
+``AC-VIS-04``, ``AC-VIS-05``) and ``phases/PHASE-11-pdv.rst``.
 
 ----
 

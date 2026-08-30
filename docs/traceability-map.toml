@@ -232,6 +232,16 @@ phase = "11"
 kind = "planned"
 phase = "11"
 
+[[ac."AC-VIS-04".evidence]]
+kind = "planned"
+phase = "11"
+note = "Exact selection through PDV's loopback control server. D-005 decided 2026-08-30: CometGUI drives PDV as CasanovoGUI does, via a generated mzTab."
+
+[[ac."AC-VIS-05".evidence]]
+kind = "planned"
+phase = "11"
+note = "mzTab fidelity (R-PDV-03). Proved by comparison against the Comet and Percolator source, not against the exporter's own accounting."
+
 # --- AC-LL ------------------------------------------------------------------
 
 [[ac."AC-LL-01".evidence]]

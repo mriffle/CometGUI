@@ -59,12 +59,11 @@ What exists
      - State
      - Notes
    * - ``specification.rst``
-     - Revision 7
-     - Revision 7 acts on the ``noxml`` discovery: the artefact section is
-       rewritten around portable archives, and ``R-TOOL-01``, ``R-TOOL-02``,
-       ``R-PERC-02`` and the ``D-008`` entry are amended. Revision 6 decided
-       licensing; revision 5 recorded Phase 00's findings without acting on
-       them. Passes ``sphinx-build -n -W``.
+     - Revision 8
+     - Revision 8 records ``D-005``: CometGUI drives PDV through a generated
+       mzTab, adding ``R-PDV-02``..``R-PDV-05`` and ``AC-VIS-04``/``05``.
+       Revision 7 acted on the ``noxml`` discovery, rewriting the artefact
+       section around portable archives. Passes ``sphinx-build -n -W``.
    * - ``ONBOARDING.rst``
      - Complete
      - Read-first document for any orchestrating agent.
@@ -73,10 +72,10 @@ What exists
      - Scope, deliverables and exit gate per phase. 00 and 01 signed off
        PARTIAL, 05 re-scoped by ``D-002`` option C.
    * - ``DECISIONS.rst``
-     - 2 open, 5 decided, 2 partial/provisional
+     - 1 open, 6 decided, 2 partial/provisional
      - ``D-001``, ``D-002`` (including option C), ``D-004`` and ``D-008``
-       (all three parts) and ``D-007`` decided; ``D-009`` provisional and
-       ``D-006`` partly decided. ``D-003`` and ``D-005`` remain open.
+       (all three parts), ``D-005`` and ``D-007`` decided; ``D-009``
+       provisional and ``D-006`` partly decided. Only ``D-003`` remains open.
    * - ``handoffs/``
      - Phase 00 present
      - ``PHASE-00-worklog.rst`` (10 units, each with a sign-off entry) and
@@ -501,8 +500,8 @@ new ``package-info.java``.
 Open decisions
 ==============
 
-Two items are open: ``D-003`` and ``D-005``. ``D-007`` and ``D-008`` are closed
-in full. ``D-009`` is answered **provisionally** -- the wording stands, the
+One item is open: ``D-003``. ``D-005``, ``D-007`` and ``D-008`` are closed in
+full. ``D-009`` is answered **provisionally** -- the wording stands, the
 underlying question does not -- and ``D-006`` is **partly** answered: the data
 is not redistributed and the local fixture is chosen, but the CI fixture set is
 deliberately deferred. **No ``D-`` item has
@@ -541,8 +540,11 @@ and accept PARTIAL**. On 2026-08-30 the owner answered the last of ``D-008``:
      - **DECIDED**: Percolator runs under Rosetta 2 on Apple silicon.
      - --
    * - ``D-005``
-     - PDV baseline only, or enhanced control mode?
-     - 11
+     - **DECIDED (2026-08-30)**: drive PDV properly, as CasanovoGUI does.
+       PDV's control server takes only mzTab, and Comet + Percolator does not
+       produce it, so **Phase 11 builds an mzTab exporter** governed by a
+       fidelity gate (``R-PDV-03``). No PDV fork and no upstream dependency.
+     - --
    * - ``D-006``
      - **PARTLY DECIDED (2026-08-30)**: CometGUI redistributes no spectrum or
        FASTA data, which removes the licence risk in every candidate -- Phase
@@ -680,9 +682,9 @@ drop:
 For the owner
 --------------
 
-Two items are genuinely open, and each blocks a phase that has not started:
-``D-003`` (which additional Percolator versions to carry) and ``D-005`` (how
-deep the PDV integration goes).
+One item is genuinely open: ``D-003`` -- which additional Percolator versions
+to carry beyond 3.07.1, for users who do not need Limelight. It blocks Phases
+05, 09 and 15, none of which has started.
 
 Two more are answered but not closed, and both are deferrals the owner made
 deliberately rather than gaps:
@@ -709,6 +711,29 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-08-30
+     - --
+     - **``D-005`` decided: CometGUI drives PDV properly, via a generated
+       mzTab.** Inspecting ``Noble-Lab/CasanovoGUI`` settled it. That project
+       drives PDV in production from ``PdvLauncher`` and ``PdvController`` --
+       ephemeral loopback port, ``/ready`` polling, debounced
+       ``/select?ref=<spectra_ref>`` -- but **every launch is** ``denovo-gui
+       --mztab``, and its launcher has no pepXML or mzID path at all. The
+       control server is real and proven; mzTab is the only door into it.
+       Casanovo emits mzTab natively, Comet + Percolator does not, so the owner
+       chose to **generate the mzTab**: *"If you need to make a mzTab converter
+       for comet+percolator results, do it ... It is essential this is accurate
+       and true to the original results."* This beats both routes revision 7
+       offered -- **no PDV fork** to maintain, and **no upstream contribution
+       on the critical path** -- and lets Phase 11 reuse CasanovoGUI's
+       launcher and controller under ``D-001``. Specification revision 8 adds
+       ``R-PDV-02``..``R-PDV-05`` and ``AC-VIS-04``/``05``, with fidelity as a
+       falsifiable gate: values transcribed rather than recomputed, missing
+       fields left explicitly null rather than defaulted, modifications
+       compared as parsed values, and export failing loudly on anything it
+       cannot represent. The named landmine is ``spectra_ref``: PDV numbers
+       spectra by 1-based file position while pepXML carries the instrument
+       scan number, so the test must use a file where the two **differ**.
    * - 2026-08-30
      - --
      - **``D-007`` decided: a local fake endpoint, and no test ever touches

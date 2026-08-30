@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 7
-:Revision date: 2026-08-29
-:Supersedes: Revision 6, 2026-08-29
+:Revision: 8
+:Revision date: 2026-08-30
+:Supersedes: Revision 7, 2026-08-29
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,24 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 8
+     - 2026-08-30
+     - **``D-005`` decided: CometGUI drives PDV exactly as CasanovoGUI does,
+       via an mzTab bridge.** This document previously assumed a hypothetical
+       ``db-gui`` control mode and, failing that, offered only baseline
+       open-in-PDV or a PDV fork. Inspection of ``Noble-Lab/CasanovoGUI``
+       establishes that PDV's control server is real, reachable and already
+       driven in production -- but **only** through ``denovo-gui --mztab``.
+       Their ``PdvLauncher`` has no pepXML or mzID path whatsoever. The owner
+       therefore chose a third route the earlier revisions did not contain:
+       **generate mzTab from Comet + Percolator results and reuse PDV's
+       existing, unmodified control server.** No fork, no upstream dependency,
+       and the launcher/controller machinery is reusable because ``D-001``
+       makes CometGUI a GPL-3.0 derivative of CasanovoGUI. The cost is a real
+       component -- an mzTab exporter with its own tests -- governed by a
+       fidelity requirement the owner stated directly: it must be *"accurate
+       and true to the original results"*. That is written into ``R-PDV-03``
+       as a falsifiable rule rather than an aspiration.
    * - 7
      - 2026-08-29
      - **Percolator artefact strategy decided (``D-002`` option C), and the
@@ -2116,26 +2134,87 @@ source/spectrum context in PDV where a robust documented mapping exists; and a
 clear error when the source spectrum format cannot be visualised by the
 selected PDV version.
 
-Enhanced exact-selection integration
-------------------------------------
+Exact-selection integration via mzTab
+--------------------------------------
 
-A desirable enhancement is a generalised database-search equivalent of PDV's
-existing de novo external-control mode, preferably contributed upstream,
-conceptually::
+**Decided 2026-08-30 (``D-005``).** CometGUI drives PDV the way CasanovoGUI
+does: a PDV window per result set, held open on a loopback control port, told
+which spectrum to display when the user selects a PSM.
 
-    java -jar PDV.jar db-gui \
-        --result search.pep.xml \
-        --result-format pepxml \
+The mechanism is PDV's existing de novo external-control mode, used unmodified::
+
+    java -jar PDV.jar denovo-gui \
+        --mztab <generated>.mztab \
         --spectrum run.mzML \
         --port <ephemeral-port> \
-        --hide-psm-table
+        [--hide-psm-table]
 
-with a loopback-only selection API keyed on a stable spectrum/native
-identifier. If this does not exist upstream when implementation begins,
-``D-005`` shall choose either (a) baseline Open-in-PDV plus PDV CLI batch figure
-generation, or (b) a minimal, clearly versioned PDV fork containing only the
-required database-search launcher and control extension. A fork must be
-checksum- and version-tracked and should be upstreamed as quickly as possible.
+with ``/ready``, ``/select?ref=<spectra_ref>`` and ``/shutdown`` on
+``127.0.0.1``. This is verified to exist and to work: ``Noble-Lab/CasanovoGUI``
+drives it in production from ``PdvLauncher`` and ``PdvController``, reserving an
+ephemeral port, polling readiness, and sending a debounced ``/select`` when the
+user clicks a peptide.
+
+**The gap, and how it is closed.** That door opens only to mzTab. CasanovoGUI
+passes through it because Casanovo emits mzTab natively; Comet plus Percolator
+does not, and no ``db-gui`` equivalent exists upstream. CometGUI therefore
+**generates the mzTab itself** from its own results. Two consequences follow,
+and both are improvements on the alternatives this document previously listed:
+**no PDV fork is required**, so there is no divergent binary to checksum,
+maintain and upstream; and **no upstream contribution is on the critical path**,
+so release 1 does not depend on a third party's schedule.
+
+``R-PDV-02``
+    CometGUI shall generate an mzTab document from the Comet pepXML and the
+    Percolator results of a completed run, sufficient for PDV's ``denovo-gui``
+    mode to display any PSM in the result set. The generated file is a run
+    artefact: it is recorded in provenance with its checksum like any other
+    output, and it is never presented to the user as a scientific deliverable
+    or as an interchange format for third parties.
+
+``R-PDV-03``
+    **Fidelity.** The generated mzTab shall be *accurate and true to the
+    original results*. This is a gate, not an aspiration, and shall be proved
+    by comparison against the source rather than by the exporter's own
+    accounting:
+
+    * **Completeness and uniqueness.** Every PSM the results model holds shall
+      appear exactly once, and the mzTab shall contain no PSM that the source
+      does not. Counts shall be asserted on both sides.
+    * **Values are carried, never recomputed.** Peptide sequence, charge,
+      observed *m/z*, retention time, protein accessions, and Percolator's
+      q-value and PEP shall be transcribed from the source. Where mzTab
+      requires a value the source does not supply, the field shall be left
+      explicitly null rather than derived, defaulted or invented.
+    * **Modifications shall survive exactly**, including position and mass, and
+      round-trip comparison shall be by parsed modification rather than by
+      string equality.
+    * **``spectra_ref`` shall resolve to the spectrum that actually produced
+      the PSM.** This is the rule most likely to fail silently: Phase 00
+      established that PDV, through ``msftbx``, numbers spectra by 1-based file
+      position while pepXML carries the instrument scan number, and the two
+      diverge for any scan-range subset. A test shall prove the identity holds
+      on a file where the two orderings differ, not merely on one where they
+      coincide.
+    * **No silent loss.** If any PSM cannot be represented faithfully, export
+      shall fail loudly, naming the PSM and the reason. A partial mzTab
+      presented as complete is the failure mode this rule exists to prevent.
+
+``R-PDV-04``
+    PDV lifecycle shall be owned by the process service (``R-PROC-02``): one
+    PDV instance per result set keyed on its mzTab, an ephemeral loopback port
+    obtained without a fixed default, readiness established by polling
+    ``/ready`` rather than by sleeping, selection requests debounced, and every
+    instance shut down when its result set closes or the application exits. A
+    PDV that fails to become ready shall surface an actionable error rather
+    than leaving the UI waiting.
+
+``R-PDV-05``
+    Reuse of ``Noble-Lab/CasanovoGUI``'s ``PdvLauncher`` and ``PdvController``
+    is permitted and expected (``D-001``), subject to that decision's
+    obligations: retain the upstream copyright notices and record the
+    derivation. What CometGUI supplies is the mzTab input and the results-model
+    binding; the port, readiness and selection machinery need not be reinvented.
 
 PDV testing
 -----------
@@ -2144,8 +2223,15 @@ PDV testing
     Automated tests shall not rely on whether a PDV window appears. At least
     one test shall invoke PDV's deterministic command-line figure generation on
     a known Comet pepXML plus spectrum file and assert a valid, non-empty
-    output figure. If the enhanced control server exists, end-to-end tests
-    shall additionally probe its health endpoint and select a known PSM.
+    output figure. End-to-end tests shall additionally start PDV on an
+    ephemeral port, prove ``/ready`` is reached, select a **known** PSM through
+    ``/select``, and assert the response rather than assuming it. Two Phase 00
+    findings make the shape of these tests non-negotiable: PDV's CLI extends
+    ``javax.swing.JFrame`` and therefore needs a display, so figure generation
+    is not headless; and PDV **exits 0 having written nothing** on indexed
+    mzML, so every test shall assert on output files and never on exit status,
+    under a timeout -- ``-rt 6`` was observed running 600 seconds writing
+    nothing.
 
 Limelight Conversion and Upload
 ===============================
@@ -3093,6 +3179,14 @@ PDV and Limelight
      - A known Comet pepXML plus spectrum file can be visualised.
    * - ``AC-VIS-03``
      - The PDV CLI automated test produces a valid annotated spectrum artefact.
+   * - ``AC-VIS-04``
+     - Selecting a PSM in the results table makes the running PDV window
+       display that spectrum, proved through the loopback control server
+       rather than by observing a window.
+   * - ``AC-VIS-05``
+     - The generated mzTab is proved accurate and true to the Comet and
+       Percolator results it came from, by comparison against the source
+       (``R-PDV-03``).
    * - ``AC-LL-01``
      - The Limelight converter installs automatically.
    * - ``AC-LL-02``

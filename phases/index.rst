@@ -73,9 +73,9 @@ authoritative for its own scope and exit gate.
      - --
      - NOT STARTED
    * - `11 <PHASE-11-pdv.rst>`_
-     - PDV Integration
+     - PDV Integration and mzTab Export
      - 05, 10
-     - D-005
+     - D-005 DECIDED -- enhanced control mode via a generated mzTab
      - NOT STARTED
    * - `12 <PHASE-12-limelight.rst>`_
      - Limelight Conversion and Upload
@@ -116,7 +116,11 @@ schedule. Where dependencies allow, phases may overlap:
   piece of work in the project. Start it as early as a Comet binary exists.
 * 07 (parameter UI) cannot start before 06 has a stable model, and it is the
   second-longest piece.
-* 11 (PDV) is independent of 12 (Limelight) once 10 is done.
+* 11 (PDV) is independent of 12 (Limelight) once 10 is done. It grew
+  materially on 2026-08-30: ``D-005`` added an **mzTab exporter** with its own
+  fidelity suite, because PDV's control server accepts only mzTab. Treat it as
+  two pieces -- the baseline integration, and the exporter -- and spike PDV's
+  acceptance of a generated mzTab before building the second out.
 * 16 contains human-gated work (licensing, UX sessions) that must be
   scheduled far earlier than it is executed.
 
