@@ -54,7 +54,8 @@ import org.cometgui.provenance.json.JsonWriter;
  *       {@code files} at the root -- identity, then environment, then configuration, then what was
  *       done, then what was touched;
  *   <li>within each record, the components in the order the record type declares them, so that the
- *       document and the Java type can be read side by side.
+ *       document and the Java type can be read side by side -- with {@code durationMillis} inserted
+ *       directly after {@code end}, being derived from it.
  * </ol>
  *
  * <p>The two open-ended maps -- {@code settings} and a command's {@code environment} -- are written
@@ -81,12 +82,26 @@ import org.cometgui.provenance.json.JsonWriter;
  *       be the one field that had it.
  * </dl>
  *
- * <h2>What is deliberately not written</h2>
+ * <h2>The duration, which is derived at write time and never carried</h2>
  *
- * <p>A run's and an execution's <em>duration</em> is derived from their start and end and is not
- * serialised. It is a third number that can contradict the two it comes from, and a reader that
- * trusted it over the instants would report a run that took a length of time it did not take.
- * Readers compute it, exactly as {@link RunRecord#duration()} does.
+ * <p>{@code AC-PRV-05} requires that "start, end, duration and exit code are recorded for every
+ * process", and the provenance record <em>is</em> the artefact: a duration that exists only as a
+ * method on a model the reader has to reconstruct is not recorded in the file. So {@code
+ * durationMillis} is written, in {@code run} and in every {@code execution}, immediately after
+ * {@code end} so that it reads beside the two numbers it comes from.
+ *
+ * <p><strong>It is computed here, at serialisation, and is never a component of any record
+ * type.</strong> That is what removes the risk of a stored duration: there is no third number
+ * travelling with the model for the two instants to disagree with, and the value in the document is
+ * a pure function of the two timestamps printed next to it. {@link
+ * CanonicalTimestamp#millisBetween} derives it from the <em>truncated</em> instants for exactly
+ * that reason -- the document shows milliseconds, so the duration must be the one a reader can
+ * recompute from what the document shows, not from nanoseconds the document does not contain.
+ *
+ * <p>A reader should therefore <strong>validate</strong> {@code durationMillis} against {@code
+ * start} and {@code end} rather than store it: a document whose duration disagrees with its own
+ * timestamps is corrupt. A run still in progress has {@code "end": null} and {@code
+ * "durationMillis": null}, because a run that has not finished has not taken a length of time yet.
  *
  * <h2>Redaction</h2>
  *
@@ -229,6 +244,12 @@ public final class ManifestWriter {
         json.name("start").value(CanonicalTimestamp.utcMillis(run.start()));
         json.name("end");
         writeOptionalTimestamp(json, run.end());
+        json.name("durationMillis");
+        if (run.end().isEmpty()) {
+            json.nullValue();
+        } else {
+            json.value(CanonicalTimestamp.millisBetween(run.start(), run.end().get()));
+        }
         json.endObject();
     }
 
@@ -298,6 +319,8 @@ public final class ManifestWriter {
         json.name("environment").sortedObject(redactor.redactEnvironment(command.environment()));
         json.name("start").value(CanonicalTimestamp.utcMillis(execution.start()));
         json.name("end").value(CanonicalTimestamp.utcMillis(execution.end()));
+        json.name("durationMillis")
+                .value(CanonicalTimestamp.millisBetween(execution.start(), execution.end()));
         json.name("exitCode").value(execution.exitCode());
         json.name("stdout");
         writeOptionalLog(json, execution.stdout());

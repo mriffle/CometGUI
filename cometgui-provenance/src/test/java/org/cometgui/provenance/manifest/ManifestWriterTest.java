@@ -214,7 +214,8 @@ class ManifestWriterTest {
                 "projectId": "project-alpha",
                 "status": "partial",
                 "start": "2026-08-31T09:14:00.250Z",
-                "end": "2026-08-31T09:48:00.000Z"
+                "end": "2026-08-31T09:48:00.000Z",
+                "durationMillis": 2039750
               },
               "application": {
                 "cometGuiVersion": "0.1.0-SNAPSHOT",
@@ -263,6 +264,7 @@ class ManifestWriterTest {
                     },
                     "start": "2026-08-31T09:15:00.000Z",
                     "end": "2026-08-31T09:47:30.500Z",
+                    "durationMillis": 1950500,
                     "exitCode": 0,
                     "stdout": {
                       "path": "/var/cometgui/runs/run-20260831-091500/comet.stdout.log",
@@ -295,6 +297,7 @@ class ManifestWriterTest {
                     "environment": {},
                     "start": "2026-08-31T09:47:31.000Z",
                     "end": "2026-08-31T09:49:02.125Z",
+                    "durationMillis": 91125,
                     "exitCode": 1,
                     "stdout": null,
                     "stderr": {
@@ -342,10 +345,11 @@ class ManifestWriterTest {
      *
      * <p>{@code R-PROV-05} requires that a crash still leaves useful history, so this shape is not
      * an edge case but the normal state of the file for the whole length of a run. It pins the four
-     * things the full document cannot: {@code "end": null} for an absent optional at the top level,
-     * an empty object for {@code settings}, empty arrays for {@code tools} and {@code files}, and
-     * the {@code und} language tag of {@link Locale#ROOT}. It carries no path, so it is the part of
-     * the format that is pinned on every platform.
+     * things the full document cannot: {@code "end": null} and the {@code "durationMillis": null}
+     * that follows from it, for an absent optional at the top level, an empty object for {@code
+     * settings}, empty arrays for {@code tools} and {@code files}, and the {@code und} language tag
+     * of {@link Locale#ROOT}. It carries no path, so it is the part of the format that is pinned on
+     * every platform.
      */
     private static final String PINNED_RUNNING_RUN = pinnedRunningRun();
 
@@ -363,7 +367,8 @@ class ManifestWriterTest {
                 "projectId": "project-beta",
                 "status": "running",
                 "start": "2026-08-31T10:15:00.000Z",
-                "end": null
+                "end": null,
+                "durationMillis": null
               },
               "application": {
                 "cometGuiVersion": "0.1.0-SNAPSHOT",
@@ -713,6 +718,70 @@ class ManifestWriterTest {
         }
 
         @Test
+        @DisplayName(
+                "records durations whose milliseconds were counted by hand from the two"
+                        + " timestamps beside each one")
+        @DisabledOnOs(value = OS.WINDOWS, disabledReason = "POSIX paths, as above")
+        void recordsDurationsCountedByHand() {
+            String document = writer().render(completedRunFixture());
+
+            List<String> durationLines =
+                    document.lines()
+                            .filter(line -> line.contains("durationMillis"))
+                            .map(String::strip)
+                            .toList();
+
+            // EVERY NUMBER BELOW WAS COUNTED, NOT COMPUTED.  Calling Duration.between here would
+            // run the same expression the writer runs, and the assertion could not fail.
+            //
+            //   run          09:14:00.250 -> 09:48:00.000  =  33 min 59.750 s  = 2 039 750 ms
+            //   comet        09:15:00.000 -> 09:47:30.500  =  32 min 30.500 s  = 1 950 500 ms
+            //   percolator   09:47:31.000 -> 09:49:02.125  =   1 min 31.125 s  =    91 125 ms
+            //
+            // Asserted as the whole list, in document order, with the trailing commas: that fails
+            // with a readable diff, and it also fails if a fourth duration appears or one of the
+            // three stops being written at all.
+            assertEquals(
+                    List.of(
+                            "\"durationMillis\": 2039750",
+                            "\"durationMillis\": 1950500,",
+                            "\"durationMillis\": 91125,"),
+                    durationLines);
+        }
+
+        @Test
+        @DisplayName("counts a duration from the truncated timestamps the document actually shows")
+        @DisabledOnOs(value = OS.WINDOWS, disabledReason = "POSIX paths, as above")
+        void countsTheDurationFromWhatTheDocumentShows() {
+            // The run's start instant carries 250 999 999 nanoseconds and the document prints
+            // ".250Z".  From the RAW instants the elapsed time is 2 039 749.000001 ms, which
+            // Duration.toMillis() reports as 2 039 749; from the two timestamps a reader can see,
+            // it is 2 039 750.  Only the second is checkable against the document, so only the
+            // second may be written -- and the one-millisecond gap is what lets this assertion
+            // tell the two derivations apart.
+            String document = writer().render(completedRunFixture());
+
+            List<String> runLines =
+                    document.lines()
+                            .map(String::strip)
+                            .filter(
+                                    line ->
+                                            line.startsWith("\"start\"")
+                                                    || line.startsWith("\"durationMillis\""))
+                            .toList();
+
+            assertEquals(
+                    List.of(
+                            "\"start\": \"2026-08-31T09:14:00.250Z\",",
+                            "\"durationMillis\": 2039750",
+                            "\"start\": \"2026-08-31T09:15:00.000Z\",",
+                            "\"durationMillis\": 1950500,",
+                            "\"start\": \"2026-08-31T09:47:31.000Z\",",
+                            "\"durationMillis\": 91125,"),
+                    runLines);
+        }
+
+        @Test
         @DisplayName("writes an absent optional as null and never omits the key")
         @DisabledOnOs(value = OS.WINDOWS, disabledReason = "POSIX paths, as above")
         void writesAnAbsentOptionalAsNull() {
@@ -726,7 +795,8 @@ class ManifestWriterTest {
                     () -> assertTrue(document.contains("\"stageId\": null")),
                     () -> assertTrue(document.contains("\"stdout\": null")),
                     () -> assertTrue(document.contains("\"stderr\": null")),
-                    () -> assertFalse(document.contains("\"end\": null")));
+                    () -> assertFalse(document.contains("\"end\": null")),
+                    () -> assertFalse(document.contains("\"durationMillis\": null")));
         }
     }
 

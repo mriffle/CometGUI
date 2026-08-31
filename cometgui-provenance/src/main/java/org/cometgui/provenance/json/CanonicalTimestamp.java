@@ -16,10 +16,12 @@
 
 package org.cometgui.provenance.json;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DecimalStyle;
+import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -57,6 +59,10 @@ import java.util.Objects;
  * provenance timestamp written in Thai digits is a timestamp no tool will parse. The pattern uses
  * {@code uuuu} rather than {@code yyyy} because {@code yyyy} is year-of-era and needs an era to be
  * unambiguous; {@code uuuu} is the proleptic year and is what ISO-8601 means.
+ *
+ * <p>{@link #millisBetween} belongs here for the same reason: a duration written into a document
+ * has to be the one a reader can recompute from the two timestamps printed beside it, which are
+ * truncated. Deriving it anywhere else would eventually derive it from the untruncated instants.
  *
  * <p><strong>Shared, so that the JSON and the report cannot drift.</strong> {@code provenance.json}
  * and {@code provenance.rst} are generated from one model, as {@code R-PROV-05} requires, and two
@@ -104,5 +110,36 @@ public final class CanonicalTimestamp {
     public static String utcMillis(Instant instant) {
         Objects.requireNonNull(instant, "instant");
         return UTC_MILLIS.format(instant);
+    }
+
+    /**
+     * The elapsed milliseconds between two instants <strong>as a reader of the document can
+     * recompute them</strong>.
+     *
+     * <p><strong>Both instants are truncated to milliseconds first, and that is the whole point of
+     * this method existing.</strong> A provenance document carries {@link #utcMillis} renderings,
+     * so a reader validating a recorded duration against the two timestamps beside it has only the
+     * truncated values to work from. Deriving the duration from the raw nanoseconds would produce a
+     * number the document contradicts itself about: for the pinned fixture, a start of {@code
+     * 09:14:00.250999999Z} and an end of {@code 09:48:00.000Z} give 2 039 749 ms from the raw
+     * instants and 2 039 750 ms from what the document actually says. The second is the honest
+     * answer, because the first describes a start the document does not contain.
+     *
+     * <p>Negative results are possible and are not rejected here: the record types already refuse
+     * an end before a start, and a serialiser is the wrong place to re-litigate a model invariant.
+     *
+     * @param start the earlier instant
+     * @param end the later instant
+     * @return the elapsed milliseconds between the two, each truncated to milliseconds first
+     * @throws NullPointerException if either argument is {@code null}
+     * @throws ArithmeticException if the elapsed time overflows a {@code long} of milliseconds,
+     *     which needs instants nearly 300 million years apart
+     */
+    public static long millisBetween(Instant start, Instant end) {
+        Objects.requireNonNull(start, "start");
+        Objects.requireNonNull(end, "end");
+        return Duration.between(
+                        start.truncatedTo(ChronoUnit.MILLIS), end.truncatedTo(ChronoUnit.MILLIS))
+                .toMillis();
     }
 }

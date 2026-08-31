@@ -150,6 +150,120 @@ class CanonicalTimestampTest {
     }
 
     @Nested
+    @DisplayName("The elapsed milliseconds")
+    class ElapsedMillis {
+
+        @Test
+        @DisplayName("are counted from the truncated instants, not from the raw nanoseconds")
+        void areCountedFromTheTruncatedInstants() {
+            // 09:14:00.250999999 to 09:48:00.000 is 2 039 749.000001 ms raw, which truncates to
+            // 2 039 749.  From the two values a DOCUMENT shows -- .250 and .000 -- it is
+            // 33 min 59.750 s, counted by hand as 2 039 750 ms.  A reader can only check the
+            // second, so the second is the answer this method must give, and the one-millisecond
+            // gap is what makes this assertion able to tell the two derivations apart.
+            assertEquals(
+                    2039750L,
+                    CanonicalTimestamp.millisBetween(
+                            Instant.parse("2026-08-31T09:14:00.250999999Z"),
+                            Instant.parse("2026-08-31T09:48:00Z")));
+        }
+
+        @Test
+        @DisplayName("agree with the two rendered timestamps for every fixture in this file")
+        void agreeWithTheRenderedTimestamps() {
+            // 09:15:00.000 to 09:47:30.500 is 32 min 30.5 s; 09:47:31.000 to 09:49:02.125 is
+            // 1 min 31.125 s.  Both counted by hand from the minutes and seconds, not computed.
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    1950500L,
+                                    CanonicalTimestamp.millisBetween(
+                                            Instant.parse("2026-08-31T09:15:00Z"),
+                                            Instant.parse("2026-08-31T09:47:30.500Z"))),
+                    () ->
+                            assertEquals(
+                                    91125L,
+                                    CanonicalTimestamp.millisBetween(
+                                            Instant.parse("2026-08-31T09:47:31Z"),
+                                            Instant.parse("2026-08-31T09:49:02.125Z"))),
+                    () ->
+                            assertEquals(
+                                    0L,
+                                    CanonicalTimestamp.millisBetween(
+                                            Instant.parse("2026-08-31T09:47:31Z"),
+                                            Instant.parse("2026-08-31T09:47:31.000999Z"))),
+                    () ->
+                            assertEquals(
+                                    1L,
+                                    CanonicalTimestamp.millisBetween(
+                                            Instant.parse("2026-08-31T09:47:31Z"),
+                                            Instant.parse("2026-08-31T09:47:31.001Z"))));
+        }
+
+        @Test
+        @DisplayName("survive a Thai-digit default locale and a foreign default zone unchanged")
+        void surviveAHostileEnvironment() {
+            Locale originalDefault = Locale.getDefault();
+            Locale originalFormat = Locale.getDefault(Locale.Category.FORMAT);
+            TimeZone originalZone = TimeZone.getDefault();
+            try {
+                Locale.setDefault(THAI_DIGITS);
+                TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Kiritimati"));
+
+                assertEquals(
+                        2039750L,
+                        CanonicalTimestamp.millisBetween(
+                                Instant.parse("2026-08-31T09:14:00.250999999Z"),
+                                Instant.parse("2026-08-31T09:48:00Z")));
+            } finally {
+                Locale.setDefault(originalDefault);
+                Locale.setDefault(Locale.Category.FORMAT, originalFormat);
+                TimeZone.setDefault(originalZone);
+            }
+        }
+
+        @Test
+        @DisplayName("are negative when the end precedes the start, rather than silently clamped")
+        void areNegativeWhenTheEndPrecedesTheStart() {
+            // The record types refuse an end before a start; a serialiser is the wrong place to
+            // re-litigate that, and a clamp to zero would hide a model defect behind a plausible
+            // number.  Two seconds backwards, counted by hand.
+            assertEquals(
+                    -2000L,
+                    CanonicalTimestamp.millisBetween(
+                            Instant.parse("2026-08-31T09:48:02Z"),
+                            Instant.parse("2026-08-31T09:48:00Z")));
+        }
+
+        @Test
+        @DisplayName("reject a null start or end, naming the parameter")
+        void rejectNullArguments() {
+            Instant nullInstant = deliberateNull();
+            Instant present = Instant.parse("2026-08-31T09:48:00Z");
+
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    "start",
+                                    assertThrows(
+                                                    NullPointerException.class,
+                                                    () ->
+                                                            CanonicalTimestamp.millisBetween(
+                                                                    nullInstant, present))
+                                            .getMessage()),
+                    () ->
+                            assertEquals(
+                                    "end",
+                                    assertThrows(
+                                                    NullPointerException.class,
+                                                    () ->
+                                                            CanonicalTimestamp.millisBetween(
+                                                                    present, nullInstant))
+                                            .getMessage()));
+        }
+    }
+
+    @Nested
     @DisplayName("The zone")
     class Zone {
 
