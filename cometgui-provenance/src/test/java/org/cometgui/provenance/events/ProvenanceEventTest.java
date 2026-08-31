@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -28,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.cometgui.provenance.manifest.ProvenanceSchema;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -268,29 +270,103 @@ class ProvenanceEventTest {
     }
 
     @Test
-    @DisplayName("a payload key that is null, empty or blank is rejected")
-    void payloadKeysAreChecked() {
-        Map<String, String> blankKey = new LinkedHashMap<>();
-        blankKey.put("   ", "value");
-        Map<String, String> emptyKey = new LinkedHashMap<>();
-        emptyKey.put("", "value");
+    @DisplayName("a payload key must be lower-case ASCII, one segment or dotted")
+    void payloadKeysMustMatchThePinnedShape() {
+        assertAll(
+                () -> assertKeyAccepted("status"),
+                () -> assertKeyAccepted("run.id"),
+                () -> assertKeyAccepted("argv.0"),
+                () -> assertKeyAccepted("file.sha256"),
+                () -> assertKeyAccepted("a"),
+                () -> assertKeyAccepted("9"),
+                // A hyphen is legal only after the first dot, exactly as it is for a settings key.
+                () -> assertKeyAccepted("comet.num-threads"),
+                () -> assertKeyRejected("runId"),
+                () -> assertKeyRejected("run_id"),
+                () -> assertKeyRejected("RUN.ID"),
+                () -> assertKeyRejected("Run.Id"),
+                () -> assertKeyRejected("num-threads"),
+                () -> assertKeyRejected("run."),
+                () -> assertKeyRejected(".id"),
+                () -> assertKeyRejected("run..id"),
+                () -> assertKeyRejected("run id"),
+                () -> assertKeyRejected("run.id "),
+                () -> assertKeyRejected(""),
+                () -> assertKeyRejected("   "));
+    }
+
+    @Test
+    @DisplayName("the rejection message names the offending key and the rule it broke")
+    void theKeyRejectionMessageIsPinned() {
+        IllegalArgumentException rejected =
+                assertThrows(
+                        IllegalArgumentException.class, () -> eventWith(Map.of("runId", "R-1")));
+
+        assertEquals(
+                "a payload key must be lower-case ASCII, either one segment or dotted segments,"
+                        + " matching (?:[a-z0-9]+(\\.[a-z0-9-]+)+)|[a-z0-9]+, but was: \"runId\"",
+                rejected.getMessage());
+    }
+
+    @Test
+    @DisplayName("the payload rule contains the settings rule rather than restating it")
+    void thePayloadRuleReusesTheSettingsRule() {
+        assertAll(
+                // Textually derived, so the two namespaces cannot drift: if the settings pattern
+                // changes, the dotted half of the payload pattern changes with it.
+                () ->
+                        assertTrue(
+                                ProvenanceEvent.PAYLOAD_KEY_PATTERN.contains(
+                                        ProvenanceSchema.SETTINGS_KEY_PATTERN),
+                                "the payload rule no longer contains the settings rule"),
+                () ->
+                        assertEquals(
+                                "(?:[a-z0-9]+(\\.[a-z0-9-]+)+)|[a-z0-9]+",
+                                ProvenanceEvent.PAYLOAD_KEY_PATTERN),
+                // Every settings key is a legal payload key, including the one already pinned.
+                () -> assertKeyAccepted(ProvenanceSchema.PERCOLATOR_SEED_SETTING));
+    }
+
+    @Test
+    @DisplayName("the keys this phase owns are exactly these, and every one matches the rule")
+    void thePinnedKeysArePinned() {
+        assertAll(
+                () -> assertEquals("status", ProvenanceEvent.STATUS_KEY),
+                () -> assertEquals("run.id", ProvenanceEvent.RUN_ID_KEY),
+                () -> assertEquals("stage", ProvenanceEvent.STAGE_KEY),
+                () -> assertEquals("tool", ProvenanceEvent.TOOL_KEY),
+                () -> assertEquals("tool.version", ProvenanceEvent.TOOL_VERSION_KEY),
+                () -> assertEquals("file.path", ProvenanceEvent.FILE_PATH_KEY),
+                () -> assertEquals("file.md5", ProvenanceEvent.FILE_MD5_KEY),
+                () -> assertEquals("file.sha256", ProvenanceEvent.FILE_SHA256_KEY),
+                () -> assertEquals("message", ProvenanceEvent.MESSAGE_KEY));
+
+        // The check that makes the convention enforceable rather than aspirational, which is what
+        // ProvenanceSchema asks every phase to do for the keys it adds.
+        for (String key :
+                List.of(
+                        ProvenanceEvent.STATUS_KEY,
+                        ProvenanceEvent.RUN_ID_KEY,
+                        ProvenanceEvent.STAGE_KEY,
+                        ProvenanceEvent.TOOL_KEY,
+                        ProvenanceEvent.TOOL_VERSION_KEY,
+                        ProvenanceEvent.FILE_PATH_KEY,
+                        ProvenanceEvent.FILE_MD5_KEY,
+                        ProvenanceEvent.FILE_SHA256_KEY,
+                        ProvenanceEvent.MESSAGE_KEY)) {
+            assertKeyAccepted(key);
+        }
+    }
+
+    @Test
+    @DisplayName("a null payload key is rejected as null, not as the wrong shape")
+    void aNullPayloadKeyIsRejected() {
         Map<String, String> nullKey = new LinkedHashMap<>();
         nullKey.put(null, "value");
 
-        assertAll(
-                () ->
-                        assertEquals(
-                                "a payload key must not be blank, and one of them is",
-                                assertThrows(
-                                                IllegalArgumentException.class,
-                                                () -> eventWith(blankKey))
-                                        .getMessage()),
-                () -> assertThrows(IllegalArgumentException.class, () -> eventWith(emptyKey)),
-                () ->
-                        assertEquals(
-                                "a payload key",
-                                assertThrows(NullPointerException.class, () -> eventWith(nullKey))
-                                        .getMessage()));
+        assertEquals(
+                "a payload key",
+                assertThrows(NullPointerException.class, () -> eventWith(nullKey)).getMessage());
     }
 
     @Test
@@ -387,6 +463,23 @@ class ProvenanceEventTest {
                                         WHEN,
                                         ProvenanceEventType.RUN_STARTED,
                                         Map.of("run.id", "R-2"))));
+    }
+
+    private static void assertKeyAccepted(String key) {
+        assertEquals(
+                Map.of(key, "value"),
+                eventWith(Map.of(key, "value")).payload(),
+                "the key \"" + key + "\" was rejected");
+    }
+
+    private static void assertKeyRejected(String key) {
+        Map<String, String> payload = new LinkedHashMap<>();
+        payload.put(key, "value");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> eventWith(payload),
+                "the key \"" + key + "\" was accepted");
     }
 
     private static ProvenanceEvent eventWith(Map<String, String> payload) {

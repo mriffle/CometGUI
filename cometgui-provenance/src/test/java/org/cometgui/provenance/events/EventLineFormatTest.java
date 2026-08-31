@@ -123,19 +123,39 @@ class EventLineFormatTest {
     }
 
     @Test
-    @DisplayName("a key is escaped exactly as a value is")
-    void keysAreEscapedToo() {
+    @DisplayName("a key goes through the same quoting as a value")
+    void keysAreQuotedLikeValues() {
         ProvenanceEvent event =
                 new ProvenanceEvent(
                         2L,
                         Instant.parse("2026-08-31T09:15:00.000Z"),
                         ProvenanceEventType.FILE_HASHED,
-                        Map.of("a\"b\nc", "1"));
+                        Map.of("file.path", "/data/a.mzML"));
 
         assertEquals(
                 "{\"seq\":2,\"time\":\"2026-08-31T09:15:00.000Z\",\"type\":\"file.hashed\","
-                        + "\"payload\":{\"a\\\"b\\nc\":\"1\"}}",
+                        + "\"payload\":{\"file.path\":\"/data/a.mzML\"}}",
                 EventLineFormat.toLine(event));
+    }
+
+    @Test
+    @DisplayName("an escaped key is decoded first and judged second")
+    void anEscapedKeyIsDecodedThenJudged() throws MalformedEventLineException {
+        // No key this writer produces needs an escape -- the shape rule allows only lower-case
+        // ASCII, digits, dots and hyphens -- but a file found on disk was not necessarily written
+        // by this build, so the reader decodes the escape and then applies the same rule to the
+        // result.  \u0061 is 'a' and decodes to a legal key; \u0041 is 'A' and does not.
+        String legal =
+                "{\"seq\":1,\"time\":\"2026-08-31T09:15:00.000Z\",\"type\":\"run.started\","
+                        + "\"payload\":{\"k\\u0061y\":\"v\"}}";
+
+        assertEquals(Map.of("kay", "v"), EventLineFormat.parse(legal).payload());
+        assertMalformed(
+                "{\"seq\":1,\"time\":\"2026-08-31T09:15:00.000Z\",\"type\":\"run.started\","
+                        + "\"payload\":{\"k\\u0041y\":\"v\"}}",
+                "a record this application would not have written: a payload key must be"
+                        + " lower-case ASCII, either one segment or dotted segments, matching"
+                        + " (?:[a-z0-9]+(\\.[a-z0-9-]+)+)|[a-z0-9]+, but was: \"kAy\"");
     }
 
     @Test
@@ -163,7 +183,7 @@ class EventLineFormatTest {
     void unicodeEscapesAreDecoded() throws MalformedEventLineException {
         String line =
                 "{\"seq\":1,\"time\":\"2026-08-31T09:15:00.000Z\",\"type\":\"run.started\","
-                        + "\"payload\":{\"k\\u0041y\":\"v\\u00B5\\/w\","
+                        + "\"payload\":{\"k\\u0061y\":\"v\\u00B5\\/w\","
                         + "\"z\":\"\\u00b5\",\"lower\":\"\\u09af\","
                         + "\"upper\":\"\\u09AF\"}}";
 
@@ -172,7 +192,7 @@ class EventLineFormatTest {
         // by anything else.  The two four-digit escapes below spell 0, 9, a, f, A and F between
         // them, which are the six characters the three hexadecimal ranges end on.
         assertEquals(
-                Map.of("kAy", "v\u00b5/w", "z", "\u00b5", "lower", "\u09af", "upper", "\u09af"),
+                Map.of("kay", "v\u00b5/w", "z", "\u00b5", "lower", "\u09af", "upper", "\u09af"),
                 EventLineFormat.parse(line).payload());
     }
 
@@ -413,7 +433,10 @@ class EventLineFormatTest {
                                         + "\"type\":\"run.started\","
                                         + "\"payload\":{\" \":\"1\"}}",
                                 "a record this application would not have written: a payload key"
-                                        + " must not be blank, and one of them is"));
+                                        + " must be lower-case ASCII, either one segment or dotted"
+                                        + " segments, matching"
+                                        + " (?:[a-z0-9]+(\\.[a-z0-9-]+)+)|[a-z0-9]+, but was:"
+                                        + " \" \""));
     }
 
     @Test

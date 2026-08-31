@@ -81,10 +81,11 @@ class ProvenanceEventLogTest {
                     "{\"seq\":2,\"time\":\"2026-08-31T09:15:01.000Z\",\"type\":\"stage.started\","
                             + "\"payload\":{\"stage\":\"comet\"}}",
                     "{\"seq\":3,\"time\":\"2026-08-31T09:15:02.000Z\",\"type\":\"tool.invoked\","
-                            + "\"payload\":{\"tool\":\"comet\",\"version\":\"2026.02.2\"}}",
+                            + "\"payload\":{\"tool\":\"comet\","
+                            + "\"tool.version\":\"2026.02.2\"}}",
                     "{\"seq\":4,\"time\":\"2026-08-31T09:15:03.000Z\",\"type\":\"file.hashed\","
-                            + "\"payload\":{\"md5\":\"d41d8cd98f00b204e9800998ecf8427e\","
-                            + "\"path\":\"/data/HeLa.mzML\"}}",
+                            + "\"payload\":{\"file.md5\":\"d41d8cd98f00b204e9800998ecf8427e\","
+                            + "\"file.path\":\"/data/HeLa.mzML\"}}",
                     "{\"seq\":5,\"time\":\"2026-08-31T09:15:04.000Z\",\"type\":\"warning.raised\","
                             + "\"payload\":{\"message\":\"Percolator 3.09 cannot write XML\"}}",
                     "{\"seq\":6,\"time\":\"2026-08-31T09:15:05.000Z\",\"type\":\"stage.finished\","
@@ -96,12 +97,12 @@ class ProvenanceEventLogTest {
      * The file's length after each of the seven appends, counted independently.
      *
      * <p>{@code python3 -c} over the seven literals above, cross-checked with {@code wc -c} on the
-     * file they make: 104, 199, 314, 457, 582, 699, 798. These are the numbers a force is expected
+     * file they make: 104, 199, 319, 472, 597, 714, 813. These are the numbers a force is expected
      * to see, which is what makes "the bytes were written before the force" an assertion rather
      * than a claim.
      */
     private static final List<Long> EXPECTED_SIZES_AT_FORCE =
-            List.of(104L, 199L, 314L, 457L, 582L, 699L, 798L);
+            List.of(104L, 199L, 319L, 472L, 597L, 714L, 813L);
 
     @TempDir private Path directory;
 
@@ -118,7 +119,7 @@ class ProvenanceEventLogTest {
         assertAll(
                 () -> assertEquals(expected, Files.readString(log, UTF_8)),
                 () -> assertArrayEquals(expected.getBytes(UTF_8), Files.readAllBytes(log)),
-                () -> assertEquals(798L, Files.size(log)),
+                () -> assertEquals(813L, Files.size(log)),
                 () ->
                         assertFalse(
                                 Files.readString(log, UTF_8).contains("\r"),
@@ -370,7 +371,9 @@ class ProvenanceEventLogTest {
                                         for (int event = 0; event < perThread; event++) {
                                             events.append(
                                                     ProvenanceEventType.FILE_HASHED,
-                                                    Map.of("path", "/data/spectra.mzML"));
+                                                    Map.of(
+                                                            ProvenanceEvent.FILE_PATH_KEY,
+                                                            "/data/spectra.mzML"));
                                         }
                                     } catch (Throwable thrown) {
                                         failure.compareAndSet(null, thrown);
@@ -573,19 +576,24 @@ class ProvenanceEventLogTest {
      */
     private static void appendTheWholeRun(ProvenanceEventLog events, List<Long> sizesOnDisk)
             throws IOException {
+        // Built through the pinned key constants, so that a rename of one of them fails against
+        // the hand-typed lines above instead of silently changing the format.
         Map<String, String> tool = new LinkedHashMap<>();
-        tool.put("version", "2026.02.2");
-        tool.put("tool", "comet");
+        tool.put(ProvenanceEvent.TOOL_VERSION_KEY, "2026.02.2");
+        tool.put(ProvenanceEvent.TOOL_KEY, "comet");
         Map<String, String> hashed = new LinkedHashMap<>();
-        hashed.put("path", "/data/HeLa.mzML");
-        hashed.put("md5", "d41d8cd98f00b204e9800998ecf8427e");
+        hashed.put(ProvenanceEvent.FILE_PATH_KEY, "/data/HeLa.mzML");
+        hashed.put(ProvenanceEvent.FILE_MD5_KEY, "d41d8cd98f00b204e9800998ecf8427e");
         Map<String, String> stageFinished = new LinkedHashMap<>();
-        stageFinished.put("status", ProvenanceStatus.COMPLETED.wireName());
-        stageFinished.put("stage", "comet");
+        stageFinished.put(ProvenanceEvent.STATUS_KEY, ProvenanceStatus.COMPLETED.wireName());
+        stageFinished.put(ProvenanceEvent.STAGE_KEY, "comet");
 
-        events.append(ProvenanceEventType.RUN_STARTED, Map.of("run.id", "R-2026-08-31-01"));
+        events.append(
+                ProvenanceEventType.RUN_STARTED,
+                Map.of(ProvenanceEvent.RUN_ID_KEY, "R-2026-08-31-01"));
         sizesOnDisk.add(Files.size(events.path()));
-        events.append(ProvenanceEventType.STAGE_STARTED, Map.of("stage", "comet"));
+        events.append(
+                ProvenanceEventType.STAGE_STARTED, Map.of(ProvenanceEvent.STAGE_KEY, "comet"));
         sizesOnDisk.add(Files.size(events.path()));
         events.append(ProvenanceEventType.TOOL_INVOKED, tool);
         sizesOnDisk.add(Files.size(events.path()));
@@ -593,7 +601,7 @@ class ProvenanceEventLogTest {
         sizesOnDisk.add(Files.size(events.path()));
         events.append(
                 ProvenanceEventType.WARNING_RAISED,
-                Map.of("message", "Percolator 3.09 cannot write XML"));
+                Map.of(ProvenanceEvent.MESSAGE_KEY, "Percolator 3.09 cannot write XML"));
         sizesOnDisk.add(Files.size(events.path()));
         events.append(ProvenanceEventType.STAGE_FINISHED, stageFinished);
         sizesOnDisk.add(Files.size(events.path()));

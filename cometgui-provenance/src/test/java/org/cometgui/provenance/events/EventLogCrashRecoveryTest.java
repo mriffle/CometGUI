@@ -64,7 +64,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class EventLogCrashRecoveryTest {
 
-    /** The four lines the fixture run writes, hand-typed. Lengths: 91, 94, 92, 98. */
+    /** The four lines the fixture run writes, hand-typed. Lengths: 91, 94, 92, 103. */
     private static final List<String> LINES =
             List.of(
                     "{\"seq\":1,\"time\":\"2026-08-31T09:15:00.000Z\",\"type\":\"run.started\","
@@ -74,16 +74,16 @@ class EventLogCrashRecoveryTest {
                     "{\"seq\":3,\"time\":\"2026-08-31T09:15:02.000Z\",\"type\":\"tool.invoked\","
                             + "\"payload\":{\"tool\":\"comet\"}}",
                     "{\"seq\":4,\"time\":\"2026-08-31T09:15:03.000Z\",\"type\":\"file.hashed\","
-                            + "\"payload\":{\"path\":\"/data/a.mzML\"}}");
+                            + "\"payload\":{\"file.path\":\"/data/a.mzML\"}}");
 
-    /** Where each line ends, counted independently: 92, 187, 280, 379. */
+    /** Where each line ends, counted independently with python3: 92, 187, 280, 384. */
     private static final long END_OF_LINE_ONE = 92L;
 
     private static final long END_OF_LINE_TWO = 187L;
 
     private static final long END_OF_LINE_THREE = 280L;
 
-    private static final long END_OF_LINE_FOUR = 379L;
+    private static final long END_OF_LINE_FOUR = 384L;
 
     /** The first three events, as they must come back from every torn variant. Hand-typed. */
     private static final List<ProvenanceEvent> FIRST_THREE =
@@ -107,7 +107,7 @@ class EventLogCrashRecoveryTest {
     @TempDir private Path directory;
 
     @Test
-    @DisplayName("the fixture run really does write these four lines and 379 bytes")
+    @DisplayName("the fixture run really does write these four lines and 384 bytes")
     void theFixtureIsWhatThisFileSaysItIs() throws IOException {
         Path log = writeTheRun();
 
@@ -158,7 +158,7 @@ class EventLogCrashRecoveryTest {
                                                 4L,
                                                 END_OF_LINE_THREE,
                                                 "the record starting here has no terminating"
-                                                        + " newline; its length on disk is 98")),
+                                                        + " newline; its length on disk is 103")),
                                 recovered.defects()),
                 () -> assertEquals(3, recovered.events().size()));
     }
@@ -391,7 +391,9 @@ class EventLogCrashRecoveryTest {
                     events.append(ProvenanceEventType.STAGE_STARTED, Map.of("stage", "comet")));
             asWritten.add(events.append(ProvenanceEventType.TOOL_INVOKED, Map.of("tool", "comet")));
             asWritten.add(
-                    events.append(ProvenanceEventType.FILE_HASHED, Map.of("path", "/data/a.mzML")));
+                    events.append(
+                            ProvenanceEventType.FILE_HASHED,
+                            Map.of(ProvenanceEvent.FILE_PATH_KEY, "/data/a.mzML")));
         }
         truncateTo(log, END_OF_LINE_THREE + 5);
 
@@ -413,7 +415,9 @@ class EventLogCrashRecoveryTest {
             events.append(ProvenanceEventType.RUN_STARTED, Map.of("run.id", "R-1"));
             events.append(ProvenanceEventType.STAGE_STARTED, Map.of("stage", "comet"));
             events.append(ProvenanceEventType.TOOL_INVOKED, Map.of("tool", "comet"));
-            events.append(ProvenanceEventType.FILE_HASHED, Map.of("path", "/data/a.mzML"));
+            events.append(
+                    ProvenanceEventType.FILE_HASHED,
+                    Map.of(ProvenanceEvent.FILE_PATH_KEY, "/data/a.mzML"));
         }
         return log;
     }

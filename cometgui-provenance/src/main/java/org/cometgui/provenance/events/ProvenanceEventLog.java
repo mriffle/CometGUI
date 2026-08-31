@@ -87,10 +87,17 @@ import org.cometgui.domain.secrets.SecretRedactor;
  * that no caller can deadlock a run by locking the log -- which keeps the sequence counter, the
  * write and the force one indivisible step. The process service reads a tool's stdout and stderr on
  * their own threads and both will record events, so this is not theoretical: two unsynchronised
- * appends could hand out the same sequence number or interleave their bytes. What it does
- * <em>not</em> make safe is two {@code ProvenanceEventLog} instances open on the same path, in this
- * process or another: each would keep its own counter and the file would end up with duplicate
- * numbers.
+ * appends could hand out the same sequence number or interleave their bytes.
+ *
+ * <p><strong>What it does not make safe, stated plainly so that a later phase meets a documented
+ * boundary rather than a bug.</strong> Two {@code ProvenanceEventLog} instances open on the same
+ * path -- two in this JVM, or one in each of two processes -- each keep their own sequence counter,
+ * so the file ends up with two events numbered 4 and none numbered 5, and {@link
+ * ProvenanceEventLogReader} reports that as a sequence gap it cannot unpick. The monitor here is a
+ * JVM object and cannot see another process. A run that needs several processes to write one log
+ * needs a lock file around the whole open-append-close cycle, and that is a design decision for the
+ * phase that needs it, not something this class can paper over: open one log per file, and pass the
+ * instance around.
  */
 public final class ProvenanceEventLog implements AutoCloseable {
 

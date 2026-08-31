@@ -22,6 +22,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
+import org.cometgui.provenance.manifest.ProvenanceSchema;
 import org.cometgui.provenance.manifest.ProvenanceStatus;
 
 /**
@@ -85,6 +87,75 @@ public record ProvenanceEvent(
      */
     public static final String STATUS_KEY = "status";
 
+    /** The run this event belongs to, on a {@link ProvenanceEventType#RUN_STARTED} event. */
+    public static final String RUN_ID_KEY = "run.id";
+
+    /** Which stage started or finished, on a {@code stage.started} or {@code stage.finished}. */
+    public static final String STAGE_KEY = "stage";
+
+    /** The name of the tool that was launched, on a {@code tool.invoked} event. */
+    public static final String TOOL_KEY = "tool";
+
+    /**
+     * The version of that tool, on a {@code tool.invoked} event.
+     *
+     * <p>Namespaced under {@code tool} rather than a bare {@code version}, because a provenance
+     * document already carries several versions -- the schema's, the application's -- and a reader
+     * scanning a log line should not have to know which one a bare word meant.
+     */
+    public static final String TOOL_VERSION_KEY = "tool.version";
+
+    /** The absolute path of the file that was hashed, on a {@code file.hashed} event. */
+    public static final String FILE_PATH_KEY = "file.path";
+
+    /** That file's MD5, on a {@code file.hashed} event. */
+    public static final String FILE_MD5_KEY = "file.md5";
+
+    /** That file's SHA-256, on a {@code file.hashed} event. */
+    public static final String FILE_SHA256_KEY = "file.sha256";
+
+    /** What the run must tell the scientist, on a {@code warning.raised} event. */
+    public static final String MESSAGE_KEY = "message";
+
+    /**
+     * The shape every payload key must have: {@value}.
+     *
+     * <p><strong>Why a shape rather than a closed list, and why this shape.</strong> The payload is
+     * the second open namespace in the provenance format, and {@code
+     * ProvenanceSchema#SETTINGS_KEY_PATTERN} already answers the question for the first one: this
+     * phase does not own the semantics later phases will record, so it pins the <em>shape</em> of a
+     * key instead of guessing at its name. Without that rule phases 05, 08 and 09 would each write
+     * {@code runId}, {@code run_id} and {@code run.id}, all three would be accepted, and a reader
+     * looking for one of them would silently miss the other two. With it, a phase either matches
+     * the convention or fails a test.
+     *
+     * <p>The dotted half of this pattern <em>is</em> {@code ProvenanceSchema#SETTINGS_KEY_PATTERN},
+     * referenced rather than copied, so that the two namespaces cannot drift apart: every settings
+     * key is a legal payload key by construction.
+     *
+     * <p><strong>The one relaxation: a single bare segment is also legal.</strong> A settings key
+     * must have at least two segments because the settings map is one flat dictionary shared by
+     * every phase in a run -- Percolator's seed, the Limelight conversion parameters, the result
+     * view's filters all live in it, so a bare {@code seed} there would be ambiguous about which
+     * tool it belonged to, and the first segment is what disambiguates it. A payload is not that.
+     * It is scoped to one event, and that event already carries its {@link ProvenanceEventType}: a
+     * {@code stage} key inside a {@code stage.started} event cannot collide with anything, and
+     * spelling it {@code stage.name} would only restate the type. So the namespacing requirement is
+     * dropped and the anti-drift rule -- lower-case ASCII, digits, dots and hyphens, no underscore,
+     * no camel case, no spaces, no empty segment -- is kept in full, which is the half that was
+     * doing the work.
+     *
+     * <p><strong>Each phase pins its own keys as constants beside {@link #STATUS_KEY}</strong>, the
+     * way {@code ProvenanceSchema} asks for settings keys, and asserts them against this pattern in
+     * its own tests. The nine above are the ones the seven event types imply and are this phase's
+     * to fix; a stage's own vocabulary is not.
+     */
+    public static final String PAYLOAD_KEY_PATTERN =
+            "(?:" + ProvenanceSchema.SETTINGS_KEY_PATTERN + ")|[a-z0-9]+";
+
+    /** The compiled form of {@link #PAYLOAD_KEY_PATTERN}, so the rule has one source of truth. */
+    private static final Pattern PAYLOAD_KEY = Pattern.compile(PAYLOAD_KEY_PATTERN);
+
     /** The earliest instant the fixed-width wire timestamp can represent. */
     private static final Instant EARLIEST = Instant.parse("0000-01-01T00:00:00Z");
 
@@ -99,8 +170,9 @@ public record ProvenanceEvent(
      *     null}, or if any payload key or value is {@code null}
      * @throws IllegalArgumentException if {@code sequence} is below {@link #FIRST_SEQUENCE}, if the
      *     timestamp falls outside the four-digit-year range the wire format can represent, if a
-     *     payload key is blank, or if a {@link ProvenanceEventType#RUN_FINISHED} event does not
-     *     carry a terminal status under {@link #STATUS_KEY}
+     *     payload key does not match {@link #PAYLOAD_KEY_PATTERN}, or if a {@link
+     *     ProvenanceEventType#RUN_FINISHED} event does not carry a terminal status under {@link
+     *     #STATUS_KEY}
      */
     public ProvenanceEvent {
         if (sequence < FIRST_SEQUENCE) {
@@ -180,9 +252,14 @@ public record ProvenanceEvent(
         Map<String, String> sorted = new TreeMap<>();
         for (Map.Entry<String, String> entry : payload.entrySet()) {
             String key = Objects.requireNonNull(entry.getKey(), "a payload key");
-            if (key.isBlank()) {
+            if (!PAYLOAD_KEY.matcher(key).matches()) {
                 throw new IllegalArgumentException(
-                        "a payload key must not be blank, and one of them is");
+                        "a payload key must be lower-case ASCII, either one segment or dotted"
+                                + " segments, matching "
+                                + PAYLOAD_KEY_PATTERN
+                                + ", but was: \""
+                                + key
+                                + "\"");
             }
             String value = entry.getValue();
             Objects.requireNonNull(value, () -> "the payload value of \"" + key + "\"");
@@ -194,12 +271,19 @@ public record ProvenanceEvent(
     /**
      * Enforces the one rule a type places on its payload: a finished run names how it finished.
      *
-     * <p><strong>No rejected value is ever quoted in these messages.</strong> The reader builds
-     * events out of lines it found in a file, and a damaged or foreign file's bytes are not
+     * <p><strong>No rejected <em>value</em> is ever quoted in these messages.</strong> The reader
+     * builds events out of lines it found in a file, and a damaged or foreign file's bytes are not
      * necessarily ones this application wrote and redacted. A message that echoed the offending
      * value would put unredacted file content into an exception, a log line and a UI, which is the
-     * leak the whole package exists to prevent. The messages therefore name the field and the rule,
-     * never the content.
+     * leak the whole package exists to prevent. The messages here therefore name the field and the
+     * rule, never the content.
+     *
+     * <p>A rejected payload <em>key</em> is quoted, and the distinction is the redaction rule set's
+     * own: {@code SecretRedactor.redactEnvironment} never redacts a name and always redacts a
+     * value, because "a variable whose name I will not tell you was set to a value I will not tell
+     * you" records nothing. {@code ProvenanceManifest} quotes a rejected settings key for the same
+     * reason. The quoted text is what makes the message useful to the phase author who wrote {@code
+     * runId} at a call site, which is where nearly every one of these rejections happens.
      *
      * @param type the event type
      * @param payload the already-sorted payload
