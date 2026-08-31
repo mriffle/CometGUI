@@ -370,6 +370,65 @@ touch the same files; the file list for each unit is fixed by the brief.
      - ``R-TEST-02``
      - pending
 
+.. _p04-schema-decisions:
+
+Schema decisions taken at unit 4, which later phases inherit
+============================================================
+
+Unit 4 raised six design questions rather than answering them alone. All six
+are recorded here because a schema decision is cheap before unit 7 pins the
+JSON and costs a schema-version bump afterwards.
+
+Optional artefact identity, and an inverse wire-name lookup
+    Both accepted as submitted. A *local* binary the user pointed at has no
+    upstream artefact, and a required field would put a ``"local"`` sentinel --
+    a lie -- into the record; the ``managed`` flag already carries that fact.
+    ``fromWireName`` lives beside the wire names so that unit 9's reader cannot
+    grow a second, drifting table.
+
+A stage identifier goes in **now**
+    ``ToolRecord`` gains ``Optional<String> stageId``. The phase document's own
+    purpose statement decides this: the provenance model is "written before the
+    stages that emit events, so that no stage can be built without recording
+    itself. Provenance retrofitted at the end is provenance with holes." It
+    holds the ``StageTag.id()`` string rather than the domain type, so the
+    manifest package stays free of the workflow's types, and it is absent for
+    an invocation outside any stage such as a capability probe.
+
+Settings keys are validated in shape, not invented in name
+    Unit 4 was right that only ``percolator.seed`` being pinned invites exactly
+    the drift ``AC-PRV-10`` describes. But this phase does not own the
+    semantics of the q-filter or Limelight settings, and a wrongly pinned key
+    is worse than an unpinned one. So the *shape* is gated instead: every key
+    must match ``[a-z0-9]+(\.[a-z0-9-]+)+``, rejected by name otherwise, and
+    ``ProvenanceSchema`` documents that each phase pins its own constant
+    beside the seed. Later phases get a rule they cannot drift from without
+    failing a test.
+
+Both locales are recorded, not one
+    The sharpest question in the phase so far. ``R-PROV-04`` says to record
+    "the JVM default locale", and gives its reason: "precisely because locale
+    can affect serialisation (``R-PARAM-11``)". But the category that actually
+    governs number formatting is ``Locale.Category.FORMAT``, so a record
+    carrying only ``Locale.getDefault()`` records the thing the requirement
+    *names* while missing the thing it is *for*. ``ApplicationRecord``
+    therefore carries both, and the test sets them apart with
+    ``Locale.setDefault(Locale.Category.FORMAT, ...)`` alone -- an assertion
+    that is impossible to pass with a single field. They agree today because
+    nothing in the product separates them; the record does not assume it.
+
+An out-copy defect is gated by SpotBugs, not by JUnit -- and that is honest
+    Unit 4 injected the defect I asked for, returning the field instead of a
+    copy from ``ToolRecord.capabilities()``, and reported that **the whole
+    suite passed**. It is right: the field is already an unmodifiable sorted
+    set, so returning it is behaviourally indistinguishable. What caught it was
+    ``mvn verify``'s SpotBugs step, ``EI_EXPOSE_REP ... may expose internal
+    representation``. No JUnit guard was added, because ``List.copyOf`` on an
+    already-immutable list returns the same instance and ``assertNotSame``
+    would fail on *correct* code. The gate is real; it is simply a static
+    analyser rather than a test, and that is worth knowing before someone
+    "strengthens" it.
+
 Rejections and rework
 =====================
 
