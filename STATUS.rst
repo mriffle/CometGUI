@@ -1028,6 +1028,76 @@ refused the exclusion on the grounds that it would weaken a shared gate to make
 its own code pass, and reported the decision rather than asking; tier 1 endorsed
 it and made it binding on Phase 03 so the tree carries one convention.
 
+.. _status-injection-must-land:
+
+A sixth shape: the defect stopped working, not the assertion
+-------------------------------------------------------------
+
+Phase 04's unit 5 found the most useful harness lesson of the session, and it
+applies to every falsifiability claim this project makes.
+
+Two agents wrote their injection script to ``inject.py`` in the **same shared
+scratchpad directory**. Two of unit 5's injections then executed the other
+agent's script, changed nothing, and the test suite went green -- so the honest
+report was *"I injected the defect and the tests still passed"*. That sentence is
+**indistinguishable from "the gate is weak"** unless the edit is proven to have
+landed. It was caught only because two defects that had previously *failed*
+suddenly passed, which is the one signature that cannot be explained away.
+
+This is the family's sixth shape and the first where the thing that quietly
+stopped working was the **defect** rather than the **assertion**:
+
+#. a rule that evaluates nothing (Phase 01);
+#. an expected value computed by the code under test (Phase 02);
+#. a property proved through a seam production need not use (Phase 04 unit 1);
+#. an assertion too coarse to see a partial failure (Phase 04 unit 3);
+#. an input set too narrow to see it (Phase 04 unit 3, again);
+#. **an injection that never landed** (Phase 04 unit 5).
+
+**The rule, now standing for every tier including tier 1.** An injection is
+evidence only if the edited file is confirmed to have changed:
+
+* assert the anchor text occurs **exactly once** before writing. Several classes
+  here match a naive replace in more than one place, or in a **Javadoc example**
+  rather than in code -- and a Javadoc-only hit changes no behaviour, so it
+  produces a false "the gate is weak" verdict;
+* print a marker and ``grep`` it back out of the target file before running
+  anything;
+* restore from a per-injection backup and verify with ``sha256sum -c``, not by
+  eye and not by ``git diff`` alone;
+* use a **per-agent scratchpad subdirectory**. Sibling subagents share one
+  scratchpad root, so unique paths are not optional. The main orchestrator's own
+  injection plan survived this only by having an unusual filename, which is luck
+  rather than method;
+* if a defect that previously failed suddenly passes, suspect the injection
+  before suspecting the gate.
+
+.. _status-hash-cache-windows:
+
+The hash cache is deliberately inert on Windows
+------------------------------------------------
+
+Phase 04 unit 5 keys the input-hash cache on a **fifth** attribute beyond
+``R-PROV-02``'s four: the POSIX inode change time ``unix:ctime``. That is a
+strengthening -- strictly more invalidation, never less -- and it is what makes
+gate item 3's same-size, same-mtime, same-inode mutation **detected** rather than
+merely survived, because user space cannot forge ``ctime``.
+
+The consequence, which is a real product behaviour and not an implementation
+detail: **on Windows neither file identity nor ``ctime`` is available, so the
+cache stores nothing at all.** The design caches nothing rather than caching
+something it cannot validate, which is the phase document's "if in doubt,
+rehash" implemented literally, and it is the right call for a correctness
+mechanism.
+
+**For the owner and for Phase 15.** Every run therefore rehashes every input on
+one of the three tier-1 platforms. For a multi-gigabyte mzML that is a
+measurable cost, and it is the kind of thing a performance phase should meet as
+a documented decision rather than as a surprise. It also compounds the standing
+risk that no Windows binary in this project has ever been executed
+(:ref:`status-session-04`), so the behaviour is currently reasoned rather than
+observed.
+
 Baseline gate run
 -----------------
 
