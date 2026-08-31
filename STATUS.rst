@@ -898,17 +898,50 @@ argument. The first two are hazards with cheap workarounds
 wrote ``SecretNames`` and ``SecretValues`` in ``cometgui-process``; Phase 04
 wrote ``SecretRedactor`` and ``SecretRegistry`` in ``cometgui-provenance``.
 Those modules are **siblings** -- each depends on ``cometgui-domain``, neither
-on the other -- so neither orchestrator could see the other's work, and each was
-correctly staying inside the paths it had been given. Within hours the two
-keyword lists had **already diverged**: Phase 03's carried ``signature`` and
-``limelightkey`` and Phase 04's did not, so a value named ``...signature...``
-would have been redacted in the process log and **not** in the provenance
-record. That is exactly the silent, security-relevant drift ``R-SEC-03`` exists
-to prevent, and it falsified Phase 04's own gate wording, "driven by **one**
-rule set".
+on the other -- so neither could *use* the other's implementation. The two
+keyword lists diverged by one entry: Phase 03's carried ``signature`` and Phase
+04's did not, so a value named ``...signature...`` would have been redacted in
+the process log and **not** in the provenance record. Phase 04 confirmed the gap
+was real -- ``REQUEST_SIGNATURE`` matched nothing in its twelve keywords. That is
+the silent, security-relevant drift ``R-SEC-03`` exists to prevent, and two rule
+sets falsify Phase 04's own gate wording, "driven by **one** rule set".
 
-It was caught only because tier 1 read the working tree rather than either
-phase's report -- neither report was wrong, and neither could have been.
+.. note::
+
+   **Two corrections to this entry, both recorded because the first draft was
+   unfair to Phase 03.**
+
+   *One keyword, not two.* This entry first claimed the lists differed by
+   ``signature`` **and** ``limelightkey``. Wrong: Phase 03's
+   ``BUILT_IN_KEYWORDS`` holds thirteen entries and ``limelightkey`` appears
+   only in a Javadoc example at ``SecretNames.java:145`` illustrating that
+   caller-added names are normalised. The error came from grepping quoted
+   strings out of a whole file, Javadoc included -- the same class of mistake
+   this project keeps cataloguing, a measurement that did not measure what it
+   claimed to. ``limelightkey`` was added to the merged set anyway, on tier 1's
+   Phase 12 reasoning rather than Phase 03's.
+
+   *Phase 03 saw it, and said so.* This entry first said neither orchestrator
+   could see the other's work and that neither report was wrong "and neither
+   could have been". Phase 03 could and did: it named its class
+   ``ProcessRedactor`` rather than ``SecretRedactor`` **deliberately**, recorded
+   that ``org.cometgui.provenance.redaction.SecretRedactor`` already existed and
+   that ``cometgui-process`` depends on ``cometgui-domain`` alone so it could not
+   use it, predicted the import collision a future workflow engine would hit
+   holding both at once, and wrote that "merging the two -- most plausibly by
+   moving the shared rules into ``cometgui-domain`` -- is an architectural
+   decision, and it belongs to whoever owns both phases." That is the correct
+   escalation and it names the exact resolution tier 1 then issued.
+
+   **What actually failed was the escalation PATH, not the analysis.** The
+   finding reached tier 1 as a Javadoc comment in a source file rather than as a
+   message, so it was found by reading the working tree and could as easily have
+   been missed. The rule that follows: **a cross-phase architectural finding is
+   escalated upward as a report, not left as a comment in the code that
+   contains it.** The one-at-a-time rule still stands -- serial phases would have
+   made the second implementation unnecessary rather than merely well-labelled --
+   but it stands on the cost of the duplication, not on any claim that the
+   phases were blind to it.
 
 **The general lesson: file-level disjointness is not design-level
 disjointness.** Two agents can respect every path boundary and still build the
@@ -931,6 +964,18 @@ registry is empty so a 500 MB flood pays nothing for a feature no tool in the
 workflow uses. The merged keyword list must be the considered **union**; a
 rejection of ``signature`` or ``limelightkey`` must be argued in the worklog,
 not made by omission.
+
+**Landed 2026-08-31** at ``b0e7122``, in ``org.cometgui.domain.secrets``, and
+verified by tier 1 rather than accepted on report: the package exists, the merged
+list is fourteen keywords, and ``cometgui-domain`` moved from 152 mutations
+across five packages to 204 across six, with the new package contributing
+exactly the 52 that ``org.cometgui.provenance.redaction`` contributed before the
+move -- so the suite followed the code rather than quietly ceasing to measure it.
+One divergence survived the merge and was caught on inspection: the two classes
+disagree on the marker string (``[REDACTED]`` against ``***REDACTED***``), which
+would have printed one string in the console log and another in the provenance
+record for the same secret. Phase 03 was directed to resolve it to a single
+constant asserted by a test.
 
 .. _status-concurrent-maven:
 
