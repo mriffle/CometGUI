@@ -31,20 +31,27 @@ import org.cometgui.domain.ports.HashService;
  * The {@link HashService} the provenance record is built on: MD5 and SHA-256 computed together, in
  * one pass, over a file of any size.
  *
- * <p><strong>One pass, one buffer.</strong> {@code R-PROV-01} forbids reading a file into memory to
- * hash it and {@code R-PROV-03} requires both digests from a single pass, and those two rules are
- * the whole design. The file is opened once; each chunk is read into one reusable {@code byte[]} of
- * {@link #BUFFER_SIZE} bytes; and <em>both</em> digests are updated from that chunk before the next
- * read overwrites it. Heap use is therefore constant in the size of the file -- a 2 GB spectrum
- * file costs the same {@value #BUFFER_SIZE} bytes as a 2 kB parameter file -- and the disk is read
- * once, not twice. Hashing the same file twice, once per algorithm, would double the I/O on exactly
- * the files where I/O dominates.
+ * <p><strong>One open, one pass, one buffer.</strong> {@code R-PROV-01} forbids reading a file into
+ * memory to hash it and {@code R-PROV-03} requires both digests from a single pass, and those two
+ * rules are the whole design. The file is opened <em>once</em>; each chunk is read into one
+ * reusable {@code byte[]} of {@link #BUFFER_SIZE} bytes; and <em>both</em> digests are updated from
+ * that chunk before the next read overwrites it. Heap use is therefore constant in the size of the
+ * file -- a 2 GB spectrum file costs the same {@value #BUFFER_SIZE} bytes as a 2 kB parameter file
+ * -- and the disk is read once, not twice. Hashing the same file twice, once per algorithm, would
+ * double the I/O on exactly the files where I/O dominates.
  *
- * <p><strong>Stateless, and safe to share between threads.</strong> This class has no fields at
- * all: the digests and the buffer are locals of the call that created them, so two threads hashing
- * two files through the same instance share nothing. One instance can be created at start-up and
- * handed to every stage. (A {@link MessageDigest} field would be the natural-looking mistake here,
- * and it would be a data race: {@code MessageDigest} is mutable and is not thread-safe.)
+ * <p>Both halves of that promise are observable, and both are asserted: {@link FileOpener} makes
+ * the <em>open</em> countable and {@link #hash(InputStream)} makes the <em>reads</em> countable.
+ * Neither on its own is enough. A version of this class that opened the file twice and threw the
+ * first pass away would produce perfectly correct digests and would satisfy every assertion that
+ * could be made about a single stream; the count of opens is the only thing that distinguishes it.
+ *
+ * <p><strong>Safe to share between threads.</strong> The class holds exactly one field, a {@code
+ * final} reference to a stateless {@link FileOpener}; the digests and the buffer are locals of the
+ * call that created them, so two threads hashing two files through the same instance share nothing
+ * mutable. One instance can be created at start-up and handed to every stage. (A {@link
+ * MessageDigest} field would be the natural-looking mistake here, and it would be a data race:
+ * {@code MessageDigest} is mutable and is not thread-safe. So would a shared buffer.)
  *
  * <p><strong>Both digests, never one.</strong> {@code R-SEC-02} makes SHA-256 the trust mechanism
  * and MD5 a provenance record only. The return type, {@link FileHashes}, cannot represent a file
@@ -98,13 +105,60 @@ public final class StreamingHashService implements HashService {
     private static final HexFormat LOWERCASE_HEX = HexFormat.of();
 
     /**
-     * Creates a hasher.
+     * How a path becomes a stream of bytes.
      *
-     * <p>Instances hold no state; creating one per call and sharing one across the whole
+     * <p>This exists for the same reason {@link StreamingHashService#hash(InputStream)} does, and
+     * covers the half of the promise that one cannot. {@code R-PROV-01} and {@code R-PROV-03} are
+     * claims about <em>how the bytes are fetched</em>, and correct digests cannot distinguish a
+     * single pass from two: an implementation that opened the file, hashed it, discarded the result
+     * and did it all again would return exactly the right answer, satisfy every assertion that can
+     * be made about one stream, and double the I/O on the multi-gigabyte spectrum files this class
+     * exists for. The only thing that tells the two apart is the number of times the file is opened
+     * -- so opening goes through a seam a test can count, and production supplies {@code
+     * Files::newInputStream}.
+     *
+     * <p>It is package-private, and it is not a configuration point: nothing outside this package
+     * may substitute a different way of reading the files whose checksums go into a provenance
+     * record.
+     */
+    @FunctionalInterface
+    interface FileOpener {
+
+        /**
+         * Opens a regular file for reading.
+         *
+         * @param path the file to open
+         * @return a stream positioned at its first byte, which the caller closes
+         * @throws IOException if the file cannot be opened
+         */
+        InputStream open(Path path) throws IOException;
+    }
+
+    /** Opens the file; {@code Files::newInputStream} in production. Stateless, and never null. */
+    private final FileOpener opener;
+
+    /**
+     * Creates a hasher that reads files from the default file system.
+     *
+     * <p>Instances hold no mutable state; creating one per call and sharing one across the whole
      * application are equally correct.
      */
     public StreamingHashService() {
-        // Nothing to initialise: see the class Javadoc on statelessness.
+        this(Files::newInputStream);
+    }
+
+    /**
+     * Creates a hasher that opens files through a given opener.
+     *
+     * <p>For tests, which is why it is package-private: the count of opens is the evidence for the
+     * single-pass rule, and evidence that cannot be gathered is not evidence. The opener must be
+     * stateless for the thread-safety promise in the class Javadoc to hold; the production one is.
+     *
+     * @param opener how a path becomes a stream
+     * @throws NullPointerException if {@code opener} is {@code null}
+     */
+    StreamingHashService(FileOpener opener) {
+        this.opener = Objects.requireNonNull(opener, "opener");
     }
 
     /**
@@ -127,7 +181,10 @@ public final class StreamingHashService implements HashService {
             // error and deserves to be told so in words this project controls and can test.
             throw new IOException("Cannot hash a directory, only a regular file: " + path);
         }
-        return hash(Files.newInputStream(path));
+        // Exactly one open, and its result goes straight into the one pass.  Anything that
+        // opened the file again -- a retry, a "let me just check the size first", a second
+        // algorithm -- would be the defect R-PROV-01 forbids, and the opener counts opens.
+        return hash(opener.open(path));
     }
 
     /**

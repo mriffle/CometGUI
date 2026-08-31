@@ -472,6 +472,179 @@ class StreamingHashServiceTest {
     }
 
     // ---------------------------------------------------------------------------------------
+    // Group 8 -- ONE OPEN, asserted on hash(Path), the path production actually takes.
+    //
+    // Group 6 proves that hash(InputStream) makes exactly one pass over the stream it is given.
+    // That is only half the promise, and on its own it is bypassable: hash(Path) is free not to
+    // use the seam the property was proved on.  An implementation that opened the file, hashed
+    // it, threw the result away and did the whole thing again would return correct digests and
+    // would satisfy every assertion in group 6, while doubling the I/O on the 2 GB spectrum
+    // files this phase exists for.  Only the number of opens tells the two apart, so this group
+    // counts opens, and counts the bytes across EVERY stream the hasher was ever handed.
+    // ---------------------------------------------------------------------------------------
+
+    /** The single-pass property, asserted where production reads its files. */
+    @Nested
+    @DisplayName("group 8: one open of the file, on the production path")
+    class SingleOpenOfTheFile {
+
+        @ParameterizedTest(name = "[{index}] {0} bytes: 1 open, {1} read calls")
+        @CsvSource({
+            "0,1,"
+                    + "d41d8cd98f00b204e9800998ecf8427e,"
+                    + "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "1,2,"
+                    + "c0cb5f0fcf239ab3d9c1fcd31fff1efc,"
+                    + "d03502c43d74a30b936740a9517dc4ea2b2ad7168caa0a774cefe793ce0b33e7",
+            "262143,2,"
+                    + "be43030cf831059e40449b0f875fe898,"
+                    + "1fb879e092e503707600dbf78bc82e397467cf68085f64b5d155bb2429701c5a",
+            "262144,2,"
+                    + "9727ea0e5ba034aaed9c7c98dd64f6b2,"
+                    + "503b844fa3b400c687fbd559c844636f6808b3aedeaa9d2c5d8824894bc4cf2a",
+            "262145,3,"
+                    + "ff5bdfe579881014a8ef9fece44a777a,"
+                    + "601312c4d582bbbfc80fd71d10f3c3ce95eab73e08568be40447ebf2cb520ef2",
+            "524295,4,"
+                    + "90ac5462c75e9d51076708bbb6261746,"
+                    + "e271eec4fcab411c2a0d197e5c027bb5c632d5647a0feb1e40fca0555ea3d330",
+            "786432,4,"
+                    + "b908d0664b6637cb24f6548d76b541e0,"
+                    + "2bb87269a598e3305bcc0a765d11e7eed096256d48a324c1c6e4b321e018b5be",
+        })
+        @DisplayName("hash(Path) opens the file once and reads its length exactly once over")
+        void opensTheFileOnceAndReadsItOnce(
+                int length, int expectedReadCalls, String md5, String sha256, @TempDir Path dir)
+                throws IOException {
+            Path file = write(dir, length + ".bin", pattern(length));
+            RecordingFileOpener opener = new RecordingFileOpener();
+            StreamingHashService hasher = new StreamingHashService(opener);
+
+            FileHashes hashes = hasher.hash(file);
+
+            assertAll(
+                    // The assertion the two-pass defect fails on, and the only one that can.
+                    () -> assertEquals(1, opener.openCount(), "open() calls"),
+                    () -> assertEquals(List.of(file), opener.openedPaths(), "paths opened"),
+                    () -> assertEquals(1, opener.streamCount(), "streams handed to the hasher"),
+                    // Totals across EVERY stream, so a discarded extra pass shows up as double.
+                    () ->
+                            assertEquals(
+                                    (long) length,
+                                    opener.totalBytesDelivered(),
+                                    "bytes read from the file, summed over every stream opened"),
+                    () ->
+                            assertEquals(
+                                    expectedReadCalls,
+                                    opener.totalReadCalls(),
+                                    "read calls, summed over every stream opened"),
+                    () -> assertEquals(BUFFER, opener.maximumRequestedLength(), "largest read"),
+                    () ->
+                            assertEquals(
+                                    List.of(),
+                                    opener.requestsLongerThan(BUFFER),
+                                    "reads asking for more than one buffer"),
+                    () ->
+                            assertEquals(
+                                    List.of(),
+                                    opener.offsetsOtherThanZero(),
+                                    "reads that did not fill the buffer from its start"),
+                    () ->
+                            assertEquals(
+                                    0,
+                                    opener.totalSingleByteReads(),
+                                    "single-byte read() calls (a byte-at-a-time pass)"),
+                    () -> assertEquals(1, opener.totalCloses(), "close() calls"),
+                    () -> assertHashes(hashes, md5, sha256));
+        }
+
+        @Test
+        @DisplayName("a directory is rejected before the file system is touched at all")
+        void aDirectoryIsNeverOpened(@TempDir Path dir) throws IOException {
+            Path subdirectory = Files.createDirectory(dir.resolve("a-directory"));
+            RecordingFileOpener opener = new RecordingFileOpener();
+            StreamingHashService hasher = new StreamingHashService(opener);
+
+            IOException thrown = assertThrows(IOException.class, () -> hasher.hash(subdirectory));
+
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    "Cannot hash a directory, only a regular file: " + subdirectory,
+                                    thrown.getMessage()),
+                    () -> assertEquals(0, opener.openCount(), "open() calls"));
+        }
+
+        @Test
+        @DisplayName("a null path is rejected before the file system is touched at all")
+        void aNullPathIsNeverOpened() {
+            RecordingFileOpener opener = new RecordingFileOpener();
+            StreamingHashService hasher = new StreamingHashService(opener);
+
+            NullPointerException thrown =
+                    assertThrows(NullPointerException.class, () -> hasher.hash(nullOf(Path.class)));
+
+            assertAll(
+                    () -> assertEquals("path", thrown.getMessage()),
+                    () -> assertEquals(0, opener.openCount(), "open() calls"));
+        }
+
+        @Test
+        @DisplayName("a missing file is attempted once, and hands out no stream")
+        void aMissingFileIsOpenedOnceAndFails(@TempDir Path dir) {
+            Path missing = dir.resolve("not-here.mzML");
+            RecordingFileOpener opener = new RecordingFileOpener();
+            StreamingHashService hasher = new StreamingHashService(opener);
+
+            assertThrows(NoSuchFileException.class, () -> hasher.hash(missing));
+
+            assertAll(
+                    () -> assertEquals(1, opener.openCount(), "open() calls"),
+                    () -> assertEquals(List.of(missing), opener.openedPaths(), "paths opened"),
+                    () -> assertEquals(0, opener.streamCount(), "streams handed to the hasher"));
+        }
+
+        @Test
+        @DisplayName("the stream the opener handed out is closed exactly once when a read fails")
+        void closesTheOpenedStreamWhenAReadFails(@TempDir Path dir) throws IOException {
+            Path file = write(dir, "abc.bin", "abc".getBytes(US_ASCII));
+            RecordingFileOpener opener = new RecordingFileOpener();
+            StreamingHashService hasher =
+                    new StreamingHashService(path -> opener.record(new FailingInputStream("gone")));
+
+            IOException thrown = assertThrows(IOException.class, () -> hasher.hash(file));
+
+            assertAll(
+                    () -> assertEquals("gone", thrown.getMessage()),
+                    () -> assertEquals(1, opener.streamCount(), "streams handed to the hasher"),
+                    () -> assertEquals(1, opener.totalCloses(), "close() calls"));
+        }
+
+        @Test
+        @DisplayName("a null opener is rejected by name")
+        void rejectsANullOpener() {
+            NullPointerException thrown =
+                    assertThrows(
+                            NullPointerException.class,
+                            () ->
+                                    new StreamingHashService(
+                                            nullOf(StreamingHashService.FileOpener.class)));
+
+            assertEquals("opener", thrown.getMessage());
+        }
+
+        @Test
+        @DisplayName("the public constructor really reads the real file system")
+        void theProductionConstructorReadsRealFiles(@TempDir Path dir) throws IOException {
+            // Everything else in this class that hashes a real file goes through the no-argument
+            // constructor, so the production wiring is exercised throughout; this states it.
+            Path file = write(dir, "abc.bin", "abc".getBytes(US_ASCII));
+
+            assertHashes(new StreamingHashService().hash(file), MD5_ABC, SHA256_ABC);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Group 7 -- one instance, many threads.
     // ---------------------------------------------------------------------------------------
 
@@ -828,6 +1001,81 @@ class StreamingHashServiceTest {
 
         int endOfStreamCount() {
             return (int) returnedCounts.stream().filter(count -> count == -1).count();
+        }
+    }
+
+    /**
+     * A {@link StreamingHashService.FileOpener} that opens real files and remembers every open,
+     * every read and every close, so "one open" can be asserted as a number.
+     *
+     * <p>The totals deliberately span <em>every</em> stream it has ever handed out, not the last
+     * one: an implementation that opened the file twice and discarded the first pass would look
+     * perfect on either stream taken alone.
+     */
+    private static final class RecordingFileOpener implements StreamingHashService.FileOpener {
+
+        private final List<Path> openedPaths = new ArrayList<>();
+        private final List<RecordingInputStream> streams = new ArrayList<>();
+
+        @Override
+        public InputStream open(Path path) throws IOException {
+            openedPaths.add(path);
+            // Files.newInputStream throws for a missing file, which is what production does, and
+            // leaves streams empty -- so an attempted open still counts as an open.
+            return record(new RecordingInputStream(Files.newInputStream(path)));
+        }
+
+        /** Registers an already-built stream, for the tests that supply their own. */
+        InputStream record(InputStream stream) {
+            RecordingInputStream recording =
+                    stream instanceof RecordingInputStream already
+                            ? already
+                            : new RecordingInputStream(stream);
+            streams.add(recording);
+            return recording;
+        }
+
+        int openCount() {
+            return openedPaths.size();
+        }
+
+        List<Path> openedPaths() {
+            return List.copyOf(openedPaths);
+        }
+
+        int streamCount() {
+            return streams.size();
+        }
+
+        int totalReadCalls() {
+            return streams.stream().mapToInt(RecordingInputStream::readCallCount).sum();
+        }
+
+        long totalBytesDelivered() {
+            return streams.stream().mapToLong(RecordingInputStream::totalBytesDelivered).sum();
+        }
+
+        int totalSingleByteReads() {
+            return streams.stream().mapToInt(RecordingInputStream::singleByteReadCount).sum();
+        }
+
+        int totalCloses() {
+            return streams.stream().mapToInt(RecordingInputStream::closeCount).sum();
+        }
+
+        int maximumRequestedLength() {
+            return streams.stream()
+                    .mapToInt(RecordingInputStream::maximumRequestedLength)
+                    .max()
+                    .orElse(-1);
+        }
+
+        List<Integer> requestsLongerThan(int limit) {
+            return streams.stream().flatMap(s -> s.requestsLongerThan(limit).stream()).toList();
+        }
+
+        List<Integer> offsetsOtherThanZero() {
+            return streams.stream().flatMap(s -> s.offsetsOtherThanZero().stream()).toList();
         }
     }
 
