@@ -225,10 +225,19 @@ Decomposition
 
    * - 2
      - ``org.cometgui.tools.process`` core: ``ProcessService`` (the
-       ``ProcessRunner`` implementation), the ``RunningProcess``
-       implementation, the two stream pumps, exit code and duration,
-       cancellation with descendant termination
+       ``ProcessRunner`` implementation), ``StartedProcess``, the two stream
+       pumps, the ``LineSplitter``, decoding, exit code, duration, the
+       explicit working directory and environment
      - Needs unit 1 to have anything to launch. ``R-PROC-02``, ``R-PROC-04``.
+
+   * - 2b
+     - The adversarial cancellation proofs: a hanging process with a child,
+       liveness of **both** after cancellation, and escalation from terminate
+       to kill
+     - **Split out of unit 2 after unit 1's sign-off**, because gate item 2 is
+       one of the two the main orchestrator named as the shortcut a tired agent
+       takes, and it deserves a fresh agent whose whole job is to break it. Its
+       implementation is unit 2's; its proof is not. Gate item 2.
 
    * - 3
      - ``org.cometgui.tools.process`` redaction: the secret registry and the
@@ -246,7 +255,7 @@ Decomposition
      - The specification's fake-executable scenario suite: every scenario in
        *Component tests with fake executables*, plus the 500 MB flood and the
        spaces/Unicode paths
-     - Needs units 1, 2 and 4. Gate items 1, 2, 3, 4.
+     - Needs units 1, 2 and 4. Gate items 1, 3, 4.
 
    * - 6
      - ``cometgui-archtests``: proof that the existing ``R-PROC-02`` rule now
