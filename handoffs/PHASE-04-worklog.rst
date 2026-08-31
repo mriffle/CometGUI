@@ -457,7 +457,7 @@ An out-copy defect is gated by SpotBugs, not by JUnit -- and that is honest
 .. _p04-sweep-blindness:
 
 The finding that a "no secret survives" sweep is the weak point, not the rules
-=============================================================================
+==============================================================================
 
 Three defects in unit 3 mattered, and **all three were in the shape of an
 assertion rather than in the production rules**. Gate item 6 rests on a sweep
