@@ -461,6 +461,36 @@ class EventLogSecrecyTest {
         }
     }
 
+    @Test
+    @DisplayName("the cut looks at the character it is about to keep, not the one after it")
+    void truncationInspectsTheCharacterBeforeTheCut() throws IOException {
+        // One astral character, alone in a run of ASCII, placed so that it straddles the cut:
+        // 188 characters of message frame plus 311 filler characters put its high surrogate at
+        // index 499 and its low surrogate at 500, and the cut falls at 500.
+        //
+        // This is the arrangement a uniform run of astral characters cannot produce.  In such a
+        // run the characters at cut-1 and cut+1 are two apart and therefore always the same half
+        // of a pair, so a check that looked one character past the cut instead of one before it
+        // would behave identically and no test would notice.  Here they differ: one is a high
+        // surrogate and the other is an ordinary letter, so looking the wrong way leaves the
+        // surrogate unpaired and the detail stops surviving its own encoding.
+        Path log =
+                doctoredLogWithKey(
+                        "Y".repeat(311) + new String(Character.toChars(0x1F600)) + "Y".repeat(60));
+
+        String detail = ProvenanceEventLogReader.recover(log).defects().get(0).detail();
+
+        assertAll(
+                () -> assertEquals(511, detail.length()),
+                () -> assertTrue(detail.endsWith(" [truncated]")),
+                () ->
+                        assertEquals(
+                                detail,
+                                new String(detail.getBytes(UTF_8), UTF_8),
+                                "the cut kept half of a character, so the detail no longer"
+                                        + " survives encoding"));
+    }
+
     /**
      * Writes a one-line log whose payload carries the given key, which no writer would produce.
      *
@@ -469,7 +499,11 @@ class EventLogSecrecyTest {
      * @throws IOException if it cannot be written
      */
     private Path doctoredLogWithKey(String key) throws IOException {
-        Path log = directory.resolve("doctored-" + Math.abs(key.hashCode()) + ".log");
+        // Integer.toUnsignedString, not Math.abs: Math.abs(Integer.MIN_VALUE) is itself
+        // negative, which SpotBugs reports as RV_ABSOLUTE_VALUE_OF_HASHCODE and which would
+        // put a minus sign in a file name here.
+        Path log =
+                directory.resolve("doctored-" + Integer.toUnsignedString(key.hashCode()) + ".log");
         Files.write(
                 log,
                 ("{\"seq\":1,\"time\":\"2026-08-31T09:15:00.000Z\",\"type\":\"run.started\","
