@@ -1121,6 +1121,69 @@ was still moving. Phase 04 hands over its fifteen-line census verbatim, with the
 invocation and the output above, so the replacement is built from a script that
 has actually caught something.
 
+.. _status-platform-divergence:
+
+Platform divergence, in two tiers -- and the grading rule it settles
+---------------------------------------------------------------------
+
+Asked to name every place its code takes a different path on a platform that has
+never executed it, Phase 04 returned **five** rather than the three tier 1 had
+identified, and sorted them into two tiers. The sorting is the useful part:
+collapsing them would overstate the residue as much as omitting them would
+understate it.
+
+**The grading rule these establish**, and it applies to every remaining phase:
+
+* *"We could not run this code on that platform"* is a **testing gap**. It does
+  not cap a grade. Phase 02 passed in this Linux-only environment on exactly
+  that basis -- its gate items had no platform-divergent path.
+* *"There is **different code** on that platform and it has never run"* is
+  **unverified behaviour**, and it does cap a grade.
+
+**Tier A -- the divergent branch IS executed here, by a faithful stand-in.**
+Not unexecuted code, and therefore not residue.
+
+* *The hash cache's attribute source.* ``FileFingerprint.of`` asks whether the
+  file system publishes the ``unix`` view; without it ``fileKey`` and ``ctime``
+  are null, ``tamperEvident()`` is false, and the cache stores nothing. That
+  branch runs here through a **zip file system**, and the stand-in was measured
+  rather than assumed. Confirmed independently at tier 1::
+
+      default FS views = [owner, dos, basic, posix, user, unix]  fileKey = (dev=33,ino=...)
+      zipfs FS views   = [zip, basic]                            fileKey = null
+
+  So the Windows-*shaped* algorithm is exercised and mutation-tested. What
+  remains unverified is that Windows is the case it stands for.
+* *Directory fsync*, exercised by substituting a ``Durability`` that throws. The
+  Windows question is sharper than "does it work": opening a directory channel
+  and **silently succeeding without forcing anything** has identical observable
+  behaviour to failing, and the opposite durability guarantee.
+
+**Tier B -- never executed in any form. This is the residue that caps the
+grade.**
+
+* **``ATOMIC_MOVE`` under contention, and this is the one that matters.** Gate
+  item 5 is proved by a concurrent reader observing only whole documents, and
+  that proof is POSIX-only. On Windows a rename over a file another process
+  holds open can fail with ``AccessDeniedException`` -- and the Provenance UI of
+  Phase 13, a virus scanner and a sync client are all exactly such processes.
+  **If Windows cannot replace an open file the repair is a retry policy or a
+  different finalisation strategy: a design change, not a test.** Routed into
+  ``phases/PHASE-13-provenance-ui.rst`` so the viewer is not built first and
+  discovered second.
+* *Absolute-path validation.* ``Path.isAbsolute()`` is false for ``/var/...`` on
+  Windows, so records valid here are rejected there. This is the actual reason
+  behind the twenty ``@DisabledOnOs(WINDOWS)`` tests, and the repair is a second
+  pinned document with Windows paths -- never a relaxation of the rule.
+* *``Path.toRealPath()`` as the cache key*, which on Windows also folds case and
+  8.3 short names.
+
+**What was deliberately kept off the list**, which is as much a judgement as
+what went on it: line endings, number formatting, digests, redaction, and JSON
+and RST generation all run identical code everywhere, with locale-sensitive
+paths pinned under Turkish, German and Thai-digit locales. Those are testing
+gaps at worst, and admitting them would dilute the document.
+
 .. _status-hash-cache-windows:
 
 The hash cache is deliberately inert on Windows
