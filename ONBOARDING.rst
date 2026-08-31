@@ -314,13 +314,29 @@ Working conventions
 Environment
 -----------
 
-The working directory is ``/workspace``. As of 2026-08-28 the machine has 64
-cores, 376 GB RAM, ~7.3 TB free, ``git``, ``python3`` and ``node``, and network
-access to GitHub and PyPI. It has **no** JDK, Maven, Gradle or Docker.
+**The checkout is not at a fixed path, and no document should say it is.** It
+was created at ``/workspace`` and moved on 2026-08-31; documents written before
+that date still say ``/workspace`` and are stale rather than describing a second
+checkout. Derive the root instead::
+
+    cd "$(git rev-parse --show-toplevel)"
+
+As of 2026-08-28 the machine has 64 cores, 376 GB RAM, ~7.3 TB free, ``git``,
+``python3`` and ``node``, and network access to GitHub and PyPI. It has **no**
+JDK, Maven, Gradle or Docker.
 
 * Everything the project needs is installed **project-locally** -- a JDK and
   build tool under ``tools/<name>-<version>/``, Python tooling in a project
   virtualenv. Nothing goes on the host PATH, nothing uses ``sudo`` or ``apt``.
+  Source the toolchain with ``. tools/env.sh`` in every shell.
+* **A relocated checkout strands anything that recorded an absolute path.** The
+  2026-08-31 move broke ``tools/env.sh`` and 22 virtualenv console scripts, and
+  the only symptom Maven offered was ``The JAVA_HOME environment variable is not
+  defined correctly``. ``scripts/build.sh`` does not catch this: its toolchain
+  stage re-bootstraps only when ``tools/env.sh`` is *missing*, never when it is
+  merely wrong. Both are repaired and the generator now resolves the path at
+  source time, so the failure should not recur -- but treat that error message
+  as "a path moved", not "the JDK is broken".
 * Record every fetched tool's URL, version, date, SHA-256 and licence in the
   project's own environment manifest. The project is intended for publication;
   an unprovenanced toolchain is not reproducible.
