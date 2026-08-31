@@ -879,6 +879,57 @@ on ``windows-percolator-verification``, which is now pushed and awaiting a pull
 request; fixing it on ``main`` as well would produce a conflict on merge and fix
 it twice. It belongs with Phase 01's residue, whoever lands it.
 
+.. _status-concurrent-maven:
+
+Running two phase orchestrators concurrently: one real hazard, and it was mine
+------------------------------------------------------------------------------
+
+Phases 03 and 04 ran concurrently on disjoint paths, which the ordering notes
+permit. The file-level separation held. **Maven did not**, and the cause was the
+dispatch, not the phases.
+
+``scripts/build.sh`` line 217 runs ``mvn -B -Dmaven.repo.local=_build/m2repo
+clean verify`` **at the repository root, in the working tree** -- and the
+briefing for *both* orchestrators told each to run ``bash scripts/build.sh``
+before writing code, on the strength of Phase 02's handoff advice. Two root
+``clean verify`` runs at once means one deletes ``target/`` under the other
+mid-build, and the error names the victim's own code rather than the collision.
+
+Three things follow for any future session that runs phases in parallel:
+
+#. **Do not tell two concurrent orchestrators to run ``scripts/build.sh``.**
+   Have the second use ``mvn -o -pl <module> -am`` instead, or serialise the two
+   opening builds explicitly. ``build.sh`` is written as the one documented
+   command for a *single* worker in a *quiet* tree.
+#. **``_build/m2repo`` is shared** by both phases and by the gate harnesses, so
+   concurrent Maven writes there are a hazard even when the modules are
+   disjoint. A ``flock`` around Maven invocations is the cheap fix and Phase 04
+   adopted one.
+#. **The gate harnesses are not the hazard.**
+   ``verify-quality-gates.sh``, ``verify-test-gates.sh`` and
+   ``verify-shell-gates.sh`` each declare "WHERE IT WORKS. Never in the working
+   tree." and each extracts ``git archive HEAD`` into a sandbox under ``_build/``
+   and builds the copy. None of them can remove a ``target/`` in the working
+   tree. This was checked rather than assumed, because a phase orchestrator had
+   attributed a collision to the baseline run; the baseline ran 17:27:37 to
+   17:39:34 with zero failures and its result stands.
+
+A shared-gate trap the same pair surfaced
+------------------------------------------
+
+``config/spotbugs/exclude.xml`` excludes ``NP_NULL_PARAM_DEREF``,
+``NP_NULL_PARAM_DEREF_NONVIRTUAL`` and ``NP_NONNULL_PARAM_VIOLATION`` -- but
+**not** ``NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS``. So any *instance* method
+calling ``Objects.requireNonNull(arg, "name")``, together with the test proving
+it rejects null, fails ``mvn verify``. That shape is everywhere in this codebase.
+
+**The standing idiom is to fix it in test code**, with a helper that launders the
+null through a method SpotBugs cannot see through (``deliberateNull()``), and
+**not** to add the detector to the exclusion file. Phase 04 met this first,
+refused the exclusion on the grounds that it would weaken a shared gate to make
+its own code pass, and reported the decision rather than asking; tier 1 endorsed
+it and made it binding on Phase 03 so the tree carries one convention.
+
 Baseline gate run
 -----------------
 
