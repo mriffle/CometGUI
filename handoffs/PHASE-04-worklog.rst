@@ -241,7 +241,23 @@ touch the same files; the file list for each unit is fixed by the brief.
        concurrent reader never observes a partial file; an interrupted write
        is proved by interrupting, not by asserting that rename is atomic.
      - ``R-PROV-05``
-     - pending
+     - **SIGNED OFF 2026-08-31** at ``a6f0b48``. I ran
+       ``mvn -pl cometgui-provenance -am verify org.pitest:...:mutationCoverage``
+       myself: ``Tests run: 87, Failures: 0, Errors: 0``,
+       ``All coverage checks have been met``, ``BugInstance size is 0``,
+       ``0 Checkstyle violations``, ``BUILD SUCCESS``. Then I injected a defect
+       the agent had not tried, and the one gate item 5 is actually about:
+       ``Files.move(tmp, target, ATOMIC_MOVE, REPLACE_EXISTING)`` replaced by
+       ``Files.copy(tmp, target, REPLACE_EXISTING); Files.delete(tmp);``, which
+       truncates the target and then streams into it. The concurrent-reader
+       test failed with ``the reader saw a document of 65536 bytes, which is
+       neither of the two written ==> expected: <0> but was: <37>`` and ``the
+       target vanished mid-rename ==> expected: <0> but was: <23>``. **That is
+       gate item 5 proved by observing a torn file, not by reasoning that
+       rename is atomic.** Reverted and re-ran green. PIT, with **no**
+       ``-D`` override on the command line, produced 28 mutations, 28 killed,
+       0 survived across all three classes, which also closes the carried
+       question of whether the POM switch was live or merely set.
 
    * - 3
      - A
@@ -416,6 +432,13 @@ Open items the orchestrator is carrying
 Neither is a blocker; both are written down so that they cannot be forgotten
 between units.
 
+The mutation switch is live -- CLOSED 2026-08-31
+    Confirmed at unit 2's sign-off: ``mvn -pl cometgui-provenance -am verify
+    org.pitest:pitest-maven:mutationCoverage`` with **no**
+    ``-Dcometgui.mutation.skip`` on the command line produced
+    ``cometgui-provenance/target/pit-reports/mutations.xml`` with 28 mutations.
+    The POM switch is doing the work, not the override. Original text follows.
+
 The mutation switch is set but has not yet been seen to *run*
     ``cometgui-provenance/pom.xml`` now carries
     ``<cometgui.mutation.skip>false</cometgui.mutation.skip>`` (``4c16864``).
@@ -439,6 +462,29 @@ Exact read counts assume a full-length read, which POSIX does not guarantee
     If they prove flaky there the repair is to keep the open, close, stream
     and total-byte counts exact and relax only the read-call count -- never to
     delete the group.
+
+Two findings from unit 2 that later phases must not lose
+--------------------------------------------------------
+
+**A same-filesystem temporary file is not optional, and this machine hides
+that.** ``java.io.tmpdir`` is ``/tmp`` on an overlay filesystem while the
+checkout is on ``/dev/sda1`` -- but JUnit's ``@TempDir`` also lives under
+``/tmp``, so a writer that wrongly used the system temp directory would still
+complete an ``ATOMIC_MOVE`` in every test on this host and never tear a file.
+The defect was caught only by the explicit assertion that the temporary file is
+a sibling of the target. **That test is not decoration and must not be
+deleted**; on a machine where the project directory and ``/tmp`` differ, the
+same defect is silent data corruption.
+
+**The Windows half of the directory-sync asymmetry is UNVERIFIED.** Opening a
+directory as a channel fails on Windows, and the writer deliberately tolerates
+that because by then the data is already renamed into place. Two tests are
+``@EnabledOnOs({OS.LINUX, OS.MAC})``, and the Windows behaviour is proved only
+by substituting a failing ``Durability``, never on a real Windows host. This is
+the same residue Phase 00 recorded: no Windows or macOS binary has ever been
+executed in this project. It does not cap this phase -- gate item 5 is proved
+on the platform the gate runs on -- but Phase 15 owns the platform matrix and
+should close it.
 
 Blockers escalated
 ==================
