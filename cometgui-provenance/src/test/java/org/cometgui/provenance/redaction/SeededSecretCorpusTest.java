@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +35,32 @@ import org.junit.jupiter.api.Test;
  * units grep the generated artefacts for the first ten of these exact strings; this file proves the
  * redactor they will be calling removes every one of them from every shape they can arrive in,
  * before any of those artefacts exist.
+ *
+ * <p><strong>WHAT A SWEEP LIKE THIS IS BLIND TO, AND WHY EVERY CARRIER BELOW IS THE SIZE IT
+ * IS.</strong> Unit 11 builds the artefact-level grep on this same corpus, so these two warnings
+ * are the ones to inherit rather than rediscover. An "is the secret still in the output" check
+ * cannot see:
+ *
+ * <ol>
+ *   <li><b>A partial rewrite of the secret.</b> {@code contains} is defeated by one changed
+ *       character. When the PEM rule was deleted to prove it could fail, an earlier rule rewrote
+ *       the {@code =} padding at the end of the key body; 99% of the key was still there, the key
+ *       had leaked, and {@code contains(body)} was false. The corpus therefore holds a long
+ *       secret's individual <em>lines</em>, so that a partial mutation still leaves whole units of
+ *       secret material to find.
+ *   <li><b>A leak conditioned on the input's size.</b> A redactor that gave up on short inputs --
+ *       {@code if (text.length() < 32) return text;} as a "fast path" -- leaks in clear and is
+ *       invisible to a corpus whose carriers all happen to be long. Every carrier here was once
+ *       long: the shortest was 38 characters, and that defect shipped past this file with 8 tests
+ *       green. <b>Carrier LENGTH is therefore part of this corpus's coverage, not an accident of
+ *       how the examples were written.</b> {@link #shortCarriers()} exists solely to hold one
+ *       deliberately small carrier per rule family, the smallest being twelve characters. Do not
+ *       "tidy" them into realistic-looking longer examples.
+ * </ol>
+ *
+ * <p>The general lesson is that a sweep proves the absence of a string, not the presence of
+ * redaction, and it is only as strong as the shapes and sizes of the inputs it is given. That is
+ * why every carrier also carries a hand-typed full-output assertion.
  *
  * <p><strong>Two assertions per carrier, and both are needed.</strong> First the full expected
  * output, typed out by hand -- which fails when a secret survives and equally when something that
@@ -118,6 +145,29 @@ class SeededSecretCorpusTest {
     /** One rendered artefact, with the name of the carrier it came from. */
     private record Carrier(String name, String rendered) {}
 
+    /**
+     * The carriers no pattern rule can clear, each for a reason worth stating.
+     *
+     * <ul>
+     *   <li>{@code argv} -- holds {@code -k <secret>}, and a single-letter flag never makes the
+     *       next argument a credential; {@code AC-PRV-03} requires the argument array to be
+     *       recorded exactly.
+     *   <li>{@code short argv} -- the same thing, in two elements.
+     *   <li>{@code log line 3} -- a bare vendor token with no surrounding syntax and no published
+     *       prefix worth pattern-matching.
+     *   <li>{@code short bare value} -- a bare password with no syntax around it at all.
+     *   <li>{@code short unnamed assignment} -- {@code pw=} is not a secret-looking name; see
+     *       {@link #shortCarriers()}.
+     * </ul>
+     */
+    private static final Set<String> CARRIERS_ONLY_THE_REGISTRY_CLEARS =
+            Set.of(
+                    "argv",
+                    "short argv",
+                    "log line 3",
+                    "short bare value",
+                    "short unnamed assignment");
+
     // -----------------------------------------------------------------------------------------
     // The carriers.
     // -----------------------------------------------------------------------------------------
@@ -144,6 +194,39 @@ class SeededSecretCorpusTest {
                 AWS_SECRET,
                 "--input",
                 "/data/HeLa_1ug_rep1.mzML");
+    }
+
+    /**
+     * One deliberately small carrier per rule family, name to raw input.
+     *
+     * <p>These exist because of blind spot (2) in the class documentation, and their size is the
+     * whole point: the longest is 23 characters and the shortest is 12, so a redactor that
+     * short-circuits on small inputs cannot hide behind them. Each one carries a corpus secret
+     * through a different rule, in the smallest text that rule can appear in.
+     *
+     * <p>{@code pw=} is here on purpose alongside {@code auth=}. {@code pw} is <em>not</em> one of
+     * {@link SecretRedactor#secretNameKeywords()} -- neither is {@code pass} -- so the pattern
+     * rules do not clear it and only the registry does. That is a real boundary of the name list
+     * and it is better recorded as a carrier than left as a surprise.
+     *
+     * @return each short carrier's name and the text to run through the redactor
+     */
+    private static Map<String, String> shortCarriers() {
+        Map<String, String> carriers = new LinkedHashMap<>();
+        carriers.put("short assignment", "auth=" + SWORDFISH);
+        carriers.put("short bearer", "Bearer " + SWORDFISH);
+        carriers.put("short credential URL", "ftp://u:" + SWORDFISH + "@h/");
+        carriers.put("short token shape", AWS_ACCESS_KEY_ID);
+        carriers.put("short unnamed assignment", "pw=" + SWORDFISH);
+        carriers.put("short bare value", SWORDFISH);
+        return carriers;
+    }
+
+    /**
+     * The smallest argument array that can carry a credential: two elements, fifteen characters.
+     */
+    private static List<String> shortArgv() {
+        return List.of("-k", SWORDFISH);
     }
 
     private static String credentialUrl() {
@@ -211,6 +294,42 @@ class SeededSecretCorpusTest {
     }
 
     @Test
+    @DisplayName("every short carrier comes out exactly as written here")
+    void shortCarriersComeOutAsWritten() {
+        SecretRedactor redactor = loaded();
+
+        assertEquals("auth=[REDACTED]", redactor.redactText("auth=swordfish-42"));
+        assertEquals("Bearer [REDACTED]", redactor.redactText("Bearer swordfish-42"));
+        assertEquals("ftp://u:[REDACTED]@h/", redactor.redactText("ftp://u:swordfish-42@h/"));
+        assertEquals("[REDACTED]", redactor.redactText("AKIAIOSFODNN7EXAMPLE"));
+        assertEquals("pw=[REDACTED]", redactor.redactText("pw=swordfish-42"));
+        assertEquals("[REDACTED]", redactor.redactText("swordfish-42"));
+        assertEquals(List.of("-k", "[REDACTED]"), redactor.redactArgv(shortArgv()));
+    }
+
+    @Test
+    @DisplayName("no short carrier is long enough for a size-conditioned defect to hide behind")
+    void everyShortCarrierIsActuallyShort() {
+        // The property this file was missing.  Asserted rather than trusted, because the carriers
+        // are ordinary-looking strings and nothing else would notice them growing.
+        for (Map.Entry<String, String> carrier : shortCarriers().entrySet()) {
+            assertTrue(
+                    carrier.getValue().length() < 32,
+                    "the \""
+                            + carrier.getKey()
+                            + "\" carrier has grown to "
+                            + carrier.getValue().length()
+                            + " characters; see blind spot (2) in this class's documentation");
+        }
+        for (String argument : shortArgv()) {
+            assertTrue(
+                    argument.length() < 32,
+                    "a short argv element has grown to " + argument.length() + " characters");
+        }
+        assertEquals(12, SWORDFISH.length());
+    }
+
+    @Test
     @DisplayName("the PEM-block carrier loses the key and keeps the log lines around it")
     void pemBlockCarrier() {
         assertEquals(
@@ -247,7 +366,7 @@ class SeededSecretCorpusTest {
     // -----------------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("not one of the thirteen seeded secrets survives any carrier")
+    @DisplayName("not one of the thirteen seeded secrets survives any carrier, long or short")
     void notOneSecretSurvivesAnyCarrier() {
         List<Carrier> redacted = redactEveryCarrier(loaded());
         StringBuilder everything = new StringBuilder();
@@ -325,18 +444,18 @@ class SeededSecretCorpusTest {
     }
 
     /**
-     * Whether the pattern half of the rule set is supposed to cover a carrier on its own.
+     * Whether the pattern half of the rule set is supposed to clear a carrier on its own.
      *
-     * <p>The two log lines that carry a bare vendor token with no surrounding syntax are the
-     * registry's job by design; see the class documentation on {@link SecretRedactor}. Naming them
-     * here rather than quietly excluding them is the point: if a later change makes a pattern cover
-     * one of them, {@link #onlyTheRegistryCoversTheseTwo()} fails and says so.
+     * <p>An explicit list, so that the boundary between the two halves is written down rather than
+     * inferred. If a later change makes a pattern rule cover one of these, {@link
+     * #onlyTheRegistryCoversTheseTwo()} fails and says so; if a change makes a pattern rule stop
+     * covering anything else, {@link #patternsAloneCoverWhatTheyClaim()} does.
      *
      * @param carrier the carrier's name
      * @return whether pattern rules alone must clear it
      */
     private static boolean patternRulesAreResponsibleFor(String carrier) {
-        return !"argv".equals(carrier) && !"log line 3".equals(carrier);
+        return !CARRIERS_ONLY_THE_REGISTRY_CLEARS.contains(carrier);
     }
 
     private static List<Carrier> redactEveryCarrier(SecretRedactor redactor) {
@@ -355,6 +474,10 @@ class SeededSecretCorpusTest {
         for (int line = 0; line < lines.size(); line++) {
             carriers.add(new Carrier("log line " + line, redactor.redactText(lines.get(line))));
         }
+        for (Map.Entry<String, String> carrier : shortCarriers().entrySet()) {
+            carriers.add(new Carrier(carrier.getKey(), redactor.redactText(carrier.getValue())));
+        }
+        carriers.add(new Carrier("short argv", String.join(" ", redactor.redactArgv(shortArgv()))));
         return carriers;
     }
 }
