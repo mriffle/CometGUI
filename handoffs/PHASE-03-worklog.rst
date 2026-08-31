@@ -718,3 +718,107 @@ Javadoc comment, and the main orchestrator found it by reading the tree rather
 than by being told.** A cross-phase finding has to travel as a message, not as a
 comment in the file that contains the problem. This phase carried the same fault
 one level up: the finding never reached tier 1 through me either.
+
+Unit 3 -- the process side of R-SEC-03
+======================================
+
+:Agent: fresh phase agent, spawned 2026-08-31, re-scoped mid-flight
+:Commit: ``cdec906``
+:Outcome: **ACCEPTED**
+
+**What was built.** ``ProcessRedactor`` -- 181 lines holding **no rules of its
+own** -- plus ``ProcessRedactorTest``, ``SecretRedactionPropertyTest`` and the
+``SecretScan`` test helper. The rules come from ``org.cometgui.domain.secrets``.
+The agent's first implementation, with its own ``SecretNames`` and
+``SecretValues`` and 32 tests, was **deleted rather than committed** when the
+shared rule set landed.
+
+**What I ran myself:**
+
+* ``flock _build/cometgui-maven.lock mvn -o -B -pl cometgui-process -am verify``
+  -- **BUILD SUCCESS**, ``Tests run: 159, Failures: 0, Errors: 0, Skipped: 0``
+  in ``cometgui-process`` (130 before) and ``Tests run: 359, Failures: 0`` in
+  ``cometgui-domain``; ``BugInstance size is 0``; ``0 Checkstyle violations``.
+* ``... -am test-compile org.pitest:pitest-maven:mutationCoverage`` --
+  ``cometgui-process``: ``Generated 103 mutations Killed 97 (94%)``, line
+  coverage ``241/255 (95%)``. Every ``ProcessRedactor`` mutant is killed; the
+  survivors are unit 2's already-argued equivalents.
+
+.. _p03-pit-command:
+
+**The PIT command in the acceptance conditions no longer works, and this will
+hit every later phase that adds a package to** ``cometgui-domain``.
+``mvn ... -pl cometgui-process org.pitest:pitest-maven:mutationCoverage`` now
+fails with *"8 tests did not pass without mutation"*, because ``_build/m2repo``
+holds a ``cometgui-domain`` snapshot that predates ``b0e7122`` and contains
+**zero** ``domain/secrets`` classes -- ``jar tf | grep -c domain/secrets`` is 0.
+``-am`` alone does not fix it: a goal-only invocation still resolves the sibling
+from the repository. The working form prefixes a lifecycle phase::
+
+    flock _build/cometgui-maven.lock mvn -o -B -pl cometgui-process -am \
+        test-compile org.pitest:pitest-maven:mutationCoverage
+
+This is Phase 02's surprise 9 in a sharper form: ``scripts/build.sh`` runs
+``clean verify`` and never ``install``, so the local repository is permanently
+behind the reactor.
+
+**My injections into the production code.**
+
+*Injection F -- redact after escaping instead of before*, which is
+``ProcessRedactor``'s headline claim::
+
+    ProcessRedactorTest.redactedBeforeEscaping
+      expected: <["/opt/tool", "--api-token", "[REDACTED]"]>
+      but was:  <["/opt/tool", "--api-token", "ab\"cd\\efgh"]>
+
+The escaped form is exactly the leak the ordering prevents: the token's ``"``
+became ``\"`` and a literal search no longer matched it.
+
+*Injection G -- stop redacting the captured environment altogether.* Eight
+failures, including the property test::
+
+    SecretRedactionPropertyTest.theEnvironmentLeaksNothing
+      expected: <{... UPLOAD_TARGET=...?key=[REDACTED],
+                  LIMELIGHT_API_TOKEN=[REDACTED]}>
+      but was:  <{... UPLOAD_TARGET=...?key=7a3f9c2e8b4d6a1f0c5e7b9d3a2f8c4e6b1d0a5f,
+                  LIMELIGHT_API_TOKEN=7a3f9c2e8b4d6a1f0c5e7b9d3a2f8c4e6b1d0a5f}>
+
+**The agent's own "cheapness" test was passing by accident, and PIT found it.**
+``assertSame`` on an ordinary Comet line passed whether the empty-registry
+short-circuit was there or not, because the shared rules *also* return their
+argument by reference when no rule fires. The mutant ``size() > 0`` to
+``size() >= 0`` survived and said so. The test now uses a line the rules **would**
+have rewritten (``Authorization: Bearer abc123def456ghi789``) and asserts both
+sides. That is the same shape as unit 2b's finding -- a real assertion, on the
+real subject, true for a reason unrelated to the code being right.
+
+**The sliding-window scanner, and the proof it fires.** Tier 1 warned that
+absence of the whole secret is not absence of the secret: Phase 04 shipped a
+sweep asserting ``contains(wholeSecret)`` that passed while a private key leaked
+with one character rewritten. ``SecretScan`` slides a 4-character window over the
+secret and reports every surviving fragment, and
+``theScannerSeesALeakThatTheNaiveAssertionMisses`` **builds that exact failure**
+-- a 40-character secret with its last character rewritten -- and requires the
+naive assertion to pass while the scan reports 36 of 37 windows. A middle rewrite
+leaves 33. Both hand-typed. ``survivingFragments`` refuses a secret too short to
+have a window, so a scan can never be vacuously clean.
+
+**The marker is pinned as a hand-typed literal**, not as a reference to the
+constant it checks::
+
+    assertEquals("[REDACTED]", SecretRedactor.REDACTION_MARKER, ...)
+
+**A stated gap this phase accepted, which Phase 12 must read.** With **no**
+registered secret value, ``redact(String)`` returns the line by reference and
+skips the *pattern* rules as well, so a bearer token printed by a tool that was
+never given a credential reaches the console log unredacted. The trade is in the
+Javadoc and pinned by a test rather than hidden. It does not extend to the two
+renderings ``R-SEC-03`` actually names: the display command and the environment
+get the full rule set **unconditionally**, because each is produced once per
+stage rather than once per line. Phase 12 registers its Limelight token and the
+per-line path switches on.
+
+**Also for Phase 12:** ``--api-token`` is **not** in the shared
+``SECRET_BEARING_LONG_FLAGS`` (``--auth-token``, ``--access-token``,
+``--session-token``, ``--api-key`` are). The registry covers it, but the real
+Limelight flag should be checked against that list.
