@@ -389,6 +389,22 @@ touch the same files; the file list for each unit is fixed by the brief.
        ``th-TH-u-nu-thai`` as well as Turkish and German. A German or Turkish
        locale alone would NOT have caught it, since neither changes the digits
        of a grouping-free integer. Restored and verified with ``sha256sum -c``.
+       **Reworked at ``e10274c``** on my instruction, because the unit had left
+       the derived duration out of the document and this phase claims to prove
+       ``AC-PRV-05`` -- "start, end, duration and exit code are recorded for
+       every process" -- and the file *is* the record. The unit's objection was
+       sound (a third number that can contradict the two it comes from) and it
+       is answered by deriving at write time rather than storing:
+       ``durationMillis`` is emitted next to ``end`` and is a component of no
+       record type. I checked the result independently, recomputing all three
+       values with python ``datetime`` from the documents' own rendered
+       timestamps: run 2039750, comet 1950500, percolator 91125, all agreeing,
+       and the running run carrying ``null`` for both ``end`` and
+       ``durationMillis``. One subtlety the unit found and unit 9 was told:
+       the value derives from the millisecond-TRUNCATED instants, because the
+       pinned run starts at ``09:14:00.250999999Z`` and renders ``.250Z`` --
+       raw subtraction gives 2039749, and only 2039750 is checkable against
+       the document a reader can see.
 
    * - 8
      - B
