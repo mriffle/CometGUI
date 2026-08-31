@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A badly-behaved scientific tool, on demand.
@@ -147,6 +148,12 @@ public final class FakeTool {
 
     /** Reported when the {@code hang-with-child} child fails to start or announce itself. */
     private static final int EXIT_CHILD_FAILED = 70;
+
+    /** Reported when the watchdog on a hanging scenario fires. Never produced by a signal. */
+    private static final int EXIT_WATCHDOG = 71;
+
+    /** How long a hanging scenario waits to be killed before halting itself. See blockForever. */
+    private static final int WATCHDOG_SECONDS = 300;
 
     private static final PrintStream OUT =
             new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8);
@@ -454,9 +461,37 @@ public final class FakeTool {
         raw.flush();
     }
 
+    /**
+     * Blocks until this program is killed, or until the watchdog gives up on it.
+     *
+     * <p><strong>Why a watchdog and not a real forever.</strong> PIT runs the whole test suite once
+     * per mutation in a minion JVM it kills at its own timeout. A mutant that breaks cancellation
+     * makes a hanging-scenario test block; the minion is killed mid-test, the test's {@code
+     * finally} never runs, and this process is reparented to PID 1 -- which, in this container, is
+     * not an init that reaps anything. Two mutation runs during phase 03 unit 2 left eight such
+     * processes alive for ever. {@code scripts/build.sh} runs that goal in its gates stage, so
+     * every full build would do it again.
+     *
+     * <p><strong>Why it cannot make a cancellation test pass by accident,</strong> which is the
+     * only reason a watchdog would be a bad idea here. The bound is {@value #WATCHDOG_SECONDS}
+     * seconds, one to two orders of magnitude longer than any timeout in this phase's tests, and
+     * the exit is {@link #EXIT_WATCHDOG}, a code no signal produces -- a cancelled process exits
+     * 143 for {@code SIGTERM} or 137 for {@code SIGKILL}, and the cancellation tests assert those
+     * numbers exactly. A test that only passed because the watchdog fired would see 71 and fail.
+     *
+     * <p>{@link Runtime#halt} rather than {@link System#exit}, because {@code hang-ignoring-term}
+     * deliberately installs a shutdown hook that never returns, and {@code exit} would wait for it.
+     */
     private static void blockForever() {
         try {
-            new CountDownLatch(1).await();
+            if (!new CountDownLatch(1).await(WATCHDOG_SECONDS, TimeUnit.SECONDS)) {
+                ERR.println(
+                        "fakes.FakeTool: watchdog fired after "
+                                + WATCHDOG_SECONDS
+                                + "s; nothing killed this process, so it is halting itself");
+                ERR.flush();
+                Runtime.getRuntime().halt(EXIT_WATCHDOG);
+            }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }

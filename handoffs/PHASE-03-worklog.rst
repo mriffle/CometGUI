@@ -369,4 +369,139 @@ agent against this machine and all recorded because they change a design:
 ``cometgui-provenance`` changes in the tree at the time belong to the Phase 04
 agent and were never staged by this phase.
 
+Unit 2 -- the core process service
+==================================
 
+:Agent: fresh phase agent, spawned 2026-08-31
+:Commit: ``3797a86``, plus the orchestrator's watchdog repair in the sign-off
+   commit
+:Outcome: **ACCEPTED**
+
+**What was built.** Six main classes in ``org.cometgui.tools.process`` --
+``ProcessService`` (the one ``ProcessBuilder`` in the product),
+``StartedProcess``, ``ProcessTree``, ``StreamPump``, ``LineSplitter``,
+``GuardedListener`` -- and six test classes. 3,639 lines.
+
+**What I ran.** I read the whole diff, then, myself:
+
+* ``mvn -o -B -pl cometgui-process -am verify`` -- **BUILD SUCCESS**,
+  ``Tests run: 118, Failures: 0, Errors: 0, Skipped: 0`` in
+  ``cometgui-process`` and ``Tests run: 256, Failures: 0`` in
+  ``cometgui-domain``; ``BugInstance size is 0`` for both modules;
+  ``You have 0 Checkstyle violations`` from all four executions.
+* ``mvn -o -B -pl cometgui-process org.pitest:pitest-maven:mutationCoverage``
+  -- **``Generated 95 mutations Killed 91 (96%)``**, line coverage
+  ``227/241 (94%)``, against ``R-TEST-02``'s 80% threshold. The module's own
+  POM now carries ``<cometgui.mutation.skip>false</cometgui.mutation.skip>``;
+  nothing was narrowed, excluded or lowered.
+* ``grep -rn "Thread\.sleep\|TimeUnit\.[A-Z_]*\.sleep\|LockSupport\.park"
+  cometgui-process/src`` -- no output.
+* ``grep -rn "new ProcessBuilder" cometgui-process/src/main`` -- exactly one
+  hit, ``ProcessService.java:152``.
+
+**Three defects I injected into the production code, none of them one the agent
+had used.**
+
+*Injection 1 -- the constructed environment of* ``R-PROC-04``. Deleting
+``builder.environment().clear()`` so the JVM's environment is inherited. Four
+tests failed, each naming the real value that leaked in::
+
+    ProcessServiceTest.anEmptyEnvironmentIsTrulyEmpty
+      expected: <[... env PATH -absent-, env HOME -absent-, env LANG -absent-,
+                  envcount 0]>
+      but was:  <[... env PATH /mnt/10TBdrive/.../bin:..., env HOME /home/agent,
+                  env LANG C.UTF-8, envcount 43]>
+
+*Injection 2 -- the heap bound of* ``R-PROC-03``. Raising
+``LineSplitter.DEFAULT_MAXIMUM_LINE_LENGTH`` to ``Integer.MAX_VALUE``, which is
+the change someone would actually make to stop a long line being split::
+
+    LineSplitterTest.theDefaultCapIs65536 expected: <65536> but was: <2147483647>
+    ProcessServiceTest.longLinesAreSplitAtTheCap expected: <20> but was: <5>
+
+*Injection 3 -- the decoder.* ``CodingErrorAction.REPLACE`` to ``REPORT``::
+
+    ProcessServiceTest.malformedBytesBecomeTheReplacementCharacter
+      expected: <[A<U+FFFD>(B]>
+      but was:  <[[cometgui] standard output could not be read:
+                  java.nio.charset.MalformedInputException: Input length = 1]>
+
+The third also shows the pump's contract holding: a read failure becomes a
+visible line rather than silence.
+
+An earlier form of injection 2 -- ``if (false && ...)`` -- was rejected by
+Checkstyle's ``SimplifyBooleanExpression`` before any test ran. Worth knowing:
+the quality gate constrains what an injection may look like, and an injection
+that cannot compile has proved nothing.
+
+**The agent found the recurring project defect in its own test, and said so.**
+Its first "the exit is the last event, exactly once" test stayed green with
+``joinUninterruptibly(standardOutputPump)`` deleted -- the assertion held only
+because the pumps happened to finish first. PIT agreed: both join-removal
+mutants survived. It added two tests that park a pump inside the listener and
+then watch a negative window for an early ``onExit``; each injected join
+deletion now fails one of them deterministically. **Anything that later
+simplifies** ``awaitCompletionAndNotify`` **must re-run that injection.**
+
+.. _p03-pit-orphans:
+
+Repair: PIT leaks hanging fakes, and would have on every full build
+-------------------------------------------------------------------
+
+PIT runs the suite once per mutation in a minion JVM it kills at its own
+timeout. A mutant that breaks cancellation makes a hanging scenario block; the
+minion is killed mid-test, the test's ``finally`` never runs, and the fake is
+reparented to PID 1, which in this container reaps nothing. The agent's two runs
+left eight such processes; mine left four. ``scripts/build.sh`` runs that goal in
+its ``gates`` stage, so every full build would add more.
+
+I fixed it inside the fake rather than in the build script, which is not this
+phase's file. ``FakeTool``'s hanging scenarios now wait ``WATCHDOG_SECONDS =
+300`` and then ``Runtime.getRuntime().halt(71)``.
+
+**Why that cannot make a cancellation test pass by accident**, which is the only
+reason a watchdog would be the wrong answer here: 300 seconds is one to two
+orders of magnitude longer than any timeout in this phase, and 71 is a code no
+signal produces -- a cancelled process exits 143 (``SIGTERM``) or 137
+(``SIGKILL``), and the cancellation tests assert those numbers exactly, so a
+test that only passed because the watchdog fired would see 71 and fail.
+``Runtime.halt`` rather than ``System.exit`` because ``hang-ignoring-term``
+deliberately installs a shutdown hook that never returns.
+
+.. _p03-watchdog-observed:
+
+**Observed, not assumed.** My own PIT run left four orphaned fake JVMs. I
+sampled ``ps -eo pid,ppid,args | awk '$2==1 && /fakes.FakeTool/'`` every 30
+seconds and killed nothing::
+
+    19:04:51 orphaned FakeTool JVMs: 4
+    19:05:21 orphaned FakeTool JVMs: 4
+    19:05:51 orphaned FakeTool JVMs: 4
+    19:06:21 orphaned FakeTool JVMs: 4
+    19:06:51 orphaned FakeTool JVMs: 3
+    19:07:21 orphaned FakeTool JVMs: 0
+
+PIT started at about 19:01, which puts the transition where a 300-second
+watchdog puts it. The machine cleans itself now.
+
+**Findings from this unit that later phases must know:**
+
+#. **With an empty environment the child JVM's** ``sun.jnu.encoding`` **falls
+   back to ASCII**, so a non-ASCII environment *value* passed to a tool would be
+   corrupted at the child's end. This phase keeps environment values ASCII and
+   flags it rather than papering over it.
+#. **The cancellation exit codes 143 and 137 are Linux-specific.** A Windows or
+   macOS run will need different literals, and no machine here can check that.
+#. ``ProcessService.closeStandardInput`` is package-private and static purely so
+   it can be proved: "the pipe was closed" is otherwise unobservable, and PIT's
+   ``VoidMethodCallMutator`` deletes an unobservable call for free.
+
+**Four surviving mutations**, all argued as equivalent and all in the same
+shapes: the ``if (interrupted) Thread.currentThread().interrupt()`` re-assert in
+the uninterruptible-wait idiom (nothing interrupts a daemon completion thread);
+``pump.join()`` removal inside a ``while (pump.isAlive())`` loop, which is more
+CPU and identical behaviour; ``depthBelow``'s ``<`` to ``<=``, reachable only
+with a cycle in the parent chain and returning the same value either way; and
+``read >= 0`` to ``read > 0`` where ``InputStreamReader.read(char[8192])``
+cannot return 0. The score is 96% with all four counted as failures, so none of
+them is load-bearing for the gate.
