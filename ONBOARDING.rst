@@ -169,13 +169,16 @@ one phase, start to finish.
 * **Signs off every work unit before moving on** (:ref:`sign-off`). Unsigned
   work does not accumulate: a unit is accepted, sent back for rework, or
   explicitly recorded as deferred with a reason.
-* May run several phase agents concurrently when their units do not touch the
-  same files; serialises them when they do. This still applies **within** a
-  phase -- the one-at-a-time rule is about phases, not work units -- but see
-  :ref:`onboarding-no-parallel-phases` for the two traps that bite parallel
-  agents at any tier: a root ``mvn clean verify`` deleting a sibling's
-  ``target/``, and an unfiltered ``spotless:apply`` reformatting another agent's
-  files.
+* **Runs work units SERIALLY by default.** The owner set this on 2026-08-31:
+  *phase agents must not run in parallel if there is ANY chance they will step
+  on each other.* Parallelism is not the default with a collision test applied
+  to it -- **serial is the default**, and running two agents at once requires a
+  positive argument that collision is *impossible*, recorded in the work log
+  before they start. "They touch different files" is **not** that argument and
+  has already been shown to be false; see
+  :ref:`onboarding-what-agents-actually-share`. If in doubt, serialise. The cost
+  of a serial run is time; the cost of a collision is money, a corrupted
+  measurement and a defect that looks like someone's code.
 * Maintains ``handoffs/PHASE-nn-worklog.rst`` as it goes, and writes
   ``handoffs/PHASE-nn-handoff.rst`` before finishing -- whether the phase
   passed, stalled or was abandoned.
@@ -236,6 +239,39 @@ rule exists.
    security-relevant drift ``R-SEC-03`` exists to prevent. Only the tier above
    both phases could see it, and only by reading the working tree rather than
    either phase's report.
+
+.. _onboarding-what-agents-actually-share:
+
+What parallel agents actually share (the file list is not the answer)
+----------------------------------------------------------------------
+
+Every collision on 2026-08-31 happened between agents that were **respecting
+their file boundaries**. Source-file disjointness is necessary and nowhere near
+sufficient. Two agents in one checkout also share, at minimum:
+
+* **the Maven working tree.** ``scripts/build.sh`` runs ``mvn clean verify`` at
+  the repository *root*, which deletes ``target/`` under every module including
+  the one another agent is mid-build in;
+* **the local repository** ``_build/m2repo``, which is not safe for concurrent
+  writes even when the modules differ;
+* **the scratchpad directory.** Sibling agents share one root. Two agents wrote
+  ``inject.py`` to it; injections then ran the *other* agent's script, changed
+  nothing, and the suite went green -- a defect that silently stopped existing;
+* **formatter and linter invocations.** An unscoped ``spotless:apply``
+  reformatted 24 files across another agent's in-progress work;
+* **the strict documentation gate**, which is global: one short title underline
+  fails the build for everybody;
+* **the git index**, which is why work is committed by *exact file path* and
+  never by directory;
+* **each other's locks.** Two phase-local ``flock`` files do not serialise
+  against one another. A lock only works if both parties agree on it.
+
+And the measurement consequence, which is worse than the friction: **a coverage
+or mutation number taken while another agent is mid-landing is
+uninterpretable, and it can read HIGH.** A class whose test does not compile is
+often absent from the report entirely, and an absent class does not lower an
+average -- it leaves the sample. That is how "All coverage checks have been met"
+was once reported over a class carrying 79 uncovered mutations.
 
 The first two are hazards with cheap workarounds. The third is the argument:
 **two agents can respect every path boundary and still build the same thing
