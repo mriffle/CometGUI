@@ -410,7 +410,52 @@ Deferred
 
 pending
 
+Open items the orchestrator is carrying
+=======================================
+
+Neither is a blocker; both are written down so that they cannot be forgotten
+between units.
+
+The mutation switch is set but has not yet been seen to *run*
+    ``cometgui-provenance/pom.xml`` now carries
+    ``<cometgui.mutation.skip>false</cometgui.mutation.skip>`` (``4c16864``).
+    The POM parses and ``mvn validate`` is clean, and PIT has been observed
+    producing 8 mutations for this module -- but only with
+    ``-Dcometgui.mutation.skip=false`` forced on the command line, which is
+    not the path ``scripts/build.sh`` takes. Confirm at the next sign-off that
+    a plain ``org.pitest:pitest-maven:mutationCoverage`` with no override
+    produces ``cometgui-provenance/target/pit-reports/mutations.xml``. A
+    switch that is set and inert is exactly the failure this project keeps
+    finding.
+
+Exact read counts assume a full-length read, which POSIX does not guarantee
+    Units 1's groups 6 and 8 assert the number of ``read(byte[], int, int)``
+    calls exactly, which is only deterministic because a read of a regular
+    file returns everything asked for on this platform. POSIX permits a short
+    read. The assertions were left exact deliberately: the counts are what
+    catch a second pass and a byte-at-a-time loop, and a genuine short read is
+    itself worth failing on and looking at. **Phase 15 owns the version and
+    platform matrix and should watch these two groups on Windows and macOS.**
+    If they prove flaky there the repair is to keep the open, close, stream
+    and total-byte counts exact and relax only the read-call count -- never to
+    delete the group.
+
 Blockers escalated
 ==================
 
-pending
+None so far. Phase 03's process service has not been needed: nothing in this
+phase launches a process, and the fake-tool corpus in
+``src/test/resources/fakes/`` has not been read or referenced.
+
+An environment observation for tier 1, not a blocker
+----------------------------------------------------
+
+Two phase orchestrators are live in one working tree, and both run Maven. A
+root ``mvn clean verify`` from one deletes ``target/`` under the other, and the
+main orchestrator's own baseline build was seen to fail this way at 17:32
+while this phase's opening ``scripts/build.sh`` was running. This phase has
+since kept to ``-pl cometgui-provenance -am`` and has run its units strictly
+one at a time rather than in the parallel waves the decomposition allows,
+which costs wall-clock time and buys clean signal: a coverage gate is
+module-wide, so two agents landing half-tested code in the same module would
+fail each other's builds for reasons neither could diagnose.
