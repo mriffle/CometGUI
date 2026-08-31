@@ -19,6 +19,7 @@ package org.cometgui.provenance.events;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -280,6 +281,203 @@ class EventLogSecrecyTest {
                         "{\"message\":\"upload: key material follows\\n[REDACTED]\\nupload:"
                                 + " done\"}"),
                 Files.readString(log, UTF_8));
+    }
+
+    // -------------------------------------------------------------------------------------
+    // The reader's error path, which is the one place file content is quoted back.
+    // -------------------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a secret in key position does not reach the defect the reader reports")
+    void aSecretInKeyPositionIsRedactedOutOfTheDefect() throws IOException {
+        // A key this application could never have written -- it is not lower-case and dotted --
+        // carrying a corpus secret in the shape a client library's debug output uses.
+        Path log = doctoredLogWithKey("password=" + PASSWORD);
+
+        RecoveredEventLog recovered = ProvenanceEventLogReader.recover(log);
+
+        assertAll(
+                () -> assertEquals(1, recovered.defects().size()),
+                () ->
+                        assertEquals(
+                                "a record this application would not have written: a payload key"
+                                        + " must be lower-case ASCII, either one segment or dotted"
+                                        + " segments, matching"
+                                        + " (?:[a-z0-9]+(\\.[a-z0-9-]+)+)|[a-z0-9]+, but was:"
+                                        + " \"password=[REDACTED]",
+                                recovered.defects().get(0).detail()),
+                () ->
+                        assertFalse(
+                                recovered.defects().get(0).detail().contains(PASSWORD),
+                                "the seeded password reached a defect detail"));
+    }
+
+    @Test
+    @DisplayName("an ordinary bad key is still named, so the diagnostic survives the redaction")
+    void anOrdinaryBadKeyIsStillNamed() throws IOException {
+        Path log = doctoredLogWithKey("runId");
+
+        RecoveredEventLog recovered = ProvenanceEventLogReader.recover(log);
+
+        // The half that stops the fix from degenerating into redacting everything: a phase author
+        // who wrote runId must still be told which key was wrong.
+        assertEquals(
+                "a record this application would not have written: a payload key must be"
+                        + " lower-case ASCII, either one segment or dotted segments, matching"
+                        + " (?:[a-z0-9]+(\\.[a-z0-9-]+)+)|[a-z0-9]+, but was: \"runId\"",
+                recovered.defects().get(0).detail());
+    }
+
+    @Test
+    @DisplayName("a bare secret in key position needs the registry, exactly as the corpus records")
+    void aBareSecretInKeyPositionNeedsTheRegistry() throws IOException {
+        Path log = doctoredLogWithKey(SWORDFISH);
+
+        RecoveredEventLog patternsOnly = ProvenanceEventLogReader.recover(log);
+        RecoveredEventLog loaded =
+                ProvenanceEventLogReader.recover(
+                        log, SecretRedactor.with(SecretRegistry.copyOf(CORPUS)));
+
+        assertAll(
+                // Stated rather than hidden: a bare token with no surrounding syntax is exactly
+                // the carrier SeededSecretCorpusTest lists as one only the registry clears, so the
+                // pattern rules alone leave it standing.  That is why recover takes a redactor.
+                () ->
+                        assertTrue(
+                                patternsOnly.defects().get(0).detail().contains(SWORDFISH),
+                                "the pattern rules now clear a bare token, which would make the"
+                                        + " registry overload look unnecessary"),
+                () ->
+                        assertEquals(
+                                "a record this application would not have written: a payload key"
+                                        + " must be lower-case ASCII, either one segment or dotted"
+                                        + " segments, matching"
+                                        + " (?:[a-z0-9]+(\\.[a-z0-9-]+)+)|[a-z0-9]+, but was:"
+                                        + " \"[REDACTED]\"",
+                                loaded.defects().get(0).detail()),
+                () ->
+                        assertFalse(
+                                loaded.defects().get(0).detail().contains(SWORDFISH),
+                                "the seeded token reached a defect detail"));
+    }
+
+    @Test
+    @DisplayName("a megabyte of junk in key position does not become a megabyte of defect")
+    void aVeryLongKeyIsBounded() throws IOException {
+        Path log = doctoredLogWithKey("Y".repeat(1000));
+
+        RecoveredEventLog recovered = ProvenanceEventLogReader.recover(log);
+        String detail = recovered.defects().get(0).detail();
+
+        assertAll(
+                () -> assertEquals(512, detail.length()),
+                () -> assertTrue(detail.endsWith(" [truncated]")),
+                () ->
+                        assertTrue(
+                                detail.startsWith(
+                                        "a record this application would not have written: a"
+                                                + " payload key must be lower-case ASCII,"),
+                                "the bound ate the diagnostic instead of the junk"));
+    }
+
+    @Test
+    @DisplayName("the bound is inclusive: 512 characters survive whole, 513 are cut")
+    void theBoundIsInclusive() throws IOException {
+        // The fixed part of this message is 189 characters (counted with python3 over the same
+        // literals), so a key of 323 Y's makes a detail of exactly 512 and one of 324 makes 513.
+        // Both sides of the boundary are asserted, because an off-by-one here is invisible in
+        // ordinary use: it would only ever cut twelve characters off one message in a thousand.
+        Path exactly = doctoredLogWithKey("Y".repeat(323));
+        Path oneMore = doctoredLogWithKey("Y".repeat(324));
+
+        String atTheBound = ProvenanceEventLogReader.recover(exactly).defects().get(0).detail();
+        String pastIt = ProvenanceEventLogReader.recover(oneMore).defects().get(0).detail();
+
+        assertAll(
+                () -> assertEquals(512, atTheBound.length()),
+                () -> assertTrue(atTheBound.endsWith("Y\""), "a detail of exactly 512 was cut"),
+                () ->
+                        assertFalse(
+                                atTheBound.endsWith(" [truncated]"),
+                                "a detail of exactly 512 was cut"),
+                () -> assertEquals(512, pastIt.length()),
+                () -> assertTrue(pastIt.endsWith(" [truncated]"), "a detail of 513 was not cut"));
+    }
+
+    @Test
+    @DisplayName("a secret straddling the cut is redacted before the cut, never after it")
+    void redactionHappensBeforeTruncation() throws IOException {
+        // The arithmetic, counted with python3 over the same literals: 188 characters of message
+        // come before the quoted key, so 307 filler characters put the secret at offset 495, and
+        // the cut falls at 500 -- five characters into it.  The trailing filler keeps the whole
+        // detail (558 characters) over the bound so that it really is truncated.
+        //
+        // This is the one arrangement that tells the two orderings apart.  Cleaning first replaces
+        // the whole token and the cut lands in the marker; cutting first leaves "sword" behind,
+        // and a five-character fragment matches neither a pattern rule nor a registered literal --
+        // the blind spot SeededSecretCorpusTest records, reached here through a code path rather
+        // than through a carrier.
+        Path log = doctoredLogWithKey("Y".repeat(307) + SWORDFISH + "Y".repeat(50));
+
+        String detail =
+                ProvenanceEventLogReader.recover(
+                                log, SecretRedactor.with(SecretRegistry.copyOf(CORPUS)))
+                        .defects()
+                        .get(0)
+                        .detail();
+
+        assertAll(
+                () -> assertEquals(512, detail.length()),
+                () -> assertTrue(detail.endsWith(" [truncated]")),
+                () ->
+                        assertFalse(
+                                detail.contains(SWORDFISH),
+                                "the seeded token survived the defect whole"),
+                () ->
+                        assertFalse(
+                                detail.contains("sword"),
+                                "a fragment of the seeded token survived the cut, so the detail"
+                                        + " was truncated before it was redacted"));
+    }
+
+    @Test
+    @DisplayName("the bound never cuts a character in half")
+    void truncationNeverSplitsACharacter() throws IOException {
+        // Each of these is one code point and two Java chars, so between the two paddings the cut
+        // lands once on a low surrogate and once on a high one.  A lone surrogate is not a
+        // character: it becomes a question mark the moment the detail is encoded for a log or a
+        // UI, which is what the round trip below detects.
+        String astral = new String(Character.toChars(0x1F600)).repeat(400);
+        for (String padding : List.of("", "a")) {
+            Path log = doctoredLogWithKey(padding + astral);
+
+            String detail = ProvenanceEventLogReader.recover(log).defects().get(0).detail();
+
+            assertTrue(detail.length() <= 512, "the detail was not bounded");
+            assertEquals(
+                    detail,
+                    new String(detail.getBytes(UTF_8), UTF_8),
+                    "the cut fell inside a character, so the detail no longer survives encoding");
+        }
+    }
+
+    /**
+     * Writes a one-line log whose payload carries the given key, which no writer would produce.
+     *
+     * @param key the raw key text, placed into the line unescaped
+     * @return the file
+     * @throws IOException if it cannot be written
+     */
+    private Path doctoredLogWithKey(String key) throws IOException {
+        Path log = directory.resolve("doctored-" + Math.abs(key.hashCode()) + ".log");
+        Files.write(
+                log,
+                ("{\"seq\":1,\"time\":\"2026-08-31T09:15:00.000Z\",\"type\":\"run.started\","
+                                + "\"payload\":{\""
+                                + key
+                                + "\":\"v\"}}\n")
+                        .getBytes(UTF_8));
+        return log;
     }
 
     // -------------------------------------------------------------------------------------

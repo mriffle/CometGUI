@@ -84,11 +84,15 @@ import java.util.Objects;
  * message this class produces names the character offset and what was expected there, and nothing
  * else.
  *
- * <p>There is exactly one exception, and it is deliberate: {@link #parse} reports a line the record
- * itself rejected by passing that rejection's message through, and {@link ProvenanceEvent} quotes a
- * payload <em>key</em> whose shape is wrong. A key is a name, and the redaction rule set never
- * redacts a name -- see the note on {@code ProvenanceEvent.requireTerminalStatusOnRunFinished}. No
- * payload value reaches a message from either class.
+ * <p>One message is not built from offsets alone: {@link #parse} reports a line that {@link
+ * ProvenanceEvent} itself rejected by passing that rejection through, and the payload-key rule
+ * quotes the offending key. That quotation is what makes the message useful to the phase author who
+ * typed {@code runId} at a call site. It is also the one route by which bytes from a file could
+ * reach a log or a UI, so it does not travel: {@link ProvenanceEventLogReader} passes every such
+ * message through the shared {@code SecretRedactor} and bounds its length before it becomes a
+ * defect, which is why the promise "no message this package produces carries file content into a
+ * log" still holds without an exception clause. No payload <em>value</em> reaches a message from
+ * either class at all.
  *
  * <p><strong>Digits are ASCII digits, tested character by character.</strong> Neither {@link
  * Character#isDigit(char)} nor {@link Long#parseLong(String)} is limited to {@code 0}-{@code 9}:

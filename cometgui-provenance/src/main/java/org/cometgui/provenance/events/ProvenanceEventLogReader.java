@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import org.cometgui.domain.secrets.SecretRedactor;
 
 /**
  * Recovers everything recoverable from an event log, however badly the writing process died.
@@ -75,11 +76,42 @@ import java.util.Objects;
  * <p>The file is read one line at a time and only one line is ever held in memory, so a log of any
  * length can be recovered; a corrupt file that contains no newline at all is the one case where
  * that line is the whole file.
+ *
+ * <p><strong>This class is the boundary at which untrusted text enters the application, and it is
+ * where the shared rule set is applied.</strong> Almost every defect detail is built from offsets
+ * and counts, but one is not: a line whose payload key has the wrong shape is reported with {@link
+ * ProvenanceEvent}'s own message, and that message quotes the key. A key is a name, and quoting it
+ * is what makes the message useful to the phase author who typed {@code runId} at a call site --
+ * but the reader is pointed at files it did not write, and a hostile or corrupted log can carry an
+ * arbitrary byte sequence in key position, including a credential. {@code R-SEC-03} has no
+ * exception clause in it, so every detail built from a parse failure goes through {@link
+ * SecretRedactor} before it becomes an {@link EventLogDefect}, and is then bounded at {@value
+ * #MAX_DETAIL_LENGTH} characters so that a megabyte of junk in key position cannot become a
+ * megabyte of defect detail.
+ *
+ * <p><strong>Redaction happens before truncation, and the order is not arbitrary.</strong>
+ * Truncating first would cut a secret in half, and half a secret matches neither a pattern rule nor
+ * a registered literal -- the exact blind spot {@code SeededSecretCorpusTest} records, where a
+ * one-character change to a key body hid it from a sweep that was looking for the whole thing.
+ * Cleaning first and cutting second cannot reintroduce what has already been replaced.
  */
 public final class ProvenanceEventLogReader {
 
     /** Bytes read from the file at a time; a line is assembled from the stream, not from this. */
     private static final int READ_BUFFER = 1 << 16;
+
+    /**
+     * The longest a defect's detail may be: {@value}.
+     *
+     * <p>Long enough that the fixed part of the longest message this package produces -- the
+     * payload-key rule, which is about 190 characters before the key itself -- still leaves a wide
+     * window of the offending key to read, and short enough that a defect list stays a thing a
+     * person can look at. See the class documentation for why a bound is needed at all.
+     */
+    private static final int MAX_DETAIL_LENGTH = 512;
+
+    /** What marks a detail that was cut short. Counted inside {@link #MAX_DETAIL_LENGTH}. */
+    private static final String TRUNCATION_MARKER = " [truncated]";
 
     /**
      * Never instantiated: this is a single operation over a path, with no state of its own.
@@ -105,8 +137,30 @@ public final class ProvenanceEventLogReader {
      * @throws NullPointerException if {@code path} is {@code null}
      */
     public static RecoveredEventLog recover(Path path) throws IOException {
+        return recover(path, SecretRedactor.patternsOnly());
+    }
+
+    /**
+     * Reads an event log, cleaning what it quotes with a redactor that knows this run's secrets.
+     *
+     * <p>The pattern rules alone catch a credential that announces itself -- an {@code
+     * Authorization} header, a credential-bearing URL, a secret-looking assignment. They cannot
+     * catch a bare token that only the application knows the value of, which is what {@code
+     * SecretRegistry} is for. A caller that holds registered credentials should recover through
+     * this overload; {@link #recover(Path)} uses the pattern rules alone, which is the right answer
+     * for a tool inspecting someone else's log and the wrong one for a live run. {@link
+     * ProvenanceEventLog} passes its own redactor here when it reopens a log after a crash.
+     *
+     * @param path the log file to recover
+     * @param redactor the rule set every quoted fragment is cleaned by before it is reported
+     * @return what was recovered and what was wrong, never {@code null}
+     * @throws IOException if the file cannot be opened or read at all
+     * @throws NullPointerException if either argument is {@code null}
+     */
+    public static RecoveredEventLog recover(Path path, SecretRedactor redactor) throws IOException {
         Objects.requireNonNull(path, "path");
-        Recovery recovery = new Recovery();
+        Objects.requireNonNull(redactor, "redactor");
+        Recovery recovery = new Recovery(redactor);
         ByteArrayOutputStream line = new ByteArrayOutputStream();
         long offset = 0;
         long lineStart = 0;
@@ -149,11 +203,18 @@ public final class ProvenanceEventLogReader {
 
         private final List<EventLogDefect> defects = new ArrayList<>();
 
+        /** Cleans every fragment that came out of the file before it is reported. */
+        private final SecretRedactor redactor;
+
         /** The sequence number the next recovered event must carry. */
         private long expectedSequence = ProvenanceEvent.FIRST_SEQUENCE;
 
         /** Counts every line the file contains, sound or not, so that a defect can be found. */
         private long lineNumber;
+
+        Recovery(SecretRedactor redactor) {
+            this.redactor = redactor;
+        }
 
         /**
          * Handles one newline-terminated line.
@@ -178,7 +239,8 @@ public final class ProvenanceEventLogReader {
             try {
                 event = EventLineFormat.parse(text);
             } catch (MalformedEventLineException notARecord) {
-                malformed(lineStart, notARecord.getMessage());
+                // The one detail that can carry bytes out of the file; see the class comment.
+                malformed(lineStart, cleanedAndBounded(notARecord.getMessage()));
                 return;
             }
             checkSequence(event, lineStart);
@@ -225,6 +287,30 @@ public final class ProvenanceEventLogReader {
                                         + event.sequence()));
             }
             expectedSequence = event.sequence() + 1;
+        }
+
+        /**
+         * Cleans a fragment that came out of the file, then bounds it.
+         *
+         * <p>Redaction first, truncation second, for the reason given on the class: half a secret
+         * matches no rule. The cut never falls between the two halves of a surrogate pair, because
+         * a lone surrogate is not a character and would be replaced the moment the detail was
+         * encoded for a log file or a UI.
+         *
+         * @param detail the message built from the file's content
+         * @return the detail with every recognised secret replaced, at most {@value
+         *     #MAX_DETAIL_LENGTH} characters long
+         */
+        private String cleanedAndBounded(String detail) {
+            String cleaned = redactor.redactText(detail);
+            if (cleaned.length() <= MAX_DETAIL_LENGTH) {
+                return cleaned;
+            }
+            int cut = MAX_DETAIL_LENGTH - TRUNCATION_MARKER.length();
+            if (Character.isHighSurrogate(cleaned.charAt(cut - 1))) {
+                cut--;
+            }
+            return cleaned.substring(0, cut) + TRUNCATION_MARKER;
         }
 
         /**

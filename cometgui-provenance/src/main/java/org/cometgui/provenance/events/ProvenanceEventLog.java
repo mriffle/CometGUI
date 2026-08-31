@@ -202,7 +202,8 @@ public final class ProvenanceEventLog implements AutoCloseable {
         Path absolute = path.toAbsolutePath();
         long nextSequence = ProvenanceEvent.FIRST_SEQUENCE;
         if (Files.exists(absolute)) {
-            nextSequence = ProvenanceEventLogReader.recover(absolute).highestSequence() + 1;
+            nextSequence =
+                    ProvenanceEventLogReader.recover(absolute, redactor).highestSequence() + 1;
             if (!endsWithTerminator(absolute)) {
                 terminateTornRecord(absolute, sync);
             }

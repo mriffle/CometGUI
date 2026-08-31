@@ -285,6 +285,12 @@ public record ProvenanceEvent(
      * reason. The quoted text is what makes the message useful to the phase author who wrote {@code
      * runId} at a call site, which is where nearly every one of these rejections happens.
      *
+     * <p>The other place a rejection can happen is {@link ProvenanceEventLogReader}, reading a file
+     * this application did not necessarily write, where the same quotation would be a way for a
+     * credential in key position to reach a log or a UI. That is handled where the untrusted text
+     * enters rather than by weakening the message here: the reader cleans every quoted fragment
+     * through the shared redactor and bounds its length. See that class for the ordering argument.
+     *
      * @param type the event type
      * @param payload the already-sorted payload
      */

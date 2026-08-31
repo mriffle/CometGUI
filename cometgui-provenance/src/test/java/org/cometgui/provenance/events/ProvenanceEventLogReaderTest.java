@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.cometgui.domain.secrets.SecretRedactor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -309,14 +310,38 @@ class ProvenanceEventLogReaderTest {
     }
 
     @Test
-    @DisplayName("a null path is rejected by name")
-    void nullPathIsRejected() {
-        assertEquals(
-                "path",
-                assertThrows(
-                                NullPointerException.class,
-                                () -> ProvenanceEventLogReader.recover(deliberateNull()))
-                        .getMessage());
+    @DisplayName("null arguments are rejected by name, on both overloads")
+    void nullArgumentsAreRejected() {
+        assertAll(
+                () ->
+                        assertEquals(
+                                "path",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () ->
+                                                        ProvenanceEventLogReader.recover(
+                                                                deliberateNull()))
+                                        .getMessage()),
+                () ->
+                        assertEquals(
+                                "path",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () ->
+                                                        ProvenanceEventLogReader.recover(
+                                                                deliberateNull(),
+                                                                SecretRedactor.patternsOnly()))
+                                        .getMessage()),
+                () ->
+                        assertEquals(
+                                "redactor",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () ->
+                                                        ProvenanceEventLogReader.recover(
+                                                                directory.resolve("events.log"),
+                                                                deliberateNull()))
+                                        .getMessage()));
     }
 
     @Test
