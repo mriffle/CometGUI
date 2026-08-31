@@ -562,6 +562,43 @@ file before anything is run; every restore is checked with ``sha256sum -c``
 rather than by eye. Per-agent subdirectories are not optional in a shared
 scratchpad.
 
+.. _p04-key-namespaces:
+
+Two key namespaces, and why only one of them needs a namespace
+==============================================================
+
+The schema has two places where a later phase invents key names: the flat
+``settings`` map, and an event's payload. Unit 4 raised the first, unit 8 the
+second, and the phase gates the SHAPE of both rather than inventing names it
+does not own the semantics of. But the two rules differ, and unit 8's argument
+for the difference is better than the one I offered, so it is recorded in its
+terms rather than mine.
+
+I had said only that ``status`` is "genuinely global" while ``percolator.seed``
+is "genuinely namespaced" -- an observation, not a rule. The rule is this. **A
+settings key needs two segments because the settings map is one flat dictionary
+shared by every phase in a run** -- Percolator's seed, the Limelight conversion
+parameters and the result view's q filters all live in the same map -- so a
+bare ``seed`` is ambiguous about which tool owns it and the first segment is
+what disambiguates it. **A payload is not that.** It is scoped to a single
+event that already carries its ``ProvenanceEventType``, so ``stage`` inside a
+``stage.started`` event cannot collide with anything and ``stage.name`` would
+only restate the type in the key.
+
+So a payload key may be a single bare lower-case segment as well as the dotted
+form, while a settings key may not. Everything that was actually doing the work
+is kept in both: lower-case ASCII, digits, dots and hyphens, no underscore, no
+camel case, no empty segment, no leading or trailing dot. ``runId``, ``run_id``,
+``RUN.ID``, ``run.``, ``.id``, ``run..id`` and ``""`` are rejected in both.
+
+The payload rule is *composed from* the settings constant rather than copied,
+and a test asserts the composition still contains it -- so a later
+copy-and-edit fails rather than merely looking untidy. Unit 8 proved that
+assertion rather than trusting it, by drifting the copy a single character
+(``[a-z0-9-]`` to ``[a-z0-9_-]``, quietly allowing underscores) and watching
+``the payload rule no longer contains the settings rule ==> expected: <true>
+but was: <false>``.
+
 Rejections and rework
 =====================
 
