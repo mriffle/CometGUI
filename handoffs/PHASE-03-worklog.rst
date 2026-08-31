@@ -1048,3 +1048,121 @@ considered. This phase's other pattern, ``".*/tools/process/.*[.]java"``, does
 match, because that path component really exists. **A scoped formatter that
 silently scopes to zero files is a green build that checked nothing** -- check
 the file count Spotless reports, never the exit code.
+
+Unit 4 -- the stage layer
+=========================
+
+:Agent: fresh phase agent, run concurrently with unit 6 in a different module
+:Commits: ``a9479ec`` and ``a2567f5``
+:Outcome: **ACCEPTED**
+
+**What was built.** ``StageRunner`` / ``RunningStage`` / ``StageOutcome`` /
+``RunMessageSink`` public, and ``StageRecorder``, ``StageLogFile``,
+``StageLogFormat``, ``ToolStream`` package-private. 3,543 lines, 80 new tests. No
+existing production class modified; ``cometgui-domain`` untouched.
+
+**What I ran myself:** ``mvn -o -B -pl cometgui-process -am verify`` --
+**BUILD SUCCESS**, ``Tests run: 239, Failures: 0, Errors: 0, Skipped: 0`` (159
+before), ``Tests run: 359`` in ``cometgui-domain``, ``BugInstance size is 0``,
+``0 Checkstyle violations``; and
+``... -am test-compile org.pitest:pitest-maven:mutationCoverage`` --
+``Generated 175 mutations Killed 168 (96%)``, line coverage ``452/472 (96%)``.
+**Zero survivors in the seven new classes**; the seven remaining are unit 2's
+already-argued equivalents.
+
+**The ownership decision is implemented as decided.** ``RunMessageSink`` is a
+one-method functional interface taking a ``LogMessage``. The
+``BoundedMessageLog`` does not move, the composition root publishes nothing, and
+what crosses the boundary is a method reference -- so the process service can
+append and cannot read the console, clear it, or learn its discard count.
+
+**"As it arrives" is proved while the tool is still running**, which is the only
+way to tell it from "all at the end": the test parks the stdout pump *inside the
+sink* at line 100 of a 20,000-line run, asserts the stage is still alive, and
+reads **exactly 103 lines** off disk -- two header lines plus lines 0 to 100 --
+with positions 2, 3, 52, 101 and 102 pinned by hand.
+
+**My injections.** Removing the per-line flush and replacing ``CREATE_NEW`` with
+``CREATE`` + ``TRUNCATE_EXISTING`` (so a re-run overwrites the first attempt)::
+
+    StageRunnerTest.linesAreOnDiskWhileTheToolRuns
+      two header lines and the 101 output lines up to the one the sink is
+      holding: buffered output would give 2, and a flush per line gives exactly
+      this ==> expected: <103> but was: <0>
+    StageRunnerTest.aRerunKeepsTheFirstAttempt
+      expected: </tmp/.../logs/comet.1.log> but was: </tmp/.../logs/comet.log>
+    StageLogFileTest.refusesWhenTheNamesRunOut
+      Expected java.io.IOException to be thrown, but nothing was thrown.
+
+And deleting the one line that puts a tool's output into the console sink::
+
+    StageRecorderTest.aHealthyStageIsQuiet:149
+      expected: <[Comet version 2024.01]> but was: <[]>
+    StageRunnerTest.nothingOfTheSecretSurvives
+      expected: <[argc 1, arg 0 [REDACTED], cwd /tmp/..., env [REDACTED]
+                  -absent-, envcount 0]> but was: <[]>
+    StageRecorderTest.theConsoleMessageIsTagged:162
+      ? ArrayIndexOutOfBounds Index 0 out of bounds for length 0
+    Tests run: 239, Failures: 8, Errors: 1
+
+.. _p03-stale-class-harness-failure:
+
+The harness failure I nearly recorded as a finding
+---------------------------------------------------
+
+**The first time I ran that last injection it reported ``Tests run: 239,
+Failures: 0`` and BUILD SUCCESS, and I was two minutes from writing "deleting
+the console wiring leaves the whole suite green" into this log as a hole in the
+phase.** It was not a hole. The defect was in the source file -- I read it back
+and saw it -- but the run was evaluated against a **stale compiled class**.
+
+I caught it only because tier 1 had told this phase to confirm an injection
+landed rather than trusting the edit, so I hashed the compiled class::
+
+    class sha BEFORE the injected run:  8b952b15a99d4c3e...
+    class sha AFTER  the injected run:  8b952b15a99d4c3e...   <- unchanged
+    class sha after re-injecting:       640d1c8e30ee922c...   <- 8 failures
+
+A byte-identical re-injection later gave nine failures. I could not reproduce
+the skip on demand -- a deliberate repeat compiled correctly -- so **I am not
+claiming a mechanism I did not establish.** What is established:
+
+* an injection can be present in the source and absent from the class the tests
+  actually run;
+* ``mvn ... test`` reports it as a clean, green build, with no diagnostic;
+* the only thing that distinguishes the two cases is **the compiled artefact**,
+  not the source, not the exit code and not the test count.
+
+The most likely contributor is that unit 4's own agent was still running Maven
+in this same working tree at that moment -- it reported afterwards that it had
+seen my injected file and deliberately left it alone. That is one more argument
+for the owner's serialisation rule, and it is why every injection from here on
+is confirmed by hashing the ``.class``.
+
+**This is the Phase 02 trap in its most dangerous form.** Phase 02's version was
+an injection overwritten by a second assignment, which produced a *false pass*
+of a gate that was fine. This one would have produced a *false finding* -- a
+phase report claiming a hole that does not exist, which is worse, because
+somebody would then have "fixed" working code.
+
+**Findings from this unit that later phases must know:**
+
+#. **A raw NUL byte reached a test source file and git classified the whole
+   21 KB file as binary.** ``git show`` printed ``Bin 0 -> 21852 bytes`` instead
+   of a diff, so a reviewer reading that commit would have seen **no test file
+   at all**. It compiled and the test passed. Repaired in ``a2567f5``. The
+   agent could not identify the mangling step. **Worth a scan of other phases'
+   sources**, and worth knowing that a clean ``git show`` is not proof a commit
+   contains reviewable text.
+#. **The timeout is measured in real time, not from the injected clock**, and
+   that is deliberate: a fixed clock never advances, so a clock-driven timeout
+   would never fire and a clock-polling one needs a sleeping thread.
+   ``CompletableFuture.orTimeout`` on the JDK's delayed executor parks nothing.
+#. ``orTimeout`` **mutates the future it is called on**, so it runs on a copy --
+   otherwise a stage that finished normally would have its outcome completed
+   exceptionally.
+#. **The disk is the record and the console is a view.** A sink that throws on
+   every line still yields a complete log file; the ordering inside ``record``
+   is one clock read, redact once, count, disk, then sink.
+#. ``StageOutcome`` **holds no environment at all** -- the way not to print an
+   environment value is not to hold one.
