@@ -414,7 +414,22 @@ touch the same files; the file list for each unit is fixed by the brief.
        complete event from a torn file. Accepts: a simulated crash mid-run
        leaves a parsable log whose recovered events are asserted by content.
      - ``R-PROV-05``, ``AC-PRV-06``
-     - pending
+     - **SIGNED OFF 2026-08-31** at ``8f00cae``/``4c33b79``, after two rework
+       rounds. Gate item 4 is proved by tearing a real file, not by argument.
+       The unit's own best evidence is defect (f): replacing the newline
+       terminator with a comma makes one crash turn the whole log into a single
+       torn line and recover **zero** events -- which proves the line-oriented
+       design rather than asserting it. My first injection made recovery stop
+       at the first defect instead of continuing past it, dressed as "once the
+       log is damaged the rest cannot be trusted": two failures, the telling one
+       being ``expected: <[1, 3]> but was: <[1]>`` -- a malformed line in the
+       MIDDLE with good events after it, which is exactly the "usable history"
+       the gate item is about. My second went at the rework's own reasoning,
+       swapping clean-then-bound for bound-then-clean with a plausible
+       efficiency excuse; it failed with ``a fragment of the seeded token
+       survived the cut, so the detail was truncated before it was redacted``,
+       a message written for the reasoning rather than the outcome. Restored,
+       ``sha256sum -c`` OK, marker count 0.
 
    * - 9
      - C
