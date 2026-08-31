@@ -163,7 +163,7 @@ class HugeFileHashingTest {
      * <p><strong>Why the other fifteen sixteenths.</strong> The sampler cannot separate the
      * hasher's live objects from the harness's, and several things in a Surefire fork legitimately
      * survive a collection mid-run: the JaCoCo agent's per-class probe arrays, JIT and
-     * compiler-thread structures promoted while an eleven-second loop is optimised, JUnit's
+     * compiler-thread structures promoted while a fourteen-second loop is optimised, JUnit's
      * descriptors for the executing test, and Surefire's output pumps. 4 MiB leaves a factor of
      * roughly fifteen for all of that.
      *
@@ -183,8 +183,8 @@ class HugeFileHashingTest {
      * <p>Without this the whole measurement is vacuous in the one way that matters: a watchdog that
      * never started, or that died on its first sample, reports a peak equal to its baseline, a
      * growth of zero, and a bound that passes while measuring nothing. Hashing 2 GiB takes about
-     * eleven seconds here and the watchdog samples every {@value #SAMPLE_INTERVAL_MILLIS} ms, so a
-     * healthy run takes of the order of a hundred samples; a machine four times faster still takes
+     * fourteen seconds here and the watchdog samples every {@value #SAMPLE_INTERVAL_MILLIS} ms, so
+     * a healthy run takes of the order of eighty samples; a machine four times faster still takes
      * more than twenty.
      */
     private static final int MINIMUM_SAMPLES = 8;
