@@ -815,7 +815,7 @@ A composite figure that cannot be reproduced in one command is not evidence.
 .. _p04-skip-audit:
 
 Audit: is any test excluded, disabled or scoped out to keep a suite green?
-=========================================================================
+==========================================================================
 
 Asked directly by tier 1, because a sentence in one of my escalations -- "a
 unit had excluded its test to get a green suite" -- describes a hard-rule
