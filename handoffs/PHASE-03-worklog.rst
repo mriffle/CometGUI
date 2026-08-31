@@ -135,6 +135,27 @@ launched as a real external process through the project JDK's own ``java``
 binary. One implementation, genuinely cross-platform, and it can spawn real
 descendants.
 
+The mutation gate switches ON in this module, because the POM already said so
+----------------------------------------------------------------------------
+
+``pom.xml``'s PIT ``<targetClasses>`` already contains
+``org.cometgui.tools.*`` -- written by Phase 01 with the comment "command
+builders, version and capability rules, secret redaction in the process
+service". ``scripts/build.sh``'s drift guard re-derives those prefixes **from
+the POM** and fails any module that compiles a class under one of them without
+setting ``<cometgui.mutation.skip>false</cometgui.mutation.skip>``. So the
+moment this phase writes its first class, ``cometgui-process`` falls under
+``R-TEST-02``'s **80% mutation threshold**, and this phase switches the gate on
+in its own module POM rather than discovering it at the end. The JaCoCo
+90/85 gate does *not* apply: ``COVERAGE_GATED_PREFIXES`` is domain, params and
+provenance, which matches the specification's "adapters covered by real
+integration tests rather than artificial line counts".
+
+Consequence for the design: everything that can be pure logic is pure logic in
+its own small class -- line splitting, redaction, log-line rendering, the
+outcome value -- because a mutation in a thread-timing path is much harder to
+kill than a mutation in a function.
+
 Units are run serially
 ----------------------
 
