@@ -510,17 +510,24 @@ The mutation switch is set but has not yet been seen to *run*
     switch that is set and inert is exactly the failure this project keeps
     finding.
 
-Exact read counts assume a full-length read, which POSIX does not guarantee
+Exact read counts are a PLATFORM ASSUMPTION, stated here deliberately
     Units 1's groups 6 and 8 assert the number of ``read(byte[], int, int)``
     calls exactly, which is only deterministic because a read of a regular
     file returns everything asked for on this platform. POSIX permits a short
     read. The assertions were left exact deliberately: the counts are what
     catch a second pass and a byte-at-a-time loop, and a genuine short read is
-    itself worth failing on and looking at. **Phase 15 owns the version and
-    platform matrix and should watch these two groups on Windows and macOS.**
-    If they prove flaky there the repair is to keep the open, close, stream
-    and total-byte counts exact and relax only the read-call count -- never to
-    delete the group.
+    itself worth failing on and looking at.
+
+    **The decision, stated so that a future CI failure reads as a documented
+    expectation rather than a mystery.** The read-CALL count is an assertion
+    about this platform as much as about this code, and it is kept exact
+    anyway. **Phase 15 owns the version and platform matrix and should watch
+    these two groups on Windows and macOS.** If they prove flaky there, the
+    repair is to relax the read-call count ALONE. The count of BYTES summed
+    over every stream opened must stay exact in every case: that is the
+    assertion which actually catches a second pass over the file, and it is
+    the one that failed when the two-pass defect was injected. Relaxing it
+    would return the suite to the state that was rejected at unit 1.
 
 Two findings from unit 2 that later phases must not lose
 --------------------------------------------------------
@@ -555,12 +562,37 @@ phase launches a process, and the fake-tool corpus in
 An environment observation for tier 1, not a blocker
 ----------------------------------------------------
 
-Two phase orchestrators are live in one working tree, and both run Maven. A
-root ``mvn clean verify`` from one deletes ``target/`` under the other, and the
-main orchestrator's own baseline build was seen to fail this way at 17:32
-while this phase's opening ``scripts/build.sh`` was running. This phase has
-since kept to ``-pl cometgui-provenance -am`` and has run its units strictly
-one at a time rather than in the parallel waves the decomposition allows,
-which costs wall-clock time and buys clean signal: a coverage gate is
-module-wide, so two agents landing half-tested code in the same module would
-fail each other's builds for reasons neither could diagnose.
+.. note::
+
+   **This section originally misattributed the cause, and the correction is
+   worth more than the observation.** It said the main orchestrator's own
+   baseline build had been destroyed by a concurrent ``target/`` deletion. That
+   was wrong, and tier 1 checked it rather than accepting it. The three
+   ``scripts/verify-*-gates.sh`` harnesses each carry "WHERE IT WORKS. Never in
+   the working tree" and each builds a *copy* under ``_build/``, so none of them
+   runs Maven in the working tree and none can remove a ``target/`` there. The
+   copying mechanism differs between them and the distinction is worth keeping
+   straight: ``verify-shell-gates.sh`` extracts ``git archive HEAD``, so it
+   tests the **committed** tree, while ``verify-quality-gates.sh`` and
+   ``verify-test-gates.sh`` ``cp`` the POMs, ``config/`` and each module's
+   ``src/``, so they test the **working** tree including uncommitted edits. A
+   phase with dirty files gets different coverage from those two harnesses than
+   from the third. The baseline ran
+   17:27:37 to 17:39:34 with zero FAIL lines and its 10/10 stands. The failing
+   log this phase observed at 17:32 was Phase 03's opening
+   ``scripts/build.sh``, not the baseline; sibling subagents share one
+   scratchpad directory, which is how the two runs came to look like one.
+   Corrected here because a durability record that keeps a false attribution is
+   worse than one that never made the claim.
+
+The real mechanism is narrower and it is a dispatch mistake rather than a gate
+hazard: ``scripts/build.sh`` line 217 runs ``mvn ... clean verify`` **at the
+repository root, in the working tree**, and both this phase and Phase 03 were
+instructed to run it before starting. Two of those at once is the ``target/``
+deletion. Tier 1 has since told Phase 03 not to run ``build.sh`` again while
+this phase is live.
+
+``_build/m2repo`` remains a genuine concurrent-write hazard regardless, because
+both phases and the gate harnesses share it even when the modules differ. This
+phase therefore keeps every Maven invocation behind a ``flock`` on
+``p04-maven.lock`` and restricts itself to ``-pl cometgui-provenance -am``.
