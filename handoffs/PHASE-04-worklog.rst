@@ -621,11 +621,45 @@ uses to turn a Java string into a filesystem path, so::
 
 and under ``LANG=C.UTF-8`` the same call returns the path unharmed. This is
 *before* any CometGUI code runs; no amount of correct handling downstream can
-recover it. **Phases 14 and 16 must make the launcher set a UTF-8 locale** --
-``-Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8`` in the ``jpackage``
-java-options, or the equivalent in the launch script -- and a CI runner that
-does not export a UTF-8 locale will silently skip coverage that a user's
-machine needs. Unit 7 handled it honestly rather than hiding it: the non-ASCII
+recover it.
+
+.. warning::
+
+   **The obvious remedy does not work, and this correction matters more than
+   the finding.** This work log first said Phases 14 and 16 should pass
+   ``-Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8`` in the ``jpackage``
+   java-options. The main orchestrator tested that claim rather than accepting
+   it, and I then reproduced it myself::
+
+       java -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8 ...
+         file.encoding    = UTF-8
+         sun.jnu.encoding = ANSI_X3.4-1968      <- the flag was ignored
+         THREW: java.nio.file.InvalidPathException: Malformed input or input
+                contains unmappable characters: /data/prot?omique/x.mzML
+
+   ``sun.jnu.encoding`` is resolved by the JVM from the process environment
+   *before* system properties are applied, so the flag is **accepted without
+   error and does nothing**. ``-Dfile.encoding=UTF-8`` appeared to work only
+   because it was already UTF-8, which makes the pair look half-effective while
+   being entirely inert for the failure it was supposed to fix.
+
+   That is this project's signature defect in a new place: **a remedy that
+   cannot work, adopted because nothing goes red when you apply it.** Someone
+   would have put those options into Phase 16's java-options, watched a clean
+   build, and shipped a product that still cannot open an accented path.
+
+   What actually works is the **environment, set before the JVM starts** --
+   verified here::
+
+       env LC_ALL=C.UTF-8 java ...   -> sun.jnu.encoding = UTF-8, path OK
+       env LANG=C.UTF-8 java ...     -> same
+
+   So the requirement for Phases 14 and 16 is **"the launcher must start the
+   JVM in a UTF-8 locale"**, which is a launcher and packaging problem that
+   ``jpackage --java-options`` cannot express. A CI runner that does not export
+   a UTF-8 locale will also silently skip coverage a user's machine needs.
+
+Unit 7 handled it honestly rather than hiding it: the non-ASCII
 text and the emoji surrogate pair moved into tool *warnings*, so the
 byte-level UTF-8 assertion over the whole document stays unconditional, and
 the one path-specific test aborts with a diagnostic naming the encoding rather
