@@ -207,7 +207,30 @@ touch the same files; the file list for each unit is fixed by the brief.
        a chunk-boundary proof that the single pass and two separate passes
        agree; failure behaviour for a missing file and a directory.
      - ``R-PROV-01``, ``R-PROV-03``
-     - pending
+     - **SIGNED OFF 2026-08-31** at ``185fbc1``, after one rejection
+       (:ref:`p04-unit1-rejection`). I recomputed all fourteen expected
+       digests myself from the test's own fixtures using GNU coreutils and a
+       Python reimplementation of its LCG pattern -- the seven published
+       vectors, the four buffer-straddling lengths, the 256 ascending byte
+       values and the NUL/0xFF fixture -- and every one matched to the
+       character. I re-injected my two-pass defect in its stronger form, two
+       opens *through* the new seam: group 8 failed 7 of 13 with
+       ``open() calls ==> expected: <1> but was: <2>``,
+       ``streams handed to the hasher ==> expected: <1> but was: <2>``,
+       ``bytes read from the file, summed over every stream opened ==>
+       expected: <1> but was: <2>`` and
+       ``close() calls ==> expected: <1> but was: <2>`` -- while **every
+       digest assertion still passed**, which is the finding restated as
+       evidence. Reverted, then ``mvn -pl cometgui-provenance -am verify``
+       plus PIT: ``Tests run: 52, Failures: 0, Errors: 0``,
+       ``All coverage checks have been met``, ``BugInstance size is 0``,
+       ``0 Checkstyle violations``, ``BUILD SUCCESS``. Measured counts moved
+       from **absent** to: JaCoCo line 23/23, branch 4/4, 1 class in
+       ``org/cometgui/provenance/hashing``; PIT 8 mutations, 8 killed, 0
+       survived, 0 no-coverage, all 8 in
+       ``org.cometgui.provenance.hashing.StreamingHashService`` -- which is
+       also the proof that PIT's ``org.cometgui.provenance.*`` glob does
+       reach a subpackage.
 
    * - 2
      - A
