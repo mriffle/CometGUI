@@ -16,10 +16,6 @@
 
 package org.cometgui.archtests;
 
-import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
-import static com.tngtech.archunit.core.domain.JavaClass.Predicates.equivalentTo;
-import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
-import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
@@ -41,6 +37,11 @@ import org.junit.jupiter.api.Test;
  * it. scripts/verify-test-gates.sh injects real violations into a sandbox copy of the tree and
  * requires each rule to reject them, which is the only way to know a rule works before the code it
  * governs is written.
+ *
+ * <p>R-PROC-02 is no longer one of those: phase 03 put a real {@code ProcessBuilder} in the package
+ * it protects. Its rule therefore lives in {@link ProcessCreationRule}, where {@link
+ * ProcessCreationRuleTest} grades the same object against fixtures that must be rejected and one
+ * that must be accepted.
  */
 class LayeringRulesTest {
 
@@ -149,20 +150,17 @@ class LayeringRulesTest {
     @Test
     @DisplayName("process creation is confined to the process service (R-PROC-02)")
     void processCreationIsConfinedToTheProcessService() {
-        noClasses()
-                .that()
-                .resideOutsideOfPackage(ProductClasses.PROCESS_SERVICE)
-                .should()
-                .dependOnClassesThat()
-                .areAssignableTo(ProcessBuilder.class)
-                .orShould()
-                .callMethodWhere(
-                        target(owner(equivalentTo(Runtime.class))).and(target(name("exec"))))
-                .because(
-                        "R-PROC-02: processes shall be started using argument arrays, never by"
-                                + " constructing a shell command string, and ProcessBuilder"
-                                + " construction shall be confined to the process service")
-                .check(ProductClasses.all());
+        /*
+         * The one rule in this class that is not built here. Phase 03 filled
+         * org.cometgui.tools.process with a real ProcessBuilder, which made two things falsifiable
+         * that were not before: that the rule still rejects a use outside the package, and that the
+         * class set it is graded against contains this phase's code at all. Both are proved in
+         * ProcessCreationRuleTest, against deliberately illegal fixtures -- and they are proved
+         * about THIS rule only because both tests check the same ArchRule object. Restating the
+         * rule here would turn that test back into a test of a copy. What the rule says is
+         * unchanged from phase 01 apart from one added clause, documented on the constant.
+         */
+        ProcessCreationRule.CONFINED_TO_THE_PROCESS_SERVICE.check(ProductClasses.all());
     }
 
     @Test

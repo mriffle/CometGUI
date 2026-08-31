@@ -54,6 +54,29 @@ class ClassImportCensusTest {
      */
     private static final int MINIMUM_IMPORTED_CLASSES = 50;
 
+    /** The package R-PROC-02 confines process creation to. */
+    private static final String PROCESS_SERVICE_PACKAGE = "org.cometgui.tools.process";
+
+    /**
+     * A floor for the process service alone, and the one number in this class that is about a
+     * single rule rather than about the import as a whole.
+     *
+     * <p>Until phase 03, {@code org.cometgui.tools.process} held one {@code package-info.java} and
+     * nothing else, so R-PROC-02 -- "nobody outside the process service creates a process" -- was
+     * true because nobody anywhere did. It is now falsifiable, and the way it would silently stop
+     * being checked is for cometgui-process to drop off this module's class path: the rule would
+     * scan a class set that does not contain the code it governs and report green having checked
+     * nothing. {@link #everyProductModuleContributesClasses} would not catch that, because a
+     * package-info class on its own satisfies "at least one".
+     *
+     * <p>Four. The module contributed eight classes when this was written and seventeen a few hours
+     * later, as the rest of phase 03 landed; that is the argument for a low floor rather than a
+     * tight one. High enough that package-info plus a straggler cannot reach it, low enough that a
+     * phase merging or splitting classes in the process service never has to edit this file. The
+     * exact guarantee is {@link #namedProductClassesArePresent}, which names ProcessService itself.
+     */
+    private static final int MINIMUM_PROCESS_SERVICE_CLASSES = 4;
+
     private static Map<String, Long> census(JavaClasses classes) {
         Map<String, Long> counts = new LinkedHashMap<>();
         for (String modulePackage : ProductClasses.MODULE_PACKAGES) {
@@ -122,8 +145,7 @@ class ClassImportCensusTest {
     }
 
     @Test
-    @DisplayName(
-            "three known classes are present, so the import is of the product and not of stubs")
+    @DisplayName("four known classes are present, so the import is of the product and not of stubs")
     void namedProductClassesArePresent() {
         JavaClasses classes = ProductClasses.all();
 
@@ -139,7 +161,41 @@ class ClassImportCensusTest {
                 () ->
                         assertTrue(
                                 classes.contain("org.cometgui.app.bootstrap.CometGuiApplication"),
-                                "the application module is missing from the import"));
+                                "the application module is missing from the import"),
+                () ->
+                        assertTrue(
+                                classes.contain("org.cometgui.tools.process.ProcessService"),
+                                "the process service is missing from the import: R-PROC-02 is"
+                                        + " being graded against a class set that does not contain"
+                                        + " the product's one and only ProcessBuilder, so it would"
+                                        + " pass however the rest of the product behaved"));
+    }
+
+    @Test
+    @DisplayName("the process service is in the import, so R-PROC-02 has something to govern")
+    void theProcessServiceContributesMoreThanItsPackageInfo() {
+        long contributed =
+                ProductClasses.all().stream()
+                        .filter(
+                                candidate ->
+                                        candidate.getPackageName().equals(PROCESS_SERVICE_PACKAGE)
+                                                || candidate
+                                                        .getPackageName()
+                                                        .startsWith(PROCESS_SERVICE_PACKAGE + "."))
+                        .count();
+
+        assertTrue(
+                contributed >= MINIMUM_PROCESS_SERVICE_CLASSES,
+                () ->
+                        "the process service contributed "
+                                + contributed
+                                + " classes to the import; the R-PROC-02 rule is being evaluated"
+                                + " against a class set that does not contain the code it governs."
+                                + " Before phase 03 this package held only package-info.java and"
+                                + " the rule was true because no class anywhere created a process."
+                                + " A count back at that floor means cometgui-process has fallen"
+                                + " off the archtests class path, not that the process service"
+                                + " stopped creating processes.");
     }
 
     @Test
