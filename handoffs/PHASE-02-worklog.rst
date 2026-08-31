@@ -581,7 +581,46 @@ Work units
        command failing with the expected diagnostic, then show it passing
        once removed; wired into ``scripts/verify-all-gates.sh``.
      - all five gate items
-     - PENDING
+     - **SIGNED OFF 2026-08-31**, commit ``7c09e89``, plus my own ``928c896``.
+       Diff read: two files, the new 837-line harness and the ``shell``
+       registration in ``verify-all-gates.sh``; nothing else, and no ``.java``,
+       POM, ``config/`` or gate threshold anywhere in the range. The script is
+       mode ``100755``, which matters because ``verify-all-gates.sh`` refuses
+       to run at all if a sub-harness is not executable.
+       ``bash scripts/verify-shell-gates.sh`` run by me: **exit 0**,
+       ``SUMMARY: 30 control(s) passed, 0 failed, in 159 seconds``,
+       ``Every gate rejected its defect and accepted the clean tree.``, over
+       eleven controls -- a clean baseline, two for gate item 1 (mouse and
+       keyboard), two for item 2, the enforced delegation for item 3, one for
+       item 4, two for item 5, and two on the harness itself.
+       ``bash scripts/verify-all-gates.sh`` run by me end to end: **exit 0**,
+       ``10 control(s) passed, 0 failed, in 699 seconds (11m39s)``, with
+       ``PASS shell 02:1,2,4,5 30 158s``. Its summary now reports coverage per
+       phase: ``PHASE-01 ... 1,2,3,4,5,6`` and ``PHASE-02 ... 1,2,4,5``, and
+       states in the output why item 3 is delegated rather than injected
+       twice.
+       **The control I most wanted to see, and did**: control 4b makes the
+       exact ineffective injection I made by hand during unit 8's sign-off --
+       removing the accessible name at the site ``showStage()`` re-assigns --
+       and requires the harness to print ``HARNESS FAILURE -- the check PASSED
+       with the defect present. Either the gate is dead or the injection never
+       reached the running code``. Control H does the same for a defect that
+       never reached the sandbox at all, in three forms (missing file,
+       unmodified file, vanished anchor). A harness that cannot tell "the gate
+       did not bite" from "the injection did not land" is a harness that
+       reports the second as the first, and this one is tested not to.
+       **Why I did not build a further meta-check of my own**: the two
+       strongest ones already exist and I watched both. The aggregate caught a
+       genuinely broken sub-harness earlier the same day -- the ``tests``
+       control reporting ``24 assertion(s) passed, 8 failed`` -- and the agent
+       reported its own first run failing ``29 passed, 1 failed`` on a
+       mis-transcribed expected diagnostic, which it corrected rather than
+       dropped.
+       My own commit ``928c896`` corrects ``docs/developer/testing.rst``,
+       which still said "all nine falsifiability harnesses" and omitted
+       ``shell`` from the ``--only`` list.
+       **Escalated**: ``STATUS.rst`` also records "9 controls" in two places.
+       That file is tier 1's and I have not touched it.
 
    * - 11
      - **Repair ``scripts/verify-test-gates.sh``.** Added after unit 8's
