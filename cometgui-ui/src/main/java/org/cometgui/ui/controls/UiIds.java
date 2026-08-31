@@ -43,6 +43,15 @@ import org.cometgui.ui.viewmodel.SectionId;
  * name) rather than from a second copy of the string. Renaming a section is then a change in one
  * enum, and every view and every test follows it.
  *
+ * <p><strong>Which is exactly why every identifier is also pinned as a literal.</strong> Deriving
+ * keeps the views and the tests consistent with each other; it does not make an identifier
+ * <em>stable</em>, and {@code R-TEST-04} asks for stability. Because a test that looks a control up
+ * through this class follows a rename silently, a rename here was once made at sign-off and left
+ * the whole build green. {@code StableIdentifierPinTest} closes that: it writes out every
+ * identifier this class hands out as a hand-typed literal and fails naming the one that moved. So
+ * <strong>changing any value in this class means changing that literal too, deliberately, in the
+ * same commit</strong> -- and checking what looks the control up.
+ *
  * <p><strong>Why this class lives in {@code controls} and not in {@code view}.</strong> Both
  * packages need it: the shell and the section panes set section and navigation identifiers, and the
  * stage stepper and the console pane set their own. Putting it here makes the dependency run one

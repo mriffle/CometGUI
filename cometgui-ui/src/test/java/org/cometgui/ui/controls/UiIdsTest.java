@@ -39,6 +39,16 @@ import org.junit.jupiter.api.Test;
  * first, so a test would quietly assert against the wrong control. That is the failure this class
  * exists to make impossible, and it is why the identifiers are derived from the model's own
  * identifiers rather than typed out.
+ *
+ * <p><strong>What this class does not prove, and where that is proved instead.</strong> Every
+ * assertion here is over a value {@link UiIds} <em>generates</em>, and the literals below are a
+ * sample: two sections of ten, one stage of eight, one stage filter, one severity. A rename of any
+ * identifier outside that sample passes this class, which is what happened when one was injected at
+ * sign-off. {@code StableIdentifierPinTest} in this package pins every identifier as a hand-typed
+ * literal and fails on a rename, on an unpinned addition and on a collision among the pinned
+ * literals. The two are complementary and neither may be deleted: this one covers the null
+ * contract, the shape of the identifiers and collisions among the generated values; that one covers
+ * their exact spelling, exhaustively.
  */
 class UiIdsTest {
 
