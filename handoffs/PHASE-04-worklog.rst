@@ -746,12 +746,107 @@ quietly lost its worst member.
 no ``jacoco.xml`` at all. It does not check the per-CLASS case, which is the
 one that bites when a single test is excluded. That gap is reported upward
 rather than patched here: ``scripts/`` is shared and not this phase's to edit.
+Tier 1 has taken it as infrastructure, to be closed after Phases 03 and 04 land
+and before Phase 05 is dispatched, in two parts: the census itself in
+``scripts/build.sh``'s gates stage beside the module-level check it completes,
+and a control in ``scripts/verify-test-gates.sh`` that injects a class excluded
+from coverage and requires the census to fail naming it. The second half is not
+optional -- a rule that has never been seen to go red is not yet a rule, which
+is the mistake this project was founded on.
+
+The script is handed over verbatim rather than described, because it has
+actually caught something. Invoked as
+``bash sample-census.sh cometgui-provenance``::
+
+    #!/usr/bin/env bash
+    # Did every compiled class actually reach the coverage and mutation samples?
+    # A class whose tests did not compile can vanish from a report entirely, and
+    # an absent class does not drag an average down -- it silently leaves the
+    # sample.
+    set -uo pipefail
+    M="${1:-cometgui-provenance}"
+    cd /mnt/10TBdrive/home/mriffle/work/comet-gui || exit 1
+    CLASSES=$(cd "$M/target/classes" 2>/dev/null && find . -name '*.class' -type f \
+      ! -name 'package-info.class' ! -name '*$*' \
+      | sed 's|^\./||; s|\.class$||; s|/|.|g' | sort)
+    JACOCO=$(grep -o '<class name="[^"]*"' "$M/target/site/jacoco/jacoco.xml" 2>/dev/null \
+      | sed 's/.*name="//; s/"//; s|/|.|g' | grep -v '\$' | sort -u)
+    PITC=$(grep -o '<mutatedClass>[^<]*</mutatedClass>' \
+      "$M/target/pit-reports/mutations.xml" 2>/dev/null \
+      | sed 's|</\?mutatedClass>||g' | sed 's/\$.*//' | sort -u)
+    echo "module: $M"
+    echo "  compiled classes (excluding package-info and inner): $(echo "$CLASSES" | grep -c .)"
+    echo "  classes in jacoco.xml:                               $(echo "$JACOCO" | grep -c .)"
+    echo "  distinct classes with PIT mutations:                 $(echo "$PITC" | grep -c .)"
+    MISSING_J=$(comm -23 <(echo "$CLASSES") <(echo "$JACOCO"))
+    MISSING_P=$(comm -23 <(echo "$CLASSES") <(echo "$PITC"))
+    if [ -n "$MISSING_J" ]; then
+        echo "  COMPILED BUT ABSENT FROM JACOCO:"; echo "$MISSING_J" | sed 's/^/    /'
+    else
+        echo "  ok: every compiled class is in the coverage sample"
+    fi
+    if [ -n "$MISSING_P" ]; then
+        echo "  compiled but no PIT mutations (may be legitimate: constants,"
+        echo "  interfaces, records with no branches):"
+        echo "$MISSING_P" | sed 's/^/    /'
+    fi
+
+and the output that caught the live instance, on a tree where five units were
+landing at once::
+
+    module: cometgui-provenance
+      compiled classes (excluding package-info and inner): 37
+      classes in jacoco.xml:                               36
+      distinct classes with PIT mutations:                 30
+      COMPILED BUT ABSENT FROM JACOCO:
+        org.cometgui.provenance.manifest.ManifestReader
+
+The second list, classes with no PIT mutations, is a prompt rather than a
+failure: an interface, an enum of constants or a record with no branches
+legitimately yields none, so it is printed for a human to judge instead of
+being asserted on.
 
 **Every headline figure this phase reports is taken from one clean end-to-end
 run with no agents in flight, a module free of modified or untracked sources,
 ``mvn -pl cometgui-domain install`` first, then one ``verify`` and one mutation
 run** -- never assembled from per-class numbers gathered across different runs.
 A composite figure that cannot be reproduced in one command is not evidence.
+
+.. _p04-skip-audit:
+
+Audit: is any test excluded, disabled or scoped out to keep a suite green?
+=========================================================================
+
+Asked directly by tier 1, because a sentence in one of my escalations -- "a
+unit had excluded its test to get a green suite" -- describes a hard-rule
+violation if it persisted. It did not. Answered here from a fresh audit of the
+tree rather than from memory.
+
+**No test is excluded, disabled or skipped to make anything pass.**
+
+* **No surefire exclusion anywhere.** The only ``<excludes>`` in ``pom.xml`` are
+  Spotless and Checkstyle *file-set* excludes for ``**/derived/**``, which are
+  Phase 02's two-licence-header split and are covered by a second execution;
+  the coverage block carries an explicit comment, "NO EXCLUSIONS. There is no
+  ``<excludes>`` here and adding one to make a ... pass" is refused. No pom in
+  the repository names ``ManifestReader``, and both
+  ``ManifestReader.java`` and ``ManifestReaderTest.java`` are present and
+  compiled. The ``ManifestReader`` absence the census caught was transient
+  in-flight scoping on one agent's command line, and it is gone.
+* **No unconditional ``@Disabled`` in either module.** Zero occurrences.
+* **Conditional skips exist and are disclosures, not exclusions.** Two
+  ``@EnabledOnOs({LINUX, MAC})`` on the directory-fsync tests, whose Windows
+  half is genuinely unverifiable here and is recorded as unverified; and
+  twenty ``@DisabledOnOs(WINDOWS)`` on tests that build POSIX absolute paths,
+  each carrying a ``disabledReason``. Phase 15 owns the platform matrix and the
+  repair is a Windows twin, never a relaxation.
+* **Two ``Assumptions.abort`` sites, both the same encoding case**
+  (:ref:`p04-encoding`). Each sits in a helper that aborts *only* when
+  ``Path.of`` actually throws ``InvalidPathException``, and names
+  ``sun.jnu.encoding`` and the ``LANG=C.UTF-8`` remedy in its message. Under a
+  UTF-8 locale the helper returns a path and the tests run normally. This is
+  the honest form: the suite reports a skip with a diagnostic rather than a
+  green it has not earned.
 
 Rejections and rework
 =====================
