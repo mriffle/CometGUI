@@ -6,7 +6,7 @@ file — it exists only because the coding harness reads it.
 - `ONBOARDING.rst` — what the project is, how phases are run, what finished means
 - `STATUS.rst` — authoritative current state; update at every gate
 - `DECISIONS.rst` — `D-001`..`D-008`; an agent must never answer these alone
-- `specification.rst` — the requirements (revision 2)
+- `specification.rst` — the requirements (revision 10)
 - `phases/index.rst` — phases 00–16 and their dependency order
 
 Work runs in three tiers: the **main orchestrator** spawns one fresh **phase
