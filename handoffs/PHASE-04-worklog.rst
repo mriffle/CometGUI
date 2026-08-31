@@ -355,7 +355,21 @@ touch the same files; the file list for each unit is fixed by the brief.
        Accepts: the whole document is pinned as a hand-typed literal; the
        finalise path uses unit 2's atomic writer.
      - ``R-PROV-05``, ``R-SEC-03``
-     - pending
+     - **SIGNED OFF 2026-08-31** at ``b1afb68``. The whole document is pinned as
+       a hand-typed text block, and I validated that literal with an
+       implementation that is not ours: extracted it and ran
+       ``python3 -m json.tool``, which parsed it, with ``schemaVersion`` first
+       and equal to 1 and the top-level key order
+       ``[schemaVersion, run, application, settings, tools, files]``. My own
+       injection went after a defect class the unit's own six did not name:
+       ``out.append(Long.toString(value))`` replaced by
+       ``String.format("%d", value)``, which is locale-sensitive only under a
+       locale whose numbering system is not ASCII. It failed --
+       ``expected: <1234567890123> but was: <?????????????>`` -- because the
+       unit had already thought of it and tests under
+       ``th-TH-u-nu-thai`` as well as Turkish and German. A German or Turkish
+       locale alone would NOT have caught it, since neither changes the digits
+       of a grouping-free integer. Restored and verified with ``sha256sum -c``.
 
    * - 8
      - B
