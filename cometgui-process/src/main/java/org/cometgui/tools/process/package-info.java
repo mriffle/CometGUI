@@ -37,6 +37,12 @@
  *   <li>{@code GuardedListener} and {@code ProcessTree} -- the two pieces of pure logic the rest
  *       depends on: a listener that cannot break a pump by throwing, and the order in which a
  *       process tree must be killed.
+ *   <li>{@link org.cometgui.tools.process.ProcessRedactor} -- {@code R-SEC-03}, applied to the
+ *       safely rendered display command, the captured environment and the console line. The rules
+ *       themselves live in {@code org.cometgui.domain.secrets}, shared with the provenance writers
+ *       so that the two cannot drift; what is process-specific is redacting each argument
+ *       <em>before</em> {@code ToolCommand.displayString()} escapes it, and costing nothing per
+ *       line when no credential is registered, which is every run of Comet, Percolator and PDV.
  * </ul>
  */
 package org.cometgui.tools.process;
