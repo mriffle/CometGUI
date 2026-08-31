@@ -669,3 +669,52 @@ Repairs I made
 #. **The interleave assertion was too coarse**, as above.
 #. **The null-rejection helper is now named** ``deliberateNull``, matching Phase
    04, per :ref:`p03-null-idiom`. Same technique, one name across both phases.
+
+The redaction collision, and where the shared rule set ended up
+================================================================
+
+Recorded here because it changed a unit mid-flight and because the lesson is
+about escalation, not about redaction.
+
+``R-SEC-03`` was being implemented **twice, in parallel, by two live phases**.
+Phase 04 had ``SecretRedactor`` and ``SecretRegistry`` in
+``cometgui-provenance``; this phase's unit 3 was building ``SecretNames`` and
+``SecretValues`` in ``cometgui-process``. The two modules are **siblings** --
+each depends on ``cometgui-domain``, neither on the other -- so neither
+implementation could consume the other, and the lists had already diverged by
+one keyword. A variable named ``REQUEST_SIGNATURE`` would have been redacted in
+the process log and **not** in the provenance record: exactly the silent,
+security-relevant drift ``R-SEC-03`` exists to prevent.
+
+The main orchestrator moved the shared rules into ``org.cometgui.domain.secrets``
+(commit ``b0e7122``) and gave Phase 04 ownership, because its tests there are
+much deeper -- a PEM private-key rule, a seeded secret corpus, registry ordering
+pinned by test. This phase consumes them and keeps only ``ProcessRedactor``,
+whose two ideas are process-specific and were explicitly ruled out of the merge:
+
+* **Redact each argv element BEFORE** ``ToolCommand.displayString()`` escapes
+  it. Escaping turns a ``"`` inside a token into ``\"``, and a literal
+  post-escape search then misses it and prints the secret in full.
+* **Return the argument by reference when the registry is empty**, with a test
+  asserting reference identity rather than equality, so a 500 MB flood pays
+  nothing for a feature no tool in this workflow uses.
+
+**One marker, decided here:** the domain's ``REDACTION_MARKER`` wins and this
+phase's ``***REDACTED***`` is deleted. Two markers would put one string in the
+console log and another in the provenance record for the same secret in the same
+run; one marker is worth more than the extra distinctiveness, and changing the
+shared constant would churn Phase 04's deeper suite for a cosmetic gain. The
+marker is asserted in a Phase 03 test as a **hand-typed literal**, not as a
+reference to the constant, so a later change to it breaks a test visibly instead
+of silently agreeing with itself.
+
+**The lesson, which is not about secrets.** Unit 3's agent found this itself: it
+named its class ``ProcessRedactor`` rather than ``SecretRedactor`` deliberately,
+recorded that Phase 04's class existed and was unreachable across the sibling
+boundary, predicted the exact collision, and wrote that merging the two "is an
+architectural decision, and it belongs to whoever owns both phases". That is the
+correct analysis and the correct escalation target -- **but it was written in a
+Javadoc comment, and the main orchestrator found it by reading the tree rather
+than by being told.** A cross-phase finding has to travel as a message, not as a
+comment in the file that contains the problem. This phase carried the same fault
+one level up: the finding never reached tier 1 through me either.
