@@ -345,7 +345,26 @@ touch the same files; the file list for each unit is fixed by the brief.
        against values computed by ``md5sum`` and ``sha256sum`` and hand-typed
        into the test; retained heap is asserted, not allocation count.
      - ``R-PROV-01``, ``R-PROV-03``
-     - pending
+     - **SIGNED OFF 2026-08-31** at ``3119189``/``6cbcad4``. I ran the test
+       myself and read its own printout: ``bytes=2147483648 opens=1
+       readCalls=8193 bytesDelivered=2147483648 heapBaseline=3958160
+       heapPeak=4223232 heapGrowth=265072 heapLimit=4194304 samples=83`` in
+       14.1 s, with the class at 29.6 s. **Retained heap, not an allocation
+       count**, sampled post-collection from a watchdog: growth of one buffer,
+       15.8x under a bound of 16x ``BUFFER_SIZE``. Both digests are the values
+       I computed with coreutils and OpenSSL before this module had a hashing
+       class. The unit shipped a **permanent negative control** rather than
+       only reverting its defect, and I ratified that: the same run prints
+       ``huge-file-control: keptChunks=128 keptBytes=33554432
+       heapGrowth=33570352 heapLimit=4194304``, so every build re-proves that
+       the bound bites at 32 MiB *while the leaky hasher's digests are exactly
+       correct*. My own injection went at the anti-vacuity guard, which is the
+       defect class this project keeps shipping: a watchdog that returns
+       before taking a single sample. Both tests failed with ``the
+       retained-heap watchdog took only 1 samples, fewer than the 8 a measured
+       run needs; its peak means nothing`` -- so a heap bound with no
+       observations behind it cannot pass. Restored, ``sha256sum -c`` OK,
+       marker count 0, and no 2 GB corpus anywhere on disk afterwards.
 
    * - 7
      - B
