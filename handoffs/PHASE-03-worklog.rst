@@ -822,3 +822,124 @@ per-line path switches on.
 ``SECRET_BEARING_LONG_FLAGS`` (``--auth-token``, ``--access-token``,
 ``--session-token``, ``--api-key`` are). The registry covers it, but the real
 Limelight flag should be checked against that list.
+
+.. _p03-platform-divergence:
+
+Platform divergence: what has never executed anywhere but Linux
+================================================================
+
+Written before the phase reports, at tier 1's instruction, because the
+distinction that decides a grade is not how many tests are skipped:
+
+* *"we could not run this code on that platform"* is a **testing gap** and does
+  not cap a grade;
+* *"there is different code on that platform and it has never run"* is
+  **unverified behaviour** and does.
+
+This phase has the second kind, and its own phase document says where:
+"Descendant termination differs sharply across platforms; use ``ProcessHandle``
+descendants and **verify per platform** rather than assuming." Gate item 4 is
+explicitly scoped -- "work **on the reference platform**" -- and **gate item 2
+is not**, which reads as deliberate.
+
+Everything below ran on Linux/amd64, glibc 2.36, Liberica JDK 25.0.4.1. Nothing
+below has ever executed on Windows or macOS. Each entry says what a twin on
+another platform would have to **prove**, so Phase 15 inherits a specification
+rather than a discovery.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 39 39
+
+   * - Divergence point
+     - Why the behaviour is expected to differ
+     - What a Windows or macOS twin must prove
+
+   * - **Terminate is not distinct from kill on Windows**
+     - ``ProcessHandle.destroy()`` sends ``SIGTERM`` on POSIX, which a process
+       may catch, ignore or use to run a shutdown hook.
+       The OpenJDK Windows implementation is understood to call
+       ``TerminateProcess`` for both ``destroy()`` and ``destroyForcibly()``,
+       which cannot be caught. If so, the whole terminate-then-escalate design
+       collapses into one immediate kill.
+     - Whether ``destroy()`` and ``destroyForcibly()`` are distinguishable at
+       all. If they are not, the escalation path and its termination grace are
+       dead code there, and ``ProcessService``'s Javadoc must say so.
+
+   * - **Exit codes 143 and 137 are POSIX-only**
+     - Every cancellation assertion in this phase pins 143 (``128+SIGTERM``) or
+       137 (``128+SIGKILL``). On Windows a terminated process reports whatever
+       exit code ``TerminateProcess`` was given -- not 143 and not 137.
+     - The exit code a cancelled and a killed process actually report, and
+       whether the two are distinguishable from an ordinary tool failure. A
+       cancelled run that looks like a crash misreports the run to the user.
+
+   * - **Orphan reparenting and what "not alive" means**
+     - This container's PID 1 does not reap, so a killed reparented child stays
+       a **permanent zombie** whose ``isAlive()`` is ``true`` for ever and whose
+       ``onExit()`` never completes. That is why ``ProcessTree`` kills
+       descendants first. Windows has no reparenting and no zombies; a normal
+       Linux host with a reaping init has neither problem.
+     - That descendants-first ordering is still correct, or is unnecessary, and
+       that ``ProcessHandle.isAlive()`` goes false promptly after a kill.
+
+   * - **The descendant snapshot itself**
+     - ``Process.descendants()`` is built from parent-pid and start-time
+       information the operating system supplies, and the shape and timing of
+       that information differ. Unit 2b showed the snapshot-after-destroy bug is
+       a race Linux always wins; another platform may lose it.
+     - That ``descendants()`` sees a grandchild, and that a snapshot taken
+       before the parent is signalled still names the whole tree.
+
+   * - **The pipe-closing behaviour that motivates the whole design**
+     - ``ProcessTree`` uses ``ProcessHandle.destroy()`` rather than
+       ``Process.destroy()`` because on Linux the latter closes the process's
+       three streams, losing output already written -- and, unit 2b measured,
+       makes the exit code read as ``1``. That is an OpenJDK Unix
+       implementation detail.
+     - Whether ``Process.destroy()`` closes the streams there too. If it does
+       not, the choice is merely harmless rather than load-bearing, and the
+       comment must stop claiming otherwise.
+
+   * - **The cleared environment (R-PROC-04)**
+     - ``ProcessService`` clears the inherited environment and puts back exactly
+       ``ToolCommand.environment()``. On Linux this is clean: unit 2 measured
+       ``envcount 0``. Many Windows programs will not start without
+       ``SystemRoot``, and some need ``PATH`` and ``TEMP``.
+     - That a real tool starts at all with a constructed environment, and what
+       the minimum Windows variable set is. **This is the entry most likely to
+       need a product change**, not just a test.
+
+   * - **Non-ASCII paths (gate item 4)**
+     - Proved here only because this module's surefire forks with
+       ``LANG``/``LC_ALL`` set to ``C.UTF-8``; without it
+       ``sun.jnu.encoding`` is ``ANSI_X3.4-1968`` and ``Path.of`` throws
+       ``InvalidPathException`` before any product code runs. That remedy is
+       POSIX-only and does nothing on Windows, where the analogous constraint is
+       the ANSI code page. ``-Dsun.jnu.encoding=UTF-8`` does **not** work: the
+       JVM resolves it from the environment before system properties apply,
+       measured independently by this phase and by tier 1.
+     - That a non-ASCII path works, and what the packaged application must set
+       to make it work. Phase 16 owns the packaged runtime's environment.
+
+   * - **The shutdown-hook fake**
+     - ``hang-ignoring-term`` survives a polite terminate by installing a
+       shutdown hook that never returns. A hook only runs for a signal the JVM
+       can catch, so on Windows the scenario probably cannot express "ignores a
+       polite terminate" at all.
+     - A platform-appropriate way to build a process that resists a polite stop,
+       or a recorded finding that none exists and the escalation is untestable
+       there.
+
+   * - **Long paths**
+     - Nothing here bounds a path length. Windows applies ``MAX_PATH`` unless
+       long paths are enabled.
+     - That a run directory nested as deeply as a real run nests still works.
+
+**What is NOT on this list, deliberately.** The fakes are one Java program
+launched through the JDK's own ``java`` binary, resolved from
+``ProcessHandle.current().info().command()`` with a ``java.exe`` fallback, so
+they need no POSIX shell and no executable bit. The line splitter, the decoder,
+the bounded log, the redaction and the argument-array rendering are pure logic
+with no platform branch. Those are ordinary testing gaps, not unverified
+behaviour.
