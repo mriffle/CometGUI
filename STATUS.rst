@@ -1246,6 +1246,67 @@ and accept PARTIAL**. On 2026-08-30 the owner answered the last of ``D-008``:
 Risks currently live
 ====================
 
+#. **A scientist with a non-ASCII character in a directory name cannot run this
+   product, and the obvious fix does not work.** Found by Phase 04 unit 7 on
+   2026-08-31 and reproduced independently by the main orchestrator before being
+   routed.
+
+   Where no ``LANG``/``LC_ALL`` is exported, the JDK reports::
+
+       file.encoding    = UTF-8
+       native.encoding  = ANSI_X3.4-1968
+       sun.jnu.encoding = ANSI_X3.4-1968
+
+   ``sun.jnu.encoding`` is what the JDK uses to turn a Java string into a
+   filesystem path, so::
+
+       Path.of("/data/protéomique/x.mzML")
+         -> java.nio.file.InvalidPathException: Malformed input or input
+            contains unmappable characters: /data/prot?omique/x.mzML
+
+   and the identical call under ``LANG=C.UTF-8`` returns the path unharmed. This
+   happens **before any CometGUI code runs**, so no downstream handling recovers
+   it. It sits squarely in the Definition of Done -- "a scientist on a clean
+   supported computer ... chooses real spectra and a FASTA" -- and non-ASCII
+   paths are named explicitly in the specification's own fake-executable list
+   ("paths containing spaces and Unicode"). Phase 03's gate item 4 requires them
+   to work.
+
+   .. warning::
+
+      **The obvious remedy is inert, and it fails silently.** Adding
+      ``-Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8`` to the ``jpackage``
+      java-options **does not work**. Measured::
+
+          java -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8 ...
+            sun.jnu.encoding = ANSI_X3.4-1968     <- flag ignored
+            PATH FAILED      = InvalidPathException
+
+      The JVM resolves ``sun.jnu.encoding`` from the process environment
+      **before** system properties are applied, so the flag is accepted without
+      error and changes nothing. ``-Dfile.encoding=UTF-8`` appears to work only
+      because it was already UTF-8, which makes the pair look half-effective.
+      Adopting it would produce a clean build, a green gate and a product that
+      still cannot open an accented path -- **a remedy that cannot work,
+      accepted because nothing goes red.** That is this project's signature
+      defect relocated from a test into a fix.
+
+   **What actually works, verified:** the process environment, set *before* the
+   JVM starts -- ``LC_ALL=C.UTF-8`` or ``LANG=C.UTF-8``. The requirement is
+   therefore "the launcher starts the JVM in a UTF-8 locale", which is a
+   **launcher and packaging** problem and cannot be expressed through
+   ``--java-options``.
+
+   **Owners.** Phase 16 owns the packaged launcher and should carry this beside
+   the ``--enable-native-access=ALL-UNNAMED`` item Phase 02 left it. Phase 14
+   owns proving it: a CI runner that does not export a UTF-8 locale silently
+   skips the coverage a user's machine needs, so the harness must assert the
+   locale rather than inherit it. Phase 04 handled it honestly in-phase -- one
+   path test aborts with a diagnostic naming the encoding rather than pretending
+   to pass, which is the single skipped test in that module.
+
+
+
 #. **Percolator 3.07.1 is the product's default, installed from the portable
    ``noxml`` archive** -- resolved 2026-08-29 (``D-002``, including option C).
    The owner ruled out source builds and required published binaries on all
