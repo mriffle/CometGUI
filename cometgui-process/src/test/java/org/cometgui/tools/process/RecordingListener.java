@@ -18,6 +18,7 @@ package org.cometgui.tools.process;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
@@ -44,6 +45,7 @@ final class RecordingListener implements ProcessListener {
 
     private final List<String> events = new ArrayList<>();
     private final ConcurrentMap<String, CountDownLatch> awaited = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, CountDownLatch> awaitedPrefixes = new ConcurrentHashMap<>();
     private final CountDownLatch exited = new CountDownLatch(1);
 
     /**
@@ -57,6 +59,37 @@ final class RecordingListener implements ProcessListener {
      */
     CountDownLatch expect(String line) {
         return awaited.computeIfAbsent(line, awaitedLine -> new CountDownLatch(1));
+    }
+
+    /**
+     * Registers a line PREFIX whose arrival a test wants to wait for.
+     *
+     * <p>{@link #expect(String)} needs the whole line, which is not always knowable in advance: the
+     * {@code hang-with-child} scenario announces itself as {@code child <pid>}, and the pid is an
+     * operating-system fact that exists only once the process is running. Waiting for the prefix is
+     * still waiting for a real event, so the no-fixed-sleep rule is untouched.
+     *
+     * <p>Call it before starting the process, for the same reason {@link #expect(String)} says so.
+     *
+     * @param prefix the exact beginning of the expected line, on either stream
+     * @return a latch counted down when a line beginning with {@code prefix} arrives
+     */
+    CountDownLatch expectPrefix(String prefix) {
+        return awaitedPrefixes.computeIfAbsent(prefix, awaitedPrefix -> new CountDownLatch(1));
+    }
+
+    /**
+     * The first recorded line beginning with {@code prefix}, on either stream, untagged.
+     *
+     * @param prefix the beginning to look for
+     * @return that line, or empty if no line recorded so far begins with it
+     */
+    Optional<String> firstLineStartingWith(String prefix) {
+        return events().stream()
+                .filter(event -> event.startsWith("out:") || event.startsWith("err:"))
+                .map(event -> event.substring("out:".length()))
+                .filter(line -> line.startsWith(prefix))
+                .findFirst();
     }
 
     /**
@@ -139,5 +172,11 @@ final class RecordingListener implements ProcessListener {
         if (waiting != null) {
             waiting.countDown();
         }
+        awaitedPrefixes.forEach(
+                (prefix, latch) -> {
+                    if (line.startsWith(prefix)) {
+                        latch.countDown();
+                    }
+                });
     }
 }
