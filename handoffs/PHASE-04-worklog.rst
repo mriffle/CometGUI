@@ -438,7 +438,9 @@ touch the same files; the file list for each unit is fixed by the brief.
        writer produced; malformed documents are rejected with a located
        message; a property suite over generated manifests round-trips.
      - ``R-PROV-05``
-     - pending
+     - **LANDED, NOT SIGNED OFF** at ``9639b77``. Committed green by its
+       author minutes before the phase paused. I did not read the diff, run
+       its gate, or inject a defect into it.
 
    * - 10
      - C
@@ -448,7 +450,9 @@ touch the same files; the file list for each unit is fixed by the brief.
        literal; every fact in the report is traceable to a manifest field;
        redaction applied through the same rule set.
      - ``R-PROV-05``, ``R-SEC-03``
-     - pending
+     - **LANDED, NOT SIGNED OFF** at ``9317abc``. Same caveat as unit 9, and
+       its sample report for the Sphinx gate has never been checked by anyone
+       but its author.
 
    * - 11
      - D
@@ -458,7 +462,7 @@ touch the same files; the file list for each unit is fixed by the brief.
        seeded secret. Accepts: zero occurrences, and the test names the file
        and offset when it finds one.
      - ``R-SEC-03``, ``AC-PRV-09``
-     - pending
+     - **NOT STARTED.** Gate item 6's end-to-end half.
 
    * - 12
      - D
@@ -468,7 +472,7 @@ touch the same files; the file list for each unit is fixed by the brief.
        the document exists in the code and every field in the code appears in
        the document, checked by a test rather than by reading.
      - ``R-PROV-05``, ``R-DOC-03``
-     - pending
+     - **NOT STARTED.** Both pages are still Phase 01 stubs.
 
    * - 13
      - D
@@ -476,7 +480,9 @@ touch the same files; the file list for each unit is fixed by the brief.
        the coverage gate, PIT survivor triage, and the injected-defect
        evidence for all seven gate items. Orchestrator work, not delegated.
      - ``R-TEST-02``
-     - pending
+     - **PARTLY DONE.** The module's mutation switch is on and verified live
+       (``4c16864``). The final clean run and ``verify-all-gates.sh`` were
+       deliberately not run: the tree is not quiet.
 
 .. _p04-schema-decisions:
 
@@ -917,7 +923,29 @@ it failing.
 Deferred
 ========
 
-pending
+**The phase was PAUSED by the owner for cost, not finished and not failed.**
+Units 1 to 8 are signed off; 9 and 10 are landed but not signed off; 11, 12 and
+13 were not started. ``handoffs/PHASE-04-handoff.rst`` is written for a fresh
+agent with no context.
+
+Explicitly not done, each with its reason:
+
+* **Unit 11**, the seeded-secret grep over generated artefacts, gate item 6's
+  end-to-end half. The rule set, the corpus and the per-writer sweeps all
+  exist; what is missing is the one test that writes JSON, RST and a log and
+  greps the files on disk.
+* **Unit 12**, the two documentation pages, still Phase 01 stubs. The schema
+  they must describe is settled and pinned as a hand-typed document in
+  ``ManifestWriterTest``.
+* **Unit 13's final run.** ``scripts/verify-all-gates.sh`` and the single clean
+  end-to-end measurement were deliberately not run: Phase 03 is still changing
+  the tree, so any figure would be invalid before this phase resumes.
+* **Sign-off of units 9 and 10** -- diffs unread, gates not re-run, no defect
+  injected into either.
+* **Confirmation that the one real PIT survivor is dead.** Its fix is landed at
+  ``892962e`` and unconfirmed.
+* **The Sphinx check over unit 10's generated report**, the RST half of gate
+  item 6, run so far only by the agent that wrote it.
 
 Open items the orchestrator is carrying
 =======================================
