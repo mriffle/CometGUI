@@ -943,3 +943,108 @@ they need no POSIX shell and no executable bit. The line splitter, the decoder,
 the bounded log, the redaction and the argument-array rendering are pure logic
 with no platform branch. Those are ordinary testing gaps, not unverified
 behaviour.
+
+Unit 6 -- gate item 5: R-PROC-02 given a real subject and in-suite controls
+===========================================================================
+
+:Agent: fresh phase agent, run concurrently with unit 4 in a different module
+:Commit: ``a623123``
+:Outcome: **ACCEPTED**
+
+**What was built.** The ``R-PROC-02`` rule is now built **once**, as
+``ProcessCreationRule.CONFINED_TO_THE_PROCESS_SERVICE``, and both
+``LayeringRulesTest`` (which grades the product) and the new
+``ProcessCreationRuleTest`` (which grades deliberately illegal fixtures) check
+**that same object**. A negative control written against a *copy* of a rule
+proves the copy has teeth and says nothing about the rule the build runs.
+``LayeringRulesTest``'s method name, ``@DisplayName`` and ``because(...)`` text
+are unchanged. Six violating fixtures, one benign outsider, and a positive
+control inside the protected package.
+
+**What I ran myself:** ``flock _build/cometgui-maven.lock mvn -o -B -pl
+cometgui-archtests -am test`` -- **BUILD SUCCESS**, ``ClassImportCensusTest``
+6/0/0/0, ``ProcessCreationRuleTest`` 7/0/0/0, ``LayeringRulesTest`` 8/0/0/0,
+module total ``Tests run: 21, Failures: 0, Errors: 0, Skipped: 0``.
+
+**The census moved, which is the point of the unit.**
+``cometgui-archtests/target/archunit-import.txt``::
+
+    imported-classes 179
+    ...
+    org.cometgui.tools.process 17
+
+It was **1** before this phase -- a lone ``package-info``. The module lines sum
+to exactly 179, which is independent evidence the new test fixtures do not leak
+into ``ProductClasses.all()``.
+
+**The vacuous pass was reproduced by accident, and the new assertions caught
+it.** Running ``-pl cometgui-archtests`` **without** ``-am`` resolves
+``cometgui-process`` from the stale jar in ``_build/m2repo``. In that run
+``LayeringRulesTest`` reported **8/8 green** while ``R-PROC-02`` was being graded
+against a process package containing only ``package-info``. Only the new census
+assertions failed::
+
+    the process service contributed 1 classes to the import; the R-PROC-02 rule
+    is being evaluated against a class set that does not contain the code it
+    governs
+
+    the process service is missing from the import: R-PROC-02 is being graded
+    against a class set that does not contain the product's one and only
+    ProcessBuilder
+
+That is the Phase 01 failure shape, live, in this phase, detected.
+
+**A real hole in the rule, found by measurement and closed.** The Phase 01 rule
+rejected a class holding a ``ProcessBuilder`` as a field, a parameter or a
+return type -- ``dependOnClassesThat().areAssignableTo(..)`` covers signature
+dependencies, not only calls -- but **accepted a class holding a
+``ProcessBuilder.Redirect``**, because a ``Redirect`` is not assignable to a
+``ProcessBuilder``. Observed with a standalone probe, not assumed. Deciding where
+a tool's stdout is redirected is process-service work, so the rule gained a
+name-matching clause over ``java\.lang\.ProcessBuilder(\$.*)?``. It rejects
+strictly more than before and rejects nothing the product does. **This is a
+hardening, not a weakening**, and the ``Runtime.exec`` clause the gate item does
+not ask for is kept and now has a fixture of its own.
+
+**My own injection, into a module neither this agent nor any other had
+touched.** I wrote ``OrchestratorInjection.runPercolatorDirectly()`` --
+``new ProcessBuilder("percolator", "--help").start().waitFor()`` -- into
+``cometgui-install``'s main sources, confirmed the file landed by ``sha256sum``
+rather than by eye, and ran the suite::
+
+    LayeringRulesTest.processCreationIsConfinedToTheProcessService:163
+    Architecture Violation [Priority: MEDIUM] - Rule 'no classes that reside
+    outside of package 'org.cometgui.tools.process..' should depend on classes
+    that are assignable to java.lang.ProcessBuilder or should call method where
+    target owner equivalent to java.lang.Runtime and target name 'exec' or
+    should depend on classes that have name matching
+    'java\.lang\.ProcessBuilder(\$.*)?', because R-PROC-02: ...' was violated
+    (2 times):
+    Method <org.cometgui.install.OrchestratorInjection.runPercolatorDirectly()>
+    calls constructor <java.lang.ProcessBuilder.<init>([Ljava.lang.String;)>
+    in (OrchestratorInjection.java:35)
+
+    Tests run: 21, Failures: 1, Errors: 0, Skipped: 0
+
+Removed the file **and its stale ``.class``**, confirmed with ``find`` and
+``git status`` that nothing remained, and re-ran: ``Tests run: 21, Failures: 0``,
+BUILD SUCCESS.
+
+**``ProductClasses.TOOLS_ADAPTERS``: the comment was corrected, the constant was
+not.** Its Javadoc claimed the pattern excluded the process service;
+``org.cometgui.tools..`` never did. Narrowing the constant would have been a
+weakening -- a process service reaching into a JavaFX control should break
+``toolAdaptersDoNotDependOnUi`` for the same reason a Comet adapter would. The
+right fix was to make the comment true.
+
+.. _p03-spotless-pattern-trap:
+
+**A trap in my own brief, found by the agent.** I gave the pattern
+``-DspotlessFiles=".*/archtests/.*[.]java"``. The path component is
+``cometgui-archtests``, so there is no literal ``/archtests/`` and the pattern
+**matches nothing, formats nothing and exits 0**. The agent noticed and used
+``".*cometgui-archtests/src/test/java/.*[.]java"``, reporting 15 files
+considered. This phase's other pattern, ``".*/tools/process/.*[.]java"``, does
+match, because that path component really exists. **A scoped formatter that
+silently scopes to zero files is a green build that checked nothing** -- check
+the file count Spotless reports, never the exit code.
