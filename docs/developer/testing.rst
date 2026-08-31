@@ -55,16 +55,16 @@ Commands
 
    * - ``bash scripts/verify-all-gates.sh``
      - **Prove every gate still fails on the defect it exists to catch.** Runs
-       all nine falsifiability harnesses and exits non-zero if any control
-       stops biting. About five minutes. Run it before signing off a phase.
+       all ten falsifiability harnesses and exits non-zero if any control
+       stops biting. About twelve minutes. Run it before signing off a phase.
 
    * - ``bash scripts/verify-all-gates.sh --list``
-     - The nine controls, what each injects, and the command that proves it.
+     - The ten controls, what each injects, and the command that proves it.
 
    * - ``bash scripts/verify-all-gates.sh --only NAME``
      - One control. Names: ``license``, ``workflows``, ``docs``,
        ``traceability``, ``sbom``, ``depscan``, ``pipeline``, ``quality``,
-       ``tests``. Repeatable, or comma-separated.
+       ``shell``, ``tests``. Repeatable, or comma-separated.
 
    * - ``bash scripts/ci/docs-build.sh``
      - The documentation gate on its own: both strict Sphinx builds. About 6 s.
@@ -73,9 +73,10 @@ Commands
      - The traceability report gate on its own, without Sphinx. About 1 s.
 
 ``scripts/verify-all-gates.sh`` is deliberately **not** a stage of
-``scripts/build.sh``. It costs five minutes where the whole build costs ninety
-seconds, and a gate people are tempted to skip is a gate that rots. It belongs
-in the nightly pipeline and in a phase sign-off, not in the edit-compile loop.
+``scripts/build.sh``. It costs about twelve minutes where the whole build costs
+under three, and a gate people are tempted to skip is a gate that rots. It
+belongs in the nightly pipeline and in a phase sign-off, not in the
+edit-compile loop.
 
 Testing philosophy
 ==================
@@ -379,7 +380,7 @@ catch, requires the narrowest command that should catch it to exit non-zero
 once the defect is removed. Every harness damages a copy under ``_build/``;
 the working tree is never touched.
 
-``bash scripts/verify-all-gates.sh`` runs all nine in one command. It injects
+``bash scripts/verify-all-gates.sh`` runs all ten in one command. It injects
 nothing itself -- it delegates -- and it fails if a sub-harness is missing or
 not executable rather than skipping it, because a skipped control counted as a
 pass is worse than no aggregator at all.
@@ -507,7 +508,11 @@ runs*, to print the marker that means the defect was caught, and to grade at
 least as many controls as the floor recorded in the script. A harness that
 exits 0 with a lower count than it used to has had controls removed or skipped,
 and that is a failure. On 2026-08-29 the nine controls graded 123 individual
-checks in 4 m 58 s.
+checks in 4 m 58 s. Phase 02 added a tenth, ``shell``
+(``scripts/verify-shell-gates.sh``, which proves that phase's five exit gate
+items fail on the defects they exist to catch), re-sized the ``tests``
+controls against a tree that had outgrown them, and added seven derived-file
+controls to ``quality``; on 2026-08-31 the ten controls graded 176 checks.
 
 Traps
 =====
