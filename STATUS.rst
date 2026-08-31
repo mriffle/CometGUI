@@ -879,6 +879,59 @@ on ``windows-percolator-verification``, which is now pushed and awaiting a pull
 request; fixing it on ``main`` as well would produce a conflict on merge and fix
 it twice. It belongs with Phase 01's residue, whoever lands it.
 
+.. _status-one-phase-at-a-time:
+
+Owner's decision, 2026-08-31: phases run one at a time
+-------------------------------------------------------
+
+**The owner ruled that once Phases 03 and 04 finish, only one phase runs at a
+time.** Those two were allowed to complete concurrently; nothing after them
+overlaps. ``ONBOARDING.rst`` and ``phases/index.rst`` are amended -- the tier-1
+permission to run two orchestrators on disjoint files is withdrawn, and the
+ordering notes now describe independence for *sequencing* only.
+
+The evidence for it came from this very session, and the third item is the
+argument. The first two are hazards with cheap workarounds
+(:ref:`status-concurrent-maven`); the third is not fixable by briefing:
+
+**Both live phases independently built a secret-redaction rule set.** Phase 03
+wrote ``SecretNames`` and ``SecretValues`` in ``cometgui-process``; Phase 04
+wrote ``SecretRedactor`` and ``SecretRegistry`` in ``cometgui-provenance``.
+Those modules are **siblings** -- each depends on ``cometgui-domain``, neither
+on the other -- so neither orchestrator could see the other's work, and each was
+correctly staying inside the paths it had been given. Within hours the two
+keyword lists had **already diverged**: Phase 03's carried ``signature`` and
+``limelightkey`` and Phase 04's did not, so a value named ``...signature...``
+would have been redacted in the process log and **not** in the provenance
+record. That is exactly the silent, security-relevant drift ``R-SEC-03`` exists
+to prevent, and it falsified Phase 04's own gate wording, "driven by **one**
+rule set".
+
+It was caught only because tier 1 read the working tree rather than either
+phase's report -- neither report was wrong, and neither could have been.
+
+**The general lesson: file-level disjointness is not design-level
+disjointness.** Two agents can respect every path boundary and still build the
+same thing twice, and no briefing about paths can prevent it, because neither
+party can see that it is duplicating anything. If two phases look
+parallelisable, that is a prompt to look for a shared abstraction between them,
+not a licence to overlap them.
+
+**The resolution, directed by tier 1 while both phases were still live:** the
+shared rule set moves to ``cometgui-domain``, the only module both siblings
+depend on. Phase 04 owns the move, because it owns the rule set and its tests
+are far deeper -- a PEM private-key block rule, registry ordering pinned by
+test, a seeded secret corpus, and short-carrier coverage added after a
+length-conditioned leak got through. Phase 03 keeps ``ProcessRedactor``, whose
+two insights are process-specific and must survive: redacting each argv element
+**before** ``ToolCommand.displayString()`` escapes it (escaping turns a ``"``
+inside a token into ``\"``, so a literal post-escape search misses it and the
+secret prints in full), and returning the argument **by reference** when the
+registry is empty so a 500 MB flood pays nothing for a feature no tool in the
+workflow uses. The merged keyword list must be the considered **union**; a
+rejection of ``signature`` or ``limelightkey`` must be argued in the worklog,
+not made by omission.
+
 .. _status-concurrent-maven:
 
 Running two phase orchestrators concurrently: one real hazard, and it was mine

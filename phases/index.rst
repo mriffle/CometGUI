@@ -36,12 +36,12 @@ authoritative for its own scope and exit gate.
      - Process Service
      - 01, 02 (both met)
      - --
-     - READY -- next, unblocked
+     - IN PROGRESS (dispatched 2026-08-31)
    * - `04 <PHASE-04-provenance-core.rst>`_
      - Hashing and Provenance Core
-     - 01, 03
+     - 01 (03 not required -- see Ordering notes)
      - --
-     - NOT STARTED
+     - IN PROGRESS (dispatched 2026-08-31, the last phase run concurrently)
    * - `05 <PHASE-05-tool-registry.rst>`_
      - Tool Registry and Installer
      - 01, 03, 04
@@ -107,16 +107,29 @@ Ordering notes
 ==============
 
 The default order is numeric, and it is a dependency order rather than a
-schedule. Where dependencies allow, phases may overlap:
+schedule.
+
+.. important::
+
+   **Phases run ONE AT A TIME** (owner's decision, 2026-08-31). The notes below
+   describe which phases are *independent*, which still matters for ordering and
+   for spotting shared abstractions -- but independence is **no longer a licence
+   to overlap them**. Phases 03 and 04 were the last pair run concurrently, and
+   they independently built the same secret-redaction rule set in two sibling
+   modules without either being able to see the other. See *Why phases run one
+   at a time* in ``../ONBOARDING.rst``.
+
+Independence, for ordering purposes only:
 
 * 03 (process service) and 04 (provenance core) are independent of each
-  other after 01 and can run in parallel.
+  other after 01. **Run 03, sign it off, then run 04.**
 * 06 (parameter model) depends on 05 only for a real Comet binary to query;
   it is otherwise independent of 03, 04 and 05 and is the longest single
   piece of work in the project. Start it as early as a Comet binary exists.
 * 07 (parameter UI) cannot start before 06 has a stable model, and it is the
   second-longest piece.
-* 11 (PDV) is independent of 12 (Limelight) once 10 is done. It grew
+* 11 (PDV) is independent of 12 (Limelight) once 10 is done -- independent in
+  the dependency sense, still run one after the other. It grew
   materially on 2026-08-30: ``D-005`` added an **mzTab exporter** with its own
   fidelity suite, because PDV's control server accepts only mzTab. Treat it as
   two pieces -- the baseline integration, and the exporter -- and spike PDV's

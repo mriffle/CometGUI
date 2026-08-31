@@ -134,9 +134,12 @@ You, if you are the top-level agent in the session.
 * Selects the next ready phase or phases and **spawns one fresh phase
   orchestrator subagent for each**. Does not implement phase work, and does not
   spawn phase agents directly.
-* May run two phase orchestrators concurrently where the dependency graph
-  allows it (see the ordering notes in ``phases/index.rst``), provided they do
-  not touch the same files.
+* **Runs exactly ONE phase orchestrator at a time.** The owner set this on
+  2026-08-31, after Phases 03 and 04 ran concurrently; those two were allowed to
+  finish, and nothing after them overlaps. It replaces an earlier permission to
+  run two at once on disjoint files. The reason is in
+  :ref:`onboarding-no-parallel-phases` and it is not a scheduling preference:
+  **file-level disjointness is not design-level disjointness.**
 * **Signs off each phase** (:ref:`sign-off`) by independently re-running the
   exit gate. The phase orchestrator's report is a claim to be checked, not
   evidence.
@@ -167,7 +170,12 @@ one phase, start to finish.
   work does not accumulate: a unit is accepted, sent back for rework, or
   explicitly recorded as deferred with a reason.
 * May run several phase agents concurrently when their units do not touch the
-  same files; serialises them when they do.
+  same files; serialises them when they do. This still applies **within** a
+  phase -- the one-at-a-time rule is about phases, not work units -- but see
+  :ref:`onboarding-no-parallel-phases` for the two traps that bite parallel
+  agents at any tier: a root ``mvn clean verify`` deleting a sibling's
+  ``target/``, and an unfiltered ``spotless:apply`` reformatting another agent's
+  files.
 * Maintains ``handoffs/PHASE-nn-worklog.rst`` as it goes, and writes
   ``handoffs/PHASE-nn-handoff.rst`` before finishing -- whether the phase
   passed, stalled or was abandoned.
@@ -197,6 +205,46 @@ One fresh subagent per work unit, spawned by the phase orchestrator.
 An agent at any tier running out of context mid-task is expected, not
 exceptional. That is what the work log, the handoffs and frequent commits are
 for: a dead agent should cost one work unit, not a phase.
+
+.. _onboarding-no-parallel-phases:
+
+Why phases run one at a time
+============================
+
+Phases 03 and 04 were run concurrently on 2026-08-31, on genuinely disjoint
+paths, with each orchestrator briefed on the other's files. The path separation
+held perfectly. Three things went wrong anyway, and the third is the reason this
+rule exists.
+
+#. **``scripts/build.sh`` runs ``mvn clean verify`` at the repository root, in
+   the working tree.** Both orchestrators were told to run it before starting --
+   it is the project's one documented command -- so each deleted the other's
+   ``target/`` mid-build, and the resulting error named the victim's own code
+   rather than the collision. ``build.sh`` is written for a single worker in a
+   quiet tree.
+#. **An unfiltered ``spotless:apply`` reformatted 24 files across a module**,
+   including the other phase's in-progress work. Scope it with
+   ``-DspotlessFiles=`` when anyone else is live.
+#. **Both phases independently built a secret-redaction rule set.** Phase 03
+   wrote ``SecretNames`` and ``SecretValues`` in ``cometgui-process``; Phase 04
+   wrote ``SecretRedactor`` and ``SecretRegistry`` in ``cometgui-provenance``.
+   Those modules are **siblings** -- each depends on ``cometgui-domain``,
+   neither on the other -- so neither orchestrator could see the other's work,
+   and each was correctly staying inside its own paths. Within hours the two
+   keyword lists had already diverged, so a value would have been redacted in
+   the process log and **not** in the provenance record: precisely the silent,
+   security-relevant drift ``R-SEC-03`` exists to prevent. Only the tier above
+   both phases could see it, and only by reading the working tree rather than
+   either phase's report.
+
+The first two are hazards with cheap workarounds. The third is the argument:
+**two agents can respect every path boundary and still build the same thing
+twice.** File-level disjointness is not design-level disjointness, and no
+briefing about paths can prevent a duplicated abstraction, because neither party
+can see that it is duplicating anything.
+
+If two phases look parallelisable, treat that as a prompt to check for a shared
+abstraction between them -- not as a reason to overlap them.
 
 .. _sign-off:
 
