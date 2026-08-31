@@ -161,11 +161,19 @@ Phase board
      - Hashing and provenance core
      - PAUSED
      - **Paused by the owner on 2026-08-31**, part-built, to stop two phases
-       sharing one tree. Units 1-7 signed off; 8-10 landed or reverted; 11-13
-       not started. Resumes with a fresh orchestrator **after Phase 03
-       completes**, from ``handoffs/PHASE-04-handoff.rst``. Every headline
-       number it recorded was taken from a tree another phase was changing and
-       **must be re-taken from a quiet one**.
+       sharing one tree. Units **1-8 signed off** on the orchestrator's own
+       injections; units **9 and 10 LANDED BUT NOT SIGNED OFF** -- committed
+       green, but their diffs were not read, their gates not re-run and nothing
+       injected into them, which the phase stated plainly rather than letting
+       them read as done; units **11-13 not started**. Gate items 1-5 met on
+       POSIX with evidence; item 6 partial (unit 11 missing); item 7 met for
+       hashing and redaction but unverified module-wide. Resumes with a fresh
+       orchestrator **after Phase 03 completes**, from
+       ``handoffs/PHASE-04-handoff.rst`` (823 lines) and
+       ``PHASE-04-worklog.rst`` (1060 lines). **Every headline number was taken
+       from a tree another phase was changing and must be re-taken from a quiet
+       one.** Expected grade on resumption is **PARTIAL**, not PASSED
+       (:ref:`status-platform-divergence`).
    * - 05
      - Tool registry and installer
      - NOT STARTED
