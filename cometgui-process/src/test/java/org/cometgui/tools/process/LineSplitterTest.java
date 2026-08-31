@@ -58,7 +58,7 @@ class LineSplitterTest {
      * @param <T> whatever the call site needs
      * @return null
      */
-    private static <T> T opaqueNull() {
+    private static <T> T deliberateNull() {
         List<T> holder = new ArrayList<>(1);
         holder.add(null);
         return holder.get(0);
@@ -422,7 +422,7 @@ class LineSplitterTest {
         @DisplayName("a null buffer is rejected")
         void aNullBufferIsRejected() {
             LineSplitter splitter = splitter(100);
-            char[] noBuffer = opaqueNull();
+            char[] noBuffer = deliberateNull();
 
             assertThrows(NullPointerException.class, () -> splitter.accept(noBuffer, 0, 0));
         }

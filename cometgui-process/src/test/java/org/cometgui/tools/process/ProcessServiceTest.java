@@ -43,6 +43,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.cometgui.domain.ports.ProcessListener;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.tools.process.fakes.FakeTools;
@@ -116,7 +117,7 @@ class ProcessServiceTest {
      * @param <T> whatever the call site needs
      * @return null
      */
-    private static <T> T opaqueNull() {
+    private static <T> T deliberateNull() {
         List<T> holder = new ArrayList<>(1);
         holder.add(null);
         return holder.get(0);
@@ -206,10 +207,17 @@ class ProcessServiceTest {
             assertEquals(201, events.size(), "100 stdout lines, 100 stderr lines and one exit");
             assertEquals("exit:0", events.get(200), "the exit must be the very last event");
             assertEquals(1L, listener.exitReports());
-            assertEquals("out 99", listener.standardOutput().get(99));
-            assertEquals("err 99", listener.standardError().get(99));
-            assertEquals(100, listener.standardOutput().size());
-            assertEquals(100, listener.standardError().size());
+            /* THE WHOLE SEQUENCE, not a sample of it.  Asserting the size and one interior
+             * element is too coarse to see a partial failure: a pump that delivered line 42
+             * twice and dropped line 43 would satisfy both.  The expected lists are built by
+             * the test from the format FakeToolSelfTest pins with hand-typed literals, so
+             * nothing on the expected side comes from the code under test. */
+            List<String> expectedStandardOutput =
+                    IntStream.range(0, 100).mapToObj(line -> "out " + line).toList();
+            List<String> expectedStandardError =
+                    IntStream.range(0, 100).mapToObj(line -> "err " + line).toList();
+            assertEquals(expectedStandardOutput, listener.standardOutput());
+            assertEquals(expectedStandardError, listener.standardError());
         }
 
         @Test
@@ -639,8 +647,8 @@ class ProcessServiceTest {
         @DisplayName("null arguments are rejected before anything is launched")
         void nullArgumentsAreRejected(@TempDir Path tmp) {
             ToolCommand command = FakeTools.command(tmp, "exit-code", "0");
-            ToolCommand noCommand = opaqueNull();
-            ProcessListener noListener = opaqueNull();
+            ToolCommand noCommand = deliberateNull();
+            ProcessListener noListener = deliberateNull();
 
             assertTrue(
                     assertThrows(

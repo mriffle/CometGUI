@@ -553,3 +553,119 @@ with a cycle in the parent chain and returning the same value either way; and
 ``read >= 0`` to ``read > 0`` where ``InputStreamReader.read(char[8192])``
 cannot return 0. The score is 96% with all four counted as failures, so none of
 them is load-bearing for the gate.
+
+Unit 2b -- the adversarial proof of gate item 2
+===============================================
+
+:Agent: fresh phase agent, spawned 2026-08-31, whose whole job was to break
+   cancellation
+:Commit: ``5d4ff81``, plus the orchestrator's two repairs in the sign-off commit
+:Outcome: **ACCEPTED. It found a real hole and closed it.**
+
+**What was built.** ``ProcessCancellationTest`` -- 1,126 lines, twelve tests in
+five nested groups -- and two methods on the shared ``RecordingListener``. No
+production code changed.
+
+**What I ran myself:** ``mvn -o -B -pl cometgui-process -am verify`` --
+**BUILD SUCCESS**, ``Tests run: 130, Failures: 0, Errors: 0, Skipped: 0``
+(118 before this unit), ``BugInstance size is 0``, ``0 Checkstyle violations``
+from every execution; and ``org.pitest:pitest-maven:mutationCoverage`` --
+``Generated 95 mutations Killed 88 (93%)``.
+
+.. _p03-pit-variance:
+
+**PIT's score varies between runs and the worklog must say so.** I measured 96%
+at the unit 2 sign-off and 93% here, on the same 95 mutations; the agent
+independently reproduced 93% on the pre-change sources and found the survivor
+set byte-identical between its two runs. The difference is three mutants in the
+uninterruptible-wait idiom that PIT classifies as timed-out (killed) or
+survived depending on machine load. **The honest number is a floor of 93%
+against a threshold of 80%**, not a point value, and a later phase should not
+treat 96% as a regression baseline.
+
+The hole: the classic bug went undetected by everything
+--------------------------------------------------------
+
+The agent injected the snapshot-after-destroy defect -- taking
+``descendants()`` **after** the parent has been destroyed, which is the exact
+bug ``ProcessTree``'s whole design exists to avoid -- and **all 128 tests
+passed, including the brand-new real-process gate item 2 test.**
+
+The reason is worth recording, because it is not carelessness: ``destroy()``
+only queues a ``SIGTERM``. The snapshot on the next line still sees the child
+and still kills it. The bug is a race this machine wins every time, and a test
+that waited for the race to be lost would be a test synchronised by a sleep.
+
+The repair asserts the order where it is a **fact rather than a race**: it drives
+``StartedProcess.requestCancellation`` against a ``Process`` whose handle records
+what was asked of it, and requires the recorded sequence. Re-injected, it now
+fails with::
+
+    expected: <[descendants, destroy:200, destroy:100]>
+    but was:  <[destroy:100, descendants, destroy:200, destroy:100]>
+
+**This is a fifth shape of the project's signature defect and it deserves its own
+name: a property that is true only because a race is always won.** Not an empty
+rule, not an expectation computed by the subject, not a seam the production path
+need not use, not an assertion too coarse to see a partial failure -- a real
+assertion, on the real subject, that the machine happens to satisfy for a reason
+unrelated to the code being right.
+
+Injections the agent ran, with what happened
+---------------------------------------------
+
+* **Reverse the termination order.** Six ``ProcessTreeTest`` failures -- but
+  *every real-process test still passed*, because both signals land microseconds
+  apart. Honest reporting of a partial result; the new order tests now catch it
+  too.
+* **``destroyAll`` made a no-op.** Ten failures across three classes, including
+  ``afterTheGraceItIsKilled expected: <[out:hanging, out:terminating, exit:137]>
+  but was: <[out:hanging, exit:137]>``.
+* **``ProcessHandle.destroy()`` replaced by ``Process.destroy()``**, the choice
+  unit 2 documented. Five failures, and one consequence nobody had written down:
+  **the exit code is misreported as 1**. Closing the read end gives the tool
+  ``EPIPE``, it dies of an ``IOException`` before the signal lands, and a
+  cancelled run would be shown to the user as a tool crash. It also delivered 82
+  lines where the correct implementation delivers 1,296.
+
+My own injections
+------------------
+
+*Injection D -- never collect descendants at all*, so only the parent is killed.
+This is gate item 2's central property. Twelve failures, and the real-process
+test failed on **liveness**::
+
+    ProcessCancellationTest.awaitExit:231
+      the child (pid 325499) was still alive 60s after the cancellation;
+      isAlive() is true
+
+*Injection E -- the fourth defect shape, on tier 1's warning.* I made
+``StreamPump`` drop exactly one line in the middle of a stream, and then --
+the harder case -- **replace line 42 with a repeat of line 41, so the line count
+is unchanged.** A count-preserving corruption is invisible to an assertion on
+size plus a sampled element, which is what ``onExitComesOnceAndLast`` had. It
+now asserts the whole ordered sequence, built by the test from the format
+``FakeToolSelfTest`` pins with hand-typed literals::
+
+    ProcessServiceTest.onExitComesOnceAndLast
+      expected: <[... out 41, out 42, out 43 ...]>
+      but was:  <[... out 41, out 41, out 43 ...]>
+
+The two flood tests caught it independently and already had the right shape::
+
+    flood line 42 is not what the fake wrote and it is not the last line
+    delivered, so the output was corrupted rather than truncated:
+    expected "0000000042 0123456789..." but got "0000000041 0123456789..."
+
+Repairs I made
+---------------
+
+#. **Gate item 2's failure was the single word "Timeout".**
+   ``handle.onExit().get(n, SECONDS)`` throws a ``TimeoutException`` carrying no
+   message, so the one gate item tier 1 said he would personally re-inject
+   reported nothing about *what* survived. An ``awaitExit(handle, what)`` helper
+   now fails with the sentence above, naming the process and its pid. Proved by
+   re-running injection D.
+#. **The interleave assertion was too coarse**, as above.
+#. **The null-rejection helper is now named** ``deliberateNull``, matching Phase
+   04, per :ref:`p03-null-idiom`. Same technique, one name across both phases.

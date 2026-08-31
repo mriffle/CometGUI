@@ -203,6 +203,39 @@ class ProcessCancellationTest {
         return new ProcessService(Clock.systemUTC(), StandardCharsets.UTF_8, grace);
     }
 
+    /**
+     * Waits for one process to end, failing with a sentence rather than a bare exception.
+     *
+     * <p>{@code handle.onExit().get(n, SECONDS)} throws a {@link TimeoutException} carrying no
+     * message at all, so a cancellation that left a process running reported itself as the single
+     * word "Timeout". That is the failure this gate item exists to catch, and a reader of a red
+     * build has to be told which of the two processes survived. Verified by injection: with the
+     * descendant snapshot emptied in {@code ProcessTree}, this now says "the child was still alive
+     * 60s after the cancellation" instead.
+     *
+     * @param handle the process that must have ended
+     * @param what which process it is, for the message
+     * @throws InterruptedException if the waiting thread is interrupted
+     */
+    private static void awaitExit(ProcessHandle handle, String what) throws InterruptedException {
+        try {
+            handle.onExit().get(FAILURE_BOUND_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException stillRunning) {
+            throw new AssertionError(
+                    what
+                            + " (pid "
+                            + handle.pid()
+                            + ") was still alive "
+                            + FAILURE_BOUND_SECONDS
+                            + "s after the cancellation; isAlive() is "
+                            + handle.isAlive(),
+                    stillRunning);
+        } catch (ExecutionException failed) {
+            throw new AssertionError(
+                    "waiting for " + what + " (pid " + handle.pid() + ") to exit failed", failed);
+        }
+    }
+
     private static void awaitMarker(CountDownLatch latch, String what) throws InterruptedException {
         assertTrue(
                 latch.await(FAILURE_BOUND_SECONDS, TimeUnit.SECONDS),
@@ -326,8 +359,8 @@ class ProcessCancellationTest {
 
                 /* LIVENESS, not the absence of an exception.  The bound is a failure bound: a
                  * process that was cancelled ends on its own, and one that was not never will. */
-                parentHandle.onExit().get(FAILURE_BOUND_SECONDS, TimeUnit.SECONDS);
-                childHandle.onExit().get(FAILURE_BOUND_SECONDS, TimeUnit.SECONDS);
+                awaitExit(parentHandle, "the parent");
+                awaitExit(childHandle, "the child");
                 assertFalse(parentHandle.isAlive(), "the parent survived the cancellation");
                 assertFalse(childHandle.isAlive(), "the child survived the cancellation");
                 assertFalse(started.isAlive());
