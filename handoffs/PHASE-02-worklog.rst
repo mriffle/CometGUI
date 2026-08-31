@@ -673,6 +673,22 @@ Work units
        weakened test suite"; it now injects a covered class whose test asserts
        nothing.
 
+   * - 12
+     - **Pin every stable identifier as a literal, exhaustively.** Added after
+       the phase reported, when the **main orchestrator found the gap at its
+       own sign-off by injection**: renaming one section's pane identifier in
+       ``UiIds`` left the whole build green, because the GUI tests compute
+       their expected identifier by calling the same helper they are checking,
+       and ``UiIdsTest`` pinned literals for only two of the ten sections.
+       ``R-TEST-04`` turns on the word *stable*, and a self-referential
+       assertion cannot see a rename. Accepted only when every identifier the
+       shell exposes is pinned as a hand-written literal, when adding a
+       section, stage or severity fails until its literal is pinned, when no
+       pinned literal is produced by calling ``UiIds``, and when a rename is
+       demonstrated failing and naming the identifier.
+     - ``R-TEST-04``, gate 2
+     - PENDING
+
 Rejections and rework
 =====================
 
