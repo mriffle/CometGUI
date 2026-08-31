@@ -709,6 +709,50 @@ not. **Run ``mvn -pl cometgui-domain install`` after any cross-module move
 before running PIT.** This one costs an hour to diagnose and ten seconds to
 avoid, and it will bite the main orchestrator re-running this phase's gate.
 
+.. _p04-sample-census:
+
+A class can leave the coverage sample without leaving a mark
+============================================================
+
+The main orchestrator raised this while five units were landing at once, and
+it is the sharpest measurement point of the phase. A package-level coverage or
+mutation figure taken while sibling units are mid-landing is not merely noisy,
+it is **uninterpretable, and it can err in either direction**. Low is visible:
+unit 7 saw ``json`` at 38% and correctly told me to read per-class numbers
+instead. **High is invisible**: a class whose test does not compile can be
+absent from the report altogether, and an absent class does not drag an
+average down -- it silently leaves the sample. "All coverage checks have been
+met" then means "met by whatever was left in it".
+
+That is the same family as every other finding this session, and it is the one
+version a handoff cannot expose, because the number it produces looks perfect.
+
+**So it is now checked rather than hoped for.** A census compares the classes
+actually compiled into ``target/classes`` against the classes present in
+``jacoco.xml`` and in ``mutations.xml``. Run against the tree mid-landing it
+found a live instance immediately::
+
+    compiled classes (excluding package-info and inner): 37
+    classes in jacoco.xml:                               36
+    COMPILED BUT ABSENT FROM JACOCO:
+      org.cometgui.provenance.manifest.ManifestReader
+
+``ManifestReader`` had been compiled and was carrying 79 ``NO_COVERAGE``
+mutations, because a unit had excluded its test to get a green suite while
+another unit was mid-flight. The coverage rule passed over a sample that had
+quietly lost its worst member.
+
+``scripts/build.sh`` already fails a MODULE that compiles classes and produces
+no ``jacoco.xml`` at all. It does not check the per-CLASS case, which is the
+one that bites when a single test is excluded. That gap is reported upward
+rather than patched here: ``scripts/`` is shared and not this phase's to edit.
+
+**Every headline figure this phase reports is taken from one clean end-to-end
+run with no agents in flight, a module free of modified or untracked sources,
+``mvn -pl cometgui-domain install`` first, then one ``verify`` and one mutation
+run** -- never assembled from per-class numbers gathered across different runs.
+A composite figure that cannot be reproduced in one command is not evidence.
+
 Rejections and rework
 =====================
 
