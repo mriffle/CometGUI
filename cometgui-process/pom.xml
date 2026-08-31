@@ -16,6 +16,32 @@
   <description>The only place in the product allowed to construct a ProcessBuilder (R-PROC-02).</description>
 
   <!--
+    THE MUTATION GATE IS ON IN THIS MODULE (phase 03 unit 2).
+
+    The parent POM's PIT <targetClasses> already contains org.cometgui.tools.*,
+    written by phase 01 with the comment "command builders, version and
+    capability rules, secret redaction in the process service".  The moment this
+    module compiled its first class under that prefix it fell under R-TEST-02's
+    80% mutation threshold, and scripts/build.sh re-derives those prefixes from
+    the POM and fails any module that compiles such a class with its switch
+    still off.  So the switch is set here, in this module's own POM, rather than
+    discovered at the end of the phase.
+
+    Setting this back to true, narrowing the parent's target list, adding an
+    exclusion or lowering the threshold are all weakenings of a gate and are
+    rejected at sign-off.  The legitimate fix for a surviving mutation is to
+    move the logic out of a thread and into a pure class, which is why
+    LineSplitter, StreamPump, GuardedListener and ProcessTree exist.
+
+    The JaCoCo 90/85 gate does NOT apply here: COVERAGE_GATED_PREFIXES is
+    domain, params and provenance, matching the specification's "adapters
+    covered by real integration tests rather than artificial line counts".
+  -->
+  <properties>
+    <cometgui.mutation.skip>false</cometgui.mutation.skip>
+  </properties>
+
+  <!--
     Only the edges the specification's layering permits are declared here.
     Adding one is an architectural change: say so in the phase handoff, and
     expect the ArchUnit rules in cometgui-archtests to have an opinion.
