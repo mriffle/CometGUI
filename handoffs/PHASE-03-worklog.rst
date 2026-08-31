@@ -58,6 +58,54 @@ always a concurrent ``clean``, not a defect. The rules this phase worked under:
    ``clean verify`` and never ``install``, so ``_build/m2repo`` holds stale
    ``org.cometgui`` snapshots (Phase 02 surprise 9).
 
+**The mechanism, established by tier 1 after the fact**, is narrower than "a
+gate harness did it": ``scripts/build.sh`` line 217 runs ``mvn ... clean
+verify`` **at the repository root, in the working tree**, and both live phase
+orchestrators were told to run it before starting. The three Maven gate
+harnesses extract ``git archive HEAD`` into a sandbox under ``_build/`` and
+build the copy, so none of them can delete a ``target/`` in the working tree;
+the 10/10 baseline stands. This phase ran ``build.sh`` once more, to confirm the
+tree, and not again while Phase 04 was live.
+
+.. _p03-shared-lock:
+
+**A residual hazard neither phase's lock actually covers, and it is worth
+fixing before a third phase runs concurrently.** Phase 04 serialises its Maven
+invocations with a ``flock`` on ``p04-maven.lock``, and this phase uses
+``_build/cometgui-maven.lock``. **Two different lock files do not serialise two
+phases against each other** -- a lock only excludes processes contending for the
+same file. And the exposure is real rather than theoretical: Phase 04 builds
+``-pl cometgui-provenance -am`` and this phase builds ``-pl cometgui-process
+-am``, and *both* of those resolve ``cometgui-domain`` from the reactor and
+write ``cometgui-domain/target/``. ``_build/m2repo`` is shared as well. **A
+single agreed lock path is needed**; this is escalated to the main
+orchestrator rather than decided here, because it binds another phase.
+
+.. _p03-null-idiom:
+
+The null-rejection idiom, arrived at twice independently
+---------------------------------------------------------
+
+``config/spotbugs/exclude.xml`` excludes ``NP_NULL_PARAM_DEREF``,
+``NP_NULL_PARAM_DEREF_NONVIRTUAL`` and ``NP_NONNULL_PARAM_VIOLATION`` in test
+sources -- but **not** ``NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS``. So an
+instance method that calls ``Objects.requireNonNull(arg, "name")``, together
+with the test proving it rejects null, fails ``mvn verify``. Both live phases
+met it. Both refused to add the detector to the shared exclusion file, which
+would be weakening a shared gate to make one's own code pass, and both took the
+same test-side fix: launder the null through a generic method SpotBugs cannot
+see through::
+
+    private static <T> T opaqueNull() {
+        return null;
+    }
+
+Phase 04 named it ``deliberateNull``. Same signature, same technique, different
+word; this phase's name was already committed and signed off in code a live
+agent was editing when the divergence came to light. ``config/spotbugs/`` has
+not been touched by this phase -- ``git log --name-only`` over the phase's range
+lists nothing under ``config`` or ``scripts``.
+
 Baseline supplied by the main orchestrator
 ------------------------------------------
 
