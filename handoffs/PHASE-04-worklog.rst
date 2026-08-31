@@ -599,6 +599,47 @@ assertion rather than trusting it, by drifting the copy a single character
 ``the payload rule no longer contains the settings rule ==> expected: <true>
 but was: <false>``.
 
+.. _p04-encoding:
+
+Two environment findings a later phase must not lose
+====================================================
+
+**A scientist with an accent in their directory name cannot run this product,
+and it has nothing to do with provenance.** Unit 7 hit it and I confirmed it
+myself rather than relaying it. This JVM reports::
+
+    file.encoding   = UTF-8
+    native.encoding = ANSI_X3.4-1968
+    sun.jnu.encoding = ANSI_X3.4-1968
+
+because the environment sets no ``LANG``. ``sun.jnu.encoding`` is what the JDK
+uses to turn a Java string into a filesystem path, so::
+
+    Path.of("/data/protéomique/x.mzML")
+    -> java.nio.file.InvalidPathException: Malformed input or input contains
+       unmappable characters: /data/prot?omique/x.mzML
+
+and under ``LANG=C.UTF-8`` the same call returns the path unharmed. This is
+*before* any CometGUI code runs; no amount of correct handling downstream can
+recover it. **Phases 14 and 16 must make the launcher set a UTF-8 locale** --
+``-Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8`` in the ``jpackage``
+java-options, or the equivalent in the launch script -- and a CI runner that
+does not export a UTF-8 locale will silently skip coverage that a user's
+machine needs. Unit 7 handled it honestly rather than hiding it: the non-ASCII
+text and the emoji surrogate pair moved into tool *warnings*, so the
+byte-level UTF-8 assertion over the whole document stays unconditional, and
+the one path-specific test aborts with a diagnostic naming the encoding rather
+than pretending to pass.
+
+**PIT resolves from the local repository, not the reactor.** After the
+redaction move, ``_build/m2repo`` still held a pre-move ``cometgui-domain``
+jar, so ``mvn -pl cometgui-provenance -am org.pitest:...:mutationCoverage``
+failed with ``ClassNotFoundException: org.cometgui.domain.secrets.SecretRegistry``
+and reported 83 test failures that looked like another unit's bug. They were
+not. **Run ``mvn -pl cometgui-domain install`` after any cross-module move
+before running PIT.** This one costs an hour to diagnose and ten seconds to
+avoid, and it will bite the main orchestrator re-running this phase's gate.
+
 Rejections and rework
 =====================
 
