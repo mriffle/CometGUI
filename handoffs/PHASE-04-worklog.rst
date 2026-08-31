@@ -269,7 +269,21 @@ touch the same files; the file list for each unit is fixed by the brief.
        the marker is a fixed literal; redaction is idempotent; non-secret
        content survives unchanged.
      - ``R-SEC-03``
-     - pending
+     - **SIGNED OFF 2026-08-31** at ``2b4575d``, after two rework rounds. I ran
+       the module gate myself: ``Tests run: 309, Failures: 0, Errors: 0``,
+       ``All coverage checks have been met``, ``BugInstance size is 0``,
+       ``0 Checkstyle violations``, PIT ``130 mutations, 130 killed, 0
+       survived`` with redaction contributing 52 and no survivor anywhere.
+       Two injections of my own. (1) A plausible optimisation,
+       ``if (text.length() < 32) return text;`` as the first statement of
+       ``redactText``: six failures including ``expected: <password:
+       [REDACTED]> but was: <password: swordfish-42>`` -- **but
+       ``SeededSecretCorpusTest`` passed, 8 tests, 0 failures**, which is the
+       finding described at :ref:`p04-sweep-blindness` and is now fixed.
+       (2) A classic off-by-one, ``index < argv.size() - 1``: ten failures
+       across four classes including the corpus test, e.g. ``expected: <[-k,
+       [REDACTED]]> but was: <[-k]>``. Reverted; the restored file's SHA-256
+       ``010251f5...`` matches the value the unit reported independently.
 
    * - 4
      - A
@@ -281,7 +295,18 @@ touch the same files; the file list for each unit is fixed by the brief.
        invariants; a file record cannot exist without both digests; the JVM
        locale and time zone have declared homes.
      - ``R-PROV-01``, ``R-PROV-04``, ``R-PROV-05``
-     - pending
+     - **SIGNED OFF 2026-08-31** at ``fea6bd6``, after one rework round that
+       added the stage id, the ``FORMAT`` locale and the settings-key shape
+       rule (:ref:`p04-schema-decisions`). Same module gate run as unit 3
+       above; ``manifest`` contributes 50 of the 130 mutations with no
+       survivors. My own injection went at the newest code, capturing the
+       format locale from ``Locale.Category.DISPLAY`` instead of ``FORMAT``:
+       two failures, ``expected: <en_US> but was: <tr_TR>`` and -- the one
+       that matters -- ``expected: <.> but was: <,>``. That second assertion
+       is on the actual decimal separator the recorded locale produces, so the
+       test proves the ``R-PARAM-11`` consequence the requirement exists for
+       rather than proving that a getter returns a field. Reverted and
+       re-verified clean.
 
    * - 5
      - B
@@ -428,6 +453,52 @@ An out-copy defect is gated by SpotBugs, not by JUnit -- and that is honest
     would fail on *correct* code. The gate is real; it is simply a static
     analyser rather than a test, and that is worth knowing before someone
     "strengthens" it.
+
+.. _p04-sweep-blindness:
+
+The finding that a "no secret survives" sweep is the weak point, not the rules
+=============================================================================
+
+Three defects in unit 3 mattered, and **all three were in the shape of an
+assertion rather than in the production rules**. Gate item 6 rests on a sweep
+that greps generated artefacts for a corpus of seeded secrets, so this is the
+single most load-bearing lesson of the phase and unit 11 inherits it.
+
+A sweep proves the ABSENCE OF A STRING, not the PRESENCE OF REDACTION. It is
+only as strong as the shapes *and the sizes* of the inputs it is given, and it
+is blind to at least two things unless they are deliberately covered.
+
+**Blind spot 1: a partial rewrite.** ``contains(secret)`` is defeated by one
+changed character. The unit found this itself, by injection: with a registered
+PEM key, an earlier pattern rule rewrote the ``-----BEGIN`` line, the literal
+that the registry was matching on no longer occurred, and **62 characters of
+key material survived** with the registry loaded and the sweep green. The
+repair was to run the literal pass *first as well as last*, and to hold the
+key's three lines as separate corpus entries so a rule that eats only the
+header still fails.
+
+**Blind spot 2: a leak conditioned on the input's size.** I injected
+``if (text.length() < 32) return text;`` at the top of ``redactText`` -- the
+sort of optimisation a maintainer writes in good faith. Six assertions failed
+in ``SecretRedactorTest``, including ``password: swordfish-42`` in clear. But
+``SeededSecretCorpusTest`` **passed, 8 tests, 0 failures**, because every
+carrier in the corpus was comfortably over 32 characters. The corpus now
+carries one deliberately short carrier per rule family, the shortest 12
+characters and the longest 23, and -- the part that keeps it fixed --
+``everyShortCarrierIsActuallyShort`` asserts the length property directly, so
+that someone later "tidying" the examples into realistic longer ones fails
+instead of silently reopening the hole. Against the repaired corpus my defect
+fails three ways, naming the secret and the carrier.
+
+**A boundary of the name rule, recorded rather than papered over.** I suggested
+``pw=swordfish-42`` as the short assignment carrier. It is not covered by the
+pattern rules at all: ``pw`` and ``pass`` are not name keywords, ``password``
+and ``passwd`` do not contain them as substrings, and ``pwd`` is deliberately
+excluded because ``PWD`` is the shell's working directory. The unit used
+``auth=`` for the pattern-covered case and kept ``pw=`` as a registry-only
+carrier, which turns a surprise into a documented boundary. I declined to add
+``pw`` as a keyword: name matching is by substring, so ``pw`` would match
+``PWD`` and redact the working directory out of every provenance record.
 
 Rejections and rework
 =====================
