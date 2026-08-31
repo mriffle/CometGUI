@@ -317,7 +317,26 @@ touch the same files; the file list for each unit is fixed by the brief.
        that preserves size *and* mtime is still detected or rehashed, and the
        recorded hash is a hash of the content actually read.
      - ``R-PROV-02``
-     - pending
+     - **SIGNED OFF 2026-08-31** at ``7e269dc``. The gate item is met by
+       DETECTION, not by luck: the cache keys on a fifth attribute beyond the
+       four ``R-PROV-02`` names, the POSIX inode change time ``unix:ctime``,
+       which the kernel bumps on both the write and the timestamp restoration
+       and which user space cannot set. Where identity or ctime is absent
+       (Windows, or a file inside a zip -- tested for real through
+       ``FileSystems.newFileSystem``) nothing is cached at all, which is
+       "when in doubt, rehash" implemented literally rather than quoted. The
+       settling rule behind it is grounded in measurement, not assumption:
+       two back-to-back writes to one file left an *identical* ctime in 184
+       of 200 trials on this host, because timestamps are only as fine as the
+       kernel tick. My own injection went at a shape the unit's twelve did not
+       cover, dressed as Windows compatibility --
+       ``fileIdentity == null || Objects.equals(...)`` on both new attributes,
+       so a cached entry with a null attribute matches anything. Two failures:
+       ``absent vs present identity ==> expected: <false> but was: <true>``
+       and the same for ctime. Restored and verified with ``sha256sum -c``
+       rather than by eye. Full module gate, run by me: ``Tests run: 554,
+       Failures: 0, Errors: 0``, 100% line and 100% branch, ``BugInstance size
+       is 0``, PIT ``hashing`` 70 mutations, 70 killed, 0 survived.
 
    * - 6
      - B
@@ -499,6 +518,35 @@ excluded because ``PWD`` is the shell's working directory. The unit used
 carrier, which turns a surprise into a documented boundary. I declined to add
 ``pw`` as a keyword: name matching is by substring, so ``pw`` would match
 ``PWD`` and redact the working directory out of every provenance record.
+
+.. _p04-injection-clobber:
+
+An injection that silently stops injecting reports a PASS
+=========================================================
+
+Unit 5 found this and it is the most dangerous mechanical hazard of the phase.
+Sibling subagents share one scratchpad directory. The unit wrote its injection
+script there as ``inject.py``; an agent in another module wrote its own
+``inject.py`` to the same path mid-run; two of unit 5's injections then ran the
+wrong script, **changed nothing, and the suite went green with the defect
+supposedly present**.
+
+This is the project's signature failure in a new costume. Phase 01's ArchUnit
+rule evaluated nothing; Phase 02's identifiers were compared against
+themselves; here it is the *defect* rather than the *assertion* that stopped
+working. The sentence "I injected X and the tests still passed" is exactly the
+sentence that means "no defect was present", and it is indistinguishable from
+"the gate is weak" unless the edit is confirmed to have landed. The unit caught
+it only because two defects that had previously FAILED suddenly passed, which
+is the one pattern that cannot be explained away.
+
+**The rule this phase now works to, and which the next agent should inherit.**
+An injection is evidence only if the edit is verified before the test result is
+believed. Every injection in this phase asserts ``count(old) == 1`` before
+writing, prints a marker, and has the marker grepped back out of the target
+file before anything is run; every restore is checked with ``sha256sum -c``
+rather than by eye. Per-agent subdirectories are not optional in a shared
+scratchpad.
 
 Rejections and rework
 =====================
