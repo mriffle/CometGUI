@@ -777,11 +777,8 @@ Residue carried forward
 
 Small, named, and none of it blocking.
 
-* **The ``Settings`` section has no owning phase.** It appears once in the
-  specification -- "Tool Manager and application Settings may be secondary
-  navigation or dialogs" -- and in no phase document. Phase 02 built it as an
-  empty pane that says so in text, pinned by a test, which is the honest
-  treatment. Tier 1 must give it an owner and content before Phase 07.
+* **The ``Settings`` section: owner assigned 2026-08-31, content deliberately
+  left empty.** See :ref:`status-settings-decision`.
 * ``UiIdsTest.noTwoIdentifiersCollide`` asserts a floor of 80 against a real
   surface of 119, and its ``allIdentifiers()`` walks ``displayOrder()`` rather
   than ``values()``. The new pin test covers the surface, so this is hardening,
@@ -892,6 +889,58 @@ depscan 16, pipeline 24, quality 42, shell 30, tests 33. "Every gate was seen to
 reject its defect and accept the clean tree." That is also the strongest
 evidence the relocation repair is complete: the whole Maven, headless-JavaFX and
 Sphinx stack runs at the new path.
+
+.. _status-settings-decision:
+
+The ``Settings`` section: owner assigned, content deliberately empty
+====================================================================
+
+Tier 1 owed a decision here before Phase 07, and the answer turned out to be a
+scope *reduction* rather than the content list the question implied.
+
+**What the specification actually says.** One sentence, at
+``specification.rst`` line 1185: "Tool Manager and application Settings **may**
+be secondary navigation or dialogs." That is permissive, not a requirement, and
+it names no content. Searching the whole specification for anything required to
+be user-configurable returns **one** hit -- ``AC-LL-05``, "the Limelight q
+cutoff is separately configurable and defaults to 0.01" -- and that control
+belongs to the Limelight and Results surfaces, not to an application-level
+preferences pane. There is no required preference for the tool install root, the
+cache or application-data directory, a proxy, a theme, or update checking; none
+of those appears in the specification at all.
+
+**The decision.**
+
+#. **Phase 07 owns the ``Settings`` section**, as the next phase that builds UI
+   and the deadline this question carried.
+#. **Its default outcome is REMOVAL from navigation, not invention.** Phase 02
+   built it honestly as an empty pane that says it is empty, pinned by a test.
+   If, by Phase 07, no phase has produced an application-level, run-independent
+   preference, Phase 07 removes the section rather than shipping a permanently
+   empty one.
+#. **An item may enter Settings only if it cites an ``R-`` rule or ``AC-``
+   criterion requiring it to be configurable.** Today none does. This is the
+   guard that keeps the section from becoming a junk drawer of invented
+   preferences, which is the failure mode a nav section with no specified
+   content invites.
+#. **No second preferences mechanism.** If a later phase does earn a preference,
+   it adds a group to this section; it does not build its own store.
+
+**Why not simply fill it.** Inventing preferences would be an agent adding
+unspecified product scope, which this project forbids -- the specification is
+the authority on *what* to build, and disagreement is resolved by a recorded
+amendment, never by a silent divergence. Two candidates were considered and
+both were rejected on inspection: ``R-CMT-05``'s "configured limit derived from
+the thread setting and available cores" is derived from a Comet parameter and
+the host, not from a user preference; and ``R-PROC-03``'s "documented retention
+policy" is documented, not configurable, and Phase 02 already implemented it as
+a constant.
+
+**For the owner.** If CometGUI *should* have a real Settings surface, that is a
+specification amendment (revision 11) rather than something an agent may decide,
+and it should be raised before Phase 07 rather than after. This entry records
+the deliberate emptiness so that a later reader does not mistake it for an
+oversight and quietly fill it.
 
 Open decisions
 ==============
