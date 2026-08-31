@@ -73,6 +73,62 @@ Determinism is a schema property
     be hand-typed and ``R-PROV-04``'s locale requirement would be a comment
     rather than a property.
 
+.. _p04-reference-digests:
+
+Independently computed reference digests
+========================================
+
+Computed by the orchestrator before any code existed, so that no expected value
+in this phase can have come from the code under test. Every value below was
+produced twice, by two implementations that share no code with each other or
+with CometGUI: GNU coreutils ``md5sum``/``sha256sum`` and OpenSSL
+``openssl dgst``. The short vectors additionally match the published RFC 1321
+and NIST vectors.
+
+.. list-table:: Short vectors
+   :header-rows: 1
+   :widths: 22 39 39
+
+   * - Content
+     - MD5
+     - SHA-256
+   * - zero bytes
+     - ``d41d8cd98f00b204e9800998ecf8427e``
+     - ``e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855``
+   * - ``a``
+     - ``0cc175b9c0f1b6a831c399e269772661``
+     - ``ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb``
+   * - ``abc``
+     - ``900150983cd24fb0d6963f7d28e17f72``
+     - ``ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad``
+   * - ``message digest``
+     - ``f96b697d7cb7938d525a2f31aaf161d0``
+     - ``f7846f55cf23e14eebeab5b4e1550cad5b509e3348fbc4efa3a1413d393cb650``
+   * - ``abcdefghijklmnopqrstuvwxyz``
+     - ``c3fcd3d76192e4007dfb496cca67e13b``
+     - ``71c480df93d6ae2f1efad1447c66c9525e316218cf51fc8d9ed832f2daf18b73``
+   * - ``The quick brown fox jumps over the lazy dog``
+     - ``9e107d9d372bb6826bd81d3542a419d6``
+     - ``d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592``
+   * - one million ``a``
+     - ``7707d6ae4e027c70eea2a935c2296f21``
+     - ``cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0``
+
+The 2 GB corpus for gate item 2 is defined here rather than by the code that
+hashes it. It is a 65521-byte block, ``block[j] = (j * 251 + 17) mod 256``,
+repeated until the file is exactly 2 147 483 648 bytes long. 65521 is prime and
+therefore shares no factor with any power-of-two read buffer, so a defect that
+mis-handles a chunk boundary changes the content it digests rather than
+landing on an identical repeat; the file length is not a multiple of the block,
+so the last block is partial. The reference values, from both tools, are
+
+``MD5 = 222ed00f986369a06082191a1300d095``
+
+``SHA-256 = afba2dcb851c0337d7f364e52c88ac7590c5e5b29c6a5c1739cfda4b59ad3be3``
+
+and the generator that produced them is nine lines of Python that never touch
+this repository.
+
 Work units
 ==========
 
