@@ -129,6 +129,59 @@ so the last block is partial. The reference values, from both tools, are
 and the generator that produced them is nine lines of Python that never touch
 this repository.
 
+.. _p04-measured-before:
+
+What the gates measured before this phase, so that "green" can be checked
+=========================================================================
+
+A coverage or mutation report is only evidence if the code in question was in
+the sample. Phase 01 shipped an ArchUnit rule that reported 8/8 while
+evaluating nothing, and the same shape is available here for free: a gate whose
+package list does not reach a new subpackage measures nothing and passes. These
+are the numbers as they stood at ``effeded``, before ``cometgui-provenance``
+held a single class with code, so that the after-numbers can be compared rather
+than believed.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 33 33
+
+   * - Measurement
+     - ``cometgui-provenance``
+     - ``cometgui-domain`` (for scale)
+   * - ``target/site/jacoco/jacoco.xml``
+     - **absent** -- ``scripts/build.sh`` prints ``inert  cometgui-provenance
+       no classes with code yet``
+     - present
+   * - JaCoCo ``<class name=`` entries
+     - 0
+     - 22
+   * - JaCoCo report ``CLASS`` counter
+     - none
+     - ``missed="0" covered="12"``
+   * - JaCoCo report ``LINE`` counter
+     - none
+     - ``missed="0" covered="301"``
+   * - JaCoCo report ``BRANCH`` counter
+     - none
+     - ``missed="0" covered="144"``
+   * - ``target/pit-reports/mutations.xml``
+     - **absent**; the POM has no ``cometgui.mutation.skip`` override, so the
+       parent's ``true`` applies and PIT does not run here at all
+     - present, 152 mutations, 152 killed
+   * - PIT mutations by package
+     - none
+     - ``build`` 22, ``log`` 23, ``platform`` 65, ``ports`` 37, ``run`` 5
+
+Two consequences follow, and both are checked at the gate rather than assumed.
+The module's mutation switch must be turned on by this phase, or PIT will
+produce no report for it and ``scripts/build.sh`` will say so. And every
+subpackage this phase creates must appear in the per-package mutation counts
+above's equivalent for ``cometgui-provenance``: PIT's ``targetClasses`` entry is
+``org.cometgui.provenance.*``, whose glob is expected to reach subpackages, but
+that expectation is verified by counting mutations per package in the produced
+report, not by reading the POM.
+
 Work units
 ==========
 
