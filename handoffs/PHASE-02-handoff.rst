@@ -12,9 +12,15 @@ PHASE-02 handoff -- Application Shell and Navigation
 
 In one line: **all five exit gate items pass, each with a demonstration of its
 own failure that anyone can re-run in one command** --
-``bash scripts/verify-shell-gates.sh``, 30 controls in 157 seconds -- and the
+``bash scripts/verify-shell-gates.sh``, 30 controls in 160 seconds -- and the
 ``D-001`` derivation machinery is built, proved, and carrying two real files
 reused from ``Noble-Lab/CasanovoGUI``.
+
+**One gap was found after this phase first reported**, by the main orchestrator,
+by injecting a rename into production code: the stable identifiers were asserted
+against values computed from the same helper that produced them, so a rename was
+invisible. It is repaired and the repair is proved; :ref:`p02-identifier-gap` is
+the first thing to read here.
 
 Read :ref:`p02-surprises` before starting Phase 03. Three entries there will
 otherwise cost a later phase real time, and one of them is a decision Phase 03
@@ -167,6 +173,9 @@ Every command below was run by me on the final tree. Run them from
        stable identifier #section-run exists in the running application``;
        leaving the ids but showing every pane gives ``#section-comet-parameters
        should not be showing while run is selected``. Controls 2a and 2b.
+       **Repaired after the phase first reported**: the identifiers were
+       *present* but not *stable* -- see :ref:`p02-identifier-gap`.
+       ``StableIdentifierPinTest`` now pins all 119 as hand-typed literals.
 
    * - 3
      - PASS
@@ -293,6 +302,71 @@ failed``.
 ``D-009`` is untouched. Every ``.java`` file in the repository, derived or not,
 carries exactly ``Copyright (C) 2026 The CometGUI authors.``
 
+.. _p02-identifier-gap:
+
+The identifier gap, found at sign-off by injection
+==================================================
+
+**This is the most useful thing in this handoff for the phases that follow, and
+it was not found by the phase that wrote the code.** It was found by the main
+orchestrator at sign-off, by injection, after this phase had reported.
+
+**The injection.** ``UiIds.sectionPane(SectionId)`` was made to return
+``"section-results-pane"`` for ``RESULTS`` only -- a valid, stable, non-null
+identifier, simply a different one. Nothing noticed:
+``SectionNavigationUiTest`` 4/0, ``KeyboardOnlyNavigationUiTest`` passed,
+``UiIdsTest`` 5/0, ``bash scripts/build.sh`` ``11/11 stages OK. BUILD OK``. I
+reproduced it independently on ``PERCOLATOR``, with
+``AccessibleNameEnumerationUiTest`` green as well.
+
+**Why nothing noticed**, and both halves mattered:
+
+#. **The GUI assertions were self-referential.** They computed the identifier
+   they expected by calling ``UiIds.sectionPane(section)`` -- the helper under
+   test -- so a rename moved the expectation and the value together. Such a
+   test proves the identifier *exists* and that navigation *works*. It cannot
+   prove *stability*, and stability is the entire content of ``R-TEST-04``.
+#. **``UiIdsTest`` pinned literals only as a sample** -- two sections out of
+   ten, two stages out of eight. Eight sections, including ``RESULTS``, could
+   be renamed freely.
+
+**The repair** (work unit 12, commit ``5569f6b``):
+``cometgui-ui/src/test/java/org/cometgui/ui/controls/StableIdentifierPinTest.java``
+writes out **all 119 identifiers as hand-typed literals** -- 22 constants, ten
+sections times five, eight stages times three, eight console stage filters,
+seven stepper arrows, two branches times two, four severity filters. Nothing on
+the expected side is produced by calling ``UiIds``, ``SectionId.id()``,
+``WorkflowStage.id()`` or ``MessageSeverity.name()``; every derived form is
+spelled out in full, so ``section-run-heading`` is typed rather than computed.
+
+It also fails on an **addition**, which is what stops the hole being rebuilt one
+enum constant later: each table's key set must equal the full ``values()`` of
+its enumeration, and ``UiIds``'s ``public static final String`` fields are
+enumerated **reflectively** and each required to be pinned. So a new section, a
+new stage, a new severity or a new constant fails the build until someone writes
+its literal down.
+
+**Evidence it bites.** The main orchestrator's exact injection now gives
+``expected: <section-results> but was: <section-results-pane>`` and ``BUILD
+FAILURE`` -- while ``UiIdsTest`` in the same run is still ``Tests run: 5,
+Failures: 0``, which is the clearest possible statement of what was missing. I
+added two more against tables and sections nobody had used: renaming the
+``TOOL_MANAGER`` navigation entry, and renaming every stage state label's
+suffix. The unit's own agent proved the other three modes -- an unpinned enum
+constant, an unpinned ``UiIds`` constant, and a collision.
+
+**What a later phase must take from this.** Adding a control means adding its
+literal to ``StableIdentifierPinTest``; the build will insist. And changing an
+identifier is now a deliberate, reviewable act rather than an invisible one --
+which is the point, because Phase 07's parameter-editor tests and Phase 14's GUI
+suite will look controls up by these strings.
+
+**And the general lesson, which is not about identifiers at all:** an assertion
+whose expected value is computed by the code under test cannot fail. This one
+survived a phase's worth of sign-offs, including mine, because everything it
+touched was green. It took an injection to find. Inject into the *production*
+code, not only into the harness.
+
 .. _p02-incomplete:
 
 What is incomplete, and why
@@ -396,6 +470,13 @@ Escalated to the main orchestrator
 
 Surprises
 =========
+
+**0. An assertion whose expected value is computed by the code under test
+cannot fail.** The whole GUI suite asserted identifiers it obtained by calling
+``UiIds`` itself, and every one of them was green while a control's identifier
+was renamed underneath it. Found at sign-off by injection, after the phase had
+reported; repaired in unit 12. :ref:`p02-identifier-gap` has the detail, and it
+is the first thing to read in this document.
 
 **1. An injection that reaches the file but not the behaviour is a harness
 failure, not a pass -- and it happened to me.** Proving gate item 4, I removed

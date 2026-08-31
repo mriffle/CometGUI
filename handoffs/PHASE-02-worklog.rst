@@ -687,7 +687,61 @@ Work units
        pinned literal is produced by calling ``UiIds``, and when a rename is
        demonstrated failing and naming the identifier.
      - ``R-TEST-04``, gate 2
-     - PENDING
+     - **SIGNED OFF 2026-08-31**, commit ``5569f6b``. **I reproduced the gap
+       myself before briefing the unit**, on a section neither the main
+       orchestrator nor the agent used: renaming ``sectionPane(PERCOLATOR)`` to
+       ``section-percolator-pane`` left ``UiIdsTest`` 5/0,
+       ``SectionNavigationUiTest`` 4/0, ``KeyboardOnlyNavigationUiTest`` 4/0,
+       ``AccessibleNameEnumerationUiTest`` 3/0 and ``BUILD SUCCESS``. The cause
+       is exactly as reported: the expected value was produced by calling the
+       helper under test, and ``UiIdsTest`` pinned literals for two sections
+       out of ten.
+       Diff read. ``git show --numstat`` is ``9/0``, ``688/0``, ``10/0`` --
+       **zero deleted lines in the whole commit**, so no existing assertion
+       could have been removed, and ``UiIdsTest``'s five tests still run. The
+       nine lines added to ``UiIds.java`` are Javadoc only: filtering the diff
+       to non-comment added lines returns nothing, so no identifier value, no
+       method body and no signature changed. Nothing outside
+       ``cometgui-ui/src/{main,test}/java/org/cometgui/ui/controls/`` was
+       touched.
+       **I checked the independence claim rather than accepting it**: every
+       ``UiIds.*`` call in the new class is on the *actual* side of an
+       assertion or inside failure-message text; the expected side is a
+       hand-typed literal in one of seven ``Map.ofEntries`` tables, with each
+       derived form spelled out in full (``section-run-heading``, not
+       ``pane + "-heading"``). 118 distinct identifier literals appear in the
+       file.
+       **Three falsifications of my own**, in a ``git archive`` sandbox with
+       ``tools/`` symlinked, deliberately using tables and sections the agent
+       did not: renaming the ``TOOL_MANAGER`` **navigation entry** to
+       ``nav-tools`` gives ``the stable identifier of the section TOOL_MANAGER
+       navigation entry (UiIds.navigationEntry) is no longer the pinned
+       nav-tool-manager ... expected: <nav-tool-manager> but was: <nav-tools>``;
+       renaming every stage **state** label suffix from ``-state`` to
+       ``-status`` gives the same shape naming ``stage INPUTS state label``.
+       And, most directly, **re-injecting the main orchestrator's exact case**
+       -- ``sectionPane(RESULTS)`` returning ``section-results-pane`` -- now
+       gives ``expected: <section-results> but was: <section-results-pane>``
+       and ``BUILD FAILURE``, while ``UiIdsTest`` in the same run is still
+       ``Tests run: 5, Failures: 0``. That pair is the proof: the old suite
+       genuinely cannot see the rename, and the new one does.
+       On the final tree: ``bash scripts/build.sh`` gives ``11/11 stages OK in
+       174 seconds. BUILD OK`` with ``45 report file(s): tests=700 failures=0
+       errors=0 skipped=0``, and ``bash scripts/verify-all-gates.sh`` exits 0
+       with ``10 control(s) passed, 0 failed, in 698 seconds (11m38s)``.
+       **Four observations the agent reported and did not fix, which I accept
+       as correctly out of its scope** and which the next phase should weigh:
+       ``UiIdsTest.noTwoIdentifiersCollide`` asserts a floor of 80 against a
+       real surface of 119; ``UiIdsTest.allIdentifiers()`` walks
+       ``SectionId.displayOrder()`` rather than ``values()``, so a section
+       dropped from the display order would leave that collision check
+       silently; ``StageStepper`` draws the arrow into a stage from
+       ``predecessors().get(0)`` only, while the pin compares every
+       predecessor, so a second edge will fail the pin and force a deliberate
+       decision about what the stepper draws; and
+       ``consoleSeverityFilter`` derives from ``MessageSeverity.name()``, so
+       renaming a **domain** enum constant renames a UI control identifier --
+       now pinned, but a real coupling worth knowing about.
 
 Rejections and rework
 =====================
