@@ -19,6 +19,7 @@ package org.cometgui.provenance.manifest;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +30,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.cometgui.domain.ports.FileHashes;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -36,7 +38,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests for {@link ToolRecord}.
  *
- * <p>Two groups carry the weight. The <em>ordering</em> group hands the record a set whose
+ * <p>Three groups carry the weight. The <em>ordering</em> group hands the record a set whose
  * iteration order is deliberately wrong -- a {@link LinkedHashSet} built in descending order -- and
  * asserts the hand-typed ascending order comes back. A record that merely copied the set would pass
  * an "are the capabilities there" test and fail this one, and it is this one that decides whether
@@ -45,24 +47,64 @@ import org.junit.jupiter.api.Test;
  * <p>The <em>copying</em> group mutates the caller's collections after construction and asserts the
  * record did not move, then mutates the collections the record handed out and asserts they refuse.
  * A test that only checked the accessor returned something immutable would not notice a constructor
- * that kept the caller's set, which is the half that actually leaks.
+ * that kept the caller's set, which is the half that actually leaks -- so the group also reads the
+ * backing field directly, through {@link ManifestFixtures#componentField}, because {@link
+ * ToolRecord#capabilities()} re-sorts on the way out and would hide exactly that defect.
+ *
+ * <p>The <em>optional</em> group proves that every {@code Optional} component distinguishes absent
+ * from present-and-empty. {@code Optional.of("")} is not a release tag, an artefact identity or a
+ * stage; it is an absent fact recorded as present, and no reader can tell the two apart afterwards.
  */
 class ToolRecordTest {
 
     private static final Path EXECUTABLE = ManifestFixtures.runFile("percolator");
 
+    /** A valid record with two components left to the caller, for the value groups. */
     private static ToolRecord tool(Set<String> capabilities, List<String> warnings) {
-        return new ToolRecord(
+        return build(
                 "percolator",
                 "3.07.1",
                 Optional.of("rel-3-07-1"),
                 EXECUTABLE,
                 ManifestFixtures.ABC_HASHES,
-                true,
                 Optional.of("percolator-3.07.1-linux-amd64.deb"),
                 capabilities,
+                Optional.of("rescore"),
                 ManifestFixtures.execution("OMP_NUM_THREADS", "8"),
                 warnings);
+    }
+
+    /**
+     * The canonical constructor with the {@code managed} flag fixed, so that a rejection test can
+     * name the one component it is making invalid instead of restating ten valid ones.
+     */
+    private static ToolRecord build(
+            String name,
+            String version,
+            Optional<String> releaseTag,
+            Path executablePath,
+            FileHashes hashes,
+            Optional<String> artefactIdentity,
+            Set<String> capabilities,
+            Optional<String> stageId,
+            ExecutionRecord execution,
+            List<String> warnings) {
+        return new ToolRecord(
+                name,
+                version,
+                releaseTag,
+                executablePath,
+                hashes,
+                true,
+                artefactIdentity,
+                capabilities,
+                stageId,
+                execution,
+                warnings);
+    }
+
+    private static ToolRecord valid() {
+        return tool(Set.of("xml"), List.of());
     }
 
     @Nested
@@ -86,6 +128,8 @@ class ToolRecordTest {
                                     Optional.of("percolator-3.07.1-linux-amd64.deb"),
                                     tool.artefactIdentity()),
                     () -> assertEquals(Set.of("xml"), tool.capabilities()),
+                    () -> assertEquals(Optional.of("rescore"), tool.stageId()),
+                    () -> assertEquals("rescore", tool.stageId().orElseThrow()),
                     () -> assertEquals(0, tool.execution().exitCode()),
                     () -> assertEquals(List.of("no advisory"), tool.warnings()));
         }
@@ -103,6 +147,7 @@ class ToolRecordTest {
                             false,
                             Optional.empty(),
                             Set.of(),
+                            Optional.of("search"),
                             ManifestFixtures.execution("OMP_NUM_THREADS", "8"),
                             List.of());
 
@@ -133,6 +178,72 @@ class ToolRecordTest {
     }
 
     @Nested
+    @DisplayName("the workflow stage that ran the tool")
+    class Stage {
+
+        @Test
+        @DisplayName("the stage identifier is kept as given")
+        void theStageIdentifierIsKept() {
+            assertEquals("rescore", valid().stageId().orElseThrow());
+        }
+
+        @Test
+        @DisplayName("an invocation outside any stage records no stage, rather than a sentinel")
+        void anInvocationOutsideAnyStageRecordsNone() {
+            ToolRecord probe =
+                    build(
+                            "percolator",
+                            "3.07.1",
+                            Optional.empty(),
+                            EXECUTABLE,
+                            ManifestFixtures.ABC_HASHES,
+                            Optional.empty(),
+                            Set.of(),
+                            Optional.empty(),
+                            ManifestFixtures.execution("A", "1"),
+                            List.of());
+
+            assertAll(
+                    () -> assertFalse(probe.stageId().isPresent()),
+                    () -> assertEquals(Optional.empty(), probe.stageId()));
+        }
+
+        @Test
+        @DisplayName("two invocations differing only in stage are different records")
+        void theStageIsPartOfIdentity() {
+            ToolRecord searched =
+                    build(
+                            "percolator",
+                            "3.07.1",
+                            Optional.empty(),
+                            EXECUTABLE,
+                            ManifestFixtures.ABC_HASHES,
+                            Optional.empty(),
+                            Set.of(),
+                            Optional.of("search"),
+                            ManifestFixtures.execution("A", "1"),
+                            List.of());
+            ToolRecord rescored =
+                    build(
+                            "percolator",
+                            "3.07.1",
+                            Optional.empty(),
+                            EXECUTABLE,
+                            ManifestFixtures.ABC_HASHES,
+                            Optional.empty(),
+                            Set.of(),
+                            Optional.of("rescore"),
+                            ManifestFixtures.execution("A", "1"),
+                            List.of());
+
+            assertAll(
+                    () -> assertEquals("search", searched.stageId().orElseThrow()),
+                    () -> assertEquals("rescore", rescored.stageId().orElseThrow()),
+                    () -> assertNotEquals(searched, rescored));
+        }
+    }
+
+    @Nested
     @DisplayName("deterministic ordering")
     class Ordering {
 
@@ -156,6 +267,23 @@ class ToolRecordTest {
                             assertEquals(
                                     List.of("xml", "tdf", "percolator-xml", "mzml"),
                                     List.copyOf(descending)));
+        }
+
+        @Test
+        @DisplayName("the stored field is sorted too, not only the copy the accessor makes")
+        void theStoredFieldIsSorted() throws ReflectiveOperationException {
+            Set<String> descending = new LinkedHashSet<>();
+            descending.add("xml");
+            descending.add("tdf");
+            descending.add("percolator-xml");
+            descending.add("mzml");
+
+            Set<?> stored =
+                    (Set<?>)
+                            ManifestFixtures.componentField(
+                                    tool(descending, List.of()), "capabilities");
+
+            assertEquals(List.of("mzml", "percolator-xml", "tdf", "xml"), List.copyOf(stored));
         }
 
         @Test
@@ -190,6 +318,18 @@ class ToolRecordTest {
         }
 
         @Test
+        @DisplayName("the stored field is isolated too, not only the copy the accessor makes")
+        void theStoredFieldIsIsolated() throws ReflectiveOperationException {
+            Set<String> callers = new LinkedHashSet<>(List.of("xml"));
+            ToolRecord tool = tool(callers, List.of());
+
+            callers.add("forged-capability");
+            Set<?> stored = (Set<?>) ManifestFixtures.componentField(tool, "capabilities");
+
+            assertEquals(List.of("xml"), List.copyOf(stored));
+        }
+
+        @Test
         @DisplayName("mutating the caller's warning list afterwards does not change the record")
         void theWarningListIsCopiedIn() {
             List<String> callers = new ArrayList<>(List.of("first advisory"));
@@ -216,7 +356,7 @@ class ToolRecordTest {
                     () ->
                             assertThrows(
                                     UnsupportedOperationException.class,
-                                    () -> handedOutCapabilities.clear()),
+                                    handedOutCapabilities::clear),
                     () ->
                             assertThrows(
                                     UnsupportedOperationException.class,
@@ -231,6 +371,77 @@ class ToolRecordTest {
     }
 
     @Nested
+    @DisplayName("an Optional component is absent or informative, never empty text")
+    class Optionals {
+
+        @Test
+        @DisplayName("a blank release tag is rejected, naming the field and the value")
+        void aBlankReleaseTagIsRejected() {
+            IllegalArgumentException thrown =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    build(
+                                            "percolator",
+                                            "3.07.1",
+                                            Optional.of(""),
+                                            EXECUTABLE,
+                                            ManifestFixtures.ABC_HASHES,
+                                            Optional.empty(),
+                                            Set.of(),
+                                            Optional.empty(),
+                                            ManifestFixtures.execution("A", "1"),
+                                            List.of()));
+
+            assertEquals("releaseTag must not be blank, but was: \"\"", thrown.getMessage());
+        }
+
+        @Test
+        @DisplayName("a blank artefact identity is rejected, naming the field and the value")
+        void aBlankArtefactIdentityIsRejected() {
+            IllegalArgumentException thrown =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    build(
+                                            "percolator",
+                                            "3.07.1",
+                                            Optional.empty(),
+                                            EXECUTABLE,
+                                            ManifestFixtures.ABC_HASHES,
+                                            Optional.of(" "),
+                                            Set.of(),
+                                            Optional.empty(),
+                                            ManifestFixtures.execution("A", "1"),
+                                            List.of()));
+
+            assertEquals("artefactIdentity must not be blank, but was: \" \"", thrown.getMessage());
+        }
+
+        @Test
+        @DisplayName("a blank stage identifier is rejected, naming the field and the value")
+        void aBlankStageIdentifierIsRejected() {
+            IllegalArgumentException thrown =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    build(
+                                            "percolator",
+                                            "3.07.1",
+                                            Optional.empty(),
+                                            EXECUTABLE,
+                                            ManifestFixtures.ABC_HASHES,
+                                            Optional.empty(),
+                                            Set.of(),
+                                            Optional.of("\t"),
+                                            ManifestFixtures.execution("A", "1"),
+                                            List.of()));
+
+            assertEquals("stageId must not be blank, but was: \"\t\"", thrown.getMessage());
+        }
+    }
+
+    @Nested
     @DisplayName("what it refuses")
     class Rejections {
 
@@ -241,15 +452,15 @@ class ToolRecordTest {
                     assertThrows(
                             IllegalArgumentException.class,
                             () ->
-                                    new ToolRecord(
+                                    build(
                                             " ",
                                             "3.07.1",
                                             Optional.empty(),
                                             EXECUTABLE,
                                             ManifestFixtures.ABC_HASHES,
-                                            true,
                                             Optional.empty(),
                                             Set.of(),
+                                            Optional.empty(),
                                             ManifestFixtures.execution("A", "1"),
                                             List.of()));
 
@@ -263,15 +474,15 @@ class ToolRecordTest {
                     assertThrows(
                             IllegalArgumentException.class,
                             () ->
-                                    new ToolRecord(
+                                    build(
                                             "percolator",
                                             "",
                                             Optional.empty(),
                                             EXECUTABLE,
                                             ManifestFixtures.ABC_HASHES,
-                                            true,
                                             Optional.empty(),
                                             Set.of(),
+                                            Optional.empty(),
                                             ManifestFixtures.execution("A", "1"),
                                             List.of()));
 
@@ -287,15 +498,15 @@ class ToolRecordTest {
                     assertThrows(
                             IllegalArgumentException.class,
                             () ->
-                                    new ToolRecord(
+                                    build(
                                             "percolator",
                                             "3.07.1",
                                             Optional.empty(),
                                             relative,
                                             ManifestFixtures.ABC_HASHES,
-                                            true,
                                             Optional.empty(),
                                             Set.of(),
+                                            Optional.empty(),
                                             ManifestFixtures.execution("A", "1"),
                                             List.of()));
 
@@ -353,6 +564,8 @@ class ToolRecordTest {
         @Test
         @DisplayName("every reference component is required, and the message names it")
         void everyReferenceComponentIsRequired() {
+            ExecutionRecord execution = ManifestFixtures.execution("A", "1");
+
             assertAll(
                     () ->
                             assertEquals(
@@ -360,17 +573,16 @@ class ToolRecordTest {
                                     assertThrows(
                                                     NullPointerException.class,
                                                     () ->
-                                                            new ToolRecord(
+                                                            build(
                                                                     "percolator",
                                                                     "3.07.1",
                                                                     null,
                                                                     EXECUTABLE,
                                                                     ManifestFixtures.ABC_HASHES,
-                                                                    true,
                                                                     Optional.empty(),
                                                                     Set.of(),
-                                                                    ManifestFixtures.execution(
-                                                                            "A", "1"),
+                                                                    Optional.empty(),
+                                                                    execution,
                                                                     List.of()))
                                             .getMessage()),
                     () ->
@@ -379,17 +591,16 @@ class ToolRecordTest {
                                     assertThrows(
                                                     NullPointerException.class,
                                                     () ->
-                                                            new ToolRecord(
+                                                            build(
                                                                     "percolator",
                                                                     "3.07.1",
                                                                     Optional.empty(),
                                                                     EXECUTABLE,
                                                                     null,
-                                                                    true,
                                                                     Optional.empty(),
                                                                     Set.of(),
-                                                                    ManifestFixtures.execution(
-                                                                            "A", "1"),
+                                                                    Optional.empty(),
+                                                                    execution,
                                                                     List.of()))
                                             .getMessage()),
                     () ->
@@ -398,17 +609,16 @@ class ToolRecordTest {
                                     assertThrows(
                                                     NullPointerException.class,
                                                     () ->
-                                                            new ToolRecord(
+                                                            build(
                                                                     "percolator",
                                                                     "3.07.1",
                                                                     Optional.empty(),
                                                                     EXECUTABLE,
                                                                     ManifestFixtures.ABC_HASHES,
-                                                                    true,
                                                                     null,
                                                                     Set.of(),
-                                                                    ManifestFixtures.execution(
-                                                                            "A", "1"),
+                                                                    Optional.empty(),
+                                                                    execution,
                                                                     List.of()))
                                             .getMessage()),
                     () ->
@@ -420,19 +630,37 @@ class ToolRecordTest {
                                             .getMessage()),
                     () ->
                             assertEquals(
-                                    "execution",
+                                    "stageId",
                                     assertThrows(
                                                     NullPointerException.class,
                                                     () ->
-                                                            new ToolRecord(
+                                                            build(
                                                                     "percolator",
                                                                     "3.07.1",
                                                                     Optional.empty(),
                                                                     EXECUTABLE,
                                                                     ManifestFixtures.ABC_HASHES,
-                                                                    true,
                                                                     Optional.empty(),
                                                                     Set.of(),
+                                                                    null,
+                                                                    execution,
+                                                                    List.of()))
+                                            .getMessage()),
+                    () ->
+                            assertEquals(
+                                    "execution",
+                                    assertThrows(
+                                                    NullPointerException.class,
+                                                    () ->
+                                                            build(
+                                                                    "percolator",
+                                                                    "3.07.1",
+                                                                    Optional.empty(),
+                                                                    EXECUTABLE,
+                                                                    ManifestFixtures.ABC_HASHES,
+                                                                    Optional.empty(),
+                                                                    Set.of(),
+                                                                    Optional.empty(),
                                                                     null,
                                                                     List.of()))
                                             .getMessage()),

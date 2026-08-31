@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.text.DecimalFormatSymbols;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Locale;
@@ -40,8 +41,16 @@ import org.junit.jupiter.api.Test;
  * run". Asserting that a record hands back the locale it was constructed with proves nothing about
  * that; what proves it is changing the JVM default to a locale nobody's machine is set to, calling
  * the factory the product calls, and finding that locale in the result. Turkish is chosen
- * deliberately -- it is the locale whose lower-casing rules break naive string handling -- and the
- * default is restored in a {@code finally} so that no later test inherits it.
+ * deliberately -- it is the locale whose lower-casing rules break naive string handling -- and
+ * every default is restored in a {@code finally} so that no later test inherits it.
+ *
+ * <p><strong>The two-locale test cannot pass with one field, and that is why it exists.</strong>
+ * {@code R-PROV-04} asks for the JVM default locale <em>because</em> locale affects serialisation,
+ * and the default that actually governs number formatting is {@link Locale.Category#FORMAT}, not
+ * the primary default. So one test sets the two apart -- a Turkish primary default with a US {@code
+ * FORMAT} default -- proves through {@link DecimalFormatSymbols} that it is the {@code FORMAT} one
+ * that decides whether a {@code comet.params} file gets a comma or a full stop, and asserts the
+ * record kept both.
  *
  * <p>The <em>where each fact lands</em> group goes through the package-private seam with four
  * hand-typed, obviously synthetic property values. Without it, the only available assertion would
@@ -64,6 +73,43 @@ class ApplicationRecordTest {
         values.put("os.arch", "sparc64");
         values.put("java.version", "25.0.4.1");
         return values;
+    }
+
+    /** A valid record, so that a rejection test can name the one component it is spoiling. */
+    private static ApplicationRecord build(
+            String cometGuiVersion,
+            String buildIdentifier,
+            String osName,
+            String osVersion,
+            String architecture,
+            String jvmVersion,
+            Locale locale,
+            Locale formatLocale,
+            ZoneId zoneId) {
+        return new ApplicationRecord(
+                cometGuiVersion,
+                buildIdentifier,
+                osName,
+                osVersion,
+                architecture,
+                jvmVersion,
+                locale,
+                formatLocale,
+                zoneId);
+    }
+
+    private static ApplicationRecord spoiled(
+            String cometGuiVersion, String buildIdentifier, String osName, String osVersion) {
+        return build(
+                cometGuiVersion,
+                buildIdentifier,
+                osName,
+                osVersion,
+                "amd64",
+                "25",
+                TURKISH,
+                TURKISH,
+                CHATHAM);
     }
 
     @Nested
@@ -130,6 +176,99 @@ class ApplicationRecordTest {
     }
 
     @Nested
+    @DisplayName("R-PROV-04 and R-PARAM-11: the FORMAT category is recorded separately")
+    class TheFormatLocale {
+
+        @Test
+        @DisplayName("a run whose FORMAT default differs from its primary default keeps both")
+        void aRunWithDivergentDefaultsKeepsBoth() {
+            Locale originalDefault = Locale.getDefault();
+            Locale originalDisplay = Locale.getDefault(Locale.Category.DISPLAY);
+            Locale originalFormat = Locale.getDefault(Locale.Category.FORMAT);
+            try {
+                // setDefault(Locale) assigns the primary default and BOTH categories; the second
+                // call then moves FORMAT alone, which is the divergence a single field cannot
+                // represent.
+                Locale.setDefault(TURKISH);
+                Locale.setDefault(Locale.Category.FORMAT, Locale.US);
+
+                ApplicationRecord captured = ApplicationRecord.capture("0.1.0", "e97d863");
+
+                assertAll(
+                        () -> assertEquals(TURKISH, captured.locale()),
+                        () -> assertEquals(Locale.US, captured.formatLocale()),
+                        () -> assertNotEquals(captured.locale(), captured.formatLocale()));
+            } finally {
+                Locale.setDefault(originalDefault);
+                Locale.setDefault(Locale.Category.DISPLAY, originalDisplay);
+                Locale.setDefault(Locale.Category.FORMAT, originalFormat);
+            }
+        }
+
+        @Test
+        @DisplayName("it is the FORMAT default, not the primary one, that decides the separator")
+        void theFormatDefaultDecidesTheSeparator() {
+            Locale originalDefault = Locale.getDefault();
+            Locale originalDisplay = Locale.getDefault(Locale.Category.DISPLAY);
+            Locale originalFormat = Locale.getDefault(Locale.Category.FORMAT);
+            try {
+                Locale.setDefault(TURKISH);
+                Locale.setDefault(Locale.Category.FORMAT, Locale.US);
+
+                ApplicationRecord captured = ApplicationRecord.capture("0.1.0", "e97d863");
+
+                assertAll(
+                        // Turkish writes 0,02 and the United States writes 0.02.  With the primary
+                        // default Turkish and FORMAT American, a number serialises with a full
+                        // stop -- so recording only captured.locale() would have described the run
+                        // as one that wrote commas into comet.params, which it did not.
+                        () ->
+                                assertEquals(
+                                        ',',
+                                        DecimalFormatSymbols.getInstance(TURKISH)
+                                                .getDecimalSeparator()),
+                        () ->
+                                assertEquals(
+                                        '.',
+                                        DecimalFormatSymbols.getInstance().getDecimalSeparator()),
+                        () ->
+                                assertEquals(
+                                        '.',
+                                        DecimalFormatSymbols.getInstance(captured.formatLocale())
+                                                .getDecimalSeparator()),
+                        () ->
+                                assertNotEquals(
+                                        DecimalFormatSymbols.getInstance(captured.locale())
+                                                .getDecimalSeparator(),
+                                        DecimalFormatSymbols.getInstance(captured.formatLocale())
+                                                .getDecimalSeparator()));
+            } finally {
+                Locale.setDefault(originalDefault);
+                Locale.setDefault(Locale.Category.DISPLAY, originalDisplay);
+                Locale.setDefault(Locale.Category.FORMAT, originalFormat);
+            }
+        }
+
+        @Test
+        @DisplayName("with nothing set apart the two agree, which is the ordinary case")
+        void withNothingSetApartTheTwoAgree() {
+            Locale originalDefault = Locale.getDefault();
+            try {
+                Locale.setDefault(Locale.JAPAN);
+
+                ApplicationRecord captured = ApplicationRecord.capture("0.1.0", "e97d863");
+
+                assertAll(
+                        () -> assertEquals(Locale.JAPAN, captured.locale()),
+                        () -> assertEquals(Locale.JAPAN, captured.formatLocale()),
+                        () -> assertEquals(captured.locale(), captured.formatLocale()));
+            } finally {
+                Locale.setDefault(originalDefault);
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("where each fact lands")
     class Mapping {
 
@@ -142,6 +281,7 @@ class ApplicationRecordTest {
                             "deadbeef",
                             properties(completeProperties()),
                             TURKISH,
+                            Locale.US,
                             CHATHAM);
 
             assertAll(
@@ -152,6 +292,7 @@ class ApplicationRecordTest {
                     () -> assertEquals("sparc64", captured.architecture()),
                     () -> assertEquals("25.0.4.1", captured.jvmVersion()),
                     () -> assertSame(TURKISH, captured.locale()),
+                    () -> assertSame(Locale.US, captured.formatLocale()),
                     () -> assertSame(CHATHAM, captured.zoneId()));
         }
 
@@ -184,6 +325,7 @@ class ApplicationRecordTest {
                                             "deadbeef",
                                             properties(missingArch),
                                             TURKISH,
+                                            Locale.US,
                                             CHATHAM));
 
             assertEquals(
@@ -207,6 +349,7 @@ class ApplicationRecordTest {
                                             "deadbeef",
                                             properties(missingName),
                                             TURKISH,
+                                            Locale.US,
                                             CHATHAM));
 
             assertEquals(
@@ -223,7 +366,12 @@ class ApplicationRecordTest {
                             NullPointerException.class,
                             () ->
                                     ApplicationRecord.capture(
-                                            "1.2.3", "deadbeef", null, TURKISH, CHATHAM));
+                                            "1.2.3",
+                                            "deadbeef",
+                                            null,
+                                            TURKISH,
+                                            Locale.US,
+                                            CHATHAM));
 
             assertEquals("systemProperty", thrown.getMessage());
         }
@@ -242,44 +390,28 @@ class ApplicationRecordTest {
                                     "cometGuiVersion must not be blank, but was: \"\"",
                                     assertThrows(
                                                     IllegalArgumentException.class,
-                                                    () ->
-                                                            new ApplicationRecord(
-                                                                    "", "e97d863", "Linux", "6.8.0",
-                                                                    "amd64", "25", TURKISH,
-                                                                    CHATHAM))
+                                                    () -> spoiled("", "e97d863", "Linux", "6.8.0"))
                                             .getMessage()),
                     () ->
                             assertEquals(
                                     "buildIdentifier must not be blank, but was: \" \"",
                                     assertThrows(
                                                     IllegalArgumentException.class,
-                                                    () ->
-                                                            new ApplicationRecord(
-                                                                    "0.1.0", " ", "Linux", "6.8.0",
-                                                                    "amd64", "25", TURKISH,
-                                                                    CHATHAM))
+                                                    () -> spoiled("0.1.0", " ", "Linux", "6.8.0"))
                                             .getMessage()),
                     () ->
                             assertEquals(
                                     "osName must not be blank, but was: \"\"",
                                     assertThrows(
                                                     IllegalArgumentException.class,
-                                                    () ->
-                                                            new ApplicationRecord(
-                                                                    "0.1.0", "e97d863", "", "6.8.0",
-                                                                    "amd64", "25", TURKISH,
-                                                                    CHATHAM))
+                                                    () -> spoiled("0.1.0", "e97d863", "", "6.8.0"))
                                             .getMessage()),
                     () ->
                             assertEquals(
                                     "osVersion must not be blank, but was: \"\"",
                                     assertThrows(
                                                     IllegalArgumentException.class,
-                                                    () ->
-                                                            new ApplicationRecord(
-                                                                    "0.1.0", "e97d863", "Linux", "",
-                                                                    "amd64", "25", TURKISH,
-                                                                    CHATHAM))
+                                                    () -> spoiled("0.1.0", "e97d863", "Linux", ""))
                                             .getMessage()),
                     () ->
                             assertEquals(
@@ -287,10 +419,10 @@ class ApplicationRecordTest {
                                     assertThrows(
                                                     IllegalArgumentException.class,
                                                     () ->
-                                                            new ApplicationRecord(
+                                                            build(
                                                                     "0.1.0", "e97d863", "Linux",
                                                                     "6.8.0", "", "25", TURKISH,
-                                                                    CHATHAM))
+                                                                    TURKISH, CHATHAM))
                                             .getMessage()),
                     () ->
                             assertEquals(
@@ -298,16 +430,16 @@ class ApplicationRecordTest {
                                     assertThrows(
                                                     IllegalArgumentException.class,
                                                     () ->
-                                                            new ApplicationRecord(
+                                                            build(
                                                                     "0.1.0", "e97d863", "Linux",
                                                                     "6.8.0", "amd64", "", TURKISH,
-                                                                    CHATHAM))
+                                                                    TURKISH, CHATHAM))
                                             .getMessage()));
         }
 
         @Test
-        @DisplayName("the locale and the time zone are required, and the message names them")
-        void theLocaleAndZoneAreRequired() {
+        @DisplayName("both locales and the time zone are required, and the message names them")
+        void bothLocalesAndTheZoneAreRequired() {
             assertAll(
                     () ->
                             assertEquals(
@@ -315,10 +447,21 @@ class ApplicationRecordTest {
                                     assertThrows(
                                                     NullPointerException.class,
                                                     () ->
-                                                            new ApplicationRecord(
+                                                            build(
                                                                     "0.1.0", "e97d863", "Linux",
                                                                     "6.8.0", "amd64", "25", null,
-                                                                    CHATHAM))
+                                                                    TURKISH, CHATHAM))
+                                            .getMessage()),
+                    () ->
+                            assertEquals(
+                                    "formatLocale",
+                                    assertThrows(
+                                                    NullPointerException.class,
+                                                    () ->
+                                                            build(
+                                                                    "0.1.0", "e97d863", "Linux",
+                                                                    "6.8.0", "amd64", "25", TURKISH,
+                                                                    null, CHATHAM))
                                             .getMessage()),
                     () ->
                             assertEquals(
@@ -326,10 +469,10 @@ class ApplicationRecordTest {
                                     assertThrows(
                                                     NullPointerException.class,
                                                     () ->
-                                                            new ApplicationRecord(
+                                                            build(
                                                                     "0.1.0", "e97d863", "Linux",
                                                                     "6.8.0", "amd64", "25", TURKISH,
-                                                                    null))
+                                                                    TURKISH, null))
                                             .getMessage()));
         }
     }

@@ -18,11 +18,14 @@ package org.cometgui.provenance.manifest;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +50,46 @@ class ProvenanceSchemaTest {
     @DisplayName("the Percolator seed settings key is pinned to \"percolator.seed\"")
     void thePercolatorSeedKeyIsPinned() {
         assertEquals("percolator.seed", ProvenanceSchema.PERCOLATOR_SEED_SETTING);
+    }
+
+    @Test
+    @DisplayName("the settings key pattern is pinned to this exact regular expression")
+    void theSettingsKeyPatternIsPinned() {
+        assertEquals("[a-z0-9]+(\\.[a-z0-9-]+)+", ProvenanceSchema.SETTINGS_KEY_PATTERN);
+    }
+
+    @Test
+    @DisplayName("the Percolator seed key obeys the convention this class pins")
+    void thePercolatorSeedKeyObeysTheConvention() {
+        assertTrue(
+                Pattern.compile(ProvenanceSchema.SETTINGS_KEY_PATTERN)
+                        .matcher(ProvenanceSchema.PERCOLATOR_SEED_SETTING)
+                        .matches(),
+                "the pinned seed key does not match the pinned key pattern: "
+                        + ProvenanceSchema.PERCOLATOR_SEED_SETTING);
+    }
+
+    @Test
+    @DisplayName("the pattern accepts what a later phase will need and refuses the near misses")
+    void thePatternAcceptsAndRefusesTheRightThings() {
+        Pattern pattern = Pattern.compile(ProvenanceSchema.SETTINGS_KEY_PATTERN);
+
+        assertAll(
+                () -> assertTrue(pattern.matcher("percolator.seed").matches()),
+                () -> assertTrue(pattern.matcher("comet.enzyme").matches()),
+                () -> assertTrue(pattern.matcher("upload.api.key").matches()),
+                () -> assertTrue(pattern.matcher("limelight.import.decoy-prefix").matches()),
+                () -> assertTrue(pattern.matcher("results.q.psm-1pct").matches()),
+                () -> assertFalse(pattern.matcher("PERCOLATOR_SEED").matches()),
+                () -> assertFalse(pattern.matcher("percolator_seed").matches()),
+                () -> assertFalse(pattern.matcher("Percolator.Seed").matches()),
+                () -> assertFalse(pattern.matcher("percolator.Seed").matches()),
+                () -> assertFalse(pattern.matcher("seed").matches()),
+                () -> assertFalse(pattern.matcher("percolator.").matches()),
+                () -> assertFalse(pattern.matcher(".seed").matches()),
+                () -> assertFalse(pattern.matcher("percolator..seed").matches()),
+                () -> assertFalse(pattern.matcher("per-colator.seed").matches()),
+                () -> assertFalse(pattern.matcher("percolator seed").matches()));
     }
 
     @Test

@@ -215,6 +215,44 @@ class ProvenanceManifestTest {
         }
 
         @Test
+        @DisplayName("the stored field is sorted too, not only the copy the accessor makes")
+        void theStoredFieldIsSorted() throws ReflectiveOperationException {
+            Map<?, ?> stored = (Map<?, ?>) ManifestFixtures.componentField(manifest(), "settings");
+
+            assertEquals(
+                    List.of("comet.enzyme", "percolator.seed", "upload.api.key"),
+                    List.copyOf(stored.keySet()));
+        }
+
+        @Test
+        @DisplayName("the stored field is isolated too, not only the copy the accessor makes")
+        void theStoredFieldIsIsolated() throws ReflectiveOperationException {
+            Map<String, String> callers = scrambledSettings();
+            ProvenanceManifest manifest =
+                    ProvenanceManifest.current(
+                            ManifestFixtures.completedRun(),
+                            ManifestFixtures.application(),
+                            callers,
+                            List.of(),
+                            List.of());
+
+            callers.put("percolator.seed", "9999");
+            callers.put("forged.setting", "forged");
+            callers.remove("comet.enzyme");
+            Map<?, ?> stored = (Map<?, ?>) ManifestFixtures.componentField(manifest, "settings");
+
+            assertAll(
+                    () -> assertEquals("1387", stored.get("percolator.seed")),
+                    () -> assertEquals("trypsin", stored.get("comet.enzyme")),
+                    () -> assertFalse(stored.containsKey("forged.setting")),
+                    () -> assertEquals(3, stored.size()),
+                    () ->
+                            assertEquals(
+                                    List.of("comet.enzyme", "percolator.seed", "upload.api.key"),
+                                    List.copyOf(stored.keySet())));
+        }
+
+        @Test
         @DisplayName("tools and files keep the order they were recorded in")
         void toolsAndFilesKeepTheirOrder() {
             ProvenanceManifest manifest = manifest();
@@ -325,6 +363,47 @@ class ProvenanceManifestTest {
                             () -> withSettings(new LinkedHashMap<>(Map.of("  ", "value"))));
 
             assertEquals("a settings key must not be blank, but was: \"  \"", thrown.getMessage());
+        }
+
+        @Test
+        @DisplayName("a key that is not dotted lower-case is rejected, printing the value")
+        void aKeyThatIsNotDottedLowerCaseIsRejected() {
+            assertAll(
+                    () -> assertRejectedKey("PERCOLATOR_SEED"),
+                    () -> assertRejectedKey("percolator_seed"),
+                    () -> assertRejectedKey("Percolator.Seed"),
+                    () -> assertRejectedKey("seed"),
+                    () -> assertRejectedKey("percolator."),
+                    () -> assertRejectedKey(".seed"),
+                    () -> assertRejectedKey("percolator..seed"),
+                    () -> assertRejectedKey("percolator seed"));
+        }
+
+        @Test
+        @DisplayName("a key that obeys the convention is accepted, hyphens and all")
+        void aKeyThatObeysTheConventionIsAccepted() {
+            Map<String, String> settings = new LinkedHashMap<>();
+            settings.put("limelight.import.decoy-prefix", "DECOY_");
+            settings.put("percolator.seed", "1387");
+
+            assertEquals(
+                    List.of("limelight.import.decoy-prefix", "percolator.seed"),
+                    List.copyOf(withSettings(settings).settings().keySet()));
+        }
+
+        private void assertRejectedKey(String key) {
+            Map<String, String> settings = new LinkedHashMap<>();
+            settings.put(key, "value");
+
+            IllegalArgumentException thrown =
+                    assertThrows(IllegalArgumentException.class, () -> withSettings(settings));
+
+            assertEquals(
+                    "a settings key must be dotted lower-case matching"
+                            + " [a-z0-9]+(\\.[a-z0-9-]+)+, but was: \""
+                            + key
+                            + "\"",
+                    thrown.getMessage());
         }
 
         @Test

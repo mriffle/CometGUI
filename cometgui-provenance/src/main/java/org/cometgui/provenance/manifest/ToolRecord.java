@@ -42,6 +42,16 @@ import org.cometgui.domain.ports.FileHashes;
  * are recorded here as the set that was actually probed. A reader of a manifest can therefore see
  * why a run took the path it took, which a version string alone would not explain.
  *
+ * <p><strong>The stage is a string, not a {@code StageTag}.</strong> The phase document's reason
+ * for building the provenance model before the stages that emit events is that "no stage can be
+ * built without recording itself"; without a stage on this record, the Provenance tab's timeline
+ * would have only the implicit order of the tool list to go on, and adding the field after the
+ * serialiser is pinned costs a schema version. So it is here now. What is <em>not</em> here is a
+ * dependency on {@link org.cometgui.domain.run.StageTag} itself: an interface is behaviour, and a
+ * manifest is a value that has to survive being written to a file and read back years later. The
+ * record keeps the identifier that interface promises is "suitable for a log file, a provenance
+ * record or a test assertion", and the workflow's types stay out of this package.
+ *
  * <p><strong>Warnings are recorded, not just displayed.</strong> An advisory that was active for
  * the version in use -- a known defect, a platform caveat, a deprecation -- is part of the run's
  * provenance. A scientist re-reading results a year later has no other way to learn that the
@@ -58,6 +68,9 @@ import org.cometgui.domain.ports.FileHashes;
  *     local binary that the application did not install and therefore cannot attribute
  * @param capabilities the capabilities that were probed on this binary; iterated in ascending
  *     order, whatever order the caller supplied
+ * @param stageId the {@link org.cometgui.domain.run.StageTag#id()} of the workflow stage that ran
+ *     this tool, absent for an invocation that belongs to no stage -- a capability probe, a version
+ *     query
  * @param execution what happened when it was run
  * @param warnings the advisories active for this version at the time of the run, in the order they
  *     were raised
@@ -71,6 +84,7 @@ public record ToolRecord(
         boolean managed,
         Optional<String> artefactIdentity,
         Set<String> capabilities,
+        Optional<String> stageId,
         ExecutionRecord execution,
         List<String> warnings) {
 
@@ -78,18 +92,20 @@ public record ToolRecord(
      * Validates the record and takes defensive, immutable copies of both collections.
      *
      * @throws NullPointerException if any reference component is {@code null}
-     * @throws IllegalArgumentException if {@code name} or {@code version} is blank, if {@code
+     * @throws IllegalArgumentException if {@code name} or {@code version} is blank, if a present
+     *     {@code releaseTag}, {@code artefactIdentity} or {@code stageId} is blank, if {@code
      *     executablePath} is relative, or if a capability or a warning is null or blank -- with a
      *     message naming the field and the rejected value
      */
     public ToolRecord {
         name = ManifestChecks.requireNonBlank(name, "name");
         version = ManifestChecks.requireNonBlank(version, "version");
-        Objects.requireNonNull(releaseTag, "releaseTag");
+        releaseTag = ManifestChecks.nonBlankIfPresent(releaseTag, "releaseTag");
         executablePath = ManifestChecks.requireAbsolute(executablePath, "executablePath");
         Objects.requireNonNull(hashes, "hashes");
-        Objects.requireNonNull(artefactIdentity, "artefactIdentity");
+        artefactIdentity = ManifestChecks.nonBlankIfPresent(artefactIdentity, "artefactIdentity");
         capabilities = ManifestChecks.sortedCopyOfNonBlank(capabilities, "capabilities");
+        stageId = ManifestChecks.nonBlankIfPresent(stageId, "stageId");
         Objects.requireNonNull(execution, "execution");
         warnings = ManifestChecks.copyOfNonBlank(warnings, "warnings");
     }

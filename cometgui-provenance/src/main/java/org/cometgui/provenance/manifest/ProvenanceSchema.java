@@ -69,6 +69,33 @@ public final class ProvenanceSchema {
     public static final String PERCOLATOR_SEED_SETTING = "percolator.seed";
 
     /**
+     * The shape every settings key must have: dotted, lower-case, at least two segments.
+     *
+     * <p><strong>Why a shape rather than a closed list.</strong> The settings map is deliberately
+     * an open namespace -- phase 09 records Percolator's scientific settings there, phase 11 the
+     * Limelight conversion parameters, phase 12 the result-view q filters used for a derived export
+     * -- and this phase does not own those semantics, so it does not invent their key names. What
+     * it can do is remove the room for drift. If every key must be dotted lower-case, then {@code
+     * "PERCOLATOR_SEED"}, {@code "percolator_seed"} and {@code "Percolator.Seed"} are all rejected
+     * at the point a manifest is built, and a phase cannot half-adopt a convention: it either
+     * matches or it fails a test.
+     *
+     * <p>The rule is {@code [a-z0-9]+(\.[a-z0-9-]+)+}. The first segment is a bare namespace --
+     * {@code percolator}, {@code comet}, {@code limelight} -- and every later segment may contain a
+     * hyphen, so that a key can carry a scientific parameter name that already has one. There is no
+     * underscore and no upper case anywhere, because a key is a token in a JSON document that a
+     * scientist reads, not a Java identifier.
+     *
+     * <p><strong>Each phase pins its own keys here, beside {@link
+     * #PERCOLATOR_SEED_SETTING}.</strong> That constant exists because a key written as a literal
+     * at two call sites is a key that eventually differs at two call sites; the same argument
+     * applies to every key a later phase adds, and this class is where they go. A phase that adds
+     * one should also assert, in its own tests, that its constant matches this pattern -- which is
+     * the check that makes the convention enforceable rather than aspirational.
+     */
+    public static final String SETTINGS_KEY_PATTERN = "[a-z0-9]+(\\.[a-z0-9-]+)+";
+
+    /**
      * Never instantiated: this class holds constants and has no state of its own.
      *
      * <p>It throws rather than being an empty private constructor so that the intent is enforced

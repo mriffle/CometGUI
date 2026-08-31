@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -54,6 +55,22 @@ final class ManifestChecks {
                     field + " must not be blank, but was: \"" + value + "\"");
         }
         return value;
+    }
+
+    /**
+     * Requires text that carries information, when there is any text at all.
+     *
+     * <p>An {@code Optional} component says "this fact may not exist". It does not say "this fact
+     * may exist and be empty": a release tag of {@code ""} is not a release tag, it is an absent
+     * one that was recorded as present, and a reader cannot tell the two apart afterwards.
+     *
+     * @param value the optional text to check
+     * @param field the component name, used in the rejection message
+     * @return {@code value}, unchanged
+     */
+    static Optional<String> nonBlankIfPresent(Optional<String> value, String field) {
+        Objects.requireNonNull(value, field);
+        return value.map(present -> requireNonBlank(present, field));
     }
 
     /**

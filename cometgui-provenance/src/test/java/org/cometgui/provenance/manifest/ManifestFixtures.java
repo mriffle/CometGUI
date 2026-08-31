@@ -76,6 +76,28 @@ final class ManifestFixtures {
     }
 
     /**
+     * Reads a record component's backing field directly, bypassing its accessor.
+     *
+     * <p>Needed for exactly one class of property: an accessor that re-normalises on the way out --
+     * {@code new TreeMap<>(settings)}, {@code new TreeSet<>(capabilities)} -- hides whether the
+     * <em>field</em> was normalised on the way in. A constructor that kept the caller's collection
+     * would still hand out a sorted, isolated copy through the accessor, so every assertion made
+     * through the accessor would pass while the record's own state was wrong. Reflection is the
+     * only path that reads what the constructor actually stored.
+     *
+     * @param record the record to look inside
+     * @param component the component name
+     * @return the field's value
+     * @throws ReflectiveOperationException if there is no such field
+     */
+    static Object componentField(Object record, String component)
+            throws ReflectiveOperationException {
+        java.lang.reflect.Field field = record.getClass().getDeclaredField(component);
+        field.setAccessible(true);
+        return field.get(record);
+    }
+
+    /**
      * An absolute path inside the notional run directory.
      *
      * @param name the file name
@@ -123,7 +145,7 @@ final class ManifestFixtures {
      * @param name the logical tool name
      * @param variable the environment variable name
      * @param value the environment variable value
-     * @return the tool record
+     * @return the tool record, tagged with the {@code search} stage
      */
     static ToolRecord tool(String name, String variable, String value) {
         return new ToolRecord(
@@ -135,6 +157,7 @@ final class ManifestFixtures {
                 true,
                 Optional.of("comet-2026.02.2-linux-x86_64.tar.gz"),
                 Set.of("mzml"),
+                Optional.of("search"),
                 execution(variable, value),
                 List.of());
     }
@@ -184,6 +207,7 @@ final class ManifestFixtures {
                 "9.4-alpha",
                 "sparc64",
                 "25.0.4.1",
+                Locale.of("tr", "TR"),
                 Locale.of("tr", "TR"),
                 ZoneId.of("Pacific/Chatham"));
     }

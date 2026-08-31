@@ -38,13 +38,20 @@ import java.util.function.UnaryOperator;
  * wrong" from "the parameters were written by a JVM whose default locale used a comma". The same is
  * true of the time zone for every timestamp in the record.
  *
- * <p>Note one nuance the requirement does not spell out. Java has two default locales, {@link
- * Locale.Category#DISPLAY} and {@link Locale.Category#FORMAT}, and it is the latter that governs
- * number formatting. {@link Locale#getDefault()} returns the primary default, which is what {@link
- * Locale#setDefault(Locale)} sets both categories to and what the requirement's words describe, so
- * that is what is recorded. A run that deliberately set only the {@code FORMAT} category would not
- * be fully described by this field; nothing in the product does that, and if anything ever does,
- * this is the field that needs splitting in two and a schema version bump.
+ * <p><strong>Two locales, because the requirement's words and the requirement's reason are not the
+ * same field.</strong> Java keeps a primary default plus two category defaults, {@link
+ * Locale.Category#DISPLAY} and {@link Locale.Category#FORMAT}, and it is {@code FORMAT} -- not the
+ * primary default -- that {@link java.text.DecimalFormatSymbols#getInstance()} and every other
+ * number formatter consult. {@code R-PROV-04} names "the JVM default locale", which is {@link
+ * Locale#getDefault()}; the reason it gives for wanting it is serialisation, which is {@code
+ * FORMAT}. Recording only the first would satisfy the sentence and miss the point of it, so both
+ * are here.
+ *
+ * <p>They agree on every machine the product runs on today, because nothing in it calls {@link
+ * Locale#setDefault(Locale.Category, Locale)} and the whole-locale setter assigns both. This record
+ * does not assume that: they are separate components, a run that set them apart is representable,
+ * and the test that proves it sets them apart deliberately -- an assertion that cannot pass with
+ * one field.
  *
  * @param cometGuiVersion the version of CometGUI that produced the run
  * @param buildIdentifier the build identifier or git commit that version was built from
@@ -53,6 +60,8 @@ import java.util.function.UnaryOperator;
  * @param architecture the CPU architecture, from {@code os.arch}
  * @param jvmVersion the Java runtime version, from {@code java.version}
  * @param locale the JVM default locale in effect during the run, as {@code R-PROV-04} requires
+ * @param formatLocale the {@link Locale.Category#FORMAT} default in effect during the run, which is
+ *     the one that actually governs number formatting and therefore {@code R-PARAM-11}
  * @param zoneId the JVM default time zone in effect during the run
  */
 public record ApplicationRecord(
@@ -63,6 +72,7 @@ public record ApplicationRecord(
         String architecture,
         String jvmVersion,
         Locale locale,
+        Locale formatLocale,
         ZoneId zoneId) {
 
     /**
@@ -80,6 +90,7 @@ public record ApplicationRecord(
         architecture = ManifestChecks.requireNonBlank(architecture, "architecture");
         jvmVersion = ManifestChecks.requireNonBlank(jvmVersion, "jvmVersion");
         Objects.requireNonNull(locale, "locale");
+        Objects.requireNonNull(formatLocale, "formatLocale");
         Objects.requireNonNull(zoneId, "zoneId");
     }
 
@@ -88,11 +99,12 @@ public record ApplicationRecord(
      *
      * <p><strong>Read at call time, and that is the requirement rather than an implementation
      * detail.</strong> {@code R-PROV-04} asks for "the JVM default locale in effect during the
-     * run", so this reads {@link Locale#getDefault()} and {@link ZoneId#systemDefault()} when it is
-     * called rather than caching them in a static field. Both are mutable process-wide state -- any
-     * library on the classpath may call {@link Locale#setDefault(Locale)} during start-up -- and a
-     * value read once at class-initialisation time would describe the JVM before the run, which is
-     * not what the requirement asks for and not what serialised the parameter files.
+     * run", so this reads {@link Locale#getDefault()}, the {@link Locale.Category#FORMAT} default
+     * and {@link ZoneId#systemDefault()} when it is called rather than caching them in a static
+     * field. All three are mutable process-wide state -- any library on the classpath may call
+     * {@link Locale#setDefault(Locale)} during start-up -- and a value read once at
+     * class-initialisation time would describe the JVM before the run, which is not what the
+     * requirement asks for and not what serialised the parameter files.
      *
      * <p>The two arguments are the only facts a JVM cannot tell you about itself: which build of
      * this application is executing.
@@ -111,6 +123,7 @@ public record ApplicationRecord(
                 buildIdentifier,
                 System::getProperty,
                 Locale.getDefault(),
+                Locale.getDefault(Locale.Category.FORMAT),
                 ZoneId.systemDefault());
     }
 
@@ -128,6 +141,7 @@ public record ApplicationRecord(
      * @param buildIdentifier the build identifier or git commit it was built from
      * @param systemProperty resolves a system property name to its value, or to {@code null}
      * @param defaultLocale the JVM default locale to record
+     * @param defaultFormatLocale the {@link Locale.Category#FORMAT} default locale to record
      * @param defaultZone the JVM default time zone to record
      * @return a record built from those sources
      * @throws IllegalStateException if {@code systemProperty} returns {@code null} for one of the
@@ -138,6 +152,7 @@ public record ApplicationRecord(
             String buildIdentifier,
             UnaryOperator<String> systemProperty,
             Locale defaultLocale,
+            Locale defaultFormatLocale,
             ZoneId defaultZone) {
         Objects.requireNonNull(systemProperty, "systemProperty");
         return new ApplicationRecord(
@@ -148,6 +163,7 @@ public record ApplicationRecord(
                 required(systemProperty, "os.arch"),
                 required(systemProperty, "java.version"),
                 defaultLocale,
+                defaultFormatLocale,
                 defaultZone);
     }
 

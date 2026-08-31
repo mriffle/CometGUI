@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
 /**
  * The whole provenance record for one run, as a single immutable value.
@@ -40,7 +41,9 @@ import java.util.TreeMap;
  * the Limelight conversion parameters -- because they are open-ended, stage-specific and added by
  * later phases. An open namespace is the right shape for them and the wrong shape for anything a
  * reader must be able to find, which is why the keys that matter are pinned as constants rather
- * than written as literals at the call sites.
+ * than written as literals at the call sites, and why every key must match {@link
+ * ProvenanceSchema#SETTINGS_KEY_PATTERN}: this phase does not own the later phases' semantics, so
+ * it pins the shape of a key rather than guessing at its name.
  *
  * <p><strong>Sorted, because a manifest is compared.</strong> The settings are iterated in
  * ascending key order, always. Two runs that differ only in the order a {@link java.util.HashMap}
@@ -65,13 +68,20 @@ public record ProvenanceManifest(
         List<FileRecord> files) {
 
     /**
+     * The compiled form of {@link ProvenanceSchema#SETTINGS_KEY_PATTERN}, so that the convention
+     * has one source of truth and a later phase can assert its own key against the same text.
+     */
+    private static final Pattern SETTINGS_KEY =
+            Pattern.compile(ProvenanceSchema.SETTINGS_KEY_PATTERN);
+
+    /**
      * Validates the manifest and takes defensive, immutable copies of all three collections.
      *
      * @throws NullPointerException if any reference component is {@code null}, or if any element of
      *     {@code tools} or {@code files} is
-     * @throws IllegalArgumentException if {@code schemaVersion} is below 1, or if a settings key is
-     *     blank or a settings value is null -- with a message naming the field and the rejected
-     *     value
+     * @throws IllegalArgumentException if {@code schemaVersion} is below 1, if a settings key is
+     *     blank or is not dotted lower-case ({@link ProvenanceSchema#SETTINGS_KEY_PATTERN}), or if
+     *     a settings value is null -- with a message naming the field and the rejected value
      */
     public ProvenanceManifest {
         if (schemaVersion < 1) {
@@ -115,6 +125,14 @@ public record ProvenanceManifest(
         Map<String, String> sorted = new TreeMap<>();
         for (Map.Entry<String, String> setting : settings.entrySet()) {
             String key = ManifestChecks.requireNonBlank(setting.getKey(), "a settings key");
+            if (!SETTINGS_KEY.matcher(key).matches()) {
+                throw new IllegalArgumentException(
+                        "a settings key must be dotted lower-case matching "
+                                + ProvenanceSchema.SETTINGS_KEY_PATTERN
+                                + ", but was: \""
+                                + key
+                                + "\"");
+            }
             if (setting.getValue() == null) {
                 throw new IllegalArgumentException(
                         "the setting \"" + key + "\" must not have a null value");

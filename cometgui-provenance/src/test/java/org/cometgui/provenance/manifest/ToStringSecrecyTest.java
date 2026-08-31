@@ -83,6 +83,7 @@ class ToStringSecrecyTest {
                 true,
                 Optional.of("percolator-3.07.1-linux-amd64.deb"),
                 Set.of("xml"),
+                Optional.of("rescore"),
                 ManifestFixtures.execution("UPLOAD_TOKEN", SECRET),
                 List.of());
     }
