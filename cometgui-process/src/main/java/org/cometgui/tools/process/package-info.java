@@ -43,6 +43,13 @@
  *       so that the two cannot drift; what is process-specific is redacting each argument
  *       <em>before</em> {@code ToolCommand.displayString()} escapes it, and costing nothing per
  *       line when no credential is registered, which is every run of Comet, Percolator and PDV.
+ *   <li>{@link org.cometgui.tools.process.StageRunner} -- the stage layer a workflow step actually
+ *       uses: one {@link org.cometgui.tools.process.RunningStage} handle to cancel and to wait on,
+ *       one {@link org.cometgui.tools.process.StageOutcome} value at the end, every line written to
+ *       a per-stage log file <em>as it arrives</em> and flushed ({@code R-PROC-03}), the same line
+ *       appended to the console through a {@link org.cometgui.tools.process.RunMessageSink} -- an
+ *       append-only capability rather than the console itself -- and an optional per-stage timeout
+ *       that is off unless one is configured.
  * </ul>
  */
 package org.cometgui.tools.process;
