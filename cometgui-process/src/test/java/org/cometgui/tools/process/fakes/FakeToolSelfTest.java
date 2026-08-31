@@ -221,13 +221,14 @@ class FakeToolSelfTest {
                                 "working 1",
                                 "working 2",
                                 "working 3",
-                                "created late.txt")
+                                "created late.txt 4")
                         + "\n",
                 completed.stdout());
         assertArrayEquals(
                 "done".getBytes(StandardCharsets.UTF_8),
                 Files.readAllBytes(workingDirectory(tmp).resolve("late.txt")),
-                "the created line is a real event a test can wait on, so it must follow the file");
+                "the created line carries the size read back out of the file, so it"
+                        + " cannot be printed before the file exists");
     }
 
     // ------------------------------------------------------------------ scenario 8 --

@@ -77,9 +77,10 @@ import java.util.concurrent.CountDownLatch;
  *       {@code partial <bytes>}, then exits {@code <code>}. The file survives the failure.
  *   <li>{@code delayed-output <file> <preLines>} -- prints {@code working <n>} for {@code n} from 0
  *       to {@code preLines - 1}, then creates the file containing exactly {@code done} with no
- *       trailing newline, then prints {@code created <file>}, then exits 0. The {@code created}
- *       line is emitted strictly after the file exists, so a test synchronises on that line
- *       instead of sleeping.
+ *       trailing newline, then prints {@code created <file> <bytes>} where {@code <bytes>} is read
+ *       back OUT OF THE FILE, then exits 0. Reading the size back is what makes the ordering a
+ *       fact rather than a comment: the line cannot be printed before the file exists. A test
+ *       therefore synchronises on that line instead of sleeping.
  *   <li>{@code flood <totalBytes> <lineLength> <stream>} -- {@code <stream>} is {@code out},
  *       {@code err} or {@code both}. Emits lines of exactly {@code <lineLength>} printable ASCII
  *       characters, excluding the newline, until at least {@code <totalBytes>} bytes -- lines plus
@@ -300,8 +301,18 @@ public final class FakeTool {
         for (int line = 0; line < preLines; line++) {
             OUT.println("working " + line);
         }
-        Files.writeString(Path.of(name), "done", StandardCharsets.UTF_8);
-        OUT.println("created " + name);
+        Path file = Path.of(name);
+        Files.writeString(file, "done", StandardCharsets.UTF_8);
+        /*
+         * The size is read back OUT OF THE FILE rather than remembered, so the announcement
+         * cannot be emitted before the file exists: reordering these two statements makes
+         * Files.size throw NoSuchFileException and the scenario fail loudly.  Without that the
+         * ordering is only a comment, and a test that waits for the marker and then opens the
+         * file would go intermittently red for a reason no one could reproduce.  Found by the
+         * phase orchestrator, by moving the announcement above the write and watching the
+         * self-test stay green.
+         */
+        OUT.println("created " + name + " " + Files.size(file));
     }
 
     private static void flood(long totalBytes, int lineLength, String stream) throws IOException {

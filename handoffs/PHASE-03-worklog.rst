@@ -268,3 +268,96 @@ Decomposition
 Sign-offs
 =========
 
+Unit 1 -- the fakes, their harness and their self-test
+======================================================
+
+:Agent: fresh phase agent, spawned 2026-08-31
+:Commit: ``46129db``, plus the orchestrator's repairs in the sign-off commit
+:Outcome: **ACCEPTED after two repairs made by the orchestrator**
+
+**What I ran.** I read the whole diff -- four files, 1,679 lines -- then
+``. ./tools/env.sh && mvn -o -B -pl cometgui-process -am test``, which printed
+``Tests run: 27, Failures: 0, Errors: 0, Skipped: 1`` for
+``FakeToolSelfTest`` and ``Tests run: 256, Failures: 0`` for
+``cometgui-domain`` in the same reactor. I ran the four acceptance greps
+myself:
+
+* ``grep -rn "Thread\.sleep\|TimeUnit\.[A-Z_]*\.sleep\|LockSupport\.park"
+  cometgui-process/src/test`` -- no output.
+* ``grep -rn "new ProcessBuilder" cometgui-process/src/test/java`` -- two hits,
+  both in ``FakeToolSelfTest.java`` (lines 668 and 692), which is the one file
+  the brief permits it in. ``FakeTool.java`` itself has one, in
+  ``hang-with-child``, which is the whole point of that scenario.
+* ``cometgui-process/target/fake-tools/classes/fakes/FakeTool.class`` -- present,
+  13,620 bytes.
+
+**Repair 1: the skipped test, which was gate item 4 quietly going missing.**
+The agent reported ``Skipped: 1`` and named the cause honestly rather than
+deleting the test: this container has no UTF-8 locale (``locale -a`` offers
+``C``, ``C.utf8``, ``POSIX``; ``LANG`` and ``LC_ALL`` are unset), so a JVM
+started here reports ``sun.jnu.encoding=ANSI_X3.4-1968`` and cannot represent a
+non-ASCII file name at all -- ``Path.of("café")`` throws
+``InvalidPathException`` before any product code runs. **An unverifiable gate
+item is not a passed gate item**, so I did not accept the skip. I added
+``<environmentVariables><LANG>C.UTF-8</LANG><LC_ALL>C.UTF-8</LC_ALL>`` to the
+surefire configuration in ``cometgui-process/pom.xml`` -- this module's own POM,
+not the shared root one -- with the reasoning written into the POM. The run is
+now ``Tests run: 27, Failures: 0, Errors: 0, Skipped: 0``. The assertion is
+unchanged: it still creates a real directory whose name is not ASCII and runs a
+real process out of it. What changed is that the JVM can spell the name.
+
+**Repair 2: a test whose name claimed more than it checked -- found by
+injection.** I injected two defects of my own, neither of them one the agent
+had used.
+
+*Injection B, caught.* ``hang-with-child`` reports ``child + (child.pid() + 1)``
+instead of the real pid::
+
+    FakeToolSelfTest.hangWithChildStartsARealDescendant:332
+      child 88705 is not among the parent's descendants [88704]
+      ==> expected: <true> but was: <false>
+
+*Injection A, NOT caught.* ``delayed-output`` announced the file **before**
+creating it -- the exact reordering its ``@DisplayName`` ("creates the file
+before it announces it") claims to forbid. The suite stayed green,
+``Tests run: 27, Failures: 0``. The test read the process's output only after
+exit, by which time both events had happened in either order, so ordering was
+asserted by the display name and by nothing else. This is the project's
+recurring shape in a new disguise: not an expectation computed by the code under
+test, but an expectation that the test never actually evaluated.
+
+The repair makes the ordering a fact rather than a comment. ``delayed-output``
+now prints ``created <file> <bytes>`` where ``<bytes>`` is read back **out of
+the file** with ``Files.size``, so the line cannot be printed before the file
+exists; the self-test pins the literal ``created late.txt 4``. Re-applying
+injection A now fails deterministically::
+
+    FakeToolSelfTest.delayedOutputAnnouncesTheFileOnlyAfterCreatingIt:216
+      expected: <0> but was: <1>
+
+(the fake dies on ``NoSuchFileException``). Reverted, and green again at
+``Tests run: 27, Failures: 0, Errors: 0, Skipped: 0``.
+
+**Findings from this unit that later units must honour**, all verified by the
+agent against this machine and all recorded because they change a design:
+
+#. **Kill descendants first, then the parent.** PID 1 in this container is not
+   an init that reaps orphans. If the parent is killed first, its child is
+   reparented to PID 1 and, once killed, becomes a **permanent zombie**:
+   ``/proc/<pid>`` still exists, so ``ProcessHandle.isAlive()`` stays ``true``
+   for ever and ``onExit()`` never completes. Gate item 2 asserts on liveness,
+   so with the wrong order that assertion can never pass here -- and it would
+   look like the process service's bug. Unit 2 terminates descendants first,
+   while their parent is alive to reap them.
+#. **``Process.destroy()`` closes the process's streams on Linux**;
+   ``ProcessHandle.destroy()`` sends the same ``SIGTERM`` and leaves them alone.
+   Unit 2 therefore cancels through the handle, so that output already written
+   by the tool is still drained rather than lost to a closed pipe.
+#. **SpotBugs analyses test sources in this build** (``includeTests`` is on).
+   ``throws Exception`` on a test helper fails it; narrow it.
+
+**Scope.** ``git status --short`` showed only unit 1's four files; the
+``cometgui-provenance`` changes in the tree at the time belong to the Phase 04
+agent and were never staged by this phase.
+
+
