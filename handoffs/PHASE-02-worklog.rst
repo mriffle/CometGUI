@@ -676,14 +676,51 @@ Work units
 Rejections and rework
 =====================
 
-None yet.
+No unit was sent back. Two units were **repaired by me after their own agent had
+finished**, and both are recorded in the sign-off entries above rather than
+hidden: unit 4's machinery needed ``config/checkstyle/checkstyle.xml``'s GROUP 0
+comment brought into step (commit ``6c1fdd7``), and my own edit there introduced
+a literal ``--`` inside an XML comment, which is illegal and stopped Checkstyle
+loading the rule set at all. The census reported ``FATAL: 24 file-set census
+check(s) failed`` and I fixed it in the same commit. It is recorded because the
+project's rule sets deliberately use single hyphens in prose, and the next
+person to edit one will hit the same thing.
+
+One unit was **added mid-phase**: unit 11, after the first full run of
+``scripts/verify-all-gates.sh`` since the phase began reported a failing
+control.
 
 Deferred
 ========
 
-Nothing yet.
+* **The ``Settings`` section has no owning phase.** Escalated; see below. The
+  pane exists, is reachable, is named and is identified, and says in text that
+  no phase claims it.
+* **``R-TEST-06``'s release check** -- proving no ``FxUiDriver`` class is in a
+  published artefact -- is phase 16's. The drivers are in test sources, so they
+  cannot reach ``cometgui-app.jar`` today, but nothing yet *checks* that.
+* **The module-wide coverage gate in ``cometgui-workflow``** was deliberately
+  left off: it binds phase 08's engine to a number this phase has no authority
+  to choose. Measured coverage there is 100% today.
+* **Non-Linux verification.** The headless recipe, TestFX, Monocle and the FFM
+  glibc probe are unverified on Windows and macOS. Same blocker as Phase 01's
+  runner matrix.
 
 Blockers escalated
 ==================
 
-None yet.
+Four items, all reported to the main orchestrator in this phase's report and in
+``handoffs/PHASE-02-handoff.rst``. None blocked any work.
+
+#. **The ``Settings`` section has no owning phase** -- nothing in
+   ``phases/index.rst``, the phase documents or ``specification.rst`` claims it.
+   The unit that found it declined to guess a phase number and wrote a note
+   saying so, pinned by a test. Tier 1 decides whether a phase claims it or the
+   index says application settings are out of scope for release 1.
+#. **``STATUS.rst`` records "9 controls" in two places**; there are now ten.
+   ``STATUS.rst`` is tier 1's file and was not touched.
+   ``docs/developer/testing.rst`` said the same thing and I corrected it.
+#. **``ONBOARDING.rst`` still calls the specification "revision 7"** (lines 43
+   and 87) and ``CLAUDE.md`` still says "revision 2". It is revision 10.
+#. **Every phase document still says ``:Status: NOT STARTED``**, including this
+   one.
