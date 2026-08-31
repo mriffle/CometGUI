@@ -177,7 +177,7 @@ binary. One implementation, genuinely cross-platform, and it can spawn real
 descendants.
 
 The mutation gate switches ON in this module, because the POM already said so
-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 
 ``pom.xml``'s PIT ``<targetClasses>`` already contains
 ``org.cometgui.tools.*`` -- written by Phase 01 with the comment "command
