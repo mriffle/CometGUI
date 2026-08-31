@@ -41,7 +41,8 @@ authoritative for its own scope and exit gate.
      - Hashing and Provenance Core
      - 01 (03 not required -- see Ordering notes)
      - --
-     - IN PROGRESS (dispatched 2026-08-31, the last phase run concurrently)
+     - PAUSED 2026-08-31, part-built. Resumes after Phase 03, from
+       ``../handoffs/PHASE-04-handoff.rst``
    * - `05 <PHASE-05-tool-registry.rst>`_
      - Tool Registry and Installer
      - 01, 03, 04

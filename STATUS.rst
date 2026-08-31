@@ -159,11 +159,13 @@ Phase board
        concurrently with 04 on disjoint paths. Not yet signed off.
    * - 04
      - Hashing and provenance core
-     - IN PROGRESS
-     - Dispatched 2026-08-31 (session 04), concurrently with 03. The phase
-       table says ``Depends on: 01, 03``; the ordering notes in
-       ``phases/index.rst`` say 03 and 04 are independent after 01. The
-       ordering note is the one being acted on. Not yet signed off.
+     - PAUSED
+     - **Paused by the owner on 2026-08-31**, part-built, to stop two phases
+       sharing one tree. Units 1-7 signed off; 8-10 landed or reverted; 11-13
+       not started. Resumes with a fresh orchestrator **after Phase 03
+       completes**, from ``handoffs/PHASE-04-handoff.rst``. Every headline
+       number it recorded was taken from a tree another phase was changing and
+       **must be re-taken from a quiet one**.
    * - 05
      - Tool registry and installer
      - NOT STARTED
