@@ -334,7 +334,53 @@ touch the same files; the file list for each unit is fixed by the brief.
 Rejections and rework
 =====================
 
-pending
+.. _p04-unit1-rejection:
+
+Unit 1, first submission (``96fe2ce``) -- REJECTED 2026-08-31
+-------------------------------------------------------------
+
+**The single-pass property was proved on a seam the production path is free
+not to use.** This is the third appearance in this project of the defect the
+phase brief calls acute, after Phase 01's ArchUnit rule that evaluated nothing
+and Phase 02's identifiers that were compared against themselves.
+
+The submitted work was good in every other respect. All 39 expected digests
+were hand-typed literals, and I recomputed every one of them independently --
+the seven short vectors, the four chunk-boundary lengths from the test's own
+LCG pattern reproduced in Python, the 256 ascending byte values and the
+``00 ff 00 ff 80 7f 01 fe 00 00 ff ff`` fixture -- with GNU coreutils, and all
+fourteen boundary values matched to the character. The agent had proved seven
+of its own defects failed correctly.
+
+What it did not have was any test of ``hash(Path)``. The class reads
+``hash(Path) -> Files.newInputStream -> hash(InputStream)``, and every
+single-pass assertion was made by handing a recording stream to the
+package-private ``hash(InputStream)``. So I replaced the delegation in
+``hash(Path)`` with a version that opens and reads the whole file **twice**,
+discarding the first result::
+
+    FileHashes discardedFirstPass = hash(Files.newInputStream(path));
+    if (discardedFirstPass == null) {
+        throw new IOException("unreachable");
+    }
+    return hash(Files.newInputStream(path));
+
+That is precisely what ``R-PROV-01`` and ``R-PROV-03`` forbid -- it doubles the
+I/O on the multi-gigabyte spectrum files the requirement was written for -- and
+it returns entirely correct digests. Observed::
+
+    Tests run: 39, Failures: 0, Errors: 0, Skipped: 0
+    BUILD SUCCESS
+
+including all nine of the group-6 read-count assertions. A gate item that
+cannot see a doubling of the I/O it exists to bound is not yet a gate item.
+
+Sent back with the requirement that opening be made observable -- a
+package-private ``FileOpener`` seam, with tests asserting through
+``hash(Path)`` that the opener is called exactly once, that the bytes
+delivered equal the file length exactly once over, and that the stream is
+closed once -- and that the rework re-apply the two-pass defect above and show
+it failing.
 
 Deferred
 ========
