@@ -154,12 +154,16 @@ Phase board
        identifier-pinning repair sign-off required. See :ref:`status-p02`.
    * - 03
      - Process service
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-08-31 (session 04) to a fresh phase orchestrator,
+       concurrently with 04 on disjoint paths. Not yet signed off.
    * - 04
      - Hashing and provenance core
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-08-31 (session 04), concurrently with 03. The phase
+       table says ``Depends on: 01, 03``; the ordering notes in
+       ``phases/index.rst`` say 03 and 04 are independent after 01. The
+       ordering note is the one being acted on. Not yet signed off.
    * - 05
      - Tool registry and installer
      - NOT STARTED
@@ -789,6 +793,106 @@ Small, named, and none of it blocking.
   writes to the log the UI reads. Phase 02 deliberately did not decide this;
   Phase 03 inherits it.
 
+.. _status-session-04:
+
+Session 04 (2026-08-31): the checkout moved, and GitHub ran something at last
+=============================================================================
+
+Three things happened before any phase work, and all three are evidence rather
+than housekeeping.
+
+**1. The checkout moved off ``/workspace`` and the toolchain was stranded.**
+``tools/env.sh`` had baked in ``/workspace/tools/...`` at install time, so
+``mvn`` reported only ``The JAVA_HOME environment variable is not defined
+correctly`` and nothing else. The virtualenv was broken the same way: 22
+console scripts carried ``#!/workspace/.venv/bin/python3``, ``sphinx-build``
+among them, which is the binary ``scripts/ci/docs-build.sh`` invokes by
+absolute path -- so the documentation gate could not have run either.
+
+The part worth carrying forward is **why nothing caught it**:
+``scripts/build.sh`` re-bootstraps the toolchain only when ``tools/env.sh`` is
+**missing**, never when it is merely **wrong**. A stale generated file is
+therefore indistinguishable from a healthy one to every script that depends on
+it. The generator now emits an ``env.sh`` that keeps the pinned directory names
+but resolves the path to them at source time from the file's own location;
+verified by generating it, copying it elsewhere and sourcing it there, where
+``JAVA_HOME`` followed the file instead of staying behind. ``ONBOARDING.rst``
+no longer asserts a fixed working directory, because that claim is exactly what
+went stale.
+
+**2. Both refs are pushed, and the token has ``workflow`` scope.** This session
+is the first of four to hold a GitHub credential. ``main`` was pushed at
+``e97d863`` -- deliberately as an explicit SHA rather than the branch tip, since
+two phase orchestrators were committing to the same tree at the time -- and
+``windows-percolator-verification`` was pushed and created. **The
+``workflow``-scope warning recorded for session 03 did not materialise**: the
+branch carries four files under ``.github/workflows/`` and the push was
+accepted. Note that a ``git push --dry-run`` would NOT have proved this, since
+that rejection is served by the remote only once the pack is actually sent.
+
+**3. GitHub has now executed a workflow -- one -- and it failed by design.**
+The Actions API had reported ``total_count = 0`` on 2026-08-30. It now reports
+**1**: the ``nightly`` workflow, ``schedule`` event, head ``9115b1c`` on
+``main``, 2026-08-31T09:21:27Z, conclusion **failure**. The failure is the
+designed one and was confirmed from the runner's own log rather than inferred::
+
+    NOT IMPLEMENTED -- nightly-version-matrix.sh
+    This CI step is a deliberate stub installed by PHASE-01.
+      owned by    PHASE-15
+    ##[error]Process completed with exit code 70.
+
+What that run proves, and it is not nothing: **the project-local toolchain
+strategy works on a real GitHub runner.** ``scripts/ci/toolchain.sh``,
+``fontstack.sh`` and ``python-env.sh`` all succeeded there -- a project-local
+JDK, Maven, font stack and virtualenv provisioned on a machine nobody
+configured, with no ``setup-java``. Every previous statement about those
+scripts was a local one.
+
+What it does **not** prove: Phase 01 item 6 needs the four workflows to run
+**on a pull request**, and a scheduled nightly is not that. Phase 00 item 8
+needs ``windows-percolator.yml``, which triggers only on ``pull_request``
+(``workflow_dispatch`` is declared but GitHub offers the button only for a file
+already on the default branch). **Both items still need the pull request to be
+opened**, which is the one action this session was asked to stop short of.
+
+.. _status-nightly-masking:
+
+A new finding: the nightly's real step never runs on a real runner
+------------------------------------------------------------------
+
+``nightly.yml`` runs its steps in one job, in order, and GitHub aborts a job at
+the first failing step. The order is four Phase-15 stubs (version matrix, large
+dataset, determinism, performance), then a Phase-15 GUI stub, then
+**Documentation link check** -- ``scripts/ci/nightly-linkcheck.sh``, which is
+**a real step**, and which the file's own header calls out as one of only two
+real steps it has. The first stub exits 70 at step 6, so the link check at step
+11 is reported ``skipped`` and **has never executed and will not execute until
+Phase 15 replaces the stubs above it.**
+
+``scripts/ci/run-pipeline-locally.sh`` cannot see this, and that is the
+instructive part: it runs each step **independently** and grades it against its
+own classification, so it correctly reports the link check green while the real
+runner never reaches it. The local harness is not wrong; it models a different
+execution semantics than the thing it stands in for. This is the same family as
+the two findings above it -- a check that is never *reached* is as inert as a
+check that is never *red* -- and it was invisible until a real runner ran.
+
+**Not fixed here, deliberately.** ``.github/workflows/nightly.yml`` is modified
+on ``windows-percolator-verification``, which is now pushed and awaiting a pull
+request; fixing it on ``main`` as well would produce a conflict on merge and fix
+it twice. It belongs with Phase 01's residue, whoever lands it.
+
+Baseline gate run
+-----------------
+
+``bash scripts/verify-all-gates.sh`` at the start of the session, after the
+toolchain repair: **10 controls passed, 0 failed, 718 seconds (11m58s)**, with
+176 graded checks -- license 5, workflows 9, docs 1, traceability 8, sbom 8,
+depscan 16, pipeline 24, quality 42, shell 30, tests 33. "Every gate was seen to
+reject its defect and accept the clean tree." That is also the strongest
+evidence the relocation repair is complete: the whole Maven, headless-JavaFX and
+Sphinx stack runs at the new path.
+
 Open decisions
 ==============
 
@@ -946,10 +1050,13 @@ Next action
 
 Two things are ready, and they are independent of each other.
 
-**1. Close the two gate items that now need only a push.** ``D-008`` supplied
-the remote on 2026-08-30 and the work is done and verified; what remains is
-that no session has had a GitHub credential, so nothing has been pushed and
-GitHub has executed nothing. Both close as soon as a runner runs:
+**1. Close the two gate items that now need only a pull request.** Superseded in
+part on 2026-08-31: the push has happened (:ref:`status-session-04`). ``main``
+is pushed at ``e97d863`` and ``windows-percolator-verification`` now exists on
+the remote, so neither item is waiting on a credential any more. **Both are now
+waiting on the pull request being opened**, because that is the trigger both
+depend on. GitHub has executed exactly one workflow -- a scheduled nightly that
+failed on a Phase-15 stub, by design -- and no pull-request workflow has run:
 
 * **Phase 00 item 8** -- a ``windows-latest`` runner executes the checklist in
   ``docs/feasibility/windows-artefact.rst``, which is the first time any Windows
@@ -992,37 +1099,51 @@ Three obligations now carry forward to every remaining phase:
 **Pending on the branch, not on ``main``.** ``scripts/verify-all-gates.sh``
 still prints that item 6 "needs a git remote, which ``D-008`` withholds", which
 has been untrue since 2026-08-30. The correction is committed on
-``windows-percolator-verification`` and lands when that branch merges; it is
-recorded here so it is not fixed twice or mistaken for a live blocker.
+``windows-percolator-verification``, which is now **pushed** and lands when that
+branch merges; it is recorded here so it is not fixed twice or mistaken for a
+live blocker. The nightly step-ordering finding in
+:ref:`status-nightly-masking` belongs to the same branch for the same reason.
 
 For the owner
 --------------
 
-**One thing is waiting on the owner: a push.** This session has no GitHub
-credential -- no ``gh``, no token, no SSH key, no credential helper -- so
-``git push`` fails here with ``could not read Username``, exactly as in session
-02. Both remaining gate items need GitHub to *execute* something, so neither can
-close from inside a session that cannot reach it.
+**Superseded 2026-08-31. The push is done; what is waiting is one button.**
+Session 04 was the first to hold a working GitHub credential, and it had
+``workflow`` scope, so the branch carrying four ``.github/workflows/`` files was
+accepted. ``main`` is at ``e97d863`` on the remote and
+``windows-percolator-verification`` exists there. Session 04 was asked to push
+and then stop, and did.
 
-Push ``main`` at ``82609f0`` first, then the branch. ``82609f0`` is the
-branch's base and the last commit the main orchestrator verified green
-(``11/11 stages OK``); ``main`` has since advanced with Phase 02 work still in
-flight, and holding the first-ever pipeline run to a verified commit keeps a
-Phase 02 failure from being mistaken for a pipeline failure. Type::
-
-    cd /workspace
-    git push origin 82609f0:main
-    git push origin windows-percolator-verification
-
-Then open this in a browser and press "Create pull request"::
+**What remains is to open the pull request** -- the trigger both outstanding
+gate items depend on, and the only step nobody has taken::
 
     https://github.com/mriffle/CometGUI/compare/main...windows-percolator-verification?expand=1
 
-Runs appear at ``https://github.com/mriffle/CometGUI/actions``. Actions is
-already enabled -- the API lists the existing workflows as ``active`` -- but it
-has executed nothing yet.
+Opening it runs ``windows-percolator.yml`` (Phase 00 item 8 -- the first time a
+Windows binary in this project is executed rather than inferred from byte
+markers) and ``pull-request.yml`` (Phase 01 item 6's unmet half). Expect the
+Windows job to be able to say **no**: its driver exits 1 for a negative finding,
+2 for inconclusive and 3 for a harness failure, and the transcript upload
+carries ``if: always()`` precisely so a failing verification still returns
+evidence. A red result there is a result, not a setback.
+
+Runs appear at ``https://github.com/mriffle/CometGUI/actions``, which is no
+longer empty: one scheduled nightly has run and failed on a Phase-15 stub, as
+designed (:ref:`status-session-04`).
+
+*Historical, retained so the sequence is auditable:* this section previously
+asked the owner to run ``git push origin 82609f0:main`` from ``/workspace``.
+Both halves are now stale -- ``82609f0`` is already an ancestor of
+``origin/main``, and the checkout is no longer at ``/workspace``. Session 04
+performed the pushes.
 
 .. warning::
+
+   **Resolved on 2026-08-31: the push succeeded and this trap did not fire.**
+   Retained because the diagnosis cost session 02 several exchanges and the next
+   token may differ. Note also that ``git push --dry-run`` does **not** test
+   for it: the rejection is served by the remote only once the pack is actually
+   sent, so a clean dry run says nothing about ``workflow`` scope.
 
    **The second push is the one that fails if the token lacks ``workflow``
    scope.** The whole deliverable lives under ``.github/workflows/``, and a
