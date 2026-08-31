@@ -58,6 +58,47 @@ always a concurrent ``clean``, not a defect. The rules this phase worked under:
    ``clean verify`` and never ``install``, so ``_build/m2repo`` holds stale
    ``org.cometgui`` snapshots (Phase 02 surprise 9).
 
+Baseline supplied by the main orchestrator
+------------------------------------------
+
+``bash scripts/verify-all-gates.sh`` -- run by the main orchestrator, not by
+this phase -- **10 controls passed, 0 failed, in 718 seconds**: license 5,
+workflows 9, docs 1, traceability 8, sbom 8, depscan 16, pipeline 24, quality
+42, shell 30, tests 33 graded checks. Every existing gate was seen to reject its
+own defect at the new checkout path. It is re-run at the end of this phase.
+
+.. _p03-item5-scope:
+
+What gate item 5 actually asks of this phase
+--------------------------------------------
+
+The ``R-PROC-02`` ArchUnit rule **already exists**, shipped by Phase 01 as
+``LayeringRulesTest.processCreationIsConfinedToTheProcessService()``, and
+``verify-test-gates.sh`` control 2 already injects a ``ProcessBuilder`` outside
+the process service and watches it bite. This phase does not re-implement it.
+
+What is new, and what can rot silently, is this: **the rule's protected package
+is empty today.** ``org.cometgui.tools.process`` holds one
+``package-info.java``, so "nobody outside the process service constructs a
+process" is true because nobody anywhere does. Two things become falsifiable
+only once this phase puts a real ``ProcessBuilder`` inside that package, and
+neither is proved by anything that exists now:
+
+#. The rule must still **fail** for a use outside the package -- re-proved by
+   injection *after* the implementation lands, not before.
+#. The new classes must actually be **inside** ``ProductClasses.all()``. If
+   ``cometgui-process`` were missing from the archtests class path, the rule
+   would scan a tree that does not contain this phase's code and report green
+   having checked nothing. That is precisely the Phase 01 failure shape -- a
+   rule reporting 8/8 while evaluating nothing -- and this is where it would
+   recur. Unit 6 therefore asserts named process-service classes are present in
+   the import and that the module's census count moved off its
+   package-info-only floor.
+
+``cometgui-app``'s ``FfmGlibcVersionSource`` reads glibc through
+``java.lang.foreign`` **specifically to avoid a subprocess**, because it
+predates this phase. It is not to be "fixed" to use the new service.
+
 Decisions taken by the orchestrator before decomposing
 ======================================================
 
@@ -208,10 +249,12 @@ Decomposition
      - Needs units 1, 2 and 4. Gate items 1, 2, 3, 4.
 
    * - 6
-     - ``cometgui-archtests``: the ``R-PROC-02`` rule hardened, and a census
-       assertion that the rule's subject set is not empty
-     - Needs a real class in the process service package before the rule can
-       be shown to permit the right thing. Gate item 5.
+     - ``cometgui-archtests``: proof that the existing ``R-PROC-02`` rule now
+       has a real subject, still rejects a use outside the package, and is
+       evaluated against a class set that actually contains this phase's code
+     - The rule already exists; it becomes falsifiable only once unit 2's
+       ``ProcessBuilder`` is inside the package. See :ref:`p03-item5-scope`.
+       Gate item 5.
 
    * - 7
      - ``cometgui-process`` test sources: the mechanical no-fixed-sleep scan
