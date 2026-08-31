@@ -42,10 +42,13 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li><b>Pattern rules</b> catch a secret nobody declared: the password in a credential-bearing
  *       URL, an {@code Authorization} or {@code Proxy-Authorization} header, an assignment whose
- *       <em>name</em> looks secret, and a handful of token formats that are recognisable on sight.
+ *       <em>name</em> looks secret, a handful of token formats that are recognisable on sight, and
+ *       a PEM-encoded private key, which is the one carrier that spans lines.
  *   <li><b>The registry</b> ({@link SecretRegistry}) catches the secret the application actually
  *       holds. It came from the OS keychain, so its exact characters are known and every emitted
  *       string has that substring replaced, wherever it appears and whatever syntax surrounds it.
+ *       It runs both before and after the pattern rules; see {@link #redactText(String)} for the
+ *       measurement that put it at both ends rather than only at the end.
  * </ul>
  *
  * <p>Neither half is sufficient. Pattern rules cannot see a bare token passed as {@code -k <value>}
@@ -119,6 +122,16 @@ public final class SecretRedactor {
     public static final String REDACTION_MARKER = "[REDACTED]";
 
     /**
+     * The most characters {@link #PEM_PRIVATE_KEY} will span between its two delimiters: 16384.
+     *
+     * <p>Generous for the job -- a 4096-bit RSA private key is about 3.2 KB of PEM, an encrypted
+     * OpenSSH key about 2.6 KB -- and small enough that the work an unterminated {@code BEGIN}
+     * delimiter can cost is a constant rather than the length of the log. See the pattern's own
+     * documentation for why an unbounded body would be a denial of service.
+     */
+    private static final int PEM_BODY_LIMIT = 16384;
+
+    /**
      * Substrings that make a name secret, in the normalised form {@link #normalise} produces: lower
      * case, with {@code _}, {@code -}, {@code .} and spaces removed.
      *
@@ -179,6 +192,58 @@ public final class SecretRedactor {
                     "--credential",
                     "--credentials",
                     "--private-key");
+
+    /**
+     * A PEM-encoded private key, delimiters and all.
+     *
+     * <p>The one credential carrier the other rules cannot see. A private key does not arrive as a
+     * name, a header or a recognisable single token: it arrives as a multi-line block that a user
+     * pasted into a field, or that a tool printed when it failed to load one. Everything between
+     * the two delimiters is the secret, and so are the delimiters, because a provenance record that
+     * said {@code -----BEGIN RSA PRIVATE KEY-----} followed by {@code [REDACTED]} would still be
+     * announcing that a key was in play at that point in the run. The whole block becomes one
+     * marker.
+     *
+     * <p>The label is matched generically rather than by a list, so {@code RSA}, {@code EC}, {@code
+     * DSA}, {@code OPENSSH}, {@code ENCRYPTED} and the bare {@code PRIVATE KEY} form are all
+     * covered, as is any future label of at most two upper-case words. It is case-sensitive,
+     * because the delimiters are fixed by RFC 7468 and a lower-case one is not a PEM block. The
+     * opening and closing labels are deliberately <em>not</em> required to agree: a mismatched pair
+     * is malformed, and redacting malformed key material is the safe reading.
+     *
+     * <p><strong>{@code -----BEGIN CERTIFICATE-----} is not matched, on purpose.</strong> A
+     * certificate is public, it is exactly the kind of thing a provenance record should be able to
+     * quote, and destroying it would be over-redaction of the record this class exists to protect.
+     *
+     * <p><strong>Linearity, which for this rule had to be designed rather than asserted.</strong> A
+     * reluctant quantifier between two literal anchors is the natural shape, and the naive form
+     * {@code BEGIN...[\s\S]*?...END} is a denial of service on a log that captured a truncated key:
+     * every unterminated {@code BEGIN} makes the engine scan to the end of the input. Two things
+     * prevent that here.
+     *
+     * <ul>
+     *   <li>The body is <b>bounded</b> at {@value #PEM_BODY_LIMIT} characters. That is several
+     *       times the size of any PEM key this application can be handed -- a 4096-bit RSA key is
+     *       about 3.2 KB and an encrypted OpenSSH key about 2.6 KB -- so the bound costs nothing
+     *       real and caps the work per anchor at a constant.
+     *   <li>The body <b>cannot cross a five-dash run</b>: each body character carries a {@code
+     *       (?!-----)} guard. So an unterminated {@code BEGIN} followed by another one stops at the
+     *       next delimiter instead of scanning forward, which is what keeps a log made entirely of
+     *       truncated {@code BEGIN} lines linear rather than quadratic.
+     * </ul>
+     *
+     * <p>The guard is a lookahead over a single character, so no quantifier is nested inside
+     * another and the worst case is five character comparisons per body character. Both properties
+     * are asserted under a timeout in {@code SecretRedactorTest}, because a performance claim that
+     * nothing measures is a comment.
+     */
+    private static final Pattern PEM_PRIVATE_KEY =
+            Pattern.compile(
+                    "-----BEGIN (?:[A-Z0-9]{1,16} ){0,2}PRIVATE KEY-----"
+                            + "(?:(?!-----)[\\s\\S]){0,"
+                            + PEM_BODY_LIMIT
+                            + "}?"
+                            + "-----END (?:[A-Z0-9]{1,16} ){0,2}PRIVATE KEY-----");
 
     /**
      * The password inside a credential-bearing URL: {@code scheme://user:password@host/...}.
@@ -390,10 +455,25 @@ public final class SecretRedactor {
      * Removes credentials from one piece of free text: a log line, a message, a manifest field.
      *
      * <p>This is the method every other entry point ends in, and the one a writer calls for
-     * anything it is about to emit. The rules run in a fixed order -- credential URLs, secret-named
-     * assignments, bare bearer tokens, well-known token shapes, then the registry -- so that a
-     * structural rule gets first refusal on the text it understands and the registry acts as the
-     * catch-all behind them.
+     * anything it is about to emit. The rules run in a fixed order: <b>the registry</b>, then PEM
+     * private-key blocks, credential URLs, secret-named assignments, bare bearer tokens, well-known
+     * token shapes, <b>and the registry again</b>.
+     *
+     * <p><strong>The literal pass runs at both ends, and the first one is not redundant.</strong>
+     * It was added after a measurement, not a hunch. The registry works by literal substring
+     * replacement, so it only matches a value that is still intact -- and a pattern rule that fires
+     * earlier can rewrite one character inside a registered secret and leave the rest of it
+     * standing, at which point the literal no longer matches and the "airtight" half of the rule
+     * set silently stops applying. That is not hypothetical: the assignment rule sees a name and an
+     * {@code =} inside the base64 body of a PEM private key and rewrites its padding, which was
+     * enough to hide 62 characters of key material from a registry pass that ran only at the end.
+     * Removing the known literals before any rule can touch them makes the class of failure go away
+     * rather than requiring every future rule to be careful. The trailing pass stays as the
+     * catch-all for anything the pattern rules leave behind.
+     *
+     * <p>The PEM rule goes first among the patterns because it is the only one whose match spans
+     * lines: run later, its base64 body would already have been chewed on by the rules that look
+     * for {@code =} signs and token shapes inside it.
      *
      * @param text the text to clean
      * @return the text with every recognised secret replaced by {@value #REDACTION_MARKER}; the
@@ -402,7 +482,9 @@ public final class SecretRedactor {
      */
     public String redactText(String text) {
         Objects.requireNonNull(text, "text");
-        String cleaned = redactCredentialUrls(text);
+        String cleaned = registry.redactIn(text);
+        cleaned = PEM_PRIVATE_KEY.matcher(cleaned).replaceAll(MARKER_AS_REPLACEMENT);
+        cleaned = redactCredentialUrls(cleaned);
         cleaned = redactSecretAssignments(cleaned);
         cleaned = BEARER_TOKEN.matcher(cleaned).replaceAll("$1" + MARKER_AS_REPLACEMENT);
         cleaned = KNOWN_TOKEN_SHAPES.matcher(cleaned).replaceAll(MARKER_AS_REPLACEMENT);

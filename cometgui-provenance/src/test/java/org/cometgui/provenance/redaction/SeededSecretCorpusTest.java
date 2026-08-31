@@ -31,9 +31,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>This is the unit-level half of exit gate item 6: "a seeded corpus of secrets (tokens,
  * passwords, bearer headers, credential-bearing URLs) appears nowhere in JSON, RST or logs". Later
- * units grep the generated artefacts for these exact ten strings; this file proves the redactor
- * they will be calling removes every one of them from every shape they can arrive in, before any of
- * those artefacts exist.
+ * units grep the generated artefacts for the first ten of these exact strings; this file proves the
+ * redactor they will be calling removes every one of them from every shape they can arrive in,
+ * before any of those artefacts exist.
  *
  * <p><strong>Two assertions per carrier, and both are needed.</strong> First the full expected
  * output, typed out by hand -- which fails when a secret survives and equally when something that
@@ -49,7 +49,8 @@ import org.junit.jupiter.api.Test;
 class SeededSecretCorpusTest {
 
     // -----------------------------------------------------------------------------------------
-    // The ten seeded secrets, hand-transcribed.
+    // The ten seeded secrets from the work unit's brief, hand-transcribed, plus the three
+    // lines of the PEM private-key body the phase orchestrator added at rework.
     // -----------------------------------------------------------------------------------------
 
     private static final String AWS_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
@@ -65,6 +66,32 @@ class SeededSecretCorpusTest {
     private static final String LIVE_TOKEN = "tok_live_abcdef0123456789";
     private static final String AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE";
 
+    /**
+     * The base64 body of a PEM private key, added by the phase orchestrator's rework of this unit.
+     *
+     * <p>It is not one of the ten the work unit pinned -- those ten are what later units grep the
+     * generated JSON, RST and logs for -- but a private key is a credential carrier the gate's
+     * example list happened not to name, and leaving it outside this sweep would be a hole. It is
+     * deliberately synthetic; see the identical fixture in {@code SecretRedactorTest}.
+     *
+     * <p><strong>{@link #CORPUS} holds its three lines separately, not this joined form, and the
+     * reason is a defect this file had until it was measured.</strong> The sweep asks whether a
+     * secret still {@code contains}s in the output, and a whole-body check is defeated by a
+     * one-character change: when the PEM rule was deleted to prove it could fail, the assignment
+     * rule reached the base64 and replaced the {@code =} padding at the end of the last line, so
+     * the body was 99% intact -- the key had leaked -- and {@code contains(body)} was false. The
+     * sweep passed vacuously. Line by line, a partial mutation still leaves whole lines of key
+     * material to find, and the sweep sees them.
+     *
+     * <p>The fixture also spells the words {@code PrivateKey} inside its base64 on purpose. That is
+     * what makes the assignment rule bite if the PEM rule is ever moved out of first place in
+     * {@code redactText}, so the rule ordering is pinned by a test rather than by a comment.
+     */
+    private static final String PEM_BODY =
+            "MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEAnotArealKeyExample\n"
+                    + "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/\n"
+                    + "ThisIsNotARealPrivateKeyItIsAFixtureForCometGUIPhase04Tests012==";
+
     /** All ten, in the order the work unit lists them. */
     private static final List<String> CORPUS =
             List.of(
@@ -78,7 +105,10 @@ class SeededSecretCorpusTest {
                     "correct-horse-battery-staple",
                     "swordfish-42",
                     "tok_live_abcdef0123456789",
-                    "AKIAIOSFODNN7EXAMPLE");
+                    "AKIAIOSFODNN7EXAMPLE",
+                    "MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEAnotArealKeyExample",
+                    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/",
+                    "ThisIsNotARealPrivateKeyItIsAFixtureForCometGUIPhase04Tests012==");
 
     /** How a production run is configured: every credential it holds is registered. */
     private static SecretRedactor loaded() {
@@ -118,6 +148,14 @@ class SeededSecretCorpusTest {
 
     private static String credentialUrl() {
         return "https://limelight-user:" + URL_PASSWORD + "@limelight.example.org/api/upload";
+    }
+
+    private static String pemLogEntry() {
+        return "2026-08-31T09:15:00Z upload: key material follows\n"
+                + "-----BEGIN RSA PRIVATE KEY-----\n"
+                + PEM_BODY
+                + "\n-----END RSA PRIVATE KEY-----\n"
+                + "2026-08-31T09:15:01Z upload: done";
     }
 
     private static List<String> logLines() {
@@ -173,6 +211,16 @@ class SeededSecretCorpusTest {
     }
 
     @Test
+    @DisplayName("the PEM-block carrier loses the key and keeps the log lines around it")
+    void pemBlockCarrier() {
+        assertEquals(
+                "2026-08-31T09:15:00Z upload: key material follows\n"
+                        + "[REDACTED]\n"
+                        + "2026-08-31T09:15:01Z upload: done",
+                loaded().redactText(pemLogEntry()));
+    }
+
+    @Test
     @DisplayName("every log line comes out exactly as written here")
     void logLineCarrier() {
         SecretRedactor redactor = loaded();
@@ -199,7 +247,7 @@ class SeededSecretCorpusTest {
     // -----------------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("not one of the ten seeded secrets survives any carrier")
+    @DisplayName("not one of the thirteen seeded secrets survives any carrier")
     void notOneSecretSurvivesAnyCarrier() {
         List<Carrier> redacted = redactEveryCarrier(loaded());
         StringBuilder everything = new StringBuilder();
@@ -302,6 +350,7 @@ class SeededSecretCorpusTest {
         carriers.add(new Carrier("environment", environmentText.toString()));
         carriers.add(new Carrier("argv", String.join(" ", redactor.redactArgv(argv()))));
         carriers.add(new Carrier("credential URL", redactor.redactText(credentialUrl())));
+        carriers.add(new Carrier("pem block", redactor.redactText(pemLogEntry())));
         List<String> lines = logLines();
         for (int line = 0; line < lines.size(); line++) {
             carriers.add(new Carrier("log line " + line, redactor.redactText(lines.get(line))));

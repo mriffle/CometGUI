@@ -20,8 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -96,6 +98,19 @@ class SecretRedactorTest {
     /** An AWS access key id: {@code AKIA} followed by sixteen uppercase alphanumerics. */
     private static final String AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE";
 
+    /**
+     * The base64 body of a PEM private key: the secret material inside the delimiters.
+     *
+     * <p>Deliberately synthetic. It uses the base64 alphabet and the line width a real key has, so
+     * that the rule is exercised on the shape it will meet, and it spells out in plain words that
+     * it is a fixture, so that nobody reading this file ever has to wonder whether a real key was
+     * committed to the repository.
+     */
+    private static final String PEM_BODY =
+            "MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEAnotArealKeyExample\n"
+                    + "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/\n"
+                    + "ThisIsNotARealPrivateKeyItIsAFixtureForCometGUIPhase04Tests012==";
+
     /** A redactor holding every corpus value, which is how a real run is configured. */
     private static SecretRedactor loaded() {
         return SecretRedactor.with(
@@ -109,7 +124,8 @@ class SecretRedactorTest {
                         PASSPHRASE,
                         SWORDFISH,
                         LIVE_TOKEN,
-                        AWS_ACCESS_KEY_ID));
+                        AWS_ACCESS_KEY_ID,
+                        PEM_BODY));
     }
 
     /**
@@ -556,13 +572,181 @@ class SecretRedactorTest {
         }
 
         @Test
+        @DisplayName("a registered value survives a pattern rule that would otherwise chew it up")
+        void theRegistryRunsBeforeThePatternsToo() {
+            // The assignment rule finds a name whose normalised form contains "privatekey" and an
+            // "=" right after it inside this base64 run, and rewrites the padding.  If the literal
+            // pass ran only after the patterns, the registered value would no longer be present to
+            // match, and sixty-two characters of key material would survive in the record.
+            String base64 = "ThisIsNotARealPrivateKeyItIsAFixtureForCometGUIPhase04Tests012==";
+            SecretRedactor redactor = SecretRedactor.patternsOnly().withSecret(base64);
+
+            assertEquals(
+                    "body [REDACTED] end",
+                    redactor.redactText(
+                            "body ThisIsNotARealPrivateKeyItIsAFixture"
+                                    + "ForCometGUIPhase04Tests012== end"));
+        }
+
+        @Test
         @DisplayName("the redactor publishes its registry, which still prints nothing")
         void theRedactorPublishesItsRegistry() {
             SecretRedactor redactor = loaded();
 
-            assertEquals(10, redactor.registry().size());
+            assertEquals(11, redactor.registry().size());
             assertSame(redactor.registry(), redactor.registry());
-            assertEquals("SecretRegistry[secretCount=10]", redactor.registry().toString());
+            assertEquals("SecretRegistry[secretCount=11]", redactor.registry().toString());
+        }
+    }
+
+    @Nested
+    @DisplayName("PEM private-key blocks, delimiters and all")
+    class PemPrivateKeys {
+
+        @Test
+        @DisplayName("the whole block goes, and the lines around it do not")
+        void theWholeBlockGoes() {
+            String captured =
+                    "2026-08-31 upload key follows\n"
+                            + "-----BEGIN RSA PRIVATE KEY-----\n"
+                            + PEM_BODY
+                            + "\n-----END RSA PRIVATE KEY-----\n"
+                            + "done";
+
+            String redacted = SecretRedactor.patternsOnly().redactText(captured);
+
+            assertEquals("2026-08-31 upload key follows\n[REDACTED]\ndone", redacted);
+            assertFalse(redacted.contains(PEM_BODY));
+            assertFalse(
+                    redacted.contains("BEGIN"),
+                    "the delimiter survived, which still announces that a key was in play");
+        }
+
+        @Test
+        @DisplayName("every labelled form and the bare form are covered")
+        void everyLabelledFormIsCovered() {
+            SecretRedactor redactor = SecretRedactor.patternsOnly();
+
+            assertEquals(
+                    "[REDACTED]",
+                    redactor.redactText(
+                            "-----BEGIN EC PRIVATE KEY-----\nMIH=\n-----END EC PRIVATE KEY-----"));
+            assertEquals(
+                    "[REDACTED]",
+                    redactor.redactText(
+                            "-----BEGIN DSA PRIVATE KEY-----\nMIH=\n"
+                                    + "-----END DSA PRIVATE KEY-----"));
+            assertEquals(
+                    "[REDACTED]",
+                    redactor.redactText(
+                            "-----BEGIN OPENSSH PRIVATE KEY-----\nMIH=\n"
+                                    + "-----END OPENSSH PRIVATE KEY-----"));
+            assertEquals(
+                    "[REDACTED]",
+                    redactor.redactText(
+                            "-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIH=\n"
+                                    + "-----END ENCRYPTED PRIVATE KEY-----"));
+            assertEquals(
+                    "[REDACTED]",
+                    redactor.redactText(
+                            "-----BEGIN PRIVATE KEY-----\nMIH=\n-----END PRIVATE KEY-----"));
+        }
+
+        @Test
+        @DisplayName("a legacy encrypted key keeps its Proc-Type headers inside the redaction")
+        void aLegacyEncryptedKeyIsCoveredHeadersAndAll() {
+            assertEquals(
+                    "key: [REDACTED]",
+                    SecretRedactor.patternsOnly()
+                            .redactText(
+                                    "key: -----BEGIN RSA PRIVATE KEY-----\n"
+                                            + "Proc-Type: 4,ENCRYPTED\n"
+                                            + "DEK-Info: AES-128-CBC,0123456789ABCDEF\n"
+                                            + "\n"
+                                            + "MIH=\n"
+                                            + "-----END RSA PRIVATE KEY-----"));
+        }
+
+        @Test
+        @DisplayName("a certificate is public and is left alone")
+        void aCertificateIsLeftAlone() {
+            String certificate =
+                    "-----BEGIN CERTIFICATE-----\n"
+                            + "MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEAnotArealKeyExample\n"
+                            + "-----END CERTIFICATE-----";
+
+            assertEquals(certificate, SecretRedactor.patternsOnly().redactText(certificate));
+        }
+
+        @Test
+        @DisplayName("a lower-case imitation of the delimiter is not a PEM block")
+        void aLowerCaseDelimiterIsNotPem() {
+            String imitation =
+                    "-----begin rsa private key-----\nMIH=\n-----end rsa private key-----";
+
+            assertEquals(imitation, SecretRedactor.patternsOnly().redactText(imitation));
+        }
+
+        @Test
+        @DisplayName("a block with no END is left exactly as it arrived")
+        void anUnterminatedBlockIsLeftAlone() {
+            String truncated = "log tail\n-----BEGIN RSA PRIVATE KEY-----\nMIH=\nMIH=";
+
+            assertEquals(truncated, SecretRedactor.patternsOnly().redactText(truncated));
+        }
+
+        @Test
+        @DisplayName("redacting an already-redacted block changes nothing")
+        void redactingTheMarkerAgainChangesNothing() {
+            assertEquals(
+                    "2026-08-31 upload key follows\n[REDACTED]\ndone",
+                    SecretRedactor.patternsOnly()
+                            .redactText("2026-08-31 upload key follows\n[REDACTED]\ndone"));
+        }
+
+        @Test
+        @DisplayName("two megabytes after an unterminated BEGIN finish in well under a second")
+        void oneUnterminatedBeginOverALargeInputIsLinear() {
+            // The realistic denial of service: a log captured a key and was then truncated, so a
+            // BEGIN delimiter is followed by megabytes of text and no END. An unbounded body would
+            // scan all of it; the bound caps the work at a constant.
+            String haystack = truncatedKeyFollowedByFiller(2_000_000);
+
+            String redacted =
+                    assertTimeoutPreemptively(
+                            Duration.ofSeconds(5),
+                            () -> SecretRedactor.patternsOnly().redactText(haystack));
+
+            assertSame(haystack, redacted, "nothing should have matched, so nothing should differ");
+        }
+
+        @Test
+        @DisplayName("sixty thousand unterminated BEGIN delimiters finish in well under a second")
+        void manyUnterminatedBeginsAreLinear() {
+            // The harsher case, and the one the five-dash guard exists for: every anchor would
+            // scan its whole bound if the body could cross the next delimiter. It cannot, so each
+            // anchor fails immediately and the whole scan stays linear in the input.
+            StringBuilder builder = new StringBuilder(2_100_000);
+            while (builder.length() < 2_000_000) {
+                builder.append("-----BEGIN RSA PRIVATE KEY-----\n");
+            }
+            String haystack = builder.toString();
+
+            String redacted =
+                    assertTimeoutPreemptively(
+                            Duration.ofSeconds(5),
+                            () -> SecretRedactor.patternsOnly().redactText(haystack));
+
+            assertSame(haystack, redacted, "nothing should have matched, so nothing should differ");
+        }
+
+        private String truncatedKeyFollowedByFiller(int atLeast) {
+            StringBuilder builder = new StringBuilder(atLeast + 4096);
+            builder.append("-----BEGIN RSA PRIVATE KEY-----\n");
+            while (builder.length() < atLeast) {
+                builder.append("MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEAnotArealKey\n");
+            }
+            return builder.toString();
         }
     }
 
