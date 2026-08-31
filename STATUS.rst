@@ -1072,6 +1072,55 @@ evidence only if the edited file is confirmed to have changed:
 * if a defect that previously failed suddenly passes, suspect the injection
   before suspecting the gate.
 
+.. _status-class-census-gap:
+
+A seventh shape, and a gap in the gate harness that lets it through
+--------------------------------------------------------------------
+
+The main orchestrator hypothesised that a coverage figure taken from a moving
+tree could err **high** as well as low, because a class whose test does not
+compile is often absent from the report altogether -- and an absent class does
+not drag an average down, it leaves the sample. Phase 04 built the check and it
+found a live instance **on the first run**::
+
+    compiled classes (excluding package-info and inner): 37
+    classes in jacoco.xml:                               36
+    COMPILED BUT ABSENT FROM JACOCO:
+      org.cometgui.provenance.manifest.ManifestReader
+
+``ManifestReader`` was compiled and carrying **79 NO_COVERAGE mutations** while
+the build reported *"All coverage checks have been met"*. The statement was true
+of the sample and false of the code.
+
+**Why this is the worst of the seven shapes, specifically for sign-off.** Every
+earlier shape produced a check that *could not fail*. This one produces a **real
+measurement over an incomplete population**. Re-running the gate -- which is what
+a sign-off does -- reproduces the same clean figure, so it cannot be caught by
+verification at all. Only auditing that the sample was **whole** catches it.
+
+*The exclusion did not persist.* Checked at tier 1 rather than assumed: no
+``ManifestReader`` entry in any ``pom.xml``, no exclusion in
+``cometgui-provenance/pom.xml``, and both the class and its test present. It was
+transient mid-flight scoping, not a gate weakened to make something pass.
+
+**The harness gap, and the ruling.** ``scripts/build.sh`` already fails a
+*module* that compiles real classes and produces no ``jacoco.xml``; that check
+exists and works. It does **not** check the per-*class* case, which is the one
+that bites when a single test is excluded or fails to compile. The two failure
+modes are one line apart in the same stage and only one is covered.
+
+#. **The check** belongs in ``scripts/build.sh``'s gates stage, beside the
+   module-level check it completes, so it protects every build.
+#. **A control proving it bites** belongs in ``scripts/verify-test-gates.sh``.
+   Adding the check without a falsification control would repeat the Phase 01
+   mistake this project was founded on.
+
+**Owner and moment: tier 1, after Phases 03 and 04 land and before Phase 05 is
+dispatched.** Not the phase that found it -- ``scripts/`` is shared and the tree
+was still moving. Phase 04 hands over its fifteen-line census verbatim, with the
+invocation and the output above, so the replacement is built from a script that
+has actually caught something.
+
 .. _status-hash-cache-windows:
 
 The hash cache is deliberately inert on Windows
