@@ -3,7 +3,7 @@ PHASE-02: Application Shell and Navigation
 ==========================================
 
 :Phase: 02
-:Status: NOT STARTED
+:Status: PASSED -- signed off 2026-08-31 by the main orchestrator (see ../STATUS.rst)
 :Depends on: 01
 :Blocked by decisions: none -- D-001 DECIDED 2026-08-29: reuse permitted,
    with notices retained and the derivation recorded

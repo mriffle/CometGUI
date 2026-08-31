@@ -29,14 +29,14 @@ authoritative for its own scope and exit gate.
    * - `02 <PHASE-02-app-shell.rst>`_
      - Application Shell and Navigation
      - 01 (met)
-     - D-001 DECIDED -- reuse permitted; retain notices, record derivation.
-       Keep the ``D-009`` copyright placeholder; do not name an entity
-     - READY -- next, unblocked
+     - D-001 DECIDED -- reuse permitted; notices retained and derivation
+       recorded, enforced by a Checkstyle superset. ``D-009`` placeholder kept
+     - PASSED (signed off 2026-08-31)
    * - `03 <PHASE-03-process-service.rst>`_
      - Process Service
-     - 01, 02
+     - 01, 02 (both met)
      - --
-     - NOT STARTED
+     - READY -- next, unblocked
    * - `04 <PHASE-04-provenance-core.rst>`_
      - Hashing and Provenance Core
      - 01, 03

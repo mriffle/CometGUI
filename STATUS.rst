@@ -6,15 +6,20 @@ Project Status
 :Updated: 2026-08-30
 :Updated by: Main orchestrator, session 03 (specification revision 10; Phase 00
    gate item 8 amended and strengthened; the Windows verification harness
-   prepared and signed off; Phase 02 dispatched and in progress)
-:Current phase: 02 -- IN PROGRESS. Phases 00 and 01 remain PARTIAL.
+   prepared and signed off; **Phase 02 run and signed off PASSED**)
+:Current phase: 02 -- **PASSED**, signed off 2026-08-31. Phase 03 is next and
+   unblocked. Phases 00 and 01 remain PARTIAL, both awaiting a push only.
 :Overall: The repository, build and every quality gate exist and have each been
    seen to fail on a deliberate defect. Phases 00 and 01 stay PARTIAL for the
    same reason they always were, but the reason has changed shape: ``D-008``
    supplied a remote on 2026-08-30, and what now blocks both is simply that **no
    session has had a push credential**. The Windows verification harness is
    written, falsifiable and locally verified; GitHub has still executed nothing
-   in this repository. See :ref:`status-residue-01`.
+   in this repository. **Phase 02 passed on 2026-08-31** -- the first phase to
+   reach PASSED rather than PARTIAL -- after sign-off found and returned one
+   real gap: the shell's "stable" identifiers were not pinned, and the whole
+   build stayed green while one changed. See :ref:`status-residue-01` and
+   :ref:`status-p02`.
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -112,7 +117,7 @@ What exists
    * - ``scripts/`` (product)
      - Re-runnable
      - ``build.sh`` (11 stages, the one documented command),
-       ``verify-all-gates.sh`` (9 controls, 123 checks) and four gate
+       ``verify-all-gates.sh`` (10 controls, 176 graded checks) and five gate
        harnesses. ``verify-all-gates.sh`` belongs in the nightly pipeline:
        it exists because a gate that is never run stopped working during
        this very phase.
@@ -143,9 +148,10 @@ Phase board
        :ref:`status-p01`.
    * - 02
      - Application shell and navigation
-     - IN PROGRESS
-     - Dispatched 2026-08-30 to a fresh phase orchestrator; units landing on
-       ``main``. Not yet signed off.
+     - PASSED
+     - Signed off 2026-08-31. All five items PASS on the main orchestrator's
+       own re-run and its own defect injections; item 2 only after the
+       identifier-pinning repair sign-off required. See :ref:`status-p02`.
    * - 03
      - Process service
      - NOT STARTED
@@ -623,6 +629,166 @@ A red Windows job is not automatically a defect. The driver exits 0 for PASS,
 1 for a NEGATIVE finding about the binary, 2 for INCONCLUSIVE and 3 for a
 harness failure, and the transcript names the value it observed in every case.
 
+.. _status-p02:
+
+Phase 02 sign-off (2026-08-31)
+==============================
+
+:Outcome: **PASSED**
+:Signed off by: Main orchestrator, session 03, by re-running every gate item
+   itself and injecting defects the phase had never seen
+:Phase records: ``handoffs/PHASE-02-worklog.rst`` (twelve units),
+   ``handoffs/PHASE-02-handoff.rst``
+
+The phase orchestrator reported ``PASSED`` over eleven work units. The main
+orchestrator re-ran all five gate items rather than accepting that report, and
+**injected its own defects rather than re-running the phase's negative
+controls**. Four items held. The fifth exposed a real gap, which was repaired
+as a twelfth unit and then re-verified here; that gap is the most useful thing
+this phase produced and is recorded in full below.
+
+.. list-table:: Gate items, as re-run at sign-off
+   :header-rows: 1
+   :widths: 5 10 85
+
+   * - #
+     - Result
+     - The defect I injected, and what it printed
+
+   * - 1
+     - PASS
+     - Made the arrow keys **skip** the Percolator section while leaving the
+       mouse untouched -- a section genuinely unreachable by keyboard, which is
+       the half of this item most likely to rot.
+       ``everySectionIsReachableByKeyboardAlone`` failed on **both** drivers:
+       ``#section-percolator showing, with percolator chosen ==> expected:
+       <true> but was: <false>``. An earlier injection of mine --
+       ``setFocusTraversable(false)`` -- correctly did **not** fail, because
+       JavaFX honours an explicit ``requestFocus()`` regardless; that was my
+       error, not a hole.
+
+   * - 2
+     - PASS
+     - **after repair.** See :ref:`status-p02-identifier-gap`. As first delivered this
+       item passed while proving less than it appeared to.
+
+   * - 3
+     - PASS
+     - JavaFX as a **method-body local only** -- no field, no parameter, no
+       return type -- in ``org.cometgui.domain.log.LogMessage``. It compiled
+       (``mvn compile`` exit 0), confirming again that the Liberica Full JDK
+       carries JavaFX and **ArchUnit is the only defence**. ArchUnit failed
+       naming both call sites and their line numbers, and quoting the
+       specification rationale in the rule text.
+
+   * - 4
+     - PASS
+     - Added a real, visible ``Button`` to the header with a stable id and no
+       accessible name: ``1 of 92 controls have none: Button with id
+       #mo-unnamed-button under #shell-header``. The count moved 91 -> 92, so
+       the enumeration is dynamic and catches **additions** rather than
+       checking a fixed list.
+
+   * - 5
+     - PASS
+     - The best of them. I retained every discarded message in a side list, so
+       ``size()`` and ``discardedCount()`` stayed **exactly correct** -- a
+       count-only test passes this defect. It failed on **retained heap**:
+       ``retained heap grew by 222050704 bytes across 1000000 appends, which is
+       over the documented bound of 33554432 bytes``. The gate measures memory,
+       which is what the item actually requires.
+
+.. _status-p02-identifier-gap:
+
+What sign-off caught that the phase did not
+--------------------------------------------
+
+**The stable identifiers were not pinned, and the whole build went green while
+one changed.** I renamed a section's identifier in *production* code --
+``UiIds.sectionPane`` returning ``section-results-pane`` instead of
+``section-results`` for ``RESULTS`` alone, a valid, stable, non-null id -- and
+observed: ``SectionNavigationUiTest`` 4/0, ``KeyboardOnlyNavigationUiTest``
+4/0, ``UiIdsTest`` 5/0, and ``bash scripts/build.sh`` -> ``11/11 stages OK.
+BUILD OK``.
+
+Two causes, both present. The GUI tests computed their expected identifier by
+calling ``UiIds.sectionPane(section)`` -- **the same helper the production code
+calls** -- so the assertion was self-referential and could not fail. And
+``UiIdsTest`` pinned literal strings only as a *sample*: two of the ten
+sections, neither of them ``RESULTS``.
+
+This matters because Phase 02 delivers ``R-TEST-04``, whose entire content is
+that identifiers are **stable**. A self-consistent test proves the control
+exists and that navigation works; it proves nothing about stability, which is
+precisely what Phase 07 and the Phase 14 GUI suite will depend on. Gate item 2
+*as literally worded* passed, so this was returned as a repair unit rather than
+a rejection.
+
+**The repair** (unit 12) pins all 119 identifiers as hand-typed literals in a
+new ``StableIdentifierPinTest``, with every derived form spelled out in full
+rather than composed. ``git show --numstat`` is ``9/0``, ``688/0``, ``10/0`` --
+**zero deleted lines**, so nothing was removed to accommodate it, and
+``assertEquals(UiIds.`` appears **0** times, so the helper never sits on the
+expected side.
+
+**Re-verified with my own injections, not the phase's.** A derived form nobody
+had tested -- the description suffix ``-description`` -> ``-desc`` -- failed
+naming ``R-TEST-04`` and the phases that depend on it. More important, the
+structural claim: I added a **new** enum constant ``MO_DIAGNOSTICS`` to
+``SectionId`` and it failed with *"SECTION_PANE pins no identifier for:
+MO_DIAGNOSTICS. A pinning table a new constant can bypass rebuilds the hole
+this class exists to close."* The hole cannot be silently reopened one section
+later.
+
+The general lesson, which is why this is recorded at length: **an assertion
+whose expected value is computed by the code under test cannot fail.** It
+survived a phase of unit sign-offs -- including the phase orchestrator's own,
+which were otherwise rigorous -- because everything it touched was green. It
+took an injection into production code to find. This is the second such
+finding in this project after Phase 01's vacuous ArchUnit pass, and the pattern
+is the same: a check that has never been seen to go red is not yet a check.
+
+``D-001`` and ``D-009``, verified independently
+------------------------------------------------
+
+* **The derivation records are truthful.** ``AtlantaFxThemes`` and
+  ``ConsolePane`` each name their upstream file and commit
+  ``480b3013e7f8fb51a2b8c58681043821e3e7f865``, which matches the actual
+  ``HEAD`` of the CasanovoGUI clone.
+* **The header configuration is extended, never relaxed.**
+  ``checkstyle-derived.xml`` is a strict **superset** of ``checkstyle.xml`` --
+  no module dropped, one ``Regexp`` module added to require the per-file
+  derivation record -- and ``scripts/build.sh`` proves the ordinary and derived
+  file sets are exhaustive and disjoint over every ``.java`` file on disk.
+* **The collective attribution is correct, and I checked the fact it rests
+  on.** Of the 83 Java files in the upstream tree, **none** carries a copyright
+  notice, so there was no per-file notice to drop.
+* **``D-009``'s placeholder is intact.** Every file reads ``Copyright (C) 2026
+  The CometGUI authors.`` The only other copyright line in the tree is
+  ``Copyright (C) the CasanovoGUI authors.`` in the four derived files, which
+  is the attribution ``D-001`` requires rather than a substitution.
+
+Residue carried forward
+------------------------
+
+Small, named, and none of it blocking.
+
+* **The ``Settings`` section has no owning phase.** It appears once in the
+  specification -- "Tool Manager and application Settings may be secondary
+  navigation or dialogs" -- and in no phase document. Phase 02 built it as an
+  empty pane that says so in text, pinned by a test, which is the honest
+  treatment. Tier 1 must give it an owner and content before Phase 07.
+* ``UiIdsTest.noTwoIdentifiersCollide`` asserts a floor of 80 against a real
+  surface of 119, and its ``allIdentifiers()`` walks ``displayOrder()`` rather
+  than ``values()``. The new pin test covers the surface, so this is hardening,
+  not a hole.
+* ``consoleSeverityFilter`` derives from ``MessageSeverity.name()``, so
+  renaming a **domain** enum renames a UI identifier. Now pinned, so it fails
+  loudly instead of drifting.
+* **Where the shared ``BoundedMessageLog`` lives** once the process service
+  writes to the log the UI reads. Phase 02 deliberately did not decide this;
+  Phase 03 inherits it.
+
 Open decisions
 ==============
 
@@ -778,17 +944,20 @@ Risks currently live
 Next action
 ===========
 
-Two things are now ready, and they are independent of each other.
+Two things are ready, and they are independent of each other.
 
-**1. Close the two gate items ``D-008`` was holding open.** The remote exists as
-of 2026-08-30, so both residues are ordinary phase work rather than blocked
-items:
+**1. Close the two gate items that now need only a push.** ``D-008`` supplied
+the remote on 2026-08-30 and the work is done and verified; what remains is
+that no session has had a GitHub credential, so nothing has been pushed and
+GitHub has executed nothing. Both close as soon as a runner runs:
 
 * **Phase 00 item 8** -- a ``windows-latest`` runner executes the checklist in
   ``docs/feasibility/windows-artefact.rst``, which is the first time any Windows
   binary in this project will have been run rather than inferred from byte
-  markers. Until it passes, every non-Linux capability claim stays inference and
-  the manifest must keep saying so.
+  markers. The workflow and its driver exist on branch
+  ``windows-percolator-verification`` and are proved falsifiable
+  (:ref:`status-residue-01`). Until it passes, every non-Linux capability claim
+  stays inference and the manifest must keep saying so.
 * **Phase 01 item 6** -- the four workflow files run on a real pull request.
   They exist and every step is proven locally -- 45 steps across 4 workflows,
   37 executed on this machine -- but GitHub has executed nothing in this
@@ -798,19 +967,33 @@ items:
 Both are re-verified on every change thereafter, which is why a runner was worth
 more than one person spending fifteen minutes.
 
-**2. Run Phase 02** (``phases/PHASE-02-app-shell.rst``). Its dependency, Phase
-01, is signed off; nothing blocks it. Two obligations it inherits and must not
-drop:
+**2. Run Phase 03** (``phases/PHASE-03-process-service.rst``). Its dependencies,
+Phases 01 and 02, are both signed off and no decision blocks it. Phase 02 leaves
+it ``ProcessRunner`` and ``ToolCommand`` as ports ready to implement, and one
+question it deliberately did not answer: **where the shared
+``BoundedMessageLog`` lives** once the process service writes to the log the UI
+reads. Phase 04 (provenance core) is independent of 03 after 01 and may run
+alongside it.
 
-* **``D-001``'s attribution duty.** Any file derived from
-  ``Noble-Lab/CasanovoGUI`` retains its copyright notices and records the
-  derivation. ``CONTRIBUTING.rst`` says how: a second Spotless file set and a
-  second Checkstyle execution with their own header file -- **extending** the
-  header configuration, never relaxing or excluding it to make a derived file
-  pass.
+Three obligations now carry forward to every remaining phase:
+
+* **``D-001``'s attribution duty**, and the machinery Phase 02 built for it. Any
+  file derived from ``Noble-Lab/CasanovoGUI`` retains its copyright notices and
+  records the derivation, and the derived file set is held to a **superset** of
+  the ordinary Checkstyle rules. Never relax the header configuration or exclude
+  a derived file from it to make one pass.
 * **The copyright placeholder stays a placeholder.** Every Java file reads
   ``Copyright (C) 2026 The CometGUI authors.`` No agent substitutes a name;
   that is ``D-009``.
+* **An assertion whose expected value is computed by the code under test cannot
+  fail.** Phase 02's identifier gap (:ref:`status-p02-identifier-gap`) is the second
+  instance of this shape in the project. Prove a check by making it go red.
+
+**Pending on the branch, not on ``main``.** ``scripts/verify-all-gates.sh``
+still prints that item 6 "needs a git remote, which ``D-008`` withholds", which
+has been untrue since 2026-08-30. The correction is committed on
+``windows-percolator-verification`` and lands when that branch merges; it is
+recorded here so it is not fixed twice or mistaken for a live blocker.
 
 For the owner
 --------------
