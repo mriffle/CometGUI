@@ -134,11 +134,11 @@ class ClassImportCensusTest {
                                 "the domain module's only behavioural class is missing"),
                 () ->
                         assertTrue(
-                                classes.contain("org.cometgui.ui.JavaFxAvailability"),
+                                classes.contain("org.cometgui.ui.view.ShellView"),
                                 "the UI module is missing from the import"),
                 () ->
                         assertTrue(
-                                classes.contain("org.cometgui.app.JavaFxAvailability"),
+                                classes.contain("org.cometgui.app.bootstrap.CometGuiApplication"),
                                 "the application module is missing from the import"));
     }
 

@@ -11,8 +11,11 @@
     bundled in the pinned BellSoft Liberica JDK 25.0.4.1+1 as resolved system
     modules; a Maven JavaFX dependency would put a second copy of the javafx.*
     packages on the class path.  cometgui-ui and cometgui-app compile against
-    the bundled modules with no extra compiler argument - verified in this
-    unit, see cometgui-ui/.../JavaFxAvailability.java.
+    the bundled modules with no extra compiler argument - verified in phase 01
+    by a scaffolding class, and now by the real user interface: phase 02's
+    org.cometgui.ui.view.ShellView and org.cometgui.app.bootstrap
+    .CometGuiApplication compile and run against them, and the phase 01
+    scaffolding was deleted when they landed.
   * The local repository is forced to _build/m2repo by .mvn/maven.config, so
     that no mvn invocation from this repository writes to the host's ~/.m2.
 -->

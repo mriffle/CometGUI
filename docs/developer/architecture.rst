@@ -1147,8 +1147,13 @@ are not rediscovered:
 carries an accessible name and a stable identifier, and its pane says so in
 text. It was escalated rather than guessed at.
 
-**Phase 01's two ``JavaFxAvailability`` scaffolding classes are still in the
-tree**, in ``org.cometgui.ui`` and ``org.cometgui.app``, although their own
-Javadoc says Phase 02 should delete them. They cannot simply be removed:
-``ClassImportCensusTest.namedProductClassesArePresent`` asserts both by name, so
-deleting them means editing the architecture-test module at the same time.
+**Phase 01's two ``JavaFxAvailability`` scaffolding classes are gone.** They
+existed to prove that ``cometgui-ui`` and ``cometgui-app`` compile against the
+JavaFX modules bundled in the pinned JDK, and their own Javadoc said Phase 02
+would replace them. It did: ``org.cometgui.ui.view.ShellView`` and
+``org.cometgui.app.bootstrap.CometGuiApplication`` are the real proof, and they
+run rather than merely compile. Deleting the scaffolding meant editing
+``ClassImportCensusTest.namedProductClassesArePresent``, which asserted both by
+name; it now names those two real classes instead, which makes the census a
+stronger statement than it was -- an import that reaches the product's shell and
+its ``Application`` subclass cannot be an import of stubs.
