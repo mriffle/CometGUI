@@ -119,7 +119,10 @@ rest of the work is.
   artefacts into ``_build/m2repo``.
 * **Commit with an explicit pathspec after the message**; never ``git add
   -A``. Other agents are live in this tree.
-* **There is no git remote and none may be created** (``D-008``).
+* **The remote is** ``https://github.com/mriffle/CometGUI.git`` (``D-008``,
+  decided 2026-08-30). **Never push and never open a pull request from a
+  phase agent**; tier 1 holds both. Never force-push and never rewrite
+  published history.
 * **Do not answer a ``D-`` item.** Report it upward.
 
 Acceptance conditions
