@@ -372,6 +372,30 @@ build_sandbox() {
     mkdir -p "${SANDBOX}/_build"
     ln -s "${M2REPO}" "${SANDBOX}/_build/m2repo"
 
+    # PROJECT DOCUMENTS THE TESTS READ AS INPUT.
+    #
+    # specification.rst is here because a test may legitimately assert against
+    # the requirement it implements rather than against a hand-typed copy of it:
+    # Phase 03's SpecificationScenarioCoverageTest reads the eleven
+    # fake-executable scenario phrases back out of this file, so the list cannot
+    # silently drift from the requirement.  That is a good shape and this
+    # harness must not punish it.  Without this line the test found no
+    # specification in the sandbox, failed there, and its failure drowned the
+    # expected diagnostics of controls 5 and 7 -- one root cause reported as
+    # three.
+    #
+    # THE RULE, so the next case is a decision rather than a rediscovery: the
+    # sandbox carries files the build reads as INPUT, and project documents that
+    # tests assert against are inputs.  It does NOT carry records (handoffs/,
+    # worklogs) or generated output (docs/_build, the traceability report),
+    # because a test asserting against those would be asserting against its own
+    # history.  Phase 04's provenance report and Phase 15's traceability work
+    # are the next two that will want a document here; add them the same way,
+    # with the reason, rather than widening this to a blanket copy of the
+    # repository -- the sandbox is deliberately minimal so that what a control
+    # damages is exactly what it means to damage.
+    cp "${ROOT}/specification.rst" "${SANDBOX}/specification.rst"
+
     local module
     for module in "${ROOT}"/cometgui-*/; do
         module="$(basename -- "${module}")"
