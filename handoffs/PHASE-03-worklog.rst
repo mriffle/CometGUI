@@ -1166,3 +1166,209 @@ somebody would then have "fixed" working code.
    is one clock read, redact once, count, disk, then sink.
 #. ``StageOutcome`` **holds no environment at all** -- the way not to print an
    environment value is not to hold one.
+
+Unit 5 -- gate items 1, 3, 4 and 6
+==================================
+
+:Agent: fresh phase agent, run **alone** under the owner's new serialisation rule
+:Commit: ``e3f0fe3``
+:Outcome: **ACCEPTED**
+
+**What was built.** Five test classes, 3,044 lines, 36 tests:
+``SpecificationScenarioCoverageTest``, ``FakeScenarioSuiteTest``,
+``FiveHundredMegabyteFloodTest``, ``AwkwardPathTest``,
+``NoFixedSleepScanTest``. No production class, POM, script or shared config
+touched.
+
+**What I ran myself:** ``mvn -o -B -pl cometgui-process -am verify`` --
+**BUILD SUCCESS**, ``Tests run: 275, Failures: 0, Errors: 0, Skipped: 0``
+(239 before), ``BugInstance size is 0``, ``0 Checkstyle violations``.
+
+Gate item 1 -- the audit found six genuinely uncovered scenarios
+----------------------------------------------------------------
+
+The agent audited the specification's eleven scenarios against what already ran
+**through the service** before writing anything. Interleaving, non-zero exit,
+child creation and hang-and-cancel were already covered by units 2 and 2b.
+Six were not: ``write-files``, ``missing-output``, ``malformed-output``,
+``partial-then-fail``, ``delayed-output``'s *file* appearance, and huge volume on
+**stderr** and on both streams at once -- only ``flood ... out`` had ever reached
+the service.
+
+The coverage map is tied down four independent ways, each failing alone: the
+eleven scenario phrases are read back **out of ``specification.rst`` on disk**
+(with a guard that the section was found and is not a stub); each named test
+method is resolved reflectively and required to carry ``@Test`` and not
+``@Disabled``; each method's **body** is extracted by a brace matcher and must
+contain the fake scenario name as a quoted literal; and the covering file must
+contain ``.start(`` and must **not** contain ``new ProcessBuilder`` -- which is
+what excludes ``FakeToolSelfTest``, since proving the *fake* behaves is not
+proving the *service* handles it.
+
+Its stated limit, in its own Javadoc: it cannot detect a scenario *added* to the
+specification and omitted from the hand-typed list. Nothing can detect an
+omission from a hand-typed list.
+
+Gate item 3 -- measured, not asserted
+--------------------------------------
+
+``flood 524288000 100 out`` through ``StageRunner``, printed by the test::
+
+    bytes=524288000 lineLength=100 lines=5190971 logBytes=700781582
+    floodMillis=11633 auditMillis=1743
+    heapBefore=8544056 heapAfter=10522240 growth=1978184 limit=33554432
+    consoleSize=10000 consoleDiscarded=5180972
+
+* **Completes** with exit code 0.
+* **Bounded heap:** grew **1,978,184 bytes** against a hand-typed 32 MiB bound.
+  An unbounded console would retain roughly **1.3 GB** for 5,190,972 messages --
+  forty times the bound -- so the bound is one the defect would breach.
+* **A complete log, checked three independent ways.** The line count
+  5,190,971 comes from a hand-typed literal, from arithmetic the test does over
+  524,288,000 / 101, and from the ``lines 5190971`` the fake writes on stderr;
+  all three must agree. First, last and six interior lines are pinned in full,
+  and **every ordinal must equal its own position**.
+* **The console stayed bounded while the disk did not:** exactly 10,000
+  retained, exactly 5,180,972 discarded, the retained window contiguous and
+  ending at the newest.
+* **Cost:** 13.74 s in ``verify``. It costs PIT more -- the agent measured
+  8m53s with it against 7m00s without, a 27% increase -- and reported that
+  rather than buffering anything to make it cheaper. **That is a configuration
+  question for tier 1, not a licence to change production code.**
+
+**My own injection.** I rewrote one interior log line's ordinal from 3,000,000
+to 2,999,999 -- **count-preserving, console untouched, and at a position the
+test does not pin by hand**, so only a contiguity check could see it. Confirmed
+the compiled class changed (``fb302dea6ddeae07`` to ``ee5149d80da9e40a``)::
+
+    FiveHundredMegabyteFloodTest.theFloodCompletesWithABoundedHeapAndACompleteLog:303
+      the ordinals are not a contiguous 0..5190970 run: position 3000000 should be
+      "0003000000 0123456789..." but was "0002999999 0123456789..."
+      ==> expected: <-1> but was: <3000000>
+
+Reverted; class sha back to ``fb302dea6ddeae07``.
+
+The heap bound's own falsifiability is not re-proved here because it already is:
+removing the eviction from ``BoundedMessageLog.append`` is control 5b of
+``scripts/verify-shell-gates.sh``, which passed in tier 1's baseline. Re-injecting
+it would have meant editing ``cometgui-domain``, which this phase does not touch.
+
+Gate item 4 -- and a real finding that changed the tests
+---------------------------------------------------------
+
+``"café über 日本語 αβγ"`` in every position that matters: the working
+directory, an argument, an output file read back, the stage log directory and
+file, and the class path the fake is launched from.
+
+**The finding.** The agent's first version failed with **doubled** replacement
+characters -- ``cwd /tmp/.../caf?? ??ber ...``. ``R-PROC-04`` makes
+``ProcessService`` clear the environment, so a **Java** child has no ``LANG``,
+reports ``sun.jnu.encoding=ANSI_X3.4-1968``, and cannot decode the bytes of its
+own **argv or its own working directory**. Unit 2 had recorded this for
+environment *values*; it applies to arguments and paths too. The service
+delivered the correct bytes -- a native tool such as Comet, which never decodes
+them, is unaffected -- but a Java tool cannot read them. The fix is the one
+``ProcessService``'s Javadoc already prescribes: the caller names ``LANG`` in
+the ``ToolCommand``. **Phase 08 and Phase 16 need this**, and it is now pinned
+by a test rather than left to be rediscovered.
+
+**My own injection: I removed the ``<environmentVariables>`` block from
+``cometgui-process/pom.xml``**, which the agent could not do because the POM was
+outside its ownership. Gate item 4 fails **loudly**, not silently::
+
+    AwkwardPathTest.theForkedJvmUsesAUtf8FileNameEncoding
+      sun.jnu.encoding is "ANSI_X3.4-1968", so this JVM cannot represent a
+      non-ASCII file name and PHASE-03 exit gate item 4 cannot be tested at all.
+      cometgui-process/pom.xml configures maven-surefire-plugin with
+      <environmentVariables><LANG>C.UTF-8</LANG><LC_ALL>C.UTF-8</LC_ALL>
+      </environmentVariables> exactly to prevent this; if that block has been
+      removed, restore it. -Dsun.jnu.encoding=UTF-8 does NOT work: the JVM
+      resolves the property from the OS locale before system properties are
+      applied.
+
+plus four ``InvalidPathException`` errors on the paths themselves. Restored.
+
+Gate item 6 -- the scan, proved against tests its author did not write
+-----------------------------------------------------------------------
+
+Tier 1 set three conditions because the author of the tests was also the author
+of the check. All three hold, and **I re-proved two of them myself** rather than
+taking the agent's word.
+
+*My injection 1 -- the indirect form, in a class unit 2 wrote.* A
+``Thread.sleep(250)`` inside a **private helper** of ``GuardedListenerTest``,
+not in a ``@Test`` body::
+
+    NoFixedSleepScanTest.noTestInThisPhaseSynchronisesWithAFixedSleep
+      PHASE-03 exit gate item 6: a test synchronised by a fixed delay asserts
+      that this machine is fast enough, not that the product is correct. ...
+      ==> expected: <[]> but was: <[.../GuardedListenerTest.java:181:
+      Thread pause: Thread.sleep(250);]>
+
+File sha ``9339902b1ea7e565`` to ``55547866f7624c04`` and back.
+
+*My injection 2 -- a scan that reads nothing.* I pointed the scan root at a
+directory that does not exist. **Four independent guards fired**, which is what
+stops this being the Phase 01 vacuous-rule failure::
+
+    itReadEveryFileUnderTheRoots  only 1 files were read, and this phase has at
+                                  least 20
+    requireTheWholeTreeWasRead    the no-fixed-sleep scan found only 1 .java
+                                  files under [...], and this phase has at least
+                                  20; the roots are wrong or the tests have gone
+                                  missing
+    theNamedFilesWereScanned      these files were not scanned ... Scanned:
+                                  [FakeTool.java]
+    theScanIncludesItself         ... is not where it should be
+
+The agent's own proofs, each with a source **and compiled-class** sha256 pair
+before, during and after: a ``Thread.sleep`` in a ``@Test`` body of unit 2b's
+``ProcessCancellationTest``; the indirect form in unit 2's ``ProcessServiceTest``;
+breaking its own file filter so it read 0 files; and a
+``LockSupport.parkNanos`` planted in ``src/test/resources/fakes/``, which was
+caught by the **catch-all** rule and not the ``LockSupport``-specific one --
+a fully-qualified call evades a receiver-anchored pattern, which is exactly why
+the catch-all exists.
+
+**The scan is not exempt from itself.** ``theScanIncludesItself`` pins that, so
+no forbidden form is written literally in the file; the fixtures are assembled
+from fragments. Ugly, and the price of a checker with no blind spot.
+
+**Scope, stated in its Javadoc:** ``cometgui-process/src/test/java`` plus
+``src/test/resources/fakes``. Reported and not fixed, being outside this phase:
+``cometgui-app`` has two pre-existing ``Thread.sleep`` calls from Phase 02, both
+backoffs inside deadline-bounded polling loops; ``cometgui-provenance`` has two
+from Phase 04, one a heap sampler's polling interval and one -- ``awaitSettled``
+in ``CachingHashServiceTest`` -- a genuine fixed delay waiting out the file
+system's one-second mtime granularity. That last is Phase 04's to justify.
+
+Two more things the agent reported honestly
+--------------------------------------------
+
+* **PIT inherits surefire's ``<environmentVariables>``.** The pitest plugin has
+  no environment configuration of its own, and the agent expected the awkward-path
+  tests to break the mutation run. They do not, because PIT's
+  ``parseSurefireConfig`` defaults to true and carries ``LANG`` into the minions.
+  **Gate item 4 survives the mutation run only because of that default.**
+* Two SpotBugs findings on its own test code were fixed in the test code;
+  ``config/spotbugs/exclude.xml`` was not touched.
+
+Unit 8 -- the documentation
+===========================
+
+:Written by: the phase orchestrator, not a unit agent, to keep one agent in the
+   tree at a time
+:Commit: ``ee96e8c``
+:Outcome: **DONE**
+
+``docs/developer/tool_adapters.rst`` was a Phase 01 stub naming this phase as
+the owner of its process-service section. It now describes the service as built:
+the two layers a caller sees, why ``displayString()`` cannot be pasted into a
+shell, the constructed environment and what it costs, the line splitter's three
+requirements, both halves of ``R-PROC-03`` and where each lives, the stage log
+format, the three cancellation rules **with the measurement behind each**, the
+timeout, redaction and the one shared rule set, the ArchUnit rule and why it is
+one object, the fakes, and a platform-divergence table. The per-tool adapter
+sections remain phases 08, 09, 11 and 12's.
+
+``bash scripts/ci/docs-build.sh`` -- **PASSED** under ``sphinx-build -n -W``.
