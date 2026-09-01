@@ -408,7 +408,12 @@ class SpecificationScenarioCoverageTest {
         Path specification = repositoryRoot.resolve(SPECIFICATION_FILE);
         assertTrue(
                 Files.isRegularFile(specification),
-                () -> specification + " is missing, so nothing here is being checked against it");
+                () ->
+                        specification
+                                + " is missing, so nothing here is being checked against it."
+                                + " scripts/verify-test-gates.sh copies it into its sandbox"
+                                + " (e1d750f) precisely so that this check runs there too, so"
+                                + " an absent specification now always means a real problem.");
         List<String> lines;
         try {
             lines = Files.readAllLines(specification, StandardCharsets.UTF_8);
