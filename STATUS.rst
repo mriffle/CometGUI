@@ -3,23 +3,25 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-08-30
-:Updated by: Main orchestrator, session 03 (specification revision 10; Phase 00
-   gate item 8 amended and strengthened; the Windows verification harness
-   prepared and signed off; **Phase 02 run and signed off PASSED**)
-:Current phase: 02 -- **PASSED**, signed off 2026-08-31. Phase 03 is next and
-   unblocked. Phases 00 and 01 remain PARTIAL, both awaiting a push only.
+:Updated: 2026-09-01
+:Updated by: Main orchestrator, session 05 (**Phase 03 signed off PARTIAL**;
+   ``main`` published to the remote at ``9abfe1b`` after GitHub push protection
+   rejected the project's own seeded-secret decoy; **Phase 04 resumed** with a
+   fresh phase orchestrator)
+:Current phase: 04 -- **IN PROGRESS**, resumed 2026-09-01 from its paused state.
+   Phase 03 is **PARTIAL**, signed off 2026-09-01. Phases 00 and 01 remain
+   PARTIAL, both now awaiting a pull request rather than a push.
 :Overall: The repository, build and every quality gate exist and have each been
-   seen to fail on a deliberate defect. Phases 00 and 01 stay PARTIAL for the
-   same reason they always were, but the reason has changed shape: ``D-008``
-   supplied a remote on 2026-08-30, and what now blocks both is simply that **no
-   session has had a push credential**. The Windows verification harness is
-   written, falsifiable and locally verified; GitHub has still executed nothing
-   in this repository. **Phase 02 passed on 2026-08-31** -- the first phase to
-   reach PASSED rather than PARTIAL -- after sign-off found and returned one
-   real gap: the shell's "stable" identifiers were not pinned, and the whole
-   build stayed green while one changed. See :ref:`status-residue-01` and
-   :ref:`status-p02`.
+   seen to fail on a deliberate defect. Three phases are signed off -- 02
+   PASSED, 03 PARTIAL, 00 and 01 PARTIAL -- and 04 is in progress. What holds
+   Phases 00 and 01 at PARTIAL has narrowed twice: ``D-008`` supplied a remote
+   on 2026-08-30, session 04 pushed, and session 05 published ``main`` in full.
+   **What is left is one pull request**, which is the trigger both of their
+   outstanding items depend on and which nobody has opened. The Windows
+   verification harness is written, falsifiable and locally verified, and
+   GitHub has now executed exactly one workflow -- a scheduled nightly that
+   failed on a Phase-15 stub, by design. See :ref:`status-residue-01`,
+   :ref:`status-p02` and :ref:`status-session-05`.
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -162,8 +164,11 @@ Phase board
        executed on Windows or macOS. See :ref:`status-p03`.
    * - 04
      - Hashing and provenance core
-     - PAUSED
-     - **Paused by the owner on 2026-08-31**, part-built, to stop two phases
+     - IN PROGRESS
+     - **Resumed 2026-09-01** with a fresh phase orchestrator, briefed by
+       ``handoffs/PHASE-04-RESUMPTION-BRIEF.rst`` and told its expected grade is
+       PARTIAL (:ref:`status-session-05`). The state below is what it inherited.
+       **Paused by the owner on 2026-08-31**, part-built, to stop two phases
        sharing one tree. Units **1-8 signed off** on the orchestrator's own
        injections; units **9 and 10 LANDED BUT NOT SIGNED OFF** -- committed
        green, but their diffs were not read, their gates not re-run and nothing
@@ -1438,6 +1443,102 @@ Residue carried forward
   ``log::append``. The question Phase 02 left open is answered without
   publishing shared mutable state.
 
+.. _status-session-05:
+
+Session 05 (2026-09-01): ``main`` is published, and push protection bit on a decoy
+==================================================================================
+
+**``main`` is on the remote at** ``9abfe1b``. Ninety-one commits -- the whole of
+Phase 03's sign-off, Phase 04's paused state and every session record -- had
+existed only on this machine. They no longer do. Nothing was force-pushed and no
+history was rewritten.
+
+.. _status-push-protection:
+
+The first external gate this project ever met, and it rejected the push
+------------------------------------------------------------------------
+
+The push was refused, and not by the ``workflow``-scope trap
+(:ref:`status-next-action`) that every previous session had been warned about.
+**GitHub push protection scanned the commits and found a credential**::
+
+    —— GitLab Access Token ——
+    - commit: fea6bd6  .../manifest/ProvenanceManifestTest.java:51
+    - commit: fea6bd6  .../manifest/ToStringSecrecyTest.java:60
+    - commit: 5b10a58  .../manifest/ToStringSecrecyTest.java:60
+    - commit: 8f00cae  .../events/ProvenanceEventLogTest.java:190
+    - commit: 8f00cae  .../events/ProvenanceEventTest.java:137
+
+The string is ``glpat-Z1x9QeR7sVbN3mK0pLtY``, a hand-typed fixture from Phase
+04's seeded-secret corpus whose own Javadoc says it is "shaped like a real
+access token so that a substring search cannot match it by accident". It is
+fabricated. It was written to be convincing, and it convinced a scanner.
+
+**Why the obvious repair does not work, which is the part worth carrying
+forward.** Editing the fixture cannot unblock the push: protection scans every
+commit in the range rather than the tip, and the string is already in three
+commits of unpushed history. The only mechanical removal is rewriting all
+ninety-one commits -- and **every sign-off entry in both work logs, both
+handoffs and this file names the commit it signed off by hash**. Rewriting
+would have destroyed the project's evidence chain to hide a decoy. It was
+refused on that ground, not on the published-history rule, since these commits
+were not yet published. The owner allowlisted the detection as a false
+positive, which is the correct disposition for a fabricated value, and the push
+then succeeded unchanged.
+
+**What the rest of the corpus shows, and it is a convention worth adopting.**
+The same scan over the working tree finds three other provider-shaped fixtures
+and only the GitLab one was rejected:
+
+* ``AKIAIOSFODNN7EXAMPLE`` is **AWS's own published documentation example**,
+  which scanners allowlist by design. Whoever chose it chose correctly.
+* ``ghp_S3cr3tT0k3nExampleValue0123456789ab`` survives only by luck: GitHub's
+  detector for its own tokens validates a checksum in the final characters, and
+  this fixture fails it. A differently-typed fake would have been rejected.
+* ``glpat-`` has no checksum in its detector, only a prefix and a length, so any
+  plausible-looking fake matches.
+
+The property a redaction corpus actually needs is **distinctiveness against an
+accidental substring match**, not provider authenticity -- so adopting each
+provider's published example value costs the corpus nothing it needs. Phase 04
+has been asked to record that judgement in its handoff rather than to change
+the fixtures, because changing them now would alter signed-off units without
+unblocking anything.
+
+**Two later phases inherit this.** Phase 12 will hold a **real** Limelight
+credential, where the same scanner is a protection rather than an obstacle and
+must not be routinely bypassed; and Phase 16 publishes the repository, where a
+fork or a mirror re-push meets the same rejection because the string stays in
+history. Neither is a defect today. Both are cheaper to know now than to
+discover at release.
+
+Baseline gate run
+-----------------
+
+``bash scripts/verify-all-gates.sh`` at the start of the session, on a quiet
+tree: **10 controls passed, 0 failed, in 1702 seconds (28m22s)**, with the
+``tests`` control at **33 graded assertions** -- the floor recorded at the
+session-04 baseline held, so no control was silently dropped or
+short-circuited.
+
+Phase 04 dispatched
+-------------------
+
+One fresh phase orchestrator, briefed by
+``handoffs/PHASE-04-RESUMPTION-BRIEF.rst`` and told **up front that its expected
+grade is PARTIAL**, so that it documents for the evidence rather than writing
+toward a verdict. It is the only phase live in the tree. Its first instruction
+is to re-measure rather than to resume, and its second is that signing off units
+9 and 10 -- landed, never read, never re-run, never injected into -- is the
+first real work of the resumption.
+
+Tier 1 holds two things away from it: ``scripts/build.sh`` and
+``scripts/verify-test-gates.sh``, where the per-class population census lands
+after this phase (:ref:`status-class-census-gap`), and pushing, which is not a
+phase agent's to do. ``handoffs/BRIEF-TEMPLATE.rst`` still told phase agents
+"there is no git remote and none may be created"; that has been untrue since
+2026-08-30 and is corrected.
+
 Open decisions
 ==============
 
@@ -1658,10 +1759,11 @@ Two things are ready, and they are independent of each other.
 
 **1. Close the two gate items that now need only a pull request.** Superseded in
 part on 2026-08-31: the push has happened (:ref:`status-session-04`). ``main``
-is pushed at ``e97d863`` and ``windows-percolator-verification`` now exists on
-the remote, so neither item is waiting on a credential any more. **Both are now
-waiting on the pull request being opened**, because that is the trigger both
-depend on. GitHub has executed exactly one workflow -- a scheduled nightly that
+is pushed -- **at** ``9abfe1b`` **as of 2026-09-01**, session 05 having
+published the remaining ninety-one commits (:ref:`status-session-05`) -- and
+``windows-percolator-verification`` exists on the remote, so neither item is
+waiting on a credential any more. **Both are now waiting on the pull request
+being opened**, because that is the trigger both depend on. GitHub has executed exactly one workflow -- a scheduled nightly that
 failed on a Phase-15 stub, by design -- and no pull-request workflow has run:
 
 * **Phase 00 item 8** -- a ``windows-latest`` runner executes the checklist in
@@ -1680,13 +1782,24 @@ failed on a Phase-15 stub, by design -- and no pull-request workflow has run:
 Both are re-verified on every change thereafter, which is why a runner was worth
 more than one person spending fifteen minutes.
 
-**2. Run Phase 03** (``phases/PHASE-03-process-service.rst``). Its dependencies,
-Phases 01 and 02, are both signed off and no decision blocks it. Phase 02 leaves
-it ``ProcessRunner`` and ``ToolCommand`` as ports ready to implement, and one
-question it deliberately did not answer: **where the shared
-``BoundedMessageLog`` lives** once the process service writes to the log the UI
-reads. Phase 04 (provenance core) is independent of 03 after 01 and may run
-alongside it.
+*Superseded on 2026-09-01: what these two items wait on has narrowed again.*
+Merging ``windows-percolator-verification`` into ``main`` rather than opening a
+pull request would close **Phase 00 item 8** -- both workflows also declare
+``workflow_dispatch``, and GitHub offers that button once the file is on the
+default branch, which satisfies "confirmed on a Windows runner". It would
+**not** close **Phase 01 item 6**, whose wording is "CI runs the pull-request
+pipeline *on a pull request*": merging fires no ``pull_request`` event. The
+route is the owner's to choose and is recorded here so the consequence is not
+rediscovered. Note also that the merge is the push that first carries
+``.github/workflows/`` to ``main``, so it is the one that tests ``workflow``
+scope -- a clean ``git push --dry-run`` says nothing about that.
+
+**2. Finish Phase 04, then close the per-class census debt before Phase 05.**
+Phase 04 resumed on 2026-09-01 (:ref:`status-session-05`) and is the only phase
+live in the tree. When it is signed off, tier 1 owns the two-part census work in
+``scripts/build.sh`` and ``scripts/verify-test-gates.sh``
+(:ref:`status-class-census-gap`) -- the check *and* a control proving it bites.
+Phase 05 is dispatched after that, not before.
 
 Three obligations now carry forward to every remaining phase:
 
@@ -1716,9 +1829,12 @@ For the owner
 **Superseded 2026-08-31. The push is done; what is waiting is one button.**
 Session 04 was the first to hold a working GitHub credential, and it had
 ``workflow`` scope, so the branch carrying four ``.github/workflows/`` files was
-accepted. ``main`` is at ``e97d863`` on the remote and
-``windows-percolator-verification`` exists there. Session 04 was asked to push
-and then stop, and did.
+accepted. Session 04 was asked to push and then stop, and did. **Session 05
+then published ``main`` in full**, at ``9abfe1b``: the push was refused once, by
+GitHub push protection rather than by the scope trap below, and the owner
+allowlisted the fabricated fixture that triggered it
+(:ref:`status-push-protection`). ``windows-percolator-verification`` is
+unchanged on the remote at ``38c066c``.
 
 **What remains is to open the pull request** -- the trigger both outstanding
 gate items depend on, and the only step nobody has taken::
