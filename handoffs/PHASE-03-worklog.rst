@@ -1372,3 +1372,48 @@ one object, the fakes, and a platform-divergence table. The per-tool adapter
 sections remain phases 08, 09, 11 and 12's.
 
 ``bash scripts/ci/docs-build.sh`` -- **PASSED** under ``sphinx-build -n -W``.
+
+Closing measurements, and one regression I caused and repaired
+==============================================================
+
+Taken from **one clean end-to-end run on a quiet tree** with
+``git status --short`` empty and nothing else building, as tier 1 required --
+a figure taken from a moving tree can read high, because a class whose test does
+not compile leaves the sample rather than lowering it.
+
+* ``bash scripts/build.sh`` -- ``11/11 stages OK in 976 seconds. BUILD OK``,
+  ``104 report file(s): tests=1741 failures=0 errors=0 skipped=2``. Both skips
+  are in ``cometgui-provenance`` from Phase 04's pause; **none in this phase**.
+* ``cometgui-process`` -- ``Tests run: 275, Failures: 0, Errors: 0, Skipped: 0``;
+  line 96.6% (455/471), branch 95.5% (86/90); PIT ``156/175 = 89.1%`` by the
+  build's strict ``KILLED``-only count, 96% by PIT's own count which also credits
+  ``TIMED_OUT``; SpotBugs ``126 class(es) analysed, 0 findings``; the Spotless
+  and Checkstyle census ``41 ordinary + 0 derived = 41 file(s) on disk``.
+* The measured population was audited, not just the score: 15 compiled classes,
+  15 in ``jacoco.xml``, none absent; 14 mutated by PIT, the fifteenth being
+  ``RunMessageSink``, a functional interface with no method body.
+* ``bash scripts/verify-all-gates.sh`` -- **``10 control(s) passed, 0 failed, in
+  1767 seconds (29m27s)``**, ``tests`` at **33 graded assertions**, matching
+  tier 1's baseline count.
+
+**The regression, and why it is recorded rather than quietly fixed.** My first
+``verify-all-gates.sh`` came back ``9 control(s) passed, 1 failed``. Unit 5's
+``SpecificationScenarioCoverageTest`` reads the scenario phrases out of
+``specification.rst`` on disk -- the first test in this project to assert
+against a **requirement document** rather than a copy of one -- and
+``verify-test-gates.sh``'s sandbox does not contain project documents. The
+cheap move was to weaken the test until the harness was happy. Instead: diagnose
+the harness, make the minimum safe change inside my own ownership (abort
+visibly, never pass silently, and only where every marker of a checkout is also
+absent), and escalate the one-line shared-file edit with the reasoning. Tier 1
+made it at ``e1d750f`` and recorded the rule it sets for later phases; the abort
+branch became unreachable and was deleted at ``c6c9ef4``, because a check that
+can never fire is not a check.
+
+**The cost this phase adds to the gate suite is real and is not hidden.**
+``verify-all-gates.sh`` went from 11m58s to 29m27s, because control 7 runs
+``scripts/build.sh`` inside its sandbox and therefore pays the 500 MB flood and
+its PIT cost a second time. Nothing was buffered, narrowed or excluded to reduce
+it. Whether that is acceptable for every run is a build-configuration decision
+for tier 1, and it is escalated as one.
+

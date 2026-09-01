@@ -214,6 +214,39 @@ The numbers, from one clean end-to-end run
    * - ArchUnit import
      - 179 classes; ``org.cometgui.tools.process`` **17**; 8 rules, 0 failures
 
+``bash scripts/verify-all-gates.sh`` on the same quiet tree:
+**``10 control(s) passed, 0 failed, in 1767 seconds (29m27s)``**, with the
+``tests`` control at **33 graded assertions** -- the same count as tier 1's
+baseline, so the harness floor did not drop.
+
+.. warning::
+
+   **That suite now takes 29m27s where the baseline took 11m58s, and this phase
+   is why.** ``verify-test-gates.sh`` control 7 runs ``scripts/build.sh`` inside
+   its sandbox, so the 500 MB flood and its PIT cost are paid there as well as in
+   the ordinary build. Nothing was weakened to reduce it; see
+   :ref:`p03-escalations`.
+
+**One control failed on my first attempt, and the cause was mine.**
+``SpecificationScenarioCoverageTest`` reads the eleven scenario phrases back out
+of ``specification.rst`` **on disk**, so a hand-typed list cannot silently drift
+from the requirement it implements. But ``verify-test-gates.sh`` does not build
+its sandbox from ``git archive``: it hand-copies ``pom.xml``, ``.mvn``,
+``config``, ``scripts`` and each module's ``pom.xml`` and ``src``, and no project
+document. The test failed there, and its failure drowned the expected
+diagnostics of two other controls, so one root cause reported as several
+failures.
+
+I diagnosed the harness rather than adjusting the test until the harness was
+happy, made the minimum safe change inside my own ownership -- a **visible
+abort**, never a silent pass, and only in a tree missing every marker of a real
+checkout -- and escalated the shared-file edit with the reasoning instead of
+making it. Tier 1 added ``specification.rst`` to the sandbox (``e1d750f``) and
+recorded the rule: **the sandbox carries what the build reads as input, and a
+project document a test asserts against is an input; it does not carry records
+or generated output.** The abort branch could then never fire, and a check that
+can never fire is not a check, so it was deleted (``c6c9ef4``).
+
 **The two mutation figures differ and both are honest.**
 ``scripts/build.sh`` counts only ``status='KILLED'``; PIT's own score also
 counts ``TIMED_OUT``. The build's number is the stricter one and is the gate.
