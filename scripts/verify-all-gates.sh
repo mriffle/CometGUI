@@ -83,6 +83,7 @@ readonly -a ALL_GATES=(
     quality
     shell
     tests
+    provenance
 )
 
 PASSED=0
@@ -228,6 +229,19 @@ gate_spec() {
             GATE_FLOOR=33
             GATE_UNIT="assertions"
             ;;
+        provenance)
+            GATE_PHASE="04"
+            GATE_ITEMS="1-6"
+            GATE_DEFECT="a hasher that digests one byte less than it read so every published vector comes back wrong; a hasher that keeps every chunk, leaving the digests EXACTLY CORRECT while the 2 GB proof's retained-heap bound is exceeded; a fingerprint that treats an absent attribute as a match, dressed as Windows compatibility, so the cache serves an entry it cannot validate; a log reader that drops the torn tail a crash leaves, so the damage is not reported; ATOMIC_MOVE replaced by copy-then-delete, which a concurrent reader sees straight through; and redaction removed from each of the three writers in turn -- the JSON value path, a size-conditioned fast path in the RST writer, and the event log's payload -- each caught by a grep of the bytes on disk that names the artefact, the corpus index and the offset without printing the secret"
+            GATE_SCRIPT="scripts/verify-provenance-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-04 exit gate items 1 to 6 were proved here"
+            )
+            GATE_FLOOR=24
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -258,6 +272,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         tests)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) assertion(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        provenance)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -265,8 +281,8 @@ gate_count() {
 usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
-that every PHASE-01 and PHASE-02 gate still fails on the defect it exists to
-catch.
+that every PHASE-01, PHASE-02 and PHASE-04 gate still fails on the defect it
+exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -285,7 +301,7 @@ itself.  A sub-harness that is missing or not executable is a fatal error
 before anything runs (exit 3): a skipped control must never be counted as a
 pass.
 
-WHAT IT COSTS.  About seven minutes, almost all of it Maven.  Elapsed time is
+WHAT IT COSTS.  About half an hour, almost all of it Maven.  Elapsed time is
 printed per control.  This is why it is not a stage of scripts/build.sh.
 
 WHEN TO RUN IT.
@@ -334,17 +350,23 @@ list_gates() {
         printf '  %-13s %-9s injects: %s\n\n' "" "" "${GATE_DEFECT}"
     done
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
-    printf '  PHASE-02.  Both phases number their items from one, so the phase is always\n'
-    printf '  named rather than inferred.\n'
+    printf '  PHASE-02, 04:n of PHASE-04.  Every phase numbers its items from one, so the\n'
+    printf '  phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
     printf '  build; 3 ArchUnit layering; 4 coverage; 5 traceability; 6 CI pipelines.\n'
     printf '  PHASE-02 items: 1 every section reachable by mouse and by keyboard alone;\n'
     printf '  2 a headless GUI test navigating all sections by stable identifier;\n'
     printf '  3 ArchUnit proving the domain has no JavaFX dependency; 4 an accessible\n'
     printf '  name on every control; 5 a bounded console under a flood test.\n'
+    printf '  PHASE-04 items: 1 known MD5 and SHA-256 vectors including the zero-byte\n'
+    printf '  file; 2 a 2 GB file hashed in one pass with bounded heap; 3 a hash cache\n'
+    printf '  that returns a value only when every attribute matches; 4 a crash leaving a\n'
+    printf '  parsable event log with usable history; 5 atomic finalisation; 6 a seeded\n'
+    printf '  secret corpus appearing nowhere in JSON, RST or logs; 7 no surviving\n'
+    printf '  mutation in hashing and redaction, which the tests control above proves.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
-    printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst and\n'
-    printf '  phases/PHASE-02-app-shell.rst.\n\n'
+    printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
+    printf '  phases/PHASE-02-app-shell.rst and phases/PHASE-04-provenance-core.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -506,7 +528,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01 and PHASE-02 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02 and PHASE-04 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
