@@ -1479,3 +1479,132 @@ recorded honestly that the module-wide ``verify`` was RED at the time, on a
 SpotBugs ``RV_ABSOLUTE_VALUE_OF_HASHCODE`` belonging to another unit, and did
 not touch it. That was repaired at ``892962e`` and the module is green now.
 Reporting a red build you did not cause is the behaviour this structure needs.
+
+.. _p04-noweakening:
+
+Audit at the resumption: was any gate weakened while the phase was paused?
+--------------------------------------------------------------------------
+
+Asked and answered mechanically rather than from memory, because a sign-off that
+does not check this is not a sign-off.
+
+* ``git diff --stat 119672f..HEAD -- pom.xml cometgui-provenance/pom.xml
+  cometgui-domain/pom.xml config/`` is **empty**. No threshold, no exclusion and
+  no rule set changed between the pause and the resumption.
+* The coverage limits in ``pom.xml`` are still ``LINE COVEREDRATIO 0.90`` and
+  ``BRANCH COVEREDRATIO 0.85`` on the core modules and ``LINE 0.80`` on
+  view-model logic; ``<mutationThreshold>80</mutationThreshold>`` is unchanged;
+  ``targetClasses`` still carries ``org.cometgui.provenance.*``.
+* There is **no** surefire ``<excludes>`` anywhere. The only ``<excludes>`` in
+  any pom are the Spotless and Checkstyle file-set splits for ``**/derived/**``,
+  each of which is covered by a second execution -- Phase 02's two-licence-header
+  arrangement, not an exemption.
+* **Zero** unconditional ``@Disabled`` in either module.
+* Exactly **two** ``Assumptions.abort`` sites, both the ``sun.jnu.encoding``
+  case, in ``ManifestRoundTripTest`` and ``ManifestWriterTest``. They stay; see
+  :ref:`p04-encoding`.
+* The twenty ``@DisabledOnOs(WINDOWS)`` and two ``@EnabledOnOs({LINUX, MAC})``
+  annotations are unchanged and each still carries its ``disabledReason``.
+
+The independently computed digests were re-derived as well, since gate item 1
+rests on them. All seven short vectors were recomputed here with GNU coreutils
+and compared against the literals in ``StreamingHashServiceTest`` -- including
+the three that live inside a ``@CsvSource`` string rather than in a Java string
+literal, which a naive grep for a quoted hex constant misses. Every one matches
+to the character.
+
+.. _p04-unit11-signoff:
+
+Unit 11 -- SIGNED OFF 2026-09-01
+---------------------------------
+
+**What it is.** ``SeededSecretArtefactSweepTest`` in ``org.cometgui.provenance``
+-- the root package, because it spans ``manifest``, ``report`` and ``events``
+and belongs to none of them. Landed at ``df7fbac``, 978 lines, eight tests. It
+builds one manifest and a seventeen-event stream that between them carry all
+thirteen corpus entries in every carrier shape gate item 6 names, writes
+``provenance.json``, ``provenance.rst`` and ``events.log`` into one run
+directory, **walks that directory** and reads every regular file back off disk,
+searching each twice -- as UTF-8 text and as raw US-ASCII bytes.
+
+**What I ran.** ``mvn -B -pl cometgui-provenance -am verify`` myself:
+``Tests run: 667, Failures: 0, Errors: 0, Skipped: 2``, the new class at
+``Tests run: 8, Failures: 0``, ``All coverage checks have been met``,
+``BugInstance size is 0``, ``0 Checkstyle violations``, ``BUILD SUCCESS``. The
+two skips are the pre-existing Windows-disabled tests in ``ManifestRoundTripTest``
+and ``ManifestWriterTest``; this class skips nothing on Linux.
+
+**Injection A -- the JSON half of gate item 6, which the unit had not tried.**
+The unit's own production injection was redaction dropped from the *event log*.
+So mine went at the *other* artefact: ``JsonWriter.value``'s
+``escapeInto(redactor.redactText(value))`` became ``escapeInto(value)`` --
+escaped but never redacted. The compiled class was confirmed to have changed,
+``5dd38bf618e1870f8a3d76fb81f495bc`` to ``030ab2bc4eb414e3e1cdd29b8ab73069``,
+because an injection that reaches the source and not the ``.class`` is the
+eighth catalogued shape. Observed::
+
+    expected: <[]> but was: <[corpus secret #1 (length 39) survived into
+    provenance.json as UTF-8 text, at offset 1595, ... #2 (95) @619,
+    #4 (14) @1150, #5 (28) @3257, #6 (28) @3328, #7 (12) @1237,
+    #8 (25) @1067, #9 (20) @331, #10 (66) @781, #11 (64) @849,
+    #12 (64) @915 ...]>
+
+    thePatternRulesAloneLeakExactlyTheRegistryOnlyCarriers
+    expected: <{events.log=[0, 5, 6, 7, 8], provenance.json=[0, 5, 6, 7, 8],
+                provenance.rst=[0, 5, 6, 7, 8]}>
+    but was:  <{events.log=[0, 5, 6, 7, 8],
+                provenance.json=[0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                provenance.rst=[0, 5, 6, 7, 8]}>
+
+Three things in that output are worth more than the failure itself. **The two
+searches agree on every offset**, which cross-checks the decode the class says
+it is cross-checking. **Only ``provenance.json`` moved**: the RST and the log
+stayed exactly at their pinned leak sets, so the sweep discriminates between
+artefacts rather than reporting "something, somewhere". And **secrets #0 and #3
+did not leak even with redaction gone from the JSON value path**, because
+``ManifestWriter`` clears the environment by variable *name* and the argument
+after ``--password`` *positionally*, before ``JsonWriter`` ever sees them --
+which is the layered design working, visible only because a defect removed one
+layer.
+
+**Injection B -- is the walk load-bearing, or decoration?** The unit's
+distinctive claim over the three narrower sweeps is that it enumerates the run
+directory instead of naming three files, and ``containsAll`` plus
+``size() >= 3`` is a weak way to assert that. So I put a fourth file in the run
+directory that nothing names -- ``stray-upload.log``, holding ``token
+tok_live_abcdef0123456789`` in clear, the shape of an artefact a later phase
+adds without telling anyone. **Three separate assertions fired**::
+
+    notOneSecretReachesAnyFileInTheRunDirectory
+      <[corpus secret #8 (length 25) survived into stray-upload.log as UTF-8
+        text, at offset 6, ... as US-ASCII bytes, at offset 6]>
+    everyArtefactCarriesTheRedactionMarker
+      "these artefacts contain no redaction marker at all, so nothing was
+       redacted in them and 'nothing leaked' means nothing"
+      expected: <[]> but was: <[stray-upload.log]>
+    thePatternRulesAloneLeakExactlyTheRegistryOnlyCarriers
+      ... but was: <{..., stray-upload.log=[8]}>
+
+The enumeration is real. Both injections reverted, marker counts 0, and the
+full ``verify`` green again.
+
+**What the unit reported honestly and I confirmed.**
+
+* Its guard-(a) demonstration removed a carrier *shape* -- two occurrences --
+  rather than a single line, because no corpus entry has exactly one carrier by
+  design. It said so rather than claiming a cleaner result than it had.
+* It did not run PIT and said so. Mutation coverage of this class is measured
+  in the final gate run recorded below, not by the unit.
+* It found, and reported rather than edited, that
+  ``ProvenanceReportWriterTest.manifestCarryingTheCorpus()`` writes a PEM block
+  with no ``-----END-----`` delimiter, so the ``SecretRedactor`` PEM *pattern*
+  cannot match it there and only the registry clears it in that fixture.
+  **Checked, and it is closed by this unit rather than open**: unit 11's own
+  fixture uses a complete block, and its ``patternsOnly()`` test pins corpus
+  indices 10-12 as *absent* from every artefact's leak set -- which is the PEM
+  pattern rule being exercised through the RST and JSON paths. No change made to
+  unit 10's fixture; changing a signed-off test to prove something another test
+  already proves would be churn.
+* A run directory after all three writers contains exactly ``events.log``,
+  ``provenance.json`` and ``provenance.rst``. ``AtomicDocumentWriter`` leaves no
+  temporary file behind, measured rather than assumed.
