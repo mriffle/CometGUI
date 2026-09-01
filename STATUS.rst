@@ -1404,6 +1404,27 @@ and recorded the general rule there: the sandbox carries what the build reads as
 carry records or generated output. Phase 04's provenance report and Phase 15's
 traceability work are the next two that will need a line there.
 
+The aggregate suite, re-run by tier 1 on a quiet tree
+-----------------------------------------------------
+
+``bash scripts/verify-all-gates.sh`` -- **10 controls passed, 0 failed, in 1835
+seconds (30m35s)**, with the ``tests`` control at **33 graded assertions**: the
+floor recorded at the session-04 baseline **held**, so no control was silently
+dropped or short-circuited. "Every gate was seen to reject its defect and accept
+the clean tree."
+
+*An earlier run of this suite reported ``pipeline`` FAILED, and it was the main
+orchestrator's own doing rather than a regression.* Foreground
+``scripts/ci/docs-build.sh`` runs -- checking edits to this very file -- raced the
+suite's strict-Sphinx step over the shared ``docs/_build/html`` directory, so the
+published HTML was missing when that step read it. Diagnosed by reading the step
+log rather than the summary, then falsified by re-running the control in
+isolation: ``1 control(s) passed, 0 failed, in 21 seconds``. Recorded because it
+is the same shared-resource collision this session spent the day eliminating in
+others, committed a third time by the tier enforcing it, and because "a gate
+failed" is exactly the finding one is most tempted to accept without asking
+which resource was shared.
+
 Residue carried forward
 ------------------------
 
