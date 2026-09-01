@@ -1113,6 +1113,40 @@ class ManifestReaderTest {
         }
 
         @Test
+        @DisplayName(
+                "is refused, not thrown out of, when the two instants are further apart"
+                        + " than a long of milliseconds")
+        void refusesAnIntervalTooLongToExpressInMilliseconds() {
+            // The format's year field is backed by a LocalDate, so it reaches year +-999 999 999,
+            // and that is about two billion years -- seven times what a long of milliseconds can
+            // hold.  A document at both extremes therefore parses, satisfies every model
+            // invariant, and reaches the duration check, where Duration.toMillis() overflows.
+            // Before this was fixed the reader let a java.lang.ArithmeticException out of
+            // ManifestReader.parse, which a caller that catches InvalidManifestException does not
+            // catch: a hostile document would have crashed the caller instead of being refused.
+            String document =
+                    exceptFor(
+                            exceptFor(
+                                    exceptFor(
+                                            exceptFor(
+                                                    runningRunDocument(),
+                                                    "\"status\": \"running\"",
+                                                    "\"status\": \"completed\""),
+                                            "\"start\": \"2026-08-31T10:15:00.000Z\"",
+                                            "\"start\": \"-0999999999-01-01T00:00:00.000Z\""),
+                                    "\"end\": null",
+                                    "\"end\": \"+0999999999-12-31T23:59:59.999Z\""),
+                            "\"durationMillis\": null",
+                            "\"durationMillis\": 0");
+
+            assertEquals(
+                    "the provenance manifest is not valid: \"run.durationMillis\" cannot be"
+                            + " checked, because the start and end recorded beside it are more"
+                            + " milliseconds apart than a signed 64-bit integer can hold",
+                    refused(document).getMessage());
+        }
+
+        @Test
         @DisplayName("is verified, not stored: the model derives its own from the two instants")
         void isVerifiedNotStored() {
             RunRecord run = ManifestReader.parse(finishedButEmptyDocument()).run();

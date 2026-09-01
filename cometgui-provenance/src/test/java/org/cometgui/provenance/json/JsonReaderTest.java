@@ -441,11 +441,26 @@ class JsonReaderTest {
         }
 
         @Test
-        @DisplayName("is refused when an array has a trailing comma")
+        @DisplayName("is refused when an array has a trailing comma, with or without space after")
         void refusesATrailingCommaInAnArray() {
-            assertEquals(
-                    "an array must not have a trailing comma (line 1, column 6)",
-                    rejected("[1, 2,]").getMessage());
+            // The second document is not decoration.  With no space before the bracket the
+            // whitespace skip after the comma is not load-bearing, and PIT proved it: removing
+            // that call left every test green.  A space between the comma and the bracket is the
+            // narrowest input that tells the two apart, and without it the reader would report
+            // "a value was expected here" for a document whose actual fault is a trailing comma.
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    "an array must not have a trailing comma (line 1, column 6)",
+                                    rejected("[1, 2,]").getMessage()),
+                    () ->
+                            assertEquals(
+                                    "an array must not have a trailing comma (line 1, column 6)",
+                                    rejected("[1, 2, ]").getMessage()),
+                    () ->
+                            assertEquals(
+                                    "an array must not have a trailing comma (line 1, column 6)",
+                                    rejected("[1, 2,\n]").getMessage()));
         }
 
         @Test
@@ -874,6 +889,58 @@ class JsonReaderTest {
             JsonValue parsed = JsonReader.parse(siblings);
 
             assertEquals(500, ((JsonArray) parsed).elements().size());
+        }
+
+        @Test
+        @DisplayName("closes a container by every route out of it, not only the empty-object one")
+        void closesAContainerByEveryRouteOutOfIt() {
+            // Four shapes, because a container is left by four different statements and the test
+            // above exercises exactly one of them -- the early return for an EMPTY OBJECT.  PIT
+            // found the other three: removing the close from an object with members, from an
+            // empty array, or from an array with elements left every test green, because no
+            // fixture had more than MAX_DEPTH siblings of those shapes and depth is only checked
+            // on the way in.  The consequence is not theoretical: a real provenance.json holds one
+            // object per file and per tool in a flat array, so a reader that counted opens without
+            // counting closes would refuse to parse any run with more than 64 inputs.
+            int siblings = JsonReader.MAX_DEPTH + 6;
+            String objectsWithMembers = "[" + "{\"a\":1},".repeat(siblings - 1) + "{\"a\":1}]";
+            String emptyArrays = "[" + "[],".repeat(siblings - 1) + "[]]";
+            String arraysWithElements = "[" + "[1],".repeat(siblings - 1) + "[1]]";
+            StringBuilder objectsInsideAnObject = new StringBuilder("{");
+            for (int member = 0; member < siblings; member++) {
+                // Distinct names: an object that repeated one would be refused as a duplicate
+                // member before the nesting bound could ever be reached.
+                objectsInsideAnObject.append(member == 0 ? "" : ",");
+                objectsInsideAnObject.append("\"k").append(member).append("\":{\"a\":1}");
+            }
+            objectsInsideAnObject.append("}");
+
+            assertAll(
+                    () -> assertEquals(70, siblings),
+                    () ->
+                            assertEquals(
+                                    siblings,
+                                    ((JsonArray) JsonReader.parse(objectsWithMembers))
+                                            .elements()
+                                            .size()),
+                    () ->
+                            assertEquals(
+                                    siblings,
+                                    ((JsonArray) JsonReader.parse(emptyArrays)).elements().size()),
+                    () ->
+                            assertEquals(
+                                    siblings,
+                                    ((JsonArray) JsonReader.parse(arraysWithElements))
+                                            .elements()
+                                            .size()),
+                    () ->
+                            assertEquals(
+                                    siblings,
+                                    ((JsonObject)
+                                                    JsonReader.parse(
+                                                            objectsInsideAnObject.toString()))
+                                            .members()
+                                            .size()));
         }
 
         @Test

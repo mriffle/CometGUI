@@ -1058,3 +1058,324 @@ this phase is live.
 both phases and the gate harnesses share it even when the modules differ. This
 phase therefore keeps every Maven invocation behind a ``flock`` on
 ``p04-maven.lock`` and restricts itself to ``-pl cometgui-provenance -am``.
+
+.. _p04-resumption:
+
+Resumption, 2026-09-01: a second phase orchestrator, on a quiet tree
+====================================================================
+
+The phase was paused on 2026-08-31 with units 1-8 signed off, 9 and 10 landed
+but unsigned, and 11-13 not started. This section is written by the phase
+orchestrator that resumed it. Everything above this line is the first
+orchestrator's record and is not edited.
+
+**The tree really is quiet this time.** No other phase orchestrator is live, no
+other agent is landing code in either module, and tier 1 is not running Maven or
+``docs-build.sh`` while this phase works. Every number below therefore means
+what it says, which is the entire reason the owner paused the phase.
+
+.. _p04-remeasured:
+
+Step 1 -- every headline number re-taken from the quiet tree
+-------------------------------------------------------------
+
+Run at ``HEAD`` = ``9abfe1b`` with ``git status --short`` empty, in the order
+:ref:`p04-first-thing` prescribes. ``mvn -pl cometgui-domain install`` first,
+because PIT resolves from ``_build/m2repo`` and not from the reactor.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Command
+     - What it produced
+
+   * - ``mvn -B -pl cometgui-domain -am install -DskipTests``
+     - ``BUILD SUCCESS``. Run first so that no PIT reading below is a
+       classloading failure in costume.
+
+   * - ``mvn -B -pl cometgui-provenance -am verify``
+     - ``Tests run: 657, Failures: 0, Errors: 0, Skipped: 2`` for
+       ``cometgui-provenance`` and ``Tests run: 359, Failures: 0, Errors: 0,
+       Skipped: 0`` for ``cometgui-domain``; ``All coverage checks have been
+       met``, ``BugInstance size is 0``, ``0 Checkstyle violations`` in both
+       modules; ``BUILD SUCCESS`` in 91 seconds.
+
+   * - ``mvn -B -pl cometgui-provenance -am test-compile
+       org.pitest:pitest-maven:mutationCoverage``
+     - ``cometgui-provenance``: **776 mutations, 767 KILLED, 6 SURVIVED, 3
+       TIMED_OUT, 0 NO_COVERAGE**, read from ``mutations.xml`` and not from the
+       console. ``cometgui-domain``: **204 mutations, 204 KILLED, 0 SURVIVED**.
+
+   * - JaCoCo, read from ``jacoco.xml``
+     - ``cometgui-provenance`` **100.00% line (1826/1826) and 100.00% branch
+       (623/623)**, every one of its six packages at 100/100.
+       ``cometgui-domain`` **100.00% line (432/432) and 100.00% branch
+       (188/188)**.
+
+**The census first, the percentages second.** Run verbatim from
+:ref:`p04-sample-census` over both modules::
+
+    module: cometgui-provenance
+      compiled classes (excluding package-info and inner): 37
+      classes in jacoco.xml:                               37
+      distinct classes with PIT mutations:                 30
+      ok: every compiled class is in the coverage sample
+      compiled but no PIT mutations (may be legitimate: constants,
+      interfaces, records with no branches):
+        org.cometgui.provenance.events.EventLogDefectKind
+        org.cometgui.provenance.events.EventLogSync
+        org.cometgui.provenance.events.MalformedEventLineException
+        org.cometgui.provenance.io.ContentWriter
+        org.cometgui.provenance.io.Durability
+        org.cometgui.provenance.manifest.LogRecord
+        org.cometgui.provenance.manifest.ProvenanceSchema
+
+    module: cometgui-domain
+      compiled classes (excluding package-info and inner): 25
+      classes in jacoco.xml:                               25
+      distinct classes with PIT mutations:                 15
+      ok: every compiled class is in the coverage sample
+      compiled but no PIT mutations (may be legitimate: constants,
+      interfaces, records with no branches):
+        org.cometgui.domain.platform.GlibcVersionSource
+        org.cometgui.domain.ports.DownloadProgressListener
+        org.cometgui.domain.ports.Downloader
+        org.cometgui.domain.ports.FileSystemAccess
+        org.cometgui.domain.ports.HashService
+        org.cometgui.domain.ports.ProcessListener
+        org.cometgui.domain.ports.ProcessRunner
+        org.cometgui.domain.ports.RunIdSource
+        org.cometgui.domain.ports.RunningProcess
+        org.cometgui.domain.run.StageTag
+
+**``ManifestReader`` is back in the sample**, which is the finding that made the
+census exist. 37 compiled, 37 in ``jacoco.xml``: nothing left the population.
+
+**The second list was judged rather than skimmed**, because that is what the
+census hands to a human. Every entry is legitimately mutation-free and the kind
+of each was checked in the source rather than inferred from its name:
+``EventLogDefectKind`` is an enum of constants; ``EventLogSync``,
+``ContentWriter``, ``Durability``, ``StageTag``, ``GlibcVersionSource`` and the
+seven ``org.cometgui.domain.ports`` entries are interfaces;
+``MalformedEventLineException`` is an exception with constructors only;
+``LogRecord`` is a two-component record whose validation delegates to
+``ManifestChecks.requireAbsolute`` and ``Objects.requireNonNull`` and carries no
+branch of its own; ``ProvenanceSchema`` is a constants holder. None is a class
+whose tests failed to compile.
+
+.. _p04-survivors-confirmed:
+
+Step 2 -- the nine open PIT survivors, confirmed one at a time
+---------------------------------------------------------------
+
+:ref:`p04-survivors` listed seven survivors and two timeouts from a moving
+tree, all reported killed or diagnosed and **none confirmed**. Confirmed here
+against ``mutations.xml`` from the quiet run.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 18 42
+
+   * - Site, as the paused phase listed it
+     - Now
+     - Evidence
+
+   * - ``ProvenanceEventLogReader$Recovery:310`` MathMutator
+       (``charAt(cut - 1)`` to ``charAt(cut + 1)``)
+     - **KILLED**
+     - Gone from the survivor list. The fixture landed at ``892962e`` --
+       ``truncationInspectsTheCharacterBeforeTheCut``, one astral character
+       alone in a run of ASCII -- and this is the run that confirms it. The
+       phase's one genuine survivor is dead.
+
+   * - ``JsonReader:203``, ``:256`` VoidMethodCall on ``skipWhitespace``
+     - SURVIVED, **equivalent confirmed**
+     - See :ref:`p04-equivalent-check`.
+
+   * - ``JsonReader:228``, ``:252``, ``:264`` VoidMethodCall on
+       ``leaveContainer``
+     - SURVIVED, **real and killable**
+     - See :ref:`p04-equivalent-check`; these are not equivalent and the
+       property they guard is a real one.
+
+   * - ``JsonReader:273`` VoidMethodCall on ``skipWhitespace``
+     - SURVIVED, **real and killable**
+     - The array trailing-comma fixture has no space before the bracket, so the
+       call is not load-bearing in it. An input-set-too-narrow gap, shape 5.
+
+   * - The two ``TIMED_OUT`` loop-control mutants
+     - **three now**
+     - ``JsonWriter:445`` (NegateConditionals in ``indent``),
+       ``ProvenanceEventLogReader:169`` (NegateConditionals in ``recover``) and
+       a third this run: ``EventLineFormat$Cursor:440``, MathMutator on the
+       ``index++`` that consumes a closing quote, which makes ``readString``
+       loop on one character for ever. All three are genuine infinite loops, so
+       PIT counting a timeout as detected is right here rather than merely
+       conventional. One mutation moved between KILLED and TIMED_OUT between
+       the two runs and the total detected is unchanged; a mutant that hangs
+       rather than fails is detected either way.
+
+.. _p04-equivalent-check:
+
+The six JsonReader survivors, checked rather than accepted
+-----------------------------------------------------------
+
+:ref:`p04-survivors` argued that two of the six were **equivalent mutants**
+whose fix is to delete code rather than to write a test, and tier 1 asked for
+that argument to be checked rather than accepted. It is right for two of them
+and wrong for the other four, and the difference is worth stating because
+"equivalent mutant" is the most convenient thing a survivor can be called.
+
+**The two that really are equivalent -- and they were deleted.**
+``JsonReader:203`` and ``:256`` are ``skipWhitespace()`` at the top of the
+member loop and the element loop. Whitespace is already skipped on the way into
+each loop (before the empty-container check) and again after every comma, so
+the call at the top of the loop is reachable only in a state where it has
+nothing to do. Reading the code establishes it; the mutation report proves no
+test can distinguish it. Both calls are now gone, replaced by a comment stating
+the invariant they were pretending to defend. **A call that cannot change
+behaviour is the code form of a check that cannot fail**, and this project does
+not keep those.
+
+**The four that are not equivalent, and what they actually guard.**
+``JsonReader:228``, ``:252``, ``:264`` are ``leaveContainer()`` on three of the
+four routes out of a container -- an object with members, an empty array, an
+array with elements -- and the existing nesting test
+``doesNotAccumulateAcrossSiblings`` drives only the fourth, the *empty object*.
+So depth was decremented on one route and untested on three, and the reason no
+test noticed is that depth is only checked on the way **in**: you need more than
+``MAX_DEPTH`` siblings of the right shape before it bites. **The consequence is
+not theoretical.** ``provenance.json`` holds one object per file and one per
+tool in flat arrays, so a reader that counted opens without counting closes
+would refuse to parse any run with more than 64 inputs -- a real product defect
+that a real run reaches. ``closesAContainerByEveryRouteOutOfIt`` now drives all
+four routes with 70 siblings each.
+
+``JsonReader:273`` is the whitespace skip after an array's comma, and it is
+shape 5 of the catalogue -- an input set too narrow to see the defect. The
+trailing-comma fixture was ``[1, 2,]``, with no space before the bracket, so the
+call did nothing in it. ``[1, 2, ]`` and ``[1, 2,\n]`` are now asserted beside
+it: without the skip the reader reports "a value was expected here" for a
+document whose actual fault is a trailing comma, which sends whoever is
+repairing a corrupt record to the wrong rule.
+
+.. _p04-unit9-signoff:
+
+Unit 9 -- SIGNED OFF 2026-09-01
+--------------------------------
+
+**What I read.** The whole of ``9639b77``: ``JsonReader`` (589 lines),
+``JsonValue``, ``JsonParseException``, ``ManifestReader`` (909 lines) and all
+four test files. Not a summary of them.
+
+**What I ran.** ``mvn -B -pl cometgui-provenance -am verify`` and the mutation
+run, both from the quiet tree; the numbers are in :ref:`p04-remeasured`.
+
+**Injection A -- the question tier 1 asked, answered by experiment rather than
+by argument.** The handoff claims that the round-trip suite cannot catch a
+reader that reads the wrong key, and that only the two hand-typed suites can.
+That is a claim about a suite, so I tested it on the suite. I renamed the member
+``"formatLocale"`` to ``"format_locale"`` in **both** ``ManifestWriter`` and
+``ManifestReader`` -- a writer and a reader agreeing on a wrong name, which is
+the only shape a round trip is blind to -- asserting the anchor occurred exactly
+once in each file first and grepping the marker back out of both afterwards.
+Observed:
+
+* ``ManifestRoundTripTest``: **Tests run: 14, Failures: 0, Errors: 0** --
+  entirely green, including all two hundred generated manifests and the
+  byte-stability check, **with every ``provenance.json`` the build can produce
+  carrying a member name no other reader would understand**;
+* ``ManifestWriterTest`` plus ``ManifestReaderTest``: **Tests run: 71,
+  Failures: 21, Errors: 15**, the first of them
+  ``expected: <the provenance manifest is not valid:
+  "tools[0].execution.durationMillis" is 1950, ...> but was: <the provenance
+  manifest is not valid: "application" has no member "format_locale">``;
+* ``ManifestWriterTest`` alone: **Tests run: 24, Failures: 7**.
+
+The claim holds exactly as stated. **The hand-typed pair is the proof and the
+round trip is the supplement**, and a future agent "simplifying" the reader
+tests to build their fixtures with the writer would delete the only thing
+standing between this project and a symmetric, unanimous, wrong record.
+Reverted with ``git checkout --``, ``touch``, and a marker count of 0 in both
+files.
+
+**Injection B -- leniency, which is how a strict reader dies.** In
+``ManifestReader.member``, an absent member returned ``JsonNull.NULL`` instead
+of throwing: the plausible "be liberal in what you accept" change, and the one
+that collapses the absent-versus-null distinction the whole schema rests on.
+Three failures, and the third is the one worth having:
+``ManifestReaderTest.refusesAnAbsentMember expected: <... "run" has no member
+"projectId"> but was: <... "run.projectId" must be a string">``,
+``refusesANonNumericOrAbsentVersion``, and
+``refused:321 Expected ... InvalidManifestException to be thrown, but nothing
+was thrown`` -- a document with no ``end`` key at all silently read as a run
+still in progress. Reverted; marker count 0; suite green again.
+
+**A defect I found that the unit did not report, and repaired.** The reader's
+own contract is that a hostile document is refused with a located
+``InvalidManifestException`` and never anything else -- it is why nesting is
+bounded rather than left to overflow the stack. The arithmetic twin of that was
+open. The timestamp format's year field is backed by a ``LocalDate`` and reaches
+year +-999 999 999, about two billion years, while ``Duration.toMillis()``
+overflows a ``long`` at about 292 million. Measured on this JVM::
+
+    parse OK   -0999999999-01-01T00:00:00.000Z
+    parse OK   +0999999999-12-31T23:59:59.999Z
+    millisBetween(...) THREW java.lang.ArithmeticException: long overflow
+
+A document at both extremes parses, satisfies every model invariant, reaches
+``requireRecordedDuration`` and threw ``java.lang.ArithmeticException`` **out of
+``ManifestReader.parse``** -- past every caller that catches
+``InvalidManifestException`` and nothing else. Unit 9 knew the *writer* half of
+this and recorded it as "a run spanning the format's two extremes cannot be
+serialised"; the reader half is the one an attacker or a corrupt file reaches,
+and it was not covered. Repaired by refusing it as an invalid manifest, and the
+repair carries its own negative control: with the guard removed the new test
+fails with ``Unexpected exception type thrown, expected:
+<...InvalidManifestException> but was: <java.lang.ArithmeticException>`` and
+``Caused by: java.lang.ArithmeticException: long overflow``. Guard restored,
+suite green.
+
+**Unit 9's five design questions, answered with the diff in front of me.**
+
+``InvalidManifestException`` nested or top-level
+    **Nested, unchanged.** One rejection type for all three ways a document can
+    be unreadable is right, and the name a caller writes,
+    ``ManifestReader.InvalidManifestException``, says where the rule that
+    rejected it lives. Phase 13's viewer is its first real caller; if it wants a
+    shorter name it can import the nested type. Moving it now would be churn in
+    signed-off code for no behaviour.
+
+Should the reader attach the rejecting exception as a cause
+    **No, unchanged, and the reasoning is stronger than the unit stated it.**
+    ``FileHashes``, ``RunId``, ``ZoneId.of`` and ``DateTimeParseException`` all
+    quote the value they rejected, so a cause chain would carry a hostile
+    document's contents into every log that prints a stack trace. The cost is
+    real -- you lose the specific message -- and it is paid deliberately: the
+    class of the rejection *is* named, and the member path tells the reader
+    which line of the file to open. ``JsonParseException`` is attached, because
+    that one type promises its own message quotes nothing.
+
+``json/package-info.java`` describes only writing
+    **Fixed.** It now documents the reader, the grammar it refuses and why, the
+    depth bound, and the rule that a rejection names a rule and a position and
+    never a character of the document. A package document that describes half
+    its package is how the next agent learns the wrong contract.
+
+A run spanning the timestamp format's two extremes cannot be serialised
+    **Kept as a stated property of the format, now enforced on both sides.**
+    ``ManifestRoundTripTest`` already round-trips each extreme separately and
+    says why it cannot do both in one manifest. The reader now refuses such a
+    document instead of throwing; see above. No format change: an interval of
+    292 million years is not a proteomics run, and widening ``durationMillis``
+    to something a ``long`` cannot hold would cost every reader in the world.
+
+Locale tags must be exactly canonical, so ``"en-us"`` is rejected
+    **Kept, unchanged, and it is the right call.**
+    ``Locale.forLanguageTag`` never fails -- handed rubbish it returns
+    ``Locale.ROOT`` -- so accepting a non-canonical tag means the field that
+    exists to explain a locale-dependent difference is the field that quietly
+    loses its value. Re-rendering the tag and requiring a match is the only
+    check available that can fail. ``R-PROV-04`` records what the JVM had, and
+    what the JVM had is what ``toLanguageTag()`` writes.

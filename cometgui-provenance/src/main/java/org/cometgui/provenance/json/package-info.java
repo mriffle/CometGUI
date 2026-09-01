@@ -15,8 +15,10 @@
  */
 
 /**
- * The canonical JSON this project writes: one byte sequence per model, chosen rather than
- * inherited.
+ * The canonical JSON this project writes, and the strict reader that accepts it and nothing else.
+ *
+ * <p>One byte sequence per model, chosen rather than inherited, and one grammar accepted on the way
+ * back in.
  *
  * <p><strong>There is no JSON library here, and that is a decision rather than an
  * omission.</strong> The provenance record is the artefact the whole product exists to produce, so
@@ -56,6 +58,26 @@
  * leak path was closed one level below the fields. Keys are not redacted -- a key is part of the
  * schema, is never user data, and redacting one would produce a document no reader could parse.
  *
- * <p>Written by phase 04 (hashing and provenance core), work unit 7.
+ * <p><strong>Reading is the other half, and it is deliberately strict.</strong> {@link
+ * org.cometgui.provenance.json.JsonReader} accepts the grammar {@link
+ * org.cometgui.provenance.json.JsonWriter} emits and refuses every dialect around it -- trailing
+ * commas, comments, single quotes, unquoted names, duplicate member names, {@code NaN}, an
+ * exponent, an integer outside a {@code long}, a raw control character, an unpaired surrogate, a
+ * byte-order mark, anything after the top-level value -- because a permissive parser accepts a
+ * corrupted provenance record and hands back an object graph that looks like a run which never
+ * happened. Nesting is bounded at {@link org.cometgui.provenance.json.JsonReader#MAX_DEPTH}, so a
+ * hostile document is a parse error with a position rather than a {@link StackOverflowError}.
+ * {@link org.cometgui.provenance.json.JsonValue} is the closed set of six shapes it returns, in
+ * which JSON {@code null} is a value rather than an absence.
+ *
+ * <p><strong>A rejection names the rule and the position and quotes nothing from the
+ * document.</strong> This is the reading half of the same rule redaction is the writing half of: a
+ * parse failure is the one moment at which a document has certainly <em>not</em> been through
+ * {@link org.cometgui.domain.secrets.SecretRedactor}, so a message echoing the offending text is
+ * how a credential reaches a log, a bug report and an issue tracker. See {@link
+ * org.cometgui.provenance.json.JsonParseException}.
+ *
+ * <p>Written by phase 04 (hashing and provenance core): the writer in work unit 7, the reader in
+ * work unit 9.
  */
 package org.cometgui.provenance.json;

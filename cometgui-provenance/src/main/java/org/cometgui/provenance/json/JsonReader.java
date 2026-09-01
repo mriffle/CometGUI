@@ -200,7 +200,10 @@ public final class JsonReader {
             return new JsonValue.JsonObject(members);
         }
         while (true) {
-            skipWhitespace();
+            // No skipWhitespace() here.  Whitespace is already skipped on the way in, above, and
+            // after every comma, below, so a call at the top of the loop can never do anything --
+            // PIT proved it by removing it and finding no test that could tell.  The invariant is
+            // written down rather than defended by a call that cannot fail.
             if (atEnd()) {
                 throw errorAt("an object was opened here and never closed", opening);
             }
@@ -253,7 +256,8 @@ public final class JsonReader {
             return new JsonValue.JsonArray(elements);
         }
         while (true) {
-            skipWhitespace();
+            // No skipWhitespace() here, for the reason given in readObject: it is already done
+            // above and after every comma.
             elements.add(readValue());
             skipWhitespace();
             if (atEnd()) {

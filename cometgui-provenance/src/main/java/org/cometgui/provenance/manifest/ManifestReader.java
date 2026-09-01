@@ -504,7 +504,21 @@ public final class ManifestReader {
             throw invalid(path, "must not be null once the interval has an end");
         }
         long recorded = integer(value, path);
-        long elapsed = CanonicalTimestamp.millisBetween(start, end.get());
+        long elapsed;
+        try {
+            elapsed = CanonicalTimestamp.millisBetween(start, end.get());
+        } catch (ArithmeticException beyondALong) {
+            // The two timestamps are further apart than a long of milliseconds can express --
+            // about 292 million years -- which the format's own year field permits and no run
+            // produces.  Refused as an invalid manifest rather than allowed to leave this class
+            // as an ArithmeticException, because a caller of a strict reader catches
+            // InvalidManifestException and nothing else, and every other hostile document is
+            // already refused that way.
+            throw invalid(
+                    path,
+                    "cannot be checked, because the start and end recorded beside it are more"
+                            + " milliseconds apart than a signed 64-bit integer can hold");
+        }
         if (recorded != elapsed) {
             throw invalid(
                     path,
