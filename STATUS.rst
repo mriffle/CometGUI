@@ -154,9 +154,12 @@ Phase board
        identifier-pinning repair sign-off required. See :ref:`status-p02`.
    * - 03
      - Process service
-     - IN PROGRESS
-     - Dispatched 2026-08-31 (session 04) to a fresh phase orchestrator,
-       concurrently with 04 on disjoint paths. Not yet signed off.
+     - PARTIAL
+     - Signed off 2026-09-01. **All six gate items PASS on the main
+       orchestrator's own re-run and its own defect injections**, none of them
+       the phase's negative controls. PARTIAL, not PASSED, because gate item 2
+       carries no platform qualifier and descendant termination has never
+       executed on Windows or macOS. See :ref:`status-p03`.
    * - 04
      - Hashing and provenance core
      - PAUSED
@@ -1282,6 +1285,137 @@ specification amendment (revision 11) rather than something an agent may decide,
 and it should be raised before Phase 07 rather than after. This entry records
 the deliberate emptiness so that a later reader does not mistake it for an
 oversight and quietly fill it.
+
+.. _status-p03:
+
+Phase 03 sign-off (2026-09-01)
+==============================
+
+:Outcome: **PARTIAL**
+:Signed off by: Main orchestrator, session 04, by re-running every gate item
+   itself and injecting six defects the phase had never tried
+:Phase records: ``handoffs/PHASE-03-worklog.rst`` (8 units, 29 commits),
+   ``handoffs/PHASE-03-handoff.rst``
+
+The phase orchestrator reported eight signed-off units and recommended
+``PARTIAL``. The main orchestrator re-ran all six gate items rather than
+accepting that report, and **injected its own defects rather than re-running the
+phase's negative controls**. All six held.
+
+.. list-table:: Gate items, as re-run at sign-off
+   :header-rows: 1
+   :widths: 5 8 87
+
+   * - #
+     - Result
+     - The defect I injected, and what it printed
+
+   * - 1
+     - PASS
+     - Drifted **one hand-typed scenario phrase** away from the specification's
+       wording -- ``stdout/stderr interleaving`` to ``stdout and stderr
+       interleaving`` -- leaving all eleven entries present, which the phase's
+       own control (renaming a covering *method*) would not have caught. Two
+       assertions failed independently, and the one that matters read
+       ``specification.rst`` **from disk** and quoted the section back: *"these
+       phrases are not in the specification's own list any more, so the map has
+       drifted from the requirement it implements."*
+
+   * - 2
+     - PASS
+     - **The opposite half of the phase's own control.** The phase emptied the
+       descendant snapshot, which leaves the *child* alive. I deleted
+       ``ordered.add(root)`` from ``ProcessTree.terminationOrder`` so
+       descendants die and the **parent** survives. ``the parent (pid 1514001)
+       was still alive 60s after the cancellation; isAlive() is true``. The test
+       asserts both halves and names which process survived.
+
+   * - 3
+     - PASS
+     - Made the log writer withhold the **last** line from disk while every
+       in-memory counter stayed exactly correct -- a tail truncation, where the
+       phase's control corrupted an interior ordinal. Heap growth was
+       4 852 904 bytes against a 33 554 432 bound, so the *bounded heap* claim
+       passed while the *complete log* claim failed on its own assertion:
+       ``the file is a whole log: header first, footer last``. The three claims
+       really are separable, as the test's own comment promises.
+
+   * - 4
+     - PASS
+     - Unicode-normalised every argv element to **NFD** inside
+       ``ProcessService`` -- invisible in a rendered diff, and distinct from the
+       phase's encoding-environment control. ``expected: <... prot?ines ...> but
+       was: <... prote?ines ...>``, the ``é`` decomposed. The assertion notes it
+       compares *"the values the operating system actually delivered rather than
+       the ones this test hoped for"*.
+
+   * - 5
+     - PASS
+     - Used ``Runtime.getRuntime().exec(...)`` in ``cometgui-install`` rather
+       than the phase's ``new ProcessBuilder``, exercising the rule's
+       ``orShould`` clause that its own control never touched.
+       ``Method <org.cometgui.install.MoRuntimeExecProbe.run()> calls method
+       <java.lang.Runtime.exec([Ljava.lang.String;)>``.
+
+   * - 6
+     - PASS
+     - A fixed sleep expressed as ``java.util.concurrent.TimeUnit.MILLISECONDS
+       .sleep(50)`` inside a private helper, in a **different** test file from
+       the phase's control -- testing whether the scan greps only the literal
+       ``Thread.sleep``. It does not: ``StageLogFileTest.java:138: a pause
+       through any receiver``. The scan also carries a hand-typed floor for the
+       number of files it must read, so a scan that read nothing fails.
+
+Why PARTIAL rather than PASSED
+------------------------------
+
+Gate item 2 carries **no platform qualifier**, and descendant termination is the
+most platform-divergent thing in this project -- exit codes 143/137,
+terminate-versus-kill, reparenting, and ``Process.destroy()`` closing pipes are
+not the same on Windows or macOS, and none of it has ever executed there. By the
+rule established for Phase 04 (:ref:`status-platform-divergence`), *"we could not
+run this code there"* is a testing gap that does not cap a grade, but *"there is
+different code there and it has never run"* is unverified behaviour and does.
+Item 4 by contrast **is** explicitly scoped to "the reference platform", so it
+caps nothing -- whoever wrote the gate scoped deliberately where they meant to.
+The phase's handoff carries nine divergence entries written as what a Windows or
+macOS twin must prove.
+
+What the phase found that is worth more than the phase
+-------------------------------------------------------
+
+**The classic snapshot-after-destroy bug passed all 128 tests.**
+``Process.destroy()`` only *queues* a SIGTERM, so a snapshot taken on the next
+line still sees the child -- a test that passed only because a race is always
+won on an idle machine, and that would have failed later on a loaded one. The
+phase's adversarial unit 2b found it and closed it by asserting the order where
+it is a fact rather than a race.
+
+**Two harness findings it reported against itself**, neither of which it had to
+disclose: an injection of its own that reached the source but not the compiled
+class and reported green -- the eighth catalogued shape, and the reason every
+tier-1 injection in this sign-off confirmed the ``.class`` hash moved -- and a
+regression it caused in ``verify-test-gates.sh``, whose sandbox carried no
+project documents. It diagnosed the harness rather than weakening its own test,
+and escalated the shared-file edit instead of making it. Tier 1 then added
+``specification.rst`` to ``build_sandbox`` in ``scripts/verify-test-gates.sh``
+and recorded the general rule there: the sandbox carries what the build reads as
+**input**, and a project document a test asserts against is an input; it does not
+carry records or generated output. Phase 04's provenance report and Phase 15's
+traceability work are the next two that will need a line there.
+
+Residue carried forward
+------------------------
+
+* **Descendant termination is unverified off Linux**, as above. Phase 15 owns
+  the platform matrix.
+* **The gate suite now costs ~29 minutes, up from 12**, because the 500 MB flood
+  is paid twice. Nothing was weakened to achieve it; it is a configuration
+  decision for the owner, and it is a real cost on every future sign-off.
+* ``BoundedMessageLog`` did **not** move and the process service never sees one:
+  it takes a ``RunMessageSink`` (append-only, one method) and a caller wires
+  ``log::append``. The question Phase 02 left open is answered without
+  publishing shared mutable state.
 
 Open decisions
 ==============

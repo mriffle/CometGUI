@@ -36,7 +36,7 @@ authoritative for its own scope and exit gate.
      - Process Service
      - 01, 02 (both met)
      - --
-     - IN PROGRESS (dispatched 2026-08-31)
+     - PARTIAL (signed off 2026-09-01)
    * - `04 <PHASE-04-provenance-core.rst>`_
      - Hashing and Provenance Core
      - 01 (03 not required -- see Ordering notes)
