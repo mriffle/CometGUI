@@ -271,9 +271,21 @@ phase = "12"
 # --- AC-PRV -----------------------------------------------------------------
 
 [[ac."AC-PRV-01".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.hashing.StreamingHashServiceTest"
+method = "matchesThePublishedVector"
+note = "Phase 04. Both digests are computed for a file, in one pass, and match the published RFC 1321 and NIST vectors."
+
+[[ac."AC-PRV-01".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.manifest.FileRecordTest"
+method = "allEightComponentsComeBack"
+note = "Phase 04. A recorded file carries both digests; FileHashes cannot represent a file hashed one way only."
+
+[[ac."AC-PRV-01".evidence]]
 kind = "planned"
 phase = "13"
-note = "Foundations are laid earlier, in phase 04."
+note = "Foundations are laid earlier, in phase 04. What phase 04 proves is the model and the format; that every file a real run touches is in the list is a stage-level claim."
 
 [[ac."AC-PRV-02".evidence]]
 kind = "planned"
@@ -290,14 +302,44 @@ phase = "13"
 note = "Foundations are laid earlier, in phase 08."
 
 [[ac."AC-PRV-05".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.manifest.ExecutionRecordTest"
+method = "theFourComponentsComeBack"
+note = "Phase 04. Start, end, exit code and the derived duration, on the model."
+
+[[ac."AC-PRV-05".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.manifest.ManifestWriterTest"
+method = "aFinishedRunIsExactlyThis"
+note = "Phase 04. The pinned provenance.json carries start, end, durationMillis and exitCode for every execution."
+
+[[ac."AC-PRV-05".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.report.ProvenanceReportWriterTest"
+method = "reportsARecomputableDuration"
+note = "Phase 04. The generated report records a duration a reader can recompute from the two timestamps beside it."
+
+[[ac."AC-PRV-05".evidence]]
 kind = "planned"
 phase = "13"
-note = "Foundations are laid earlier, in phase 04."
+note = "Foundations are laid earlier, in phase 04. Phase 04 proves the record and both artefacts; that every process of a real run is recorded is a stage-level claim."
+
+[[ac."AC-PRV-06".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.events.EventLogCrashRecoveryTest"
+method = "aTearInTheMiddleOfTheLastRecord"
+note = "Phase 04. A real log is torn mid-record and the surviving history is asserted by content, not by count."
+
+[[ac."AC-PRV-06".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.manifest.FileRecordTest"
+method = "aCancelledStageLeavesAPartialOutput"
+note = "Phase 04. A file left behind by a cancelled stage is representable and is marked partial, as R-PROV-01 requires."
 
 [[ac."AC-PRV-06".evidence]]
 kind = "planned"
 phase = "13"
-note = "Foundations are laid earlier, in phase 04."
+note = "Foundations are laid earlier, in phase 04. Phase 04 proves the model and the recovery; what a user sees of a failed run is phase 13's."
 
 [[ac."AC-PRV-07".evidence]]
 kind = "planned"
@@ -308,14 +350,32 @@ kind = "planned"
 phase = "13"
 
 [[ac."AC-PRV-09".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.SeededSecretArtefactSweepTest"
+method = "notOneSecretReachesAnyFileInTheRunDirectory"
+note = "Phase 04. Thirteen seeded secrets, three generated artefacts, and a grep of the bytes on disk; guarded against a vacuous sweep by five further tests in the same class."
+
+[[ac."AC-PRV-09".evidence]]
 kind = "planned"
 phase = "13"
-note = "Foundations are laid earlier, in phase 04."
+note = "Foundations are laid earlier, in phase 04. The sweep covers the provenance artefacts; the export paths phase 13 adds are not yet swept."
+
+[[ac."AC-PRV-10".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.manifest.ProvenanceManifestTest"
+method = "theSeedIsReadBackThroughThePinnedKey"
+note = "Phase 04. The seed is read back through ProvenanceSchema.PERCOLATOR_SEED_SETTING rather than a literal, and the locale is on the record beside it."
+
+[[ac."AC-PRV-10".evidence]]
+kind = "test"
+class = "org.cometgui.provenance.manifest.ApplicationRecordTest"
+method = "theFactoryRecordsTheDefaultLocaleInEffect"
+note = "Phase 04. R-PROV-04: the JVM default locale in effect during the run is the one recorded."
 
 [[ac."AC-PRV-10".evidence]]
 kind = "planned"
 phase = "09"
-note = "Foundations are laid earlier, in phase 04."
+note = "Foundations are laid earlier, in phase 04. Phase 04 pins the key and proves the round trip; that the value written is the seed Percolator actually ran with is phase 09's."
 
 # --- AC-TST -----------------------------------------------------------------
 
