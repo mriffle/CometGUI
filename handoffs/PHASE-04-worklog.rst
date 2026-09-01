@@ -1608,3 +1608,91 @@ full ``verify`` green again.
 * A run directory after all three writers contains exactly ``events.log``,
   ``provenance.json`` and ``provenance.rst``. ``AtomicDocumentWriter`` leaves no
   temporary file behind, measured rather than assumed.
+
+.. _p04-unit12-signoff:
+
+Unit 12 -- SIGNED OFF 2026-09-01
+---------------------------------
+
+**What it is.** ``31be8c1``: ``docs/reference/provenance_format.rst`` (1163
+lines, the versioned on-disk schema), ``docs/developer/provenance_schema.rst``
+(642 lines, the model behind it), ``ProvenanceFormatDocumentationTest`` (401
+lines, the drift check) and five ``AC-PRV`` evidence entries in
+``docs/traceability-map.toml``.
+
+**What I ran.** ``mvn -B -pl cometgui-provenance -am verify``: ``Tests run:
+669, Failures: 0, Errors: 0, Skipped: 2``, the new class at ``Tests run: 2``,
+``All coverage checks have been met``, ``BugInstance size is 0``,
+``0 Checkstyle violations``. ``bash scripts/ci/docs-build.sh``: ``build 1 OK --
+51 HTML page(s) ... (49 from source documents)``, ``build 2 OK -- 46 HTML
+page(s) ... (43 from source documents)``, ``docs-build.sh: PASSED.``.
+``bash scripts/ci/traceability.sh``: ``PASSED``, ``99 R- rules, 80 AC-
+criteria, all mapped and verified``, ``0 automated, 11 partial, 61 planned, 8
+human sign-off``. I read the rendered rows rather than the summary line: all
+five ``AC-PRV`` criteria now read **partial**, each naming its test *and*
+keeping the ``planned`` entry with a note saying what Phase 04 does **not**
+prove -- for ``AC-PRV-10``, "that the value written is the seed Percolator
+actually ran with is phase 09's". That is the honest shape.
+
+**Injection A -- the direction the unit did not try.** The unit proved the
+drift check fires when a member is **added** to the writer. The other direction
+is the dangerous one: a member **removed**, which leaves the reference page
+promising a field no ``provenance.json`` carries, and a reader writing a parser
+from the page against a document that has no such member. I deleted
+``json.name("architecture").value(application.architecture());`` from
+``ManifestWriter``. Both halves fired::
+
+    expected: <[application, application.architecture, application.buildIdentifier, ...]>
+    but was:  <[application, application.buildIdentifier, ...]>
+
+    the walk must find the documented number of members; an empty walk equals
+    an empty expected set and proves nothing ==> expected: <57> but was: <56>
+
+**Injection B -- is the exclusion guard vacuous?** The check skips the two
+open-ended maps, ``settings`` and each ``execution.environment``, because their
+keys are run data rather than schema. An exclusion that excluded nothing would
+look exactly like a correct one, so the class asserts the fixture really
+carries entries in both. I emptied the fixture's settings map and the guard
+fired with the message it was written for::
+
+    the fixture must carry a settings entry for the exclusion to exclude
+    ==> expected: <true> but was: <false>
+
+Both reverted, marker counts 0, the class green again.
+
+**One thing the unit reported as a defect that is not one, corrected here.** It
+reported that ``FileHashes`` accepts ``[0-9a-fA-F]+`` while every writer emits
+lower case, and called it a defect it had not fixed. Read in full, the record's
+compact constructor ends ``return digest.toLowerCase(Locale.ROOT)``: it
+**canonicalises**, so the model never carries an upper-case digest and two
+records built from differently-cased spellings of one digest are equal. The
+lenience is on the way in only, and it is deliberate. The reference page's own
+wording is already right -- "a writer emits lower case; a reader that compares
+digest strings should normalise case rather than assume it, because the model's
+own check accepts either" -- which is advice to someone comparing raw document
+text, and correct. No change made. Recorded because a handoff that carries a
+false defect is worse than one that carries none.
+
+**Three findings from the unit that are real and are carried forward.**
+
+* **The specification's "safely rendered command for display" has no member in
+  the format.** ``argv`` is recorded and the display string is a pure function
+  of it (``ToolCommand.displayString()``). The page states the divergence in
+  its *Where each specification fact is recorded* table rather than hiding it.
+  It sits oddly beside ``durationMillis``, which **is** written on the ground
+  that "the artefact is the record" -- and the two are reconcilable only
+  because a duration cannot be recomputed from a *truncated* document without
+  the writer's own rule, while a display string can be recomputed from ``argv``
+  exactly. If tier 1 disagrees, it is a schema-version 2 change, not a
+  documentation fix.
+* **``ExecutionRecord.status`` documents three values and enforces none.** Its
+  Javadoc says ``COMPLETED``, ``FAILED`` or ``CANCELLED``; the constructor only
+  null-checks and ``ManifestReader`` accepts all five wire names there. The
+  page now states what is written, what is documented and what is actually
+  accepted, which is the honest three-way answer. Narrowing the type is a
+  behaviour change and belongs to whoever owns the stage semantics.
+* **The event log's file name is pinned by no constant.**
+  ``ManifestWriter.FILE_NAME`` and ``ProvenanceReportWriter.FILE_NAME`` exist;
+  the log is opened on a caller-supplied path and ``events.log`` appears only
+  in tests. **Phase 13 needs a discoverable log in a run directory** and must
+  pin a constant rather than guess a name.
