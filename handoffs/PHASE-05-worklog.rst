@@ -528,7 +528,10 @@ collide -- they share ``cometgui-domain``, the Maven working tree,
        rejected; the bomb guard is proved to bite on ratio, on absolute size
        and on entry count separately.
      - ``R-SEC-05``, ``R-TOOL-01``, ``R-TOOL-02``, gate 3
-     -
+     - **ACCEPTED 2026-09-02** after two rounds -- see :ref:`p05-u4-signoff`.
+       Gate item 3 has a real upstream artefact behind it. Gating the package
+       found five XXE guards that could each be deleted with the suite green,
+       and three live product defects including a copy loop that spun.
 
    * - 5
      - **Atomic install, marker, recovery, lock, fix-ups.** The eight-step
@@ -1393,6 +1396,131 @@ packages here and flips its own module's switch; it does not narrow this list"*
 -- and adding a package **strengthens** the gate rather than weakening it, which
 is the only direction this project allows. I make the change myself rather than
 handing it to the unit, so that only one party is editing the reactor at a time.
+
+.. _p05-u4-signoff:
+
+Unit 4 sign-off
+===============
+
+**Accepted 2026-09-02** at ``00e6494``, after two rounds. My own build on the
+accepted tree, nothing else live::
+
+    11/11 stages OK in 1085 seconds.  BUILD OK
+    160 report file(s): tests=2962 failures=0 errors=0 skipped=3
+    ok  cometgui-install  line 100.0% (1831/1831)  branch 99.4% (746/750)
+    ok  cometgui-install  44 compiled class(es), all 44 in the sample
+    ok  cometgui-install  848/863 mutations killed = 98.2%
+    ok  cometgui-install  146 class(es) analysed, 0 findings
+    13 critical package prefix(es) read from pom.xml
+    ok  8 architecture rule(s) checked, 0 failures
+
+What I verified rather than read
+---------------------------------
+
+237 archive tests green on my own run. The traversal pair is the shape tier 1's
+standing direction 1 demands: the **real** ``rel-3-06-05`` macOS zip installs in
+named-member mode with digest ``f6c62710...`` **and** is rejected whole, with the
+entry named, and a snapshot of the destination's *parent* proves nothing escaped
+-- asserted by walking the tree, not by trusting the exception.
+
+``GuardBypassStructureTest`` is the strongest structural check in this phase. It
+parses each compiled class's constant pool and requires that **only**
+``ExtractionGuard`` can create, write, link, copy or delete a file, with two
+anti-vacuity guards (the scan must have found the guard, and must have inspected
+at least fifteen classes), plus a separate test requiring the scan to find the
+guard's *own* ``newOutputStream``, ``createSymbolicLink`` and
+``createDirectories`` -- so a scanner that saw nothing at all fails.
+
+My injection: ``hasDriveLetter`` returning false. **Bit** -- 8 failures, because
+the refused-path table already carried ``C:/x`` with a **forward** slash, the one
+drive-letter form no other check catches.
+
+Then I gated the package, and it changed the unit
+--------------------------------------------------
+
+``org.cometgui.install.archive.*`` was **not** in ``<targetClasses>``, so 8550
+lines of the phase's security-critical code carried **no mutation evidence at
+all**. The agent reported that residue itself rather than leaving it to be
+discovered. I added the package -- the same decision as for the downloader, with
+more force, because ``R-SEC-05`` is this phase's security rule and gate item 3
+is the gate over it.
+
+First run: **799/864 = 92.4%**, 60 survivors and 5 timeouts. Above the 80%
+threshold, so the build was green; it is ``R-TEST-02``'s **absolute clause** that
+was not satisfied.
+
+.. _p05-xxe:
+
+**The one that mattered: five XXE guards that nothing tested.** Every one of
+``PkgPayloadReader.parse``'s hardening calls -- ``FEATURE_SECURE_PROCESSING``,
+``DISALLOW_DOCTYPE``, ``setXIncludeAware``, ``setExpandEntityReferences``,
+``setNamespaceAware`` -- could be **deleted with the whole suite still green**.
+The xar table of contents is XML that arrived over the network inside a
+downloaded ``.pkg``: attacker-controlled input by construction, on the one
+parser in this phase that reads hostile XML. The protections were present and
+unproven, which is a rule that has never been seen to work.
+
+Two of them were **unprovable as written**, because ``setXIncludeAware(false)``
+and ``setNamespaceAware(false)`` restate JDK defaults and a test inspecting a
+fresh factory passes without them. The repair changed the shape: ``harden()``
+now **forces** the safe state over a factory the caller supplies, and the test
+hands it one set to every unsafe value. **I deleted each of the five in turn
+myself** and every one failed::
+
+    setFeature(FEATURE_SECURE_PROCESSING)  exit=1  Tests run: 6, Failures: 1
+    setFeature(DISALLOW_DOCTYPE)           exit=1  Tests run: 6, Failures: 4
+    setXIncludeAware(false)                exit=1  Tests run: 6, Failures: 1
+    setExpandEntityReferences(false)       exit=1  Tests run: 6, Failures: 1
+    setNamespaceAware(false)               exit=1  Tests run: 6, Failures: 1
+
+Behaviourally, an external entity, a ``SYSTEM`` entity pointing at a local file
+(with the file's contents asserted to appear nowhere) and a ten-level
+billion-laughs are each refused at the ``DOCTYPE``, artefact named, message
+under 500 characters so the refusal is not the bomb going off in the log.
+
+**Ratified, and it goes beyond what I asked:** ``parse`` now uses
+``DocumentBuilderFactory.newDefaultInstance`` rather than ``newInstance``,
+because ``newInstance`` consults a system property and the class path, so a
+dependency could change which parser reads this attacker-controlled document
+while the hardening is written against the built-in one's behaviour. That is the
+right call and I would have asked for it had I thought of it.
+
+Three product defects, not test gaps
+-------------------------------------
+
+The residue was not only thin tests. Three were live faults:
+
+* **A container answering a read with zero bytes made the copy loop spin.** The
+  loop tested ``read >= 0``. This is precisely the "mutant that makes extraction
+  hang on a 99 MB archive" I asked about, and it was real rather than a test
+  artefact. It now refuses, proved against a stream that returns 0 forever.
+* **A gzip payload that is not one escaped as a bare ``EOFException`` naming no
+  artefact.** Both payload readers now refuse by name.
+* **Four readers' ``close()`` calls were unobserved**, so an install could run
+  out of file handles. Proved by *naming*, not counting: the test resolves every
+  ``/proc/self/fd`` entry and asserts none points inside its own archive
+  directory, because a descriptor count drifts for unrelated reasons.
+
+Final archive figure **464/476 = 97.5%**, from 62 non-killed to 12; module
+**848/863 = 98.2%**. The 8 remaining survivors and 4 timeouts are each argued
+beside the code, and three of the timeouts are mutants that break
+``InputStream``'s contract and hang **inside the JDK's inflater** rather than in
+anything this project owns.
+
+.. _p05-open-thread:
+
+An open thread, not tidied away
+--------------------------------
+
+``everySettingIsForcedFromItsUnsafeValue`` **failed once**, in a single run, and
+its assertion message was lost to a truncated pipeline. It has not recurred in
+nine subsequent full-module runs, and no test anywhere sets a JAXP system
+property. The agent pinned ``newDefaultInstance`` partly to remove ambient
+variation but explicitly does **not** claim that was the cause.
+
+**Nine green runs are not an explanation.** This is an unexplained one-off in a
+security test, it is recorded as open, and if it reappears that is the thread to
+pull.
 
 Rejections and rework
 =====================
