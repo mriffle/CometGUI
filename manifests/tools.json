@@ -40,6 +40,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -84,6 +85,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -128,6 +130,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -172,6 +175,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -282,6 +286,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -362,6 +367,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": "2.34",
+        "glibcxx": "3.4.29",
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -446,6 +452,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": "12.7",
         "requiredHostLibraries": []
       },
@@ -530,6 +537,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": [
           "MSVCP140.dll",
@@ -615,6 +623,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": "2.14",
+        "glibcxx": "3.4.21",
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -699,6 +708,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": "12.7",
         "requiredHostLibraries": []
       },
@@ -783,6 +793,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": [
           "MSVCP140.dll",
@@ -829,6 +840,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": "15.0",
         "requiredHostLibraries": []
       },
@@ -866,6 +878,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": [
           "MSVCP140.dll",
@@ -904,6 +917,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -937,6 +951,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -970,6 +985,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -1003,6 +1019,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -1036,6 +1053,7 @@
       ],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -1064,6 +1082,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -1092,6 +1111,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -1120,6 +1140,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -1148,6 +1169,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },
@@ -1176,6 +1198,7 @@
       "advisories": [],
       "minimumHostRequirements": {
         "glibc": null,
+        "glibcxx": null,
         "macos": null,
         "requiredHostLibraries": []
       },

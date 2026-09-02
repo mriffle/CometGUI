@@ -311,6 +311,7 @@ class ShippedManifestTest {
                                         PEP_ABOVE_ONE_TEXT)),
                         new MinimumHostRequirements(
                                 Optional.of(GlibcVersion.parse("2.34")),
+                                Optional.of(GlibcVersion.parse("3.4.29")),
                                 Optional.empty(),
                                 List.of()),
                         ToolVersion.parse("0.1.0"));

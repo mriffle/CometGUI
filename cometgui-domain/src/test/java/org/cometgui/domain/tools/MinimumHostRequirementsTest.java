@@ -37,21 +37,24 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests for {@link MinimumHostRequirements}.
  *
- * <p>The values used are the real ones: {@code GLIBC_2.34} for the Percolator 3.07.1 portable
- * archive, {@code GLIBC_2.38} for the 3.09 Debian payload, {@code GLIBC_2.14} for the 3.06.5
- * archive, and the four Visual C++ runtime DLLs the Windows portable zip imports and does not ship.
+ * <p>The values used are the real ones, read with {@code readelf -V} from the artefacts in this
+ * phase's mirror: {@code GLIBC_2.34} and {@code GLIBCXX_3.4.29} for the Percolator 3.07.1 portable
+ * archive, {@code GLIBC_2.38} and {@code GLIBCXX_3.4.32} for the 3.09 Debian payload, {@code
+ * GLIBC_2.14} and {@code GLIBCXX_3.4.21} for the 3.06.5 archive, and the four Visual C++ runtime
+ * DLLs the Windows portable zip imports and does not ship.
  *
- * <p><strong>Each rejection is graded with the other two components both absent and both
- * present.</strong> None of the three validations depends on the other fields, so asserting one of
+ * <p><strong>Each rejection is graded with the other three components both absent and both
+ * present.</strong> None of the four validations depends on the other fields, so asserting one of
  * them only against an otherwise-empty record would leave that axis untested -- the shape that let
  * a blank-note rule be switched off for a single enum constant in {@link DeclaredCapability}.
  *
  * <p><strong>What this file does not test, deliberately.</strong> There is no "does this host
- * satisfy these requirements" rule to test: the record carries the floors and nothing compares them
- * to a host yet. That comparison, and the exact-equality boundary that decides whether a host with
- * precisely glibc 2.34 is offered Percolator 3.07.1, belong to phase 05 unit 6's probe. {@link
- * #theGlibcFloorIsAVersion()} exercises {@link GlibcVersion#isAtLeast} to show the floor is a
- * comparable value rather than text; that is phase 02's class, not this record's contract, and it
+ * satisfy these requirements" rule here: the record carries the floors and nothing in this module
+ * compares them to a host. That comparison, and the exact-equality boundary that decides whether a
+ * host with precisely glibc 2.34 is offered Percolator 3.07.1, live in {@code
+ * org.cometgui.install.probe.HostRequirementCheck}. {@link #theGlibcFloorIsAVersion()} and {@link
+ * #theGlibcxxFloorIsAVersion()} exercise {@link GlibcVersion#isAtLeast} to show the floors are
+ * comparable values rather than text; that is phase 02's class, not this record's contract, and it
  * is here as documentation of intent rather than as coverage of this unit.
  */
 class MinimumHostRequirementsTest {
@@ -59,9 +62,12 @@ class MinimumHostRequirementsTest {
     private static final List<String> VISUAL_CPP_RUNTIME =
             List.of("MSVCP140.dll", "VCRUNTIME140.dll", "VCRUNTIME140_1.dll", "VCOMP140.DLL");
 
-    /** The other two components, absent in one context and present in the other. */
+    /** The other three components, absent in one context and present in the other. */
     private static final List<Optional<GlibcVersion>> GLIBC_CONTEXTS =
             List.of(Optional.empty(), Optional.of(GlibcVersion.parse("2.34")));
+
+    private static final List<Optional<GlibcVersion>> GLIBCXX_CONTEXTS =
+            List.of(Optional.empty(), Optional.of(GlibcVersion.parse("3.4.29")));
 
     private static final List<Optional<String>> MACOS_CONTEXTS =
             List.of(Optional.empty(), Optional.of("12.7"));
@@ -74,7 +80,10 @@ class MinimumHostRequirementsTest {
     void theGlibcFloorIsAVersion() {
         MinimumHostRequirements requirements =
                 new MinimumHostRequirements(
-                        Optional.of(GlibcVersion.parse("2.34")), Optional.empty(), List.of());
+                        Optional.of(GlibcVersion.parse("2.34")),
+                        Optional.empty(),
+                        Optional.empty(),
+                        List.of());
 
         assertAll(
                 () ->
@@ -94,10 +103,69 @@ class MinimumHostRequirementsTest {
     }
 
     @Test
+    @DisplayName("the C++ runtime floor is a separate, comparable version of its own")
+    void theGlibcxxFloorIsAVersion() {
+        MinimumHostRequirements requirements =
+                new MinimumHostRequirements(
+                        Optional.empty(),
+                        Optional.of(GlibcVersion.parse("3.4.29")),
+                        Optional.empty(),
+                        List.of());
+
+        assertAll(
+                () -> assertEquals(Optional.empty(), requirements.minimumGlibc()),
+                () ->
+                        assertEquals(
+                                GlibcVersion.of(3, 4, 29),
+                                requirements.minimumGlibcxx().orElseThrow()),
+                () ->
+                        assertTrue(
+                                GlibcVersion.parse("3.4.30")
+                                        .isAtLeast(requirements.minimumGlibcxx().orElseThrow()),
+                                "Debian 12's GLIBCXX_3.4.30 meets the 3.07.1 C++ floor"),
+                () ->
+                        assertFalse(
+                                GlibcVersion.parse("3.4.30")
+                                        .isAtLeast(GlibcVersion.parse("3.4.32")),
+                                "Debian 12's GLIBCXX_3.4.30 does not meet the 3.09 .deb C++ floor,"
+                                        + " which is the line the loader reports FIRST"),
+                () -> assertFalse(requirements.isEmpty()));
+    }
+
+    @Test
+    @DisplayName("the two Linux floors are independent: 3.09's C++ floor is unmet where glibc's is")
+    void theTwoLinuxFloorsAreIndependent() {
+        MinimumHostRequirements payload309 =
+                new MinimumHostRequirements(
+                        Optional.of(GlibcVersion.parse("2.38")),
+                        Optional.of(GlibcVersion.parse("3.4.32")),
+                        Optional.empty(),
+                        List.of());
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                GlibcVersion.of(2, 38, 0), payload309.minimumGlibc().orElseThrow()),
+                () ->
+                        assertEquals(
+                                GlibcVersion.of(3, 4, 32),
+                                payload309.minimumGlibcxx().orElseThrow()),
+                () ->
+                        assertFalse(
+                                payload309
+                                        .minimumGlibc()
+                                        .orElseThrow()
+                                        .equals(payload309.minimumGlibcxx().orElseThrow()),
+                                "the two floors are different numbers and neither implies the"
+                                        + " other"));
+    }
+
+    @Test
     @DisplayName("the Windows Visual C++ runtime is declared as required host libraries")
     void theWindowsRuntimeIsDeclared() {
         MinimumHostRequirements requirements =
-                new MinimumHostRequirements(Optional.empty(), Optional.empty(), VISUAL_CPP_RUNTIME);
+                new MinimumHostRequirements(
+                        Optional.empty(), Optional.empty(), Optional.empty(), VISUAL_CPP_RUNTIME);
 
         assertAll(
                 () ->
@@ -115,7 +183,8 @@ class MinimumHostRequirementsTest {
     @DisplayName("a macOS floor is kept as upstream states it")
     void theMacOsFloorIsKept() {
         MinimumHostRequirements requirements =
-                new MinimumHostRequirements(Optional.empty(), Optional.of(" 12.7 "), List.of());
+                new MinimumHostRequirements(
+                        Optional.empty(), Optional.empty(), Optional.of(" 12.7 "), List.of());
 
         assertAll(
                 () -> assertEquals("12.7", requirements.minimumMacOsVersion().orElseThrow()),
@@ -130,28 +199,36 @@ class MinimumHostRequirementsTest {
         assertAll(
                 () -> assertTrue(none.isEmpty()),
                 () -> assertEquals(Optional.empty(), none.minimumGlibc()),
+                () -> assertEquals(Optional.empty(), none.minimumGlibcxx()),
                 () -> assertEquals(Optional.empty(), none.minimumMacOsVersion()),
                 () -> assertEquals(List.of(), none.requiredHostLibraries()),
                 () ->
                         assertEquals(
                                 none,
                                 new MinimumHostRequirements(
-                                        Optional.empty(), Optional.empty(), List.of())));
+                                        Optional.empty(),
+                                        Optional.empty(),
+                                        Optional.empty(),
+                                        List.of())));
     }
 
     @Test
-    @DisplayName("a record is empty only when all three components are")
+    @DisplayName("a record is empty only when all four components are")
     void isEmptyIsGradedOnEveryComponent() {
         assertAll(
                 () ->
                         assertTrue(
                                 new MinimumHostRequirements(
-                                                Optional.empty(), Optional.empty(), List.of())
+                                                Optional.empty(),
+                                                Optional.empty(),
+                                                Optional.empty(),
+                                                List.of())
                                         .isEmpty()),
                 () ->
                         assertFalse(
                                 new MinimumHostRequirements(
                                                 Optional.of(GlibcVersion.parse("2.34")),
+                                                Optional.empty(),
                                                 Optional.empty(),
                                                 List.of())
                                         .isEmpty(),
@@ -159,12 +236,25 @@ class MinimumHostRequirementsTest {
                 () ->
                         assertFalse(
                                 new MinimumHostRequirements(
-                                                Optional.empty(), Optional.of("12.7"), List.of())
+                                                Optional.empty(),
+                                                Optional.of(GlibcVersion.parse("3.4.29")),
+                                                Optional.empty(),
+                                                List.of())
+                                        .isEmpty(),
+                                "a C++ runtime floor alone is a requirement"),
+                () ->
+                        assertFalse(
+                                new MinimumHostRequirements(
+                                                Optional.empty(),
+                                                Optional.empty(),
+                                                Optional.of("12.7"),
+                                                List.of())
                                         .isEmpty(),
                                 "a macOS floor alone is a requirement"),
                 () ->
                         assertFalse(
                                 new MinimumHostRequirements(
+                                                Optional.empty(),
                                                 Optional.empty(),
                                                 Optional.empty(),
                                                 List.of("MSVCP140.dll"))
@@ -179,6 +269,7 @@ class MinimumHostRequirementsTest {
                 new MinimumHostRequirements(
                         Optional.empty(),
                         Optional.empty(),
+                        Optional.empty(),
                         Arrays.asList(" VCRUNTIME140.dll ", "MSVCP140.dll"));
 
         assertEquals(
@@ -190,7 +281,8 @@ class MinimumHostRequirementsTest {
     void theListIsCopied() {
         List<String> mutable = new ArrayList<>(List.of("MSVCP140.dll"));
         MinimumHostRequirements requirements =
-                new MinimumHostRequirements(Optional.empty(), Optional.empty(), mutable);
+                new MinimumHostRequirements(
+                        Optional.empty(), Optional.empty(), Optional.empty(), mutable);
 
         mutable.add("SOMETHING_ELSE.dll");
 
@@ -208,21 +300,29 @@ class MinimumHostRequirementsTest {
     void aBlankMacOsFloorIsRejected(String blank) {
         List<Executable> assertions = new ArrayList<>();
         for (Optional<GlibcVersion> glibc : GLIBC_CONTEXTS) {
-            for (List<String> libraries : LIBRARY_CONTEXTS) {
-                assertions.add(
-                        () ->
-                                assertEquals(
-                                        "minimumMacOsVersion must not be blank when it is present;"
-                                                + " leave it absent instead",
-                                        assertThrows(
-                                                        IllegalArgumentException.class,
-                                                        () ->
-                                                                new MinimumHostRequirements(
-                                                                        glibc,
-                                                                        Optional.of(blank),
-                                                                        libraries))
-                                                .getMessage(),
-                                        "glibc=" + glibc + " libraries=" + libraries));
+            for (Optional<GlibcVersion> glibcxx : GLIBCXX_CONTEXTS) {
+                for (List<String> libraries : LIBRARY_CONTEXTS) {
+                    assertions.add(
+                            () ->
+                                    assertEquals(
+                                            "minimumMacOsVersion must not be blank when it is"
+                                                    + " present; leave it absent instead",
+                                            assertThrows(
+                                                            IllegalArgumentException.class,
+                                                            () ->
+                                                                    new MinimumHostRequirements(
+                                                                            glibc,
+                                                                            glibcxx,
+                                                                            Optional.of(blank),
+                                                                            libraries))
+                                                    .getMessage(),
+                                            "glibc="
+                                                    + glibc
+                                                    + " glibcxx="
+                                                    + glibcxx
+                                                    + " libraries="
+                                                    + libraries));
+                }
             }
         }
 
@@ -234,37 +334,30 @@ class MinimumHostRequirementsTest {
     void aBlankLibraryIsRejected() {
         List<Executable> assertions = new ArrayList<>();
         for (Optional<GlibcVersion> glibc : GLIBC_CONTEXTS) {
-            for (Optional<String> macOs : MACOS_CONTEXTS) {
-                assertions.add(
-                        () ->
-                                assertEquals(
-                                        "requiredHostLibraries[1] must not be blank",
-                                        assertThrows(
-                                                        IllegalArgumentException.class,
-                                                        () ->
-                                                                new MinimumHostRequirements(
-                                                                        glibc,
-                                                                        macOs,
-                                                                        Arrays.asList(
-                                                                                "MSVCP140.dll",
-                                                                                "  ")))
-                                                .getMessage(),
-                                        "glibc=" + glibc + " macOs=" + macOs));
-                assertions.add(
-                        () ->
-                                assertEquals(
-                                        "requiredHostLibraries[0] must not be null",
-                                        assertThrows(
-                                                        IllegalArgumentException.class,
-                                                        () ->
-                                                                new MinimumHostRequirements(
-                                                                        glibc,
-                                                                        macOs,
-                                                                        Arrays.asList(
-                                                                                null,
-                                                                                "MSVCP140.dll")))
-                                                .getMessage(),
-                                        "glibc=" + glibc + " macOs=" + macOs));
+            for (Optional<GlibcVersion> glibcxx : GLIBCXX_CONTEXTS) {
+                for (Optional<String> macOs : MACOS_CONTEXTS) {
+                    String where = context(glibc, glibcxx, macOs);
+                    assertions.add(
+                            () ->
+                                    assertEquals(
+                                            "requiredHostLibraries[1] must not be blank",
+                                            rejectionOf(
+                                                    glibc,
+                                                    glibcxx,
+                                                    macOs,
+                                                    Arrays.asList("MSVCP140.dll", "  ")),
+                                            where));
+                    assertions.add(
+                            () ->
+                                    assertEquals(
+                                            "requiredHostLibraries[0] must not be null",
+                                            rejectionOf(
+                                                    glibc,
+                                                    glibcxx,
+                                                    macOs,
+                                                    Arrays.asList(null, "MSVCP140.dll")),
+                                            where));
+                }
             }
         }
 
@@ -276,75 +369,109 @@ class MinimumHostRequirementsTest {
     void aDuplicateLibraryIsRejected() {
         List<Executable> assertions = new ArrayList<>();
         for (Optional<GlibcVersion> glibc : GLIBC_CONTEXTS) {
-            for (Optional<String> macOs : MACOS_CONTEXTS) {
-                assertions.add(
-                        () ->
-                                assertEquals(
-                                        "requiredHostLibraries names \"MSVCP140.dll\" more than"
-                                                + " once",
-                                        assertThrows(
-                                                        IllegalArgumentException.class,
-                                                        () ->
-                                                                new MinimumHostRequirements(
-                                                                        glibc,
-                                                                        macOs,
-                                                                        Arrays.asList(
-                                                                                "MSVCP140.dll",
-                                                                                " MSVCP140.dll ")))
-                                                .getMessage(),
-                                        "glibc=" + glibc + " macOs=" + macOs));
+            for (Optional<GlibcVersion> glibcxx : GLIBCXX_CONTEXTS) {
+                for (Optional<String> macOs : MACOS_CONTEXTS) {
+                    String where = context(glibc, glibcxx, macOs);
+                    assertions.add(
+                            () ->
+                                    assertEquals(
+                                            "requiredHostLibraries names \"MSVCP140.dll\" more"
+                                                    + " than once",
+                                            rejectionOf(
+                                                    glibc,
+                                                    glibcxx,
+                                                    macOs,
+                                                    Arrays.asList(
+                                                            "MSVCP140.dll", " MSVCP140.dll ")),
+                                            where));
+                }
             }
         }
 
         assertAll(assertions);
     }
 
+    private static String rejectionOf(
+            Optional<GlibcVersion> glibc,
+            Optional<GlibcVersion> glibcxx,
+            Optional<String> macOs,
+            List<String> libraries) {
+        return assertThrows(
+                        IllegalArgumentException.class,
+                        () -> new MinimumHostRequirements(glibc, glibcxx, macOs, libraries))
+                .getMessage();
+    }
+
+    private static String context(
+            Optional<GlibcVersion> glibc, Optional<GlibcVersion> glibcxx, Optional<String> macOs) {
+        return "glibc=" + glibc + " glibcxx=" + glibcxx + " macOs=" + macOs;
+    }
+
     @Test
     @DisplayName("a null part is rejected by name whatever else is declared")
     void nullPartsAreRejectedByName() {
         Optional<GlibcVersion> absentGlibc = Nulls.of(Optional.class);
+        Optional<GlibcVersion> absentGlibcxx = Nulls.of(Optional.class);
         Optional<String> absentMacOs = Nulls.of(Optional.class);
         List<String> absentLibraries = Nulls.of(List.class);
         List<Executable> assertions = new ArrayList<>();
         for (Optional<GlibcVersion> glibc : GLIBC_CONTEXTS) {
-            for (Optional<String> macOs : MACOS_CONTEXTS) {
-                for (List<String> libraries : LIBRARY_CONTEXTS) {
-                    assertions.add(
-                            () ->
-                                    assertEquals(
-                                            "minimumGlibc",
-                                            assertThrows(
-                                                            NullPointerException.class,
-                                                            () ->
-                                                                    new MinimumHostRequirements(
-                                                                            absentGlibc,
-                                                                            macOs,
-                                                                            libraries))
-                                                    .getMessage()));
-                    assertions.add(
-                            () ->
-                                    assertEquals(
-                                            "minimumMacOsVersion",
-                                            assertThrows(
-                                                            NullPointerException.class,
-                                                            () ->
-                                                                    new MinimumHostRequirements(
-                                                                            glibc,
-                                                                            absentMacOs,
-                                                                            libraries))
-                                                    .getMessage()));
-                    assertions.add(
-                            () ->
-                                    assertEquals(
-                                            "requiredHostLibraries",
-                                            assertThrows(
-                                                            NullPointerException.class,
-                                                            () ->
-                                                                    new MinimumHostRequirements(
-                                                                            glibc,
-                                                                            macOs,
-                                                                            absentLibraries))
-                                                    .getMessage()));
+            for (Optional<GlibcVersion> glibcxx : GLIBCXX_CONTEXTS) {
+                for (Optional<String> macOs : MACOS_CONTEXTS) {
+                    for (List<String> libraries : LIBRARY_CONTEXTS) {
+                        assertions.add(
+                                () ->
+                                        assertEquals(
+                                                "minimumGlibc",
+                                                assertThrows(
+                                                                NullPointerException.class,
+                                                                () ->
+                                                                        new MinimumHostRequirements(
+                                                                                absentGlibc,
+                                                                                glibcxx,
+                                                                                macOs,
+                                                                                libraries))
+                                                        .getMessage()));
+                        assertions.add(
+                                () ->
+                                        assertEquals(
+                                                "minimumGlibcxx",
+                                                assertThrows(
+                                                                NullPointerException.class,
+                                                                () ->
+                                                                        new MinimumHostRequirements(
+                                                                                glibc,
+                                                                                absentGlibcxx,
+                                                                                macOs,
+                                                                                libraries))
+                                                        .getMessage()));
+                        assertions.add(
+                                () ->
+                                        assertEquals(
+                                                "minimumMacOsVersion",
+                                                assertThrows(
+                                                                NullPointerException.class,
+                                                                () ->
+                                                                        new MinimumHostRequirements(
+                                                                                glibc,
+                                                                                glibcxx,
+                                                                                absentMacOs,
+                                                                                libraries))
+                                                        .getMessage()));
+                        assertions.add(
+                                () ->
+                                        assertEquals(
+                                                "requiredHostLibraries",
+                                                assertThrows(
+                                                                NullPointerException.class,
+                                                                () ->
+                                                                        new MinimumHostRequirements(
+                                                                                glibc,
+                                                                                glibcxx,
+                                                                                macOs,
+                                                                                absentLibraries))
+                                                        .getMessage()));
+                    }
                 }
             }
         }

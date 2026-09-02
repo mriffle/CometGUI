@@ -145,6 +145,7 @@ final class ManifestDocuments {
     static String requirements() {
         return new Json()
                 .raw("glibc", "null")
+                .raw("glibcxx", "null")
                 .raw("macos", "null")
                 .raw("requiredHostLibraries", "[]")
                 .render();

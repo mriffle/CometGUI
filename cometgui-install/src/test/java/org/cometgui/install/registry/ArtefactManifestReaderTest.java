@@ -453,15 +453,24 @@ class ArtefactManifestReaderTest {
                                                                         .render()))
                                                 .render()))
                         .render();
+        /*
+         * This case used to use "glibcxx" as its unknown member, and phase 05 unit 6 then made
+         * glibcxx a KNOWN one -- so the case was rewritten around a member the build genuinely
+         * does not read rather than deleted.  "musl" is the right shape of example: a C library
+         * this project might one day declare a floor against and does not today, so a manifest
+         * naming it is a misspelling or a newer file, and either way is refused rather than
+         * silently ignored.
+         */
         String unknownInRequirements =
                 shape.record()
                         .raw(
                                 "minimumHostRequirements",
                                 new Json()
                                         .raw("glibc", "null")
+                                        .raw("glibcxx", "null")
                                         .raw("macos", "null")
                                         .raw("requiredHostLibraries", "[]")
-                                        .str("glibcxx", "3.4.29")
+                                        .str("musl", "1.2.4")
                                         .render())
                         .render();
 
@@ -487,7 +496,7 @@ class ArtefactManifestReaderTest {
                                         .contains(
                                                 "\"artefacts[0].minimumHostRequirements\" has"
                                                         + " member(s) this build does not know:"
-                                                        + " [glibcxx]"),
+                                                        + " [musl]"),
                                 rejectionOf(ManifestDocuments.document(unknownInRequirements))));
     }
 

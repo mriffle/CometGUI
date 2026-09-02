@@ -34,11 +34,18 @@ import java.util.HexFormat;
  * them <strong>fails</strong> when they are absent rather than skipping: an extraction suite that
  * quietly stops checking the real containers is the fifth shape of a check that cannot go red, and
  * the message below says exactly how to refill the mirror.
+ *
+ * <p><strong>Made public by phase 05 unit 6, deliberately and narrowly.</strong> The probe suite
+ * needs the same mirror and the same repository root, and this project's rule is one JSON reader,
+ * one hasher, one mirror helper -- a second one in another package is the duplication that has
+ * already been paid for twice here. The class stays where the phase put it and only the three
+ * members another package uses were widened; {@code assertContent} is still package-private,
+ * because it is the extraction suite's own assertion.
  */
-final class ArtefactMirror {
+public final class ArtefactMirror {
 
     /** Where the mirror lives, relative to the repository root. */
-    static final String MIRROR = "scratch/phase05/artefacts";
+    public static final String MIRROR = "scratch/phase05/artefacts";
 
     private ArtefactMirror() {}
 
@@ -47,7 +54,7 @@ final class ArtefactMirror {
      *
      * @return the root
      */
-    static Path repositoryRoot() {
+    public static Path repositoryRoot() {
         Path cursor = Path.of("").toAbsolutePath();
         while (cursor != null && !Files.isDirectory(cursor.resolve("manifests"))) {
             cursor = cursor.getParent();
@@ -67,7 +74,7 @@ final class ArtefactMirror {
      * @param fileName the mirror's file name, {@code <release-tag>__<upstream file name>}
      * @return the artefact
      */
-    static Path artefact(String fileName) {
+    public static Path artefact(String fileName) {
         Path file = repositoryRoot().resolve(MIRROR).resolve(fileName);
         if (!Files.isRegularFile(file)) {
             throw new AssertionError(
@@ -91,7 +98,7 @@ final class ArtefactMirror {
      * @return the digest
      * @throws IOException if the file cannot be read
      */
-    static String sha256(Path file) throws IOException {
+    public static String sha256(Path file) throws IOException {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] buffer = new byte[65536];

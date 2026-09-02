@@ -168,7 +168,7 @@ public final class ArtefactManifestReader {
     private static final Set<String> ADVISORY_MEMBERS = Set.of("id", "text");
 
     private static final Set<String> REQUIREMENT_MEMBERS =
-            Set.of("glibc", "macos", "requiredHostLibraries");
+            Set.of("glibc", "glibcxx", "macos", "requiredHostLibraries");
 
     private ArtefactManifestReader() {
         throw new AssertionError(
@@ -614,6 +614,24 @@ public final class ArtefactManifestReader {
                                                 record,
                                                 "must be a glibc version such as 2.34",
                                                 () -> GlibcVersion.parse(value)));
+        /*
+         * The C++ runtime floor is read the same way and is deliberately a SEPARATE member rather
+         * than something derived from the glibc one.  A GNU/Linux binary records GLIBC_* and
+         * GLIBCXX_* symbol versions independently, and in the loader failure this project executed
+         * the GLIBCXX line is reported FIRST -- so a manifest that carried only the glibc floor
+         * would let an advance check answer "runnable" for a build that fails on libstdc++.
+         */
+        Optional<GlibcVersion> glibcxx =
+                optionalText(requirements, requirementsPath, record, "glibcxx")
+                        .map(
+                                value ->
+                                        checked(
+                                                child(requirementsPath, "glibcxx"),
+                                                record,
+                                                "must be the numbers of a GLIBCXX symbol version,"
+                                                        + " such as 3.4.29, written without the"
+                                                        + " GLIBCXX_ prefix",
+                                                () -> GlibcVersion.parse(value)));
         Optional<String> macos = optionalText(requirements, requirementsPath, record, "macos");
         String librariesPath = child(requirementsPath, "requiredHostLibraries");
         List<JsonValue> elements =
@@ -628,9 +646,10 @@ public final class ArtefactManifestReader {
         return checked(
                 requirementsPath,
                 record,
-                "must carry an optional glibc version, an optional macOS version and a list of"
-                        + " required host libraries with none blank and none named twice",
-                () -> new MinimumHostRequirements(glibc, macos, libraries));
+                "must carry an optional glibc version, an optional GLIBCXX version, an optional"
+                        + " macOS version and a list of required host libraries with none blank"
+                        + " and none named twice",
+                () -> new MinimumHostRequirements(glibc, glibcxx, macos, libraries));
     }
 
     /*

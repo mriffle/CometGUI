@@ -42,8 +42,30 @@ import org.cometgui.domain.platform.GlibcVersion;
  * compares against. A second glibc version type would be a second parser and a second ordering, and
  * the two would eventually disagree about the same host.
  *
+ * <p><strong>{@code minimumGlibcxx} is the C++ runtime floor, and it is not the same
+ * floor.</strong> A GNU/Linux binary built with GCC records two independent sets of symbol
+ * versions: {@code GLIBC_*} from the C library and {@code GLIBCXX_*} from {@code libstdc++}. They
+ * move independently -- Percolator 3.07.1 needs {@code GLIBC_2.34} and {@code GLIBCXX_3.4.29}; the
+ * 3.09 Debian payload needs {@code GLIBC_2.38} and {@code GLIBCXX_3.4.32} -- and in the loader
+ * failure this project executed on its own Debian 12 host <em>the {@code GLIBCXX} line is reported
+ * first</em>. A check that knew only about glibc would therefore predict "runnable" for a build
+ * that fails on the C++ runtime, which is the specific wrong answer this component exists to
+ * prevent.
+ *
+ * <p>It reuses {@link GlibcVersion} for the same reason {@code minimumGlibc} does, and the reuse is
+ * deliberate rather than convenient: a {@code GLIBCXX} version is {@code major.minor.patch} of
+ * decimal components compared numerically, which is exactly what that type is, and it is a version
+ * of a <em>host library</em> rather than of a tool. The type's name says "glibc" and this is
+ * libstdc++, which is the one thing wrong with the reuse; a dedicated {@code GlibcxxVersion} would
+ * be a second parser of the same shape, and phase 05 unit 6 did not have the domain scope to add
+ * one. Recorded here so that a later phase can weigh that trade rather than rediscover it.
+ *
  * @param minimumGlibc the oldest glibc the artefact will load on, absent when none is declared or
  *     the platform is not Linux
+ * @param minimumGlibcxx the oldest {@code libstdc++} symbol-version set the artefact will load on,
+ *     written as the numbers of a {@code GLIBCXX_x.y.z} version -- {@code 3.4.29} for Percolator
+ *     3.07.1. Absent when none is declared, which is the case for every artefact that is statically
+ *     linked, is not an ELF binary, or is a JAR
  * @param minimumMacOsVersion the oldest macOS release the artefact will run on, as upstream states
  *     it -- {@code 12.7}, {@code 15.0}; a string rather than a parsed version because nothing in
  *     this project compares macOS versions yet and a type nobody orders would be a type nobody
@@ -56,11 +78,13 @@ import org.cometgui.domain.platform.GlibcVersion;
  */
 public record MinimumHostRequirements(
         Optional<GlibcVersion> minimumGlibc,
+        Optional<GlibcVersion> minimumGlibcxx,
         Optional<String> minimumMacOsVersion,
         List<String> requiredHostLibraries) {
 
     private static final MinimumHostRequirements NONE =
-            new MinimumHostRequirements(Optional.empty(), Optional.empty(), List.of());
+            new MinimumHostRequirements(
+                    Optional.empty(), Optional.empty(), Optional.empty(), List.of());
 
     /**
      * Validates the requirements and takes a defensive, immutable copy of the library list.
@@ -72,6 +96,7 @@ public record MinimumHostRequirements(
      */
     public MinimumHostRequirements {
         Objects.requireNonNull(minimumGlibc, "minimumGlibc");
+        Objects.requireNonNull(minimumGlibcxx, "minimumGlibcxx");
         Objects.requireNonNull(minimumMacOsVersion, "minimumMacOsVersion");
         minimumMacOsVersion = strippedIfPresent(minimumMacOsVersion);
         requiredHostLibraries = checkedLibraries(requiredHostLibraries);
@@ -122,7 +147,8 @@ public record MinimumHostRequirements(
     /**
      * The requirements of an artefact that declares none.
      *
-     * @return an instance with no glibc floor, no macOS floor and no required host libraries
+     * @return an instance with no glibc floor, no C++ runtime floor, no macOS floor and no required
+     *     host libraries
      */
     public static MinimumHostRequirements none() {
         return NONE;
@@ -135,6 +161,7 @@ public record MinimumHostRequirements(
      */
     public boolean isEmpty() {
         return minimumGlibc.isEmpty()
+                && minimumGlibcxx.isEmpty()
                 && minimumMacOsVersion.isEmpty()
                 && requiredHostLibraries.isEmpty();
     }
