@@ -8,10 +8,11 @@ Project Status
    ``main`` published to the remote after GitHub push protection rejected the
    project's own seeded-secret decoy; **Phase 04 resumed, reworked once and
    signed off PARTIAL**)
-:Current phase: 04 -- **PARTIAL**, signed off 2026-09-02 on tier 1's own re-run
-   and seven of its own defect injections. Phase 03 is **PARTIAL**, signed off
-   2026-09-01. Phases 00 and 01 remain PARTIAL, both awaiting a pull request.
-   **Phase 05 is next**, after the per-class census debt is closed.
+:Current phase: 05 -- **IN PROGRESS**, dispatched 2026-09-02. Phase 04 is
+   **PARTIAL**, signed off 2026-09-02 on tier 1's own re-run and seven of its
+   own defect injections; Phase 03 **PARTIAL**, 2026-09-01. Phases 00 and 01
+   remain PARTIAL, both awaiting a pull request. The per-class census debt is
+   closed (:ref:`status-census-closed`).
 :Overall: The repository, build and every quality gate exist and have each been
    seen to fail on a deliberate defect. Three phases are signed off -- 02
    PASSED, 03 PARTIAL, 00 and 01 PARTIAL -- and 04 is in progress. What holds
@@ -188,8 +189,13 @@ Phase board
        (:ref:`status-platform-divergence`).
    * - 05
      - Tool registry and installer
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - **Dispatched 2026-09-02** with a fresh phase orchestrator, briefed by
+       ``handoffs/PHASE-05-BRIEF.rst`` and told its expected grade is PARTIAL:
+       gate item 9 is macOS-only and cannot be executed here. The first phase
+       to reach the network. Dependencies 01, 03 and 04 are all signed off and
+       no decision blocks it; the owner approved the network access on
+       2026-09-02.
    * - 06
      - Comet parameter model
      - NOT STARTED

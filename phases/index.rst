@@ -46,7 +46,7 @@ authoritative for its own scope and exit gate.
      - Tool Registry and Installer
      - 01, 03, 04
      - none open. D-002 (option C), D-003 and D-004 all DECIDED
-     - NOT STARTED
+     - IN PROGRESS (dispatched 2026-09-02)
    * - `06 <PHASE-06-comet-param-model.rst>`_
      - Comet Parameter Model
      - 01, 05
