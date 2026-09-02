@@ -84,6 +84,24 @@ final class RecordingProgressListener implements DownloadProgressListener {
     }
 
     /**
+     * The smallest byte count reported.
+     *
+     * <p>On a resumed transfer this must be the resume point: a listener told a number below it has
+     * been told that the download went backwards, which is a progress bar running in reverse on the
+     * one transfer big enough to have been resumed.
+     *
+     * @return the smallest count
+     * @throws IllegalStateException if nothing was reported at all
+     */
+    long lowestByteCount() {
+        List<Long> counts = byteCounts();
+        if (counts.isEmpty()) {
+            throw new IllegalStateException("no progress was reported at all");
+        }
+        return Collections.min(counts);
+    }
+
+    /**
      * Whether the byte counts never went backwards.
      *
      * @return {@code true} if every report was at least as large as the one before it

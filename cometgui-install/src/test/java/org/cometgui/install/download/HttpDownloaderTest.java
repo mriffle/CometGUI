@@ -333,6 +333,183 @@ class HttpDownloaderTest {
                         () -> assertArrayEquals(body, Files.readAllBytes(file)));
             }
         }
+
+        @Test
+        @DisplayName("on a resumed transfer counts the whole artefact, not the resumed portion")
+        void onAResumedTransferCountsTheWholeArtefact() throws IOException {
+            // The axis the three tests above do not vary. Every one of them starts from zero, so
+            // a downloader that reported the bytes of THIS ATTEMPT rather than the position in the
+            // artefact would satisfy all of them: the listener would be told the offset, then jump
+            // backwards to the first chunk of the remainder, then climb again -- a progress bar
+            // running in reverse on the 99 MB PDV download, which is the one transfer big enough
+            // to be resumed. The report's own resumedFromBytes()/bytesTransferred() cannot see it,
+            // because they are the report and not what the listener was told.
+            byte[] body = bytes(2_000_000, 'a');
+            long offset = 1_500_000L;
+            try (LoopbackHttpServer server = new LoopbackHttpServer(serving(body));
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                PartialDownload partial = PartialDownload.beside(file);
+                Files.write(partial.file(), java.util.Arrays.copyOf(body, (int) offset));
+                partial.recordState(body.length, "\"v1\"");
+
+                AtomicBoolean destinationSeenMidTransfer = new AtomicBoolean();
+                RecordingProgressListener progress = new RecordingProgressListener();
+                DownloadProgressListener watcher =
+                        (transferred, total) -> {
+                            if (Files.exists(file)) {
+                                destinationSeenMidTransfer.set(true);
+                            }
+                            progress.onProgress(transferred, total);
+                        };
+
+                DownloadReport report =
+                        downloader.fetch(
+                                DownloadRequest.of(server.uri("/a.zip"), file)
+                                        .resuming(true)
+                                        .listeningTo(watcher));
+
+                assertAll(
+                        () -> assertEquals(206, report.statusCode(), "it really was a resume"),
+                        () -> assertEquals(offset, report.resumedFromBytes()),
+                        () ->
+                                assertEquals(
+                                        offset,
+                                        progress.byteCounts().get(0),
+                                        "the first report is the bytes already on disk, not zero"),
+                        () ->
+                                assertEquals(
+                                        offset,
+                                        progress.lowestByteCount(),
+                                        "and nothing below it is ever reported: a count of this"
+                                                + " attempt rather than of the artefact would show"
+                                                + " up here as a number near the first chunk size"),
+                        () ->
+                                assertTrue(
+                                        progress.isMonotone(),
+                                        "monotone ACROSS the resume boundary, which is the join a"
+                                                + " fresh download never has"),
+                        () -> assertEquals(body.length, progress.lastByteCount()),
+                        () ->
+                                assertEquals(
+                                        java.util.Set.of((long) body.length),
+                                        progress.totals(),
+                                        "the total is the whole artefact, not the remainder"),
+                        () ->
+                                assertTrue(
+                                        progress.events().size() > 3,
+                                        "the remainder arrives in several chunks, so the join is"
+                                                + " genuinely crossed rather than stepped over: "
+                                                + progress.events().size()
+                                                + " report(s)"),
+                        () ->
+                                assertTrue(
+                                        progress.byteCounts().stream()
+                                                .anyMatch(
+                                                        count ->
+                                                                count > offset
+                                                                        && count < body.length),
+                                        "and at least one report lands strictly inside the"
+                                                + " remainder"),
+                        () ->
+                                assertFalse(
+                                        destinationSeenMidTransfer.get(),
+                                        "a resumed transfer creates the destination at the end too,"
+                                                + " not as it goes"),
+                        () -> assertArrayEquals(body, Files.readAllBytes(file)));
+            }
+        }
+
+        @Test
+        @DisplayName("on a clean restart starts from zero, not from the abandoned resume point")
+        void onACleanRestartStartsFromZero() throws IOException {
+            // The same axis, the other way. When the server refuses the range the partial file is
+            // abandoned, so the listener must be told 0 -- a bar that opened at 75% and then
+            // downloaded the whole file again would be monotone and still wrong.
+            byte[] body = bytes(2_000_000, 'a');
+            long offset = 1_500_000L;
+            try (LoopbackHttpServer server =
+                            new LoopbackHttpServer(LoopbackHttpServer.ignoringRange(() -> body));
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                PartialDownload partial = PartialDownload.beside(file);
+                Files.write(partial.file(), java.util.Arrays.copyOf(body, (int) offset));
+                partial.recordState(body.length, "\"v1\"");
+
+                RecordingProgressListener progress = new RecordingProgressListener();
+                DownloadReport report =
+                        downloader.fetch(
+                                DownloadRequest.of(server.uri("/a.zip"), file)
+                                        .resuming(true)
+                                        .listeningTo(progress));
+
+                assertAll(
+                        () -> assertTrue(report.rangeRequested(), "a range was asked for"),
+                        () -> assertEquals(200, report.statusCode(), "and refused"),
+                        () -> assertEquals(0L, report.resumedFromBytes()),
+                        () -> assertEquals(0L, progress.byteCounts().get(0)),
+                        () -> assertEquals(0L, progress.lowestByteCount()),
+                        () -> assertTrue(progress.isMonotone()),
+                        () -> assertEquals(body.length, progress.lastByteCount()),
+                        () -> assertEquals(java.util.Set.of((long) body.length), progress.totals()),
+                        () -> assertArrayEquals(body, Files.readAllBytes(file)));
+            }
+        }
+
+        @Test
+        @DisplayName("on a resumed transfer with no declared total, still counts the artefact")
+        void onAResumedTransferWithNoDeclaredTotal() throws IOException {
+            // The third axis crossed with the second: resumed AND no length declared. The total
+            // stays negative throughout and the byte counts are still positions in the artefact.
+            byte[] body = bytes(200_000, 'a');
+            int offset = 150_000;
+            try (LoopbackHttpServer server =
+                            new LoopbackHttpServer(
+                                    (request, out) -> {
+                                        int from =
+                                                LoopbackHttpServer.rangeStart(request)
+                                                        .orElseThrow();
+                                        LoopbackHttpServer.head(
+                                                out,
+                                                206,
+                                                "Partial Content",
+                                                "Content-Length: " + (body.length - from),
+                                                "Content-Range: bytes "
+                                                        + from
+                                                        + "-"
+                                                        + (body.length - 1)
+                                                        + "/*",
+                                                "ETag: \"v1\"");
+                                        out.write(body, from, body.length - from);
+                                    });
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                PartialDownload partial = PartialDownload.beside(file);
+                Files.write(partial.file(), java.util.Arrays.copyOf(body, offset));
+                partial.recordState(-1, "\"v1\"");
+
+                RecordingProgressListener progress = new RecordingProgressListener();
+                DownloadReport report =
+                        downloader.fetch(
+                                DownloadRequest.of(server.uri("/a.zip"), file)
+                                        .resuming(true)
+                                        .listeningTo(progress));
+
+                assertAll(
+                        () -> assertEquals(206, report.statusCode()),
+                        () -> assertEquals(offset, report.resumedFromBytes()),
+                        () -> assertEquals(java.util.Set.of(-1L), progress.totals()),
+                        () -> assertEquals((long) offset, progress.byteCounts().get(0)),
+                        () -> assertEquals((long) offset, progress.lowestByteCount()),
+                        () -> assertTrue(progress.isMonotone()),
+                        () -> assertEquals((long) body.length, progress.lastByteCount()),
+                        () -> assertTrue(progress.events().size() > 3),
+                        () -> assertArrayEquals(body, Files.readAllBytes(file)));
+            }
+        }
     }
 
     @Nested
@@ -1151,7 +1328,15 @@ class HttpDownloaderTest {
                 assertAll(
                         () -> assertEquals(1000L, thrown.declaredTotalBytes()),
                         () -> assertEquals(400L, thrown.receivedBytes()),
-                        () -> assertFalse(Files.exists(file)));
+                        () -> assertFalse(Files.exists(file)),
+                        () ->
+                                assertEquals(
+                                        400L,
+                                        Files.size(partial.file()),
+                                        "the partial file is kept on the 206 path too, not only on"
+                                                + " the 200 path -- it is the path a resume takes,"
+                                                + " so it is the one where keeping it matters"),
+                        () -> assertTrue(Files.exists(partial.stateFile())));
             }
         }
 
