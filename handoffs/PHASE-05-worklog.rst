@@ -506,3 +506,53 @@ Blockers escalated
    which an owner decision deleted and which no agent may reverse. **Reported
    to tier 1 with (a) recommended.** Not a ``D-`` item: nothing is
    redistributed and no platform promise changes.
+
+   **ANSWERED by tier 1, 2026-09-02: option (a).** Windows fetches the two
+   schemas from the Linux ``noxml`` ``.deb``. Tier 1 re-verified the
+   byte-identity itself across the 3.06.5 ``.deb``, the 3.07.1 ``.deb`` and
+   the 3.07.1 ``.pkg`` before answering, and recorded the reasoning: the
+   choice fills a silence in ``specification.rst`` rather than contradicting
+   its text, redistributes nothing, reverses no owner decision and executes no
+   installer, and the byte-identity evidence is what makes it safe -- the file
+   Windows would have got from the NSIS installer **is** the file it gets from
+   the ``.deb``.
+
+   Tier 1 also confirmed independently that the shipped ``percolator_out.xsd``
+   declares ``majorVersion`` as ``use="required" fixed="2"`` while the 3.07.1
+   binary writes ``3``, so **that schema cannot validate that binary's own
+   output unmodified**. The XSDs are therefore a provenance and validation
+   asset, not a runtime prerequisite and not, as shipped, a working validation
+   gate. **Because taking a Debian package's payload onto a Windows machine
+   looks like a mistake to a later reader, unit 2 records the reason in the
+   registry itself and unit 11 records it in
+   ``docs/developer/tool_registry.rst``.** An undocumented oddity becomes
+   somebody's cleanup.
+
+.. _p05-tier1-directions:
+
+Standing directions from tier 1, carried into the units
+=======================================================
+
+Given on dispatch of unit 1, 2026-09-02, and repeated in the unit briefs that
+own them.
+
+#. **The manifest-names-the-member design must not become the reason the
+   traversal guard is never exercised.** Both hold at once: for ``ZIP`` the
+   archive's own path never places a file, **and** the guard that rejects
+   ``../my_build/percolator-noxml/src/percolator`` is still exercised, against
+   that real upstream artefact. Tier 1 has said this is the part of the phase
+   it is most likely to try to break at sign-off.
+#. **"The output file exists" is not a probe condition**, because the 8+8
+   failure leaves a zero-byte file; and **``--help`` arrives on stderr**, so a
+   probe reading stdout alone sees an empty string. Both are pinned as facts
+   in unit 7's tests, not merely recorded here -- they are exactly the
+   assumptions a later agent re-introduces.
+#. **The ``R-PLAT-03`` classifier is written against observed text**,
+   including the two-layer case in :ref:`p05-central-risk` where stubbing
+   ``libboost_filesystem`` exposes ``GLIBCXX_3.4.32`` and ``GLIBC_2.38``
+   beneath the missing-object failure. A classifier built from invented
+   strings is a rule that has never seen its subject.
+#. ``scripts/ci/nightly-manifest-verify.sh`` **stays a stub.** It is Phase
+   15's, and a stub that exits non-zero is the correct state.
+#. The opt-in real-URL fetch command and its cost are handed to tier 1 with
+   the closing report; tier 1 will run it once at sign-off.
