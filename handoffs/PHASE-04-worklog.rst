@@ -555,7 +555,9 @@ single most load-bearing lesson of the phase and unit 11 inherits it.
 
 A sweep proves the ABSENCE OF A STRING, not the PRESENCE OF REDACTION. It is
 only as strong as the shapes *and the sizes* of the inputs it is given, and it
-is blind to at least two things unless they are deliberately covered.
+is blind to at least three things unless they are deliberately covered. The
+third -- occurrence count -- was found by tier 1 at sign-off; see
+:ref:`p04-third-blind-spot`.
 
 **Blind spot 1: a partial rewrite.** ``contains(secret)`` is defeated by one
 changed character. The unit found this itself, by injection: with a registered
@@ -1755,3 +1757,128 @@ asserts that harness still contains its mutation control **and** that
 ``<cometgui.mutation.skip>false</cometgui.mutation.skip>``. A switch that is set
 and inert is the failure this project keeps finding, and it is now asserted on
 every aggregate run rather than checked once.
+
+.. _p04-third-blind-spot:
+
+Rework after tier 1's sign-off injection: the corpus's third blind spot
+-----------------------------------------------------------------------
+
+Tier 1 injected one character into the shared rule set --
+``KNOWN_TOKEN_SHAPES.matcher(cleaned).replaceAll(...)`` became
+``replaceFirst(...)`` -- and **everything stayed green**: 83 domain tests and 22
+provenance secrecy tests, including this phase's own
+``SeededSecretArtefactSweepTest``, all passing with a secret-leaking change live
+in ``cometgui-domain``. **No carrier in the corpus held its secret more than
+once**, so nothing in the suite could tell the two apart. That is catalogued
+shape 5, an input set too narrow, on a dimension the corpus had already reasoned
+carefully about twice.
+
+**A sharper finding underneath it, measured before anything was written.** The
+obvious repair -- add a two-occurrence carrier to the corpus -- does **not**
+work, and would have shipped a test that cannot fail. ``redactText`` runs the
+literal registry pass **first**, and ``SecretRegistry.redactIn`` uses
+``String.replace``, which clears **every** occurrence. ``loaded()`` registers
+the whole corpus, so under it the literal pass repairs a broken pattern rule
+before that rule is ever reached. Measured on the compiled class with the defect
+live::
+
+    --- patternsOnly(): the registry cannot mask a pattern defect ---
+    token shape x2         survives=true   [REDACTED] AKIAIOSFODNN7EXAMPLE
+    --- loaded(): the registry's String.replace clears every occurrence ---
+    token shape x2         survives=false  [REDACTED] [REDACTED]
+
+So the repeated carriers are swept with ``SecretRedactor.patternsOnly()``, and
+the reason is written into the class documentation beside the carriers rather
+than left for the next person to rediscover. **This also means the existing
+``shortCarriersComeOutAsWritten`` assertions prove less than they appear to**:
+run through ``loaded()``, ``auth=swordfish-42`` is cleared by the registry
+before the assignment rule sees it. They are not wrong -- they pin the composed
+behaviour a caller gets -- but ``patternsAloneCoverWhatTheyClaim`` is the test
+that holds the pattern rules to account, and it is where the new carriers
+matter.
+
+**What was added**, to
+``cometgui-domain/src/test/java/org/cometgui/domain/secrets/SeededSecretCorpusTest.java``
+and nothing else:
+
+* a third entry in the class documentation's blind-spot list, naming occurrence
+  count beside partial rewrite and input size, in the same voice, and carrying
+  the masking measurement above;
+* ``repeatedCarriers()`` -- one carrier per rule family with its secret in it
+  twice, **built by duplicating the corresponding short carrier** rather than
+  written out again, so the short carriers stay short by construction and a
+  later edit to one cannot leave its twin testing a different rule;
+* ``repeatedCarriersComeOutAsWritten`` (pattern families, ``patternsOnly()``),
+  ``repeatedRegistryOnlyCarriersComeOutAsWritten`` (bare value, ``pw=``, argv,
+  ``loaded()``), and ``everyRepeatedCarrierIsItsShortCarrierTwice``, which pins
+  the duplication relationship so blind spots (2) and (3) cannot pull against
+  each other;
+* the repeated carriers, a two-block PEM carrier, a four-element argv and a
+  two-name environment wired into ``redactEveryCarrier``, so they reach both the
+  absence sweep and ``patternsAloneCoverWhatTheyClaim``.
+
+**Every expected string is hand-typed from the rule** -- each occurrence of the
+secret becomes the marker, everything else survives -- and not captured from the
+redactor. The probe above was an independent cross-check of values already
+derived, not their source.
+
+**The deliverable: the defect re-injected, and the exact text.** Anchor asserted
+to occur exactly once, marker grepped back out, and the **compiled class
+confirmed changed** (``f3210458a6d76b92c55629238ba82bca`` to
+``b5051066b25adafa9093c319b407cb3d``) before any result was believed::
+
+    SeededSecretCorpusTest.patternsAloneCoverWhatTheyClaim:600
+      a pattern rule stopped covering its carrier: [corpus secret #9 survived
+      the short token shape twice carrier with the pattern rules alone]
+      ==> expected: <true> but was: <false>
+
+    SeededSecretCorpusTest.repeatedCarriersComeOutAsWritten:424
+      expected: <[REDACTED] [REDACTED]> but was: <[REDACTED] AKIAIOSFODNN7EXAMPLE>
+
+**And each family's carrier was proved load-bearing on its own rule**, one
+injection at a time so that attribution could not be borrowed. Every one names
+**its own** carrier and no other:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 42 58
+
+   * - Injection
+     - The carrier that caught it
+
+   * - ``KNOWN_TOKEN_SHAPES`` to ``replaceFirst``
+     - ``corpus secret #9 survived the short token shape twice carrier``
+
+   * - ``PEM_PRIVATE_KEY`` to ``replaceFirst``
+     - ``corpus secret #10`` and ``#11 survived the pem block twice carrier``
+
+   * - ``CREDENTIAL_URL`` to ``replaceFirst``
+     - ``corpus secret #7 survived the short credential URL twice carrier``
+
+   * - ``BEARER_TOKEN`` to ``replaceFirst``
+     - ``corpus secret #7 survived the short bearer twice carrier``
+
+   * - the assignment scan stopped after its first match
+     - ``corpus secret #7 survived the short assignment twice carrier``
+
+That fifth one is worth noting: ``redactSecretAssignments`` is an explicit scan
+rather than a ``replaceAll``, so ``replaceFirst`` cannot be written there -- the
+equivalent defect is the loop stopping early, and the carrier catches that too.
+
+**This is a change to ``cometgui-domain``, which Phase 03 also depends on**, so
+it is recorded here as the shared-module rule requires. It is **test-only**: no
+production file was modified, ``replaceAll`` is correct and stays, and Phase
+03's sign-off is untouched. The one production edit made during this work was
+each temporary injection, every one reverted with ``git checkout --`` and a
+``touch``, with the marker count confirmed back to 0.
+
+**Re-measured after the rework**, on the quiet tree:
+
+* ``cometgui-domain`` **362 tests** (was 359; the three new ones), 0 failures;
+  ``cometgui-provenance`` **669 tests**, 0 failures, 2 skipped -- unchanged.
+* JaCoCo **100.00% line and 100.00% branch** in both modules, unchanged.
+* PIT ``cometgui-domain`` **204 mutations, 204 KILLED**, ``secrets``
+  contributing 52; ``cometgui-provenance`` **774 mutations, 771 KILLED, 0
+  SURVIVED, 3 TIMED_OUT**. Unchanged.
+* The census is still whole: **37 compiled / 37 in jacoco.xml** for
+  ``cometgui-provenance`` and **25 / 25** for ``cometgui-domain``.

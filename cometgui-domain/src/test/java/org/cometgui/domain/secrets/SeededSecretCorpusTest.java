@@ -16,6 +16,7 @@
 
 package org.cometgui.domain.secrets;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -56,6 +57,25 @@ import org.junit.jupiter.api.Test;
  *       how the examples were written.</b> {@link #shortCarriers()} exists solely to hold one
  *       deliberately small carrier per rule family, the smallest being twelve characters. Do not
  *       "tidy" them into realistic-looking longer examples.
+ *   <li><b>A leak conditioned on the OCCURRENCE COUNT.</b> A rule that clears the first match and
+ *       leaves the rest -- {@code replaceAll} changed to {@code replaceFirst}, one character -- is
+ *       invisible to a corpus in which no carrier holds its secret more than once. Every carrier
+ *       here did exactly that, and the defect passed 83 domain tests and 22 provenance secrecy
+ *       tests with a secret-leaking change live in the shared rule set. It is not an exotic input:
+ *       {@code --token X --retry-token X}, an environment dump, or a log line that repeats a URL
+ *       all carry one secret twice. <b>Occurrence COUNT is therefore part of this corpus's coverage
+ *       too</b>, and {@link #repeatedCarriers()} holds one carrier per rule family with its secret
+ *       in it twice.
+ *       <p><b>Those carriers must be swept with {@link SecretRedactor#patternsOnly()}, and this is
+ *       the part that is easy to get wrong.</b> {@link #loaded()} registers the whole corpus, and
+ *       {@code SecretRegistry.redactIn} uses {@code String.replace}, which clears EVERY occurrence
+ *       -- so the literal pass that runs first in {@code redactText} repairs a broken pattern rule
+ *       before that rule is ever reached, and the defect above stays invisible. Measured, not
+ *       reasoned: with {@code replaceFirst} injected, the token-shape carrier reads {@code
+ *       [REDACTED] AKIAIOSFODNN7EXAMPLE} under the pattern rules alone and {@code [REDACTED]
+ *       [REDACTED]} under a loaded registry. {@link #patternsAloneCoverWhatTheyClaim()} is the
+ *       sweep that sees it; a "simplification" of that test to use {@link #loaded()} would silently
+ *       remove the only thing that catches this.
  * </ol>
  *
  * <p>The general lesson is that a sweep proves the absence of a string, not the presence of
@@ -166,7 +186,12 @@ class SeededSecretCorpusTest {
                     "short argv",
                     "log line 3",
                     "short bare value",
-                    "short unnamed assignment");
+                    "short unnamed assignment",
+                    // The repeated carriers inherit their family's classification: duplicating a
+                    // carrier cannot make a pattern rule start or stop covering it.
+                    "short argv twice",
+                    "short bare value twice",
+                    "short unnamed assignment twice");
 
     // -----------------------------------------------------------------------------------------
     // The carriers.
@@ -227,6 +252,60 @@ class SeededSecretCorpusTest {
      */
     private static List<String> shortArgv() {
         return List.of("-k", SWORDFISH);
+    }
+
+    /**
+     * Every short carrier with its secret in it <strong>twice</strong>, one per rule family.
+     *
+     * <p>These exist because of blind spot (3) in the class documentation. Each is built by
+     * repeating its own entry from {@link #shortCarriers()} with a single space between the two
+     * copies, rather than being written out again here, and that is deliberate twice over: it makes
+     * the shortness guard {@link #everyShortCarrierIsActuallyShort()} apply to these by
+     * construction, and it means a later edit to a short carrier cannot leave its repeated twin
+     * testing a different rule. {@link #everyRepeatedCarrierIsItsShortCarrierTwice()} pins that
+     * relationship so the two cannot drift apart.
+     *
+     * @return each repeated carrier's name and the text to run through the redactor
+     */
+    private static Map<String, String> repeatedCarriers() {
+        Map<String, String> repeated = new LinkedHashMap<>();
+        for (Map.Entry<String, String> carrier : shortCarriers().entrySet()) {
+            repeated.put(
+                    carrier.getKey() + " twice", carrier.getValue() + " " + carrier.getValue());
+        }
+        return repeated;
+    }
+
+    /** The smallest argument array carrying one credential in two separate elements. */
+    private static List<String> repeatedArgv() {
+        return List.of("-k", SWORDFISH, "-k", SWORDFISH);
+    }
+
+    /**
+     * Two differently-named variables holding one credential.
+     *
+     * <p>A map cannot repeat a key, so "twice" for an environment means two names that are both
+     * secret-looking carrying the same value -- which is what a shell that exports both {@code
+     * GITHUB_TOKEN} and {@code GH_TOKEN} actually produces.
+     *
+     * @return the environment
+     */
+    private static Map<String, String> repeatedEnvironment() {
+        Map<String, String> environment = new LinkedHashMap<>();
+        environment.put("GITHUB_TOKEN", GITHUB_TOKEN);
+        environment.put("GH_TOKEN", GITHUB_TOKEN);
+        environment.put("COMET_PARAMS", "/data/comet.params");
+        return environment;
+    }
+
+    /** A log entry carrying two whole PEM blocks, which is the long family's repeated carrier. */
+    private static String repeatedPemBlocks() {
+        return "-----BEGIN RSA PRIVATE KEY-----\n"
+                + PEM_BODY
+                + "\n-----END RSA PRIVATE KEY-----\n"
+                + "-----BEGIN RSA PRIVATE KEY-----\n"
+                + PEM_BODY
+                + "\n-----END RSA PRIVATE KEY-----";
     }
 
     private static String credentialUrl() {
@@ -327,6 +406,104 @@ class SeededSecretCorpusTest {
                     "a short argv element has grown to " + argument.length() + " characters");
         }
         assertEquals(12, SWORDFISH.length());
+    }
+
+    @Test
+    @DisplayName("every repeated carrier loses BOTH occurrences, not just the first")
+    void repeatedCarriersComeOutAsWritten() {
+        // Blind spot (3).  Every expected string below is typed from the RULE -- each occurrence
+        // of the secret becomes the marker and everything else survives -- and not captured from
+        // the redactor.
+        //
+        // THE PATTERN FAMILIES ARE SWEPT WITH patternsOnly() ON PURPOSE.  loaded() registers the
+        // whole corpus and the literal pass runs FIRST in redactText, clearing every occurrence
+        // with String.replace before any pattern rule is reached; under it a rule that cleared
+        // only its first match would look perfect.  Do not "simplify" these to loaded().
+        SecretRedactor patterns = SecretRedactor.patternsOnly();
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                "auth=[REDACTED] auth=[REDACTED]",
+                                patterns.redactText("auth=swordfish-42 auth=swordfish-42")),
+                () ->
+                        assertEquals(
+                                "Bearer [REDACTED] Bearer [REDACTED]",
+                                patterns.redactText("Bearer swordfish-42 Bearer swordfish-42")),
+                () ->
+                        assertEquals(
+                                "ftp://u:[REDACTED]@h/ ftp://u:[REDACTED]@h/",
+                                patterns.redactText(
+                                        "ftp://u:swordfish-42@h/ ftp://u:swordfish-42@h/")),
+                () ->
+                        assertEquals(
+                                "[REDACTED] [REDACTED]",
+                                patterns.redactText("AKIAIOSFODNN7EXAMPLE AKIAIOSFODNN7EXAMPLE")),
+                () ->
+                        assertEquals(
+                                "[REDACTED]\n[REDACTED]", patterns.redactText(repeatedPemBlocks())),
+                // The name rule needs no registry: a variable called *TOKEN is a credential
+                // whatever its value looks like, and both of these are.
+                () ->
+                        assertEquals(
+                                Map.of(
+                                        "GITHUB_TOKEN",
+                                        "[REDACTED]",
+                                        "GH_TOKEN",
+                                        "[REDACTED]",
+                                        "COMET_PARAMS",
+                                        "/data/comet.params"),
+                                patterns.redactEnvironment(repeatedEnvironment())));
+    }
+
+    @Test
+    @DisplayName("the repeated carriers only the registry can clear lose both occurrences too")
+    void repeatedRegistryOnlyCarriersComeOutAsWritten() {
+        // The other half: a bare value, an unnamed assignment and a single-letter flag are not
+        // covered by any pattern rule, so these prove SecretRegistry.redactIn clears every
+        // occurrence rather than the first.  Here loaded() is the redactor under test, not a
+        // masking hazard.
+        SecretRedactor redactor = loaded();
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                "[REDACTED] [REDACTED]",
+                                redactor.redactText("swordfish-42 swordfish-42")),
+                () ->
+                        assertEquals(
+                                "pw=[REDACTED] pw=[REDACTED]",
+                                redactor.redactText("pw=swordfish-42 pw=swordfish-42")),
+                () ->
+                        assertEquals(
+                                List.of("-k", "[REDACTED]", "-k", "[REDACTED]"),
+                                redactor.redactArgv(repeatedArgv())));
+    }
+
+    @Test
+    @DisplayName("every repeated carrier really is its short carrier twice, so it stays short")
+    void everyRepeatedCarrierIsItsShortCarrierTwice() {
+        // The property that keeps blind spots (2) and (3) from pulling against each other.  If a
+        // repeated carrier were written out by hand it could quietly grow into the realistic
+        // long example the class documentation warns against, and the size guard would not see
+        // it because it only looks at shortCarriers().  Asserted rather than trusted.
+        Map<String, String> shorts = shortCarriers();
+        Map<String, String> repeated = repeatedCarriers();
+
+        assertEquals(shorts.size(), repeated.size());
+        for (Map.Entry<String, String> carrier : shorts.entrySet()) {
+            String twice = repeated.get(carrier.getKey() + " twice");
+            assertEquals(
+                    carrier.getValue() + " " + carrier.getValue(),
+                    twice,
+                    "the \""
+                            + carrier.getKey()
+                            + "\" repeated carrier is no longer its short"
+                            + " carrier twice, so it no longer inherits the size guard");
+            assertTrue(
+                    twice.contains(SWORDFISH) || twice.contains(AWS_ACCESS_KEY_ID),
+                    "the \"" + carrier.getKey() + "\" repeated carrier carries no corpus secret");
+        }
     }
 
     @Test
@@ -478,6 +655,26 @@ class SeededSecretCorpusTest {
             carriers.add(new Carrier(carrier.getKey(), redactor.redactText(carrier.getValue())));
         }
         carriers.add(new Carrier("short argv", String.join(" ", redactor.redactArgv(shortArgv()))));
+        // Blind spot (3): one carrier per rule family with its secret in it twice.  These reach
+        // patternsAloneCoverWhatTheyClaim() as well as the absence sweep, and that is the test
+        // that catches a rule which clears only its first match.
+        for (Map.Entry<String, String> carrier : repeatedCarriers().entrySet()) {
+            carriers.add(new Carrier(carrier.getKey(), redactor.redactText(carrier.getValue())));
+        }
+        carriers.add(
+                new Carrier(
+                        "short argv twice", String.join(" ", redactor.redactArgv(repeatedArgv()))));
+        carriers.add(new Carrier("pem block twice", redactor.redactText(repeatedPemBlocks())));
+        StringBuilder repeatedEnvironmentText = new StringBuilder();
+        for (Map.Entry<String, String> variable :
+                redactor.redactEnvironment(repeatedEnvironment()).entrySet()) {
+            repeatedEnvironmentText
+                    .append(variable.getKey())
+                    .append('=')
+                    .append(variable.getValue());
+            repeatedEnvironmentText.append('\n');
+        }
+        carriers.add(new Carrier("environment twice", repeatedEnvironmentText.toString()));
         return carriers;
     }
 }
