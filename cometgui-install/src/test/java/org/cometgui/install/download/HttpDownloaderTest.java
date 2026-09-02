@@ -405,6 +405,114 @@ class HttpDownloaderTest {
         }
 
         @Test
+        @DisplayName("works when the server declared no length at all")
+        void worksWhenNoLengthWasDeclared() throws IOException {
+            // Graded over an axis the cancellation rule does not depend on. A plausible extra
+            // condition -- "only stop when we know how much is left" -- would leave every chunked
+            // download uncancellable, and no mutation operator writes that condition, so only a
+            // test that varies the axis can see it.
+            byte[] body = bytes(2_000_000, 'a');
+            try (LoopbackHttpServer server =
+                            new LoopbackHttpServer(
+                                    (request, out) -> {
+                                        LoopbackHttpServer.head(
+                                                out, 200, "OK", "Transfer-Encoding: chunked");
+                                        for (int written = 0;
+                                                written < body.length;
+                                                written += 8192) {
+                                            LoopbackHttpServer.write(
+                                                    out, Integer.toHexString(8192) + "\r\n");
+                                            out.write(body, written, 8192);
+                                            LoopbackHttpServer.write(out, "\r\n");
+                                            out.flush();
+                                        }
+                                        LoopbackHttpServer.write(out, "0\r\n\r\n");
+                                    });
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                AtomicBoolean stop = new AtomicBoolean();
+                DownloadProgressListener trigger =
+                        (transferred, total) -> {
+                            if (transferred >= 8192) {
+                                stop.set(true);
+                            }
+                        };
+
+                DownloadCancelledException thrown =
+                        assertThrows(
+                                DownloadCancelledException.class,
+                                () ->
+                                        downloader.fetch(
+                                                DownloadRequest.of(server.uri("/a.zip"), file)
+                                                        .listeningTo(trigger)
+                                                        .cancellableBy(stop::get)));
+
+                PartialDownload partial = PartialDownload.beside(file);
+                assertAll(
+                        () -> assertTrue(thrown.bytesTransferred() >= 8192),
+                        () -> assertTrue(thrown.bytesTransferred() < body.length),
+                        () -> assertFalse(Files.exists(file)),
+                        () -> assertFalse(Files.exists(partial.file())),
+                        () -> assertFalse(Files.exists(partial.stateFile())));
+            }
+        }
+
+        @Test
+        @DisplayName("works on a resumed transfer, and takes the partial file with it")
+        void worksOnAResumedTransfer() throws IOException {
+            // The other axis the rule does not depend on: cancelling a transfer that started from
+            // an existing partial file must still leave nothing behind, and the bytes it reports
+            // are the bytes of the artefact, not of this attempt.
+            byte[] body = bytes(2_000_000, 'a');
+            try (LoopbackHttpServer server = new LoopbackHttpServer(serving(body));
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                PartialDownload partial = PartialDownload.beside(file);
+                Files.write(partial.file(), java.util.Arrays.copyOf(body, 500_000));
+                partial.recordState(body.length, "\"v1\"");
+
+                AtomicBoolean stop = new AtomicBoolean();
+                DownloadProgressListener trigger =
+                        (transferred, total) -> {
+                            if (transferred >= 600_000) {
+                                stop.set(true);
+                            }
+                        };
+
+                DownloadCancelledException thrown =
+                        assertThrows(
+                                DownloadCancelledException.class,
+                                () ->
+                                        downloader.fetch(
+                                                DownloadRequest.of(server.uri("/a.zip"), file)
+                                                        .resuming(true)
+                                                        .listeningTo(trigger)
+                                                        .cancellableBy(stop::get)));
+
+                assertAll(
+                        () ->
+                                assertEquals(
+                                        Optional.of("bytes=500000-"),
+                                        server.requests().get(0).range(),
+                                        "it really was a resume"),
+                        () ->
+                                assertTrue(
+                                        thrown.bytesTransferred() >= 600_000,
+                                        "the count is of the artefact, not of this attempt: "
+                                                + thrown.bytesTransferred()),
+                        () -> assertTrue(thrown.bytesTransferred() < body.length),
+                        () -> assertFalse(Files.exists(file)),
+                        () ->
+                                assertFalse(
+                                        Files.exists(partial.file()),
+                                        "the partial file the transfer inherited is gone too"),
+                        () -> assertFalse(Files.exists(partial.stateFile())));
+            }
+        }
+
+        @Test
         @DisplayName("before the first byte opens no connection at all")
         void beforeTheFirstByteOpensNoConnection() throws IOException {
             byte[] body = bytes(64, 'a');
