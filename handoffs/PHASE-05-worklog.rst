@@ -307,9 +307,12 @@ collide -- they share ``cometgui-domain``, the Maven working tree,
        meets 90/85 and its mutation gate.
      - ``R-TOOL-01``, ``R-TOOL-03``, ``R-TOOL-06``, ``R-TOOL-08``,
        ``R-PLAT-02``, ``R-PLAT-03``, ``R-PERC-01``, ``R-PERC-11``
-     - **REWORK, 2026-09-02** -- see :ref:`p05-u1-signoff`. First submission
-       ``ea686d6``: everything the agent reported reproduced when I re-ran it,
-       and an injection of my own **survived 108 tests**.
+     - **ACCEPTED 2026-09-02** after one rework -- see :ref:`p05-u1-signoff`.
+       ``ea686d6`` reproduced exactly when I re-ran it, but an injection of my
+       own **survived 108 tests**; ``42033ad`` widened ten test classes and both
+       that injection and a second, unannounced one now fail. Build 11/11 in
+       910s, domain 100.0% line and branch, 49/49 in the census, 368/369
+       mutations. Ten test classes changed, no production source.
 
    * - 2
      - **The artefact manifest and its reader.** ``manifests/tools.json``
@@ -563,6 +566,83 @@ as this phase's second most likely.
 Restored with ``git checkout --``; the source hash returned to ``b8586159...``,
 the marker greps back out at zero occurrences, and ``git status --porcelain``
 is empty.
+
+Unit 1 accepted, after one rework
+---------------------------------
+
+Rework committed as ``42033ad``, on top of my sign-off record and leaving
+``ea686d6`` untouched. **Ten test classes widened; no production source
+changed** -- the rule was right and the tests were thin, which is the correct
+shape of this repair.
+
+**What I ran myself**, on ``42033ad`` with nothing else building.
+
+*The same injection, again.* Anchor still unique. Source ``b8586159...`` to
+``31b47c54...`` (my wording differs from the agent's, so the hash does too);
+**compiled class** ``8835fcb3...`` to ``1b4c7018...``; ``UNVERIFIED`` present in
+the constructor bytecode. The four-class command that previously exited 0 with
+108 passes now exits **1** with ``Tests run: 171, Failures: 18``, and
+``DeclaredCapabilityTest`` goes from 10 tests to 25 with 18 failing. It fails
+for the right reason, not by coincidence::
+
+    DeclaredCapabilityTest.theEvidenceAxisIsCoveredWhole:188 every evidence
+    value must reject a blank note; a value missing here is a capability that
+    can be claimed with no provenance ==> expected: <[OBSERVED_BY_EXECUTION,
+    INFERRED_FROM_ARTEFACT_BYTES, UNVERIFIED]> but was:
+    <[OBSERVED_BY_EXECUTION, INFERRED_FROM_ARTEFACT_BYTES]>
+
+*A second, different injection, to test whether the audit was real or
+cosmetic.* Repairing only the defect that was found is the cheap response, so I
+injected into a different widened class without warning: ``InstallProgress``
+accepting a negative ``bytesTransferred`` when the phase is ``FAILED`` or
+``CANCELLED`` -- "a failed transfer has no meaningful byte count". Compiled
+class ``1cc980d1...`` to ``ea70743e...``. ``InstallProgressTest`` exits **1**,
+``Tests run: 40, Failures: 2``, from
+``aNegativeByteCountIsRejectedInEveryPhase`` -- the phase-axis test the audit
+added. **The audit was real.**
+
+Both injections reverted with ``git checkout --``; both source hashes back to
+baseline, both markers grep back out at zero, ``git status --porcelain`` empty.
+
+*The build, my own run,* 07:35:25 to 07:50:35::
+
+    11/11 stages OK in 910 seconds.  BUILD OK
+    127 report file(s): tests=2334 failures=0 errors=0 skipped=2
+    ok  cometgui-domain   line 100.0% (832/832)  branch 100.0% (350/350)
+    ok  cometgui-domain   49 compiled class(es), all 49 in the sample
+    ok  cometgui-domain   368/369 mutations killed = 99.7%
+    ok  cometgui-domain   154 class(es) analysed, 0 findings
+    ok  8 architecture rule(s) checked, 0 failures
+
+Reactor tests 2182 to 2334; ``cometgui-domain`` 788 to 940. Coverage and the
+census are unchanged, which is what a test-only change should do.
+
+.. _p05-tenth-shape:
+
+A tenth shape: an added conjunct is invisible to coverage *and* to mutation
+---------------------------------------------------------------------------
+
+The phase brief says "nine shapes of a check that cannot fail -- expect a
+tenth". This is the tenth, and it was the agent that named it.
+
+The hole in :ref:`p05-u1-injection` sat under **100% line coverage, 100% branch
+coverage and a 99.7% mutation score**, and none of the three could have found
+it. Coverage cannot: every line and every branch of the original rule was
+executed. Mutation cannot either, and this is the part worth keeping: **PIT
+mutates the expression that is there; it never adds a conjunct.** There is no
+mutation operator that turns ``note.isBlank()`` into ``note.isBlank() &&
+evidence != UNVERIFIED``, because that is not a mutation of the expression, it
+is a different expression. The mutation score was identical before and after
+the repair -- 368/369 both times -- which is the evidence that the gate was
+blind rather than merely quiet.
+
+So a rule can be fully covered, fully mutation-tested, and still be switched
+off for one value of a parameter it was never varied over. The defence is not a
+stronger automated gate; it is **grading every rejection over the axes the rule
+does not depend on**, which is what the rework did, plus a human injection of
+the plausible-sounding extra condition. Unit 12 carries this as a control, and
+it is the reason a hand-written injection is worth doing even on a module that
+reports perfect numbers.
 
 Carried forward from unit 1
 ---------------------------
