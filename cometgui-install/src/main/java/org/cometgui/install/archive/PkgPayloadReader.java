@@ -17,6 +17,7 @@
 package org.cometgui.install.archive;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -27,6 +28,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
 import javax.xml.XMLConstants;
@@ -200,34 +203,51 @@ final class PkgPayloadReader implements ArchiveReader {
     }
 
     private static Element findPayloadFile(Node node) {
-        NodeList children = node.getChildNodes();
-        for (int index = 0; index < children.getLength(); index++) {
-            Node child = children.item(index);
-            if (child instanceof Element element) {
-                if ("file".equals(element.getTagName())) {
-                    Element name = child(element, "name");
-                    if (name != null && PAYLOAD.equals(name.getTextContent())) {
-                        return element;
-                    }
+        for (Element element : elementsOf(node)) {
+            if ("file".equals(element.getTagName())) {
+                Element name = child(element, "name");
+                if (name != null && PAYLOAD.equals(name.getTextContent())) {
+                    return element;
                 }
-                Element found = findPayloadFile(element);
-                if (found != null) {
-                    return found;
-                }
+            }
+            Element found = findPayloadFile(element);
+            if (found != null) {
+                return found;
             }
         }
         return null;
     }
 
     private static Element child(Element parent, String tag) {
-        NodeList children = parent.getChildNodes();
-        for (int index = 0; index < children.getLength(); index++) {
-            Node child = children.item(index);
-            if (child instanceof Element element && tag.equals(element.getTagName())) {
+        for (Element element : elementsOf(parent)) {
+            if (tag.equals(element.getTagName())) {
                 return element;
             }
         }
         return null;
+    }
+
+    /*
+     * The element children of a node, as a list.  Walking a NodeList by index puts an off-by-one
+     * boundary in two places for no gain: item(getLength()) returns null rather than throwing, so
+     * the mutant that walks one past the end behaves identically and cannot be killed.  Reading
+     * the children once removes the arithmetic instead of arguing about it.
+     */
+    private static List<Element> elementsOf(Node node) {
+        /*
+         * One index walk rather than two.  Its own boundary is not killable and is not a hole:
+         * NodeList.item returns null past the end rather than throwing, so a walk that went one too
+         * far would skip a null and stop on the next test.  The loop is here once so that the
+         * argument is made once.
+         */
+        NodeList children = node.getChildNodes();
+        List<Element> elements = new ArrayList<>(children.getLength());
+        for (int index = 0; index < children.getLength(); index++) {
+            if (children.item(index) instanceof Element element) {
+                elements.add(element);
+            }
+        }
+        return elements;
     }
 
     private long childLong(Element data, String tag) throws IOException {
@@ -275,7 +295,20 @@ final class PkgPayloadReader implements ArchiveReader {
         byte[] sniff = buffered.readNBytes(6);
         buffered.reset();
         if (sniff.length >= 2 && (sniff[0] & 0xFF) == 0x1F && (sniff[1] & 0xFF) == 0x8B) {
-            return new GZIPInputStream(buffered);
+            try {
+                return new GZIPInputStream(buffered);
+            } catch (IOException cause) {
+                /*
+                 * The payload announced itself as gzip and then was not one -- a header too short
+                 * to finish, or a checksum that does not belong.  Refused with the artefact's name
+                 * on it: an EOFException carrying no subject tells a reader that something ended,
+                 * and not which downloaded file to go and look at.
+                 */
+                throw malformed(
+                        "its payload begins with the gzip marker and is not a readable gzip"
+                                + " stream: "
+                                + cause);
+            }
         }
         String text = new String(sniff, StandardCharsets.US_ASCII);
         if (text.startsWith("0707")) {
@@ -298,16 +331,45 @@ final class PkgPayloadReader implements ArchiveReader {
         return text.toString();
     }
 
+    /** The feature name that refuses a {@code DOCTYPE} declaration outright. */
+    static final String DISALLOW_DOCTYPE = "http://apache.org/xml/features/disallow-doctype-decl";
+
+    /**
+     * Forces a parser factory into the only configuration this reader will read a package with.
+     *
+     * <p>The table of contents is XML that arrived over the network inside a downloaded {@code
+     * .pkg}: attacker-controlled by construction. A parser left at its defaults will resolve an
+     * external entity -- reaching the network or the local file system from inside an extraction --
+     * and will expand a nested entity until the heap is gone.
+     *
+     * <p><strong>It forces the state; it does not merely decline to disturb it.</strong> Two of
+     * these five settings happen to match the JDK's own defaults today, so a version of this method
+     * that omitted them would behave identically on this runtime and no test could tell -- which is
+     * exactly a protection that is present, believed and unproven. Written as a forcing operation
+     * over a factory the caller supplies, each of the five is load-bearing and {@code
+     * XarTableOfContentsHardeningTest} proves it by handing in a factory set to every unsafe value
+     * first.
+     *
+     * @param factory the factory to harden, in whatever state it arrives
+     * @return the same factory, hardened
+     * @throws ParserConfigurationException if the factory refuses a setting this reader requires,
+     *     which is a reason not to parse rather than a reason to carry on
+     */
+    static DocumentBuilderFactory harden(DocumentBuilderFactory factory)
+            throws ParserConfigurationException {
+        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setFeature(DISALLOW_DOCTYPE, true);
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
+        factory.setNamespaceAware(false);
+        return factory;
+    }
+
     private Element parse(byte[] toc) throws IOException {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         try {
-            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-            factory.setNamespaceAware(false);
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            return builder.parse(new java.io.ByteArrayInputStream(toc)).getDocumentElement();
+            DocumentBuilder builder =
+                    harden(DocumentBuilderFactory.newInstance()).newDocumentBuilder();
+            return builder.parse(new ByteArrayInputStream(toc)).getDocumentElement();
         } catch (ParserConfigurationException | SAXException cause) {
             throw malformed("its table of contents is not readable as XML: " + cause.getMessage());
         }
@@ -322,6 +384,11 @@ final class PkgPayloadReader implements ArchiveReader {
         ByteBuffer buffer = ByteBuffer.allocate(length).order(ByteOrder.BIG_ENDIAN);
         channel.position(offset);
         while (buffer.hasRemaining()) {
+            /*
+             * The test is for the end of the file, which a channel reports as -1.  A file channel
+             * positioned inside a file never answers a non-empty buffer with zero, so the boundary
+             * between "< 0" and "<= 0" is a value this loop cannot be handed.
+             */
             if (channel.read(buffer) < 0) {
                 throw malformed(
                         "it ends before offset "

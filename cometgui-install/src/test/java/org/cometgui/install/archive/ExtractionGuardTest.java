@@ -81,6 +81,8 @@ class ExtractionGuardTest {
                 "\\\\server\\share",
                 "C:/x",
                 "c:x",
+                "C:",
+                "\u0000leading",
                 "a:b",
                 "a\\b",
                 "a//b",
@@ -396,6 +398,64 @@ class ExtractionGuardTest {
                                 rejection.getMessage().contains("null"),
                                 "a diagnostic that says a target resolves to \"null\" sends a"
                                         + " reader nowhere"));
+    }
+
+    @Test
+    @DisplayName("a link target whose very first character is a NUL is refused for that")
+    void aLinkTargetBeginningWithANul() throws IOException {
+        ExtractionGuard guard = guardOver(work.resolve("dest"), 1024L);
+        ExtractionRejectedException rejection =
+                assertThrows(
+                        ExtractionRejectedException.class,
+                        () -> guard.placeSymlink(ArchiveEntry.symlink("link", "\u0000elsewhere")));
+        assertTrue(
+                rejection.getMessage().contains("is empty or contains a NUL character"),
+                () -> "wrong message: " + rejection.getMessage());
+    }
+
+    @Test
+    @DisplayName("a link target whose very first character is a backslash is refused for that")
+    void aLinkTargetBeginningWithABackslash() throws IOException {
+        ExtractionGuard guard = guardOver(work.resolve("dest"), 1024L);
+        ExtractionRejectedException rejection =
+                assertThrows(
+                        ExtractionRejectedException.class,
+                        () -> guard.placeSymlink(ArchiveEntry.symlink("link", "\\\\server")));
+        assertTrue(
+                rejection.getMessage().contains("is spelled with a backslash or a drive letter"),
+                () -> "wrong message: " + rejection.getMessage());
+    }
+
+    @Test
+    @DisplayName("a chain of exactly as many links as the limit allows still resolves")
+    void aChainOfExactlyTheLimit() throws IOException {
+        Path destination = Files.createDirectories(work.resolve("dest"));
+        /*
+         * Forty is the limit, so forty must work and forty-one must not.  Testing only the refusal
+         * would leave "refuse everything" passing; this is the half that says the limit is a limit
+         * rather than a prohibition.
+         */
+        for (int index = 0; index < 40; index++) {
+            Files.createSymbolicLink(
+                    destination.resolve("hop" + index), Path.of("hop" + (index + 1)));
+        }
+        Files.createDirectory(destination.resolve("hop40"));
+        ExtractionGuard guard = guardOver(destination, 1024L);
+        PlacedFile link = guard.placeSymlink(ArchiveEntry.symlink("entry", "hop0"));
+        assertAll(
+                () -> assertEquals(new PlacedFile("entry", ArchiveEntryType.SYMLINK, 0L), link),
+                () ->
+                        assertEquals(
+                                Path.of("hop0"),
+                                Files.readSymbolicLink(destination.resolve("entry")),
+                                "the link is created and points where the archive said"),
+                /*
+                 * Deliberately not asserted by following the chain: Linux applies its own limit of
+                 * forty links and would refuse a forty-first traversal itself, so an assertion
+                 * through the file system here would be measuring the kernel rather than this
+                 * guard.  What is proved is that the guard resolved the chain and accepted it.
+                 */
+                () -> assertEquals(1, guard.report().placed().size()));
     }
 
     @Test

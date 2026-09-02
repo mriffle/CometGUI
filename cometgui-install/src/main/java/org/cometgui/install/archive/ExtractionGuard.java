@@ -171,6 +171,13 @@ final class ExtractionGuard {
         if (path.startsWith("/") || path.startsWith("\\") || hasDriveLetter(path)) {
             throw reject(RejectionReason.ENTRY_NAME_ABSOLUTE, path, entryName, fromArchive);
         }
+        /*
+         * The index here is never zero: a name beginning with a backslash was refused as absolute
+         * four lines above, because that is what it means on the platform that uses backslashes.
+         * The rule is written as "anywhere" rather than as "after the first character" because
+         * that is the rule -- the unreachable half of the boundary is a consequence of the
+         * ordering, not a case anyone should have to think about here.
+         */
         if (path.indexOf('\\') >= 0) {
             throw reject(RejectionReason.ENTRY_NAME_BACKSLASH, path, entryName, fromArchive);
         }
@@ -488,6 +495,22 @@ final class ExtractionGuard {
         long total = 0;
         int read;
         while ((read = content.read(buffer)) >= 0) {
+            /*
+             * A STREAM THAT NEITHER DELIVERS A BYTE NOR ADMITS TO BEING FINISHED IS REFUSED RATHER
+             * THAN WAITED ON.  InputStream.read is contractually allowed to return zero only for a
+             * zero-length request, and this one asks for 65536 bytes; a container that answers zero
+             * makes no progress, and a loop that keeps asking turns a 99 MB artefact into a hang
+             * that looks like a slow disk.  PIT found this by making BoundedEntryStream return
+             * zero, and three of its mutants timed out here rather than being killed -- which is
+             * the shape of a product hang, not of a test artefact.
+             */
+            if (read == 0) {
+                throw ExtractionRejectedException.entry(
+                        RejectionReason.MALFORMED_ARCHIVE,
+                        entryName,
+                        " -- reading it returned no bytes and did not report the end of the entry,"
+                                + " so the container is not making progress");
+            }
             expand(entryName, read);
             if (out != null) {
                 out.write(buffer, 0, read);
@@ -571,6 +594,11 @@ final class ExtractionGuard {
      * out of a class where every branch has to mean something.
      */
     private Path parentDirectoryOf(String relative) {
+        /*
+         * lastSlash is -1 or greater than zero and never zero: a checked relative path cannot
+         * begin with a separator, because a leading "/" was refused as absolute before this string
+         * existed.  The zero case is unreachable rather than untested.
+         */
         int lastSlash = relative.lastIndexOf('/');
         return lastSlash > 0 ? destination.resolve(relative.substring(0, lastSlash)) : destination;
     }

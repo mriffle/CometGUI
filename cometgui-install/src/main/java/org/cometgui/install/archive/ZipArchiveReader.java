@@ -151,9 +151,18 @@ final class ZipArchiveReader implements ArchiveReader {
         return ArchiveEntry.file(name, catalogued.sizeBytes());
     }
 
+    /**
+     * The bytes of the entry {@link #next()} last returned.
+     *
+     * <p>Handed out unwrapped. A zip's entry stream is already bounded by the container, and no
+     * caller closes an entry stream -- the reader owns it -- so a non-closing wrapper here would be
+     * a branch with nothing behind it.
+     *
+     * @return the current entry's bytes, empty for a directory or a symbolic link
+     */
     @Override
     public InputStream content() {
-        return content == zip ? new BoundedEntryStream(zip, Long.MAX_VALUE) : content;
+        return content;
     }
 
     @Override
@@ -312,6 +321,16 @@ final class ZipArchiveReader implements ArchiveReader {
             throws IOException {
         int cursor = extraOffset;
         int end = extraOffset + extraLength;
+        /*
+         * TERMINATION IS NOT AN ACCIDENT OF THE DATA.  dataSize is masked to 0..65535, so the step
+         * below is at least four and the cursor always advances, whatever an attacker writes in the
+         * extra field.  There is no input for which this does not terminate.
+         *
+         * Its own comparison survives mutation and cannot do otherwise.  The four bytes are a
+         * header about to be read, so "<=" is the rule; the only input that separates it from "<"
+         * is an extra field ending in a bare header with no payload, and such a header cannot be
+         * the eight-byte size field being looked for -- so both forms reach the same refusal below.
+         */
         while (cursor + 4 <= end) {
             int headerId = directory.getShort(cursor) & 0xFFFF;
             int dataSize = directory.getShort(cursor + 2) & 0xFFFF;
@@ -344,6 +363,7 @@ final class ZipArchiveReader implements ArchiveReader {
         ByteBuffer buffer = ByteBuffer.allocate(length).order(ByteOrder.LITTLE_ENDIAN);
         channel.position(offset);
         while (buffer.hasRemaining()) {
+            /* -1 is the end of the file; a file channel never answers a non-empty buffer with 0. */
             if (channel.read(buffer) < 0) {
                 throw ExtractionRejectedException.artefact(
                         RejectionReason.MALFORMED_ARCHIVE,

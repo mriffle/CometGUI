@@ -365,6 +365,35 @@ class ArchiveEdgeCasesTest {
     }
 
     @Test
+    @DisplayName("a payload of exactly two bytes is long enough to be recognised as gzip")
+    void aTwoBytePayload() throws IOException {
+        /*
+         * Two bytes is exactly what the gzip magic number takes, so this is the shortest payload
+         * the sniff can form an opinion about; one byte shorter and it must not try.
+         */
+        ExtractionRejectedException rejection =
+                refuse(
+                        ArtefactKind.PKG_PAYLOAD,
+                        ArchiveFixtures.pkgBytesWithPayload(
+                                new byte[] {0x1F, (byte) 0x8B}, "application/octet-stream"),
+                        "twobyte.pkg");
+        assertAll(
+                () -> assertEquals(RejectionReason.MALFORMED_ARCHIVE, rejection.reason()),
+                () ->
+                        assertTrue(
+                                rejection
+                                        .getMessage()
+                                        .contains(
+                                                "its payload begins with the gzip marker and is not"
+                                                        + " a readable gzip stream"),
+                                () ->
+                                        "two bytes of gzip magic is recognised AS gzip and fails as"
+                                                + " a truncated one, rather than being reported as"
+                                                + " unrecognisable: "
+                                                + rejection.getMessage()));
+    }
+
+    @Test
     @DisplayName("a data element with no encoding is read as stored bytes")
     void aDataElementWithNoEncoding() throws IOException {
         byte[] cpio = ArchiveFixtures.cpioBytes(List.of(Entry.file("tool.bin", "payload")));

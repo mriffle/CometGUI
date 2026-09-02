@@ -156,7 +156,13 @@ final class DebPayloadReader implements ArchiveReader {
             return member;
         }
         if (name.endsWith(".tar.gz")) {
-            return new GZIPInputStream(member);
+            try {
+                return new GZIPInputStream(member);
+            } catch (IOException cause) {
+                /* Named for the reason PkgPayloadReader.decompress gives for naming its own. */
+                throw malformed(
+                        "its \"" + name + "\" member is not a readable gzip stream: " + cause);
+            }
         }
         throw ExtractionRejectedException.artefact(
                 RejectionReason.UNSUPPORTED_COMPRESSION,

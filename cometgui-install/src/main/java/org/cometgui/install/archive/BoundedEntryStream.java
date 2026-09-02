@@ -33,6 +33,18 @@ import java.io.InputStream;
  *
  * <p><strong>Closing it does not close the underlying stream.</strong> The guard writes entries
  * through try-with-resources, so a plain view would close the whole archive after the first entry.
+ *
+ * <h2>Why three mutants of this class time out rather than dying</h2>
+ *
+ * <p>Both {@code read} methods answer a request for bytes with either a byte count or -1, and never
+ * with zero: that is the {@link java.io.InputStream} contract, and the decompressors this window
+ * feeds rely on it. Mutants that make either method return zero therefore break the contract, and
+ * the JDK's own inflater spins on the result inside its own loop -- so PIT records a timeout rather
+ * than a kill, and the hang is in a library this project does not own rather than in this class.
+ *
+ * <p>The one place <em>this</em> code could have spun on such a stream is the guard's copy loop,
+ * and it no longer can: {@code ExtractionGuard.transfer} refuses a read that delivers nothing and
+ * reports no end, which {@code GuardAccountingTest} proves against a stream that does exactly that.
  */
 final class BoundedEntryStream extends FilterInputStream {
 
@@ -69,6 +81,12 @@ final class BoundedEntryStream extends FilterInputStream {
         }
         int wanted = (int) Math.min(length, remaining);
         int read = in.read(buffer, offset, wanted);
+        /*
+         * The guard is against -1, not against 0: subtracting a zero-length read would be a no-op
+         * anyway, so the two forms of this condition are indistinguishable and PIT is right that
+         * one of them cannot be killed.  It is written as "> 0" because that is what the sentence
+         * means -- take off what was actually delivered.
+         */
         if (read > 0) {
             remaining -= read;
         }

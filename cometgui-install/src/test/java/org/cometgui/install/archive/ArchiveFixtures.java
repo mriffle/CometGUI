@@ -193,6 +193,24 @@ final class ArchiveFixtures {
      * @throws IOException if deflating fails
      */
     static byte[] zipBytes(List<Entry> entries, boolean directorySlash) throws IOException {
+        return zipBytes(entries, directorySlash, ENTRY_COMMENT);
+    }
+
+    /**
+     * A zip whose central-directory records carry the comment the caller chooses.
+     *
+     * <p>The empty comment exists for one test: a record with no name, no extra field and no
+     * comment makes the directory exactly forty-six bytes long, which is the only input that tells
+     * "is there room for another record" apart from "is there room for this one".
+     *
+     * @param entries the entries
+     * @param directorySlash whether a directory's name ends in {@code /}
+     * @param comment the comment on every record, possibly empty
+     * @return the archive bytes
+     * @throws IOException if deflating fails
+     */
+    static byte[] zipBytes(List<Entry> entries, boolean directorySlash, String comment)
+            throws IOException {
         ByteArrayOutputStream file = new ByteArrayOutputStream();
         List<int[]> offsets = new ArrayList<>();
         List<byte[]> compressed = new ArrayList<>();
@@ -212,13 +230,15 @@ final class ArchiveFixtures {
             Entry entry = entries.get(index);
             byte[] name = nameOf(entry, directorySlash);
             directory.write(
-                    centralHeader(
+                    centralHeaderWithComment(
                             name,
                             entry.payload(),
                             compressed.get(index),
                             entry,
-                            offsets.get(index)[0]));
+                            offsets.get(index)[0],
+                            comment));
             directory.write(name);
+            directory.write(comment.getBytes(StandardCharsets.UTF_8));
         }
         file.write(directory.toByteArray());
         file.write(endRecord(entries.size(), directory.size(), directoryOffset));
@@ -249,8 +269,22 @@ final class ArchiveFixtures {
         return header.array();
     }
 
-    private static byte[] centralHeader(
-            byte[] name, byte[] raw, byte[] deflated, Entry entry, int localOffset) {
+    /**
+     * A comment on every central-directory record.
+     *
+     * <p>Real archivers write these, and until one appeared here the walk from one record to the
+     * next could drop the comment length without any test noticing -- every record was 46 bytes
+     * plus a name and nothing else, so three of the four numbers being added were zero.
+     */
+    static final String ENTRY_COMMENT = "written by CometGUI's test fixtures";
+
+    private static byte[] centralHeaderWithComment(
+            byte[] name,
+            byte[] raw,
+            byte[] deflated,
+            Entry entry,
+            int localOffset,
+            String comment) {
         ByteBuffer header = ByteBuffer.allocate(46).order(ByteOrder.LITTLE_ENDIAN);
         header.putInt(0x02014b50);
         header.putShort((short) (3 << 8 | 20));
@@ -264,7 +298,7 @@ final class ArchiveFixtures {
         header.putInt((int) entry.declaredSize());
         header.putShort((short) name.length);
         header.putShort((short) 0);
-        header.putShort((short) 0);
+        header.putShort((short) comment.length());
         header.putShort((short) 0);
         header.putShort((short) 0);
         header.putInt(entry.mode() << 16);
@@ -303,22 +337,25 @@ final class ArchiveFixtures {
             Entry entry = entries.get(index);
             byte[] name = nameOf(entry, true);
             byte[] header =
-                    centralHeader(
+                    centralHeaderWithComment(
                             name,
                             entry.payload(),
                             compressed.get(index),
                             entry,
-                            offsets.get(index));
+                            offsets.get(index),
+                            ENTRY_COMMENT);
             ByteBuffer patched = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN);
             patched.putInt(24, -1);
             patched.putShort(30, (short) 12);
             directory.write(header);
+            /* Name, then extra field, then comment: the order a central-directory record uses. */
             directory.write(name);
             ByteBuffer extra = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN);
             extra.putShort((short) 0x0001);
             extra.putShort((short) 8);
             extra.putLong(entry.declaredSize());
             directory.write(extra.array());
+            directory.write(ENTRY_COMMENT.getBytes(StandardCharsets.UTF_8));
         }
         byte[] directoryBytes = directory.toByteArray();
         file.write(directoryBytes);

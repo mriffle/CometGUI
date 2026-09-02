@@ -95,6 +95,27 @@ class ArchiveValuesTest {
         }
 
         @Test
+        @DisplayName("an entry ceiling of exactly zero is refused: it would admit no archive")
+        void exactlyZeroEntriesIsRefused() {
+            assertEquals(
+                    "maxEntryCount must be a positive number of entries, but was: 0",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () -> new ExtractionLimits(1L, 0, 2.0d, 1L))
+                            .getMessage());
+        }
+
+        @Test
+        @DisplayName("a ratio floor of exactly zero is allowed: it measures every archive")
+        void exactlyZeroFloorIsAllowed() {
+            assertEquals(
+                    0L,
+                    new ExtractionLimits(1L, 1, 2.0d, 0L).ratioCheckedAboveBytes(),
+                    "zero is a floor, not the absence of one: it says measure the ratio from the"
+                            + " first byte, which is stricter rather than broken");
+        }
+
+        @Test
         @DisplayName("a negative ratio floor is refused, naming the value")
         void aNegativeFloorIsRefused() {
             assertEquals(
@@ -305,6 +326,17 @@ class ArchiveValuesTest {
         }
 
         @Test
+        @DisplayName("a report of nothing at all is a report, not an error")
+        void allThreeCountsMayBeZero() {
+            ExtractionReport report = new ExtractionReport(List.of(), 0, 0L, 0L);
+            assertAll(
+                    () -> assertEquals(0, report.entriesRead()),
+                    () -> assertEquals(0L, report.expandedBytes()),
+                    () -> assertEquals(0L, report.artefactBytes()),
+                    () -> assertEquals(List.of(), report.paths()));
+        }
+
+        @Test
         @DisplayName("a report's list is copied, so a caller cannot change what happened")
         void theReportIsImmutable() {
             ExtractionReport report =
@@ -404,6 +436,25 @@ class ArchiveValuesTest {
                     () -> assertEquals(-1, window.read(new byte[4], 0, 4)),
                     () -> assertEquals(0L, window.remaining()),
                     () -> assertEquals('d', shared.read()));
+        }
+
+        @Test
+        @DisplayName("a byte whose value is zero still counts as a byte")
+        void aZeroByteIsStillAByte() throws IOException {
+            java.io.ByteArrayInputStream shared =
+                    new java.io.ByteArrayInputStream(new byte[] {0, 65});
+            BoundedEntryStream window = new BoundedEntryStream(shared, 2);
+            assertAll(
+                    () -> assertEquals(0, window.read()),
+                    () ->
+                            assertEquals(
+                                    1L,
+                                    window.remaining(),
+                                    "read() returns the byte's value, and a value of zero is a"
+                                            + " delivered byte -- a window that only counted"
+                                            + " positive values would run past its own end"),
+                    () -> assertEquals(65, window.read()),
+                    () -> assertEquals(0L, window.remaining()));
         }
 
         @Test
