@@ -539,6 +539,47 @@ collide -- they share ``cometgui-domain``, the Maven working tree,
      - every gate item
      -
 
+.. _p05-injection-protocol:
+
+The injection protocol, as this phase now runs it
+==================================================
+
+Sharpened by tier 1 on 2026-09-02, after unit 3's agent reported a figure it
+could not explain instead of letting it pass. Recorded here because every
+remaining unit of this phase is held to it.
+
+**What happened.** The same baseline class ``904baa02...``, the same one-line
+defect, and two different injected class hashes: ``210d3e9a...`` from me and
+``a4a570b1...`` from the agent. The agent guessed a different compile
+invocation and said so rather than papering over it.
+
+**The measured cause**, which tier 1 established by compiling two classes
+differing by nothing but a comment line: ``javac`` records a
+``LineNumberTable`` in its debug info, so **a comment moves every line below it
+and therefore moves the class hash**. Compiled with ``-g:none`` the two classes
+are byte-identical, which proves the difference is line-number metadata rather
+than behaviour. ``-Djacoco.skip=true`` is a red herring -- JaCoCo instruments at
+run time through a javaagent and never rewrites ``target/classes``.
+
+**The three rules that follow:**
+
+#. **"The compiled class hash moved" stays mandatory.** It is what proves an
+   edit reached the bytecode, and it is the only defence against the eighth
+   shape -- an injection that reached the source but not the compiled class.
+   Nothing about that changes.
+#. **Two parties' injected class hashes differing is NOT evidence that they
+   injected different defects.** Line numbers alone move it, and chasing such a
+   mismatch is chasing formatting.
+#. **To compare two injections, compare the injected SOURCE hashes** -- or, if
+   all that matters is that the same property was falsified, **compare the
+   assertion text that failed.**
+
+**And the behaviour worth keeping.** The agent reported a number it could not
+explain rather than quietly dropping it. That is the behaviour this structure
+depends on: a phase in which agents suppress inconvenient figures is the one
+failure mode none of these gates can catch, because every gate reads what it is
+given.
+
 .. _p05-u1-signoff:
 
 Unit 1 sign-off
