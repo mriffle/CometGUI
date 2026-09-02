@@ -379,10 +379,13 @@ collide -- they share ``cometgui-domain``, the Maven working tree,
        is compared field by field, not by size.
      - ``R-TOOL-01``, ``R-TOOL-02``, ``R-TOOL-03``, ``R-SEC-02``,
        ``R-PERC-11``, ``R-PERC-12``, ``D-008``, gate 8
-     - **REWORK, 2026-09-02** -- see :ref:`p05-u2-signoff`. ``fd24fa7``: all 54
-       checksums re-derived by me from the bytes with 0 mismatches, the honesty
-       properties hold, my injection bit, build green at 992s. Two small
-       additions asked for.
+     - **ACCEPTED 2026-09-02** after one rework -- see :ref:`p05-u2-signoff`.
+       All 54 checksums re-derived by me from the bytes, 0 mismatches; the
+       honesty properties hold; three injections of mine all bit, one of them
+       in three places where it bit in one before the rework. Build 11/11 in
+       984s, cometgui-install 100.0% line and branch, 8/8 in the census,
+       189/189 mutations. The rework found a real defect: selection offered
+       one 99 MB download twice, the second marked as running under Rosetta 2.
 
    * - 3
      - **Downloader.** ``org.cometgui.install.download``: an
@@ -822,6 +825,142 @@ the same commit reports ``tests=2483`` and ``(560/560)``. One test and one line,
 in the safe direction, but an unexplained delta between a reported figure and
 the committed tree is the "evidence read without being dated" shape and is worth
 one sentence rather than a shrug.
+
+Unit 2 accepted, after one rework
+----------------------------------
+
+Reworked in ``eac6d5e``, on top of the agent's own ``c4bb680``. **The manifest
+itself is byte-identical to what I checked** -- ``git diff fd24fa7 eac6d5e --
+manifests/tools.json`` is empty -- so the 54 checksum verifications above stand
+for the accepted tree, and ``manifests/tools.json`` and the copy inside the jar
+are both sha256
+``3f6707d3b13686750914a5cfbb20bab11ae29acdd079577028cbe12ef0aaffcf``: one file,
+shipped once, confirmed by hashing both.
+
+**My build, on the accepted tree**::
+
+    11/11 stages OK in 984 seconds.  BUILD OK
+    136 report file(s): tests=2485 failures=0 errors=0 skipped=2
+    ok  cometgui-install  line 100.0% (567/567)  branch 100.0% (172/172)
+    ok  cometgui-install  8 compiled class(es), all 8 in the sample
+    ok  cometgui-install  189/189 mutations killed = 100.0%
+    ok  cometgui-install  30 class(es) analysed, 0 findings
+    ok  every module with critical-package code has its mutation gate on
+
+Three injections, all of them mine
+-----------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Defect injected
+     - What went red
+
+   * - **A.** Invert the second sort key, so translated sorts before native.
+     - **Three** failures: the fixture ordering test, ``ShippedManifest
+       Test.cometIsOfferedNativelyOnAppleSilicon`` and
+       ``aPlatformIndependentDownloadIsOfferedOnce``. Before the rework this
+       same injection failed **one** test, which is the measurable difference
+       the rework made.
+
+   * - **B.** Key the one-row-per-download rule on the **version** instead of
+       the download URL -- the mistake the agent said it nearly made.
+     - **Two** failures: the fixture ordering test and the Comet real-data
+       test. The agent predicted exactly one. It is in the safe direction, but
+       recorded because **a prediction about one's own harness is a claim to
+       check, not to believe.**
+
+   * - **C.** Keep the **last** row for each download instead of the first, so
+       the translated row survives where a native one exists. Mine, chosen
+       before reading the agent's suggestion.
+     - ``aPlatformIndependentDownloadIsOfferedOnce``, with the product
+       consequence in the message: *"pdv is a JAR, and a row marked
+       TRANSLATED_ROSETTA_2 would tell a scientist that a Java program runs
+       under Rosetta 2 ==> expected: <NATIVE> but was: <TRANSLATED_ROSETTA_2>"*.
+       So the test checks **which** row survives, not merely how many.
+
+All three reverted; markers grep back out at zero; ``git status --porcelain``
+empty.
+
+Two real defects the agent found in its own work
+-------------------------------------------------
+
+Both are worth the phase's memory, and the second is the more interesting.
+
+#. **The duplicate check was keyed on the version's spelling.** It used
+   ``ToolVersion.text()``, so a manifest carrying both ``3.09`` and ``3.09.0``
+   for one tool and platform was accepted, and ``select(host, tool,
+   parse("3.09"))`` returned **both** rows -- because ``ToolVersion.equals``
+   compares numerically and calls them one version. The check that exists to
+   stop one release being offered twice would have missed exactly the case it
+   was for. Found by re-reading, not by a failing test.
+
+#. **Selection offered the same download twice, and this one was surfaced by
+   the review item I asked for.** PDV's zip and the converter's JAR are one
+   file each, carried on all five platforms because the specification requires
+   an operating system and an architecture in every record. On
+   ``macos-aarch64`` both the ``macos-aarch64`` row and the ``macos-x86-64``
+   row are runnable, so the Tool Manager would have shown one **99 MB**
+   download twice and marked the second one as running under Rosetta 2 -- *a
+   false statement about a Java program*, not merely a repeated row.
+
+   The fix keys on the **URL**, not the version, and that distinction is the
+   whole point: Comet's two macOS builds are two different files with two
+   different digests, verified so in my own checksum run, and they remain two
+   genuine offers with the native one first; two rows naming one file were
+   never a choice.
+
+   **The lesson is the one the review was testing.** I asked for the ordering
+   rule to be asserted against the shipped manifest rather than only against a
+   fixture, because the rule was proved through a seam production need not use
+   -- the third of the project's nine shapes. Writing that assertion is what
+   made the duplicate visible. A fixture built to exercise a rule contains
+   exactly what the rule needs and nothing awkward; the real data contains a
+   99 MB file carried on five platforms.
+
+Carried forward from unit 2
+----------------------------
+
+* **``MinimumHostRequirements`` has no field for a GLIBCXX floor, and unit 6
+  needs one.** 3.07.1 requires ``GLIBCXX_3.4.29`` and the 3.09 payload requires
+  ``GLIBCXX_3.4.32`` -- and in :ref:`the loader failure I executed
+  <p05-central-risk>` the **GLIBCXX** line is reported *before* the ``GLIBC``
+  one, so an advance check that knows only about glibc would predict "runnable"
+  for a binary that fails on the C++ runtime. **Decision: unit 6 adds
+  ``minimumGlibcxx`` to ``MinimumHostRequirements`` and to the manifest**, in
+  the unit that first reads it, rather than landing a field nothing uses.
+* **Payload entries carry a ``./`` prefix** in the ``.deb`` tar and the ``.pkg``
+  cpio that the manifest's member paths omit. **Unit 4 must normalise**, and
+  must not do it by trimming whatever the archive happens to start with.
+* ``bcrypt.dll`` is deliberately **omitted** from the 3.09 Windows row's
+  required libraries: it is a system DLL, not a redistributable.
+* Companions carry ``id``, ``runtimePrerequisite``, ``gatesCapability``,
+  ``note`` and a uniform ``members`` list; ``memberMd5`` and companion-member
+  ``md5`` exist so every digest pair goes through the existing ``FileHashes``.
+* The reader loads ``/tools.json`` **from the classpath**, never from a
+  relative path that would only work with the repository root as the working
+  directory.
+
+.. _p05-stale-lock:
+
+A lock file that nothing takes
+-------------------------------
+
+While diagnosing :ref:`my own collision <p05-my-own-collision>` I found
+``_build/cometgui-maven.lock``, left by an earlier phase. **Nothing in
+``scripts/`` references it** -- ``grep -rn "cometgui-maven.lock\|flock\|LOCK"
+scripts/*.sh scripts/ci/*.sh`` returns nothing. It is a lock that is enforced by
+no one, and a reader who saw it could reasonably conclude that builds in this
+tree are serialised. That is the project's signature defect relocated from a
+test into a piece of process safety: a mechanism that cannot do the thing its
+existence implies.
+
+``scripts/`` is tier 1's, so this is **escalated, not fixed**: either delete the
+file, or make ``scripts/build.sh`` actually take it. The unit 2 agent had moved
+it, with the rest of ``_build/`` except ``m2repo``, into
+``_build/archive-before-p05-unit2/``; that move is not what let my collision
+happen, because nothing was reading the file in the first place.
 
 .. _p05-my-own-collision:
 
