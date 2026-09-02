@@ -67,11 +67,13 @@ import org.cometgui.domain.tools.ToolVersion;
  *
  * <h2>What a capability claim here is worth</h2>
  *
- * <p>Each capability arrives as a {@link DeclaredCapability}, carrying how it was established. No
- * Windows or macOS binary has ever been executed anywhere in this project, so no non-Linux row may
- * claim {@code observed-by-execution}. {@code R-TOOL-07} then makes the probe the final authority
- * on the host; these declarations exist so the Tool Manager can say what is known before the probe
- * has run, and so a fabricated row is visible as one.
+ * <p>Each capability arrives as a {@link DeclaredCapability}, carrying how it was established. A
+ * row may claim {@code observed-by-execution} only where somebody watched that build run: every
+ * {@code linux-x86-64} row, and -- since 2026-09-02, on a GitHub {@code windows-latest} runner --
+ * Percolator 3.07.1's Windows {@code XML_OUTPUT}. No macOS binary has been run anywhere at all.
+ * {@code R-TOOL-07} then makes the probe the final authority on the host; these declarations exist
+ * so the Tool Manager can say what is known before the probe has run, and so a fabricated row is
+ * visible as one.
  *
  * @param tool which tool this is a build of
  * @param version which release, as upstream names it

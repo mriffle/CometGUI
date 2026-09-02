@@ -386,12 +386,64 @@ class ShippedManifestTest {
 
     // ------------------------------------------------------------------ honesty --
 
+    /*
+     * EVERY CLAIM OF OBSERVATION, TYPED OUT BY HAND.  Until 2026-09-02 this test read "no
+     * non-Linux row may claim observation", which was true because no Windows or macOS binary had
+     * ever been executed anywhere in this project.  A GitHub windows-latest runner then executed
+     * Percolator 3.07.1's portable noxml binary, so the sentence is false for Windows and the rule
+     * has to become one about evidence rather than one about platforms.
+     *
+     * It is an allowlist and not a "must carry a note" rule, because a fabricated claim can carry
+     * a fabricated note: that rule would grade the presence of prose rather than the truth of the
+     * claim.  This list is falsifiable in both directions.  A fabricated claim anywhere fails it.
+     * And a GENUINE new observation cannot be added without editing this list, which is the
+     * friction that matters, because the edit is where somebody has to write down what was run,
+     * where, and when.
+     *
+     * XML_DECOY_OUTPUT is deliberately NOT here for Windows.  The runner exercised -X and
+     * --xml-in; it did not exercise -X -Z, and 200 psm elements from 200 targets is the
+     * target-only shape.  Adding it would be exactly the over-reading the evidence does not
+     * support.
+     */
+    private static final List<String> OBSERVED_BY_EXECUTION =
+            List.of(
+                    "comet 2026.02.2 linux-x86-64 COMPLETE_PARAMS_QUERY",
+                    "comet 2026.02.2 linux-x86-64 PEPXML_OUTPUT",
+                    "comet 2026.02.2 linux-x86-64 PIN_OUTPUT",
+                    "percolator 3.06.5 linux-x86-64 XML_DECOY_OUTPUT",
+                    "percolator 3.06.5 linux-x86-64 XML_OUTPUT",
+                    "percolator 3.07.1 linux-x86-64 XML_DECOY_OUTPUT",
+                    "percolator 3.07.1 linux-x86-64 XML_OUTPUT",
+                    "percolator 3.07.1 windows-x86-64 XML_OUTPUT");
+
     @Test
-    @DisplayName("no non-Linux row claims a capability was observed by execution")
-    void noNonLinuxRowClaimsObservation() throws IOException {
+    @DisplayName("exactly the capabilities somebody has watched run claim to have been observed")
+    void onlyWatchedCapabilitiesClaimObservation() throws IOException {
         List<String> claiming = new ArrayList<>();
         for (ArtefactRecord record : shipped().artefacts()) {
-            if (record.platform().operatingSystem() == HostOperatingSystem.LINUX) {
+            for (DeclaredCapability declared : record.capabilities()) {
+                if (declared.isObserved()) {
+                    claiming.add(record.describe() + " " + declared.capability().id());
+                }
+            }
+        }
+        claiming.sort(String::compareTo);
+
+        assertEquals(
+                OBSERVED_BY_EXECUTION,
+                claiming,
+                "a row claiming observed-by-execution that is not in this list is a fabricated"
+                        + " claim, and a real observation missing from it means somebody upgraded"
+                        + " a row without recording what was run -- the whole product's promise is"
+                        + " that it says what it knows");
+    }
+
+    @Test
+    @DisplayName("no macOS row claims observation, because no macOS binary has been run anywhere")
+    void noMacOsRowClaimsObservation() throws IOException {
+        List<String> claiming = new ArrayList<>();
+        for (ArtefactRecord record : shipped().artefacts()) {
+            if (record.platform().operatingSystem() != HostOperatingSystem.MACOS) {
                 continue;
             }
             for (DeclaredCapability declared : record.capabilities()) {
@@ -404,9 +456,9 @@ class ShippedManifestTest {
         assertEquals(
                 List.of(),
                 claiming,
-                "no Windows or macOS binary has ever been executed anywhere in this project, so a"
-                        + " row claiming observed-by-execution for one is a fabricated claim -- and"
-                        + " the whole product's promise is that it says what it knows");
+                "no macOS binary has been executed anywhere in this project -- not on hardware,"
+                        + " not on a runner, not under emulation -- so every macOS capability is"
+                        + " an inference and must say so");
     }
 
     @Test

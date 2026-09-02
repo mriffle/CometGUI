@@ -21,11 +21,12 @@ import java.util.Objects;
 /**
  * How a capability claim was established. This is the type that keeps the manifest honest.
  *
- * <p><strong>No Windows or macOS binary has ever been executed anywhere in this project.</strong>
- * Every non-Linux row in the specification's artefact table is a byte-marker inference: someone
- * looked for a writer literal in the downloaded bytes. That is real evidence and it is not the same
- * evidence as running the program, and the difference decides what the application is allowed to
- * tell a scientist.
+ * <p><strong>No macOS binary has ever been executed anywhere in this project</strong>, and until
+ * 2026-09-02 no Windows one had either -- on that date a GitHub {@code windows-latest} runner ran
+ * Percolator 3.07.1's portable build and watched it write Percolator XML. Every row that has not
+ * been through something like that is a byte-marker inference: someone looked for a writer literal
+ * in the downloaded bytes. That is real evidence and it is not the same evidence as running the
+ * program, and the difference decides what the application is allowed to tell a scientist.
  *
  * <p>So: <strong>a capability whose evidence is not {@link #OBSERVED_BY_EXECUTION} may never be
  * described as verified, confirmed, proven or tested.</strong> Not in the manifest, not in the Tool

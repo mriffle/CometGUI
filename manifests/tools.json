@@ -505,8 +505,8 @@
       "capabilities": [
         {
           "capability": "XML_OUTPUT",
-          "evidence": "inferred-from-artefact-bytes",
-          "note": "no Percolator binary for windows-x86-64 has ever been run anywhere in this project. Phase 05 unit 2 read the extracted member (sha256 b9d9bbe82bc4...) and found the pout-XML writer literals xmloutput, decoy-xml-output, percolator_out, per-colator.com/percolator_out and pout.xml present in its bytes. That is an inference from bytes and the host probe decides on the machine (R-TOOL-07)."
+          "evidence": "observed-by-execution",
+          "note": "observed to start and to write Percolator XML on a GitHub windows-latest runner (Windows Server 2025, x86-64, administrator, VS-equipped image) on 2026-09-02, run 33644055780: the binary printed its 3.07.1 banner, exited 0, and wrote 148272 bytes holding 200 psm and 200 peptide elements, parsed rather than grepped, from a 200-target 200-decoy PIN. The runner's image supplies the Visual C++ runtime the zip does not carry, so a clean end-user machine remains untested and requiredHostLibraries still applies"
         },
         {
           "capability": "XML_DECOY_OUTPUT",

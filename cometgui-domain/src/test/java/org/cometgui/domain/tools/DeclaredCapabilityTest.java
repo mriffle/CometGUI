@@ -106,11 +106,12 @@ class DeclaredCapabilityTest {
      * tests across four classes passed with the rule switched off. The blank axis was covered
      * thoroughly and the evidence axis was not covered at all.
      *
-     * UNVERIFIED is not an arbitrary constant to have missed. It is the value every Windows and
-     * every macOS capability row in this phase's manifest carries, because no Windows or macOS
-     * binary has ever been executed anywhere in this project, and the note is the only field that
-     * records why such a row is unverified. A row reading XML_OUTPUT / UNVERIFIED / "" is an
-     * unverified claim with no provenance at all.
+     * UNVERIFIED is not an arbitrary constant to have missed. It is the value most non-Linux
+     * capability rows in this phase's manifest carry, because almost nothing outside Linux has
+     * been executed anywhere in this project -- one Windows build on a runner on 2026-09-02, and
+     * no macOS binary ever -- and the note is the only field that records why such a row is
+     * unverified. A row reading XML_OUTPUT / UNVERIFIED / "" is an unverified claim with no
+     * provenance at all.
      *
      * The rejection does not depend on the evidence or on the capability, so it is asserted over
      * every value of both. Both sources are driven off values(), so a fourth CapabilityEvidence or
