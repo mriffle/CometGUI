@@ -183,22 +183,17 @@ for v in xml noxml; do
     [ -x "${d}/usr/bin/percolator" ] || die "no ${v} Linux percolator" 1
 done
 
-python3 - "${WORK}/linuxcontrol/test.pin" <<'PY'
-import random, sys
-random.seed(7)
-rows = ["SpecId\tLabel\tScanNr\tExpMass\tCalcMass\tfeat1\tfeat2\tfeat3\tPeptide\tProteins"]
-for i in range(400):
-    tgt = i % 2 == 0
-    f1 = random.gauss(3.0 if tgt else 0.0, 1.0)
-    f2 = random.gauss(1.5 if tgt else 0.0, 1.0)
-    f3 = random.gauss(0.0, 1.0)
-    pep = "K." + "".join(random.choice("ACDEFGHIKLMNPQRSTVWY") for _ in range(9)) + ".R"
-    prot = ("sp|P%05d|TEST" if tgt else "decoy_sp|P%05d|TEST") % i
-    rows.append("psm%d\t%d\t%d\t1000.5\t1000.4\t%.4f\t%.4f\t%.4f\t%s\t%s"
-                % (i, 1 if tgt else -1, i, f1, f2, f3, pep, prot))
-open(sys.argv[1], "w").write("\n".join(rows) + "\n")
-print("  wrote a 400-PSM synthetic PIN")
-PY
+# One generator, two platforms.  This used to be a Python heredoc right here;
+# the Windows CI job needs the same 400-PSM input, and two copies of a
+# generator are two things that drift, so it now lives in
+# make_synthetic_pin.py and both platforms call it.  The SHA-256 is asserted
+# on the call as well as pinned inside the generator: a change to either file
+# alone stops this script, because every Percolator number recorded in
+# docs/feasibility/windows-artefact.rst was measured with this exact input.
+python3 "${SCRIPT_DIR}/make_synthetic_pin.py" "${WORK}/linuxcontrol/test.pin" \
+    --print-sha256 \
+    --expect-sha256 6643ede48534fcd28c90a1d4e53781e47ba39b0523e9f907ea8e1a63b15af61e \
+    | tee -a "${LOG}"
 
 cd "${WORK}/linuxcontrol"
 for v in xml noxml; do

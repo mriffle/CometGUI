@@ -17,10 +17,11 @@
 # Two steps are real: the documentation link check, which needs nothing that
 # does not exist yet, and the provisioning steps.
 #
-# NEVER RUN ON A SCHEDULE HERE.  There is no git remote (D-008), so this file
-# has never been executed by GitHub.  scripts/ci/run-pipeline-locally.sh runs
-# every step below on this machine and requires each stub to fail and each real
-# step to pass.
+# NEVER RUN ON A SCHEDULE HERE.  As of 2026-09-02 this is the ONLY file GitHub
+# has executed in this repository: one scheduled run, which failed on a
+# Phase-15 stub exactly as designed.  No pull-request workflow has ever run.
+# scripts/ci/run-pipeline-locally.sh runs every step below on this machine and
+# requires each stub to fail and each real step to pass.
 
 name: nightly
 
@@ -77,7 +78,10 @@ jobs:
 
   windows:
     # UNVERIFIABLE IN THIS ENVIRONMENT.  There is no non-Linux machine here and
-    # no git remote, so this job has never run anywhere.  It is named rather
+    # This job has never run on a runner.  When
+    # it first does, note that .gitattributes now pins *.sh to LF: without it
+    # this step would have died on `set -Eeuo pipefail\r` before reaching the
+    # stub.  It is named rather
     # than omitted because the specification requires the Windows Thermo RAW
     # search test in the nightly pipeline, and a later phase should switch it on
     # rather than discover it was never written.  PHASE-15 owns the RAW test.

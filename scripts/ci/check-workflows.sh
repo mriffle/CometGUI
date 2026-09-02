@@ -12,9 +12,12 @@
 #   bash scripts/ci/check-workflows.sh --self-test   # the gate, then prove it can fail
 #   bash scripts/ci/check-workflows.sh --help
 #
-# --self-test copies .github/ and scripts/ under _build/, damages the copy nine
-# ways -- among them renaming a script the workflow names -- and requires every
-# damaged copy to be rejected and the undamaged one accepted.
+# --self-test copies .github/ and scripts/ under _build/, damages the copy
+# nineteen ways -- among them renaming a script the workflow names, using an
+# action outside a workflow's allowlist, and dropping the `if: always()` that
+# makes a FAILING run still upload its evidence -- and requires every damaged
+# copy to be rejected and the undamaged one accepted.  The count is a floor,
+# not a fixture: scripts/verify-all-gates.sh fails if it ever goes down.
 #
 # Needs no network access.
 #

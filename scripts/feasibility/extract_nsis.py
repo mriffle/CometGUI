@@ -34,9 +34,19 @@ second parameter set is ``SetOutPath``, which establishes ``$OUTDIR``.
 Usage
 -----
     python3 extract_nsis.py INSTALLER.exe -o OUTDIR [--list] [--json FILE]
+    python3 extract_nsis.py --self-test
 
 Exit status is not evidence: check that the listed files exist with the
 listed sizes.
+
+Windows
+-------
+NSIS member paths are Windows paths: ``$INSTDIR\\bin\\percolator.exe``.  On
+Linux a backslash is an ordinary filename character; on Windows it is a
+separator, Win32 strips trailing dots and spaces from every component before
+the filesystem sees it, and names such as ``NUL`` are devices.  ``--self-test``
+drives the path safety net under both platforms' ``os.path`` and requires that
+every case land in the same place, inside the output directory, under both.
 """
 
 from __future__ import annotations
@@ -485,12 +495,45 @@ class NsisArchive:
         return dict(sorted(hist.items()))
 
 
+# Windows reserves these for devices, in every directory and whatever the
+# extension: "bin\NUL.txt" is the null device, not a file.
+WIN_RESERVED = frozenset(
+    ("CON", "PRN", "AUX", "NUL")
+    + tuple("COM%d" % i for i in range(1, 10))
+    + tuple("LPT%d" % i for i in range(1, 10))
+)
+
+
+def _safe_segment(seg: str) -> str:
+    """Reduce one path component to a form Win32 cannot reinterpret.
+
+    Two things Win32 does and ``os.path`` does not.  It strips trailing dots
+    and spaces from *every* component before the filesystem sees it, so the
+    component ``".. "`` -- which the ``".."`` filter in ``_safe_join`` lets
+    through, and which ``ntpath.normpath`` keeps -- is a parent-directory hop
+    on Windows; and it resolves the reserved names above to devices.  Trailing
+    dots and spaces are therefore replaced rather than removed, so the result
+    can be neither ``".."`` nor a shadow of a legitimate neighbour, and a
+    reserved stem is prefixed.  Control characters, which the earlier
+    substitution does not cover, are illegal in a Windows filename.
+
+    This runs on every platform: a Linux and a Windows extraction of the same
+    installer must produce the same tree, or comparing their checksums proves
+    nothing.
+    """
+    seg = re.sub(r"[\x00-\x1f]", "_", seg)
+    seg = re.sub(r"[. ]+$", lambda m: "_" * len(m.group(0)), seg)
+    if seg.split(".")[0].upper() in WIN_RESERVED:
+        seg = "_" + seg
+    return seg
+
+
 def _safe_join(root: str, install_path: str) -> str:
     """Map a Windows install path onto a relative path under root, safely."""
     p = install_path.replace("\\", "/")
     p = re.sub(r"^\$[A-Za-z_0-9()]+", lambda m: m.group(0).lstrip("$"), p)
     p = re.sub(r"[:*?\"<>|]", "_", p)
-    parts = [seg for seg in p.split("/") if seg not in ("", ".", "..")]
+    parts = [_safe_segment(seg) for seg in p.split("/") if seg not in ("", ".", "..")]
     dest = os.path.normpath(os.path.join(root, *parts))
     root_abs = os.path.abspath(root)
     if not os.path.abspath(dest).startswith(root_abs + os.sep):
@@ -498,13 +541,211 @@ def _safe_join(root: str, install_path: str) -> str:
     return dest
 
 
+# --------------------------------------------------------------------------
+# --self-test
+# --------------------------------------------------------------------------
+
+
+def _win32_canonicalise(path: str) -> str:
+    """Model the Win32 path canonicaliser closely enough to catch an escape.
+
+    Win32 strips trailing dots and spaces from every component and only then
+    resolves ``".."``.  ``os.path`` never does the first step, so a component
+    such as ``".. "`` is inert to Python and a parent-directory hop to the
+    filesystem.  That gap is what this models, so the self-test can measure a
+    Windows escape from a Linux host.
+    """
+    out = []
+    for seg in path.replace("\\", "/").split("/"):
+        if not seg:
+            continue
+        if set(seg) <= {".", " "}:
+            # Win32 strips the trailing dots and spaces, so ".. ", ".. ." and
+            # "..." can all end up as the parent hop "..".  Exactly which of
+            # them do cannot be settled from here, so assume the worst: one
+            # dot is "stay", two or more may be "up".  Over-approximating the
+            # attacker can only raise a false alarm, never clear a real
+            # escape.
+            if seg.count(".") >= 2:
+                if out and out[-1] != "..":
+                    out.pop()
+                else:
+                    out.append("..")
+            continue
+        seg = seg.rstrip(". ")
+        if seg:
+            out.append(seg)
+    return "/".join(out)
+
+
+# (label, install path, where it must land under the output directory,
+#  or None if the extractor must refuse it outright)
+SELF_TEST_CASES = [
+    ("real payload member", r"$INSTDIR\bin\percolator.exe", "INSTDIR/bin/percolator.exe"),
+    ("real plugins member", r"$PLUGINSDIR\System.dll", "PLUGINSDIR/System.dll"),
+    ("real nested member",
+     r"$INSTDIR\share\xml\percolator\xml-pin-1-3\percolator_in.xsd",
+     "INSTDIR/share/xml/percolator/xml-pin-1-3/percolator_in.xsd"),
+    ("dot-dot prefix", r"..\..\evil.txt", "evil.txt"),
+    ("dot-dot in the middle", r"bin\..\..\evil.txt", "bin/evil.txt"),
+    ("deep dot-dot climb", r"$INSTDIR\bin\..\..\..\..\evil.txt", "INSTDIR/bin/evil.txt"),
+    ("absolute drive path", r"C:\evil.txt", "C_/evil.txt"),
+    ("drive-relative path", r"C:evil.txt", "C_evil.txt"),
+    ("UNC share path", "\\\\server\\share\\evil.txt", "server/share/evil.txt"),
+    ("leading separator", r"\evil.txt", "evil.txt"),
+    ("trailing-space dot-dot", "$INSTDIR\\.. \\.. \\evil.txt", "INSTDIR/___/___/evil.txt"),
+    ("trailing space after a name", "$INSTDIR\\bin \\evil.txt", "INSTDIR/bin_/evil.txt"),
+    ("trailing-dot dot-dot", r"$INSTDIR\...\...\evil.txt", "INSTDIR/___/___/evil.txt"),
+    ("device name CON", r"$INSTDIR\CON", "INSTDIR/_CON"),
+    ("device name with suffix", r"$INSTDIR\bin\NUL.txt", "INSTDIR/bin/_NUL.txt"),
+    ("device name lowercase", r"$INSTDIR\bin\com1", "INSTDIR/bin/_com1"),
+    ("device name LPT9.dll", r"$INSTDIR\bin\LPT9.dll", "INSTDIR/bin/_LPT9.dll"),
+    ("non-device lookalike", r"$INSTDIR\bin\CONFIG.sys", "INSTDIR/bin/CONFIG.sys"),
+    ("trailing dot shadows a file", r"$INSTDIR\bin\percolator.exe.",
+     "INSTDIR/bin/percolator.exe_"),
+    ("trailing space shadows a file", "$INSTDIR\\bin\\percolator.exe ",
+     "INSTDIR/bin/percolator.exe_"),
+    ("control character", "$INSTDIR\\bin\\x\x01y.dll", "INSTDIR/bin/x_y.dll"),
+    ("alternate data stream", r"$INSTDIR\bin\percolator.exe:evil", "INSTDIR/bin/percolator.exe_evil"),
+    ("nothing left to write", r"..\..", None),
+]
+
+
+def self_test() -> int:
+    """Drive the path safety net with both platforms' os.path and report.
+
+    Nothing is written and no installer is needed: ``_safe_join`` is called
+    once with POSIX semantics and once with Windows semantics, and each case
+    must land in the same place, inside the output directory, under both --
+    where "inside" is judged by ``_win32_canonicalise``, not by ``os.path``.
+    """
+    import io
+    import ntpath
+    import posixpath
+
+    root = "out"
+    saved_path, saved_sep, saved_altsep = os.path, os.sep, os.altsep
+    results = []
+
+    def run(pathmod, sep, altsep, install_path):
+        os.path, os.sep, os.altsep = pathmod, sep, altsep
+        try:
+            return _safe_join(root, install_path).replace("\\", "/")
+        except NsisError:
+            return None
+
+    print("=== extract_nsis --self-test: the path safety net, both platforms ===")
+    print("No installer is read and nothing is written.\n")
+    try:
+        for label, install_path, expected in SELF_TEST_CASES:
+            posix = run(posixpath, "/", None, install_path)
+            nt = run(ntpath, "\\", "/", install_path)
+            os.path, os.sep, os.altsep = saved_path, saved_sep, saved_altsep
+
+            agree = posix == nt
+            got = posix
+            as_expected = got == (None if expected is None else root + "/" + expected)
+            if got is None:
+                contained = True
+                no_device = True
+            else:
+                canon = _win32_canonicalise(got)
+                contained = canon == root or canon.startswith(root + "/")
+                no_device = all(
+                    s.rstrip(". ").split(".")[0].upper() not in WIN_RESERVED
+                    for s in canon.split("/")
+                )
+            ok = agree and as_expected and contained and no_device
+            results.append(ok)
+            why = []
+            if not agree:
+                why.append("posix %r != nt %r" % (posix, nt))
+            if not as_expected:
+                why.append("expected %r" % expected)
+            if not contained:
+                why.append("ESCAPES the output directory on Windows")
+            if not no_device:
+                why.append("names a Windows device")
+            print("  %s %-32s %-44s %s"
+                  % ("ok  " if ok else "FAIL", label,
+                     "REFUSED" if got is None else got,
+                     "; ".join(why)))
+    finally:
+        os.path, os.sep, os.altsep = saved_path, saved_sep, saved_altsep
+
+    # The two output-encoding fixes.  Linux cannot run them on Windows, but it
+    # can reproduce exactly what a redirected Windows stdout and a Windows
+    # text-mode write do, and show that the guarded form survives both.
+    print()
+    name = "bin\\\u0141ukasz.dll"          # not encodable in cp1252
+    for label, kwargs, expected_ok in (
+        ("stdout cp1252, unguarded", {}, False),
+        ("stdout cp1252, guarded", {"errors": "backslashreplace"}, True),
+    ):
+        try:
+            w = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", **kwargs)
+            w.write(name)
+            w.flush()
+            survived = True
+        except UnicodeEncodeError:
+            survived = False
+        ok = survived == expected_ok
+        results.append(ok)
+        print("  %s %-32s %-44s %s"
+              % ("ok  " if ok else "FAIL", label,
+                 "survived" if survived else "UnicodeEncodeError",
+                 "" if ok else "expected %s" % expected_ok))
+
+    payload = json.dumps({"files": []}, indent=2)
+    for label, newline, want_cr in (
+        ("manifest newline default", "\r\n", True),   # what Windows would do
+        ("manifest newline pinned", "\n", False),
+    ):
+        buf = io.BytesIO()
+        w = io.TextIOWrapper(buf, encoding="utf-8", newline=newline)
+        w.write(payload)
+        w.flush()
+        has_cr = b"\r" in buf.getvalue()
+        ok = has_cr == want_cr
+        results.append(ok)
+        print("  %s %-32s %-44s %s"
+              % ("ok  " if ok else "FAIL", label,
+                 "CRLF" if has_cr else "LF only", "" if ok else "unexpected"))
+
+    print()
+    if all(results):
+        print("extract_nsis: self-test OK -- %d checks, every path contained under "
+              "both POSIX and Windows semantics." % len(results))
+        return 0
+    print("extract_nsis: SELF-TEST FAILED -- %d of %d checks did not hold."
+          % (results.count(False), len(results)), file=sys.stderr)
+    return 1
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Extract an NSIS installer payload.")
-    ap.add_argument("installer")
+    ap.add_argument("installer", nargs="?")
     ap.add_argument("-o", "--output", help="directory to write the payload into")
     ap.add_argument("--list", action="store_true", help="list only, extract nothing")
     ap.add_argument("--json", help="write a machine-readable manifest here")
+    ap.add_argument("--self-test", action="store_true",
+                    help="check the path safety net under Windows semantics and exit")
     args = ap.parse_args(argv)
+
+    if args.self_test:
+        return self_test()
+    if not args.installer:
+        ap.error("the following arguments are required: installer")
+
+    # A payload member name is an arbitrary UTF-16 string.  On Windows a
+    # *redirected* stdout -- a CI log, a pipe into tee -- encodes with the ANSI
+    # code page, cp1252 in most installs, and a name outside it raises
+    # UnicodeEncodeError part-way through the run.  Mangle the printed name
+    # rather than lose the extraction.  No effect where every name encodes.
+    try:
+        sys.stdout.reconfigure(errors="backslashreplace")
+    except (AttributeError, ValueError):
+        pass
 
     arc = NsisArchive(args.installer)
     print("installer      : %s" % args.installer)
@@ -574,7 +815,10 @@ def main(argv=None):
           % (len(manifest["files"]), total, len(uniq), manifest["unique_bytes"]))
 
     if args.json:
-        with open(args.json, "w") as jf:
+        # Explicit encoding and newline: with the defaults this file would be
+        # cp1252 with CRLF on Windows and UTF-8 with LF here, so the same
+        # installer would produce two different manifests.
+        with open(args.json, "w", encoding="utf-8", newline="\n") as jf:
             json.dump(manifest, jf, indent=2)
         print("manifest written to %s" % args.json)
 

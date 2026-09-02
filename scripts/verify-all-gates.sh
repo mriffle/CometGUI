@@ -138,7 +138,7 @@ gate_spec() {
             ;;
         workflows)
             GATE_ITEMS="6"
-            GATE_DEFECT="nine damaged copies of .github/ -- a renamed step script, a dropped required step, continue-on-error, a trailing || true, a git push added to release.yml"
+            GATE_DEFECT="nineteen damaged copies of .github/ -- a renamed step script, a dropped required step, continue-on-error, a trailing || true, a git push added to release.yml, an unknown workflow naming a missing script, an action outside a workflow allowlist, an action pinned to a tag, and the if: always() dropped from the transcript upload"
             GATE_SCRIPT="scripts/ci/check-workflows.sh"
             GATE_ARGS=(--self-test)
             GATE_PROOF=("self-test OK" "the undamaged one accepted")
@@ -319,8 +319,11 @@ WHAT IT DOES NOT COVER.  Exit gate item 1 -- "a clean checkout builds and tests
 green with one documented command" -- is bash scripts/build.sh, and is not
 repeated here; the quality control proves only the half of item 1 that consists
 of gates failing the build.  The "on a pull request" half of exit gate item 6
-needs a git remote, which D-008 withholds; the pipeline control proves every
-step locally instead and says so.
+needs GitHub to run the pipeline ON A PULL REQUEST, and no pull request has
+ever been opened.  The remote has existed since D-008 was decided on
+2026-08-30 and main is pushed; one scheduled nightly has run and failed on a
+Phase-15 stub by design.  No pull-request workflow has run.  The pipeline
+control proves every step on this machine instead, and says so.
 USAGE
 }
 
@@ -576,9 +579,11 @@ main() {
     printf '  PHASE-01 item 1 is covered only in part: these controls prove that the\n'
     printf '  gates which FAIL the build still bite. That a clean checkout BUILDS green\n'
     printf '  is bash scripts/build.sh, and is not repeated here.\n'
-    printf '  The "on a pull request" half of PHASE-01 item 6 needs a git remote, which\n'
-    printf '  D-008 withholds; the pipeline control proves every step on this machine\n'
-    printf '  instead.\n'
+    printf '  The "on a pull request" half of PHASE-01 item 6 needs GitHub to run the\n'
+    printf '  pipeline ON A PULL REQUEST. The remote has existed since D-008 was decided\n'
+    printf '  on 2026-08-30 and main is pushed, but no pull request has been opened, so\n'
+    printf '  that trigger has never fired; the pipeline control proves every step on\n'
+    printf '  this machine instead.\n'
     printf '  PHASE-02 item 3 -- an ArchUnit test proving the domain module has no JavaFX\n'
     printf '  dependency -- is the same rule PHASE-01 item 3 installs, so it is proved by\n'
     printf '  the tests control rather than injected twice; the shell control fails if\n'

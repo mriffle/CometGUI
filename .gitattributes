@@ -1,0 +1,41 @@
+# CometGUI -- line endings for the files a Windows runner has to EXECUTE.
+#
+# WHY THIS FILE EXISTS.  GitHub's windows-latest image installs Git for Windows
+# with /VERYSILENT and passes no CRLFOption override -- its
+# images/windows/scripts/build/Install-Git.ps1 sets only safe.directory -- so
+# the installer default, core.autocrlf=true, is what applies on that runner.
+# Under that setting a checked-out shell script arrives with CRLF line endings,
+# and Git Bash then runs it with the carriage returns still in it.
+#
+# That is fatal on the FIRST LINE OF EVERY SCRIPT HERE.  Every scripts/ci/*.sh
+# begins with `set -Eeuo pipefail`, and with a trailing \r that line is
+# `set -Eeuo pipefail\r`.  Demonstrated on this machine (Linux, GNU bash),
+# 2026-08-30, rather than assumed:
+#
+#     $ printf '#!/usr/bin/env bash\r\nset -Eeuo pipefail\r\necho hi\r\n' > crlf.sh
+#     $ bash crlf.sh
+#     crlf.sh: line 2: set: pipefail: invalid option name
+#     $ echo $?
+#     2
+#
+#   -- while the identical script written with LF prints `hi` and exits 0.  The
+# same failure hits every later line: a command name with \r appended is not a
+# command, hence the more familiar `$'\r': command not found`.
+#
+# The rules below remove the dependency on core.autocrlf entirely: these files
+# are LF in the repository and LF in the working tree, on every platform, no
+# matter how the person or the runner has Git configured.
+#
+# THIS ALSO FIXES A LATENT FAILURE THAT ALREADY EXISTED.  The Windows job in
+# .github/workflows/nightly.yml runs `bash scripts/ci/nightly-windows-raw.sh`
+# and would have hit exactly this wall the first time it ran.  It never has --
+# GitHub has executed nothing in this repository -- so the bug has never been
+# observed, and it is fixed here before it can be.
+#
+# DELIBERATELY NOT `* text=auto`.  A blanket rule decides line endings for
+# every file in the repository by guessing which ones are text, and this
+# project ships fixtures whose bytes are pinned by SHA-256.  Naming the two
+# extensions that a Windows runner executes is the whole of what is needed.
+
+*.sh text eol=lf
+*.py text eol=lf

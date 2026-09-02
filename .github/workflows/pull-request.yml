@@ -26,12 +26,17 @@
 #    and this project's whole reproducibility claim rests on their being the
 #    same build.
 #
-# WHAT THIS FILE HAS NOT BEEN SEEN TO DO.  It has never run on a pull request:
-# this repository has NO GIT REMOTE, and creating one is D-008, an owner
-# decision (see CONTRIBUTING.rst, "There is no git remote").  PHASE-01 exit
-# gate item 6 is therefore only half met.  The half that IS met is that every
-# step below has been executed locally, by scripts/ci/run-pipeline-locally.sh,
-# which reads the steps out of this file rather than out of a copy of it.
+# WHAT THIS FILE HAS NOT BEEN SEEN TO DO.  It has never run on a pull request
+# -- or anywhere else.  GitHub has executed exactly ONE workflow in this
+# repository, a scheduled nightly on 2026-08-31; no pull-request workflow has
+# ever run, because no pull request has been opened.  A remote
+# does exist now (D-008, decided 2026-08-30) and nothing has been pushed to it.
+# PHASE-01 exit gate item 6 is therefore still only half met, and the half that
+# IS met is that every step below has been executed locally, by
+# scripts/ci/run-pipeline-locally.sh, which reads the steps out of this file
+# rather than out of a copy of it.  Opening a pull request is what would meet
+# the other half; see .github/workflows/windows-percolator.yml, whose branch is
+# meant to be the one that does it.
 name: pull-request
 
 on:
