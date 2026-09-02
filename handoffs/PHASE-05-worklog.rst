@@ -1005,11 +1005,137 @@ seventeen minutes.
 notification, not for its commit, before running Maven.** A commit is a
 durability checkpoint; it says nothing about whether the agent has stopped.
 
+.. _p05-u3-signoff:
+
+Unit 3 sign-off
+===============
+
+Committed as ``d88e001`` and ``f38f44a``: ``org.cometgui.install.download``
+(the ``Downloader`` port over ``java.net.http``, with the redirect, range,
+cancellation and truncation logic) and ``org.cometgui.install.verify`` (the
+``R-SEC-02`` decision, and the composition that implements the
+restart-after-a-failed-resume rule).
+
+The HTTPS rule's loopback carve-out: accepted, with the reasoning
+------------------------------------------------------------------
+
+The unit brief said "HTTPS only". What was built accepts https anywhere, plus
+plain http to a **127.0.0.0/8 or ``::1`` literal only**. The agent reported the
+deviation rather than burying it, which is the behaviour this structure needs.
+**I accept it**, having checked all three supporting claims rather than taking
+them:
+
+* ``config/checkstyle/checkstyle.xml`` line 188 bans ``sun, com.sun,
+  jdk.internal`` through ``IllegalImport``, and the rule set covers test
+  sources, so ``com.sun.net.httpserver`` is genuinely unusable and the
+  raw-socket loopback server was not a preference.
+* The carve-out is **literal-only and anchored** -- ``LOOPBACK_LITERAL`` is
+  applied with ``.matches()``, not ``.find()``, so ``127.0.0.1.example.com``
+  cannot slip through -- and names are refused for the right reason: a name
+  resolves at connect time, so a name-based check answers a different question
+  from the connection that follows.
+* It is unreachable from product data: ``ArtefactValues.REQUIRED_SCHEME`` is
+  ``https`` for every manifest record and ``ShippedManifestTest.everyUrlIsHttps``
+  asserts it against the shipped file.
+
+And ``DownloadRequestTest.refusedUrls`` grades the narrowness itself, which is
+what makes this a carve-out rather than a hole: ``localhost``, ``LOCALHOST``,
+``localhost.localdomain``, the boundary literals ``126.255.255.255`` and
+``128.0.0.1``, credentials over **both** schemes including over loopback,
+no-host, other schemes and non-absolute URIs.
+
+**Why the alternatives are worse.** A strict production rule plus a test-only
+permissive seam would run every transfer test through a seam production does not
+use -- the third shape, and the very defect unit 2 was sent back to fix. An
+HTTPS loopback server needs either a new dependency or a committed private key,
+and a committed private key is strictly worse. The property ``R-SEC-02``
+protects is integrity against an intermediary, and a plain-http connection to a
+loopback **literal** has no intermediary because it has no path off the machine.
+Unit 11 records this in ``docs/developer/tool_registry.rst``.
+
+The defect I injected, which the unit did not catch
+----------------------------------------------------
+
+In ``HttpDownloader`` I replaced the single anchor ``listener.onProgress(offset
++ transferred, declaredTotal);`` with ``listener.onProgress(transferred,
+declaredTotal);`` -- **progress reported from the resume point rather than the
+absolute position.**
+
+It landed -- anchor unique, compiled class ``904baa02...`` to ``210d3e9a...`` --
+and the module test run **exited 0**: ``HttpDownloaderTest`` ran **59 tests**
+and the module ran ``Tests run: 338, Failures: 0, Errors: 0, Skipped: 1``, all
+green with the defect in place.
+
+On a resumed transfer the listener would report the offset, jump **backwards**
+to a small number, then climb again, and every percentage computed against
+``declaredTotal`` would be wrong for the resumed portion. That is the 99 MB PDV
+download the phase document singles out for deliberate cancellation and restart
+testing: a progress bar that runs backwards on the one transfer big enough to be
+resumed.
+
+**It is the twin of a hole the unit had already found and fixed in itself.**
+``f38f44a`` exists because the added conjunct ``isCancelled() && declaredTotal
+>= 0`` -- "only stop when we know how much is left", which would make every
+chunked download uncancellable -- survived the unit's three original
+cancellation tests, all of which used a server declaring a length. The unit then
+graded cancellation over the no-declared-length and resumed axes. It did not do
+the same for progress: the progress assertions are thorough on the
+fresh-download axis and absent on the resumed one.
+
+Measured facts recorded for units 5 and 10
+-------------------------------------------
+
+All observed by the unit, none of them in the work log before:
+
+* ``HttpDownloader`` is ``AutoCloseable`` and owns an ``HttpClient`` with
+  threads. **Close it.**
+* **Cancellation deletes the partial file**, so a cancelled 99 MB download
+  restarts from zero. Resume survives a *failure*, not a cancellation.
+* A truncation or network failure **propagates** out of ``VerifiedDownloader``;
+  retrying it is the installer's job. Only a *checksum* failure after a resume
+  is retried internally, once.
+* **``HttpRequest.timeout`` does not abort a streaming body once the headers
+  have arrived** -- verified with a two-second trickle under a 500 ms request
+  timeout. That is what makes a 60-second response timeout safe on a 99 MB
+  download rather than a guarantee of failure.
+* A body shorter than a declared ``Content-Length`` surfaces from the JDK as
+  ``java.io.IOException: fixed content-length: N, bytes received: M``, and
+  ``java.net.ConnectException`` for a refused loopback connection carries a
+  **null** message.
+* **The atomic move now has no fallback.** The unit removed the
+  ``AtomicMoveNotSupportedException`` catch as unreachable, correctly, because
+  the partial file is always a sibling of the destination and the move is
+  therefore always a same-directory rename. **Unit 5 must know that this
+  reasoning covers the cross-filesystem case and not the Windows-contention
+  case**: ``AccessDeniedException`` on a file another process holds open is a
+  different exception, and ``STATUS.rst``'s *Platform divergence, in two tiers*
+  records ``ATOMIC_MOVE`` under contention as live tier-B residue.
+
+Decided by me: ``org.cometgui.install.download.*`` joins the mutation targets
+-----------------------------------------------------------------------------
+
+The package now holds the **availability-versus-corrupt classification** that
+``D-008`` turns into a product requirement: a vanished artefact must be reported
+as an upstream availability failure naming the URL and the expected checksum,
+never as a corrupt download. A mutation that collapsed that distinction would
+violate the decision, and nothing would currently stop it.
+
+The root POM's own comment sanctions the addition -- *"A later phase adds its
+packages here and flips its own module's switch; it does not narrow this list"*
+-- and adding a package **strengthens** the gate rather than weakening it, which
+is the only direction this project allows. I make the change myself rather than
+handing it to the unit, so that only one party is editing the reactor at a time.
+
 Rejections and rework
 =====================
 
 Units sent back, why, and what changed.
 
+* **Unit 3, sent back 2026-09-02**: progress on a **resumed** transfer was
+  reported from the resume point rather than the absolute position, and 338
+  tests passed with the defect in place. The twin of a hole the unit had
+  already found and fixed in itself for cancellation. See
+  :ref:`p05-u3-signoff`.
 * **Unit 2, sent back 2026-09-02** for two small additions: a shipped-manifest
   assertion that Comet on Apple silicon is offered its native build before the
   translated one, which is ``D-004``'s own sentence and was proved only on a
