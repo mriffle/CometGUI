@@ -860,6 +860,12 @@
                    Unit 4 reported plainly that its 8550 lines carried NO mutation evidence at
                    all, which is not a state this project leaves security code in. -->
               <param>org.cometgui.install.archive.*</param>
+              <!-- Added by phase 05 after unit 5.  R-TOOL-04's completion marker and
+                   R-TOOL-05's cross-process lock are the rules that stop a half-written
+                   tool being executed, and a mutation that disabled either would be
+                   invisible to coverage.  The unit measured 239/241 against this package
+                   itself before I gated it. -->
+              <param>org.cometgui.install.cache.*</param>
               <!-- stage invalidation rules -->
               <param>org.cometgui.workflow.state.*</param>
             </targetClasses>
