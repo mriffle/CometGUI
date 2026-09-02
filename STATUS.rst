@@ -2089,6 +2089,59 @@ instead of dropping it, which is the behaviour this three-tier structure depends
 on and the one failure mode none of these gates can catch. It cost one message
 to resolve and would have cost a phase to discover late.
 
+.. _status-tenth-shape:
+
+The tenth shape: a hole no coverage or mutation gate can reach (2026-09-02)
+===========================================================================
+
+Found by Phase 05's unit 1 agent, confirmed by the phase orchestrator on its own
+re-run, and recorded here because it is the first shape in this catalogue that
+**the project's strongest automated gates are structurally unable to find**.
+
+**The hole.** A validation rule was missing a conjunct -- it should have refused
+a record whose note was blank *and* whose evidence value was not
+``UNVERIFIED``, and it tested only the first half. It sat under **100% line,
+100% branch and 99.7% mutation coverage** and none of the three could have
+found it.
+
+**Why mutation testing is blind to it, which is the general point.** PIT mutates
+**the expression that is there**. No mutation operator *adds* a conjunct, so no
+mutant of the written rule ever produces ``note.isBlank() && evidence !=
+UNVERIFIED``. The evidence that the gate was blind rather than merely quiet is
+that the score was **368/369 before and after the repair** -- the number did not
+move, because there was never a mutant to kill.
+
+**Where this sits among the other nine.** Shapes 1-6 and 8 are checks that
+cannot fail. Shape 7 -- a real measurement over an incomplete population -- is a
+check answering the wrong question, and shape 9 is a check answering a question
+about the wrong *time*. This one is different again: **the measurement is
+correct, complete, current, and about code that was never written.** A gate can
+only grade what exists.
+
+**The defence, and it is not another gate.** Grade every rejection over the
+axes the rule does *not* depend on, and inject by hand. The repair changed **ten
+test classes and no production source**, which is the right shape when the
+finding is that the rule was correct and the tests were thin. The orchestrator
+then verified the audit was real rather than a patch of the one known defect, by
+injecting a **second, unannounced** defect -- ``InstallProgress`` accepting a
+negative byte count when the phase is ``FAILED`` or ``CANCELLED`` -- and
+watching the newly added phase-axis test catch it too.
+
+**The standing rule this makes explicit for every remaining phase:** a coverage
+or mutation figure is evidence about the code that exists. It says nothing about
+a condition nobody wrote. Only an adversarial reading of the *requirement*
+against the *rule* finds those, which is why tier-by-tier injection is not
+redundant with the gates and cannot be replaced by them.
+
+*Related, from the same phase and the same day:* the orchestrator's own
+injection into unit 3 -- progress on a **resumed** transfer reported from the
+resume point rather than the absolute position, so the bar runs backwards on the
+99 MB PDV download the phase document singles out -- **survived 338 tests**,
+including 59 downloader tests. It was the twin of a hole the unit had already
+found and closed in itself: cancellation had been graded over its axes, progress
+over none. Sent back and closed, with the failure text
+``expected: <1500000> but was: <16229>``.
+
 Open decisions
 ==============
 
