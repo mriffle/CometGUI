@@ -1932,6 +1932,31 @@ from a command whose **own command line contained that string**, so it matched
 itself and would have waited forever. The project's standing warning about
 ``pkill -f`` matching your own shell has a patient twin.
 
+What it costs, because it is not free
+--------------------------------------
+
+``bash scripts/verify-all-gates.sh`` now takes **2985 seconds (49m45s)**, up
+from 1962 (32m42s) before this work and from 718 at the session-04 baseline. The
+``tests`` control alone went 1370s to 2397s: control 8 runs a full ``mvn
+verify`` **and** a full ``scripts/build.sh`` inside the sandbox, because
+proving this particular defect requires demonstrating that the ordinary build
+stays green before showing the census reject it. Nothing was weakened or
+buffered to reduce it, and the two halves are not separable without losing the
+point of the control.
+
+That is now the third increase in this suite's cost recorded here, and it is a
+standing budget question for the owner rather than an engineering one: it is
+paid on every phase sign-off from here to Phase 16.
+
+Final state, at the point Phase 05 is dispatched
+-------------------------------------------------
+
+``bash scripts/verify-all-gates.sh``: **11 controls passed, 0 failed**, with
+every floor met or exceeded -- license 5, workflows 9, docs 1, traceability 8,
+sbom 8, depscan 16, pipeline 24, quality 42, shell 30, **tests 37** and
+provenance 24. "Every gate was seen to reject its defect and accept the clean
+tree."
+
 The build, at the point Phase 05 is dispatched
 -----------------------------------------------
 
