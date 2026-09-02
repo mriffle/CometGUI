@@ -274,6 +274,53 @@ Two build rules that bind specific units
   **90% line / 85% branch over the whole module** and is mutation-critical.
   Unit 1's classes are held to that.
 
+.. _p05-download-facts:
+
+Download facts established by the orchestrator before unit 3
+=============================================================
+
+Measured on 2026-09-02 against the real upstream host, so that unit 3 designs
+the resume path from what the server does rather than from what HTTP permits.
+
+**A release download is a redirect to a signed URL that expires.**
+``https://github.com/<owner>/<repo>/releases/download/<tag>/<file>`` answers
+``302`` with ``content-length: 0`` and redirects to
+``release-assets.githubusercontent.com`` with a signature carrying an expiry
+about an hour out. Two consequences: the client **must follow redirects**
+(Java's ``HttpClient`` does **not** by default -- its default is
+``Redirect.NEVER``, and a downloader that forgets this silently writes a
+zero-byte file), and a resume attempted later must **re-request the original
+``github.com`` URL** to obtain a fresh signature rather than reusing a stored
+redirect target.
+
+**Range requests work.** The asset host answers ``accept-ranges: bytes`` and a
+ranged request returns ``206`` with ``content-range: bytes 0-99/946303`` and an
+``etag``. Resume is genuinely implementable and is not a fiction.
+
+**``If-Range`` is ignored, and this is the trap.** Sent a deliberately stale
+validator -- ``If-Range: "0xDEADBEEFDEADBEE"`` against a real ETag of
+``"0x8DC9130344F5BFC"`` -- the server still answers **206 with the partial
+range**, not ``200`` with the whole body. Confirmed twice: through the redirect
+and again directly against the signed URL with no redirect in the picture, and
+the 206 response even carries the real ETag.
+
+So the standard mechanism for "tell me if the file changed under my partial
+download" **does not work here**. If upstream re-tags an asset between the
+first attempt and the resume, a client relying on ``If-Range`` splices bytes
+from two different files and produces a corrupt result that no HTTP status
+reveals. The rules that follow, and unit 3 is held to them:
+
+#. Record the total length and the ``ETag`` seen on the first attempt, and
+   **discard the partial file and restart** if either differs on the resume.
+   That is a cheap check, but it is advisory only, because the server is under
+   no obligation to keep an ETag stable.
+#. **The mandatory SHA-256 verification is the sole integrity authority**
+   (``R-SEC-02``), and it is what actually catches a spliced download.
+#. **A resumed download that fails its checksum discards the partial file and
+   restarts from zero** -- it never resumes again. Resuming a second time
+   splices the same corruption back in and fails identically, which reads as an
+   upstream fault when it is the client's own.
+
 Work units
 ==========
 
