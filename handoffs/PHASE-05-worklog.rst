@@ -321,6 +321,108 @@ reveals. The rules that follow, and unit 3 is held to them:
    splices the same corruption back in and fails identically, which reads as an
    upstream fault when it is the client's own.
 
+.. _p05-eleventh-shape:
+
+An eleventh shape: a diagnostic that lies about the value it rejected
+======================================================================
+
+Catalogued at tier 1's direction, because the project has not met this one
+before and will meet it again. It is a **variant of the fourth shape** -- an
+assertion too coarse to see a partial failure -- but it lives somewhere nobody
+looks: inside an error message, on a path where **the rule itself is working
+correctly**.
+
+``DownloadReport``'s constructor rejects a report whose parts do not add up. The
+guard was right, its own arithmetic was mutation-killed, and the rejection fired
+exactly when it should. What survived was the addition **inside the message**::
+
+    "... " + resumedFromBytes + " kept plus " + bytesTransferred
+           + " received is " + (resumedFromBytes + bytesTransferred)
+
+Mutate that second addition and the class still rejects everything it should,
+still throws, still passes every behavioural test -- and reports *"400 kept plus
+600 received is -200"*. The assertion did not see it because it stopped at
+``startsWith("a report must account for every byte")``.
+
+**Why it is worth its own entry.** Every instinct this project has built says to
+check *that* a rule fired. A diagnostic is the part a human reads at three in the
+morning, months later, to find out *why*; a message that misstates the value it
+rejected sends that person to the wrong place with the authority of the system
+behind it. And the usual defences are all absent here: coverage sees the line
+executed, mutation testing needs the message pinned to notice, and a test that
+greps the opening words passes.
+
+**The defence** is the one applied here: pin the **whole** message, with the
+computed value **hand-typed** rather than recomputed -- because an expected value
+computed by the code under test cannot fail, which is the second shape and would
+have reintroduced the hole in the fix.
+
+**It generalises past error messages** to anything the product tells a human and
+nothing else consumes: the ``R-PLAT-03`` loader diagnostic that names a required
+and an available version, ``R-PERC-10``'s explanation of why an older Percolator
+was chosen, ``R-PERC-11``'s advisories, and every provenance field a reviewer
+reads a year later. Units 6, 7 and 9 own three of those, and their briefs say so.
+
+.. _p05-project-findings:
+
+Two findings tier 1 has taken as project-level
+===============================================
+
+Recorded here in the form later phases inherit them.
+
+**A redundant "correct" final value masks every wrong value before it.**
+``HttpDownloader`` ended every transfer with ``listener.onProgress(size,
+declaredTotal)``, duplicating what the loop's last iteration had already
+reported. It looked harmless. It was the reason my resumed-progress injection
+survived: with every mid-transfer report wrong, the final report still landed on
+the right number, so ``lastByteCount()`` stayed correct and the endpoint
+assertions passed. **Removing it made the last report the loop's own work**, and
+my re-injection then failed with four assertions where it had failed with three.
+
+This is not a downloader detail. It applies to anything that reports progress
+toward a known total, which puts **Phase 08's stage progress and Phase 13's
+provenance viewer** directly in its path: a final "100%" that is written rather
+than reached will hide every wrong percentage before it.
+
+**A fixture contains what the rule needs; real data contains what the world
+has.** The one-row-per-download defect was found by asserting an ordering rule
+against the **shipped** ``manifests/tools.json`` instead of against a fixture --
+and nobody injected it. The fixture had been built to exercise ordering, so it
+contained exactly two comparable rows and nothing awkward. The real manifest
+contains a 99 MB file carried on five platforms because the specification
+requires an operating system and an architecture in every record, and on Apple
+silicon two of those five rows are both runnable.
+
+The rule belongs on the fixture, where it can be stated cleanly. **The
+product's own instance of the rule belongs on the real data**, because that is
+where the awkward cases live. Doing only the first is the third shape -- a
+property proved through a seam production need not use.
+
+.. _p05-lock-ruling:
+
+The lock: tier 1's ruling
+==========================
+
+The escalation in :ref:`p05-stale-lock` was answered on 2026-09-02, and the
+finding was worse than the file. ``_build/cometgui-maven.lock`` is gone,
+surviving only in ``_build/archive-before-p05-unit2/``, and nothing under
+``scripts/`` or ``.github/`` ever referenced it -- but ``STATUS.rst`` line 1032
+told readers *"a flock around Maven invocations is the cheap fix and Phase 04
+adopted one"*, while ``build.sh`` line 217 runs ``mvn clean verify`` at the
+repository root with **no lock at all**. Phase 04 adopted one in its agents' own
+command lines, which vanished when those agents did.
+
+**A protection that is documented, believed and absent** -- the signature defect
+relocated into the authoritative record. Tier 1's ruling, both parts its own to
+execute: the record is corrected **now**, because the false sentence is the
+active harm; ``build.sh`` takes a real ``flock`` **at Phase 05 sign-off, not
+during it**, with a control proving it actually serialises, because changing the
+build under a live phase is the precise hazard being discussed.
+
+Until then the operative protections are the serial rule and the pair of
+practices these four collisions produced: **do not write anything the build
+reads, and do not assume an agent has finished until it says so.**
+
 Work units
 ==========
 
