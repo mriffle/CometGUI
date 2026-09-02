@@ -296,15 +296,20 @@ collide -- they share ``cometgui-domain``, the Maven working tree,
        detected through a port over system properties), artefact kind
        enumeration, capability, capability-evidence, install state, probe
        stage and probe-failure kind, loader-failure diagnostic, install
-       progress, and the ``ToolRegistry``/``ToolInstaller`` ports the UI is
-       allowed to see. *Accepts when:* version ordering is proved by a table
+       progress, and the ``ToolManager`` port the UI is allowed to
+       see (this row originally said ``ToolRegistry``/``ToolInstaller``; the
+       unit brief said ``ToolManager``, the agent followed the brief, and the
+       row is corrected here rather than in the code). *Accepts when:* version ordering is proved by a table
        including ``3.06.5 < 3.07.1 < 3.09`` and ``2026.02.2``; platform
        detection is proved from pinned ``os.name``/``os.arch`` triples for all
        five tier-1 pairs plus an unknown pair that must be rejected, not
        guessed; every enum constant is exercised; ``cometgui-domain`` still
        meets 90/85 and its mutation gate.
-     - ``R-TOOL-01``, ``R-PLAT-02``, ``R-PERC-01``
-     -
+     - ``R-TOOL-01``, ``R-TOOL-03``, ``R-TOOL-06``, ``R-TOOL-08``,
+       ``R-PLAT-02``, ``R-PLAT-03``, ``R-PERC-01``, ``R-PERC-11``
+     - **REWORK, 2026-09-02** -- see :ref:`p05-u1-signoff`. First submission
+       ``ea686d6``: everything the agent reported reproduced when I re-ran it,
+       and an injection of my own **survived 108 tests**.
 
    * - 2
      - **The artefact manifest and its reader.** ``manifests/tools.json``
@@ -477,10 +482,125 @@ collide -- they share ``cometgui-domain``, the Maven working tree,
      - every gate item
      -
 
+.. _p05-u1-signoff:
+
+Unit 1 sign-off
+===============
+
+**What I ran myself, on the committed tree at ``ea686d6``, with nothing else
+building.** Not read from the agent's report; every figure below is from my own
+run.
+
+``bash scripts/build.sh`` -> ``11/11 stages OK in 968 seconds``, ``BUILD OK``,
+``127 report file(s): tests=2182 failures=0 errors=0 skipped=2``. The four
+lines that matter::
+
+    ok       cometgui-domain   line 100.0% (832/832)  branch 100.0% (350/350)
+    ok       cometgui-domain   49 compiled class(es), all 49 in the sample
+    ok       cometgui-domain   368/369 mutations killed = 99.7%
+    ok       8 architecture rule(s) checked, 0 failures
+
+The census figure is the one worth reading twice: ``cometgui-domain`` held 25
+compiled classes before this unit and holds 49 now, and all 49 are in the
+coverage sample. The two skips are Phase 04's and pre-date this unit.
+
+I read the diff rather than the description of it: 46 files, 6847 insertions,
+every one under ``cometgui-domain/src/main/java/org/cometgui/domain/tools/`` or
+its test twin. Nothing outside the unit's paths. No gate, threshold, exclusion
+or rule was touched.
+
+Two tests I checked specifically for the shapes this project keeps finding, and
+both are sound. ``ToolVersionTest.Ordering`` sorts a jumbled list with the
+method under test and compares it to a **hand-typed** ascending literal, so the
+expected value is not computed by the code under test.
+``ProbeFailureKindTest`` pins every kind's stage in a hand-typed
+``@CsvSource`` table; its last test does compare two methods of the class under
+test to each other, which alone could not fail, but it sits on top of the
+pinned table and is a consistency check rather than the only check.
+
+.. _p05-u1-injection:
+
+The defect I injected, which the unit did not catch
+---------------------------------------------------
+
+In ``DeclaredCapability``'s compact constructor I replaced the single anchor
+``if (note.isBlank()) {`` with ``if (note.isBlank() && evidence !=
+CapabilityEvidence.UNVERIFIED) {`` -- the plausible-sounding "an unverified
+capability has no provenance to state, so let its note be empty".
+
+The injection **landed**, checked rather than assumed: the anchor occurred
+exactly once; the source hash went ``b8586159...`` to ``39fd3ac8...``; the
+**compiled class** went ``8835fcb3...`` to ``bd619d13...``; and ``javap -c``
+showed ``UNVERIFIED`` in the constructor's bytecode.
+
+``mvn -pl cometgui-domain -Dtest='DeclaredCapabilityTest,ToolOfferTest,
+ToolCapabilityTest,CapabilityEvidenceTest' test`` then exited **0**. The
+surefire reports prove those four classes really ran -- all stamped 07:01:44,
+while ``ToolVersionTest`` still carried 06:40:14 from the earlier build, so the
+selection worked and nothing was silently skipped::
+
+    DeclaredCapabilityTest  tests="10" failures="0"
+    ToolOfferTest           tests="17" failures="0"
+    ToolCapabilityTest      tests="66" failures="0"
+    CapabilityEvidenceTest  tests="15" failures="0"
+
+**108 tests passed with the blank-note rejection switched off.**
+
+The cause is the project's fifth shape, an input set too narrow to see the
+defect. ``aBlankNoteIsRejected`` is a ``@ValueSource`` over five blank strings
+and every one is built with ``OBSERVED_BY_EXECUTION``: the blank axis is
+covered thoroughly and the **evidence axis is not covered at all**.
+
+It matters more than a thin test usually would. ``UNVERIFIED`` is the evidence
+value every Windows and every macOS capability row in this phase's manifest
+carries, because no Windows or macOS binary has ever been executed anywhere in
+this project, and the note is the only field recording *why* such a row is
+unverified. With the injection in place the manifest could carry ``XML_OUTPUT``
+/ ``UNVERIFIED`` / an empty note -- an unverified claim with no provenance at
+all, which is exactly the failure ``phases/PHASE-05-tool-registry.rst`` names
+as this phase's second most likely.
+
+Restored with ``git checkout --``; the source hash returned to ``b8586159...``,
+the marker greps back out at zero occurrences, and ``git status --porcelain``
+is empty.
+
+Carried forward from unit 1
+---------------------------
+
+* **``ProbeFailureKind.stage()`` is single-valued**, and ``TIMED_OUT`` and
+  ``EXECUTION_FAILED`` fall to ``LOADABILITY`` under the agent's rule: an
+  ambiguous kind takes the earliest stage, because the safe direction is "we
+  did not establish that it starts" and never "we established that it cannot do
+  this". ``CAPABILITY_ABSENT`` is consequently the only kind whose stage is
+  ``CAPABILITY``, which is what makes this phase's named trap checkable.
+  **Units 6 and 7 are bound by this**; if either needs a stage-varying kind,
+  ``stage()`` moves onto the occurrence record rather than becoming a guess.
+* **``MinimumHostRequirements`` has no satisfaction rule and its test does not
+  give it one.** The assertions near lines 60 to 67 of
+  ``MinimumHostRequirementsTest`` exercise ``GlibcVersion.isAtLeast``, which is
+  Phase 02's class. **Unit 6 owns "is this host satisfied", and must test the
+  exact-equality boundary**: a host with precisely ``GLIBC_2.34`` must be
+  offered Percolator 3.07.1, not refused it.
+* **The wire-format ids unit 2 must match**, pinned by hand-typed tests in unit
+  1 rather than derived from ``name()``: tools ``comet``, ``percolator``,
+  ``pdv``, ``limelight-converter``; platforms ``linux-x86-64``,
+  ``macos-aarch64``, ``windows-x86-64`` and so on; artefact kinds and
+  capabilities as the uppercase specification tokens; evidence
+  ``observed-by-execution``, ``inferred-from-artefact-bytes``, ``unverified``.
+* **``ToolVersion`` requires two to four numeric components**, so a bare ``3``
+  is rejected and ``3.05`` equals ``3.5``. That is what makes ``R-TOOL-08``'s
+  minimum-3.05 floor a numeric comparison rather than a string test.
+
 Rejections and rework
 =====================
 
 Units sent back, why, and what changed.
+
+* **Unit 1, sent back 2026-09-02** for one round: the narrow-axis validation
+  hole in :ref:`p05-u1-injection`, plus an audit of every other rejection test
+  in the unit for the same shape, plus proof by re-injecting the same defect
+  and watching it go red. The first submission was otherwise sound and was not
+  rejected as a whole.
 
 Deferred
 ========
