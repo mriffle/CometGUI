@@ -367,8 +367,15 @@ final class PkgPayloadReader implements ArchiveReader {
 
     private Element parse(byte[] toc) throws IOException {
         try {
+            /*
+             * newDefaultInstance, not newInstance: the built-in parser, chosen without consulting
+             * the javax.xml.parsers.DocumentBuilderFactory system property or whatever JAXP
+             * provider happens to be on the class path.  The document being read here is
+             * attacker-controlled, and which parser reads it should not be something a dependency
+             * can change -- the hardening below is written against the behaviour of this one.
+             */
             DocumentBuilder builder =
-                    harden(DocumentBuilderFactory.newInstance()).newDocumentBuilder();
+                    harden(DocumentBuilderFactory.newDefaultInstance()).newDocumentBuilder();
             return builder.parse(new ByteArrayInputStream(toc)).getDocumentElement();
         } catch (ParserConfigurationException | SAXException cause) {
             throw malformed("its table of contents is not readable as XML: " + cause.getMessage());

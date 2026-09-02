@@ -365,6 +365,35 @@ class ArchiveEdgeCasesTest {
     }
 
     @Test
+    @DisplayName("a Debian payload that claims gzip and is not names the member and the package")
+    void aDebPayloadThatIsNotReallyGzip() throws IOException {
+        byte[] deb =
+                ArchiveFixtures.debBytesWithPayload(
+                        "data.tar.gz", new byte[] {0x1F, (byte) 0x8B, 0x08, 0x00});
+        Path artefact = Files.write(archives.resolve("nearly.deb"), deb);
+        ExtractionRejectedException rejection =
+                assertThrows(
+                        ExtractionRejectedException.class,
+                        () ->
+                                extractor.extractWholeArtefact(
+                                        ArtefactKind.DEB_PAYLOAD,
+                                        artefact,
+                                        destination,
+                                        "whatever"));
+        assertAll(
+                () -> assertEquals(RejectionReason.MALFORMED_ARCHIVE, rejection.reason()),
+                () -> assertEquals("nearly.deb", rejection.subject()),
+                () ->
+                        assertTrue(
+                                rejection
+                                        .getMessage()
+                                        .contains(
+                                                "its \"data.tar.gz\" member is not a readable gzip"
+                                                        + " stream"),
+                                () -> "wrong message: " + rejection.getMessage()));
+    }
+
+    @Test
     @DisplayName("a payload of exactly two bytes is long enough to be recognised as gzip")
     void aTwoBytePayload() throws IOException {
         /*

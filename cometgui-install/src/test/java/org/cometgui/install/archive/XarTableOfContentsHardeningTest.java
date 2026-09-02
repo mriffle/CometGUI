@@ -81,7 +81,8 @@ class XarTableOfContentsHardeningTest {
     @DisplayName(
             "hardening forces every setting from its unsafe value, not merely from the default")
     void everySettingIsForcedFromItsUnsafeValue() throws ParserConfigurationException {
-        DocumentBuilderFactory unsafe = DocumentBuilderFactory.newInstance();
+        /* The same implementation the reader pins, so this measures that parser and no other. */
+        DocumentBuilderFactory unsafe = DocumentBuilderFactory.newDefaultInstance();
         unsafe.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, false);
         unsafe.setFeature(PkgPayloadReader.DISALLOW_DOCTYPE, false);
         unsafe.setXIncludeAware(true);
