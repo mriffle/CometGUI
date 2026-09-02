@@ -1971,6 +1971,81 @@ BUILD OK**, ``106 report file(s): tests=1756 failures=0 errors=0 skipped=2``,
 census clean in all six modules, and ArchUnit ``8 architecture rule(s) checked,
 0 failures`` once the stale report was regenerated.
 
+.. _status-p05-xsd:
+
+Phase 05: where Windows gets the Percolator XSD companions (tier 1, 2026-09-02)
+================================================================================
+
+Phase 05 escalated this at decomposition, correctly, as engineering rather than
+a ``D-`` item. ``R-TOOL-02`` requires both Percolator XSDs beside the binary.
+``specification.rst`` names the ``noxml`` ``.deb`` for Linux and the ``.pkg``
+for macOS and is **silent on Windows**, because ``D-002`` option C deleted NSIS
+extraction and the NSIS installer is the only Windows artefact that carries
+them.
+
+**Decision: Windows fetches the two schemas from the Linux** ``noxml`` ``.deb``.
+It redistributes nothing, reverses no owner decision, executes no installer and
+changes no platform promise; it fills a silence rather than contradicting the
+specification's text, so it needs no revision. Cost is one additional ~1.8 MB
+download on a Windows install.
+
+**What makes it safe, verified at tier 1 rather than accepted.** The two files
+are byte-identical across artefact kinds *and* versions -- ``sha256`` prefixes
+``21204c89…`` (``percolator_out.xsd``) and ``fa50a550…``
+(``percolator_in.xsd``) from the 3.06.5 ``.deb``, the 3.07.1 ``.deb`` and the
+3.07.1 ``.pkg``. The file Windows would have obtained from the NSIS installer
+is the same file it obtains from the ``.deb``.
+
+**And the stakes are lower than the requirement makes them sound.** Checked
+directly: the shipped ``percolator_out.xsd`` declares ``majorVersion`` as
+``use="required" fixed="2"`` while the 3.07.1 binary writes ``3``, so **the
+schema cannot validate that binary's own output unmodified** -- the standing
+risk recorded in *Risks currently live*. The XSDs are a provenance and
+validation asset, not a runtime prerequisite: Phase 00 proved by execution that
+XML output works without them.
+
+**The documentation obligation this creates.** Downloading a Debian package on
+a Windows machine is odd enough that a later reader will take it for a mistake
+and "clean it up". Phase 05 records in the registry and in
+``docs/developer/tool_registry.rst`` why it is done and that the schemas are
+platform-independent.
+
+.. _status-p05-upstream-facts:
+
+Three upstream facts Phase 05 established by execution
+=======================================================
+
+All three verified independently at tier 1 from the fetched artefacts, because
+two of them shape design rather than documentation.
+
+* **A genuine upstream release contains a path-traversal entry.**
+  ``rel-3-06-05/percolator-noxml-osx-portable.zip`` has exactly one member and
+  it is named ``../my_build/percolator-noxml/src/percolator``. A correct
+  ``R-SEC-05`` guard rejects that archive, and the obvious repair -- take the
+  basename -- is precisely the weakening this project forbids. Phase 05's
+  design resolves it without touching the guard: for ``ZIP`` artefacts **the
+  manifest names the member and the destination, and the archive's own path
+  never places a file.** That is strictly stronger than sanitising a path, and
+  it gives gate item 3 a real upstream artefact rather than a synthetic
+  fixture. The traversal guard stays and must still be exercised.
+* **Percolator 3.09's Windows artefact is a bare ``percolator.exe``**, 640512
+  bytes, not an archive. Any code assuming "Percolator implies ZIP" is wrong.
+* **3.09 has no Linux row at all** -- no portable archive; its ``.deb`` needs
+  ``GLIBC_2.38`` *and* ``libboost_filesystem.so.1.83.0``, which it does not
+  ship. Absent is the honest manifest entry, exactly as ``D-003`` anticipated.
+
+**Two probe assumptions that would otherwise have been re-invented**, both
+found by executing rather than reading: on the too-small-fixture failure the
+output file **exists and is zero bytes**, so "the file exists" is not a
+sufficient probe condition; and Percolator's ``--help`` arrives on **stderr**,
+so a probe reading stdout alone sees an empty string. Both are pinned by tests
+rather than left in a work log.
+
+**The ``--help`` probe is now disproved by measurement, not by argument.** The
+portable ``noxml`` binary and the ``noxml`` ``.deb`` binary print
+**byte-identical** help, 17928 characters each, both listing ``--xmloutput``
+and ``--decoy-xml-output``. A text probe discriminates nothing.
+
 Open decisions
 ==============
 
