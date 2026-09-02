@@ -1029,8 +1029,14 @@ Three things follow for any future session that runs phases in parallel:
    command for a *single* worker in a *quiet* tree.
 #. **``_build/m2repo`` is shared** by both phases and by the gate harnesses, so
    concurrent Maven writes there are a hazard even when the modules are
-   disjoint. A ``flock`` around Maven invocations is the cheap fix and Phase 04
-   adopted one.
+   disjoint. A ``flock`` around Maven invocations is the cheap fix, and Phase 04
+   adopted one **in its own agents' command lines only**. *Corrected 2026-09-02:*
+   nothing under ``scripts/`` has ever taken a lock -- ``build.sh`` runs
+   ``mvn clean verify`` at the repository root unprotected -- so a reader of
+   this paragraph would have concluded that builds here are serialised when they
+   are not. Four collisions across three sessions say otherwise. The lock lands
+   in ``build.sh`` with a control proving it serialises; see
+   :ref:`status-lock-absent`.
 #. **The gate harnesses are not the hazard.**
    ``verify-quality-gates.sh``, ``verify-test-gates.sh`` and
    ``verify-shell-gates.sh`` each declare "WHERE IT WORKS. Never in the working
@@ -2142,6 +2148,200 @@ found and closed in itself: cancellation had been graded over its axes, progress
 over none. Sent back and closed, with the failure text
 ``expected: <1500000> but was: <16229>``.
 
+.. _status-lock-absent:
+
+The lock nothing takes, and the ruling on it (2026-09-02)
+==========================================================
+
+Phase 05 escalated that ``_build/cometgui-maven.lock`` existed while
+``grep -rn "flock" scripts/`` returned nothing. Checked at tier 1 and it is
+worse than the file: the file is gone (it survives only in a build archive) but
+**this document told readers a lock was adopted**, while ``build.sh`` line 217
+runs ``mvn clean verify`` at the repository root unprotected. Phase 04 did adopt
+one -- in its agents' command lines, which vanished with those agents.
+
+So the protection was **documented, believed and absent**: this project's
+signature defect relocated into its own record. Four collisions across three
+sessions prove it, and every one was committed by the tier enforcing the rule.
+
+**Ruling, in two parts.** The false sentence is corrected now, because it is the
+active harm. ``build.sh`` takes a real ``flock`` **at Phase 05 sign-off, with a
+control proving it serialises** -- not mid-phase, because changing the build
+under a live phase is the hazard itself, and a lock never seen to block is
+exactly what we are complaining about. ``flock`` releases on process death, so
+there is no stale-lock hazard.
+
+*A fourth and fifth instance, both tier 1's, recorded because the shape is now
+unmistakable.* A "wait until the other harness exits" loop used ``pgrep -f`` with
+a pattern its **own command line contained**, so it matched itself and would have
+waited forever; and a "is the tree busy" check did the same, reporting BUSY for
+hours when only the harness's own shell wrappers matched. The project's warning
+about ``pkill -f`` matching your own shell has both an impatient and a patient
+twin. **A process check must exclude the checker.**
+
+.. _status-windows-first-execution:
+
+The first Windows execution in this project's history (2026-09-02)
+===================================================================
+
+Pull request #1 ran two workflows. **A ``windows-latest`` runner executed
+Percolator**, which no machine in this project had ever done: every non-Linux
+capability claim until today was inference from byte markers read on Linux.
+
+**Two binaries were exercised and they must never be conflated.**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 39 39
+
+   * - Observation
+     - **A** -- NSIS installer payload (XML build), not shipped
+     - **B** -- portable ``noxml`` build, **the artefact the product installs**
+
+   * - sha256 / bytes
+     - ``044f3957…4691e`` / 804 864
+     - ``b9d9bbe8…5f059f`` / 707 072
+
+   * - Started?
+     - **No.** Exit ``3221225781`` (``0xC0000135``,
+       ``STATUS_DLL_NOT_FOUND``), three invocations, 0 bytes captured each
+       time. The loader failed before any application code ran.
+     - **Yes.** ``Percolator version 3.07.1, Build Date Jun 20 2024 13:21:08``,
+       in all three invocations.
+
+   * - Wrote XML?
+     - Nothing; the output file does not exist.
+     - **exit 0, 148 272 bytes, 200 ``<psm>`` and 200 ``<peptide>``** parsed
+       with an XML parser, against a 200-target/200-decoy PIN. The Linux twin
+       produced 200/200 from the same input.
+
+   * - ``--xml-in``
+     - Diagnostic absent -- and **correctly refused as INCONCLUSIVE**, because
+       the banner was absent from the same capture. Absence proves nothing
+       without positive proof the binary started.
+     - ``ERROR: Compiler flag XML_SUPPORT was off``, exit 1: a **positive
+       observation of a negative capability**, and confirmation that the
+       functional probe's discriminator works on Windows.
+
+**Why the job is red, and why that is right.** The verdict is ``INCONCLUSIVE``
+(exit 2), not ``NEGATIVE`` (exit 1) and not ``HARNESS FAILURE`` (exit 3). The
+driver's exit taxonomy earned its keep: it declined to report "not XML-capable"
+about a binary that never started, which is precisely the wrong-cause failure
+this project keeps warning phases about.
+
+**What is now observed, and the phrasing is load-bearing.** Percolator 3.07.1's
+portable Windows binary is *observed to start and to write Percolator XML on a
+GitHub ``windows-latest`` runner (Windows Server 2025, x86-64, administrator,
+Visual-Studio-equipped image) on 2026-09-02*. Not *verified*, not *confirmed*,
+not "runs on Windows" unqualified.
+
+**What remains unverified, and one caveat is sharper than the transcript's
+own.** The zip carries no Visual C++ runtime and the runner's image ships
+VC++ 2022, so **the runner supplied it**. The transcript says this "cannot
+settle" the question; the sharper reading is that it settles it *negatively* --
+a clean end-user machine is still untested, and Phase 05's in-scope VC++ line is
+**not** discharged. Also untested: standard-user (the runner was administrator),
+consumer Windows 10/11 (this was Windows Server 2025), Windows on ARM, and
+macOS entirely. One run, one image version.
+
+**A committed document was disproved by the run**, and the correction is at
+``docs/feasibility/windows-artefact.rst``: the payload's own
+``xerces-c_3_1.dll`` imports 60 functions from ``MSVCR100.dll`` (Visual C++
+2010), which the payload does not ship. The original analysis parsed one file's
+imports rather than the transitive closure. **The artefact the product ships is
+unaffected** -- its closure carries no xerces -- and the ``noxml`` NSIS
+installer's payload is byte-identical to the portable zip's with a
+self-contained closure.
+
+.. _status-p01-item6:
+
+Phase 01 item 6: the first half is met, on evidence
+----------------------------------------------------
+
+``pull-request.yml`` ran **on a pull request** -- run ``33644055679``, event
+``pull_request``, PR #1, conclusion **success**, 1139 s, all 15 steps green,
+``146 report file(s): tests=2682 failures=0 errors=0 skipped=1``.
+
+The two **zero-second** steps were audited rather than assumed, because a
+zero-second step is where a silent skip hides. Both can go red: the real-tool
+integration step asserts that **no** integration test exists yet and fails the
+moment one appears (*"PASSED (nothing to run, and that is asserted rather than
+assumed)"*), and the dependency scan ran a live canary that found 7 advisories
+for a known-vulnerable log4j coordinate. No pull-request step is a stub; the
+stubs live in ``nightly.yml`` and exit 70 by design.
+
+The item's second half -- "its failure modes are demonstrated, not assumed" --
+is supplied by ``verify-quality-gates.sh`` and ``verify-test-gates.sh``, not by
+this green run, and is unchanged.
+
+.. _status-p00-item8-contradiction:
+
+Phase 00 item 8 contradicts itself, and tier 1 will not quietly reword it
+-------------------------------------------------------------------------
+
+**This is an escalation to the owner, not a decision.** Item 8 requires the
+binary's ``--xml-in`` to **not** answer ``Compiler flag XML_SUPPORT was off``,
+and then, since ``D-002`` option C, requires "the same observations" of the
+portable ``noxml`` build. But the ``noxml`` build is *defined* by printing
+exactly that diagnostic -- item 8's own amendment note says so: *"only
+``--xml-in`` -- which the ``noxml`` build refuses by name -- separates the
+twins."*
+
+Read literally, **the artefact the product ships can never satisfy item 8**, no
+matter how well it behaves; it behaved exactly as the model predicts and a
+strict reading still scores it a failure. That is a drafting fault introduced by
+the amendment, not a shortfall in the work.
+
+Rewording a gate so that something passes is the one move this project forbids
+outright, so it is not done here on tier 1's own authority. The proposal, for
+the owner: clause (iii) applies to the **XML** build only; for the ``noxml``
+build the required observation is that it **does** print the diagnostic, which
+is the positive control the phase already treats it as. Nothing that was proven
+becomes unproven; an unsatisfiable clause becomes a satisfiable one that tests
+the same fact.
+
+The item's opening verb, "**confirmed** on a Windows runner", also uses a word
+the project forbids elsewhere about Windows binaries.
+
+.. _status-p05-findings:
+
+Four findings from Phase 05 that outlive it
+============================================
+
+* **A redundant "correct" final value masks every wrong value before it.** The
+  downloader ended each transfer by re-reporting the final byte count. Harmless
+  and redundant -- and it meant a loop reporting wrong numbers throughout still
+  ended on the right one, so any check of the end state passed. That is exactly
+  why an injected resumed-progress defect survived 338 tests while
+  ``lastByteCount()`` stayed correct. Removed rather than argued equivalent.
+  **Phase 08's stage progress and Phase 13's provenance viewer are in its
+  path.**
+* **A fixture contains what the rule needs; real data contains what the world
+  has.** Asserting an ordering rule against the *shipped* manifest rather than a
+  fixture surfaced a defect nobody injected: PDV's 99 MB zip and the converter
+  JAR offered **twice** on Apple silicon, the second labelled
+  ``TRANSLATED_ROSETTA_2`` -- a false statement about a Java program.
+* **The eleventh shape: a diagnostic that lies about the value it rejected.**
+  The guard fires correctly, its arithmetic is mutation-killed, every
+  behavioural test passes -- and the message reads ``400 kept plus 600 received
+  is -200``, because the assertion stopped at the opening words. It generalises
+  to the ``R-PLAT-03`` loader diagnostic, ``R-PERC-10``'s explanation and every
+  provenance field a reviewer reads a year later.
+* **Five security protections, none of them held in place.** All five XXE
+  hardening calls on the parser that reads an attacker-controlled ``.pkg``
+  table of contents could each be deleted with the whole suite green. Two were
+  *unprovable as written* because they restate JDK defaults. The repair was a
+  shape change, not more tests -- ``harden()`` now forces the safe state over a
+  caller-supplied factory set to every unsafe value -- after which each of the
+  five fails on its own. **A protection that cannot be observed to matter is
+  indistinguishable from one that is absent.**
+
+*And a third form of the same green-for-nothing trap:*
+``mvn -Dtest='package.*'`` matches zero tests and **exits 0**. Three agents have
+now been caught by a ``-Dtest`` expression that selected nothing -- a wrong
+separator, a glob, and a missing ``surefire.`` prefix. **Read the ``Tests run:``
+line, never the exit code.**
+
 Open decisions
 ==============
 
@@ -2376,7 +2576,12 @@ failed on a Phase-15 stub, by design -- and no pull-request workflow has run:
   ``windows-percolator-verification`` and are proved falsifiable
   (:ref:`status-residue-01`). Until it passes, every non-Linux capability claim
   stays inference and the manifest must keep saying so.
-* **Phase 01 item 6** -- the four workflow files run on a real pull request.
+* **Phase 01 item 6** -- the pull-request pipeline runs on a real pull request.
+  *Corrected 2026-09-02: this previously said "the four workflow files", which
+  no pull request can ever satisfy.* Only two of the four declare
+  ``pull_request``: ``pull-request.yml`` and ``windows-percolator.yml``.
+  ``nightly.yml`` is ``schedule`` plus ``workflow_dispatch`` and ``release.yml``
+  is ``workflow_dispatch`` only, so the item as written was unsatisfiable.
   They exist and every step is proven locally -- 45 steps across 4 workflows,
   37 executed on this machine -- but GitHub has executed nothing in this
   repository at all: the Actions API reported ``total_count = 0`` runs on

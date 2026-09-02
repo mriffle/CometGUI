@@ -418,11 +418,34 @@ The 92 Xerces symbols are the C++-mangled ``xercesc_3_1`` namespace and include
 ``XMLGrammarPoolImpl::serializeGrammars`` and the ``DefaultHandler`` SAX2
 callbacks -- an XML *parser* and grammar pool, not an XML writer.
 
-What this tells a later phase about the Windows install: the payload carries
-its own MSVC 2019 runtime DLLs alongside the executable, so a separate
-Visual C++ redistributable should not be needed, but ``percolator.exe`` and the
-DLLs in ``$INSTDIR\bin`` must stay in one directory. The remaining imports are
-Windows components. Confirming that on Windows requires running it there.
+What this tells a later phase about the Windows install: ``percolator.exe`` and
+the DLLs in ``$INSTDIR\bin`` must stay in one directory.
+
+.. warning::
+
+   **Corrected 2026-09-02, by running it on Windows.** This paragraph used to
+   say that "a separate Visual C++ redistributable should not be needed" and
+   that "the remaining imports are Windows components". **Both are false**, and
+   the first Windows execution in this project's history is what exposed them.
+
+   On a ``windows-latest`` runner the payload ``percolator.exe`` failed to load
+   three times with exit ``3221225781`` (``0xC0000135``,
+   ``STATUS_DLL_NOT_FOUND``): the process was created, the loader could not
+   resolve its imports, and no application code ran. The cause is one level
+   deeper than this analysis looked. The payload's own
+   ``xerces-c_3_1.dll`` imports 60 functions from **``MSVCR100.dll``, the
+   Visual C++ 2010 runtime**, which the 22-file payload does not contain and
+   which GitHub's image does not ship. The original analysis parsed only
+   ``percolator.exe``'s imports and never walked the transitive closure.
+
+   **This does not affect the artefact the product installs.** ``D-002`` option
+   C ships the portable ``noxml`` build, whose closure carries no xerces and
+   therefore no ``MSVCR100`` dependency; it started and wrote XML on that same
+   runner. The ``noxml`` NSIS installer's payload binary is byte-identical to
+   the portable zip's and its closure is self-contained.
+
+   A reminder of the general shape: **an import closure is not the imports of
+   one file.**
 
 Strings: the A/B, quoted exactly
 ================================

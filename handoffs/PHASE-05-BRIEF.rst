@@ -86,8 +86,11 @@ this reason -- it reports "NOT XML-capable" for a binary whose XML the Limelight
 converter consumed -- and **must not be copied into the product.**
 
 **2. The manifest must never assert a capability the project has not
-observed.** No Windows or macOS binary has ever been executed anywhere in this
-project; every non-Linux row in the specification's artefact table is a
+observed.** *Updated 2026-09-02: no longer true of Windows.* A ``windows-latest``
+runner has now executed Percolator 3.07.1's portable ``noxml`` binary, which
+started and wrote XML; the XML installer payload failed to load. No macOS binary
+has ever been executed, and no Windows binary has run on a clean end-user
+machine, a standard-user account, consumer Windows or ARM. Every non-Linux row in the specification's artefact table is a
 byte-marker inference. Build the manifest, the extraction and the probe against
 the Linux path, mark other platforms' capability as **probed at runtime**, and
 let the manifest say ``unverified-on-windows`` where that is the truth. The
