@@ -847,6 +847,13 @@
               <param>org.cometgui.install.registry.*</param>
               <param>org.cometgui.install.verify.*</param>
               <param>org.cometgui.install.probe.*</param>
+              <!-- Added by phase 05 after unit 3, which put real logic here: the
+                   distinction between "upstream no longer publishes this" and "the
+                   bytes were corrupted" is a D-008 product requirement, and a
+                   mutation that collapsed it would report a vanished artefact as a
+                   corrupt download.  Adding a package STRENGTHENS this gate; the
+                   list is never narrowed. -->
+              <param>org.cometgui.install.download.*</param>
               <!-- stage invalidation rules -->
               <param>org.cometgui.workflow.state.*</param>
             </targetClasses>
