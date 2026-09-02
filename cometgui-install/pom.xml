@@ -16,6 +16,55 @@
   <description>Managed artefact registry, download, SHA-256 verification, safe extraction of every artefact kind, atomic install and probing.</description>
 
   <!--
+    MUTATION GATE ON, AND NO LONGER INERT (phase 05 unit 2).  R-TEST-02 names
+    the artefact registry as critical pure logic, and pom.xml's <targetClasses>
+    already lists org.cometgui.install.registry.* for exactly that reason.
+    Until this unit the module compiled nothing but package-info classes, so the
+    parent's default of `true` was correct: PIT runs with failWhenNoMutations at
+    its default and would have failed a module with nothing to mutate.  The
+    module now has real classes under that prefix, so the switch goes on, and
+    scripts/build.sh's drift check fails the build if critical-package code ever
+    appears here with the gate off again.  Switching it back off to make a build
+    pass is a weakening of a gate and is a rejection at sign-off.
+
+    THE COVERAGE SWITCH IS DELIBERATELY NOT FLIPPED.  cometgui-install is not
+    one of the specification's core-domain, parameter or provenance prefixes, so
+    cometgui.coverage.core.skip stays true here; the mutation gate and the
+    per-class coverage census are what hold this module.
+  -->
+  <properties>
+    <cometgui.mutation.skip>false</cometgui.mutation.skip>
+  </properties>
+
+  <!--
+    THE MANIFEST HAS EXACTLY ONE COPY, AT manifests/tools.json, AND IT IS SHIPPED
+    FROM THERE.  A copy under src/main/resources would be a second file to keep
+    in step with the authoritative one, and this project has already paid for
+    that shape twice.  The directory is resolved from
+    ${maven.multiModuleProjectDirectory} - the repository root Maven itself
+    computed from the .mvn directory - so it does not depend on the working
+    directory a build was started from.
+
+    The module's own src/main/resources is listed as well, because naming any
+    <resource> replaces Maven's default rather than adding to it, and a later
+    unit that adds an ordinary resource here would otherwise find it silently
+    absent from the jar.
+  -->
+  <build>
+    <resources>
+      <resource>
+        <directory>${maven.multiModuleProjectDirectory}/manifests</directory>
+        <includes>
+          <include>tools.json</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+    </resources>
+  </build>
+
+  <!--
     Only the edges the specification's layering permits are declared here.
     Adding one is an architectural change: say so in the phase handoff, and
     expect the ArchUnit rules in cometgui-archtests to have an opinion.
@@ -28,6 +77,18 @@
     <dependency>
       <groupId>org.cometgui</groupId>
       <artifactId>cometgui-process</artifactId>
+    </dependency>
+    <!--
+      The manifest is JSON, and org.cometgui.provenance.json.JsonReader is this
+      repository's one JSON reader.  Writing a second parser here is exactly the
+      duplication that produced two divergent secret-redaction rule sets on
+      2026-08-31: two readers would eventually disagree about what a valid
+      document is.  No cycle is created - cometgui-provenance depends only on
+      cometgui-domain - and no architecture rule restricts this edge.
+    -->
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-provenance</artifactId>
     </dependency>
   </dependencies>
 </project>
