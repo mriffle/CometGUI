@@ -231,7 +231,7 @@ gate_spec() {
             ;;
         provenance)
             GATE_PHASE="04"
-            GATE_ITEMS="1-6"
+            GATE_ITEMS="1,2,3,4,5,6"
             GATE_DEFECT="a hasher that digests one byte less than it read so every published vector comes back wrong; a hasher that keeps every chunk, leaving the digests EXACTLY CORRECT while the 2 GB proof's retained-heap bound is exceeded; a fingerprint that treats an absent attribute as a match, dressed as Windows compatibility, so the cache serves an entry it cannot validate; a log reader that drops the torn tail a crash leaves, so the damage is not reported; ATOMIC_MOVE replaced by copy-then-delete, which a concurrent reader sees straight through; and redaction removed from each of the three writers in turn -- the JSON value path, a size-conditioned fast path in the RST writer, and the event log's payload -- each caught by a grep of the bytes on disk that names the artefact, the corpus index and the offset without printing the secret"
             GATE_SCRIPT="scripts/verify-provenance-gates.sh"
             GATE_ARGS=()
@@ -554,13 +554,19 @@ main() {
     printf '%s\n' "${ROWS[@]}"
 
     # Which exit gate items this run covered, per phase, deduplicated and
-    # sorted.  Per phase and not pooled: both phases number their items from
-    # one, so a pooled list would silently credit one phase with the other's
+    # sorted.  Per phase and not pooled: every phase numbers its items from
+    # one, so a pooled list would silently credit one phase with another's
     # coverage -- which is exactly the kind of quiet lie these controls exist
     # to prevent.
+    #
+    # GATE_ITEMS is split on commas and only ^[0-9]+$ survives, so an entry
+    # written as a RANGE -- "1-6" -- is dropped and the phase prints "none".
+    # State the items individually.  A phase added here without being added to
+    # the loop below prints nothing at all, which is why the loop is a list
+    # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02; do
+    for phase in 01 02 04; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"

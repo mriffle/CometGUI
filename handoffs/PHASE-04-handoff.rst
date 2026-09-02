@@ -3,40 +3,87 @@ PHASE-04 handoff -- Hashing and Provenance Core
 =====================================================
 
 :Phase: 04
-:Phase orchestrator: Phase-04 orchestrator subagent (session 04)
-:Status: IN PROGRESS -- this document is being written as the phase closes
-:Last updated: 2026-08-31
+:Phase orchestrator: session 04 (units 1-10), then session 05's resumption
+   orchestrator (units 9-13 and the sign-offs)
+:Outcome: **PARTIAL** -- all seven gate items evidenced on POSIX; the residue
+   is named at :ref:`p04-divergence` and is Windows behaviour that has never
+   run anywhere
+:Last updated: 2026-09-02
 
-.. warning::
+.. note::
 
-   **PHASE 04 IS PAUSED, NOT FINISHED, FAILED OR ABANDONED.** The owner paused
-   it for cost while Phase 03 finishes alone in the same working tree. A fresh
-   agent resumes it from this document. Nothing here is a claim that the phase
-   is done.
+   **THE PHASE IS FINISHED AND EVERY NUMBER BELOW WAS RE-TAKEN FROM A QUIET
+   TREE.** It was paused part-built on 2026-08-31 with units 1-8 signed off, 9
+   and 10 landed but unsigned, and 11-13 not started. It resumed on 2026-09-01
+   with no other phase live in the working tree, which is what makes the
+   figures mean anything. The paused document's warning that "every number in
+   this document was taken from a noisy tree" has been discharged: they were
+   all re-taken, and where a re-taken number differs from the paused one, the
+   difference is recorded rather than overwritten.
 
-   **EVERY NUMBER IN THIS DOCUMENT WAS TAKEN FROM A NOISY TREE.** Between two
-   and five agents were landing code in ``cometgui-provenance`` for most of the
-   phase, and Phase 03 was working in ``cometgui-process`` throughout. No
-   headline figure here has been re-taken from a quiet tree, and the single
-   clean end-to-end run that would produce one was deliberately NOT run,
-   because Phase 03 is still changing the tree and any figure would be invalid
-   by the time this phase resumes. **Re-take them all.** See
-   :ref:`p04-first-thing`.
+Where the numbers come from
+===========================
 
-Why the numbers cannot be trusted yet
-=====================================
+One clean end-to-end run at ``9ddb3e3``, with ``git status --short`` empty and
+no other agent in the tree, in the order :ref:`p04-first-thing` prescribes:
+``mvn -pl cometgui-domain install`` first, because PIT resolves from
+``_build/m2repo`` and not from the reactor, then one ``verify``, then one
+mutation run, then the class-population census over both modules.
 
-This is not modesty, it is the phase's own central finding applied to itself.
+.. list-table::
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - Measurement
+     - ``cometgui-provenance``
+     - ``cometgui-domain``
+
+   * - Tests
+     - 669 run, 0 failures, 0 errors, 2 skipped
+     - 359 run, 0 failures, 0 errors, 0 skipped
+
+   * - JaCoCo line / branch
+     - **100.00%** (1827/1827) / **100.00%** (623/623)
+     - **100.00%** (432/432) / **100.00%** (188/188)
+
+   * - PIT
+     - **774 mutations, 771 KILLED, 0 SURVIVED, 3 TIMED_OUT, 0 NO_COVERAGE**
+     - **204 mutations, 204 KILLED, 0 SURVIVED**
+
+   * - Class-population census
+     - 37 compiled, **37 in jacoco.xml**, 30 with PIT mutations
+     - 25 compiled, **25 in jacoco.xml**, 15 with PIT mutations
+
+   * - Static analysis
+     - ``BugInstance size is 0``, ``0 Checkstyle violations``
+     - the same
+
+**Read the census before the percentages, and it is clean.** The seven
+``cometgui-provenance`` classes with no PIT mutations were judged rather than
+skimmed: an enum of constants, four interfaces, an exception with constructors
+only, a two-component record whose validation delegates, and a constants
+holder. Not one is a class whose tests failed to compile -- which is the
+condition that made the census necessary. ``ManifestReader``, the class that
+was compiled, carried 79 ``NO_COVERAGE`` mutations and was **absent from the
+coverage sample** on the day the census was written, is back in the population.
+
+**The aggregate falsifiability suite**, ``bash scripts/verify-all-gates.sh``:
+**11 controls passed, 0 failed, in 1917 seconds (31m57s)**, up from 10 controls
+in 1702 seconds at the start of the session. The eleventh is this phase's own
+new harness (:ref:`p04-harness`), graded at 24 controls. No floor was lowered
+and no control was removed.
+
+The paused document's central warning, kept because it is still true
+--------------------------------------------------------------------
+
 A coverage or mutation figure taken while sibling units are mid-landing is
 uninterpretable, and it can err in **either** direction. Low is visible: one
 unit saw its ``json`` package read 38% because another unit's tests had not
 compiled yet. High is invisible: a class whose test does not compile can be
-absent from the report altogether, and an absent class does not drag an
-average down -- it silently leaves the sample. That happened here, was caught,
-and is the reason :ref:`p04-census` exists.
-
-So: treat every figure below as an observation about a moving tree, useful for
-knowing roughly where things stand and useless as evidence for a gate.
+absent from the report altogether, and an absent class does not drag an average
+down -- it silently leaves the sample. That happened here, was caught, and is
+the reason :ref:`p04-census` exists. **The remedy is not to be careful; it is
+to run the census beside the numbers on every build.**
 
 .. contents:: Contents
    :depth: 2
@@ -235,90 +282,104 @@ agent reported success.
      - ``3e552b4``, reworked at ``8f00cae`` and ``4c33b79``.
 
    * - 9
-     - Strict JSON reader
-     - **See below**
-     - Nothing committed at the time of the pause.
+     - Strict JSON reader and round-trip suite
+     - **Signed off**
+     - ``9639b77``, signed off at ``90443ed``. Landed unsigned at the pause;
+       the resumption read the diff, re-ran the gate, injected two defects,
+       answered the unit's five design questions, closed the six PIT survivors
+       and repaired one defect the unit had not reported. See
+       :ref:`p04-resumption-work`.
 
    * - 10
      - ``provenance.rst`` report
-     - **See below**
-     - Nothing committed at the time of the pause.
+     - **Signed off**
+     - ``9317abc``, signed off at ``670b886``. Same shape: diff read, gate
+       re-run, two defects injected, and the Sphinx gate over the generated
+       sample run **both ways** for the first time.
 
    * - 11
      - Seeded-secret grep over generated artefacts
-     - **NOT STARTED**
-     - Gate item 6's end-to-end half. Deliberately not begun.
+     - **Signed off**
+     - ``df7fbac``, signed off at ``d8d2f0d``.
+       ``SeededSecretArtefactSweepTest`` writes all three artefacts into one
+       run directory, walks it, and greps every file on disk twice -- as UTF-8
+       text and as raw bytes. Gate item 6 is now whole.
 
    * - 12
      - Documentation
-     - **NOT STARTED**
-     - ``docs/reference/provenance_format.rst`` and
-       ``docs/developer/provenance_schema.rst`` are still the Phase 01 stubs.
+     - **Signed off**
+     - ``31be8c1``, signed off at ``aefe40d``.
+       ``docs/reference/provenance_format.rst`` (the versioned schema),
+       ``docs/developer/provenance_schema.rst`` (the model), a mechanical drift
+       check between the page and the writer, and five ``AC-PRV`` evidence
+       entries.
 
    * - 13
      - Gate enablement and falsifiability
-     - **Partly done**
-     - The module's mutation switch is on and verified live (``4c16864``). The
-       final clean run and ``verify-all-gates.sh`` were not run.
+     - **Done**
+     - ``9ddb3e3``. The module's mutation switch is on and proved live;
+       ``scripts/verify-provenance-gates.sh`` is new and registered as the
+       eleventh control of ``verify-all-gates.sh``; the final clean run and the
+       aggregate suite were both made.
 
-.. _p04-reverted:
+.. _p04-resumption-work:
 
-Units 9 and 10 -- LANDED, NOT SIGNED OFF
------------------------------------------
+Units 9 and 10, and what signing them off actually found
+---------------------------------------------------------
 
-Both committed in the final minutes, so **nothing was reverted and no work was
-lost**. But both are ``LANDED, NOT SIGNED OFF``, and the distinction is the
-whole point of this project's structure:
+At the pause both were ``LANDED, NOT SIGNED OFF``: committed green by their
+authors in the final minutes, with **no diff read, no gate re-run and no defect
+injected into either**. The resumption did all three for each, and the two
+things it found are worth more than the sign-offs.
 
-* **Unit 9**, the strict JSON reader and round-trip suite, at ``9639b77``.
-* **Unit 10**, the ``provenance.rst`` report, at ``9317abc``.
+**The round-trip suite's blind spot, proved rather than argued.** The paused
+handoff claimed that a round trip cannot catch a reader that reads the wrong
+key, and that only the two hand-typed suites can. That is a claim about a
+suite, so it was tested on the suite: ``"formatLocale"`` was renamed to
+``"format_locale"`` in **both** ``ManifestWriter`` and ``ManifestReader`` -- a
+writer and a reader agreeing on a wrong name, which is the only shape a round
+trip is blind to. ``ManifestRoundTripTest`` stayed **entirely green**, 14 tests
+including all two hundred generated manifests and the byte-stability check,
+while every ``provenance.json`` the build could produce carried a member name
+no other reader would understand. ``ManifestWriterTest`` and
+``ManifestReaderTest`` together failed 21 and errored 15. **Preserve that
+separation.** A future agent "simplifying" the reader tests to build their
+fixtures with the writer would delete the only thing standing between this
+project and a symmetric, unanimous, wrong provenance record.
 
-**I did not read either diff, did not run their gates myself, and did not
-inject a defect into either.** Every other unit in this phase carries all
-three. What follows is therefore each agent's own account, which is a claim to
-be checked and not evidence:
+**A defect unit 9 did not report, found at sign-off and repaired.** The
+reader's contract is that a hostile document is refused with a located
+``InvalidManifestException`` and never anything else -- which is why nesting is
+bounded rather than left to overflow the stack. The arithmetic twin of that was
+open. The timestamp format's year field is backed by a ``LocalDate`` and reaches
+year +-999 999 999, about two billion years, while ``Duration.toMillis()``
+overflows a ``long`` at about 292 million. Measured on this JVM::
 
-Unit 10 reported 59 report tests green, its package at 100% line and 100%
-branch, PIT 121 mutations with 0 survivors, and all six of its own
-falsifiability defects caught -- including item (d), the structural test that
-enumerates 53 record components reflectively and fails when the report omits
-one. It left a fully populated sample report for the Sphinx gate at
-``cometgui-provenance/target/provenance-report-sample/provenance.rst``, with
-``conf.py`` and ``index.rst`` beside it so the check is one command::
+    parse OK   -0999999999-01-01T00:00:00.000Z
+    parse OK   +0999999999-12-31T23:59:59.999Z
+    millisBetween(...) THREW java.lang.ArithmeticException: long overflow
 
-    .venv/bin/sphinx-build -n -W -b html \
-        cometgui-provenance/target/provenance-report-sample /tmp/rst-sample-html
+A document at both extremes parsed, satisfied every model invariant, reached
+``requireRecordedDuration`` and threw ``java.lang.ArithmeticException`` **out of
+``ManifestReader.parse``**, past every caller that catches
+``InvalidManifestException`` and nothing else. Unit 9 knew the *writer* half and
+recorded it as "a run spanning the format's two extremes cannot be serialised";
+the *reader* half is the one a corrupt file reaches. Repaired, with its own
+negative control.
 
-**Run that. I did not.** The sample is regenerated by the test suite, and a
-clean-proof copy was left in the session scratchpad, which does not survive
-this session.
-
-Unit 10 also reported the finding that decides how RST values are escaped: of
-the four value shapes an inline literal cannot carry, **two fail the Sphinx
-gate silently**. A lone backtick and an empty value raise errors, but a value
-with a leading space *builds clean* and renders with the markup gone and the
-backticks visible. So the escaping convention could not be developed by
-watching the build go red, which is why it is stated in the report's own
-preamble.
-
-**Unit 10's three survivors were reported killed; unit 9's six were reported
-still open, with a precise diagnosis of each -- see** :ref:`p04-survivors`.
-Neither claim has been confirmed from a quiet tree.
-
-Unit 9 also left five design questions for whoever signs it off. They are
-recorded here rather than answered, because answering them without reading the
-diff would be the same mistake as signing the unit off without reading it:
-whether ``InvalidManifestException`` should be a top-level type rather than
-nested in ``ManifestReader``; whether the reader should attach the rejecting
-exception as a *cause* (it deliberately does not, because ``FileHashes``,
-``RunId`` and ``DateTimeParseException`` all quote the value they rejected,
-which would put a hostile document's contents into a stack trace -- the cost
-being that you lose the specific message); that ``json/package-info.java``
-still describes only writing; that a run spanning the timestamp format's two
-extremes cannot be serialised because ``millisBetween`` overflows a ``long``;
-and that locale tags must be exactly canonical, so ``"en-us"`` is rejected,
-because ``Locale.forLanguageTag`` never fails and silently returns
-``Locale.ROOT`` for rubbish.
+**The Sphinx gate over unit 10's sample report, run both ways at last.** The
+sample is the fully populated fixture -- an empty settings value, one with a
+leading space, one with a line feed, one with backticks and an asterisk, a path
+holding a quotation mark and a backslash, accented text and an emoji. Clean it
+builds; and because exit 0 proves nothing, the **HTML was read**: no
+``problematic`` or ``system-message`` spans, **zero** literal double-backticks
+anywhere in the output, 108 rendered inline literals, and each of the four
+values an inline literal cannot carry present in its escaped form. With an
+underline one character short injected, the same gate failed with eight
+``Title underline too short`` warnings under ``-W`` and exit 1. Two of those
+four value shapes **fail silently in Sphinx**, so a green build is not by
+itself evidence that a value was rendered as a literal -- which is why the HTML
+is inspected and not only the exit code.
 
 .. _p04-crosstalk:
 
@@ -347,97 +408,135 @@ another agent's revert.
 
 .. _p04-gate-items:
 
-The seven gate items, with evidence and with what is missing
-============================================================
+The seven gate items, with the command that produces the evidence
+=================================================================
 
-Every command below is the one that produces the evidence. Every number is
-from a noisy tree.
+Every command below was run by the phase orchestrator on the quiet tree at
+``9ddb3e3``, and every figure is from that run. Each item also has a control in
+``scripts/verify-provenance-gates.sh`` that injects the defect the item exists
+to catch and requires the named command to reject it -- so each row is backed by
+a green run *and* by a red one.
 
 .. list-table::
    :header-rows: 1
-   :widths: 4 22 12 62
+   :widths: 4 20 10 66
 
    * - #
      - Gate item
-     - Status
-     - Evidence, command, and what is missing
+     - Result
+     - The command, the evidence, and the control that proves it can fail
 
    * - 1
      - Known MD5 and SHA-256 vectors, including the zero-byte file
-     - **Met**
-     - Every expected digest is a hand-typed literal. I recomputed all fourteen
-       myself with GNU coreutils and a Python reimplementation of the test's own
-       LCG pattern generator, and all matched to the character. The reference
-       table was pinned in the work log *before* the module held a hashing
-       class, so no expected value can have come from the code under test.
-       ``mvn -pl cometgui-provenance -am test -Dtest=StreamingHashServiceTest``
+     - **MET**
+     - ``mvn -pl cometgui-provenance -am test -Dtest=StreamingHashServiceTest``
+       -- 52 tests, 0 failures. Every expected digest is a hand-typed literal
+       and all fourteen published values were **recomputed independently with
+       GNU coreutils** at the resumption, including the three that live inside
+       a ``@CsvSource`` string where a grep for a quoted hex constant misses
+       them; every one matched to the character. The reference table was pinned
+       in the work log *before* the module held a hashing class, so no expected
+       value can have come from the code under test.
+       **Control 1** digests one byte less than was read: ``MD5 ==> expected:
+       <900150983cd24fb0d6963f7d28e17f72> but was:
+       <187ef4436122d1cc2f40dc2b92f0eba0>``.
 
    * - 2
      - 2 GB in one pass, bounded heap, digests matching independent values
-     - **Met**
-     - Run by me, not reported to me: ``bytes=2147483648 opens=1
-       readCalls=8193 bytesDelivered=2147483648 heapBaseline=3958160
-       heapPeak=4223232 heapGrowth=265072 heapLimit=4194304 samples=83``.
-       Retained heap sampled post-collection, not an allocation count. The
-       digests were computed by coreutils *and* OpenSSL before this code
-       existed. A **permanent negative control** ships in the suite and prints
+     - **MET**
+     - ``mvn -pl cometgui-provenance -am test -Dtest=HugeFileHashingTest`` --
+       the suite prints its own measurement: ``huge-file: bytes=2147483648
+       writeMillis=1192 hashMillis=14189 totalMillis=15381 opens=1
+       readCalls=8193 bytesDelivered=2147483648 heapBaseline=4680816
+       heapPeak=4945888 heapGrowth=265072 heapLimit=4194304 samples=81``.
+       Retained heap sampled post-collection, not an allocation count: growth
+       of one buffer, 15.8x under a bound of 16x ``BUFFER_SIZE``. Both digests
+       were computed by coreutils **and** OpenSSL before this code existed. A
+       **permanent negative control** ships in the suite and prints
        ``huge-file-control: keptChunks=128 keptBytes=33554432
-       heapGrowth=33570352``, so every build re-proves the bound bites while
-       the leaky hasher's digests stay exactly correct.
-       ``mvn -pl cometgui-provenance -am test -Dtest=HugeFileHashingTest``
+       heapGrowth=33833192 heapLimit=4194304``, so every build re-proves the
+       bound bites while the leaky hasher's digests stay exactly correct.
+       **Control 2** makes the real hasher keep every chunk, which leaves the
+       digests correct and is invisible to every other test in the module.
 
    * - 3
      - Cache returns a value only when every attribute matches
-     - **Met on POSIX**
-     - Detected rather than survived: the key carries ``unix:ctime``, which the
-       kernel bumps on both the write and the mtime restoration and which user
-       space cannot forge. Where that evidence is absent the cache stores
-       **nothing**. **On Windows this is a different algorithm that has never
-       run** -- see :ref:`p04-divergence`.
-       ``mvn -pl cometgui-provenance -am test -Dtest=CachingHashServiceTest``
+     - **MET on POSIX**
+     - ``mvn -pl cometgui-provenance -am test -Dtest=CachingHashServiceTest``
+       (35 tests) and ``-Dtest=FileFingerprintTest``. Detected rather than
+       survived: the key carries a fifth attribute beyond ``R-PROV-02``'s four,
+       the inode change time ``unix:ctime``, which the kernel bumps on both the
+       write and the mtime restoration and which user space cannot forge. Where
+       that evidence is absent the cache stores **nothing**. **On Windows this
+       is a different algorithm that has never run** -- :ref:`p04-divergence`.
+       **Control 3** treats an absent attribute as a match, dressed as Windows
+       compatibility: ``absent vs present identity ==> expected: <false> but
+       was: <true>``.
 
    * - 4
      - A crash mid-run leaves a parsable log with usable history
-     - **Met on POSIX**
-     - Proved by tearing real files at several byte offsets, not by argument.
-       The strongest evidence is the unit's own defect (f): replacing the
+     - **MET on POSIX**
+     - ``mvn -pl cometgui-provenance -am test -Dtest=EventLogCrashRecoveryTest``
+       -- proved by tearing real files at several byte offsets, not by
+       argument. The unit's own strongest evidence is defect (f): replacing the
        newline terminator makes one crash turn the whole log into a single torn
-       line and recover **zero** events. My injection made recovery stop at the
-       first defect and failed on the middle-malformed-line case,
-       ``expected: <[1, 3]> but was: <[1]>``.
-       ``mvn -pl cometgui-provenance -am test -Dtest=EventLogCrashRecoveryTest``
+       line and recover **zero** events. **Control 4** drops the torn tail
+       instead of reporting it, so a crashed run reads back as a clean one.
 
    * - 5
      - Finalisation is atomic; an interrupted finalise never truncates
-     - **Met on POSIX**
-     - Proved by observation. Replacing ``ATOMIC_MOVE`` with
-       ``Files.copy`` + ``delete`` made a concurrent reader observe **37
-       truncated documents and 23 moments where the target did not exist**.
-       Interruption is proved by interrupting. **The Windows half is unproven
-       and is the most important item in** :ref:`p04-divergence`.
-       ``mvn -pl cometgui-provenance -am test -Dtest=AtomicDocumentWriterTest``
+     - **MET on POSIX**
+     - ``mvn -pl cometgui-provenance -am test -Dtest=AtomicDocumentWriterTest``
+       -- proved by observation. **Control 5** replaces ``ATOMIC_MOVE`` with
+       ``Files.copy`` + ``delete`` and a concurrent reader then observes
+       truncated documents and moments at which the target does not exist at
+       all. Interruption is proved by interrupting. **The Windows half is
+       unproven and is the most important item in** :ref:`p04-divergence`.
 
    * - 6
      - Seeded secrets appear nowhere in JSON, RST or logs; the test greps
-     - **PARTIAL**
-     - The rule set half is done and strong: one rule set in
-       ``org.cometgui.domain.secrets``, applied inside the JSON writer and the
-       event log rather than at call sites, with a seeded corpus whose
-       **carrier length is part of its coverage**. The JSON and event-log
-       sweeps exist. **What is missing is unit 11**: the end-to-end test that
-       generates all three artefacts and greps the files on disk. The RST half
-       cannot exist until unit 10 does.
+     - **MET**
+     - ``mvn -pl cometgui-provenance -am test
+       -Dtest=SeededSecretArtefactSweepTest`` (8 tests) plus
+       ``ProvenanceReportWriterTest``, ``EventLogSecrecyTest`` and
+       ``cometgui-domain``'s ``SeededSecretCorpusTest``. **This is the item the
+       pause left ``PARTIAL`` and unit 11 completed.** One test now builds a
+       manifest and a seventeen-event stream carrying all thirteen corpus
+       entries, writes ``provenance.json``, ``provenance.rst`` and an event log
+       into one run directory, **walks that directory** and reads every regular
+       file back off disk, searching each as UTF-8 text and as raw US-ASCII
+       bytes. The RST half is closed by ``sphinx-build -n -W`` over the
+       generated sample, run both ways.
+       **Controls 6a, 6b and 6c** remove redaction from each writer in turn.
+       Each failure names the artefact, the corpus index, the length and the
+       offset, and prints no secret: ``corpus secret #1 (length 39) survived
+       into provenance.json as US-ASCII bytes, at offset 1595``.
 
    * - 7
      - PIT reports no surviving mutation in hashing and redaction
-     - **Met for those two packages, UNVERIFIED overall**
-     - The hashing package was last measured at 70 mutations, 70 killed, 0
-       survived; the moved secrets package at 52 mutations, 52 killed, 0
-       survived in ``cometgui-domain``. Both were clean. **But the module-wide
-       figure has not been re-taken from a quiet tree**, and the last full
-       reading showed nine survivors in units 9 and 10's uncommitted code
-       (:ref:`p04-survivors`). Run ``mvn -pl cometgui-domain install`` first or
-       PIT resolves a stale jar.
+     - **MET, and stronger than the item asks**
+     - ``mvn -pl cometgui-provenance -am test-compile
+       org.pitest:pitest-maven:mutationCoverage``, read from ``mutations.xml``
+       rather than from the console: **774 mutations, 771 KILLED, 0 SURVIVED,
+       3 TIMED_OUT, 0 NO_COVERAGE** across the whole module, not only the two
+       packages the item names -- ``hashing`` 70, ``io`` 20, ``events`` 189,
+       ``json`` 221, ``manifest`` 153, ``report`` 121. ``cometgui-domain``,
+       which holds the redaction rule set, is **204 mutations, 204 KILLED**
+       with ``secrets`` contributing 52. The three timeouts are genuine
+       infinite loops and PIT counts a timeout as detected; each was read and
+       confirmed to be one. **Control 7** asserts that
+       ``scripts/verify-test-gates.sh`` still holds the mutation control the
+       item delegates to, and that this module still carries
+       ``<cometgui.mutation.skip>false</cometgui.mutation.skip>`` -- a switch
+       that is set and inert is the failure this project keeps finding.
+
+**Why the outcome is ``PARTIAL`` and not ``PASSED``.** Every item above is met
+on the platform the gate runs on. Items 3, 4 and 5 carry a Windows half that is
+**different code that has never executed anywhere**, which
+``STATUS.rst``'s grading rule calls unverified behaviour rather than a testing
+gap. The residue is enumerated at :ref:`p04-divergence` tier B and the largest
+of it -- ``ATOMIC_MOVE`` over a file another process holds open -- is already
+routed to Phase 13.
 
 .. _p04-where-secrets:
 
@@ -512,67 +611,70 @@ fix that does not work is worse than one naming only the problem.
 
 .. _p04-survivors:
 
-Open PIT survivors -- a precise work list
-=========================================
+The PIT survivors: all closed, and two of them were not what they looked like
+=============================================================================
 
-The last mutation run any agent made, reported by unit 9 and read from
-``mutations.xml`` rather than the console, was **776 mutations, 767 KILLED, 7
-SURVIVED, 2 TIMED_OUT, 0 NO_COVERAGE**. That run was still on a moving tree.
-Six survivors are in unit 9's parser and one is in unit 8's reader.
-
-**Two of the six are equivalent mutants, and the fix is to delete the code, not
-to write a test.** That is worth saying plainly, because chasing an equivalent
-mutant with a test is how a suite acquires assertions that cannot fail.
+At the pause the last mutation run showed **776 mutations, 767 KILLED, 7
+SURVIVED, 2 TIMED_OUT** on a moving tree, all diagnosed and **none confirmed**.
+The resumption confirmed every one. The module is now **774 mutations, 771
+KILLED, 0 SURVIVED, 3 TIMED_OUT**.
 
 .. list-table::
    :header-rows: 1
-   :widths: 22 20 58
+   :widths: 34 14 52
 
-   * - Site
-     - Mutator
-     - Diagnosis and the fix unit 9 identified but did not apply
+   * - Site, as the pause listed it
+     - Outcome
+     - What actually closed it
 
-   * - ``JsonReader:203``, ``JsonReader:256``
-     - VoidMethodCall on ``skipWhitespace``
-     - **Equivalent mutants.** Whitespace is already skipped before the loop
-       and after every comma, so the call at the loop top is redundant.
-       **Delete the two calls.** Do not add a test.
+   * - ``ProvenanceEventLogReader$Recovery:310``, MathMutator on
+       ``charAt(cut - 1)``
+     - **KILLED**
+     - The one genuine survivor. Its fixture landed at ``892962e`` and was
+       unconfirmed; the resumption's first mutation run confirms it. A single
+       astral character alone in ASCII is what tells ``cut-1`` and ``cut+1``
+       apart -- in a *uniform* run of astral characters they are always the
+       same half of a pair, and the mutant is observationally identical.
 
-   * - ``JsonReader:228``
-     - VoidMethodCall on ``leaveContainer``
-     - Needs a document where a container closes and nesting continues after
-       it: ``[{"a":1},{"a":1}, ...x70]``. Without the call, depth passes 64 and
-       the parse fails.
+   * - ``JsonReader:203`` and ``:256``, VoidMethodCall on ``skipWhitespace``
+     - **Equivalent, and the code was deleted**
+     - The pause called these equivalent mutants whose fix is to delete code.
+       Checked rather than accepted, and it holds: whitespace is already
+       skipped on the way into each loop and after every comma, so the call at
+       the loop top is reachable only in a state where it has nothing to do.
+       Both are gone, replaced by a comment stating the invariant they were
+       pretending to defend. **A call that cannot change behaviour is the code
+       form of a check that cannot fail.**
 
-   * - ``JsonReader:252``
-     - VoidMethodCall on ``leaveContainer``
-     - Same, via the empty-array early return: ``[[],[], ...x70]``.
+   * - ``JsonReader:228``, ``:252``, ``:264``, VoidMethodCall on
+       ``leaveContainer``
+     - **KILLED, and they were never equivalent**
+     - These are three of the four routes out of a container, and the existing
+       nesting test drove only the fourth -- the empty-object early return. The
+       reason no test noticed is that depth is checked only on the way *in*, so
+       it takes more than ``MAX_DEPTH`` siblings of the right shape to bite.
+       **The consequence is a real product defect, not a mutation-score
+       artefact**: ``provenance.json`` holds one object per file and one per
+       tool in flat arrays, so a reader that counted opens without counting
+       closes would refuse to parse any run with more than 64 inputs.
 
-   * - ``JsonReader:264``
-     - VoidMethodCall on ``leaveContainer``
-     - Same, via an array's normal close: ``[[1],[1], ...x70]``.
+   * - ``JsonReader:273``, VoidMethodCall on ``skipWhitespace``
+     - **KILLED**
+     - Shape 5, an input set too narrow. The trailing-comma fixture was
+       ``[1, 2,]`` with no space, so the call did nothing in it. ``[1, 2, ]``
+       and ``[1, 2,\n]`` are now asserted beside it: without the skip the
+       reader reports "a value was expected here" for a document whose actual
+       fault is a trailing comma.
 
-   * - ``JsonReader:273``
-     - VoidMethodCall on ``skipWhitespace``
-     - The array trailing-comma fixture is ``[1, 2,]`` with no space, so the
-       call is not load-bearing. ``[1, 2, ]`` -- with a space before the
-       bracket -- kills it. The object equivalent is already dead because that
-       fixture is multi-line.
-
-   * - ``ProvenanceEventLogReader$Recovery:310``
-     - MathMutator
-     - **Real, and its fix is landed at** ``892962e`` **but UNCONFIRMED.**
-       ``charAt(cut - 1)`` mutated to ``charAt(cut + 1)`` survived because the
-       only surrogate fixture was a *uniform* run of astral characters, where
-       cut-1 and cut+1 are two apart and therefore always the same half of a
-       pair -- the mutant is observationally identical. A single astral
-       character alone in ASCII tells them apart, and that fixture is now in
-       the tree. **Confirming the kill is the first PIT run whoever resumes
-       should make.**
-
-The two ``TIMED_OUT`` are loop-control mutants in ``JsonWriter`` and
-``ProvenanceEventLogReader`` that hang rather than fail. PIT counts a timeout
-as detected, and both are genuine infinite loops, so neither is a survivor.
+**The three timeouts, read rather than counted.** ``JsonWriter:445`` and
+``ProvenanceEventLogReader:169`` are negated loop conditionals; the third,
+``EventLineFormat$Cursor:440``, is a MathMutator on the ``index++`` that
+consumes a closing quote, which makes ``readString`` loop on one character for
+ever. All three are genuine infinite loops, so PIT counting a timeout as
+detected is right here rather than merely conventional. One mutation moved
+between ``KILLED`` and ``TIMED_OUT`` across two runs with the total detected
+unchanged: a mutant that hangs rather than fails is detected either way, and a
+mutation slow enough to sit near the timeout can report as either.
 
 .. _p04-roundtrip:
 
@@ -717,8 +819,8 @@ rule, and that is the mistake this project was founded on.
 
 .. _p04-shapes:
 
-Seven shapes of one defect
-==========================
+Nine shapes of one defect
+=========================
 
 This project has one recurring failure, and this phase catalogued four new
 forms of it. They are collected here because the next agent will meet an
@@ -761,63 +863,235 @@ stopped working.
    jacoco.xml*; "All coverage checks have been met" was true of the sample and
    meaningless about the code. See :ref:`p04-census`.
 
+#. **An injection that reached the source but not the compiled class.** Phase
+   03's, and the reason every injection in this phase's harness is proved to
+   have changed the ``.class`` and not only the ``.java``.
+#. **A check whose subject silently left the sample.** The ninth, found by this
+   phase's own harness on its first run: a "did the class actually run" guard
+   that scraped the console read ``Tests run: 0`` for a class that had just run
+   fifty-two tests, because this module puts its tests in ``@Nested`` classes
+   and surefire prints the outer class as zero. It stopped the run rather than
+   passing -- which is the only reason it is a story about a guard working
+   rather than another entry in this list.
+
 The remedy that generalises: **verification must include an audit of the
 population, and that audit has to run beside the numbers rather than once.** A
 census on a quiet tree finds nothing and proves nothing; it earns its place by
-running on every build.
+running on every build. Expect a tenth.
+
+.. _p04-harness:
+
+The falsifiability harness this phase now ships
+===============================================
+
+``scripts/verify-provenance-gates.sh``, registered as the ``provenance``
+control of ``scripts/verify-all-gates.sh`` with a floor of **24 controls**.
+Phases 01 and 02 each ship one; Phase 03 escalated the absence of one as debt
+before Phase 08 depends on its service. Phase 04 now has one, and it was
+**assembled from ``handoffs/PHASE-04-worklog.rst`` rather than invented** --
+every injection in it was actually made during the phase and its exact failure
+text is in that record.
+
+It damages a ``git archive HEAD`` sandbox under ``_build/`` and never the
+working tree; every injection must match its anchor **exactly once** and be
+proved to differ from a pristine copy before any test result is believed; every
+restore is verified and then ``touch``\ ed, because a copy preserves the
+modification time and Maven then runs the *previous* defect's classes against
+clean sources.
+
+**It found two defects in itself before it accepted anything, and both are
+recorded in the script rather than quietly fixed.**
+
+* Its "did the class actually run" guard scraped the console for ``Tests run:
+  N ... -- in <class>``. Every test class in this module puts its tests in
+  ``@Nested`` classes, and surefire prints each nested class under its
+  ``@DisplayName`` and then prints ``Tests run: 0`` for the **outer** class --
+  so the guard read 0 for a class that had just run 52 tests and stopped the run
+  with a harness error. That is the guard working, on its first run, on its own
+  author. The count now comes from ``<testsuite tests="N">`` in the surefire
+  XML, and the previous control's reports are deleted before each run so that a
+  run which executed nothing cannot be graded against stale files.
+* Its gate item 2 assertion was written from the printout **quoted in this
+  handoff**, which is abbreviated: the real line carries three timing fields
+  between ``bytes=`` and ``opens=``. The harness rejected its own first
+  expectation before it accepted anything.
+
+Cost: **236 seconds**, which takes ``verify-all-gates.sh`` from 1702 to 1917
+seconds. The script's stated cost was corrected from "about seven minutes" to
+"about half an hour", which it already was before this phase added to it.
+
+.. _p04-carried-answers:
+
+Two questions carried in from elsewhere, answered
+=================================================
+
+**Phase 03's escalation 4: the fixed sleep in ``CachingHashServiceTest``.**
+Answered by justifying it in the code, and the justification is now a paragraph
+of ``awaitSettled``'s documentation. It is **not a fixed sleep**: the deadline
+is read from the file's own later of ``mtime`` and ``unix:ctime``, truncated to
+its second plus one, and the sleep is whatever remains of that and is skipped
+when the deadline has already passed -- which it usually has. **There is no
+event to wait for**: the thing awaited is not a change to the file but the
+system clock advancing past the second the file was last changed in, and the
+kernel publishes no notification for that, so a ``WatchService`` has nothing to
+subscribe to and a poll would be a busy-wait for the same deadline. The
+alternative is a substituted clock, which group 4 already uses for the boundary
+cases and which group 1 deliberately does not, because a property proved only
+through a seam is a property the production path is free not to have -- the
+rejection this phase's unit 1 earned. The one chosen number is a 20 ms margin
+past the second boundary, and it is named as such. If a mechanical scan flags
+the method, that paragraph is the answer.
+
+**The seeded corpus and GitHub's push protection.** Tier 1's push of ``main``
+was rejected because ``glpat-Z1x9QeR7sVbN3mK0pLtY`` -- a hand-typed fake shaped
+like a GitLab access token -- matches the ``glpat-`` prefix its scanner keys on.
+Two corrections to the record first, both checked rather than assumed. The
+string is in **five locations, all of them in ``cometgui-provenance``**;
+``git log -S`` over all history shows it entering in exactly two source commits
+(``5b10a58`` and ``3e552b4``) and there is **no occurrence in
+``cometgui-domain``, ever**. And ``STATUS.rst`` now contains the literal string
+too, so tier 1's own record is a sixth copy and the owner's allowlisting has to
+cover it.
+
+**The convention question, which is this module's to answer.** Whoever chose
+``AKIAIOSFODNN7EXAMPLE`` chose AWS's published documentation example, which
+scanners allowlist by design. **That is the right convention and the corpus
+should adopt it wherever a provider-shaped prefix is needed.** The property the
+corpus actually needs is *distinctiveness against an accidental substring
+match* -- that a sweep for it cannot be satisfied by text that happens to occur
+in a path, a digest or a version string -- and a provider's own published
+example has that property exactly as well as a hand-typed fake does, because it
+is equally arbitrary and equally long. Authenticity is not a property the corpus
+needs at all: nothing here authenticates against a provider, and
+``SeededSecretCorpusTest``'s own reasoning is about *shape* and *length*, never
+about whether a token would be accepted by anyone. So adopting published
+examples costs the corpus nothing it needs, and buys the absence of a class of
+obstruction that will otherwise recur at every fork, mirror and re-push.
+
+Two caveats that keep this from being a rule to apply blindly. **A published
+example does not exist for every provider** -- Limelight has none, and
+``ll_live_9f8e7d6c5b4a39281706`` is invented because it must be; for those, an
+invented value is still correct, and choosing one that fails the provider's own
+checksum where a checksum exists is what
+``ghp_S3cr3tT0k3nExampleValue0123456789ab`` does by luck and should do by
+intent. And **the fixtures must not be changed now**: the string is already in
+unpushed-then-pushed history, editing the working tree cannot remove it, and
+rewriting history would destroy the commit hashes that every sign-off entry in
+both work logs cites as its evidence. The convention is for the **next** fixture
+anyone writes, and for Phase 12, which will hold a real Limelight credential and
+where the same scanner is a protection rather than an obstacle and must not be
+routinely bypassed.
+
+.. _p04-escalations:
+
+Escalated to the main orchestrator
+==================================
+
+#. **The grade.** ``PARTIAL``, for the reason in :ref:`p04-gate-items`: every
+   item is met on POSIX and items 3, 4 and 5 carry Windows code that has never
+   executed anywhere. If tier 1 judges that "verify per platform" is Phase 15's
+   obligation rather than this phase's, every item is a clean ``PASS`` and so is
+   the phase. That is a call above me.
+
+#. **``scripts/verify-test-gates.sh`` needs one line, and its own comment
+   predicts it.** The sandbox that script builds carries the POMs, ``config/``,
+   ``scripts/``, ``specification.rst`` and each module's ``src/`` -- and its
+   comment says "Phase 04's provenance report and Phase 15's traceability work
+   are the next two that will want a document here; add them the same way, with
+   the reason". Unit 12's drift check between ``docs/reference/
+   provenance_format.rst`` and ``ManifestWriter`` would be **mechanical on both
+   sides** if the test could read that page, and today it cannot: a test that
+   opened ``docs/`` would fail inside that sandbox and take a currently-green
+   control down with it. The page is therefore stood in for by a hand-typed set
+   inside the test, with the page named in the class documentation.
+   **The cost of each option.** Adding ``cp "${ROOT}/docs/reference/
+   provenance_format.rst" "${SANDBOX}/..."`` is one line and lets a follow-up
+   make the check fully mechanical; leaving it is a page that can drift from
+   its own hand-typed copy while the writer stays in step with both. I did not
+   make the change because that script is on my escalate-before-editing list
+   and tier 1 is implementing the census in it immediately after this phase
+   lands. **A cross-directory ``.. include::`` is not an alternative**: I tested
+   it, and ``scripts/ci/docs-build.sh --self-test`` copies only ``docs/`` into
+   a throwaway tree, so an include reaching outside it would break the
+   documentation gate's own self-test.
+
+#. **The class-population census is still fifteen lines run by hand.** Tier 1
+   owns putting it into ``scripts/build.sh`` with a control in
+   ``verify-test-gates.sh``. It was run by hand at every measurement in this
+   resumption and found nothing, which is what a clean tree should look like --
+   and is exactly why it has to run on every build rather than when someone
+   remembers. The script is in the work log verbatim.
+
+#. **``ExecutionRecord.status`` documents three values and enforces none.** Its
+   documentation says ``COMPLETED``, ``FAILED`` or ``CANCELLED``; the
+   constructor only null-checks and ``ManifestReader`` accepts all five wire
+   names there. Narrowing the type is a behaviour change and belongs to whoever
+   owns the stage semantics -- Phase 08. Documented as it is rather than as it
+   claims to be.
+
+#. **The specification names "a safely rendered command for display" and the
+   format has no member for it.** ``argv`` is recorded and the display string
+   is a pure function of it. The reference page states the divergence. If tier 1
+   thinks the file must carry it, that is a schema-version 2 change rather than
+   a documentation fix.
+
+#. **The event log's file name is pinned by no constant.**
+   ``ManifestWriter.FILE_NAME`` and ``ProvenanceReportWriter.FILE_NAME`` exist;
+   the log is opened on a caller-supplied path and ``events.log`` appears only
+   in tests. **Phase 13 needs a discoverable log in a run directory** and must
+   pin a constant rather than guess a name.
 
 .. _p04-first-thing:
 
-The first thing the next agent should do
-========================================
+What is incomplete, and the first thing the next agent should do
+================================================================
 
-**1. Re-take every number from a quiet tree.** Nothing in this document is
-evidence for a gate. In order::
+**What is incomplete.** Only the platform residue. Every unit is signed off,
+every gate item is evidenced, and nothing in this phase is deferred except:
 
-    git status --short                 # must be clean; if not, stop and find out why
-    . ./tools/env.sh
-    mvn -B -Dmaven.repo.local=_build/m2repo -pl cometgui-domain install -DskipTests
-    mvn -B -Dmaven.repo.local=_build/m2repo -pl cometgui-provenance -am verify
-    mvn -B -Dmaven.repo.local=_build/m2repo -pl cometgui-provenance -am \
-        org.pitest:pitest-maven:mutationCoverage
-    bash <the census from the work log> cometgui-provenance
+* the Windows behaviour of gate items 3, 4 and 5, enumerated at
+  :ref:`p04-divergence` tier B. ``ATOMIC_MOVE`` over a file another process
+  holds open is routed to Phase 13; absolute-path validation and
+  ``toRealPath`` case folding are Phase 15's platform matrix;
+* the ``sun.jnu.encoding`` defect, routed to Phases 14 and 16, with the finding
+  that the obvious ``-Dsun.jnu.encoding=UTF-8`` remedy is **inert** -- see
+  :ref:`p04-encoding-sites`. **Do not delete the two ``Assumptions.abort``
+  sites**; both orchestrators agreed they are the honest form;
+* the six items escalated at :ref:`p04-escalations`, none of which blocks a
+  later phase.
 
-The ``install`` is not optional; see :ref:`p04-traps`. Read the census output
-before reading the coverage percentage: a percentage over an incomplete
-population is worse than no percentage.
+**The first thing the next agent should do, by who they are.**
 
-**2. Sign off units 9 and 10 properly, or send them back.** They are committed
-and their authors' accounts are good, but no one has read the diffs, re-run
-their gates, or injected a defect into them. Signing off means all three. In
-particular:
+*If you are grading this phase:* re-run the seven commands in
+:ref:`p04-gate-items` and then ``bash scripts/verify-provenance-gates.sh``,
+which injects a defect into each item and requires the gate to reject it. Do
+not reuse its injections as your own -- pick different ones. The census is
+fifteen lines in the work log and takes a second; run it before you read any
+percentage.
 
-* run the Sphinx command in :ref:`p04-reverted` over unit 10's sample report --
-  the RST half of gate item 6 and the whole of the report's validity rest on
-  it, and **it has never been run by anyone but the agent that wrote it**;
-* re-check the nine PIT survivors in :ref:`p04-survivors`, all reported killed
-  and none confirmed;
-* for unit 9, ask the question its brief asked: whether the round-trip suite
-  alone could catch a reader that reads the wrong key. It cannot, and the
-  hand-typed parse-and-assert suite is the part that carries the proof.
+*If you are Phase 13, the Provenance UI:* read
+``docs/reference/provenance_format.rst`` first -- it is written so that a
+parser can be built from it without opening the Java -- and then
+``docs/developer/provenance_schema.rst``. Then settle ``ATOMIC_MOVE`` under
+contention **before** building a viewer that holds ``provenance.json`` open,
+because if Windows cannot replace an open file the repair is a retry policy or
+a different finalisation strategy: a design change, not a test. And pin a
+constant for the event log's file name; there is not one yet.
 
-**3. Then, and only then, do units 11, 12 and 13**, which are not started:
+*If you are Phase 08, the workflow engine:* every stage that runs a tool must
+add a ``ToolRecord`` with its ``stageId``, and every file it touches a
+``FileRecord``. The model exists so that no stage can be built without
+recording itself -- that is the whole reason this phase came before the stages
+-- and ``ProvenanceEventLog`` is what a crashed run leaves behind. Settings keys
+are gated by *shape*, ``[a-z0-9]+(\.[a-z0-9-]+)+``, and each phase pins its own
+constant beside ``percolator.seed``.
 
-* **Unit 11** is gate item 6's missing half: one end-to-end test that builds a
-  manifest and an event log carrying the seeded corpus, writes JSON, RST and
-  the log, and **greps the generated files on disk**. Build it on the corpus in
-  ``cometgui-domain``'s ``SeededSecretCorpusTest``, and read that class's
-  Javadoc first -- it records the two blind spots a sweep has.
-* **Unit 12** is the documentation: ``docs/reference/provenance_format.rst``
-  and ``docs/developer/provenance_schema.rst`` are still Phase 01 stubs. The
-  schema they must describe is settled and pinned in ``ManifestWriterTest``'s
-  hand-typed document.
-* **Unit 13** is the final gate run, including ``scripts/verify-all-gates.sh``,
-  which takes about twelve minutes and was deliberately not run here.
+*If you are Phase 12, Limelight upload:* ``limelightkey`` in the shared keyword
+list **does not make you safe on its own**. No name rule can see a token passed
+positionally or embedded in a URL. Register the credential *value* with a
+``SecretRegistry``, and read :ref:`p04-carried-answers` on the fixture
+convention before you write a test fixture that looks like a real key.
 
-**4. Do not run two phases in one tree.** Serialise, or accept that every
-number is suspect. That lesson cost this phase more than any technical problem
-in it.
-
-**5. Read ``handoffs/PHASE-04-worklog.rst``.** Every sign-off entry names the
-defect that was injected and the exact failure text it produced. Those are the
-proofs; this document is only the map.
+*Whoever you are:* **read ``handoffs/PHASE-04-worklog.rst``.** Every sign-off
+entry names the defect that was injected and the exact failure text it
+produced. Those are the proofs; this document is only the map.

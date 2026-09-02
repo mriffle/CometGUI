@@ -1134,6 +1134,35 @@ class CachingHashServiceTest {
      * proving a real cache hit on the real system clock rather than on a substituted one. It is at
      * most one second, and usually less.
      *
+     * <p><strong>Why this delay cannot be an event, asked and answered.</strong> Phase 03's
+     * mechanical no-fixed-sleep scan does not reach this module and escalated the question here, so
+     * the justification is written down rather than assumed. Three things make it a computed wait
+     * rather than a fixed sleep, and the difference is the whole answer:
+     *
+     * <ul>
+     *   <li><strong>The deadline is read from the file, not chosen.</strong> It is the file's own
+     *       later of {@code mtime} and {@code unix:ctime}, truncated to its second, plus one
+     *       second. The sleep is whatever remains of that, and is skipped entirely when the
+     *       deadline has already passed -- which it usually has, because the tests do other work
+     *       first.
+     *   <li><strong>There is no event to wait for.</strong> The thing being awaited is not a change
+     *       to the file: it is the system clock advancing past the second the file was last changed
+     *       in. A {@link java.nio.file.WatchService} reports file changes and the kernel publishes
+     *       nothing when a second elapses, so no notification exists to subscribe to. A poll would
+     *       be a busy-wait for the same deadline and would not be more honest.
+     *   <li><strong>The alternative is a seam this group exists not to use.</strong> Group 4
+     *       already substitutes a clock for the boundary cases, which is the right tool there.
+     *       Group 1 deliberately runs through the public constructor on the real file system with
+     *       the real clock, because a property proved only through a seam is a property the
+     *       production path is free not to have -- the rejection this phase's unit 1 earned.
+     * </ul>
+     *
+     * <p>The one chosen number is the {@code 20 ms} margin past the second boundary, which covers
+     * the scheduler waking the thread a moment early; without it the wait can return in the same
+     * second it was waiting to leave, and the test becomes flaky rather than slow. If a mechanical
+     * scan flags this method, this paragraph is the answer: it stays, and the reason is that the
+     * event it would subscribe to does not exist.
+     *
      * @param file the file to wait for
      * @throws IOException if its timestamps cannot be read
      * @throws InterruptedException if the wait is interrupted

@@ -1392,7 +1392,7 @@ lines), ``RstWriter`` (702 lines), the package document and both test files.
 paused phase named as its outstanding obligation.
 
 **The Sphinx gate over the generated sample, run at last -- and seen to fail
-first.** :ref:`p04-reverted` recorded that unit 10's sample report "has never
+first.** The paused handoff recorded that unit 10's sample report "has never
 been through Sphinx by anyone but the agent that wrote it". A check nobody has
 watched fail is not yet a check, so it was run both ways.
 
@@ -1696,3 +1696,62 @@ false defect is worse than one that carries none.
   the log is opened on a caller-supplied path and ``events.log`` appears only
   in tests. **Phase 13 needs a discoverable log in a run directory** and must
   pin a constant rather than guess a name.
+
+.. _p04-unit13-signoff:
+
+Unit 13 -- gate enablement, the final measurement, and a falsifiability harness
+-------------------------------------------------------------------------------
+
+Orchestrator work, not delegated.
+
+**The falsifiability harness that Phase 03 escalated as debt.**
+``scripts/verify-provenance-gates.sh`` (``9ddb3e3``) is Phase 04's answer to the
+gap Phase 03 named: Phases 01 and 02 each ship a harness proving their gate
+items fail on the defects those items exist to catch, and a third phase ending
+without one would have doubled the debt. It was **assembled from this work log
+rather than invented** -- every injection in it was actually made during the
+phase and its exact failure text is recorded above -- and it is registered in
+``scripts/verify-all-gates.sh`` as the ``provenance`` control with a floor of
+24.
+
+**Twenty-four controls, 236 seconds.** The full list is in the script's header.
+The five that carry the phase's own findings are worth naming here: a hasher
+that keeps every chunk it reads, which leaves the **digests exactly correct**
+and is invisible to every test except the 2 GB retained-heap bound; a
+fingerprint that treats an absent attribute as a match, dressed as Windows
+compatibility; ``ATOMIC_MOVE`` replaced by copy-then-delete, which a concurrent
+reader sees straight through; the size-conditioned leak in the RST writer that
+only the corpus's short carriers catch; and a control on the harness itself that
+runs with **no** defect injected and requires the run to be reported as a
+HARNESS FAILURE rather than a pass.
+
+**The harness found two defects in itself before it accepted anything, and both
+are recorded in the script rather than quietly fixed.**
+
+* Its "did the class actually run" guard scraped the console for
+  ``Tests run: N ... -- in <class>``. Every test class in this module puts its
+  tests in ``@Nested`` classes, and surefire prints each nested class under its
+  ``@DisplayName`` and then prints ``Tests run: 0`` for the *outer* class -- so
+  the guard read **0 for a class that had just run 52 tests** and stopped the
+  run with a harness error. That is the guard working, on its first run, on its
+  own author. The count now comes from ``<testsuite tests="N">`` in the surefire
+  XML, and the previous control's reports are deleted before each run so that a
+  run which executed nothing cannot be graded against stale files.
+* Its gate item 2 assertion was written from the printout quoted in
+  ``handoffs/PHASE-04-handoff.rst``, which is abbreviated: the real line is
+  ``huge-file: bytes=2147483648 writeMillis=... hashMillis=... totalMillis=...
+  opens=1 readCalls=8193 bytesDelivered=2147483648 ...`` and carries three
+  timing fields the quotation omits. The harness rejected its own first
+  expectation before it accepted anything, which is the behaviour a harness
+  exists to have.
+
+**Item 7 is delegated and the delegation is enforced rather than asserted.**
+Proving the mutation gate here would mean a second twenty-minute mutation run
+and two things to keep in step with one gate.
+``scripts/verify-test-gates.sh`` already injects a covered class whose test
+asserts nothing and requires the mutation gate to reject it, so control 7
+asserts that harness still contains its mutation control **and** that
+``cometgui-provenance/pom.xml`` still carries
+``<cometgui.mutation.skip>false</cometgui.mutation.skip>``. A switch that is set
+and inert is the failure this project keeps finding, and it is now asserted on
+every aggregate run rather than checked once.
