@@ -44,6 +44,29 @@ final class ManifestFixtures {
     static final URI URL =
             URI.create("https://github.com/example/example/releases/download/t/artefact");
 
+    /**
+     * A download URL of its own for one tool, version and platform.
+     *
+     * <p>Distinct per record on purpose. Selection offers at most one row per download, so fixtures
+     * that shared a URL would collapse into one row and a test about ordering would silently be
+     * testing nothing. The tests that need two records to name <em>one</em> download say so by
+     * passing the URL explicitly.
+     *
+     * @param tool the tool
+     * @param version the version text
+     * @param platform the artefact's platform
+     * @return a URL unique to the three of them
+     */
+    static URI urlFor(ToolName tool, String version, HostPlatform platform) {
+        return URI.create(
+                "https://github.com/example/example/releases/download/t/"
+                        + tool.id()
+                        + "-"
+                        + version
+                        + "-"
+                        + platform.id());
+    }
+
     private ManifestFixtures() {}
 
     static FileHashes hashes() {
@@ -84,7 +107,7 @@ final class ManifestFixtures {
                 "rel-t",
                 platform,
                 ArtefactKind.ZIP,
-                URL,
+                urlFor(tool, version, platform),
                 946303,
                 hashes(),
                 Optional.of(member()),
@@ -107,13 +130,30 @@ final class ManifestFixtures {
      * @return the record
      */
     static ArtefactRecord wholeArtefact(ToolName tool, String version, HostPlatform platform) {
+        return wholeArtefact(tool, version, platform, urlFor(tool, version, platform));
+    }
+
+    /**
+     * A valid whole-artefact record naming a download the caller chooses.
+     *
+     * <p>For the tests about one download carried on more than one platform, which is what PDV and
+     * the Limelight converter really are.
+     *
+     * @param tool the tool
+     * @param version the version text
+     * @param platform the artefact's platform
+     * @param url the download
+     * @return the record
+     */
+    static ArtefactRecord wholeArtefact(
+            ToolName tool, String version, HostPlatform platform, URI url) {
         return new ArtefactRecord(
                 tool,
                 ToolVersion.parse(version),
                 "rel-t",
                 platform,
                 ArtefactKind.BARE_EXECUTABLE,
-                URL,
+                url,
                 946303,
                 hashes(),
                 Optional.empty(),

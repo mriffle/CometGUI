@@ -136,9 +136,12 @@ class ArtefactManifestTest {
     @Test
     @DisplayName("one download described two different ways is rejected, naming both records")
     void oneUrlMustBeDescribedOneWay() {
-        ArtefactRecord linux = ManifestFixtures.wholeArtefact(ToolName.PDV, "2.7.0", LINUX_X86_64);
+        ArtefactRecord linux =
+                ManifestFixtures.wholeArtefact(
+                        ToolName.PDV, "2.7.0", LINUX_X86_64, ManifestFixtures.URL);
         ArtefactRecord windowsAgreeing =
-                ManifestFixtures.wholeArtefact(ToolName.PDV, "2.7.0", WINDOWS_X86_64);
+                ManifestFixtures.wholeArtefact(
+                        ToolName.PDV, "2.7.0", WINDOWS_X86_64, ManifestFixtures.URL);
         ArtefactRecord windowsDisagreeing =
                 new ArtefactRecord(
                         ToolName.PDV,

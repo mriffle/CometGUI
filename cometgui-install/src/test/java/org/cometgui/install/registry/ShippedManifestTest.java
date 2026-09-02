@@ -195,6 +195,14 @@ class ShippedManifestTest {
                     + " (upstream issue #394, fixed in 3.08.1 and 3.09), so a PEP"
                     + " above 1.0 can appear in its output.";
 
+    /** {@code D-004}'s sentence about Comet, which the shipped manifest has to keep true. */
+    private static final String COMET_RUNS_NATIVELY =
+            "D-004: \"Comet still runs natively (it publishes an aarch64 macOS"
+                    + " build), so only the Percolator stage is translated.\" Comet is"
+                    + " the one tool that really has both builds on this host, so it is"
+                    + " the only place the native-before-translated ordering key can be"
+                    + " observed against the shipped data";
+
     private static final Pattern BANNED =
             Pattern.compile("\\b(verified|confirmed|proven|tested)\\b", Pattern.CASE_INSENSITIVE);
 
@@ -539,6 +547,74 @@ class ShippedManifestTest {
                                 "D-004: the only XML-capable macOS Percolator upstream publishes is"
                                         + " x86-64, so on Apple silicon that stage runs under"
                                         + " Rosetta 2 and the user has to be told so in advance"));
+    }
+
+    @Test
+    @DisplayName("on Apple silicon Comet is offered natively first, and its x86-64 build second")
+    void cometIsOfferedNativelyOnAppleSilicon() throws IOException {
+        List<ArtefactSelection> offered = shipped().select(MACOS_AARCH64, ToolName.COMET);
+        List<String> described = new ArrayList<>();
+        for (ArtefactSelection selection : offered) {
+            described.add(
+                    selection.artefact().describe()
+                            + (selection.isTranslated() ? " (translated)" : " (native)"));
+        }
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "comet 2026.02.2 macos-aarch64 (native)",
+                                        "comet 2026.02.2 macos-x86-64 (translated)"),
+                                described,
+                                COMET_RUNS_NATIVELY),
+                () ->
+                        assertEquals(
+                                ArtefactExecutability.NATIVE,
+                                offered.get(0).executability(),
+                                "the native build must be first, not merely present"),
+                () ->
+                        assertTrue(
+                                !offered.get(0)
+                                        .artefact()
+                                        .url()
+                                        .equals(offered.get(1).artefact().url()),
+                                "two different downloads with two different digests, which"
+                                        + " is why both are offered rather than collapsed"));
+    }
+
+    @Test
+    @DisplayName("a JAR carried on every platform is offered once, and never as translated")
+    void aPlatformIndependentDownloadIsOfferedOnce() throws IOException {
+        ArtefactManifest manifest = shipped();
+        List<Executable> assertions = new ArrayList<>();
+        for (ToolName tool : List.of(ToolName.PDV, ToolName.LIMELIGHT_CONVERTER)) {
+            List<ArtefactSelection> offered = manifest.select(MACOS_AARCH64, tool);
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    1,
+                                    offered.size(),
+                                    tool.id()
+                                            + " is one download carried on all five platforms"
+                                            + " because the specification requires an"
+                                            + " operating system and an architecture in"
+                                            + " every record; on Apple silicon both its own"
+                                            + " row and the macos-x86-64 row are runnable,"
+                                            + " and offering both would show one file"
+                                            + " twice: "
+                                            + describedBy(offered)));
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    ArtefactExecutability.NATIVE,
+                                    offered.get(0).executability(),
+                                    tool.id()
+                                            + " is a JAR, and a row marked TRANSLATED_ROSETTA_2"
+                                            + " would tell a scientist that a Java program runs"
+                                            + " under Rosetta 2"));
+        }
+        assertAll(assertions);
     }
 
     @Test

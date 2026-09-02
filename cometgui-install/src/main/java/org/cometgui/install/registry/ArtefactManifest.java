@@ -20,9 +20,11 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.tools.ArtefactExecutability;
 import org.cometgui.domain.tools.HostPlatform;
@@ -207,13 +209,21 @@ public record ArtefactManifest(int schemaVersion, List<ArtefactRecord> artefacts
      * -- a Linux host is never offered a Windows build, and an x86-64 machine is never offered
      * {@code aarch64} code.
      *
-     * <p>The result is ordered newest version first, native before translated, then by platform
-     * identifier, and it is a list rather than a set because that order is the answer.
+     * <p>The result is ordered newest version first, then native before translated, and it is a
+     * list rather than a set because that order is the answer. There is deliberately no third
+     * ordering key; see the comment on {@code OFFER_ORDER} for why adding one would be adding a
+     * comparison no input can reach.
+     *
+     * <p><strong>At most one row per download.</strong> A platform-independent artefact is carried
+     * on every platform, so on Apple silicon its own row and its {@code macos-x86-64} row are both
+     * runnable; only the native one is offered, because they are one file. Two genuinely different
+     * builds of one release -- Comet's {@code aarch64} and {@code x86-64} macOS binaries -- are two
+     * offers, native first ({@code D-004}).
      *
      * @param host the machine in front of the user
      * @param tool the tool being offered
-     * @return the artefacts this host can run, possibly empty -- which is the honest answer for
-     *     Percolator 3.09 on Linux
+     * @return the artefacts this host can run, newest first, at most one row per download, possibly
+     *     empty -- which is the honest answer for Percolator 3.09 on Linux
      * @throws NullPointerException if either argument is {@code null}
      */
     public List<ArtefactSelection> select(HostPlatform host, ToolName tool) {
@@ -230,7 +240,37 @@ public record ArtefactManifest(int schemaVersion, List<ArtefactRecord> artefacts
             }
         }
         selected.sort(OFFER_ORDER);
-        return List.copyOf(selected);
+        return oneRowPerDownload(selected);
+    }
+
+    /*
+     * ONE ROW PER DOWNLOAD, AND THE NATIVE ONE WINS.  The specification requires an operating
+     * system and an architecture in every record, so a platform-independent artefact -- PDV's zip,
+     * the Limelight converter's JAR -- is one download carried on all five platforms.  On Apple
+     * silicon both its macos-aarch64 row and its macos-x86-64 row are runnable, so without this the
+     * Tool Manager would show the same 99 MB download twice and mark the second one as running
+     * under Rosetta 2: a false statement about a Java program, not merely a repeated row.
+     *
+     * THE KEY IS THE URL, NOT THE VERSION, and that distinction is the point.  Comet 2026.02.2
+     * publishes an aarch64 macOS build AND an x86-64 one -- two different files, two different
+     * digests -- and both are genuine offers on an Apple silicon Mac, with the native one first.
+     * D-004 says exactly that: "Comet still runs natively (it publishes an aarch64 macOS build), so
+     * only the Percolator stage is translated."  Collapsing those to one row would delete a real
+     * choice; collapsing two rows that name one file removes a duplicate that was never a choice.
+     *
+     * The list is already ordered native before translated, so keeping the first row for each
+     * download keeps the native one wherever a native artefact exists, and keeps the translated one
+     * -- Percolator 3.07.1 on Apple silicon, which is D-004's whole subject -- where none does.
+     */
+    private static List<ArtefactSelection> oneRowPerDownload(List<ArtefactSelection> ordered) {
+        List<ArtefactSelection> preferred = new ArrayList<>(ordered.size());
+        Set<URI> downloads = new LinkedHashSet<>();
+        for (ArtefactSelection selection : ordered) {
+            if (downloads.add(selection.artefact().url())) {
+                preferred.add(selection);
+            }
+        }
+        return List.copyOf(preferred);
     }
 
     /**
