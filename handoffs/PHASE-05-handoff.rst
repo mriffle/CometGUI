@@ -421,7 +421,28 @@ Traps that would cost hours
   would not reproduce -- the signature symptom of this project's collision, now
   four instances across three sessions. Wait for the completion notification.
   And **do not write anything the build reads** while one runs: ``handoffs/``
-  and ``STATUS.rst`` are among the 45 documents the docs gate builds.
+  and ``STATUS.rst`` are among the documents the docs gate builds.
+
+* **A process check must exclude the checker, and a process check is not a
+  completion signal.** Two different errors that look alike, and this project
+  has now made both several times.
+
+  The first is mechanical: ``pgrep -f <pattern>`` matches **its own invoking
+  shell**, because the wrapper's command line contains the pattern. Tier 1's
+  "wait until the harness exits" loop therefore waited forever on itself, and
+  its "is the tree busy" check reported BUSY for hours while the tree was in
+  fact quiet, so document edits were held back for nothing. Exclude the checker
+  -- match on the JVM's real main class, as in ``pgrep -f
+  org.codehaus.plexus.classworlds.launcher.Launcher``, and even then read the
+  matched command lines rather than the count.
+
+  The second is a reasoning error and is the more expensive: **"no build process
+  is running" does not mean "the agent has stopped."** I used that proxy twice.
+  The first time I started a build into a live agent and paid a re-run; the
+  second time I caught it only because a test file happened to be mid-edit in
+  ``git status``. An agent between two commands has no process at all. **The
+  completion notification is the only signal that means finished**, and unit
+  12's harness must not inherit the cheaper one.
 
 .. _p05h-open:
 
