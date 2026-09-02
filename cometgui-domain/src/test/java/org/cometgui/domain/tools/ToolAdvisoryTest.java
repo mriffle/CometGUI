@@ -20,9 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.cometgui.domain.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -33,6 +36,19 @@ import org.junit.jupiter.params.provider.ValueSource;
  * carry, so the shape of the identifier is exercised against the values it will actually hold.
  */
 class ToolAdvisoryTest {
+
+    private static final List<String> USABLE_IDS =
+            List.of(
+                    "percolator",
+                    "percolator.pep-above-one",
+                    "percolator.3-06-5.peptide-protein-ids",
+                    "comet.thermo-raw-windows-only");
+
+    private static final List<String> TEXTS =
+            List.of(
+                    "something a user should know",
+                    "3.07.1 predates 3.08's change of default PEP regressor to I-splines.",
+                    "x");
 
     @Test
     @DisplayName("an advisory keeps its identifier and its sentence")
@@ -89,33 +105,52 @@ class ToolAdvisoryTest {
                 "percolator_pep",
                 "percolator.pep!"
             })
-    @DisplayName("an identifier that cannot be relied on is rejected, quoting it")
+    @DisplayName("an identifier that cannot be relied on is rejected whatever the text says")
     void unusableIdentifiersAreRejected(String id) {
-        IllegalArgumentException rejected =
-                assertThrows(
-                        IllegalArgumentException.class,
-                        () -> new ToolAdvisory(id, "something a user should know"));
+        /*
+         * Graded against several texts, not one. Neither validation depends on the other field, so
+         * fixing the text would leave that axis untested -- the shape that let a blank-note rule be
+         * switched off for a single enum constant in DeclaredCapability and still pass 108 tests.
+         */
+        List<Executable> assertions = new ArrayList<>();
+        for (String text : TEXTS) {
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    "not a usable advisory id: \""
+                                            + id
+                                            + "\" (expected lower-case words joined by single dots"
+                                            + " or hyphens, such as"
+                                            + " percolator.pep-regressor-changed-in-3-08)",
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () -> new ToolAdvisory(id, text))
+                                            .getMessage(),
+                                    "id \"" + id + "\" with text \"" + text + "\""));
+        }
 
-        assertEquals(
-                "not a usable advisory id: \""
-                        + id
-                        + "\" (expected lower-case words joined by single dots or hyphens, such"
-                        + " as percolator.pep-regressor-changed-in-3-08)",
-                rejected.getMessage());
+        assertAll(assertions);
     }
 
     @ParameterizedTest(name = "[{index}] \"{0}\"")
     @ValueSource(strings = {"", " ", "\t\n"})
-    @DisplayName("a blank sentence is rejected, naming the field")
+    @DisplayName("a blank sentence is rejected whatever the identifier is, naming the field")
     void aBlankTextIsRejected(String blank) {
-        IllegalArgumentException rejected =
-                assertThrows(
-                        IllegalArgumentException.class,
-                        () -> new ToolAdvisory("percolator.pep-above-one", blank));
+        List<Executable> assertions = new ArrayList<>();
+        for (String id : USABLE_IDS) {
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    "text must not be blank: an advisory with no sentence tells"
+                                            + " the user nothing",
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () -> new ToolAdvisory(id, blank))
+                                            .getMessage(),
+                                    "id \"" + id + "\""));
+        }
 
-        assertEquals(
-                "text must not be blank: an advisory with no sentence tells the user nothing",
-                rejected.getMessage());
+        assertAll(assertions);
     }
 
     @Test

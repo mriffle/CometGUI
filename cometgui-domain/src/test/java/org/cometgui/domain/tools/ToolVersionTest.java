@@ -29,6 +29,7 @@ import org.cometgui.domain.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -203,25 +204,53 @@ class ToolVersionTest {
         }
 
         @Test
-        @DisplayName("a negative component is rejected, naming which one")
+        @DisplayName("a negative component is rejected at every position, naming which one")
         void rejectsNegativeComponents() {
-            assertAll(
-                    () ->
-                            assertEquals(
-                                    "component 1 of a tool version must not be negative, but was:"
-                                            + " -1",
-                                    assertThrows(
-                                                    IllegalArgumentException.class,
-                                                    () -> ToolVersion.of(-1, 0))
-                                            .getMessage()),
-                    () ->
-                            assertEquals(
-                                    "component 3 of a tool version must not be negative, but was:"
-                                            + " -5",
-                                    assertThrows(
-                                                    IllegalArgumentException.class,
-                                                    () -> ToolVersion.of(3, 7, -5))
-                                            .getMessage()));
+            /*
+             * Every position, not one. The check runs inside a loop over the array and does not
+             * depend on which index it is at, so grading it at a single index would leave the index
+             * axis untested -- the shape that let a blank-note rule be switched off for a single
+             * enum constant in DeclaredCapability and still pass 108 tests.
+             */
+            List<Executable> assertions = new ArrayList<>();
+            for (int width = ToolVersion.MINIMUM_COMPONENTS;
+                    width <= ToolVersion.MAXIMUM_COMPONENTS;
+                    width++) {
+                for (int position = 0; position < width; position++) {
+                    int[] components = new int[width];
+                    components[position] = -(position + 1);
+                    int expectedIndex = position + 1;
+                    int expectedValue = -(position + 1);
+                    assertions.add(
+                            () ->
+                                    assertEquals(
+                                            "component "
+                                                    + expectedIndex
+                                                    + " of a tool version must not be negative,"
+                                                    + " but was: "
+                                                    + expectedValue,
+                                            assertThrows(
+                                                            IllegalArgumentException.class,
+                                                            () -> ToolVersion.of(components))
+                                                    .getMessage(),
+                                            "position "
+                                                    + expectedIndex
+                                                    + " of "
+                                                    + components.length));
+                }
+            }
+
+            assertEquals(9, assertions.size(), "two, three and four component versions");
+            assertAll(assertions);
+        }
+
+        @Test
+        @DisplayName("the first negative component is the one named, not the last")
+        void namesTheFirstNegativeComponent() {
+            assertEquals(
+                    "component 1 of a tool version must not be negative, but was: -1",
+                    assertThrows(IllegalArgumentException.class, () -> ToolVersion.of(-1, -2, -3))
+                            .getMessage());
         }
 
         @Test

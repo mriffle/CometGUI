@@ -22,10 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.cometgui.domain.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -35,10 +39,20 @@ import org.junit.jupiter.params.provider.ValueSource;
  * org.cometgui.domain.ports.DownloadProgressListener} rather than invented, and a caller that
  * divides by it without checking shows a negative fraction -- so {@link
  * InstallProgress#hasKnownTotal()} is asserted at the boundary, not merely somewhere.
+ *
+ * <p><strong>The rejection and the boundary are graded over every phase and every tool.</strong>
+ * Neither rule depends on either: {@code bytesTransferred} may not be negative during a probe any
+ * more than during a download. Pinning the phase at {@code DOWNLOADING} would leave the phase axis
+ * untested and would let a rule ANDed with a phase pass -- the shape that let a blank-note rule be
+ * switched off for a single enum constant in {@link DeclaredCapability}.
  */
 class InstallProgressTest {
 
     private static final ToolVersion VERSION = ToolVersion.parse("3.07.1");
+
+    private static final List<Long> NEGATIVE_TOTALS = List.of(-1L, -100L, Long.MIN_VALUE);
+
+    private static final List<Long> KNOWN_TOTALS = List.of(0L, 1L, 99_000_000L);
 
     @Test
     @DisplayName("a report keeps every part it was given")
@@ -80,35 +94,72 @@ class InstallProgressTest {
         assertTrue(progress.hasKnownTotal());
     }
 
-    @Test
-    @DisplayName("a negative byte count is rejected, naming the field and the value")
-    void aNegativeByteCountIsRejected() {
-        IllegalArgumentException rejected =
-                assertThrows(
-                        IllegalArgumentException.class,
+    @ParameterizedTest(name = "[{index}] phase={0}")
+    @EnumSource(InstallPhase.class)
+    @DisplayName("the known-total boundary is the same in every install phase")
+    void theKnownTotalBoundaryHoldsInEveryPhase(InstallPhase phase) {
+        List<Executable> assertions = new ArrayList<>();
+        for (ToolName tool : ToolName.values()) {
+            for (long negative : NEGATIVE_TOTALS) {
+                assertions.add(
                         () ->
-                                new InstallProgress(
-                                        ToolName.COMET,
-                                        VERSION,
-                                        InstallPhase.DOWNLOADING,
-                                        -1L,
-                                        100L));
+                                assertFalse(
+                                        new InstallProgress(tool, VERSION, phase, 0L, negative)
+                                                .hasKnownTotal(),
+                                        tool.id() + " " + phase.name() + " total " + negative));
+            }
+            for (long known : KNOWN_TOTALS) {
+                assertions.add(
+                        () ->
+                                assertTrue(
+                                        new InstallProgress(tool, VERSION, phase, 0L, known)
+                                                .hasKnownTotal(),
+                                        tool.id() + " " + phase.name() + " total " + known));
+            }
+        }
 
-        assertEquals("bytesTransferred must not be negative, but was: -1", rejected.getMessage());
+        assertAll(assertions);
     }
 
-    @Test
-    @DisplayName("zero bytes transferred is accepted: an install starts there")
-    void zeroBytesIsAccepted() {
+    @ParameterizedTest(name = "[{index}] phase={0}")
+    @EnumSource(InstallPhase.class)
+    @DisplayName("a negative byte count is rejected in every phase, naming the field and the value")
+    void aNegativeByteCountIsRejectedInEveryPhase(InstallPhase phase) {
+        List<Executable> assertions = new ArrayList<>();
+        for (ToolName tool : ToolName.values()) {
+            for (long negative : NEGATIVE_TOTALS) {
+                assertions.add(
+                        () ->
+                                assertEquals(
+                                        "bytesTransferred must not be negative, but was: "
+                                                + negative,
+                                        assertThrows(
+                                                        IllegalArgumentException.class,
+                                                        () ->
+                                                                new InstallProgress(
+                                                                        tool, VERSION, phase,
+                                                                        negative, 100L))
+                                                .getMessage(),
+                                        tool.id() + " " + phase.name()));
+            }
+        }
+
+        assertAll(assertions);
+    }
+
+    @ParameterizedTest(name = "[{index}] phase={0}")
+    @EnumSource(InstallPhase.class)
+    @DisplayName("zero bytes transferred is accepted in every phase: an install starts there")
+    void zeroBytesIsAcceptedInEveryPhase(InstallPhase phase) {
         assertEquals(
                 0L,
-                new InstallProgress(ToolName.COMET, VERSION, InstallPhase.DOWNLOADING, 0L, 100L)
-                        .bytesTransferred());
+                new InstallProgress(ToolName.COMET, VERSION, phase, 0L, 100L).bytesTransferred());
     }
 
-    @Test
-    @DisplayName("a null part is rejected by name")
-    void nullPartsAreRejectedByName() {
+    @ParameterizedTest(name = "[{index}] phase={0}")
+    @EnumSource(InstallPhase.class)
+    @DisplayName("a null part is rejected by name in every phase")
+    void nullPartsAreRejectedByName(InstallPhase phase) {
         assertAll(
                 () ->
                         assertEquals(
@@ -119,10 +170,11 @@ class InstallProgressTest {
                                                         new InstallProgress(
                                                                 Nulls.of(ToolName.class),
                                                                 VERSION,
-                                                                InstallPhase.DOWNLOADING,
+                                                                phase,
                                                                 0L,
                                                                 0L))
-                                        .getMessage()),
+                                        .getMessage(),
+                                phase.name()),
                 () ->
                         assertEquals(
                                 "version",
@@ -132,22 +184,27 @@ class InstallProgressTest {
                                                         new InstallProgress(
                                                                 ToolName.COMET,
                                                                 Nulls.of(ToolVersion.class),
-                                                                InstallPhase.DOWNLOADING,
+                                                                phase,
                                                                 0L,
                                                                 0L))
-                                        .getMessage()),
-                () ->
-                        assertEquals(
-                                "phase",
-                                assertThrows(
-                                                NullPointerException.class,
-                                                () ->
-                                                        new InstallProgress(
-                                                                ToolName.COMET,
-                                                                VERSION,
-                                                                Nulls.of(InstallPhase.class),
-                                                                0L,
-                                                                0L))
-                                        .getMessage()));
+                                        .getMessage(),
+                                phase.name()));
+    }
+
+    @Test
+    @DisplayName("a null phase is rejected by name")
+    void aNullPhaseIsRejectedByName() {
+        assertEquals(
+                "phase",
+                assertThrows(
+                                NullPointerException.class,
+                                () ->
+                                        new InstallProgress(
+                                                ToolName.COMET,
+                                                VERSION,
+                                                Nulls.of(InstallPhase.class),
+                                                0L,
+                                                0L))
+                        .getMessage());
     }
 }

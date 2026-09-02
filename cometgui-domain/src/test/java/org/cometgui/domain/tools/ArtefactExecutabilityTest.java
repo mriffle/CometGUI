@@ -24,11 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 import org.cometgui.domain.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests for {@link ArtefactExecutability}.
@@ -149,10 +151,18 @@ class ArtefactExecutabilityTest {
                 () -> assertFalse(ArtefactExecutability.INCOMPATIBLE.isRunnable()));
     }
 
-    @Test
-    @DisplayName("a null platform is rejected by name, so an argument swap cannot pass as empty")
-    void nullPlatformsAreRejectedByName() {
-        HostPlatform linux = platform("linux-x86-64");
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("everyPlatform")
+    @DisplayName(
+            "a null platform is rejected by name, whichever real platform is on the other side")
+    void nullPlatformsAreRejectedByName(HostPlatform real) {
+        /*
+         * Graded against every platform on the other side rather than one. The null checks do not
+         * depend on the other argument, so pinning it would leave that axis untested -- the shape
+         * that let a blank-note rule be switched off for a single enum constant in
+         * DeclaredCapability and still pass 108 tests. It also proves neither null quietly becomes
+         * INCOMPATIBLE, which would read as a legitimate verdict.
+         */
         HostPlatform absent = Nulls.of(HostPlatform.class);
 
         assertAll(
@@ -161,14 +171,31 @@ class ArtefactExecutabilityTest {
                                 "host",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> ArtefactExecutability.of(absent, linux))
-                                        .getMessage()),
+                                                () -> ArtefactExecutability.of(absent, real))
+                                        .getMessage(),
+                                "artefact " + real.id()),
                 () ->
                         assertEquals(
                                 "artefactPlatform",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> ArtefactExecutability.of(linux, absent))
-                                        .getMessage()));
+                                                () -> ArtefactExecutability.of(real, absent))
+                                        .getMessage(),
+                                "host " + real.id()));
+    }
+
+    /**
+     * Every platform the product knows, built from the two enums rather than listed.
+     *
+     * @return the six operating-system and architecture pairs
+     */
+    static Stream<HostPlatform> everyPlatform() {
+        List<HostPlatform> platforms = new ArrayList<>();
+        for (HostOperatingSystem operatingSystem : HostOperatingSystem.values()) {
+            for (HostArchitecture architecture : HostArchitecture.values()) {
+                platforms.add(new HostPlatform(operatingSystem, architecture));
+            }
+        }
+        return platforms.stream();
     }
 }

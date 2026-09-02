@@ -29,6 +29,7 @@ import org.cometgui.domain.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -39,6 +40,14 @@ import org.junit.jupiter.params.provider.EnumSource;
  * represent: a capability belonging to another tool, the same capability answered twice, an
  * advisory identifier a test could not tell apart, and an installed tool the application cannot
  * point at.
+ *
+ * <p><strong>Every rejection is graded over every install state.</strong> None of these rules
+ * depends on the state -- a capability of the wrong tool is wrong whether the tool is installed,
+ * failed or unavailable here -- so pinning the state at one constant would leave the state axis
+ * untested, which is exactly the shape that let a blank-note rule be switched off for a single enum
+ * constant in {@link DeclaredCapability} and still pass 108 tests. The one rule that <em>does</em>
+ * depend on the state is the installed-path requirement, and it is graded on both sides of that
+ * dependency.
  */
 class ToolOfferTest {
 
@@ -60,6 +69,13 @@ class ToolOfferTest {
             new ToolAdvisory(
                     "percolator.pep-regressor-changed-in-3-08",
                     "3.07.1 predates 3.08's change of default PEP regressor to I-splines.");
+
+    /** An installed path has to be present when the state is INSTALLED, so states differ here. */
+    private static Optional<Path> pathFor(ToolInstallState state) {
+        return state == ToolInstallState.INSTALLED
+                ? Optional.of(Path.of("cometgui-tools", "percolator").toAbsolutePath())
+                : Optional.empty();
+    }
 
     private static ToolOffer offer(
             ToolInstallState state,
@@ -149,14 +165,15 @@ class ToolOfferTest {
                                     offer.loaderDiagnostic().orElseThrow().message()));
         }
 
-        @Test
+        @ParameterizedTest(name = "[{index}] {0}")
+        @EnumSource(ToolOrigin.class)
         @DisplayName("a local binary is an offer like any other, with no artefact behind it")
-        void aLocalBinaryIsAnOffer() {
+        void anyOriginIsAnOffer(ToolOrigin origin) {
             ToolOffer offer =
                     new ToolOffer(
                             ToolName.PERCOLATOR,
                             PERCOLATOR_3_07_1,
-                            ToolOrigin.LOCAL,
+                            origin,
                             ToolInstallState.INSTALLED,
                             List.of(),
                             List.of(),
@@ -164,7 +181,7 @@ class ToolOfferTest {
                             Optional.of(Path.of("local-bin", "percolator").toAbsolutePath()));
 
             assertAll(
-                    () -> assertEquals(ToolOrigin.LOCAL, offer.origin()),
+                    () -> assertEquals(origin, offer.origin()),
                     () -> assertEquals(List.of(), offer.capabilities()));
         }
 
@@ -190,59 +207,112 @@ class ToolOfferTest {
     @DisplayName("what an offer refuses to represent")
     class Rejections {
 
-        @Test
-        @DisplayName("a capability belonging to another tool cannot be attached")
-        void aCapabilityOfAnotherToolIsRejected() {
-            DeclaredCapability thermo =
-                    new DeclaredCapability(
-                            ToolCapability.THERMO_RAW_WINDOWS,
-                            CapabilityEvidence.UNVERIFIED,
-                            "inferred from the Windows companion DLL list");
-
-            IllegalArgumentException rejected =
-                    assertThrows(
-                            IllegalArgumentException.class,
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("a capability of another tool is rejected in every state, for every mismatch")
+        void aCapabilityOfAnotherToolIsRejected(ToolInstallState state) {
+            List<Executable> assertions = new ArrayList<>();
+            for (ToolCapability capability : ToolCapability.values()) {
+                for (ToolName tool : ToolName.values()) {
+                    if (tool == capability.tool()) {
+                        continue;
+                    }
+                    DeclaredCapability declared =
+                            new DeclaredCapability(
+                                    capability,
+                                    CapabilityEvidence.UNVERIFIED,
+                                    "declared for the wrong tool on purpose");
+                    assertions.add(
                             () ->
-                                    offer(
-                                            ToolInstallState.NOT_INSTALLED,
-                                            List.of(thermo),
-                                            List.of(),
-                                            Optional.empty()));
+                                    assertEquals(
+                                            capability.id()
+                                                    + " is a capability of "
+                                                    + capability.tool().id()
+                                                    + " and cannot be declared for "
+                                                    + tool.id(),
+                                            assertThrows(
+                                                            IllegalArgumentException.class,
+                                                            () ->
+                                                                    new ToolOffer(
+                                                                            tool,
+                                                                            PERCOLATOR_3_07_1,
+                                                                            ToolOrigin.MANAGED,
+                                                                            state,
+                                                                            List.of(declared),
+                                                                            List.of(),
+                                                                            Optional.empty(),
+                                                                            pathFor(state)))
+                                                    .getMessage(),
+                                            capability.id() + " on " + tool.id() + " in " + state));
+                }
+            }
 
-            assertEquals(
-                    "THERMO_RAW_WINDOWS is a capability of comet and cannot be declared for"
-                            + " percolator",
-                    rejected.getMessage());
+            assertAll(assertions);
         }
 
-        @Test
-        @DisplayName("the same capability declared twice is rejected, naming it")
-        void aDuplicateCapabilityIsRejected() {
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("the same capability declared twice is rejected in every state, naming it")
+        void aDuplicateCapabilityIsRejected(ToolInstallState state) {
             DeclaredCapability xmlInferred =
                     new DeclaredCapability(
                             ToolCapability.XML_OUTPUT,
                             CapabilityEvidence.INFERRED_FROM_ARTEFACT_BYTES,
                             "writer literal found in the macOS portable zip");
+            DeclaredCapability pinObserved =
+                    new DeclaredCapability(
+                            ToolCapability.PIN_OUTPUT,
+                            CapabilityEvidence.OBSERVED_BY_EXECUTION,
+                            "executed on linux-x86-64 by phase 00");
+            DeclaredCapability pinUnverified =
+                    new DeclaredCapability(
+                            ToolCapability.PIN_OUTPUT,
+                            CapabilityEvidence.UNVERIFIED,
+                            "not probed on this platform");
 
-            IllegalArgumentException rejected =
-                    assertThrows(
-                            IllegalArgumentException.class,
-                            () ->
-                                    offer(
-                                            ToolInstallState.NOT_INSTALLED,
-                                            List.of(XML_OBSERVED, xmlInferred),
-                                            List.of(),
-                                            Optional.empty()));
-
-            assertEquals(
-                    "capabilities names XML_OUTPUT more than once, so the offer claims two"
-                            + " answers for one question",
-                    rejected.getMessage());
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    "capabilities names XML_OUTPUT more than once, so the offer"
+                                            + " claims two answers for one question",
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () ->
+                                                            offer(
+                                                                    state,
+                                                                    List.of(
+                                                                            XML_OBSERVED,
+                                                                            xmlInferred),
+                                                                    List.of(),
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    "percolator in " + state),
+                    () ->
+                            assertEquals(
+                                    "capabilities names PIN_OUTPUT more than once, so the offer"
+                                            + " claims two answers for one question",
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () ->
+                                                            new ToolOffer(
+                                                                    ToolName.COMET,
+                                                                    ToolVersion.parse("2026.02.2"),
+                                                                    ToolOrigin.MANAGED,
+                                                                    state,
+                                                                    List.of(
+                                                                            pinObserved,
+                                                                            pinUnverified),
+                                                                    List.of(),
+                                                                    Optional.empty(),
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    "comet in " + state));
         }
 
-        @Test
-        @DisplayName("an advisory identifier used twice is rejected, quoting it")
-        void aDuplicateAdvisoryIdIsRejected() {
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("an advisory identifier used twice is rejected in every state, quoting it")
+        void aDuplicateAdvisoryIdIsRejected(ToolInstallState state) {
             ToolAdvisory sameIdOtherText =
                     new ToolAdvisory(
                             "percolator.pep-regressor-changed-in-3-08", "worded another way");
@@ -252,10 +322,10 @@ class ToolOfferTest {
                             IllegalArgumentException.class,
                             () ->
                                     offer(
-                                            ToolInstallState.NOT_INSTALLED,
+                                            state,
                                             List.of(),
                                             List.of(PEP_REGRESSOR, sameIdOtherText),
-                                            Optional.empty()));
+                                            pathFor(state)));
 
             assertEquals(
                     "advisories names the id \"percolator.pep-regressor-changed-in-3-08\" more"
@@ -282,15 +352,21 @@ class ToolOfferTest {
                     rejected.getMessage());
         }
 
-        @Test
-        @DisplayName("a relative installed path is rejected, quoting it")
-        void aRelativeInstalledPathIsRejected() {
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("a relative installed path is rejected in every state, quoting it")
+        void aRelativeInstalledPathIsRejected(ToolInstallState state) {
+            /*
+             * Graded over every state deliberately. The absoluteness rule applies whenever a path
+             * is present and does NOT depend on the state -- only the "a path must be present"
+             * half does, and that half is asserted separately above and in otherStatesNeedNoPath.
+             */
             IllegalArgumentException rejected =
                     assertThrows(
                             IllegalArgumentException.class,
                             () ->
                                     offer(
-                                            ToolInstallState.INSTALLED,
+                                            state,
                                             List.of(),
                                             List.of(),
                                             Optional.of(Path.of("tools/percolator"))));
@@ -300,9 +376,10 @@ class ToolOfferTest {
                     rejected.getMessage());
         }
 
-        @Test
-        @DisplayName("a null entry in either list is rejected, naming its position")
-        void aNullEntryIsRejected() {
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("a null entry in either list is rejected in every state, naming its position")
+        void aNullEntryIsRejected(ToolInstallState state) {
             assertAll(
                     () ->
                             assertEquals(
@@ -311,12 +388,13 @@ class ToolOfferTest {
                                                     IllegalArgumentException.class,
                                                     () ->
                                                             offer(
-                                                                    ToolInstallState.NOT_INSTALLED,
+                                                                    state,
                                                                     Arrays.asList(
                                                                             XML_OBSERVED, null),
                                                                     List.of(),
-                                                                    Optional.empty()))
-                                            .getMessage()),
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    state.name()),
                     () ->
                             assertEquals(
                                     "advisories[0] must not be null",
@@ -324,17 +402,24 @@ class ToolOfferTest {
                                                     IllegalArgumentException.class,
                                                     () ->
                                                             offer(
-                                                                    ToolInstallState.NOT_INSTALLED,
+                                                                    state,
                                                                     List.of(),
                                                                     Arrays.asList(
                                                                             null, PEP_REGRESSOR),
-                                                                    Optional.empty()))
-                                            .getMessage()));
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    state.name()));
         }
 
-        @Test
-        @DisplayName("a null part is rejected by name")
-        void nullPartsAreRejectedByName() {
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("a null part is rejected by name in every state")
+        void nullPartsAreRejectedByName(ToolInstallState state) {
+            List<DeclaredCapability> absentCapabilities = Nulls.of(List.class);
+            List<ToolAdvisory> absentAdvisories = Nulls.of(List.class);
+            Optional<LoaderDiagnostic> absentDiagnostic = Nulls.of(Optional.class);
+            Optional<Path> absentPath = Nulls.of(Optional.class);
+
             assertAll(
                     () ->
                             assertEquals(
@@ -346,12 +431,13 @@ class ToolOfferTest {
                                                                     Nulls.of(ToolName.class),
                                                                     PERCOLATOR_3_07_1,
                                                                     ToolOrigin.MANAGED,
-                                                                    ToolInstallState.NOT_INSTALLED,
+                                                                    state,
                                                                     List.of(),
                                                                     List.of(),
                                                                     Optional.empty(),
-                                                                    Optional.empty()))
-                                            .getMessage()),
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    state.name()),
                     () ->
                             assertEquals(
                                     "version",
@@ -362,12 +448,13 @@ class ToolOfferTest {
                                                                     ToolName.PERCOLATOR,
                                                                     Nulls.of(ToolVersion.class),
                                                                     ToolOrigin.MANAGED,
-                                                                    ToolInstallState.NOT_INSTALLED,
+                                                                    state,
                                                                     List.of(),
                                                                     List.of(),
                                                                     Optional.empty(),
-                                                                    Optional.empty()))
-                                            .getMessage()),
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    state.name()),
                     () ->
                             assertEquals(
                                     "origin",
@@ -378,29 +465,13 @@ class ToolOfferTest {
                                                                     ToolName.PERCOLATOR,
                                                                     PERCOLATOR_3_07_1,
                                                                     Nulls.of(ToolOrigin.class),
-                                                                    ToolInstallState.NOT_INSTALLED,
+                                                                    state,
                                                                     List.of(),
                                                                     List.of(),
                                                                     Optional.empty(),
-                                                                    Optional.empty()))
-                                            .getMessage()),
-                    () ->
-                            assertEquals(
-                                    "state",
-                                    assertThrows(
-                                                    NullPointerException.class,
-                                                    () ->
-                                                            new ToolOffer(
-                                                                    ToolName.PERCOLATOR,
-                                                                    PERCOLATOR_3_07_1,
-                                                                    ToolOrigin.MANAGED,
-                                                                    Nulls.of(
-                                                                            ToolInstallState.class),
-                                                                    List.of(),
-                                                                    List.of(),
-                                                                    Optional.empty(),
-                                                                    Optional.empty()))
-                                            .getMessage()),
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    state.name()),
                     () ->
                             assertEquals(
                                     "capabilities",
@@ -408,11 +479,12 @@ class ToolOfferTest {
                                                     NullPointerException.class,
                                                     () ->
                                                             offer(
-                                                                    ToolInstallState.NOT_INSTALLED,
-                                                                    Nulls.of(List.class),
+                                                                    state,
+                                                                    absentCapabilities,
                                                                     List.of(),
-                                                                    Optional.empty()))
-                                            .getMessage()),
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    state.name()),
                     () ->
                             assertEquals(
                                     "advisories",
@@ -420,11 +492,12 @@ class ToolOfferTest {
                                                     NullPointerException.class,
                                                     () ->
                                                             offer(
-                                                                    ToolInstallState.NOT_INSTALLED,
+                                                                    state,
                                                                     List.of(),
-                                                                    Nulls.of(List.class),
-                                                                    Optional.empty()))
-                                            .getMessage()),
+                                                                    absentAdvisories,
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    state.name()),
                     () ->
                             assertEquals(
                                     "loaderDiagnostic",
@@ -435,12 +508,13 @@ class ToolOfferTest {
                                                                     ToolName.PERCOLATOR,
                                                                     PERCOLATOR_3_07_1,
                                                                     ToolOrigin.MANAGED,
-                                                                    ToolInstallState.NOT_INSTALLED,
+                                                                    state,
                                                                     List.of(),
                                                                     List.of(),
-                                                                    Nulls.of(Optional.class),
-                                                                    Optional.empty()))
-                                            .getMessage()),
+                                                                    absentDiagnostic,
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    state.name()),
                     () ->
                             assertEquals(
                                     "installedPath",
@@ -448,11 +522,32 @@ class ToolOfferTest {
                                                     NullPointerException.class,
                                                     () ->
                                                             offer(
-                                                                    ToolInstallState.NOT_INSTALLED,
+                                                                    state,
                                                                     List.of(),
                                                                     List.of(),
-                                                                    Nulls.of(Optional.class)))
-                                            .getMessage()));
+                                                                    absentPath))
+                                            .getMessage(),
+                                    state.name()));
+        }
+
+        @Test
+        @DisplayName("a null state is rejected by name before the installed path is examined")
+        void aNullStateIsRejectedByName() {
+            assertEquals(
+                    "state",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () ->
+                                            new ToolOffer(
+                                                    ToolName.PERCOLATOR,
+                                                    PERCOLATOR_3_07_1,
+                                                    ToolOrigin.MANAGED,
+                                                    Nulls.of(ToolInstallState.class),
+                                                    List.of(),
+                                                    List.of(),
+                                                    Optional.empty(),
+                                                    Optional.empty()))
+                            .getMessage());
         }
     }
 

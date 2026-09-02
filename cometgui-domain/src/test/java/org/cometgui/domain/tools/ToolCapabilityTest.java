@@ -28,6 +28,7 @@ import java.util.Set;
 import org.cometgui.domain.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -138,40 +139,76 @@ class ToolCapabilityTest {
         }
     }
 
-    @Test
-    @DisplayName("a capability cannot be attached to the wrong tool")
-    void aCapabilityCannotBeAttachedToTheWrongTool() {
-        IllegalArgumentException thermoOnPercolator =
-                assertThrows(
-                        IllegalArgumentException.class,
-                        () ->
-                                ToolCapability.THERMO_RAW_WINDOWS.requireBelongsTo(
-                                        ToolName.PERCOLATOR));
-        IllegalArgumentException xmlOnComet =
-                assertThrows(
-                        IllegalArgumentException.class,
-                        () -> ToolCapability.XML_OUTPUT.requireBelongsTo(ToolName.COMET));
-        IllegalArgumentException xmlOnPdv =
-                assertThrows(
-                        IllegalArgumentException.class,
-                        () -> ToolCapability.XML_OUTPUT.requireBelongsTo(ToolName.PDV));
+    @ParameterizedTest(name = "[{index}] {0}")
+    @EnumSource(ToolCapability.class)
+    @DisplayName("a capability cannot be attached to any tool but its own")
+    void aCapabilityCannotBeAttachedToTheWrongTool(ToolCapability capability) {
+        /*
+         * The full cross, not three examples. The rejection does not depend on which capability or
+         * which tool is involved, so grading it at one pair would leave both axes untested -- the
+         * shape that let a blank-note rule be switched off for a single enum constant in
+         * DeclaredCapability and still pass 108 tests. Driven off values(), so a seventeenth
+         * capability or a fifth tool is graded the day it is declared.
+         */
+        List<Executable> assertions = new ArrayList<>();
+        for (ToolName tool : ToolName.values()) {
+            if (tool == capability.tool()) {
+                continue;
+            }
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    capability.id()
+                                            + " is a capability of "
+                                            + capability.tool().id()
+                                            + " and cannot be declared for "
+                                            + tool.id(),
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () -> capability.requireBelongsTo(tool))
+                                            .getMessage(),
+                                    capability.id() + " offered to " + tool.id()));
+        }
 
+        assertEquals(3, assertions.size(), "every capability has exactly three wrong tools");
+        assertAll(assertions);
+    }
+
+    @Test
+    @DisplayName("the three rejection messages the specification's own examples produce")
+    void theRejectionMessagesArePinned() {
         assertAll(
                 () ->
                         assertEquals(
                                 "THERMO_RAW_WINDOWS is a capability of comet and cannot be"
                                         + " declared for percolator",
-                                thermoOnPercolator.getMessage()),
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () ->
+                                                        ToolCapability.THERMO_RAW_WINDOWS
+                                                                .requireBelongsTo(
+                                                                        ToolName.PERCOLATOR))
+                                        .getMessage()),
                 () ->
                         assertEquals(
                                 "XML_OUTPUT is a capability of percolator and cannot be declared"
                                         + " for comet",
-                                xmlOnComet.getMessage()),
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () ->
+                                                        ToolCapability.XML_OUTPUT.requireBelongsTo(
+                                                                ToolName.COMET))
+                                        .getMessage()),
                 () ->
                         assertEquals(
                                 "XML_OUTPUT is a capability of percolator and cannot be declared"
                                         + " for pdv",
-                                xmlOnPdv.getMessage()));
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () ->
+                                                        ToolCapability.XML_OUTPUT.requireBelongsTo(
+                                                                ToolName.PDV))
+                                        .getMessage()));
     }
 
     @ParameterizedTest(name = "[{index}] {0}")

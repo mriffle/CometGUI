@@ -28,13 +28,15 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.cometgui.domain.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests for {@link LoaderDiagnostic}.
@@ -54,8 +56,52 @@ import org.junit.jupiter.params.provider.ValueSource;
  *
  * <p>Every expected message below is hand-typed. Building one by calling {@code message()} would be
  * an expected value computed by the code under test, and could not fail.
+ *
+ * <p><strong>Every rejection is graded over every failure kind the type accepts, not over
+ * one.</strong> None of the validation rules depends on the kind -- a diagnostic that cannot name
+ * what failed is useless whichever loader message produced it -- so fixing the kind at one constant
+ * would leave the kind axis untested. That is the shape that let a blank-note rule be switched off
+ * for a single enum constant in {@link DeclaredCapability} and still pass 108 tests. The kinds come
+ * from {@link ProbeFailureKind#isLoadabilityFailure()} rather than from a hand-written list, so a
+ * loadability kind added later is graded the day it is declared.
  */
 class LoaderDiagnosticTest {
+
+    private static final List<String> BLANKS = List.of("", " ", "\t\n");
+
+    /**
+     * Every failure kind a loader diagnostic accepts, derived from the enum rather than listed.
+     *
+     * @return the loadability failure kinds
+     */
+    static Stream<ProbeFailureKind> everyLoadabilityFailureKind() {
+        return Arrays.stream(ProbeFailureKind.values())
+                .filter(ProbeFailureKind::isLoadabilityFailure);
+    }
+
+    @Test
+    @DisplayName("the shared failure-kind source grades every loadability kind, and only those")
+    void theSharedKindSourceIsWhole() {
+        /*
+         * The guard on the guard. Every rejection below is driven by everyLoadabilityFailureKind(),
+         * so this file only stays broad while that method stays broad. If it is ever narrowed to a
+         * hand-written list -- or if a kind moves stage -- this fails rather than silently grading
+         * fewer cases.
+         */
+        List<String> graded = everyLoadabilityFailureKind().map(ProbeFailureKind::name).toList();
+
+        assertEquals(
+                List.of(
+                        "MISSING_SHARED_OBJECT",
+                        "MISSING_SYMBOL_VERSION",
+                        "WRONG_ARCHITECTURE",
+                        "MACOS_QUARANTINE",
+                        "MISSING_WINDOWS_RUNTIME_DLL",
+                        "NOT_EXECUTABLE",
+                        "TIMED_OUT",
+                        "EXECUTION_FAILED"),
+                graded);
+    }
 
     @Nested
     @DisplayName("the three loader failures observed on this host")
@@ -277,6 +323,34 @@ class LoaderDiagnosticTest {
                             + " documented remedy.",
                     diagnostic.message());
         }
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("org.cometgui.domain.tools.LoaderDiagnosticTest#everyLoadabilityFailureKind")
+        @DisplayName("no failure kind can produce a message containing null or Optional")
+        void noKindEverRendersNull(ProbeFailureKind kind) {
+            String bothAbsent =
+                    new LoaderDiagnostic(
+                                    kind,
+                                    "percolator",
+                                    Optional.empty(),
+                                    Optional.empty(),
+                                    List.of())
+                            .message();
+            String oneAbsent =
+                    new LoaderDiagnostic(
+                                    kind,
+                                    "percolator",
+                                    Optional.of("GLIBC_2.38"),
+                                    Optional.empty(),
+                                    List.of("install Percolator 3.06.5"))
+                            .message();
+
+            assertAll(
+                    () -> assertFalse(bothAbsent.contains("null"), bothAbsent),
+                    () -> assertFalse(bothAbsent.contains("Optional"), bothAbsent),
+                    () -> assertFalse(oneAbsent.contains("null"), oneAbsent),
+                    () -> assertFalse(oneAbsent.contains("Optional"), oneAbsent));
+        }
     }
 
     @Nested
@@ -284,18 +358,7 @@ class LoaderDiagnosticTest {
     class Wording {
 
         @ParameterizedTest(name = "[{index}] {0}")
-        @EnumSource(
-                value = ProbeFailureKind.class,
-                names = {
-                    "MISSING_SHARED_OBJECT",
-                    "MISSING_SYMBOL_VERSION",
-                    "WRONG_ARCHITECTURE",
-                    "MACOS_QUARANTINE",
-                    "MISSING_WINDOWS_RUNTIME_DLL",
-                    "NOT_EXECUTABLE",
-                    "TIMED_OUT",
-                    "EXECUTION_FAILED"
-                })
+        @MethodSource("org.cometgui.domain.tools.LoaderDiagnosticTest#everyLoadabilityFailureKind")
         @DisplayName("every loadability failure has its own sentence, naming the object")
         void everyLoadabilityFailureHasASentence(ProbeFailureKind kind) {
             LoaderDiagnostic diagnostic =
@@ -438,66 +501,80 @@ class LoaderDiagnosticTest {
             assertEquals(loadability, accepted);
         }
 
-        @ParameterizedTest(name = "[{index}] \"{0}\"")
-        @ValueSource(strings = {"", " ", "\t\n"})
-        @DisplayName("a blank object name is rejected, naming the field")
-        void aBlankObjectNameIsRejected(String blank) {
-            IllegalArgumentException rejected =
-                    assertThrows(
-                            IllegalArgumentException.class,
-                            () ->
-                                    new LoaderDiagnostic(
-                                            ProbeFailureKind.MISSING_SHARED_OBJECT,
-                                            blank,
-                                            Optional.empty(),
-                                            Optional.empty(),
-                                            List.of()));
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("org.cometgui.domain.tools.LoaderDiagnosticTest#everyLoadabilityFailureKind")
+        @DisplayName("a blank object name is rejected for every kind, naming the field")
+        void aBlankObjectNameIsRejected(ProbeFailureKind kind) {
+            List<Executable> assertions = new ArrayList<>();
+            for (String blank : BLANKS) {
+                assertions.add(
+                        () ->
+                                assertEquals(
+                                        "objectName must not be blank: an R-PLAT-03 diagnostic has"
+                                                + " to name what the loader complained about",
+                                        assertThrows(
+                                                        IllegalArgumentException.class,
+                                                        () ->
+                                                                new LoaderDiagnostic(
+                                                                        kind,
+                                                                        blank,
+                                                                        Optional.empty(),
+                                                                        Optional.empty(),
+                                                                        List.of()))
+                                                .getMessage(),
+                                        kind.name() + " with objectName \"" + blank + "\""));
+            }
 
-            assertEquals(
-                    "objectName must not be blank: an R-PLAT-03 diagnostic has to name what the"
-                            + " loader complained about",
-                    rejected.getMessage());
+            assertAll(assertions);
         }
 
-        @Test
-        @DisplayName("a present but blank version is rejected, naming which one")
-        void aBlankVersionIsRejected() {
-            assertAll(
-                    () ->
-                            assertEquals(
-                                    "requiredVersion must not be blank when it is present; leave"
-                                            + " it absent instead",
-                                    assertThrows(
-                                                    IllegalArgumentException.class,
-                                                    () ->
-                                                            new LoaderDiagnostic(
-                                                                    ProbeFailureKind
-                                                                            .MISSING_SYMBOL_VERSION,
-                                                                    "libc.so.6",
-                                                                    Optional.of("  "),
-                                                                    Optional.empty(),
-                                                                    List.of()))
-                                            .getMessage()),
-                    () ->
-                            assertEquals(
-                                    "availableVersion must not be blank when it is present; leave"
-                                            + " it absent instead",
-                                    assertThrows(
-                                                    IllegalArgumentException.class,
-                                                    () ->
-                                                            new LoaderDiagnostic(
-                                                                    ProbeFailureKind
-                                                                            .MISSING_SYMBOL_VERSION,
-                                                                    "libc.so.6",
-                                                                    Optional.empty(),
-                                                                    Optional.of(""),
-                                                                    List.of()))
-                                            .getMessage()));
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("org.cometgui.domain.tools.LoaderDiagnosticTest#everyLoadabilityFailureKind")
+        @DisplayName("a present but blank version is rejected for every kind, naming which one")
+        void aBlankVersionIsRejected(ProbeFailureKind kind) {
+            List<Executable> assertions = new ArrayList<>();
+            for (String blank : BLANKS) {
+                assertions.add(
+                        () ->
+                                assertEquals(
+                                        "requiredVersion must not be blank when it is present;"
+                                                + " leave it absent instead",
+                                        assertThrows(
+                                                        IllegalArgumentException.class,
+                                                        () ->
+                                                                new LoaderDiagnostic(
+                                                                        kind,
+                                                                        "libc.so.6",
+                                                                        Optional.of(blank),
+                                                                        Optional.empty(),
+                                                                        List.of()))
+                                                .getMessage(),
+                                        kind.name() + " required \"" + blank + "\""));
+                assertions.add(
+                        () ->
+                                assertEquals(
+                                        "availableVersion must not be blank when it is present;"
+                                                + " leave it absent instead",
+                                        assertThrows(
+                                                        IllegalArgumentException.class,
+                                                        () ->
+                                                                new LoaderDiagnostic(
+                                                                        kind,
+                                                                        "libc.so.6",
+                                                                        Optional.empty(),
+                                                                        Optional.of(blank),
+                                                                        List.of()))
+                                                .getMessage(),
+                                        kind.name() + " available \"" + blank + "\""));
+            }
+
+            assertAll(assertions);
         }
 
-        @Test
-        @DisplayName("a null or blank alternative is rejected, naming its position")
-        void aBlankAlternativeIsRejected() {
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("org.cometgui.domain.tools.LoaderDiagnosticTest#everyLoadabilityFailureKind")
+        @DisplayName("a null or blank alternative is rejected for every kind, naming its position")
+        void aBlankAlternativeIsRejected(ProbeFailureKind kind) {
             assertAll(
                     () ->
                             assertEquals(
@@ -506,13 +583,13 @@ class LoaderDiagnosticTest {
                                                     IllegalArgumentException.class,
                                                     () ->
                                                             new LoaderDiagnostic(
-                                                                    ProbeFailureKind
-                                                                            .MISSING_SHARED_OBJECT,
+                                                                    kind,
                                                                     "libc.so.6",
                                                                     Optional.empty(),
                                                                     Optional.empty(),
                                                                     Arrays.asList("upgrade", " ")))
-                                            .getMessage()),
+                                            .getMessage(),
+                                    kind.name()),
                     () ->
                             assertEquals(
                                     "alternatives[0] must not be null",
@@ -520,33 +597,40 @@ class LoaderDiagnosticTest {
                                                     IllegalArgumentException.class,
                                                     () ->
                                                             new LoaderDiagnostic(
-                                                                    ProbeFailureKind
-                                                                            .MISSING_SHARED_OBJECT,
+                                                                    kind,
                                                                     "libc.so.6",
                                                                     Optional.empty(),
                                                                     Optional.empty(),
                                                                     Arrays.asList(null, "upgrade")))
-                                            .getMessage()));
+                                            .getMessage(),
+                                    kind.name()));
         }
 
         @Test
-        @DisplayName("a null part is rejected by name")
-        void nullPartsAreRejectedByName() {
+        @DisplayName("a null kind is rejected by name before its stage is examined")
+        void aNullKindIsRejectedByName() {
+            assertEquals(
+                    "kind",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () ->
+                                            new LoaderDiagnostic(
+                                                    Nulls.of(ProbeFailureKind.class),
+                                                    "libc.so.6",
+                                                    Optional.empty(),
+                                                    Optional.empty(),
+                                                    List.of()))
+                            .getMessage());
+        }
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("org.cometgui.domain.tools.LoaderDiagnosticTest#everyLoadabilityFailureKind")
+        @DisplayName("a null part is rejected by name for every failure kind")
+        void nullPartsAreRejectedByName(ProbeFailureKind kind) {
+            Optional<String> absentOptional = Nulls.of(Optional.class);
+            List<String> absentList = Nulls.of(List.class);
+
             assertAll(
-                    () ->
-                            assertEquals(
-                                    "kind",
-                                    assertThrows(
-                                                    NullPointerException.class,
-                                                    () ->
-                                                            new LoaderDiagnostic(
-                                                                    Nulls.of(
-                                                                            ProbeFailureKind.class),
-                                                                    "libc.so.6",
-                                                                    Optional.empty(),
-                                                                    Optional.empty(),
-                                                                    List.of()))
-                                            .getMessage()),
                     () ->
                             assertEquals(
                                     "objectName",
@@ -554,13 +638,41 @@ class LoaderDiagnosticTest {
                                                     NullPointerException.class,
                                                     () ->
                                                             new LoaderDiagnostic(
-                                                                    ProbeFailureKind
-                                                                            .MISSING_SHARED_OBJECT,
+                                                                    kind,
                                                                     Nulls.of(String.class),
                                                                     Optional.empty(),
                                                                     Optional.empty(),
                                                                     List.of()))
-                                            .getMessage()),
+                                            .getMessage(),
+                                    kind.name()),
+                    () ->
+                            assertEquals(
+                                    "requiredVersion",
+                                    assertThrows(
+                                                    NullPointerException.class,
+                                                    () ->
+                                                            new LoaderDiagnostic(
+                                                                    kind,
+                                                                    "libc.so.6",
+                                                                    absentOptional,
+                                                                    Optional.empty(),
+                                                                    List.of()))
+                                            .getMessage(),
+                                    kind.name()),
+                    () ->
+                            assertEquals(
+                                    "availableVersion",
+                                    assertThrows(
+                                                    NullPointerException.class,
+                                                    () ->
+                                                            new LoaderDiagnostic(
+                                                                    kind,
+                                                                    "libc.so.6",
+                                                                    Optional.empty(),
+                                                                    absentOptional,
+                                                                    List.of()))
+                                            .getMessage(),
+                                    kind.name()),
                     () ->
                             assertEquals(
                                     "alternatives",
@@ -568,13 +680,13 @@ class LoaderDiagnosticTest {
                                                     NullPointerException.class,
                                                     () ->
                                                             new LoaderDiagnostic(
-                                                                    ProbeFailureKind
-                                                                            .MISSING_SHARED_OBJECT,
+                                                                    kind,
                                                                     "libc.so.6",
                                                                     Optional.empty(),
                                                                     Optional.empty(),
-                                                                    Nulls.of(List.class)))
-                                            .getMessage()));
+                                                                    absentList))
+                                            .getMessage(),
+                                    kind.name()));
         }
     }
 

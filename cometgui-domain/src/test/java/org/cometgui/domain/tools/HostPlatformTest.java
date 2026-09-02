@@ -29,6 +29,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for {@link HostPlatform}.
@@ -131,30 +133,37 @@ class HostPlatformTest {
                                     HostPlatform.of("mac os x", "ARM64").orElseThrow().id()));
         }
 
-        @Test
-        @DisplayName("a null property value is rejected by name, not treated as unrecognised")
-        void nullPropertiesAreRejectedByName() {
-            assertAll(
-                    () ->
-                            assertEquals(
-                                    "osName",
-                                    assertThrows(
-                                                    NullPointerException.class,
-                                                    () ->
-                                                            HostPlatform.of(
-                                                                    Nulls.of(String.class),
-                                                                    "amd64"))
-                                            .getMessage()),
-                    () ->
-                            assertEquals(
-                                    "osArch",
-                                    assertThrows(
-                                                    NullPointerException.class,
-                                                    () ->
-                                                            HostPlatform.of(
-                                                                    "Linux",
-                                                                    Nulls.of(String.class)))
-                                            .getMessage()));
+        @ParameterizedTest(name = "[{index}] os.arch={0}")
+        @ValueSource(strings = {"amd64", "x86_64", "aarch64", "arm64", "i386", "", "  "})
+        @DisplayName("a null os.name is rejected by name whatever os.arch says")
+        void aNullOsNameIsRejectedByName(String osArch) {
+            /*
+             * Graded against recognised AND unrecognised architectures. The null check does not
+             * depend on the other value, so pinning it at one would leave that axis untested --
+             * the shape that let a blank-note rule be switched off for a single enum constant in
+             * DeclaredCapability and still pass 108 tests. It also proves the rejection is not
+             * quietly turning into the empty Optional an unrecognised pair produces.
+             */
+            assertEquals(
+                    "osName",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () -> HostPlatform.of(Nulls.of(String.class), osArch))
+                            .getMessage(),
+                    "os.arch=" + osArch);
+        }
+
+        @ParameterizedTest(name = "[{index}] os.name={0}")
+        @ValueSource(strings = {"Linux", "Mac OS X", "Windows 11", "FreeBSD", "", "  "})
+        @DisplayName("a null os.arch is rejected by name whatever os.name says")
+        void aNullOsArchIsRejectedByName(String osName) {
+            assertEquals(
+                    "osArch",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () -> HostPlatform.of(osName, Nulls.of(String.class)))
+                            .getMessage(),
+                    "os.name=" + osName);
         }
     }
 
@@ -276,34 +285,36 @@ class HostPlatformTest {
     @DisplayName("value semantics")
     class ValueSemantics {
 
-        @Test
-        @DisplayName("a null half is rejected by name")
-        void rejectsNullComponents() {
-            assertAll(
-                    () ->
-                            assertEquals(
-                                    "operatingSystem",
-                                    assertThrows(
-                                                    NullPointerException.class,
-                                                    () ->
-                                                            new HostPlatform(
-                                                                    Nulls.of(
-                                                                            HostOperatingSystem
-                                                                                    .class),
-                                                                    HostArchitecture.X86_64))
-                                            .getMessage()),
-                    () ->
-                            assertEquals(
-                                    "architecture",
-                                    assertThrows(
-                                                    NullPointerException.class,
-                                                    () ->
-                                                            new HostPlatform(
-                                                                    HostOperatingSystem.LINUX,
-                                                                    Nulls.of(
-                                                                            HostArchitecture
-                                                                                    .class)))
-                                            .getMessage()));
+        @ParameterizedTest(name = "[{index}] {0}")
+        @EnumSource(HostArchitecture.class)
+        @DisplayName("a null operating system is rejected by name whatever the architecture is")
+        void aNullOperatingSystemIsRejectedByName(HostArchitecture architecture) {
+            assertEquals(
+                    "operatingSystem",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () ->
+                                            new HostPlatform(
+                                                    Nulls.of(HostOperatingSystem.class),
+                                                    architecture))
+                            .getMessage(),
+                    architecture.id());
+        }
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @EnumSource(HostOperatingSystem.class)
+        @DisplayName("a null architecture is rejected by name whatever the operating system is")
+        void aNullArchitectureIsRejectedByName(HostOperatingSystem operatingSystem) {
+            assertEquals(
+                    "architecture",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () ->
+                                            new HostPlatform(
+                                                    operatingSystem,
+                                                    Nulls.of(HostArchitecture.class)))
+                            .getMessage(),
+                    operatingSystem.id());
         }
 
         @Test
