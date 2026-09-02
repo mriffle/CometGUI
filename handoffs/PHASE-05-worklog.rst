@@ -941,6 +941,14 @@ Carried forward from unit 2
 * The reader loads ``/tools.json`` **from the classpath**, never from a
   relative path that would only work with the repository root as the working
   directory.
+* **A platform-independent artefact is still five rows in ``artefacts()``.**
+  ``select`` now hides the duplication, but the raw list does not, because the
+  specification requires an operating system and an architecture in **every**
+  record and PDV's zip and the converter's JAR are one file each. **Units 9 and
+  11 will see five rows where a user should see one tool**, and must go through
+  ``select`` rather than ``artefacts()`` when they mean "what is on offer here".
+  Removing the duplication at source would be a specification amendment, which
+  is not this phase's to make.
 
 .. _p05-stale-lock:
 
