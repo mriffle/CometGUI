@@ -114,14 +114,36 @@ running the check. An item that cannot be verified has not passed.
    extracted without admin rights, and what its host requirements are.
 7. The latest compatible Percolator version is established from upstream data
    with the evidence recorded, not assumed from the specification.
-8. The Windows Percolator artefact is confirmed on a Windows runner -- payload
-   obtained without admin rights; the binary **observed to start**, evidenced
-   by its own version banner rather than by an exit code; and ``--xml-in``
-   **not** answering ``Compiler flag XML_SUPPORT was off`` -- or the blocking
-   reason is documented precisely and the manifest does not claim it. Because
-   ``D-002`` option C ships the portable ``noxml`` archive, the same
-   observations are additionally required of **that** binary, which is the one
-   the product actually installs.
+8. The Windows Percolator artefact is **observed on a Windows runner** --
+   payload obtained without admin rights; the binary **observed to start**,
+   evidenced by its own version banner rather than by an exit code; and, **for
+   the XML-capable build**, ``--xml-in`` **not** answering ``Compiler flag
+   XML_SUPPORT was off`` -- or the blocking reason is documented precisely and
+   the manifest does not claim it. Because ``D-002`` option C ships the portable
+   ``noxml`` archive, the same observations are additionally required of
+   **that** binary, which is the one the product actually installs -- except
+   that for the ``noxml`` build the required observation is the **opposite**:
+   it **must** answer ``Compiler flag XML_SUPPORT was off``, which is the
+   positive control proving the detector can see that string on that host.
+
+   .. note::
+
+      **Clause corrected 2026-09-02, on the owner's approval, after the first
+      Windows run exposed a contradiction in the amendment below.** As written
+      since 2026-08-30 this item required ``--xml-in`` **not** to print the
+      diagnostic, and then required "the same observations" of the ``noxml``
+      build -- which is *defined* by printing it, as the amendment note itself
+      says. The artefact the product ships could therefore never satisfy this
+      item however well it behaved, and on 2026-09-02 it behaved exactly as the
+      model predicts while a literal reading still scored it a failure.
+
+      **Nothing that was proven becomes unproven.** An unsatisfiable clause
+      becomes a satisfiable one testing the same fact: the XML build must not
+      print the diagnostic, the ``noxml`` build must. This was escalated to the
+      owner rather than reworded on tier 1's authority, because amending a gate
+      so that something passes is otherwise indistinguishable from weakening
+      it. The verb "confirmed" also became "observed", a word this project
+      permits about a binary it has actually run.
 
    .. note::
 
