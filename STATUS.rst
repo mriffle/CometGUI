@@ -1796,16 +1796,23 @@ Residue carried forward
 ------------------------
 
 * **Windows behaviour for gate items 3, 4 and 5**, as above.
-* **The per-class census is still run by hand.** It was whole at every
-  measurement in this phase, which is precisely why it must run on every build
-  rather than when someone remembers. Tier 1 owns closing it
-  (:ref:`status-class-census-gap`) before Phase 05 is dispatched.
-* **``scripts/verify-test-gates.sh`` needs one line** --
-  ``docs/reference/provenance_format.rst`` in ``build_sandbox`` -- so unit 12's
-  drift check is mechanical on both sides. The phase escalated this rather than
-  editing a tier-1 file, and tested that a cross-directory ``.. include::`` is
-  **not** an alternative because ``docs-build.sh --self-test`` copies only
-  ``docs/``. It lands with the census work.
+* **The per-class census is closed** (:ref:`status-census-closed`), on every
+  build and with a control that proves it bites.
+* **The sandbox line the phase escalated was NOT added, and the escalation was
+  half a change.** ``ProvenanceFormatDocumentationTest`` does not read
+  ``docs/reference/provenance_format.rst`` from disk: it holds a **hand-typed**
+  copy of the member list, transcribed from that page. Copying the page into
+  ``build_sandbox`` therefore changes nothing on its own -- the sandbox would
+  carry a file no test opens, against its own documented rule that it holds only
+  what the build reads as input. Making the drift check mechanical is a *test*
+  change plus that line, and it is phase work rather than tier-1 infrastructure.
+  **Owner: Phase 13**, the next phase to touch the provenance format. The
+  phase's other finding stands and is worth keeping: a cross-directory
+  ``.. include::`` is not an alternative, because ``docs-build.sh --self-test``
+  copies only ``docs/``.
+* **``build.sh --only gates`` grades undated evidence**
+  (:ref:`status-only-gates-staleness`), and the dangerous direction is a stale
+  *pass*. Not fixed; recorded with its repair named.
 * **The artefact sweep's corpus still seeds each secret once**, so an
   occurrence-count defect in the *writers* would not be seen there. The domain
   corpus now covers the rule set, which is where that defect class lives; the
@@ -1816,6 +1823,122 @@ Residue carried forward
 * The specification's "safely rendered command for display" has no member in the
   format; adding one is a schema v2 change and an owner-visible decision, not an
   agent's.
+
+.. _status-census-closed:
+
+The per-class census is closed, and closing it found two more defects
+=====================================================================
+
+Tier 1's debt from :ref:`status-class-census-gap`, discharged 2026-09-02, after
+Phases 03 and 04 landed and before Phase 05 was dispatched -- the owner and
+moment recorded when the gap was found.
+
+**The check.** ``scripts/build.sh``'s gates stage now compares, per module, the
+classes actually compiled into ``target/classes`` against the classes present in
+``jacoco.xml``, and **fails the build** on any class that compiled and did not
+reach the coverage sample. It sits directly beside the module-level check it
+completes -- that check catches a module with no report at all, this one catches
+the per-class case, and the two are one line apart in the same failure. On a
+quiet tree, through the documented command::
+
+    -- JaCoCo: every compiled class reached the coverage sample
+       ok       cometgui-domain              25 compiled class(es), all 25 in the sample
+       ok       cometgui-provenance          37 compiled class(es), all 37 in the sample
+       ok       cometgui-process             15 compiled class(es), all 15 in the sample
+       ok       cometgui-workflow            3 compiled class(es), all 3 in the sample
+       ok       cometgui-ui                  13 compiled class(es), all 13 in the sample
+       ok       cometgui-app                 8 compiled class(es), all 8 in the sample
+
+The companion list -- compiled classes carrying no PIT mutations -- is printed
+as a **prompt for a person and is deliberately not an assertion**, because an
+interface, a constant enum, an exception with only a constructor or a
+branchless record legitimately yields none. A rule there would fail honest code
+and would be weakened within a week.
+
+**The control, which is not optional.** ``scripts/verify-test-gates.sh``
+control 8 injects the quiet form the project forbids by name -- a JaCoCo
+``<excludes>`` added to shrink a report -- and requires two things in sequence:
+that ``mvn verify`` **still exits 0 and still prints "All coverage checks have
+been met"**, which is the green build the shortcut buys; and that the documented
+build command then rejects it, naming the class. ``bash
+scripts/verify-test-gates.sh`` now grades **37 assertions, 0 failed**, and the
+floor in ``scripts/verify-all-gates.sh`` is raised 33 to 37 so the four new ones
+cannot be silently removed.
+
+.. _status-control-wrong-reason:
+
+The control passed for the wrong reason first, and that is the ninth instance
+-----------------------------------------------------------------------------
+
+Written as a plain substring search for the class name, control 8's fourth
+assertion passed against this line::
+
+    [INFO] Running org.cometgui.domain.secrets.SecretRegistryTest
+
+which surefire prints on **every** build. The assertion would have held with the
+census naming nothing at all. It is the project's signature defect -- an
+assertion too coarse to see what it claims to see -- committed by tier 1 inside
+**the control whose only purpose is to prove a check can fail**, and it was
+caught by reading the evidence line printed under the ``PASS`` rather than the
+``PASS``. The assertion is now anchored to the census's own indented output
+line, verified to match it and not to match the decoy. **A control needs its own
+evidence read as carefully as the gate it controls.**
+
+.. _status-only-gates-staleness:
+
+A real gap this work exposed: ``--only gates`` reads evidence it never dates
+-----------------------------------------------------------------------------
+
+``scripts/build.sh --only gates`` deliberately **reads** what the main build
+already produced -- surefire reports, ``jacoco.xml``, the ArchUnit results --
+rather than re-running it. That is sound and documented. What it does not do is
+check that what it reads describes the tree in front of it.
+
+Observed live: a ``--only gates`` run on a clean tree reported
+``LayeringRulesTest: tests=8 failures=1``, quoting a ``Runtime.exec`` violation
+in ``org.cometgui.install.MoRuntimeExecProbe``. That class was **tier 1's own
+injection during the Phase 03 sign-off**, reverted correctly sixteen hours
+earlier; it is absent from the source tree and from history. The surefire XML on
+disk was dated ``2026-09-01 19:08:49`` and had simply never been regenerated.
+The full documented command is unaffected -- it runs ``mvn clean verify`` first
+-- which is exactly why this had never been seen.
+
+**The harmless direction is the one that showed up; the dangerous one is the
+reverse.** A stale report can equally be *green*: if the last recorded run
+passed and the code has broken since, ``--only gates`` prints ``ok``. That is a
+real measurement, correctly read, describing a tree that no longer exists --
+the same family as :ref:`status-class-census-gap`, and it survives a re-run for
+the same reason. **Not fixed here**, because it is a second change to a shared
+script and this entry is the record that it is known rather than a decision to
+live with it. The repair is a freshness assertion: refuse to grade a report
+older than the newest class file in the module it describes. It belongs with
+whoever next edits ``build.sh``, and before ``--only gates`` is ever used to
+sign anything off.
+
+Tier 1 collided with itself, for the third time in this project
+----------------------------------------------------------------
+
+Recorded because the pattern is now three-for-three: **every concurrency
+collision in this project has been committed by the tier enforcing the rule
+against it.** Tier 1 started ``verify-test-gates.sh`` while a ``build.sh --only
+gates`` run was still going -- ten minutes of overlap, two Maven-driven
+harnesses in one tree sharing ``_build/m2repo``. It produced a transient
+``MISSING  cometgui-install: 1 class(es) with code but no jacoco.xml`` that was
+gone when the tree was quiet, and cost a re-run to disprove.
+
+A second, smaller self-inflicted trap in the same hour: the chained "wait until
+the other harness exits" loop used ``pgrep -f "scripts/verify-test-gates.sh"``
+from a command whose **own command line contained that string**, so it matched
+itself and would have waited forever. The project's standing warning about
+``pkill -f`` matching your own shell has a patient twin.
+
+The build, at the point Phase 05 is dispatched
+-----------------------------------------------
+
+``bash scripts/build.sh`` on a quiet tree: **11/11 stages OK in 927 seconds,
+BUILD OK**, ``106 report file(s): tests=1756 failures=0 errors=0 skipped=2``,
+census clean in all six modules, and ArchUnit ``8 architecture rule(s) checked,
+0 failures`` once the stale report was regenerated.
 
 Open decisions
 ==============

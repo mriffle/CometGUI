@@ -655,6 +655,33 @@ real_classes_of() {
         | sed 's|^\./||' | sort )
 }
 
+# Top-level classes a module compiled, fully qualified.  Inner classes are
+# dropped on both sides of the census below, because JaCoCo and PIT each report
+# them under their own names and comparing them would make the check fire on a
+# naming artefact rather than on a missing class.  Sorted AFTER the path is
+# turned into a dotted name: '/' and '.' do not sort alike, so sorting the paths
+# would hand comm two differently ordered lists and invent differences.
+compiled_class_names_of() {
+    real_classes_of "$1" | grep -v '[$]' | sed 's|[.]class$||; s|/|.|g' | LC_ALL=C sort
+}
+
+# The classes a module's JaCoCo report actually scored, fully qualified.
+jacoco_class_names_of() {
+    local xml="$1"
+    [ -f "${xml}" ] || return 0
+    grep -o '<class name="[^"]*"' "${xml}" 2>/dev/null \
+        | sed 's/.*name="//; s/"$//; s|/|.|g' | grep -v '[$]' | LC_ALL=C sort -u
+}
+
+# The classes PIT mutated, fully qualified, with inner classes folded into the
+# outer class they belong to.
+pit_class_names_of() {
+    local xml="$1"
+    [ -f "${xml}" ] || return 0
+    grep -o '<mutatedClass>[^<]*</mutatedClass>' "${xml}" 2>/dev/null \
+        | sed 's|</\?mutatedClass>||g; s/[$].*//' | LC_ALL=C sort -u
+}
+
 # True when a module's POM opts into one of the gate switches.
 module_opts_in() {
     local module="$1" property="$2"
@@ -728,6 +755,65 @@ stage_gates() {
     done
     [ "${measured}" -gt 0 ] \
         || { echo "   JACOCO MEASURED NO LINES AT ALL IN ANY MODULE"; failures=$((failures + 1)); }
+
+    echo "-- JaCoCo: every compiled class reached the coverage sample"
+    # THE POPULATION, NOT THE SCORE.  A coverage rule reports "All coverage
+    # checks have been met" over whatever is in its sample.  A class whose test
+    # does not compile, or which one command line quietly scoped out, is often
+    # absent from the report altogether -- and an absent class does not drag an
+    # average down, it silently leaves the sample.  The result is a real
+    # measurement over an incomplete population: the only defect shape this
+    # project has found that RE-RUNNING THE GATE CANNOT CATCH, because re-running
+    # reproduces the same clean figure.  Only auditing that the sample was whole
+    # catches it.
+    #
+    # Not hypothetical.  On 2026-08-31, in a tree where five units were landing
+    # at once, cometgui-provenance compiled 37 classes and jacoco.xml held 36:
+    # ManifestReader was carrying 79 NO_COVERAGE mutations while the build
+    # reported that every coverage check had been met.  The statement was true
+    # of the sample and false of the code.
+    #
+    # The module-level case above -- classes compiled, no jacoco.xml at all --
+    # was already checked.  This is the per-CLASS case, one line further down the
+    # same failure, and it is the one that bites when a single test is excluded.
+    local absent census_total
+    for module in "${PRODUCT_MODULES[@]}"; do
+        xml="${ROOT}/${module}/target/site/jacoco/jacoco.xml"
+        [ -f "${xml}" ] || continue
+        census_total="$(compiled_class_names_of "${module}" | wc -l)"
+        [ "${census_total}" -gt 0 ] || continue
+        absent="$(comm -23 \
+            <(compiled_class_names_of "${module}") \
+            <(jacoco_class_names_of "${xml}"))"
+        if [ -n "${absent}" ]; then
+            echo "   ABSENT   ${module}: compiled, but missing from jacoco.xml:"
+            printf '%s\n' "${absent}" | sed 's/^/              /'
+            echo "            This module's coverage figure is a real measurement"
+            echo "            over an incomplete population. Do not read it."
+            failures=$((failures + 1))
+        else
+            printf '   ok       %-28s %s compiled class(es), all %s in the sample\n' \
+                "${module}" "${census_total}" "${census_total}"
+        fi
+    done
+
+    echo "-- PIT: compiled classes carrying no mutations (a prompt, never a failure)"
+    # DELIBERATELY NOT AN ASSERTION.  An interface, an enum of constants, an
+    # exception with only a constructor or a record with no branches legitimately
+    # yields no mutations, so a rule here would fail honest code and would be
+    # weakened within a week.  It is printed for a person to judge instead.
+    local pit_xml unmutated
+    for module in "${PRODUCT_MODULES[@]}"; do
+        pit_xml="${ROOT}/${module}/target/pit-reports/mutations.xml"
+        [ -f "${pit_xml}" ] || continue
+        unmutated="$(comm -23 \
+            <(compiled_class_names_of "${module}") \
+            <(pit_class_names_of "${pit_xml}"))"
+        if [ -n "${unmutated}" ]; then
+            printf '   note     %-28s no PIT mutations; judge, do not assume:\n' "${module}"
+            printf '%s\n' "${unmutated}" | sed 's/^/              /'
+        fi
+    done
 
     echo "-- JaCoCo: a module holding gated code must have its gate switched on"
     local class_file prefix hit coverage_drift=0

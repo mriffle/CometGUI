@@ -965,6 +965,89 @@ PYTHON
     # whole build a second time here would cost 90 s to prove the same thing.
 }
 
+control_class_left_the_coverage_sample() {
+    banner "8  the population, not the score: a class that quietly left the coverage sample"
+    # THE ONE DEFECT SHAPE RE-RUNNING A GATE CANNOT CATCH.  Every other control
+    # here injects something that makes a check go red.  This one injects
+    # something that makes a check go GREEN over less code than it claims: a
+    # class that compiles, is never scored, and is therefore absent from the
+    # report rather than scored low.  An absent class does not drag an average
+    # down -- it leaves the sample.  Re-running the gate reproduces the same
+    # clean figure, so verification cannot find it; only auditing that the
+    # sample was whole can.
+    #
+    # Found live on 2026-08-31: cometgui-provenance compiled 37 classes and
+    # jacoco.xml held 36.  ManifestReader was carrying 79 NO_COVERAGE mutations
+    # while the build reported "All coverage checks have been met".
+    #
+    # The injection is the quiet form the project forbids by name -- an
+    # <excludes> added to make a report smaller.  Note what must happen: `mvn
+    # verify` must still PASS, because the excluded class is fully covered and
+    # removing it changes no ratio.  That is the whole point.  The census in
+    # scripts/build.sh is the only thing standing between that green build and a
+    # meaningless coverage figure.
+    python3 - "${SANDBOX}/cometgui-domain/pom.xml" <<'PYTHON'
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    text = handle.read()
+marker = "  </properties>\n"
+if marker not in text:
+    raise SystemExit("could not find the end of the properties block in cometgui-domain/pom.xml")
+injected = marker + """
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>coverage-report</id>
+            <configuration>
+              <excludes>
+                <exclude>**/secrets/SecretRegistry.class</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+"""
+text = text.replace(marker, injected, 1)
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(text)
+PYTHON
+    assert_modified "a class excluded from the coverage report" "cometgui-domain/pom.xml"
+
+    # First half: the build the exclusion was written to fool really is fooled.
+    # If this ever stops passing, the control is no longer testing what it says.
+    assert_passes "mvn verify still exits 0 with the class gone from the report" \
+        "${LOGS}/08-left-sample-verify.log" -pl cometgui-domain clean verify
+    assert_log_contains "and the coverage rule still reports itself satisfied" \
+        "${LOGS}/08-left-sample-verify.log" \
+        "All coverage checks have been met"
+
+    # Second half: the census names the class, by name, and fails the build.
+    assert_build_script_fails "the documented build command rejects the incomplete population" \
+        'ABSENT   cometgui-domain: compiled, but missing from jacoco\.xml' \
+        "${LOGS}/08-left-sample-buildsh.log"
+    # ANCHORED, and the anchors are the point.  A plain substring search for the
+    # class name passes on "[INFO] Running org.cometgui.domain.secrets.
+    # SecretRegistryTest", which surefire prints on every build -- so the
+    # assertion would hold even if the census named nothing at all.  It did
+    # exactly that when this control was first written.  The census prints the
+    # absent class indented on a line of its own, so match that and nothing
+    # else: leading whitespace, the exact name, end of line.
+    assert_log_matches "and it names the class that left the sample, on the census's own line" \
+        "${LOGS}/08-left-sample-buildsh.log" \
+        '^ +org\.cometgui\.domain\.secrets\.SecretRegistry$'
+
+
+    restore_from_tree "cometgui-domain/pom.xml"
+}
+
 control_harness_self_test() {
     banner "S  the harness itself: an un-injected control must be a harness failure"
     # Every control above calls assert_injected or assert_modified before it
@@ -1026,6 +1109,7 @@ main() {
     control_untested_viewmodel
     control_unasserted_test
     control_unmeasured_coverage
+    control_class_left_the_coverage_sample
     control_harness_self_test
 
     printf '\n===============================================================================\n'

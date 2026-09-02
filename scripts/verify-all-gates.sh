@@ -226,7 +226,7 @@ gate_spec() {
             GATE_SCRIPT="scripts/verify-test-gates.sh"
             GATE_ARGS=()
             GATE_PROOF=("Every gate rejected its defect and accepted the clean tree.")
-            GATE_FLOOR=33
+            GATE_FLOOR=37
             GATE_UNIT="assertions"
             ;;
         provenance)
