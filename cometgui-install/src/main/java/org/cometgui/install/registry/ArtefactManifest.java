@@ -110,10 +110,19 @@ public record ArtefactManifest(int schemaVersion, List<ArtefactRecord> artefacts
                             + " nothing and would be indistinguishable from one that failed to"
                             + " load");
         }
+        /*
+         * THE KEY IS THE NORMALISED VERSION, NOT THE TEXT UPSTREAM WROTE.  ToolVersion.toString()
+         * renders 3.09 and 3.09.0 identically because they ARE one version -- that is what
+         * ToolVersion.equals says, and it is what select(host, tool, version) matches on.  Keying
+         * this check on describe(), which keeps upstream's spelling, would let one release be
+         * written two ways in one manifest and then offered twice for a single selection: a
+         * duplicate the check exists to catch and would have missed.
+         */
         Map<String, Integer> seen = new LinkedHashMap<>();
         for (int index = 0; index < copy.size(); index++) {
             ArtefactRecord record = copy.get(index);
-            Integer first = seen.putIfAbsent(record.describe(), index);
+            String key = record.tool().id() + " " + record.version() + " " + record.platform().id();
+            Integer first = seen.putIfAbsent(key, index);
             if (first != null) {
                 throw new IllegalArgumentException(
                         "artefacts describes "
@@ -121,7 +130,9 @@ public record ArtefactManifest(int schemaVersion, List<ArtefactRecord> artefacts
                                 + " twice, at index "
                                 + first
                                 + " and index "
-                                + index);
+                                + index
+                                + "; two versions that differ only in how they are written --"
+                                + " 3.09 and 3.09.0 -- are one version");
             }
         }
         requireOneUrlDescribedOneWay(copy);

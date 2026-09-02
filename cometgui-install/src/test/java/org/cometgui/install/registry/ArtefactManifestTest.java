@@ -120,7 +120,9 @@ class ArtefactManifestTest {
                                                 + tool.id()
                                                 + " 3.07.1 "
                                                 + platform.id()
-                                                + " twice, at index 0 and index 2",
+                                                + " twice, at index 0 and index 2; two versions"
+                                                + " that differ only in how they are written --"
+                                                + " 3.09 and 3.09.0 -- are one version",
                                         assertThrows(
                                                         IllegalArgumentException.class,
                                                         () -> new ArtefactManifest(1, records))
@@ -255,6 +257,25 @@ class ArtefactManifestTest {
                 List.of(),
                 MinimumHostRequirements.none(),
                 ToolVersion.parse("0.1.0"));
+    }
+
+    @Test
+    @DisplayName("3.09 and 3.09.0 are the same row, so writing both is a duplicate")
+    void twoSpellingsOfOneVersionAreADuplicate() {
+        List<ArtefactRecord> records =
+                List.of(
+                        ManifestFixtures.namedMember(ToolName.PERCOLATOR, "3.09", MACOS_AARCH64),
+                        ManifestFixtures.wholeArtefact(
+                                ToolName.PERCOLATOR, "3.09.0", MACOS_AARCH64));
+
+        assertEquals(
+                "artefacts describes percolator 3.09.0 macos-aarch64 twice, at index 0 and index"
+                        + " 1; two versions that differ only in how they are written -- 3.09 and"
+                        + " 3.09.0 -- are one version",
+                assertThrows(IllegalArgumentException.class, () -> new ArtefactManifest(1, records))
+                        .getMessage(),
+                "keyed on the text upstream wrote, this pair would both be accepted and then both"
+                        + " be offered for one selection, because ToolVersion compares them equal");
     }
 
     @Test
