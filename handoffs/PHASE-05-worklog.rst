@@ -402,8 +402,13 @@ collide -- they share ``cometgui-domain``, the Maven working tree,
        actually transferred; ``http://`` is refused; 404 is reported as
        availability with the URL; the 946 KB real Percolator artefact is
        fetched from its real URL and its SHA-256 matches unit 0's.
-     - ``R-SEC-02``, ``D-008``, gate 1
-     -
+     - ``R-SEC-02``, ``R-TOOL-04``, ``D-008``, gate 1
+     - **ACCEPTED 2026-09-02** after three rounds -- see :ref:`p05-u3-signoff`.
+       The real 946 KB Percolator artefact is fetched from its real URL through
+       product code and verified against the pinned SHA-256 in 5.2s. Build
+       11/11 in 1039s, 384/387 mutations = 99.2% over a gate I widened, 27/27
+       in the census. My injection survived round one and now fails with four
+       assertions where it once failed with none.
 
    * - 4
      - **Extraction, once, for every kind (``R-SEC-05``).**
@@ -1122,6 +1127,126 @@ cancellation tests, all of which used a server declaring a length. The unit then
 graded cancellation over the no-declared-length and resumed axes. It did not do
 the same for progress: the progress assertions are thorough on the
 fresh-download axis and absent on the resumed one.
+
+Unit 3 accepted, after three rounds
+------------------------------------
+
+**My build, on the accepted tree** (``12d871e``)::
+
+    11/11 stages OK in 1039 seconds.  BUILD OK
+    146 report file(s): tests=2682 failures=0 errors=0 skipped=3
+    ok  cometgui-install  line 100.0% (1023/1023)  branch 99.1% (348/351)
+    ok  cometgui-install  27 compiled class(es), all 27 in the sample
+    ok  cometgui-install  384/387 mutations killed = 99.2%
+    ok  cometgui-install  85 class(es) analysed, 0 findings
+    12 critical package prefix(es) read from pom.xml
+    ok  8 architecture rule(s) checked, 0 failures
+
+**And the milestone, run by me**::
+
+    mvn -o -pl cometgui-install -Dcometgui.install.upstream=true \
+        -Dtest=UpstreamArtefactTest -Dsurefire.failIfNoSpecifiedTests=false test
+    Tests run: 2, Failures: 0, Errors: 0, Skipped: 0   --  5.2 s wall clock
+
+That is the real 946303-byte Percolator artefact, fetched from its real GitHub
+URL through the real redirect to the signed asset host, and verified against the
+pinned SHA-256 -- **through product code, not through a spike.** The third skip
+in the build is this test declining to run without its opt-in flag, and the
+reason is printed rather than silent; an always-running companion pins the URL,
+the size and both digests against the shipped ``manifests/tools.json``, so the
+gate is not vacuous when the flag is absent.
+
+My injection, re-run after the survivor work, now fails with **more** assertions
+than before -- 4 and 3 where it was 3 and 2 -- which is the concrete
+confirmation of the ``copy:503`` decision below.
+
+Where I was wrong, and the agent corrected me
+----------------------------------------------
+
+Recorded because a sign-off that only records the agent's errors is not an
+honest record.
+
+I read ``DownloadReport``'s surviving mutant as landing on the guard ``if
+(resumedFromBytes + bytesTransferred != fileSizeBytes)`` and told the agent it
+was therefore *"suppress a validation error"*, named in ``R-TEST-02``'s absolute
+clause. **It was not the guard.** Line 70 is the guard and line 71 is the
+``throw``; javac attributes a whole string concatenation to the statement it
+begins, so the surviving addition was the one at line 77, **inside the
+diagnostic message**. I checked the source myself after the agent said so, and
+it is right.
+
+The guard's own addition had been killed all along -- which is why my
+"``(0, 1000, 1000)`` should have thrown" reasoning did not play out. What the
+mutant actually corrupted was a message that could have read *"400 kept plus 600
+received is -200"* and shipped, because the assertion stopped at
+``startsWith("a report must account for every byte")``. That is the **fourth**
+shape, an assertion too coarse to see a partial failure, living inside an error
+message -- a smaller fault than the one I alleged, and a real one. It is killed
+by pinning the whole message with the sum **hand-typed as a fourth
+``CsvSource`` column** rather than recomputed.
+
+The instruction that produced this was still the right one: I told the agent to
+find out *why* it survived before writing the test, because the answer might be
+more interesting than the mutant. It was, and it pointed somewhere other than
+where I expected.
+
+An accounting fact worth keeping
+---------------------------------
+
+PIT's own console credits a ``TIMED_OUT`` mutant as a kill; ``scripts/build.sh``
+line 923 counts ``status='KILLED'`` **only**. So the console said ``Killed 385``
+where the gate says ``384/387``, from identical results. **The gate is stricter
+than the tool's own summary**, and already implements the principle that a
+timeout is not a kill. The two figures will always differ by the timeout count,
+and a reader comparing them should not go looking for flakiness.
+
+The nine survivors: seven killed, two argued, one timeout explained
+--------------------------------------------------------------------
+
+* **Three ``PartialDownload::discard`` removals** -- the rule that a partial file
+  of unknown or stale provenance is thrown away rather than appended to. All
+  three are invisible on the happy path, because a completed download moves the
+  partial away and a restart truncates it. Each is now asserted on a path where
+  the attempt does **not** complete, which is the case that matters: the bytes
+  left behind are what a later resuming attempt would find and trust.
+* **``close:242``** -- killed by closing the downloader and requiring the next
+  fetch to fail naming ``closed`` **and to reach no server**. ``HttpDownloader``
+  owns an ``HttpClient`` and an ``HttpClient`` owns threads; unit 5 holds one for
+  the length of an install.
+* **``nextChunk``'s ``onDisk < declaredTotal``** -- killed by a 206 that lies:
+  its content-range promises 100 bytes in total, its ``Content-Length`` promises
+  60 more, and it sends 50, so the file ends holding exactly the declared total
+  and the transfer still failed. Nothing is short, so "truncated" is the wrong
+  word and the checksum decides. This also covered the module's last reachable
+  uncovered branch.
+* **``copy:503`` removed rather than argued, and I accept the argument.** The
+  final ``onProgress(size, declaredTotal)`` was a duplicate -- but the reason to
+  delete it is that **it masked endpoint defects**: with it present, a loop
+  reporting entirely wrong numbers still ended on the right one. That is not
+  hypothetical, it is exactly how my own injection kept the last report correct
+  while every mid-transfer report was wrong. My re-injection failing with four
+  assertions instead of three is the measurement that the removal strengthened
+  the tests rather than weakening them. **A line that can only hide a defect is
+  worth less than the assertion it weakens.**
+* **Two ``declaredTotal >= 0`` versus ``> 0`` boundaries, argued equivalent** --
+  they differ only at a declared length of exactly zero, where the second
+  operand becomes "a byte count < 0", which nothing satisfies. The argument is
+  in the code, and a new test **reaches the boundary value**, serving
+  ``Content-Length: 0``, so the claim rests on a demonstrated-reachable value
+  rather than on an assertion that the value is unreachable.
+* **The ``TIMED_OUT`` mutant** is a negated conditional on the 416 guard that
+  makes the restart unconditional and the loop infinite. Unreachable in correct
+  code -- every ``continue`` is guarded by ``point.isPresent()`` and empties
+  ``point`` first, so the loop turns at most twice -- and that invariant is now
+  written above the loop. The agent deliberately did **not** add a restart
+  counter to convert the timeout into an assertion, because in correct code the
+  watchdog's ``throw`` would be a branch nothing can test. I accept that: it is
+  the same reasoning behind its other deletions, and ``build.sh`` does not credit
+  the timeout as a kill in any case.
+
+Three uncovered branches remain, all compiler artefacts: two are javac's
+try-with-resources close path and one is the synthetic default of an exhaustive
+enum switch. Neither is reachable from Java.
 
 Measured facts recorded for units 5 and 10
 -------------------------------------------
