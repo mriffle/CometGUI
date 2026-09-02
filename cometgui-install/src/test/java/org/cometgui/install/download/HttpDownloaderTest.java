@@ -1608,6 +1608,250 @@ class HttpDownloaderTest {
         }
 
         @Test
+        @DisplayName("a stale partial with no state beside it is deleted even when the fetch fails")
+        void aStalePartialWithNoStateIsDeletedEvenWhenTheFetchFails() throws IOException {
+            // The discard is invisible on the happy path -- a completed download moves the partial
+            // away anyway, and one that restarts truncates it. It is observable only when the
+            // attempt does NOT complete, and that is the case that matters: the bytes left behind
+            // are what a later resuming attempt would find and trust.
+            try (LoopbackHttpServer server =
+                            new LoopbackHttpServer(
+                                    (request, out) ->
+                                            LoopbackHttpServer.head(
+                                                    out, 404, "Not Found", "Content-Length: 0"));
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                PartialDownload partial = PartialDownload.beside(file);
+                Files.write(partial.file(), bytes(400, 'z'));
+
+                assertThrows(
+                        ArtefactUnavailableException.class,
+                        () ->
+                                downloader.fetch(
+                                        DownloadRequest.of(server.uri("/a.zip"), file)
+                                                .resuming(true)));
+
+                assertFalse(
+                        Files.exists(partial.file()),
+                        "bytes of unknown provenance are thrown away when they are found, not left"
+                                + " for a later attempt to append to");
+            }
+        }
+
+        @Test
+        @DisplayName("a partial is deleted when resuming is forbidden, even when the fetch fails")
+        void aPartialIsDeletedWhenResumingIsForbidden() throws IOException {
+            // The same rule over the other axis: here the state file IS valid and it is the caller
+            // who forbade resuming. Leaving the pair on disk would let a later resuming(true) call
+            // continue from bytes this call was told to abandon.
+            try (LoopbackHttpServer server =
+                            new LoopbackHttpServer(
+                                    (request, out) ->
+                                            LoopbackHttpServer.head(
+                                                    out, 404, "Not Found", "Content-Length: 0"));
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                PartialDownload partial = PartialDownload.beside(file);
+                Files.write(partial.file(), bytes(400, 'z'));
+                partial.recordState(1000, "\"v1\"");
+
+                assertThrows(
+                        ArtefactUnavailableException.class,
+                        () ->
+                                downloader.fetch(
+                                        DownloadRequest.of(server.uri("/a.zip"), file)
+                                                .resuming(false)));
+
+                assertAll(
+                        () -> assertFalse(Files.exists(partial.file())),
+                        () -> assertFalse(Files.exists(partial.stateFile())));
+            }
+        }
+
+        @Test
+        @DisplayName("a 416 deletes the partial even when the restart itself then fails")
+        void a416DeletesThePartialEvenWhenTheRestartFails() throws IOException {
+            AtomicBoolean first = new AtomicBoolean(true);
+            try (LoopbackHttpServer server =
+                            new LoopbackHttpServer(
+                                    (request, out) -> {
+                                        if (first.compareAndSet(true, false)) {
+                                            LoopbackHttpServer.head(
+                                                    out,
+                                                    416,
+                                                    "Range Not Satisfiable",
+                                                    "Content-Length: 0");
+                                            return;
+                                        }
+                                        LoopbackHttpServer.head(
+                                                out, 404, "Not Found", "Content-Length: 0");
+                                    });
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                PartialDownload partial = PartialDownload.beside(file);
+                Files.write(partial.file(), bytes(900, 'z'));
+                partial.recordState(900, "\"v1\"");
+
+                assertThrows(
+                        ArtefactUnavailableException.class,
+                        () ->
+                                downloader.fetch(
+                                        DownloadRequest.of(server.uri("/a.zip"), file)
+                                                .resuming(true)));
+
+                assertAll(
+                        () -> assertEquals(2, server.requests().size()),
+                        () ->
+                                assertFalse(
+                                        Files.exists(partial.file()),
+                                        "a partial longer than the artefact now is cannot be"
+                                                + " trusted, and is gone whether or not the restart"
+                                                + " succeeded"),
+                        () -> assertFalse(Files.exists(partial.stateFile())));
+            }
+        }
+
+        @Test
+        @DisplayName("a changed validator deletes the partial even when the restart then fails")
+        void aChangedValidatorDeletesThePartialEvenWhenTheRestartFails() throws IOException {
+            byte[] body = bytes(1000, 'a');
+            AtomicBoolean first = new AtomicBoolean(true);
+            try (LoopbackHttpServer server =
+                            new LoopbackHttpServer(
+                                    (request, out) -> {
+                                        if (first.compareAndSet(true, false)) {
+                                            // A 206 that resumes cleanly as far as HTTP is
+                                            // concerned, but under a different ETag.
+                                            LoopbackHttpServer.head(
+                                                    out,
+                                                    206,
+                                                    "Partial Content",
+                                                    "Content-Length: 600",
+                                                    "Content-Range: bytes 400-999/1000",
+                                                    "ETag: \"v2\"");
+                                            out.write(body, 400, 600);
+                                            return;
+                                        }
+                                        LoopbackHttpServer.head(
+                                                out, 404, "Not Found", "Content-Length: 0");
+                                    });
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                PartialDownload partial = PartialDownload.beside(file);
+                Files.write(partial.file(), java.util.Arrays.copyOf(body, 400));
+                partial.recordState(1000, "\"v1\"");
+
+                assertThrows(
+                        ArtefactUnavailableException.class,
+                        () ->
+                                downloader.fetch(
+                                        DownloadRequest.of(server.uri("/a.zip"), file)
+                                                .resuming(true)));
+
+                assertAll(
+                        () -> assertEquals(2, server.requests().size()),
+                        () ->
+                                assertEquals(
+                                        Optional.empty(),
+                                        server.requests().get(1).range(),
+                                        "the restart asked for no range"),
+                        () ->
+                                assertFalse(
+                                        Files.exists(partial.file()),
+                                        "and the partial it abandoned is gone, not left for the"
+                                                + " next attempt to splice"),
+                        () -> assertFalse(Files.exists(partial.stateFile())));
+            }
+        }
+
+        @Test
+        @DisplayName("a body that fails with every declared byte down is a failure, not truncation")
+        void aBodyThatFailsWithEveryDeclaredByteDownIsAFailure() throws IOException {
+            // A 206 that lies: its content-range promises 100 bytes in total, its Content-Length
+            // promises 60 more, and it sends 50. The file ends up holding exactly the 100 the
+            // content-range promised, and the transfer still failed. "Stopped short" would be the
+            // wrong word for it -- nothing is short -- so it is a plain failure and the checksum
+            // decides. This is the boundary between < and <= on that condition.
+            byte[] body = bytes(100, 'a');
+            try (LoopbackHttpServer server =
+                            new LoopbackHttpServer(
+                                    (request, out) -> {
+                                        LoopbackHttpServer.head(
+                                                out,
+                                                206,
+                                                "Partial Content",
+                                                "Content-Length: 60",
+                                                "Content-Range: bytes 50-99/100",
+                                                "ETag: \"v1\"");
+                                        out.write(body, 50, 50);
+                                    });
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                PartialDownload partial = PartialDownload.beside(file);
+                Files.write(partial.file(), java.util.Arrays.copyOf(body, 50));
+                partial.recordState(100, "\"v1\"");
+
+                DownloadException thrown =
+                        assertThrows(
+                                DownloadException.class,
+                                () ->
+                                        downloader.fetch(
+                                                DownloadRequest.of(server.uri("/a.zip"), file)
+                                                        .resuming(true)));
+
+                assertAll(
+                        () ->
+                                assertEquals(
+                                        DownloadFailedException.class,
+                                        thrown.getClass(),
+                                        "not a truncation: the declared total is all present"),
+                        () ->
+                                assertTrue(
+                                        thrown.getMessage().contains("failed after 100 byte(s)"),
+                                        thrown.getMessage()),
+                        () -> assertEquals(100L, Files.size(partial.file())),
+                        () -> assertFalse(Files.exists(file)));
+            }
+        }
+
+        @Test
+        @DisplayName("a closed downloader refuses to fetch rather than pretending to work")
+        void aClosedDownloaderRefusesToFetch() throws IOException {
+            // HttpDownloader owns an HttpClient, and an HttpClient owns threads. Unit 5 will hold
+            // one for the length of an install, so close() has to actually close something; a
+            // close() that did nothing would leak those threads and nothing would say so.
+            try (LoopbackHttpServer server = new LoopbackHttpServer(serving(bytes(64, 'a')))) {
+                HttpDownloader downloader = downloader();
+                Path file = work.resolve("artefact.zip");
+                downloader.close();
+
+                DownloadFailedException thrown =
+                        assertThrows(
+                                DownloadFailedException.class,
+                                () ->
+                                        downloader.fetch(
+                                                DownloadRequest.of(server.uri("/a.zip"), file)));
+
+                assertAll(
+                        () ->
+                                assertTrue(
+                                        thrown.getMessage().contains("closed"),
+                                        "the client really was closed: " + thrown.getMessage()),
+                        () ->
+                                assertEquals(
+                                        List.of(),
+                                        server.requests(),
+                                        "and no request reached the server"),
+                        () -> assertFalse(Files.exists(file)));
+            }
+        }
+
+        @Test
         @DisplayName("a 206 answered to a request with no range is refused")
         void a206WithoutARangeRequestIsRefused() throws IOException {
             byte[] body = bytes(300, 'a');
@@ -1871,6 +2115,46 @@ class HttpDownloaderTest {
                                         Files.exists(
                                                 Path.of("a-download-that-never-happens.zip.part")),
                                         "and nothing was left in the working directory"));
+            }
+        }
+
+        @Test
+        @DisplayName("a server declaring a length of exactly zero is handled at the boundary")
+        void aDeclaredLengthOfExactlyZero() throws IOException {
+            // This exists to back an equivalence claim rather than to catch a defect. Two
+            // surviving mutants turn `declaredTotal >= 0` into `> 0`, and the two readings can
+            // differ only at a declared length of exactly zero. This reaches that value and pins
+            // the behaviour there: an empty body is a completed download, not a truncation --
+            // which is what both readings say, and why no test can tell them apart.
+            try (LoopbackHttpServer server =
+                            new LoopbackHttpServer(
+                                    (request, out) ->
+                                            LoopbackHttpServer.head(
+                                                    out, 200, "OK", "Content-Length: 0"));
+                    HttpDownloader downloader = downloader()) {
+
+                Path file = work.resolve("artefact.zip");
+                RecordingProgressListener progress = new RecordingProgressListener();
+                DownloadReport report =
+                        downloader.fetch(
+                                DownloadRequest.of(server.uri("/a.zip"), file)
+                                        .listeningTo(progress));
+
+                assertAll(
+                        () -> assertEquals(0L, report.declaredTotalBytes()),
+                        () ->
+                                assertTrue(
+                                        report.totalWasDeclared(),
+                                        "zero is a declared length, not the absence of one"),
+                        () -> assertEquals(0L, report.fileSizeBytes()),
+                        () -> assertEquals(0L, report.bytesTransferred()),
+                        () -> assertTrue(Files.exists(file), "the empty file is still delivered"),
+                        () -> assertEquals(0L, Files.size(file)),
+                        () -> assertEquals(0L, progress.lastByteCount()),
+                        () ->
+                                assertFalse(
+                                        Files.exists(PartialDownload.beside(file).file()),
+                                        "and the temporary file is cleaned up"));
             }
         }
 

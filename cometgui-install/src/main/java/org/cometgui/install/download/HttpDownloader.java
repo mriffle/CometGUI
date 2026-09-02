@@ -255,6 +255,15 @@ public final class HttpDownloader implements Downloader, ArtefactFetcher, AutoCl
             Optional<PartialDownload.ResumePoint> resume)
             throws IOException {
         Optional<PartialDownload.ResumePoint> point = resume;
+        /*
+         * TERMINATION.  Every `continue` below is guarded by `point.isPresent()` and sets `point`
+         * to empty before it runs, so the loop goes round at most twice: once with a resume point
+         * and once without.  That invariant is the whole proof, and it is worth stating because it
+         * is what a mutation of either guard destroys -- inverting the 416 test makes the restart
+         * unconditional, and the loop then spins for ever.  PIT finds that as a TIMED_OUT rather
+         * than as a failing assertion, which is a detection, not a hang anything can reach: no
+         * input can make a guard fire while `point` is empty.
+         */
         while (true) {
             URI source = request.source();
             long offset = point.map(PartialDownload.ResumePoint::offsetBytes).orElse(0L);
@@ -496,11 +505,35 @@ public final class HttpDownloader implements Downloader, ArtefactFetcher, AutoCl
             throw new DownloadCancelledException(source, size);
         }
         if (declaredTotal >= 0 && size < declaredTotal) {
-            // A body longer than declared is deliberately not checked here: it cannot pass the
-            // mandatory SHA-256, and inventing a second rule for it would be a rule nothing tests.
+            /*
+             * Two things about this condition.
+             *
+             * A body LONGER than declared is deliberately not checked: it cannot pass the mandatory
+             * SHA-256, and inventing a second rule for it would be a rule nothing tests.
+             *
+             * `declaredTotal >= 0` versus `> 0` is an EQUIVALENT MUTATION and there is no test that
+             * can kill it.  The two differ only when the server declared a length of exactly zero,
+             * and then the second operand is `size < 0` -- impossible, because `size` is a count of
+             * bytes written.  So both readings are false for every input, and the boundary cannot
+             * be observed.  Stated here rather than left for the next reader to re-derive.
+             */
             throw new TruncatedDownloadException(source, declaredTotal, size, null);
         }
-        listener.onProgress(size, declaredTotal);
+        /*
+         * NO FINAL onProgress HERE, AND THAT IS THE POINT.  There used to be a
+         * `listener.onProgress(size, declaredTotal)` on this line, as a belt-and-braces
+         * postcondition: "whatever the loop did, the last thing the listener hears is the true
+         * size".  It was redundant on every reachable path -- the loop's last iteration already
+         * reported `offset + transferred`, which is `size`, and a body with no chunks at all
+         * leaves the initial report, where `size == offset`.
+         *
+         * It was worse than redundant.  It MASKED endpoint defects: a loop reporting the wrong
+         * numbers still ended on the right one, so an assertion on the last report could not see
+         * it.  That is not hypothetical -- it is exactly how the "report the bytes of this attempt
+         * rather than the position in the artefact" defect kept `lastByteCount()` correct while
+         * every mid-transfer report was wrong.  Removing it makes the last report the loop's own
+         * work, and therefore something a test can hold the loop to.
+         */
         return new DownloadReport(
                 source,
                 request.destination(),
@@ -532,6 +565,17 @@ public final class HttpDownloader implements Downloader, ArtefactFetcher, AutoCl
             throw new DownloadFailedException(
                     "the thread was interrupted while downloading " + source, source, e);
         } catch (IOException e) {
+            /*
+             * `onDisk < declaredTotal` is the difference between "the body stopped short" and "the
+             * body failed with everything it promised already on disk", and it IS observable: a
+             * 206 whose content-range says /100 but whose Content-Length says 60 while sending 50
+             * leaves exactly 100 bytes down and still fails.  That is a failure, not a truncation,
+             * and a test pins it.
+             *
+             * `declaredTotal >= 0` versus `> 0` is EQUIVALENT, for the same reason as the
+             * truncation check in copy(): they differ only at a declared length of zero, where the
+             * second operand becomes `onDisk < 0`, which no byte count satisfies.
+             */
             if (declaredTotal >= 0 && onDisk < declaredTotal) {
                 throw new TruncatedDownloadException(source, declaredTotal, onDisk, e);
             }

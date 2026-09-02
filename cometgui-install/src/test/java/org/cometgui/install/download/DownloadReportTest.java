@@ -67,15 +67,31 @@ class DownloadReportTest {
                 () -> assertEquals(-1L, DownloadReport.NO_DECLARED_TOTAL));
     }
 
+    /*
+     * The fourth column is the sum the message must quote, HAND-TYPED rather than computed from
+     * the first two. The rule's arithmetic and the message's arithmetic are two separate additions
+     * in the source, and only the first of them was ever asserted: a message reading "400 kept plus
+     * 600 received is -200" passed every test here, because the assertion stopped at the opening
+     * words. A diagnostic that states a total it computed wrongly sends its reader to the wrong
+     * place, so the number in the text is pinned exactly like the number in the rule.
+     */
     @ParameterizedTest(name = "{0} kept plus {1} received is not a file of {2} bytes")
-    @CsvSource({"400,600,1001", "400,600,999", "0,0,1", "500,0,1000"})
-    void theBytesMustAddUp(long resumedFrom, long transferred, long size) {
+    @CsvSource({"400,600,1001,1000", "400,600,999,1000", "0,0,1,0", "500,0,1000,500"})
+    void theBytesMustAddUp(long resumedFrom, long transferred, long size, long quotedSum) {
         IllegalArgumentException thrown =
                 assertThrows(
                         IllegalArgumentException.class,
                         () -> report(resumedFrom, transferred, size, size));
-        assertTrue(
-                thrown.getMessage().startsWith("a report must account for every byte"),
+        assertEquals(
+                "a report must account for every byte of the finished file: "
+                        + resumedFrom
+                        + " kept plus "
+                        + transferred
+                        + " received is "
+                        + quotedSum
+                        + ", but the file is "
+                        + size
+                        + " bytes",
                 thrown.getMessage());
     }
 
