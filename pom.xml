@@ -854,6 +854,12 @@
                    corrupt download.  Adding a package STRENGTHENS this gate; the
                    list is never narrowed. -->
               <param>org.cometgui.install.download.*</param>
+              <!-- Added by phase 05 after unit 4, for the same reason and with more force:
+                   R-SEC-05's traversal, absolute-path, symlink and decompression-bomb checks
+                   are the security rules of this phase, and gate item 3 is the gate over them.
+                   Unit 4 reported plainly that its 8550 lines carried NO mutation evidence at
+                   all, which is not a state this project leaves security code in. -->
+              <param>org.cometgui.install.archive.*</param>
               <!-- stage invalidation rules -->
               <param>org.cometgui.workflow.state.*</param>
             </targetClasses>
