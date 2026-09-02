@@ -55,6 +55,10 @@ class RealArtefactExtractionTest {
     private static final String IN_XSD_SHA256 =
             "fa50a550ea01c9109197ad2c8c9efdcdad448fddd81c5ddcf54f13f8af280f4f";
 
+    /** The shipped manifest's digest for the Limelight converter JAR. */
+    private static final String CONVERTER_JAR_SHA256 =
+            "843573396ce0654a0ac81582b378c496923e49dde71f40d750d890947774ece1";
+
     /** Unit 0's digest for PDV 2.7.0's launcher jar. */
     private static final String PDV_LAUNCHER_SHA256 =
             "fc876310b6f9dd95bd9538f212e28d45ac0226ea1615a9c09f2e904d70d07908";
@@ -244,9 +248,7 @@ class RealArtefactExtractionTest {
                         ArtefactMirror.assertContent(
                                 destination.resolve("cometPercolator2LimelightXML.jar"),
                                 2_762_075L,
-                                ArtefactMirror.sha256(
-                                        ArtefactMirror.artefact(
-                                                "v2.8.1__cometPercolator2LimelightXML.jar"))));
+                                CONVERTER_JAR_SHA256));
     }
 
     @Test
