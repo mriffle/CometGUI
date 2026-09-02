@@ -5,12 +5,13 @@ Project Status
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-09-01
 :Updated by: Main orchestrator, session 05 (**Phase 03 signed off PARTIAL**;
-   ``main`` published to the remote at ``9abfe1b`` after GitHub push protection
-   rejected the project's own seeded-secret decoy; **Phase 04 resumed** with a
-   fresh phase orchestrator)
-:Current phase: 04 -- **IN PROGRESS**, resumed 2026-09-01 from its paused state.
-   Phase 03 is **PARTIAL**, signed off 2026-09-01. Phases 00 and 01 remain
-   PARTIAL, both now awaiting a pull request rather than a push.
+   ``main`` published to the remote after GitHub push protection rejected the
+   project's own seeded-secret decoy; **Phase 04 resumed, reworked once and
+   signed off PARTIAL**)
+:Current phase: 04 -- **PARTIAL**, signed off 2026-09-02 on tier 1's own re-run
+   and seven of its own defect injections. Phase 03 is **PARTIAL**, signed off
+   2026-09-01. Phases 00 and 01 remain PARTIAL, both awaiting a pull request.
+   **Phase 05 is next**, after the per-class census debt is closed.
 :Overall: The repository, build and every quality gate exist and have each been
    seen to fail on a deliberate defect. Three phases are signed off -- 02
    PASSED, 03 PARTIAL, 00 and 01 PARTIAL -- and 04 is in progress. What holds
@@ -164,12 +165,15 @@ Phase board
        executed on Windows or macOS. See :ref:`status-p03`.
    * - 04
      - Hashing and provenance core
-     - IN PROGRESS
-     - **Resumed 2026-09-01** with a fresh phase orchestrator, briefed by
-       ``handoffs/PHASE-04-RESUMPTION-BRIEF.rst`` and told its expected grade is
-       PARTIAL (:ref:`status-session-05`). The state below is what it inherited.
-       **Paused by the owner on 2026-08-31**, part-built, to stop two phases
-       sharing one tree. Units **1-8 signed off** on the orchestrator's own
+     - PARTIAL
+     - Signed off 2026-09-02. **All seven gate items PASS on the main
+       orchestrator's own re-run and its own seven defect injections**, none of
+       them the phase's negative controls; item 6 only after a returned rework
+       that closed a third blind spot in the secret corpus
+       (:ref:`status-p04-occurrence`). PARTIAL, not PASSED, because gate items
+       3, 4 and 5 rest on Windows branches that have never executed anywhere.
+       See :ref:`status-p04`. *Historically: paused by the owner on 2026-08-31,
+       part-built, to stop two phases sharing one tree.* Units **1-8 signed off** on the orchestrator's own
        injections; units **9 and 10 LANDED BUT NOT SIGNED OFF** -- committed
        green, but their diffs were not read, their gates not re-run and nothing
        injected into them, which the phase stated plainly rather than letting
@@ -1538,6 +1542,280 @@ after this phase (:ref:`status-class-census-gap`), and pushing, which is not a
 phase agent's to do. ``handoffs/BRIEF-TEMPLATE.rst`` still told phase agents
 "there is no git remote and none may be created"; that has been untrue since
 2026-08-30 and is corrected.
+
+.. _status-p04:
+
+Phase 04 sign-off (2026-09-02)
+==============================
+
+:Outcome: **PARTIAL**
+:Signed off by: Main orchestrator, session 05, by re-running all seven gate
+   items itself and injecting seven defects of its own -- none of them the
+   phase's controls
+:Phase records: ``handoffs/PHASE-04-worklog.rst``, ``handoffs/PHASE-04-handoff.rst``
+:Head: ``87acc84``
+
+The phase resumed from its paused state, re-measured on a quiet tree before
+resuming any work, signed off units 9 and 10 properly, and built units 11, 12
+and 13. Tier 1 then re-ran every gate item rather than accepting that report,
+and **injected its own defects rather than re-running the phase's negative
+controls**. Six held on the first pass; one did not, was returned as rework,
+and now holds.
+
+.. list-table:: Gate items, as re-run at sign-off
+   :header-rows: 1
+   :widths: 5 8 87
+
+   * - #
+     - Result
+     - The defect I injected, and what it printed
+
+   * - 1
+     - PASS
+     - Corrupted **only the zero-byte vector**, by digesting a single ``0`` byte
+       when the stream yielded nothing -- so all thirteen non-empty vectors
+       stayed exact and the phase's own control, which digests one byte less,
+       cannot express it at all on an empty file. ``MD5 ==> expected:
+       <d41d8cd98f00b204e9800998ecf8427e> but was:
+       <93b885adfe0da089cdf634904fd59f71>``, caught independently in two test
+       groups.
+
+   * - 2
+     - PASS
+     - An extra full read of the file before the real one -- **correct digests,
+       heap growth 273 896 bytes against a 4 194 304 bound**, and only "one
+       pass" false. Distinct from the phase's heap control, which keeps every
+       chunk. Six assertions failed, the first being ``open() calls ==>
+       expected: <1> but was: <2>``, and the permanent in-suite negative control
+       printed its expected ``heapGrowth=33570920`` alongside.
+
+   * - 3
+     - PASS
+     - Left ``unix:ctime`` **present but frozen** to ``Instant.EPOCH``, so
+       ``tamperEvident()`` stays true and the cache still serves -- the subtle
+       form, where the fifth attribute exists but cannot witness anything. The
+       phase's control instead made identity absent. ``both calls reached the
+       hasher ==> expected: <2> but was: <1>``: a stale hash served for a
+       mutated file.
+
+   * - 4
+     - PASS
+     - Silently dropped the **good event following a defect**, so recovery still
+       reports the defect and still returns a usable-looking history one record
+       short -- a partial loss rather than the phase's clean-read control.
+       ``expected: <[1, 2, 3, 4]> but was: <[1, 2, 3]>``. The test asserts
+       recovered sequence numbers, not merely that something was recovered.
+
+   * - 5
+     - PASS
+     - Kept ``ATOMIC_MOVE`` **and** ``REPLACE_EXISTING`` -- so every structural
+       check of the call still passed, and ``FileSystemDurabilityTest`` stayed
+       green 5/5 -- but emptied the target first, opening a zero-byte window.
+       ``the reader saw a document of 0 bytes, which is neither of the two
+       written``, observed 842 times. Proof by observation is the load-bearing
+       part, exactly as the phase claimed.
+
+   * - 6
+     - PASS **after rework**
+     - Two injections. The first found a real gap and was returned; see
+       :ref:`status-p04-occurrence`. The second leaked the argv **in the RST
+       report only**, leaving the JSON and the event log clean, to test whether
+       the sweep really reads all three artefacts: ``provenance.rst=[0, 3, 5, 6,
+       7, 8]`` against ``[0, 5, 6, 7, 8]`` for the other two. The sweep reports
+       per artefact and per secret, which is the resolution needed to see it.
+
+   * - 7
+     - PASS
+     - Read from ``mutations.xml`` rather than the console: ``cometgui-
+       provenance`` **774 mutations, 771 KILLED, 3 TIMED_OUT, 0 SURVIVED, 0
+       NO_COVERAGE**; the ``hashing`` package **70/70**; ``cometgui-domain``
+       **204/204** with ``secrets`` **52/52**. The gate item names hashing and
+       redaction specifically, and both are clean, as is the module as a whole.
+
+.. _status-p04-occurrence:
+
+What sign-off caught that the phase did not: occurrence count
+--------------------------------------------------------------
+
+Changing one word in the shared rule set -- ``KNOWN_TOKEN_SHAPES.matcher(...)
+.replaceAll(...)`` to ``.replaceFirst(...)`` -- left **83 ``cometgui-domain``
+tests and 22 provenance secrecy tests green, including the new whole-directory
+artefact sweep**, while a token appearing twice in one string had its second
+occurrence written out in clear. Proved by running the compiled redactor
+directly rather than argued::
+
+    TWICE -> used token [REDACTED] then retried with ghp_S3cr3t...0123456789ab
+    SECOND OCCURRENCE SURVIVES: true
+
+and, after restoring, ``[REDACTED]`` twice with ``SECOND OCCURRENCE SURVIVES:
+false``. **The production code was correct**; what was missing was that no
+carrier in the corpus contained its secret more than once.
+
+This is catalogued shape 5 -- an input set too narrow to see the defect -- and
+it is worth recording because of *where* it landed. ``SeededSecretCorpusTest``
+documents two blind spots and argues explicitly that **carrier length is part of
+this corpus's coverage, not an accident of how the examples were written**.
+Occurrence *count* is the same kind of property, reasoned about in the same
+file, and missed. It does not overturn gate item 6 -- the artefacts the sweep
+generates genuinely carry no secret, because each is seeded once -- but it was
+not acceptable residue with Phase 12 due to hold a real Limelight credential.
+
+**The repair is more instructive than the finding, and this is the part to
+carry forward.** The obvious fix -- add a two-occurrence carrier to the existing
+tests -- **would have shipped a check that cannot fail.** ``redactText`` runs
+the literal registry pass *first*, and ``SecretRegistry.redactIn`` uses
+``String.replace``, which clears every occurrence; so through the fully loaded
+corpus that pass silently repairs a broken pattern rule before the rule is ever
+reached. The phase measured this before writing anything, and landed the new
+carriers under ``patternsOnly()`` instead. Tier 1 confirmed both halves
+independently: the ordering and the ``String.replace`` in the source, and the
+defect going red on re-injection::
+
+    SeededSecretCorpusTest.patternsAloneCoverWhatTheyClaim:600
+      a pattern rule stopped covering its carrier: [corpus secret #9 survived
+      the short token shape twice carrier with the pattern rules alone]
+      ==> expected: <true> but was: <false>
+
+A corollary the phase reported against its own earlier work, and which is worth
+more than the fix: ``shortCarriersComeOutAsWritten`` proves less than it
+appears to, for the same masking reason. The repeated carriers are built by
+duplicating the short ones, so blind spots 2 and 3 cannot drift apart.
+
+Two harness errors of my own, both instructive
+-----------------------------------------------
+
+Recorded because each produced a **misleading exit code in a different
+direction**, and because the project's own documents warned about both.
+
+* ``-Dtest=CachingHashServiceTest+FileFingerprintTest`` -- a ``+`` where
+  surefire wants a ``,`` -- matched nothing, ran **zero tests**, and **exited
+  0** with an injected defect live in the tree. Indistinguishable from "the gate
+  is weak" except that the log carries no ``Tests run:`` line at all.
+* Correcting the separator without ``-Dsurefire.failIfNoSpecifiedTests=false``
+  then failed **upstream**: ``cometgui-domain`` matched no test, aborted, and
+  ``cometgui-provenance`` was ``SKIPPED``. A red build that never ran the gate.
+
+Both were caught by the standing protocol rather than by luck: confirm the
+compiled ``.class`` hash moved, and read *why* a build is red or green rather
+than *that* it is.
+
+The numbers, from a quiet tree
+-------------------------------
+
+Taken by tier 1 after ``mvn -pl cometgui-domain install``, on a tree with no
+agent in flight.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Measure
+     - Value
+
+   * - Tests
+     - ``cometgui-provenance`` **669**, 0 failures, 2 skipped;
+       ``cometgui-domain`` **362**, 0 failures
+
+   * - Coverage, read from ``jacoco.xml``
+     - **100.00% line (1827/1827) and 100.00% branch (623/623)** in
+       ``cometgui-provenance``; 100.00%/100.00% in ``cometgui-domain``
+
+   * - Mutation, read from ``mutations.xml``
+     - provenance **774: 771 KILLED, 3 TIMED_OUT, 0 SURVIVED, 0 NO_COVERAGE**;
+       domain **204/204**
+
+   * - Class-population census
+     - ``cometgui-provenance`` **37 compiled / 37 in jacoco.xml**;
+       ``cometgui-domain`` **25 / 25**. ``ManifestReader`` is back in the
+       sample. The seven classes PIT never mutated were **audited rather than
+       skimmed**: an enum of constants, three interfaces, one functional
+       interface, an exception with only a constructor, a constants holder, and
+       one record whose validation delegates to ``ManifestChecks``. None is a
+       class whose test failed to compile.
+
+   * - Aggregate suite
+     - ``bash scripts/verify-all-gates.sh`` -- **11 controls passed, 0 failed,
+       in 1962 seconds (32m42s)**. Every pre-existing floor held (license 5,
+       workflows 9, docs 1, traceability 8, sbom 8, depscan 16, pipeline 24,
+       quality 42, shell 30, tests 33) and the new ``provenance`` control grades
+       **24**. No floor was lowered.
+
+   * - The generated report, under the strict docs gate
+     - ``sphinx-build -n -W`` over
+       ``cometgui-provenance/target/provenance-report-sample`` -- ``build
+       succeeded``, and because exit 0 proves nothing: 25 422 bytes of HTML, 108
+       rendered literals, **0** docutils ``problematic``/``system-message``
+       spans, **0** stray double-backticks. Tier 1's own grep for every seeded
+       secret over the generated directory returns nothing.
+
+Nothing was weakened, checked rather than assumed
+--------------------------------------------------
+
+``git diff`` over ``pom.xml``, every module ``pom.xml``, ``config/`` and
+``.mvn/`` across the whole phase is **empty**. Thresholds stand at 0.90 line,
+0.85 branch, 0.80 class and mutation 80. No surefire exclusion was added; the
+only ``<excludes>`` in the tree remain Phase 02's Spotless and Checkstyle
+derived-file sets. **Zero unconditional** ``@Disabled`` in either module. The
+rework touched no production code. No phase commit touched ``STATUS.rst``,
+``DECISIONS.rst``, ``phases/``, ``scripts/build.sh`` or
+``scripts/verify-test-gates.sh``.
+
+The writer/reader separation unit 9 identified as load-bearing **survives**:
+``ManifestReaderTest`` names ``ManifestWriter`` five times and calls it never --
+twice for the ``FILE_NAME`` constant, which it pins to the literal
+``provenance.json``, and three times in prose. No fixture in the reader's tests
+is generated by the writer.
+
+Why PARTIAL rather than PASSED
+------------------------------
+
+By the rule at :ref:`status-platform-divergence`: *"we could not run this code
+there"* is a testing gap and does not cap a grade, but *"there is different code
+there and it has never run"* is unverified behaviour and does. Gate items 3, 4
+and 5 each rest on a branch that behaves differently on Windows and has never
+executed anywhere:
+
+* **``ATOMIC_MOVE`` under contention**, and it remains the one that matters.
+  Item 5's proof -- a concurrent reader observing only whole documents -- is
+  POSIX-only. On Windows a rename over a file another process holds open can
+  fail with ``AccessDeniedException``. Already routed to
+  ``phases/PHASE-13-provenance-ui.rst``, which must settle it **before**
+  building a viewer that holds ``provenance.json`` open.
+* **The hash cache is inert on Windows** (:ref:`status-hash-cache-windows`), so
+  item 3 grades a different algorithm there. The Windows-shaped branch *is*
+  exercised here through a zip file system, which is why this is the weaker of
+  the two, but the stand-in is not the case itself.
+* **Absolute-path validation and ``toRealPath``**, which are why twenty tests
+  carry ``@DisabledOnOs(WINDOWS)``. The repair is a second pinned document with
+  Windows paths, never a relaxation of the rule.
+
+Items 1, 2, 6 and 7 are platform-neutral and clean. Phase 15 owns the platform
+matrix.
+
+Residue carried forward
+------------------------
+
+* **Windows behaviour for gate items 3, 4 and 5**, as above.
+* **The per-class census is still run by hand.** It was whole at every
+  measurement in this phase, which is precisely why it must run on every build
+  rather than when someone remembers. Tier 1 owns closing it
+  (:ref:`status-class-census-gap`) before Phase 05 is dispatched.
+* **``scripts/verify-test-gates.sh`` needs one line** --
+  ``docs/reference/provenance_format.rst`` in ``build_sandbox`` -- so unit 12's
+  drift check is mechanical on both sides. The phase escalated this rather than
+  editing a tier-1 file, and tested that a cross-directory ``.. include::`` is
+  **not** an alternative because ``docs-build.sh --self-test`` copies only
+  ``docs/``. It lands with the census work.
+* **The artefact sweep's corpus still seeds each secret once**, so an
+  occurrence-count defect in the *writers* would not be seen there. The domain
+  corpus now covers the rule set, which is where that defect class lives; the
+  phase judged a second copy of the property not worth the duplication and tier
+  1 agrees, but it is recorded rather than forgotten.
+* **``ExecutionRecord.status`` documents three values and enforces none**
+  (Phase 08), and the event log's file name is pinned by no constant (Phase 13).
+* The specification's "safely rendered command for display" has no member in the
+  format; adding one is a schema v2 change and an owner-visible decision, not an
+  agent's.
 
 Open decisions
 ==============
