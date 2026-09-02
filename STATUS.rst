@@ -2342,6 +2342,43 @@ now been caught by a ``-Dtest`` expression that selected nothing -- a wrong
 separator, a glob, and a missing ``surefire.`` prefix. **Read the ``Tests run:``
 line, never the exit code.**
 
+.. _status-injection-from-outside:
+
+The strongest finding of Phase 05: where a useful injection comes from
+=======================================================================
+
+Phase 05's orchestrator injected a defect into every unit it signed off, and
+reported the pattern rather than only the results:
+
+  **Every injection chosen from inside its own acceptance conditions bit
+  immediately. All three that survived came from outside them.**
+
+The surviving three were found by asking a different question. Not *"is this
+rule tested?"* — which an acceptance list already answers — but **"what silent
+behaviour does this code have that no condition names?"** That is how a
+resumed-transfer progress defect survived 338 tests, how a blank-note rejection
+survived 108, and how five XXE protections turned out to be individually
+deletable with the whole suite green.
+
+**Why this matters beyond one phase.** An acceptance condition is a statement of
+what the author already thought of. An injection drawn from that list tests the
+implementation against the author's own imagination, and it will nearly always
+fail loudly, which feels like rigour and is not. The defects that survive are
+the ones nobody wrote a condition for — and the sign-off tier exists precisely
+because it can read the *requirement* against the *code* rather than against the
+author's list.
+
+This is the practical companion to :ref:`status-tenth-shape`, which established
+that coverage and mutation scores are silent about a condition nobody wrote.
+Together they say the same thing from two directions: **the gates grade what
+exists; a human adversary must supply what does not.**
+
+*Recorded also because of how it was surfaced.* The phase reported the pattern
+against itself, unprompted, while handing over — including that the one gate it
+widened which found nothing did so because that unit had already pointed PIT at
+its own package before being asked. A phase that reports the shape of its own
+blind spots is worth more than one that reports a higher score.
+
 Open decisions
 ==============
 
