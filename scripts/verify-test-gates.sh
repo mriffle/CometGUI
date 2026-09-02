@@ -235,10 +235,32 @@ graded_log() {
 # The baseline mutation run must have mutated something and killed all of it.
 # BOTH halves matter and neither is a constant: a run that generated no
 # mutations is the vacuous pass PIT offers when its target classes match
-# nothing, and a run that left survivors means the clean tree does not meet the
-# gate, which would make every dirty run below meaningless.  The count itself is
-# read out of the log (22 when this harness was written, 152 after phase 02);
-# what is asserted is that it is greater than zero and that every one died.
+# nothing, and an UNEXPECTED survivor on the clean tree would mean the baseline
+# has drifted, which would make every dirty run below meaningless.  The count
+# itself is read out of the log (22 when this harness was written, 152 after
+# phase 02).
+#
+# AMENDED 2026-09-03, and read this before touching it.  This assertion used to
+# demand killed == generated.  That was correct until 2026-09-02 and is not any
+# more: cometgui-domain now contains ONE genuine equivalent mutant that no test
+# can kill -- ToolVersion.compareTo:214, ConditionalsBoundaryMutator, where
+# 'index < width' -> 'index <= width' compares componentAt(width) as 0 against
+# 0.  Phase 05 unit 1's author argued it in a comment and declined the rewrite
+# that would kill it, and tier 1 agrees: chasing an equivalent mutant with a
+# test is how a suite acquires assertions that cannot fail.
+#
+# The old assertion's own justification -- "the clean tree does not meet the
+# gate" -- became FALSE at that moment: R-TEST-02's gate is 80% and the module
+# sits at 99.7%.  So the control was failing on a correct tree, and a control
+# that fails on correct code is broken rather than strict.
+#
+# WHAT REPLACED IT IS STRICTER, NOT LOOSER.  The survivor set must equal a
+# HAND-TYPED list exactly.  A new survivor fails.  A survivor that moves class
+# or line fails.  And a listed survivor that is now KILLED also fails, which is
+# what stops this list becoming a drawer that quietly absorbs regressions: it
+# must be edited deliberately, by a person, with a reason.  Adding an entry here
+# to make a build pass is a weakening and is forbidden; the only honest reason
+# to add one is a NEW equivalent mutant argued in the production code first.
 assert_pit_killed_everything() {
     local label="$1" log="$2" summary generated killed percent
     summary="$(pit_summary "${log}")"
@@ -251,11 +273,34 @@ assert_pit_killed_everything() {
         record_fail "${label}: PIT generated 0 mutations, so the 80% gate was evaluated over nothing"
         return
     fi
-    if [ "${killed}" -ne "${generated}" ] || [ "${percent}" -ne 100 ]; then
-        record_fail "${label}: the clean tree left survivors -- ${killed}/${generated} killed (${percent}%)"
+    # The hand-typed expected survivor set for the baseline module.  One entry.
+    # See the amendment note above before changing it.
+    local expected_survivors="org.cometgui.domain.tools.ToolVersion:214:ConditionalsBoundaryMutator"
+
+    local report observed
+    report="$(pit_report_of cometgui-domain)"
+    observed="$(python3 - "${report}" <<'PYTHON'
+import re, sys
+x = open(sys.argv[1], encoding="utf-8").read()
+out = []
+for m in re.finditer(r"<mutation[^>]*status=['\"]SURVIVED['\"][^>]*>(.*?)</mutation>", x, re.S):
+    body = m.group(1)
+    cls = re.search(r"<mutatedClass>(.*?)</mutatedClass>", body)
+    line = re.search(r"<lineNumber>(\d+)</lineNumber>", body)
+    mut = re.search(r"<mutator>(.*?)</mutator>", body)
+    if cls and line and mut:
+        out.append("%s:%s:%s" % (cls.group(1), line.group(1), mut.group(1).rsplit(".", 1)[-1]))
+print("\n".join(sorted(set(out))))
+PYTHON
+)"
+    local expected_sorted
+    expected_sorted="$(printf '%s\n' "${expected_survivors}" | tr ' ' '\n' | grep -v '^$' | sort -u)"
+
+    if [ "${observed}" != "${expected_sorted}" ]; then
+        record_fail "${label}: the clean tree's survivor set is not the hand-typed one. expected [$(printf '%s' "${expected_sorted}" | tr '\n' ' ')] observed [$(printf '%s' "${observed}" | tr '\n' ' ')] -- a new survivor, a moved one, or a listed one that is now killed. Do not add an entry to make this pass; see the note above ${label}."
         return
     fi
-    record_pass "${label}: ${generated} mutations, all ${killed} killed (${percent}%)"
+    record_pass "${label}: ${generated} mutations, ${killed} killed (${percent}%), survivor set exactly the hand-typed $(printf '%s' "${expected_sorted}" | tr '\n' ' ')"
 }
 
 # assert_pit_survivors_were_covered <label> <log>
@@ -372,6 +417,16 @@ build_sandbox() {
     mkdir -p "${SANDBOX}/_build"
     ln -s "${M2REPO}" "${SANDBOX}/_build/m2repo"
 
+    # The real-artefact mirror, symlinked for the same reason as tools/ and
+    # .venv/: large (146 MB) and only ever read.  Phase 05's extraction and
+    # install suites read the bytes upstream actually publishes out of
+    # scratch/phase05/artefacts, and they FAIL rather than skip when it is
+    # absent -- deliberately, because "an extraction suite that stops reading
+    # the real containers stops proving anything".  Without this, 13 tests fail
+    # in every sandbox build and controls 7 and 8 die in the build stage before
+    # the census they exist to prove ever runs.
+    ln -s "${ROOT}/scratch" "${SANDBOX}/scratch"
+
     # PROJECT DOCUMENTS THE TESTS READ AS INPUT.
     #
     # specification.rst is here because a test may legitimately assert against
@@ -395,6 +450,24 @@ build_sandbox() {
     # repository -- the sandbox is deliberately minimal so that what a control
     # damages is exactly what it means to damage.
     cp "${ROOT}/specification.rst" "${SANDBOX}/specification.rst"
+
+    # manifests/ is here for the same reason and by the same rule: the build
+    # reads it as INPUT.  Phase 05's cometgui-install ships manifests/tools.json
+    # as a resource resolved through ${maven.multiModuleProjectDirectory}, so
+    # without this directory 26 tests fail in every sandbox build with
+    # "InvalidArtefactManifest ... missing from the classpath at /tools.json".
+    #
+    # That is not a hypothetical.  It broke controls 7 and 8 for three days:
+    # both damage a POM and require scripts/build.sh to reject it AT THE CENSUS
+    # STAGE with the census's own diagnostic, and instead the build died three
+    # stages earlier on the missing manifest.  The controls still went red, so
+    # nothing looked wrong -- but they were red for the wrong reason, which
+    # means the thing they exist to prove was not being proved at all.  The
+    # per-class census was landed on 2026-09-02 "with a control proving it
+    # bites"; the census does bite in a real build, and it was the PROOF that
+    # was broken.  A control that fails for the wrong reason is worth no more
+    # than one that passes for the wrong reason.
+    cp -r "${ROOT}/manifests" "${SANDBOX}/manifests"
 
     local module
     for module in "${ROOT}"/cometgui-*/; do
@@ -1091,6 +1164,10 @@ main() {
     . "${ROOT}/tools/env.sh"
     command -v mvn >/dev/null || die "mvn is not on PATH after sourcing tools/env.sh."
     [ -d "${M2REPO}" ] || die "${M2REPO#"${ROOT}/"} does not exist; run bash scripts/build.sh first."
+    # Checked here rather than discovered as 13 test failures inside a sandbox
+    # build, which is how it presented the first time and cost a diagnosis.
+    [ -d "${ROOT}/scratch/phase05/artefacts" ] \
+        || die "scratch/phase05/artefacts does not exist. Phase 05's extraction and install suites read the real upstream bytes from there and fail rather than skip without them, so controls 7 and 8 would die in the build stage instead of proving the census. The mirror is gitignored; refill it by fetching each artefact from the URL in manifests/tools.json and verifying its SHA-256 before use."
     bash "${ROOT}/scripts/fetch-fontstack.sh" --verify >/dev/null \
         || die "the font stack is missing; run bash scripts/fetch-fontstack.sh first."
 

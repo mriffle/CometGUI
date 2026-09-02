@@ -2379,6 +2379,70 @@ widened which found nothing did so because that unit had already pointed PIT at
 its own package before being asked. A phase that reports the shape of its own
 blind spots is worth more than one that reports a higher score.
 
+.. _status-suite-was-red:
+
+The gate suite was red for three days, and my own control was the reason
+=========================================================================
+
+Phase 05's successor orchestrator re-took ``verify-all-gates.sh`` as its first
+act and found **10 controls passed, 1 failed** -- not the 11/0 on record. The
+recorded figure was taken at ``96e7da4``, before Phase 05's units landed, and
+nobody had re-run it since. Two independent faults, and the second is tier 1's.
+
+**Fault 1 -- an assertion that had become false about correct code.**
+``assert_pit_killed_everything`` demanded ``killed == generated`` on the clean
+tree. Since 2026-09-02 ``cometgui-domain`` contains one **genuine equivalent
+mutant** -- ``ToolVersion.compareTo:214``, ``ConditionalsBoundaryMutator``,
+where ``index < width`` becomes ``index <= width`` and compares
+``componentAt(width)`` as 0 against 0. Phase 05 unit 1's author argued it in the
+code and declined the rewrite that would kill it; tier 1 agrees, because
+chasing an equivalent mutant with a test is how a suite acquires assertions
+that cannot fail. The assertion's own justification -- *"the clean tree does not
+meet the gate"* -- was false: the gate is 80% and the module sits at 99.7%.
+**A control that fails on correct code is broken, not strict.**
+
+Replaced by something **stricter**: the survivor set must equal a hand-typed
+list *exactly*. A new survivor fails; a survivor that moves class or line
+fails; and **a listed survivor that is now killed also fails**, which is what
+stops the list becoming a drawer that absorbs regressions. Adding an entry to
+make a build pass is forbidden in the note above it.
+
+.. _status-red-for-the-wrong-reason:
+
+**Fault 2 -- my census control was failing for the wrong reason, and that is
+why nobody noticed.** On 2026-09-02 the per-class census was landed here "with
+a control proving it bites". Controls 7 and 8 damage a POM and require
+``build.sh`` to reject it **at the census stage, with the census's own
+diagnostic**. Instead the build died three stages earlier, twice over: the
+sandbox carried no ``manifests/`` (Phase 05 ships ``manifests/tools.json`` as a
+resource) and no ``scratch/phase05/artefacts`` (Phase 05's extraction suites
+read the real upstream bytes and **fail rather than skip** without them --
+deliberately, since "an extraction suite that stops reading the real containers
+stops proving anything"). Thirteen tests failed in every sandbox build.
+
+**The controls still went red, so nothing looked wrong.** That is the whole
+lesson: **a control that fails for the wrong reason is worth no more than one
+that passes for the wrong reason**, and it is harder to see, because red reads
+as working. Tier 1 verified the pass on 2026-09-02 and never asked why the
+failure was a failure -- the exact distinction it had spent the week demanding
+of every tier below it.
+
+Both repaired by carrying the two inputs into the sandbox, under the rule that
+was already written there: *the sandbox carries what the build reads as input*.
+A precondition now names an absent mirror directly rather than letting it
+present as thirteen test failures. Re-run at tier 1: ``37 assertion(s) passed,
+0 failed``, with control 8 quoting ``ABSENT   cometgui-domain: compiled, but
+missing from jacoco.xml`` and naming ``org.cometgui.domain.secrets.SecretRegistry``
+on the census's own line.
+
+*Two smaller findings from the same report, both about believing a signal.* A
+liveness check must exclude **defunct** processes as well as the checker: this
+host carries 705 zombies, 345 of them named ``java``, so ``pgrep java`` matches
+hundreds of processes that exited hours ago. And a background wrapper's
+completion notification reports **the wrapper's** exit code, not the wrapped
+command's -- the successor's notification said "exit code 0" while the suite
+exited 1, and reading only the notification would have reported a green suite.
+
 Open decisions
 ==============
 
