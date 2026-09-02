@@ -1705,3 +1705,347 @@ own them.
    15's, and a stub that exits non-zero is the correct state.
 #. The opt-in real-URL fetch command and its cost are handed to tier 1 with
    the closing report; tier 1 will run it once at sign-off.
+
+.. _p05-orchestrator-2:
+
+Phase orchestrator handover, and the re-scope of units 6 to 12
+===============================================================
+
+:Taken over: 2026-09-02 at ``be5dd72``
+:By: the second Phase-05 phase orchestrator (session 06)
+:From: ``handoffs/PHASE-05-handoff.rst``
+
+Units 1 to 5 are signed off, nothing is landed-but-unsigned, and
+``git status --porcelain`` was empty when I arrived. What follows is what I
+re-measured myself, what I changed about the plan, and why.
+
+What I re-measured before planning anything
+--------------------------------------------
+
+**``origin/main`` is at** ``be5dd72``\ **, the same commit as ``HEAD``.** The
+handoff says it is handing over two commits ahead of ``origin/main`` at
+``38c17b5``; tier 1 has pushed since, and that sentence is stale. Nothing is
+unpublished.
+
+**The gitignored artefact mirror survived the handover**, which was not
+certain: ``scratch/phase05/artefacts`` holds 24 files, 185 MB. I re-derived
+**32 artefact and companion rows** -- every ``url``/``sha256``/``sizeBytes``
+triple in ``manifests/tools.json``, artefacts and companions alike -- from
+those bytes: **0 mismatches, 0 missing**. So units 6 and 7 have real upstream
+binaries to probe without re-running ``fetch-survey.sh``.
+
+.. _p05-scope-change:
+
+What I changed about units 6 to 12, and why
+--------------------------------------------
+
+The handoff re-scoped units 6-12 and I inherit that re-scope, with two
+changes. Both are recorded rather than made silently, because a renumbered or
+repurposed unit that nobody wrote down is the drift this project keeps paying
+for.
+
+**Change 1: old unit 8 is absorbed into unit 7.** The handoff recommends this
+and I agree: local binary registration is the same adapter code reading a
+different source of binary, and splitting it buys a second agent's context and
+nothing else.
+
+**Change 2, which is mine: unit 8's number is reused for work nobody owned.**
+``org.cometgui.domain.tools.ToolManager`` -- the port the Tool Manager UI is
+allowed to see, and the only one it has -- **has no implementation and no unit
+that produces one.** The handoff's unit 9 is "a view-model and view ... plus
+wiring in ``ApplicationServices``", and the composition behind the port is
+implied by the word *wiring*. It is not wiring. It is: manifest ``select``
+per host; the host-requirement filter; ``ToolCache.verify`` for install state;
+``InstallPipeline`` started on a background thread behind an ``InstallHandle``;
+failure mapped to ``ToolInstallState`` and ``LoaderDiagnostic``; and
+``registerLocalBinary``. That is a work unit, and it is the one gate items 1,
+2, 5, 7 and 8 actually run through.
+
+**It goes before the UI, which is the handoff's own recommendation applied one
+unit earlier.** The handoff says to move the end-to-end install ahead of the
+UI polish "because that is the item most likely to reveal the domain port is
+the wrong shape, and discovering that after the UI is built is expensive". A
+``ToolManager`` implementation exercised from a JUnit harness reveals a wrong
+port shape *without* a UI existing at all, which is cheaper still -- and gate
+item 1's wording, "driven through the Tool Manager UI, not from a test
+helper", still forces the through-the-UI unit afterwards. So the order is:
+port runtime (8), then UI (9), then the install driven through the UI (10).
+
+.. _p05-tools-seam:
+
+An engineering decision the two critical-path units both need
+--------------------------------------------------------------
+
+``cometgui-tools`` depends on ``cometgui-domain`` and ``cometgui-process``, and
+on nothing else. ``ToolProbe`` lives in ``org.cometgui.install.cache`` and
+takes an ``ArtefactRecord``, which lives in ``org.cometgui.install.registry``.
+**So the functional capability probe cannot implement ``ToolProbe`` from the
+module it belongs in**, and two units would otherwise discover that separately
+and answer it differently.
+
+Decided by me, before dispatching either: ``org.cometgui.install.probe``
+declares a narrow ``CapabilityProber`` port stated entirely in **domain**
+vocabulary -- tool, version, host platform, the executable's path, out to a
+``Set<ToolCapability>``. ``cometgui-tools`` implements it; a composing
+``ToolProbe`` in ``org.cometgui.install.probe`` runs loadability, then
+identity, then delegates capability to it. **No module's dependency list
+changes**, the layering rules are untouched, and the seam is the same shape as
+``Downloader`` and ``HashService``. If a unit finds this wrong, it reports it
+rather than adding a dependency.
+
+Units 6 to 12, as this orchestrator will run them
+--------------------------------------------------
+
+The rows above, written by my predecessor, are left exactly as they were: they
+are the record of what was planned, and overwriting them would destroy the only
+evidence that the plan changed. This table is what I will actually dispatch.
+Where the two differ, the difference is explained in :ref:`p05-scope-change`.
+
+**Serially.** No positive argument exists that any two of these cannot collide
+-- they share ``cometgui-domain``, the Maven working tree, ``_build/m2repo``,
+the docs gate and the git index -- so none is offered, and none will be.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 4 34 20 42
+
+   * - #
+     - Unit, and what changed from the predecessor's row
+     - Rules and gate items
+     - Sign-off
+
+   * - 6
+     - **Loadability and identity probes, and the ``R-PLAT-03``
+       diagnostic.** ``org.cometgui.install.probe``. Unchanged in substance.
+       Adds ``minimumGlibcxx`` to ``MinimumHostRequirements`` and the manifest,
+       here rather than earlier, and owns the host-satisfaction rule including
+       the exact-equality boundary. **Also declares ``CapabilityProber``**, the
+       port unit 7 implements -- see :ref:`p05-tools-seam`.
+     - ``R-PLAT-02``, ``R-PLAT-03``, ``R-TOOL-06``, gate 5
+     -
+
+   * - 7
+     - **Tool adapters, the functional capability probe, and local binary
+       registration.** ``org.cometgui.tools.*``. **Absorbs the old unit 8**:
+       same adapter code, different source of binary. Flips
+       ``cometgui-tools``'s mutation switch in the same commit as its first
+       class, and re-runs ``scripts/verify-test-gates.sh`` afterwards, because
+       that harness writes a control class into the package this unit fills.
+     - ``R-PERC-02``, ``R-TOOL-02``, ``R-TOOL-06``, ``R-TOOL-07``,
+       ``R-TOOL-08``, ``R-PERC-01``, gates 6, 7
+     -
+
+   * - 8
+     - **The Tool Manager runtime behind the port.** *Scope changed.* This
+       number was "local binary registration"; that is now unit 7's. It is
+       reused for the implementation of ``org.cometgui.domain.tools.ToolManager``,
+       which **has no implementation, no test double and no unit producing
+       one**, and which is what gate items 1, 2, 5, 7 and 8 actually run
+       through. Exercised end to end from JUnit with **no UI**, so a wrong port
+       shape is found before the UI is built.
+     - ``R-TOOL-04``..``R-TOOL-08``, ``R-PERC-01``, gates 1, 2, 5, 7, 8
+     -
+
+   * - 9
+     - **Tool Manager UI section and wiring.** Unchanged, but now built on a
+       port that has been run.
+     - ``R-PERC-01``, ``R-PERC-03``, ``R-PERC-11``, gates 5, 8
+     -
+
+   * - 10
+     - **The end-to-end install driven through the UI**, plus the deliberate
+       PDV cancellation and restart, plus the opt-in real-upstream variant.
+       Gate item 1's wording is literal -- "driven through the Tool Manager
+       UI, not from a test helper" -- which is why unit 8 does not discharge
+       it.
+     - gates 1, 2
+     -
+
+   * - 11
+     - **Documentation**: ``docs/developer/tool_registry.rst``,
+       ``docs/tool_manager.rst``, and **only the artefact table** in
+       ``docs/platform_support.rst``. Checked against the stubs themselves:
+       ``docs/developer/tool_adapters.rst``'s per-tool sections belong to
+       phases 08, 09, 11 and 12, and ``docs/developer/version_capabilities.rst``
+       belongs to Phase 09. Neither is this phase's.
+     - ``R-DOC-06``, ``R-PERC-12``
+     -
+
+   * - 12
+     - **``scripts/verify-install-gates.sh``**, assembled from the injections
+       in this log rather than invented, in
+       ``scripts/verify-provenance-gates.sh``'s shape. Registration in
+       ``verify-all-gates.sh`` is escalated, not assumed.
+     - every gate item
+     -
+
+.. _p05-zombie-processes:
+
+A mechanical cause for the process-check trap nobody had named
+---------------------------------------------------------------
+
+``STATUS.rst`` records, under *The lock nothing takes, and the ruling on it*,
+that a "wait until the other harness exits" loop and an "is the tree busy"
+check each used ``pgrep
+-f`` with a pattern their own command line contained, so both matched
+themselves -- the impatient and the patient forms of the same mistake, both
+tier 1's, and the rule drawn from them is that **a process check must exclude
+the checker.**
+
+There is a second cause, and it is worse because excluding the checker does not
+fix it. On this host right now::
+
+    $ ps -eo stat | grep -c Z
+    705
+    $ ps -eo stat,comm | awk '$1 ~ /Z/ {print $2}' | sort | uniq -c | sort -rn | head -4
+        345 java
+        176 cat
+         93 bash
+         52 sleep
+
+**705 zombie processes, 345 of them named ``java``.** A zombie stays in the
+process table until its parent reaps it, and these parents are dead shells from
+sessions that ended hours and days ago. So ``pgrep java``, ``pgrep -f mvn`` and
+every ``ps | grep`` liveness check in this tree matches hundreds of processes
+that **exited long ago** -- and reports BUSY for ever, correctly excluding the
+checker and still being wrong.
+
+The rule that follows: **a liveness check must exclude defunct processes as
+well as the checker** -- match on a live attribute such as a non-zero RSS, or
+on the JVM's real main class read from a still-open ``/proc/<pid>/cmdline``, and
+read the matched lines rather than the count. And the standing conclusion is
+unchanged and is the one to rely on: **the completion notification is the only
+signal that means finished.**
+
+I found this while waiting for the gate suite, by checking that the suite was
+still alive without matching my own command line.
+
+.. _p05-gate-retake:
+
+The aggregate suite, re-taken -- and it is red
+===============================================
+
+``bash scripts/verify-all-gates.sh``, run by me at ``be5dd72`` on a quiet tree
+with nothing else building, 2026-09-02::
+
+    10 control(s) passed, 1 failed, in 1504 seconds (25m04s).
+    tests: exited 1; a gate did not bite, or the harness could not run.
+    verify-all-gates.sh: 1 control(s) failed.
+
+The recorded figure this replaces -- **11 controls, 0 failed, 2926s**, measured
+at ``96e7da4`` -- is now known to have been stale by movement rather than by
+noise, exactly as the handoff warned. Every other control passed at or above
+its floor: license 5, workflows 19, docs 1, traceability 8, sbom 8, depscan 16,
+pipeline 24, quality 42, shell 30, provenance 24. **No floor was lowered and
+none needs to be.**
+
+``scripts/verify-test-gates.sh`` reports **33 assertions passed, 4 failed**.
+The four are two independent faults, and the second is the serious one.
+
+.. _p05-control0:
+
+Fault 1: an argued equivalent mutant makes CONTROL 0 red
+---------------------------------------------------------
+
+::
+
+    FAIL  the baseline mutation run really mutated something, and killed all of
+          it: the clean tree left survivors -- 368/369 killed (99%)
+
+Read out of ``mutations.xml`` rather than the console, the survivor is
+``org.cometgui.domain.tools.ToolVersion.compareTo`` line 214,
+``ConditionalsBoundaryMutator`` -- ``index < width`` becoming ``index <=
+width``.
+
+**It is a genuine equivalent mutant and no test can kill it.** The extra
+iteration compares ``componentAt(width)`` on both sides; ``componentAt``
+returns 0 at or past the end of the component list, so it is 0 against 0 for
+any two versions, the difference is 0, and the loop falls through to the same
+``return 0``. Unit 1's author wrote that argument into a comment above the loop
+and declined the alternative implementation that would kill it, because that
+one is correct only by way of an invariant established in another method. I
+agree and I am not asking for it to be reversed.
+
+``assert_pit_killed_everything`` requires ``killed == generated`` **and**
+``percent == 100``, and its own comment gives the reason: *"a run that left
+survivors means the clean tree does not meet the gate, which would make every
+dirty run below meaningless."* **That sentence is now false.** The clean tree
+does meet the gate -- 99.7% against a floor of 80 -- so the runs below are not
+meaningless. The assertion has become stronger than the property it defends,
+and legitimate growth turned it red.
+
+**Phase 04 signed off with ``cometgui-domain`` at 204/204. Unit 1 took it to
+368/369**, a figure the unit 1, 2, 3, 4 and 5 sign-offs and ``STATUS.rst`` all
+record as accepted. So this control has been failing since ``42033ad``, and
+nobody saw it because the aggregate suite had not been re-run since phase start
+-- which is open thread 2 in the handoff. This is what was behind it.
+
+.. _p05-sandbox-manifest:
+
+Fault 2: this phase broke the sandbox, and two controls now fail for the wrong reason
+--------------------------------------------------------------------------------------
+
+::
+
+    FAIL  the documented build command rejects unmeasured coverage: failed, but
+          without the expected diagnostic 'MISSING  cometgui-domain: ...'
+    FAIL  the documented build command rejects the incomplete population:
+          failed, but without the expected diagnostic 'ABSENT   cometgui-domain: ...'
+    FAIL  and it names the class that left the sample: nothing matches
+          '^ +org\.cometgui\.domain\.secrets\.SecretRegistry$'
+
+Controls 7 and 8 damage ``cometgui-domain/pom.xml`` in the sandbox and require
+``bash scripts/build.sh`` to reject it **at the census stage, with the census's
+own diagnostic**. The build does fail. It fails **three stages earlier**, in
+``build``, and the reason is ours::
+
+    ShippedManifestTest.percolator309HasNoLinuxRow:525 ? InvalidArtefactManifest
+    the tool artefact manifest is missing from the classpath at "/tools.json"
+
+``Tests run: 806, Failures: 3, Errors: 23`` in ``cometgui-install``; control 8's
+log carries the same message 52 times.
+
+**The cause.** Unit 2 ships ``manifests/tools.json`` into
+``cometgui-install``'s jar through a ``<resource>`` element pointing at
+``${maven.multiModuleProjectDirectory}/manifests`` -- one file, shipped once,
+which is the right design and I am not reversing it. But
+``scripts/verify-test-gates.sh`` builds its sandbox from a **deliberately
+minimal** copy: ``.mvn``, ``config``, ``scripts``, ``specification.rst``, each
+module's ``pom.xml`` and each module's ``src``. There is no ``manifests/``
+directory in ``_build/test-gate-sandbox``, confirmed by ``ls``. So in the
+sandbox that resource directory does not exist, ``/tools.json`` is not on the
+classpath, and **26 ``cometgui-install`` tests fail in every sandbox build.**
+
+**Why this is the serious one.** It is
+``STATUS.rst``'s catalogued *a control that fails for the wrong reason*,
+happening for real, and it lands on the check tier 1 closed on 2026-09-02
+together with "a control proving it bites". The census itself still runs and
+still bites in the real build; what is broken is **the proof that it does**. A
+control that goes red whatever you do to it is worth no more than one that goes
+green whatever you do to it, and this one has been red since unit 2 landed.
+
+**The repair is one line, and the harness's own rule prescribes it.** Above the
+copy loop it says: *"the sandbox carries files the build reads as INPUT ... add
+them the same way, with the reason, rather than widening this to a blanket
+copy."* ``manifests/tools.json`` is a file the build reads as input -- a module
+POM names it as a ``<resource>``. Copying ``manifests/`` beside ``config/``
+restores both controls to grading what they mean to grade, lowers no floor, and
+widens nothing. **``scripts/verify-test-gates.sh`` is tier 1's file, so this is
+escalated, not fixed.**
+
+.. _p05-exit-code-again:
+
+And the trap caught me too
+---------------------------
+
+I ran the suite in the background as
+``bash scripts/verify-all-gates.sh > log 2>&1; echo "EXIT=$?"``. The harness
+reported the task as **"completed (exit code 0)"** -- the exit code of my
+wrapper, not of the suite, which exited 1. Had I taken the completion
+notification at face value I would have reported a green suite and moved on.
+
+**Exit code 0 proves nothing, and that applies to the exit code a wrapper
+reports as much as to the one a tool returns.** The suite's own summary line is
+the evidence; the notification is not. Recorded because it is the fourth
+distinct form this trap has taken in this project, after the ``+`` separator,
+the ``package.*`` glob and the missing ``surefire.`` prefix.
