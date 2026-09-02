@@ -546,7 +546,9 @@ collide -- they share ``cometgui-domain``, the Maven working tree,
        serialise and neither observes a partial entry; the installed binary is
        executable and actually runs.
      - ``R-TOOL-04``, ``R-TOOL-05``, ``R-PLAT-04``, ``R-PLAT-05``, gates 2, 4
-     -
+     - **ACCEPTED 2026-09-02**, no rework -- see :ref:`p05-u5-signoff`. My
+       injection bit. Build 11/11 in 1300s, 62/62 in the census, 1087/1104
+       mutations over 14 gated prefixes.
 
    * - 6
      - **Loadability and identity probes, and the ``R-PLAT-03``
@@ -1521,6 +1523,91 @@ variation but explicitly does **not** claim that was the cause.
 **Nine green runs are not an explanation.** This is an unexplained one-off in a
 security test, it is recorded as open, and if it reappears that is the thread to
 pull.
+
+.. _p05-u5-signoff:
+
+Unit 5 sign-off
+===============
+
+**Accepted 2026-09-02** at ``0ff3d72``. ``org.cometgui.install.cache``: 19
+production classes, 178 tests. My own build, on a quiet tree, after gating the
+new package::
+
+    11/11 stages OK in 1300 seconds.  BUILD OK
+    172 report file(s): tests=3140 failures=0 errors=0 skipped=3
+    ok  cometgui-install  line 100.0% (2568/2568)  branch 99.5% (956/960)
+    ok  cometgui-install  62 compiled class(es), all 62 in the sample
+    ok  cometgui-install  1087/1104 mutations killed = 98.4%
+    14 critical package prefix(es) read from pom.xml
+    ok  8 architecture rule(s) checked, 0 failures
+
+**The defect I injected** was aimed at whether the unit had repeated the very
+gap it was sent to close. It had not: ``ArchiveMember.hashes()`` was a recorded
+value nothing compared, and the marker's ``payloadEntryCount`` is the same
+shape -- so I made ``ToolCache`` trust the marker's own count instead of
+counting the directory. Compiled class ``cfa4e9dd...`` to ``3afb20ac...``. It
+**bit**: ``ToolCacheTest.aLostFileIsCaughtByTheEntryCount:201 expected:
+<CONTENT_COUNT_MISMATCH> but was: <INSTALLED>``. Reverted, hash restored, tree
+clean.
+
+**This is the first unit that needed no rework**, and the reason is worth
+recording: it is the first whose agent pointed PIT at its own package before
+being asked, found 239/241, and reported the two non-kills with arguments. The
+three gates I widened after units 3 and 4 each found real defects; this one
+found nothing, because the unit had already looked.
+
+What it built that later units depend on
+-----------------------------------------
+
+* **``InstallStep`` is an enumeration the pipeline is driven by**, and a step
+  added without an action **stops the installer** rather than being skipped.
+  The eight names are pinned hand-typed, so a ninth fails that test at once.
+* **The marker is written last, after the atomic move**, and carries the length
+  and both digests of every file the manifest names, plus
+  ``payloadEntryCount``. ``ToolCache.verify`` re-hashes on every read.
+* **Interruption is proved in a real second JVM with ``Runtime.halt``** after
+  each of the eight steps in turn -- no ``finally``, no unwinding, lock released
+  by the OS. Steps 1-6 leave ``NOT_PRESENT``, step 7 ``NO_MARKER``, only step 8
+  ``INSTALLED``.
+* **The lock is a JVM-wide permit plus a ``FileLock``**, because a ``FileLock``
+  is held by the *process* and a second attempt inside one JVM throws rather
+  than waiting. Two real JVMs serialise, one is observed to wait, **and a
+  control shows the same harness observing an overlap when the lock is left
+  out** -- without which the first test could pass vacuously.
+* **``ToolProbe`` is a declared, unimplemented seam.** Units 6 and 7 implement
+  it. It is also how gate item 2 is served here: a probe stub that fails the
+  test if entered proves a corrupted download never reaches execution.
+
+Decisions the unit took, which I ratify
+----------------------------------------
+
+* **``AtomicMoveNotSupportedException`` is re-thrown, never handled.** A copy
+  fallback is not atomic and would silently replace the guarantee ``R-TOOL-04``
+  rests on. Every other ``FileSystemException`` becomes ``CACHE_CONTENDED``
+  with **no retry**, quoting the file system's own reason and naming the likely
+  holders. Tested on Linux with a read-only parent. **The Windows contention
+  case is still untested and the residue is unchanged.**
+* **The cache directory uses the normalised version** (``percolator/3.7.1/``),
+  because ``ToolVersion.equals`` is numeric and text-named directories would
+  make ``3.09`` and ``3.09.0`` two directories for one version. **The marker
+  and every user-facing string keep upstream's spelling.** Unit 9 must render
+  ``text()``, never the directory name.
+* **Step 2 re-hashes the file** rather than trusting the digest
+  ``VerifiedArtefact`` reports -- found by mutation testing, because a source
+  that lies otherwise passes step 2.
+
+Two findings for any later unit that spawns a JVM
+--------------------------------------------------
+
+* **PIT's coverage minion does not use Surefire's class path.** A child JVM
+  launched with ``System.getProperty("java.class.path")`` gets the minion's own
+  under PIT, dies with ``ClassNotFoundException``, and the parent test hangs
+  until timeout -- which failed ``build.sh``'s PIT stage with *"tests did not
+  pass without mutation"*. Derive the class path from
+  ``getProtectionDomain().getCodeSource()``. And **a mutant is invisible to a
+  child JVM**, which loads unmutated classes from ``target/classes``.
+* **A mutant that blocks scores ``TIMED_OUT``, not a kill**, and ``build.sh``
+  counts only ``KILLED``. One such survivor remains in ``InstallLock.close``.
 
 Rejections and rework
 =====================

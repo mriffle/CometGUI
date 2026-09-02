@@ -1,304 +1,546 @@
-==================================================================
-PHASE-05 handoff -- Tool Registry and Installer (mid-phase)
-==================================================================
+====================================================================
+PHASE-05 handoff -- Tool Registry and Installer (to a successor)
+====================================================================
 
 :Phase: 05
 :Written: 2026-09-02
-:Outcome so far: **four of twelve units signed off; the phase is INCOMPLETE and
-   is handed over mid-flight**, at tier 1's direction, while the record can be
-   written from a quiet tree rather than from exhaustion
-:Phase orchestrator: Phase-05 orchestrator subagent (session 05)
-:Records: ``handoffs/PHASE-05-worklog.rst`` -- the decomposition, every unit's
-   sign-off, every injection with its failure text, and the findings this
-   document only summarises
-:Tree this describes: ``00e6494``, ``git status --short`` empty
-
-In one line: **the download, verification and extraction half of the installer
-is built, gated and proven against real upstream artefacts; the probe, install,
-UI and end-to-end half is not started.**
+:Outcome: **INCOMPLETE. Units 1-5 of 12 signed off; units 6-12 not started.**
+   The phase is handed to a fresh phase orchestrator by owner decision, not
+   because anything is wrong with it.
+:Written by: the Phase-05 orchestrator (session 05), who will not be available
+   to answer questions
+:Records: ``handoffs/PHASE-05-worklog.rst`` -- the evidence. **This document is
+   the map; the work log is the proof.** Every claim here is backed there by a
+   command and the text it produced.
 
 .. contents:: Contents
    :depth: 2
    :local:
 
-.. _p05h-numbers:
+Start here
+==========
 
-Every number here, and the tree it came from
-=============================================
+You are taking over a phase that is **five twelfths done and clean**. Nothing is
+half-landed, nothing is landed-but-unsigned, and every unit that exists was
+re-verified by me running its checks myself and injecting a defect its author
+had not tried.
 
-Phase 04's handoff was written from a moving tree and every headline figure had
-to be re-taken. So: **each figure below was measured by the phase orchestrator,
-personally, on a quiet tree with no agent live and nothing uncommitted**, and the
-commit is named. Anything I did not measure that way is marked.
+Do these four things, in this order, before you plan anything:
+
+#. ``cd "$(git rev-parse --show-toplevel)"`` and ``. ./tools/env.sh``. **The
+   checkout is not at ``/workspace``**; documents older than 2026-08-31 say it
+   is and they are stale text, not a second tree.
+#. ``git fetch`` and check where you are. **I am handing over at ``2f4511f``,
+   which is two commits ahead of ``origin/main`` at ``38c17b5``** -- the unit 5
+   sign-off and its mutation gate. Tier 1 pushes; you do not.
+#. **Run ``bash scripts/verify-all-gates.sh``.** It takes ~50 minutes and it is
+   the one number in this document that describes a tree which no longer exists.
+   See :ref:`p05s-figures`.
+#. Read ``handoffs/PHASE-05-worklog.rst`` in full. It is long. Read it anyway:
+   it holds every injection with the exact failure text, and that is what makes
+   the five sign-offs checkable rather than assertions you have to take from a
+   stranger.
+
+The one-paragraph version
+=========================
+
+This phase builds the thing that makes "the scientist installs nothing by hand"
+true: a manifest of pinned upstream artefacts, a downloader, checksum
+verification, safe extraction, an atomic install, a three-stage probe, and a
+Tool Manager UI. **The download, verification, extraction and installation half
+is built, gated and proven against real upstream artefacts. The probing, UI and
+end-to-end half is not started.** The phase's expected grade is ``PARTIAL``,
+because gate item 9 requires a macOS machine and none exists.
+
+.. _p05s-tree:
+
+The tree you are inheriting
+============================
 
 .. list-table::
    :header-rows: 1
-   :widths: 40 18 42
+   :widths: 34 66
 
-   * - Measurement
-     - Tree
-     - Value
+   * - Thing
+     - State
+
+   * - ``git status --short``
+     - empty
+
+   * - ``HEAD``
+     - ``2f4511f``, two ahead of ``origin/main``
 
    * - ``bash scripts/build.sh``
-     - ``00e6494``
-     - ``11/11 stages OK in 1085 seconds. BUILD OK``;
-       ``tests=2962 failures=0 errors=0 skipped=3``
+     - ``11/11 stages OK in 1300 seconds. BUILD OK``,
+       ``tests=3140 failures=0 errors=0 skipped=3``
 
-   * - ``bash scripts/verify-all-gates.sh``
-     - ``96e7da4`` (phase start)
-     - 11 controls passed, 0 failed, 2926s. **Not re-run since; must be
-       re-taken before sign-off.**
+   * - Modules with code from this phase
+     - ``cometgui-domain`` (``org.cometgui.domain.tools``, 24 classes) and
+       ``cometgui-install`` (5 packages, 62 classes)
 
-   * - ``cometgui-domain`` coverage / census / mutation
-     - ``00e6494``
-     - line 100.0% (832/832), branch 100.0% (350/350); 49 compiled, all 49 in
-       the sample; 368/369 = 99.7%
+   * - ``cometgui-tools``
+     - **still only ``package-info.java`` files, and its mutation switch is
+       still off.** This is the single most likely way you break the build --
+       see :ref:`p05s-traps`.
 
-   * - ``cometgui-install`` coverage / census / mutation
-     - ``00e6494``
-     - line 100.0% (1831/1831), branch 99.4% (746/750); 44 compiled, all 44 in
-       the sample; 848/863 = 98.2%
+   * - Mutation-gated packages
+     - **14** prefixes, up from 11. I added three; see :ref:`p05s-decisions`.
 
-   * - Critical package prefixes in ``pom.xml``
-     - ``00e6494``
-     - **13**, up from 11 at phase start
+The three skips in the build are two of Phase 04's and one opt-in network test
+declining without its flag **with a printed reason**. None is in this phase's
+code, and this phase disabled nothing.
 
-   * - Reactor tests
-     - ``96e7da4`` then ``00e6494``
-     - 1756 -> **2962**
+.. _p05s-units:
 
-The three skips are: two in ``cometgui-provenance`` from Phase 04, and the
-opt-in upstream download test declining without its flag **with a printed
-reason**. None is in this phase's new code.
+Units 1 to 5, and the defect I injected into each
+==================================================
 
-.. _p05h-units:
-
-Unit state, one line each
-==========================
+Every unit was sent back at least once except unit 5. **In every case the hole
+was the same shape**: a rule asserted at one point on an axis it does not
+actually depend on. If you read one thing about how to review this phase's work,
+read that sentence again -- it predicted four of the five holes.
 
 .. list-table::
    :header-rows: 1
-   :widths: 5 20 12 63
+   :widths: 4 17 12 67
 
    * - #
      - Unit
      - State
-     - The defect I injected, and what it produced
+     - What I injected, and the text it produced
 
    * - 1
-     - Domain tool vocabulary
+     - Domain tool vocabulary, ``org.cometgui.domain.tools``
      - **SIGNED OFF** ``42033ad``
-     - ``DeclaredCapability``'s blank-note rejection skipped when evidence is
-       ``UNVERIFIED``. **Survived 108 tests.** After rework it fails 18 of 171:
-       ``every evidence value must reject a blank note ... expected:
-       <[OBSERVED_BY_EXECUTION, INFERRED_FROM_ARTEFACT_BYTES, UNVERIFIED]> but
-       was: <[OBSERVED_BY_EXECUTION, INFERRED_FROM_ARTEFACT_BYTES]>``
+     - Blank-note rejection skipped when evidence is ``UNVERIFIED``. **Survived
+       108 tests.** After rework, 18 of 171 fail: ``every evidence value must
+       reject a blank note ... expected: <[OBSERVED_BY_EXECUTION,
+       INFERRED_FROM_ARTEFACT_BYTES, UNVERIFIED]> but was:
+       <[OBSERVED_BY_EXECUTION, INFERRED_FROM_ARTEFACT_BYTES]>``
 
    * - 2
-     - Manifest and strict reader
+     - Manifest and strict reader, ``...install.registry``
      - **SIGNED OFF** ``eac6d5e``
-     - Three of mine. Inverting native-before-translated fails **three** tests
-       (one before the rework). Keying the one-row-per-download rule on version
-       rather than URL fails two. Keeping the translated row fails with ``pdv is
-       a JAR, and a row marked TRANSLATED_ROSETTA_2 would tell a scientist that
-       a Java program runs under Rosetta 2 ==> expected: <NATIVE> but was:
-       <TRANSLATED_ROSETTA_2>``
+     - Three. Inverting native-before-translated fails **three** tests (one
+       before rework). Keying one-row-per-download on version not URL fails two.
+       Keeping the translated row: ``pdv is a JAR, and a row marked
+       TRANSLATED_ROSETTA_2 would tell a scientist that a Java program runs
+       under Rosetta 2 ==> expected: <NATIVE> but was: <TRANSLATED_ROSETTA_2>``
 
    * - 3
-     - Downloader and checksum decision
+     - Downloader and checksum decision, ``...download`` / ``...verify``
      - **SIGNED OFF** ``12d871e``
      - Progress on a **resumed** transfer reported from the resume point.
-       **Survived 338 tests.** Now fails: ``expected: <1500000> but was:
-       <16229>`` and ``monotone ACROSS the resume boundary ... expected: <true>
-       but was: <false>``
+       **Survived 338 tests.** Now: ``expected: <1500000> but was: <16229>`` and
+       ``monotone ACROSS the resume boundary ... expected: <true> but was:
+       <false>``
 
    * - 4
-     - Safe extraction (``R-SEC-05``)
+     - Safe extraction, ``...archive``
      - **SIGNED OFF** ``00e6494``
      - ``hasDriveLetter`` returning false: **bit**, 8 failures, because the
        refused-path table already carried ``C:/x``. Then I deleted each of the
-       five XXE guards in turn myself; all five fail, ``DISALLOW_DOCTYPE`` with
-       4 of 6.
+       five XXE guards in turn; all five fail, ``DISALLOW_DOCTYPE`` with 4 of 6.
 
-   * - 5-12
-     - Install, probes, adapters, local binary, UI, end-to-end, docs, harness
+   * - 5
+     - Atomic install, marker, lock, ``...cache``
+     - **SIGNED OFF** ``0ff3d72``
+     - Made ``ToolCache`` trust the marker's own ``payloadEntryCount`` instead
+       of counting the directory. **Bit**:
+       ``ToolCacheTest.aLostFileIsCaughtByTheEntryCount:201 expected:
+       <CONTENT_COUNT_MISMATCH> but was: <INSTALLED>``
+
+   * - 6-12
+     - Probes, adapters, local binary, UI, end-to-end, docs, harness
      - **NOT STARTED**
-     - No agent was dispatched. Nothing is landed-but-unsigned anywhere.
+     - No agent dispatched. Nothing exists. See :ref:`p05s-remaining`.
 
-**Nothing is in the landed-but-unsigned state.** Every unit above was
-re-verified by the orchestrator running the checks itself, not by reading a
-report, and every one was sent back at least once.
+.. _p05s-nowhere:
 
-.. _p05h-survey:
+What I know that is written nowhere else
+=========================================
 
-The upstream survey -- the least recoverable thing in this document
-====================================================================
+This is the section I would most want if I were you, and the one that dies with
+me if I do not write it.
 
-Twenty-four artefacts fetched by pinned URL on 2026-09-02, 145 MB, each with
-size, SHA-256 and MD5. The raw table is ``scratch/phase05/SURVEY.tsv`` and the
-assembled one ``scratch/phase05/MANIFEST-INPUT.txt`` -- **both gitignored, so if
-that directory is lost the survey must be re-run.** The values that survive in
-git are in ``manifests/tools.json``, and I re-derived **all 54** of them from the
-bytes with **zero mismatches**.
+How I actually reviewed, and why the injections that mattered all came from outside the brief
+----------------------------------------------------------------------------------------------
 
-**Upstream had not moved**: every SHA-256 Phase 00 recorded on 2026-08-29
-reproduced byte for byte, and all four ``latest`` tags were unchanged.
+My acceptance conditions were good enough that **every injection I chose from
+inside them bit immediately** -- which tells you the agent read the brief, and
+nothing else. The three injections that *survived* were all things I went
+looking for **outside** the stated conditions, by asking a different question:
+not "is this rule tested?" but **"what silent behaviour does this code have that
+no acceptance condition names?"**
 
-Facts that were not known before this phase
---------------------------------------------
+Progress reporting during a resume. A blank note under one evidence value. A
+sort order that only matters when a tool has two builds for one platform. None
+of those were in my own brief; all three were real.
+
+So: **do not choose your injection from your own acceptance list.** Read the
+production code for behaviour that is observable but unstated, and attack that.
+
+The pattern that predicted four of five holes
+----------------------------------------------
+
+Every hole was **a rule graded at one point on an axis it does not depend on**.
+Blank-note tested only with ``OBSERVED_BY_EXECUTION``. Progress tested only on
+fresh downloads. Traversal narrowed to a leading ``..`` because every fixture
+began with one. Duplicate-name asserted on one of four entry types.
+
+When you review units 6-12, ask of each rejection: *which parameter is this
+rule stated over, and which parameters is it silent about?* Then vary the silent
+one.
+
+Why I gated three packages after the fact rather than up front
+---------------------------------------------------------------
+
+I added ``org.cometgui.install.download.*`` after unit 3,
+``org.cometgui.install.archive.*`` after unit 4 and
+``org.cometgui.install.cache.*`` after unit 5. **I could not have chosen those
+package names at decomposition time** -- I did not know what shape the code
+would take, and gating a package that turned out to hold only value objects
+would have been noise.
+
+The first two each found real defects the moment they were switched on,
+including five deletable XXE protections. The third found nothing, because that
+unit had already pointed PIT at itself.
+
+**Do the same for units 6-12.** ``org.cometgui.install.probe.*`` and
+``org.cometgui.tools.*`` are *already* in the list, so those two are different:
+they will bite the moment a class lands. Anything else new -- a UI view-model
+package, for instance -- is yours to gate deliberately once you can see it.
+Widening a gate never needs permission; narrowing one does.
+
+Things I tried that did not work
+---------------------------------
+
+* **My first checksum verifier reported four mismatches that were my bug.** I
+  keyed local artefact files by basename, and 3.06.5 and 3.07.1 publish their
+  macOS and Windows portable zips under **the same file names**, so the map
+  collided and compared one release's rows against another's files. Re-keyed by
+  release tag, all 54 checksums matched. **A red result can be the harness's
+  fault as easily as a green one can be a lie.**
+* **I twice ran ``mvn -Dtest='SomeName'`` where the class did not exist**, got
+  ``BUILD SUCCESS``, and briefly believed an injection had survived. A phase
+  agent did the same thing independently on the same day. See
+  :ref:`p05s-traps`.
+* **I twice treated "no Maven process is running" as "the agent has stopped."**
+  Once it cost a re-run; once I caught it only because a test file happened to
+  be mid-edit in ``git status``.
+
+Why the manifest lives where it does
+-------------------------------------
+
+``manifests/tools.json`` at the repository root, shipped into
+``cometgui-install``'s jar by a ``<resource>`` element pointing at
+``${maven.multiModuleProjectDirectory}/manifests``. **Not** a copy under
+``src/main/resources``. Both the file and the jar's copy hash
+``3f6707d3...``: one file, shipped once. A second copy is a second thing to
+keep in step, and this project has paid for that twice.
+
+Why the routine tests do not touch the network, and what I rejected
+--------------------------------------------------------------------
+
+Tests serve the **real artefact bytes** over a loopback HTTP server, from a
+mirror populated by pinned URL with mandatory SHA-256. The stated limit is that
+this proves download, verification, extraction and install against real bytes
+over real HTTP, and **does not** prove upstream availability -- which is
+``R-TEST-08`` and belongs to Phase 15.
+
+I considered and **rejected** making the production HTTPS rule strict and giving
+tests a permissive seam. That would run every transfer test through a seam
+production does not use, which is the third of this project's nine shapes and
+the exact defect I sent unit 2 back to fix. The loopback carve-out is narrower:
+plain HTTP to a **127.0.0.0/8 or ``::1`` literal only**, never a name, because a
+name resolves at connect time and a name-based check answers a different
+question from the connection that follows. It is unreachable from product data
+and its narrowness is itself graded.
+
+Why unit 1 defines ports nobody implements
+-------------------------------------------
+
+``ToolManager``, ``InstallHandle``, ``InstallProgressListener`` and
+``ToolProbe`` are declared with no implementation. That is this project's idiom,
+not an oversight: ``Downloader``, ``HashService`` and ``ProcessRunner`` were all
+declared phases before the phase that implemented them. The Javadoc on each says
+which unit owns the implementation.
+
+A version subtlety that will bite the UI
+-----------------------------------------
+
+``ToolVersion.equals`` is **numeric**, so ``3.07.1`` and ``3.7.1`` are one
+version and ``3.09`` equals ``3.09.0``. The install cache therefore uses the
+**normalised** directory name (``percolator/3.7.1/``), because text-named
+directories would make one version into two. **But the marker and every
+user-facing string keep upstream's spelling**, which is what a scientist can
+look up. Unit 9 must render ``ToolVersion.text()`` and never the directory name.
+
+What the phase deliberately did not do
+---------------------------------------
+
+* **``NSIS_PAYLOAD`` is not implemented and must not be.** ``D-002`` option C
+  deleted it. ``ArtefactKind`` has exactly six constants and a test asserts so,
+  with a Javadoc saying why, precisely so nobody "completes" the enum.
+* **``scripts/ci/nightly-manifest-verify.sh`` is left as a stub that exits
+  non-zero.** ``R-TEST-08`` is Phase 15's. A stub that exits non-zero is the
+  correct state; making it exit 0 would be a gate weakening.
+* **Nothing downloaded is committed.** The artefact mirror lives in
+  ``scratch/``, which is gitignored.
+
+.. _p05s-survey:
+
+The upstream survey, which is the least recoverable thing here
+===============================================================
+
+On 2026-09-02 I fetched **24 artefacts by pinned URL, 145 MB**, and recorded
+size, SHA-256 and MD5 for each. **Upstream had not moved**: every SHA-256 Phase
+00 recorded on 2026-08-29 reproduced byte for byte and all four ``latest`` tags
+were unchanged.
+
+The raw tables are ``scratch/phase05/SURVEY.tsv`` and
+``scratch/phase05/MANIFEST-INPUT.txt``. **Both are gitignored. If that directory
+is gone, the survey must be re-run** -- ``scratch/phase05/fetch-survey.sh``
+does it. What survives in git is ``manifests/tools.json``, whose **54**
+checksums I re-derived from the bytes myself with zero mismatches.
+
+Facts nobody knew before this phase
+------------------------------------
 
 #. **A genuine upstream artefact contains a path-traversal entry.**
-   ``rel-3-06-05/percolator-noxml-osx-portable.zip`` has one member, named
+   ``rel-3-06-05/percolator-noxml-osx-portable.zip`` has one member named
    ``../my_build/percolator-noxml/src/percolator``. Gate item 3 therefore has a
    **real** artefact behind it, which no security rule in this project has had.
 #. **Percolator 3.09's Windows artefact is a bare ``percolator.exe``**, 640512
-   bytes, **not a zip**. Any code assuming "Percolator implies ZIP" is wrong.
-#. **Percolator 3.09 has no Linux row at all** -- no portable archive; the
-   ``.deb`` needs ``GLIBC_2.38`` *and* ``libboost_filesystem.so.1.83.0`` which it
-   does not ship. Both failures were reproduced here. Absent is the honest
-   entry.
-#. **The XSD pair is byte-identical across platforms and versions**
-   (``21204c89...`` and ``fa50a550...`` from the 3.07.1 ``.deb``, the 3.07.1
-   ``.pkg``, the 3.06.5 ``.deb`` and the 3.06.5 ``.pkg``). That is what makes
-   the Windows sourcing decision safe.
-#. **The two Comet macOS binaries are exactly the same size** (3998328) and have
-   **different** SHA-256 values, closing Phase 00's open question 10. Do not
-   deduplicate them.
+   bytes, not a zip. Code assuming "Percolator implies ZIP" is wrong.
+#. **Percolator 3.09 has no Linux row at all.** No portable archive; the
+   ``.deb`` needs ``GLIBC_2.38`` *and* ``libboost_filesystem.so.1.83.0`` which
+   it does not ship. Both reproduced here. **Absent is the honest entry and a
+   test asserts the absence is deliberate**, so nobody "fixes" it by adding one.
+#. **The XSD pair is byte-identical across platforms and versions**, which is
+   what makes Windows sourcing them from the Linux ``.deb`` safe.
+#. **The two Comet macOS binaries are the same size (3998328) with different
+   digests.** Closes Phase 00's open question 10. Do not deduplicate them.
 #. **PDV is the only multi-entry archive the product installs**: 222 entries,
-   115057606 bytes uncompressed from 103407417, ratio **1.11**. The most
-   expansive real artefact anywhere is the 3.09 ``.deb`` at ratio **4.046**.
-   Those two numbers are what the decompression-bomb ceilings are calibrated
-   against.
+   115057606 bytes uncompressed, ratio **1.11**. The most expansive real
+   artefact anywhere is the 3.09 ``.deb`` at ratio **4.046**. Those two numbers
+   calibrate the decompression-bomb ceilings.
 
-The capability probe, executed
--------------------------------
+The capability probe, executed by me
+-------------------------------------
 
 Against the binary from ``rel-3-07-01/percolator-noxml-ubuntu-portable.zip``:
 
-* **64 target + 64 decoy**, ``-X`` -> exit 0, 46601 bytes, **exactly 64**
-  ``<psm``, correct root element and the
-  ``http://per-colator.com/percolator_out/`` namespace.
-* ``-X -Z`` -> exit 0, 96997 bytes, **128** ``<psm``, both ``p:decoy="true"``
-  and ``"false"``.
-* **8 target + 8 decoy** -> exit **1**, ``median decoy score <= score at 1%
-  FDR`` -- the documented false negative, reproduced.
+* **64 target + 64 decoy** with ``-X`` -> exit 0, 46601 bytes, **exactly 64**
+  ``<psm``, correct root element and namespace.
+* ``-X -Z`` -> exit 0, 96997 bytes, **128** ``<psm``, both decoy values.
+* **8 + 8** -> exit **1**, ``median decoy score <= score at 1% FDR``. The
+  documented false negative, reproduced.
 * ``--help`` from the portable and the ``.deb`` ``noxml`` binaries is
-  **byte-identical, 17928 characters**, both listing ``--xmloutput`` and
-  ``--decoy-xml-output``. **A text probe discriminates nothing.**
+  **byte-identical, 17928 characters**, both listing ``--xmloutput``.
 
-**Two traps the specification's wording does not cover.** On the failing 8+8 run
-the output file **exists and is zero bytes**, so "the file exists" is not a
-sufficient probe condition. And ``--help`` arrives on **stderr** -- confirmed
-independently on Windows -- so a probe reading stdout alone sees an empty
-string. Units 6 and 7 are bound by both.
+**Two traps the specification does not state.** On the failing run the output
+file **exists and is zero bytes**, so "the file exists" is not a sufficient
+probe condition. And **``--help`` arrives on stderr** -- confirmed independently
+on Windows -- so a probe reading stdout alone sees an empty string. Unit 7 is
+bound by both.
 
-Loader failures, executed
---------------------------
+Loader failures, executed by me
+--------------------------------
 
-Both ``R-PLAT-03`` shapes were produced on this host (Debian 12, glibc 2.36)
-from the 3.09 ``.deb`` payload, so the classifier is written against observed
-text:
+Both ``R-PLAT-03`` shapes, on this host (Debian 12, glibc 2.36), from the 3.09
+``.deb`` payload:
 
-* as published -- ``error while loading shared libraries:
+* as published: ``error while loading shared libraries:
   libboost_filesystem.so.1.83.0: cannot open shared object file``, exit 127;
 * with a stub of that library on ``LD_LIBRARY_PATH``, exposing the layer
-  beneath -- ``libstdc++.so.6: version 'GLIBCXX_3.4.32' not found`` and
+  beneath: ``libstdc++.so.6: version 'GLIBCXX_3.4.32' not found`` and
   ``libc.so.6: version 'GLIBC_2.38' not found``, exit 1.
 
-``readelf -V`` floors: 3.06.5 portable ``GLIBC_2.14``, 3.07.1 portable
-``GLIBC_2.34``, 3.09 ``.deb`` ``GLIBC_2.38``.
+``readelf -V`` floors: 3.06.5 ``GLIBC_2.14``, 3.07.1 ``GLIBC_2.34``, 3.09
+``GLIBC_2.38``. **Unit 6 must write its classifier against those strings**, not
+against invented ones.
 
-.. _p05h-windows:
-
-Windows, as of 2026-09-02: one thing observed, most things still not
----------------------------------------------------------------------
+Windows and macOS: exactly what is known
+-----------------------------------------
 
 A GitHub ``windows-latest`` runner executed Percolator 3.07.1's portable
-``noxml`` binary -- **the artefact the product ships** -- on 2026-09-02, run
-33644055780. It printed its banner, exited 0, and wrote 148272 bytes holding
-**200 ``<psm>`` and 200 ``<peptide>``** elements, parsed rather than grepped, and
-``--xml-in`` answered ``ERROR: Compiler flag XML_SUPPORT was off``, exit 1 --
-which is a positive observation of a *negative* capability and confirms the
-functional probe's discriminator works there.
+``noxml`` binary -- the artefact the product ships -- on 2026-09-02, run
+33644055780. It printed its banner, exited 0, wrote 148272 bytes holding **200
+``<psm>`` and 200 ``<peptide>``** elements parsed rather than grepped, and
+``--xml-in`` answered ``ERROR: Compiler flag XML_SUPPORT was off``, exit 1.
 
-**What that licenses, and nothing more.** ``percolator 3.07.1 windows-x86-64
-XML_OUTPUT`` is now ``observed-by-execution``. ``XML_DECOY_OUTPUT`` on that row
-is **deliberately still an inference**: the run exercised ``-X`` and
-``--xml-in``, not ``-X -Z``, and 200 psm from 200 targets is the target-only
-shape.
+**What that licenses:** ``percolator 3.07.1 windows-x86-64 XML_OUTPUT`` is
+``observed-by-execution``, and the functional probe's *detector* is proven to
+work on Windows.
 
-**What is not discharged.** The zip carries no Visual C++ runtime and the
-runner's image supplies one, so **a clean end-user machine remains untested** and
-``requiredHostLibraries`` stands. Also untested: a standard (non-administrator)
-user, consumer Windows 10/11 rather than Server 2025, and Windows on ARM. **No
-macOS binary has been executed anywhere in this project, still.**
+**What it does not:** ``XML_DECOY_OUTPUT`` on that row is still an inference --
+the run never exercised ``-X -Z``, and 200 psm from 200 targets is the
+target-only shape. The zip carries no Visual C++ runtime and **the runner's
+image supplied one**, so a clean end-user machine is untested and
+``requiredHostLibraries`` stands. Untested: standard (non-administrator) user,
+consumer Windows 10/11 rather than Server 2025, Windows on ARM. **No macOS
+binary has ever been executed anywhere in this project -- not on hardware, not
+on a runner, not under emulation.**
 
-.. _p05h-decisions:
+There is a hand-typed allowlist in ``ShippedManifestTest`` of the **eight**
+(row, capability) pairs anyone has watched run, plus a separate rule that no
+macOS row may claim observation. **Adding a genuine new observation requires
+editing that list**, which is the friction that forces someone to write down
+what was run.
 
-Decisions taken, so a fresh agent does not re-litigate them
-============================================================
+.. _p05s-figures:
 
-**The Tool Manager UI may not reference the installer.** ``LayeringRulesTest``
-restricts ``org.cometgui.ui..`` to java/javax/javafx/ui/domain/workflow/results/
-provenance/params and forbids ``java.net``, ``java.security``, ``java.util.zip``
-and ``java.util.jar``; ``cometgui-ui``'s POM declares neither installer module.
-So the whole Tool Manager vocabulary lives in ``org.cometgui.domain.tools`` and
-reaches the installer through a domain port. **This is why unit 1 exists**, and
-unit 9 is built on it.
+Which figures to trust, one by one
+===================================
 
-**One JSON reader, one hasher, one launcher, one redactor.**
-``cometgui-install`` depends on ``cometgui-provenance`` and uses its
-``JsonReader``; checksums go through the existing ``HashService``; processes
-through ``ProcessService``; redaction through ``org.cometgui.domain.secrets``.
-No second implementation of any of them.
+.. list-table::
+   :header-rows: 1
+   :widths: 30 12 58
 
-**The manifest exists once**, at ``manifests/tools.json``, shipped into the jar
-by a ``<resource>`` pointing at the repository-root directory. Both copies hash
-``3f6707d3...``: one file, shipped once.
+   * - Figure
+     - Trust
+     - Why
 
-**For a ``ZIP``, the manifest names the member and the archive's own path never
-places a file.** Forced by the real traversing artefact. It is **stronger** than
-sanitising a name, not weaker -- and the traversal guard is still exercised
-against that same artefact, so the design did not become the reason the guard is
-never tested.
+   * - ``build.sh`` 11/11 in 1300s, ``tests=3140``
+     - **Yes**
+     - Mine, on ``2f4511f``, quiet tree, ``git status`` empty.
 
-**Capability evidence is a field, and observation is an allowlist.** Every claim
-carries how it was established. ``ShippedManifestTest`` pins the **eight**
-(row, capability) pairs anyone has watched run, by hand, and a separate rule
-forbids any macOS row from claiming observation. An allowlist rather than a
-"must carry a note" rule, because a fabricated claim can carry a fabricated
-note -- that would grade prose rather than truth.
+   * - ``cometgui-install`` 100.0% line / 99.5% branch, 62/62 census,
+       1087/1104 mutations
+     - **Yes**
+     - Same run.
 
-**Windows takes the XSD pair from the Linux ``.deb``** (tier 1, 2026-09-02),
-because the schemas are platform-independent and byte-identical and ``D-002``
-option C deleted the only Windows source. **The manifest record says why**, so it
-does not become somebody's cleanup.
+   * - ``cometgui-domain`` 100.0%/100.0%, 49/49, 368/369
+     - **Yes**
+     - Same run.
 
-**Routine tests serve real artefact bytes over loopback HTTP**, from a mirror
-populated by pinned URL with mandatory SHA-256. **Stated limit:** that proves
-download, verification, extraction and install against real bytes over real
-HTTP; it does **not** prove upstream availability, which is ``R-TEST-08`` and
-Phase 15's. ``scripts/ci/nightly-manifest-verify.sh`` remains a stub that exits
-non-zero, which is correct.
+   * - The 54 manifest checksums
+     - **Yes**
+     - Re-derived by me from the bytes, keyed by release tag after I found and
+       fixed my own basename bug.
 
-**Two mutation gates were widened by me**, both ratified by tier 1. Adding a
-package strengthens the gate and the POM's own comment sanctions it; the list is
-never narrowed.
+   * - Each unit's acceptance build
+     - **Yes**
+     - Each run after that unit's completion notification, ``git status``
+       clean.
 
-* ``org.cometgui.install.download.*`` -- because the availability-versus-corrupt
-  distinction is a ``D-008`` product requirement. Found 9 survivors.
-* ``org.cometgui.install.archive.*`` -- because ``R-SEC-05`` is this phase's
-  security rule and unit 4 reported that its 8550 lines carried **no mutation
-  evidence at all**. Found 62. See :ref:`the XXE finding <p05-xxe>` in the work log.
+   * - ``verify-all-gates.sh`` -- 11 controls, 0 failed, 2926s
+     - **NO -- re-take it**
+     - Measured on ``96e7da4`` at phase start. Not because the tree was noisy
+       -- it was quiet -- but because the **tree has moved**: three mutation
+       gates, ~1400 tests, and PR #1 changed ``verify-all-gates.sh`` itself.
 
-.. _p05h-gates:
+**Two measurements were taken on a noisy tree, and neither was used for
+anything.** Unit 2's first sign-off build failed with ``package
+org.cometgui.provenance.json does not exist`` because I started it while the
+agent was live; discarded and re-run clean. My first unit 4 XXE attempt ran
+while the agent was mid-edit *and* used a class-name pattern that matched
+nothing; discarded and redone. Both are recorded in the work log.
+
+.. _p05s-remaining:
+
+The seven remaining units, as I would now scope them
+=====================================================
+
+This is **not** my decomposition from the start of the phase. I have changed it,
+and the changes are the point.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 5 30 65
+
+   * - #
+     - Unit
+     - What I would now say, and what changed
+
+   * - 6
+     - Loadability and identity probe, ``org.cometgui.install.probe``
+     - **Package is already mutation-gated**, so it bites on the first class.
+       Implements unit 5's ``ToolProbe`` seam. **Add ``minimumGlibcxx`` to
+       ``MinimumHostRequirements`` and the manifest here** -- not earlier, where
+       it would be a field nothing reads. The GLIBCXX line is reported *before*
+       the GLIBC one, so a check knowing only glibc predicts "runnable" for a
+       binary that fails on the C++ runtime. **Owns the exact-equality
+       boundary**: a host with precisely ``GLIBC_2.34`` must be **offered**
+       3.07.1, not refused. Write the classifier against the observed strings
+       above. If it ever walks an import closure, note that **an import closure
+       is not one file's imports** -- ``docs/feasibility/windows-artefact.rst``
+       carries that correction.
+
+   * - 7
+     - Tool adapters and the functional capability probe, ``org.cometgui.tools``
+     - **Flip ``cometgui-tools``'s mutation switch in the same commit as the
+       first class** or the build fails. The synthetic PIN must be **64 target
+       + 64 decoy**; 8+8 produces a false negative. **A zero-byte output file
+       is not success**, and **``--help`` is on stderr**. Do not let the Windows
+       result harden into a claim that the XML twin's capability is known there
+       -- it is not. ``THERMO_RAW_WINDOWS`` is already gated on its companions
+       as manifest **data** (``gatesCapability``), so that rule is a lookup,
+       not a conditional to write.
+
+   * - 8
+     - Local binary registration
+     - Small. ``ToolVersion`` requiring two-to-four numeric components is what
+       makes the ">= 3.05" floor a numeric comparison. **I would now merge this
+       into unit 7**: it is the same adapter code with a different source of
+       binary, and splitting it buys nothing.
+
+   * - 9
+     - Tool Manager UI and wiring
+     - **The hardest constraint in the phase**: ``LayeringRulesTest`` forbids
+       ``org.cometgui.ui..`` from touching ``org.cometgui.install..``,
+       ``org.cometgui.tools..``, ``java.net``, ``java.security``,
+       ``java.util.zip`` and ``java.util.jar``, and ``cometgui-ui``'s POM
+       declares neither installer module. Everything the UI renders must be in
+       ``org.cometgui.domain.tools``, which is why unit 1 exists. Render
+       ``ToolVersion.text()``, never the cache directory name. Go through
+       ``select``, **not** ``artefacts()`` -- a platform-independent artefact is
+       five rows in the raw list and one offer.
+
+   * - 10
+     - End-to-end install driven through the UI
+     - Gate items 1 and 2. **I would now do this before unit 9's polish**, not
+       after: it is the item most likely to reveal that the domain port is the
+       wrong shape, and finding that after the UI is built is expensive. Test
+       PDV's cancel-and-restart deliberately -- and note **cancellation deletes
+       the partial**, so a cancelled 99 MB download restarts from zero; resume
+       survives a *failure*, not a cancellation.
+
+   * - 11
+     - Documentation
+     - ``docs/developer/tool_registry.rst``, ``docs/tool_manager.rst``, and the
+       artefact table in ``docs/platform_support.rst``. **There is no
+       ``docs/user/`` directory** -- the original brief said there was.
+       ``R-DOC-06``'s final wording on ``platform_support`` is **Phase 16's**;
+       this phase supplies the table only. Generate the matrix from
+       ``manifests/tools.json`` so it cannot diverge. Record the loopback
+       carve-out and the Windows-XSD oddity here, or someone will "tidy" them.
+
+   * - 12
+     - ``scripts/verify-install-gates.sh``
+     - **Assembled from the injections in the work log, not invented.** They are
+       all there with their exact failure text. Register it in
+       ``verify-all-gates.sh`` **without lowering any floor** -- a run grading
+       fewer controls than before is a failure even when green. Its controls
+       must not inherit the process-check or ``-Dtest=`` traps below.
+
+**On sequencing**: 6 and 7 are the critical path -- everything downstream needs
+a working probe. 11 can be written any time after 7. 12 must be last.
+
+**My estimate was 12 to 20 hours for units 6-12 and I still hold it**, with the
+caveat that 9 and 10 are the least predictable work in the phase: headless
+JavaFX under Monocle, and a live install driven through a UI. If it moves, it
+moves there.
+
+.. _p05s-gates:
 
 The nine exit gate items
 =========================
 
 .. list-table::
    :header-rows: 1
-   :widths: 5 14 81
+   :widths: 5 13 82
 
    * - #
      - State
@@ -306,30 +548,31 @@ The nine exit gate items
 
    * - 1
      - **NOT MET**
-     - Needs units 5, 9 and 10. The **download** half is proven through product
-       code: ``mvn -o -pl cometgui-install -Dcometgui.install.upstream=true
+     - Units 6, 7, 9, 10. The **download** half works through product code:
+       ``mvn -o -pl cometgui-install -Dcometgui.install.upstream=true
        -Dtest=UpstreamArtefactTest -Dsurefire.failIfNoSpecifiedTests=false
-       test`` fetches the real 946303-byte Percolator artefact through the real
-       redirect and verifies the pinned SHA-256 in **5.2 s**. Nothing is driven
-       through the UI yet.
+       test`` fetches the real 946303-byte artefact and verifies its pinned
+       SHA-256 in **5.2 s**.
 
    * - 2
      - **PARTIAL**
-     - Checksum rejection is built and gated (``org.cometgui.install.verify``,
-       mutation-critical); an MD5 match with a SHA-256 mismatch is a rejection.
-       **The "no process was launched" assertion belongs to unit 10 and does not
-       exist.**
+     - Proved at the installer: a corrupted download is rejected and a probe
+       stub that fails if entered is never reached, graded over all four
+       artefact kinds and a corrupted companion. **The UI half is unit 10.**
 
    * - 3
-     - **MET, pending my re-run at sign-off**
-     - ``AttackMatrixTest``: 12 attacks x 4 multi-entry kinds, plus the real
-       traversing artefact installing safely **and** being rejected whole.
-       Bomb ceilings proved to bite on ratio, total size and entry count
-       **separately**. Structural proof that no kind can bypass the guard.
+     - **MET**
+     - 12 attacks x 4 multi-entry kinds; the real traversing artefact installs
+       safely **and** is rejected whole; bomb ceilings bite on ratio, total size
+       and entry count **separately**; a bytecode scan proves no artefact kind
+       can place a file except through the guard.
 
    * - 4
-     - **NOT MET**
-     - Unit 5. Nothing about completion markers or interrupted installs exists.
+     - **MET**
+     - Interruption in a real second JVM via ``Runtime.halt`` after each of the
+       eight steps; a marker whose digest stopped matching makes the entry not
+       installed; two JVMs serialise with one observed to wait and a control
+       showing overlap without the lock.
 
    * - 5
      - **NOT MET**
@@ -338,9 +581,7 @@ The nine exit gate items
 
    * - 6
      - **NOT MET**
-     - Unit 7. The manifest already gates ``THERMO_RAW_WINDOWS`` on its three
-       companions as **data** (``gatesCapability``), so the rule is data-driven
-       and not a conditional to be written.
+     - Unit 7, but the manifest data is already in place.
 
    * - 7
      - **NOT MET**
@@ -348,135 +589,116 @@ The nine exit gate items
 
    * - 8
      - **PARTIAL**
-     - The manifest and selection are done and tested against the shipped file:
-       3.09 has no Linux row, Rosetta selection works, one row per download.
-       **The UI half is unit 9.**
+     - Manifest and selection done and tested against the shipped file. **UI
+       half is unit 9.**
 
    * - 9
      - **CANNOT BE MET HERE**
-     - No macOS machine exists. This is the item that makes the phase
-       ``PARTIAL`` by ``ONBOARDING.rst``'s rule, exactly as tier 1's brief
-       predicted.
+     - No macOS machine exists. This is what makes the phase ``PARTIAL``. The
+       quarantine code runs on Linux through the same
+       ``UserDefinedFileAttributeView`` (tier A), but **that Gatekeeper then
+       accepts the binary is not proved and is claimed nowhere.**
 
-.. _p05h-next:
+.. _p05s-decisions:
 
-What I would do next, in this order
-====================================
+Decisions taken, which you should not re-litigate
+==================================================
 
-#. **Re-run ``bash scripts/verify-all-gates.sh``.** The only figure in this
-   document not taken on the current tree is from ``96e7da4``. It costs ~50
-   minutes and must not overlap any Maven run.
-#. **Unit 5, the atomic install**, and give it three things this phase learned:
-   ``ArchiveMember.hashes()`` is **recorded and compared by nobody** today --
-   a value with no check, which unit 4 flagged itself and which
-   ``ArtefactVerifier.verify(Path, FileHashes, long, URI)`` already has the
-   right signature to close; the **atomic move has no fallback** since unit 3
-   removed an unreachable ``AtomicMoveNotSupportedException`` catch, whose
-   reasoning covers the cross-filesystem case and **not** Windows contention
-   (``AccessDeniedException`` on a file another process holds open); and unit 4
-   does **not** clean the destination after a rejection, so the install must
-   stage into a directory it discards.
-#. **Unit 6**, adding ``minimumGlibcxx`` to ``MinimumHostRequirements`` and the
-   manifest -- **in the unit that first reads it**, not before. The GLIBCXX line
-   is reported *before* the GLIBC one, so a check knowing only glibc predicts
-   "runnable" for a binary that fails on the C++ runtime. It also owns the
-   exact-equality boundary: a host with precisely ``GLIBC_2.34`` must be
-   **offered** 3.07.1.
-#. **Unit 7**, the functional capability probe, held to the two traps above --
-   a zero-byte output file is not success, and ``--help`` is on stderr.
-#. Then 8, 9, 10, 11, 12 in order. **Unit 12 must be assembled from the
-   injections recorded in the work log, not invented**, and registered in
-   ``scripts/verify-all-gates.sh`` without lowering any floor.
+* **The UI may not see the installer.** Structural, enforced by ArchUnit. The
+  whole Tool Manager vocabulary is ``org.cometgui.domain.tools``.
+* **One JSON reader, one hasher, one process launcher, one redactor.**
+  ``cometgui-install`` depends on ``cometgui-provenance`` for ``JsonReader``.
+  Never write a second one of any of them.
+* **For a ``ZIP``, the manifest names the member and the archive's own path
+  never places a file** -- forced by the real traversing artefact. Stronger than
+  sanitising a name, and **the traversal guard is still exercised** against that
+  same artefact, so the design did not become the reason the guard is untested.
+* **Windows takes the XSD pair from the Linux ``.deb``** (tier 1, 2026-09-02).
+  The manifest record says why, because it looks like a mistake otherwise.
+* **``AtomicMoveNotSupportedException`` is re-thrown, never handled.** A copy
+  fallback is not atomic and would silently replace the guarantee ``R-TOOL-04``
+  rests on. Other ``FileSystemException``\s become ``CACHE_CONTENDED`` with **no
+  retry**. The Windows contention case is untested and remains residue.
+* **Three mutation gates were added by me**, all ratified. Adding strengthens;
+  the list is never narrowed.
 
-.. _p05h-traps:
+.. _p05s-traps:
 
-Traps that would cost hours
-============================
+Traps, in full
+==============
 
-* **``mvn -Dtest='package.*'`` silently matches zero tests and exits 0.** Both a
-  phase agent and I believed an injection had survived on that basis. **Explicit
-  class names only.** With ``-Dsurefire.failIfNoSpecifiedTests=false`` there is
-  no warning at all.
-* **A mutation-critical package with no gate switched on fails the build** the
-  moment a real class lands. ``org.cometgui.install.probe.*`` and
-  ``org.cometgui.tools.*`` are in ``<targetClasses>`` and **``cometgui-tools``
-  still has its switch off with only ``package-info`` files**. Unit 7 must flip
+* **``mvn -Dtest='package.*'`` or a misspelled class name matches zero tests and
+  exits 0.** With ``-Dsurefire.failIfNoSpecifiedTests=false`` there is no
+  warning at all. It caught a phase agent and it caught me, on the same day.
+  **Use explicit class names and read the ``Tests run:`` count, never the exit
+  code.**
+* **A mutation-critical package with its module's switch off fails the build**
+  the moment a real class lands. ``org.cometgui.install.probe.*`` and
+  ``org.cometgui.tools.*`` are in ``<targetClasses>``, and **``cometgui-tools``
+  still has its switch off with only ``package-info`` files.** Unit 7 must flip
   it in the same commit as its first class.
-* **The per-class census fails the build.** A class whose test does not compile
-  leaves the coverage sample rather than scoring low.
-* **A raw NUL byte reaching a source file** has now bitten **three** times in
-  this project -- Phase 03 through a heredoc, and twice in this phase, once
-  through a shell heredoc and once through an agent's file-writing tool. It
-  compiles, and it makes a test pass for the wrong reason. A sweep over every
-  ``.java`` file currently finds none.
+* **The per-class coverage census fails the build.** A class whose test does not
+  compile leaves the coverage sample rather than scoring low.
+* **A raw NUL byte reaching a source file has now bitten three times** -- Phase
+  03 through a heredoc, and twice in this phase, once through a shell heredoc
+  and once through an agent's file-writing tool. It compiles, and it makes a
+  test pass for the wrong reason. Git shows the file as binary, so a reviewer
+  sees no diff at all.
 * **A comment line moves the compiled class hash**, because javac records a
-  ``LineNumberTable``. "The class hash moved" stays mandatory; **two parties'
-  injected class hashes differing is not evidence they injected different
-  defects.** Compare injected *source* hashes, or the failing assertion text.
-* **``build.sh`` counts only ``status='KILLED'``**, while PIT's console credits
-  ``TIMED_OUT`` as a kill. The gate is stricter than the tool's own summary and
-  the two figures always differ by the timeout count.
-* **A commit is not a completion.** I started a build while an agent was still
-  live and got ``package org.cometgui.provenance.json does not exist``, which
-  would not reproduce -- the signature symptom of this project's collision, now
-  four instances across three sessions. Wait for the completion notification.
-  And **do not write anything the build reads** while one runs: ``handoffs/``
-  and ``STATUS.rst`` are among the documents the docs gate builds.
+  ``LineNumberTable``. "The class hash moved" stays mandatory as proof an
+  injection reached the bytecode, but **two parties' injected class hashes
+  differing is not evidence they injected different defects.** Compare injected
+  *source* hashes, or the failing assertion text.
+* **``build.sh`` counts only ``status='KILLED'``** while PIT's console credits
+  ``TIMED_OUT`` as a kill. The gate is stricter than the tool's own summary.
+* **A commit is not a completion**, and **a process check is not a completion
+  signal either.** ``pgrep -f`` matches its own invoking shell, so a naive check
+  reports BUSY forever; match the JVM's real main class and **read the matched
+  command lines, not the count**. And an agent between two commands has no
+  process at all -- **the completion notification is the only signal that means
+  finished.** I broke this twice.
+* **Do not write anything the build reads while a build runs.** ``handoffs/``
+  and ``STATUS.rst`` are among the documents the strict docs gate builds.
+* **PIT's coverage minion does not use Surefire's class path.** A child JVM
+  launched with ``System.getProperty("java.class.path")`` dies under PIT with
+  ``ClassNotFoundException``, hanging the parent until timeout and failing the
+  PIT stage with *"tests did not pass without mutation"*. Derive it from
+  ``getProtectionDomain().getCodeSource()``. And **a mutant is invisible to a
+  child JVM**, which loads unmutated classes from ``target/classes``.
 
-* **A process check must exclude the checker, and a process check is not a
-  completion signal.** Two different errors that look alike, and this project
-  has now made both several times.
+.. _p05s-open:
 
-  The first is mechanical: ``pgrep -f <pattern>`` matches **its own invoking
-  shell**, because the wrapper's command line contains the pattern. Tier 1's
-  "wait until the harness exits" loop therefore waited forever on itself, and
-  its "is the tree busy" check reported BUSY for hours while the tree was in
-  fact quiet, so document edits were held back for nothing. Exclude the checker
-  -- match on the JVM's real main class, as in ``pgrep -f
-  org.codehaus.plexus.classworlds.launcher.Launcher``, and even then read the
-  matched command lines rather than the count.
-
-  The second is a reasoning error and is the more expensive: **"no build process
-  is running" does not mean "the agent has stopped."** I used that proxy twice.
-  The first time I started a build into a live agent and paid a re-run; the
-  second time I caught it only because a test file happened to be mid-edit in
-  ``git status``. An agent between two commands has no process at all. **The
-  completion notification is the only signal that means finished**, and unit
-  12's harness must not inherit the cheaper one.
-
-.. _p05h-open:
-
-Open threads, not tidied away
-==============================
+Open threads, untidied
+=======================
 
 #. **An unexplained one-off failure in a security test.**
    ``XarTableOfContentsHardeningTest.everySettingIsForcedFromItsUnsafeValue``
    failed **once**, and its assertion message was lost to a truncated pipeline.
    It has not recurred in nine subsequent full-module runs and no test sets a
    JAXP system property. ``newDefaultInstance`` was pinned partly to remove
-   ambient variation, but **nobody claims that was the cause**. Nine green runs
-   are not an explanation. **If it reappears, that is the thread to pull.**
-#. **``verify-all-gates.sh`` has not been re-run** since the phase started, and
-   this phase has added two mutation-gated packages and ~1200 tests.
+   ambient variation, but nobody claims that was the cause. **Nine green runs
+   are not an explanation. If it reappears, that is the thread to pull.**
+#. **``verify-all-gates.sh`` has not been re-run** since phase start.
 #. **``scripts/verify-install-gates.sh`` does not exist** (unit 12), so this
-   phase has no falsifiability harness registered yet -- the same debt Phase 03
+   phase has no registered falsifiability harness yet -- the same debt Phase 03
    carried.
-#. **A lock that nothing takes.** Tier 1 has ruled: the record is corrected now,
-   and ``build.sh`` takes a real ``flock`` **at Phase 05 sign-off**, with a
-   control proving it serialises. Until then the protections are the serial rule
-   and the two practices above.
-#. **``ArchiveMember.hashes()`` is compared by nobody in production.** Unit 5.
+#. **A lock that nothing takes.** Tier 1 has ruled: ``build.sh`` gains a real
+   ``flock`` **at Phase 05 sign-off**, with a control proving it serialises. Not
+   before, because changing the build under a live phase is the hazard itself.
+   Until then the protections are the serial rule and the two practices above.
+#. **``InstallLock.close`` has a surviving mutant that PIT scores ``TIMED_OUT``**
+   rather than killing, because covering tests block unboundedly.
 #. **Three uncovered branches in ``cometgui-install``** are javac artefacts --
    two try-with-resources close paths and one synthetic default of an exhaustive
    enum switch. Not reachable from Java.
 
-The first thing the next agent should do
-=========================================
+The first thing to do
+=====================
 
-Read ``handoffs/PHASE-05-worklog.rst`` -- not this document -- for anything you
-intend to rely on. This is the map; the work log is the evidence, and it carries
-every injection with the exact text it produced, which is what makes the four
-sign-offs checkable rather than assertions.
+``git fetch``, confirm you are at ``2f4511f``, then run
+``bash scripts/verify-all-gates.sh`` on a quiet tree. It is the only figure in
+this document that describes a tree which no longer exists, and everything else
+here is either measured on the tree you are holding or marked as not.
 
-Then run ``bash scripts/verify-all-gates.sh`` on a quiet tree, because it is the
-one figure here that describes a tree that no longer exists.
+Then read the work log. This document is what I concluded; that one is what
+happened.
