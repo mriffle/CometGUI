@@ -264,7 +264,14 @@ sufficient. Two agents in one checkout also share, at minimum:
 * **the git index**, which is why work is committed by *exact file path* and
   never by directory;
 * **each other's locks.** Two phase-local ``flock`` files do not serialise
-  against one another. A lock only works if both parties agree on it.
+  against one another. A lock only works if both parties agree on it;
+* **the project documents the build reads as input.** ``scripts/ci/docs-build.sh``
+  discovers 45 of them, ``STATUS.rst`` among them, so *editing a document* while
+  another agent builds is interference exactly as *running a build* is. Tier 1
+  committed ``STATUS.rst`` three times inside a phase agent's build window on
+  2026-09-02 while scrupulously not running Maven, and the agent caught it. The
+  rule is not "do not run the build"; it is **"do not write anything the build
+  reads"**.
 
 And the measurement consequence, which is worse than the friction: **a coverage
 or mutation number taken while another agent is mid-landing is
