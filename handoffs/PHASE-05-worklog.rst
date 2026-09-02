@@ -377,8 +377,12 @@ collide -- they share ``cometgui-domain``, the Maven working tree,
        a test rejects the words verified/confirmed/proven/tested applied to a
        platform with ``unverified-*`` evidence; a hand-typed expected record
        is compared field by field, not by size.
-     - ``R-TOOL-01``, ``R-TOOL-03``, ``R-PERC-12``, gate 8
-     -
+     - ``R-TOOL-01``, ``R-TOOL-02``, ``R-TOOL-03``, ``R-SEC-02``,
+       ``R-PERC-11``, ``R-PERC-12``, ``D-008``, gate 8
+     - **REWORK, 2026-09-02** -- see :ref:`p05-u2-signoff`. ``fd24fa7``: all 54
+       checksums re-derived by me from the bytes with 0 mismatches, the honesty
+       properties hold, my injection bit, build green at 992s. Two small
+       additions asked for.
 
    * - 3
      - **Downloader.** ``org.cometgui.install.download``: an
@@ -718,11 +722,153 @@ Carried forward from unit 1
   is rejected and ``3.05`` equals ``3.5``. That is what makes ``R-TOOL-08``'s
   minimum-3.05 floor a numeric comparison rather than a string test.
 
+.. _p05-u2-signoff:
+
+Unit 2 sign-off
+===============
+
+**What I ran myself, on ``fd24fa7``.** Every figure below is from my own run.
+
+Fifty-four independent checksum checks, nothing disagreed
+----------------------------------------------------------
+
+I re-derived every checksum in ``manifests/tools.json`` from the bytes in
+``scratch/phase05/artefacts/``: **39** artefact, zip-member and
+companion-archive checks and **15** companion-member checks -- the XSD pairs
+extracted from all four payloads, both ``.deb`` and both ``.pkg``, and the three
+Comet Windows DLLs -- with **0 mismatches**.
+
+The first version of my checker reported four mismatches, and they were **my
+bug, not the manifest's**: I keyed the local files by basename, and 3.06.5 and
+3.07.1 publish their macOS and Windows portable zips under the *same* file
+names, so the dictionary collided and compared the 3.06.5 rows against the
+3.07.1 files. Re-keyed by release tag, everything matched. Recorded because it
+is the same lesson in the other direction: **a red result can be the harness's
+fault as easily as a green one can be a lie**, and "exit code 0 proves nothing"
+has a mirror image.
+
+The honesty properties hold
+---------------------------
+
+* ``observed-by-execution`` appears on **linux-x86-64 only** -- seven claims --
+  and nowhere else. Every other row is ``inferred-from-artefact-bytes`` or
+  ``unverified``. Zero dishonest claims.
+* **No 3.09 row claims any XML capability**, and there is **no Percolator 3.09
+  Linux row at all**, which is the honest absence ``D-003`` and ``R-PERC-12``
+  require.
+* Every evidence note names who ran it and what was observed. I checked one
+  against its source rather than accepting it: the 3.06.5 note attributes the
+  64-plus-64 fixture to Phase 00's sweep, and
+  ``scripts/feasibility/noxml_sweep.py`` line 485 does set ``n_target = 64`` on
+  the ``--probe`` path. The note is accurate, and it credits Phase 00 rather
+  than implying unit 0 did that execution.
+* Advisories are present and mandated by ``R-PERC-11``, not decorative: 3.07.1
+  carries both the I-splines and the PEP-above-one items, 3.06.5 carries
+  two-lines-old and the peptide-protein-id behaviour, 3.09 carries that it
+  writes no pout XML, macOS carries Rosetta 2, Windows carries the Visual C++
+  runtime, and PDV carries the upstream licence contradiction.
+* Comet's ``linux-x86-64`` row claims only the three capabilities Phase 00
+  established **by execution** and not the further options its usage text
+  advertises. That conservatism is ``R-TOOL-08`` applied correctly, and it is
+  the opposite of the textual-probe error this phase exists to avoid.
+
+The defect I injected
+---------------------
+
+I inverted the second sort key of ``ArtefactManifest.OFFER_ORDER`` so that a
+translated artefact sorts before a native one. Compiled class ``21ef9ea9...``
+to ``88de51f5...``. It **bit**: ``ArtefactManifestTest.selectionIsOrdered``
+failed against a hand-typed expected list, on a fixture that deliberately gives
+one version both an arm64 and an x86-64 macOS row so the key is observable at
+all. Reverted; marker greps back out at zero; tree clean.
+
+The build, my own run
+---------------------
+
+::
+
+    11/11 stages OK in 992 seconds.  BUILD OK
+    136 report file(s): tests=2483 failures=0 errors=0 skipped=2
+    ok  cometgui-install  line 100.0% (560/560)  branch 100.0% (168/168)
+    ok  cometgui-install  8 compiled class(es), all 8 in the sample
+    ok  cometgui-install  187/187 mutations killed = 100.0%
+    ok  cometgui-install  30 class(es) analysed, 0 findings
+    ok  every module with critical-package code has its mutation gate on
+
+``cometgui-install`` printed ``inert -- no classes with code yet`` before this
+unit and now carries a real, whole population.
+
+Sent back for two small additions
+---------------------------------
+
+#. **The ordering rule is tested; the product's own instance of it is not.**
+   ``ShippedManifestTest`` covers Apple silicon for Percolator, where no version
+   publishes both a native and a translated macOS build, so the
+   native-before-translated key is never observable there. **Comet** is the tool
+   that does have both on ``macos-aarch64``, and ``D-004`` says in as many words
+   that Comet runs natively while only the Percolator stage is translated. The
+   manifest satisfies that today and nothing asserts it against the shipped
+   data -- the third shape, a property proved through a seam production need not
+   use, in its mildest form.
+#. **A Javadoc promising an ordering key the code deliberately refuses to
+   have.** ``select``'s Javadoc says "then by platform identifier"; the comment
+   above ``OFFER_ORDER`` explains at length, and correctly, that a third key
+   would be a comparison no input can reach. A reader who trusts the Javadoc
+   will "fix" the comparator to match it, which puts the unreachable branch
+   back.
+
+Also asked: the agent reported ``tests=2482`` and ``(559/559)`` where my run of
+the same commit reports ``tests=2483`` and ``(560/560)``. One test and one line,
+in the safe direction, but an unexplained delta between a reported figure and
+the committed tree is the "evidence read without being dated" shape and is worth
+one sentence rather than a shrug.
+
+.. _p05-my-own-collision:
+
+I committed the project's most-repeated mistake, and it is the fourth instance
+-------------------------------------------------------------------------------
+
+**My first sign-off build of ``fd24fa7`` failed**, in stage 4, with
+``package org.cometgui.provenance.json does not exist`` across every import in
+``ArtefactManifestReader``. The reactor summary showed ``CometGUI ::
+Provenance ... SUCCESS`` three modules earlier, so a dependency that had just
+built successfully was not on the next module's compile classpath.
+
+It did not reproduce. ``-pl cometgui-install -am clean compile`` succeeded; a
+full-lifecycle ``clean verify`` over the first six modules succeeded; a second
+``bash scripts/build.sh`` on a quiet tree succeeded in 992 seconds. The module
+POM is correct and the effective POM carries ``cometgui-provenance`` at compile
+scope.
+
+**The cause was me.** I started that build while the unit 2 agent was still live
+in the tree. It had committed, and I treated the commit as the finish -- but a
+commit is not a completion, and the agent was still running: a message sent
+afterwards was accepted for delivery "at its next tool round", which is what
+proved it. Two Maven processes sharing ``_build/m2repo`` and every module's
+``target/`` is exactly the collision ``ONBOARDING.rst`` documents, and its
+signature symptom is exactly what I saw -- **a transient failure naming the
+victim's own code rather than the collision.**
+
+``STATUS.rst`` records that every concurrency collision in this project has been
+committed by the tier enforcing the rule against it, three times, all by tier 1.
+This is the fourth and the first by tier 2. It cost one re-run and about
+seventeen minutes.
+
+**The rule this phase now follows: wait for the agent's completion
+notification, not for its commit, before running Maven.** A commit is a
+durability checkpoint; it says nothing about whether the agent has stopped.
+
 Rejections and rework
 =====================
 
 Units sent back, why, and what changed.
 
+* **Unit 2, sent back 2026-09-02** for two small additions: a shipped-manifest
+  assertion that Comet on Apple silicon is offered its native build before the
+  translated one, which is ``D-004``'s own sentence and was proved only on a
+  fixture; and the deletion of a Javadoc clause promising an ordering key the
+  code deliberately refuses to have. Neither is a defect in the manifest, whose
+  54 checksums and honesty properties I verified independently.
 * **Unit 1, sent back 2026-09-02** for one round: the narrow-axis validation
   hole in :ref:`p05-u1-injection`, plus an audit of every other rejection test
   in the unit for the same shape, plus proof by re-injecting the same defect
