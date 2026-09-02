@@ -16,6 +16,32 @@
   <description>The only place in the product allowed to construct a ProcessBuilder (R-PROC-02).</description>
 
   <!--
+    THE MUTATION GATE IS ON IN THIS MODULE (phase 03 unit 2).
+
+    The parent POM's PIT <targetClasses> already contains org.cometgui.tools.*,
+    written by phase 01 with the comment "command builders, version and
+    capability rules, secret redaction in the process service".  The moment this
+    module compiled its first class under that prefix it fell under R-TEST-02's
+    80% mutation threshold, and scripts/build.sh re-derives those prefixes from
+    the POM and fails any module that compiles such a class with its switch
+    still off.  So the switch is set here, in this module's own POM, rather than
+    discovered at the end of the phase.
+
+    Setting this back to true, narrowing the parent's target list, adding an
+    exclusion or lowering the threshold are all weakenings of a gate and are
+    rejected at sign-off.  The legitimate fix for a surviving mutation is to
+    move the logic out of a thread and into a pure class, which is why
+    LineSplitter, StreamPump, GuardedListener and ProcessTree exist.
+
+    The JaCoCo 90/85 gate does NOT apply here: COVERAGE_GATED_PREFIXES is
+    domain, params and provenance, matching the specification's "adapters
+    covered by real integration tests rather than artificial line counts".
+  -->
+  <properties>
+    <cometgui.mutation.skip>false</cometgui.mutation.skip>
+  </properties>
+
+  <!--
     Only the edges the specification's layering permits are declared here.
     Adding one is an architectural change: say so in the phase handoff, and
     expect the ArchUnit rules in cometgui-archtests to have an opinion.
@@ -26,4 +52,49 @@
       <artifactId>cometgui-domain</artifactId>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <!--
+        WHY THIS MODULE'S TESTS FORCE A UTF-8 LOCALE ON THE FORKED JVM.
+
+        PHASE-03 exit gate item 4 is "paths containing spaces and non-ASCII
+        characters work on the reference platform".  This build container has no
+        UTF-8 locale selected: `locale -a` offers C, C.utf8 and POSIX, and
+        neither LANG nor LC_ALL is set, so a JVM started here reports
+        sun.jnu.encoding=ANSI_X3.4-1968 and native.encoding=ANSI_X3.4-1968.
+
+        In that state the JVM cannot represent a non-ASCII file name AT
+        ALL: Path.of("café") throws InvalidPathException before any product code
+        runs.  The gate item would be untestable, and an untestable gate item has
+        not passed.
+
+        The system property sun.jnu.encoding does NOT fix it: the JVM derives that property
+        from the OS locale during startup, before system properties are applied.
+        The environment variable does, and it is the same thing a real desktop
+        user's session already has.  So the forked test JVM is given one.
+
+        This is a TEST ENVIRONMENT correction, not a weakened gate: the assertion
+        still creates a real directory whose name is not ASCII, runs a real
+        process from it, and checks the result.  What changed is that the JVM can
+        now spell the name.
+
+        A PRODUCT-LEVEL CONSEQUENCE FOR A LATER PHASE, recorded here because this
+        is where it was found: CometGUI installed on a host whose locale is POSIX
+        would be unable to open a spectrum file whose name is not ASCII, for the
+        same reason and through no fault of its own.  Phase 16 owns the packaged
+        runtime's environment.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <environmentVariables>
+            <LANG>C.UTF-8</LANG>
+            <LC_ALL>C.UTF-8</LC_ALL>
+          </environmentVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

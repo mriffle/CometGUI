@@ -16,6 +16,27 @@
   <description>The stage DAG, its explicit states, and the orchestration of validate, Comet, Percolator and the downstream stages.</description>
 
   <!--
+    THE MUTATION GATE IS ON IN THIS MODULE (phase 02 unit 3).
+    The parent POM lists org.cometgui.workflow.state.* among PIT's
+    <targetClasses> because R-TEST-02 counts the stage state model as critical
+    pure logic, and phase 02 unit 3 put the first classes into that package.
+    The threshold itself (80%) lives in the parent POM so that no module can
+    hold a different number.
+    Setting this back to true to make a build pass is a weakening of a gate and
+    is rejected at sign-off; so is removing the package from <targetClasses>.
+
+    cometgui.coverage.core.skip is deliberately NOT set here.  That switch
+    applies the 90% line / 85% branch rule to the whole module bundle, and this
+    module is where phase 08's workflow engine will land; committing the engine
+    to that number is not this phase's call to make.  The coverage of what is
+    here is measured and reported at every build all the same - scripts/build.sh
+    prints it - and the phase that adds the engine owns the decision.
+  -->
+  <properties>
+    <cometgui.mutation.skip>false</cometgui.mutation.skip>
+  </properties>
+
+  <!--
     Only the edges the specification's layering permits are declared here.
     Adding one is an architectural change: say so in the phase handoff, and
     expect the ArchUnit rules in cometgui-archtests to have an opinion.

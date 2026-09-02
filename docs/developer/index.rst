@@ -10,10 +10,12 @@ pages describe the implementation that satisfies them.
 
 .. note::
 
-   **Every page below except** :doc:`testing` **is a stub created by Phase
-   01.** Each stub names the phase that owns its content. This index and the
-   strict documentation build exist first on purpose: a documentation gate
-   added at the end of a project measures nothing.
+   **Every page below except** :doc:`testing` **and** :doc:`architecture`
+   **is a stub created by Phase 01.** Each stub names the phase that owns its
+   content. This index and the strict documentation build exist first on
+   purpose: a documentation gate added at the end of a project measures
+   nothing. :doc:`architecture` was written by Phase 02 and describes the
+   layering as it is actually built.
 
 .. toctree::
    :maxdepth: 2

@@ -14,7 +14,8 @@
 #
 # WHAT THIS FILE HAS NOT BEEN SEEN TO DO: anything at all.  GitHub has never
 # executed ANY workflow in this repository -- the Actions API reported
-# total_count = 0 runs on 2026-08-30, the day this file was written.  A remote
+# total_count = 0 runs on 2026-08-30, the day this file was written; one
+# scheduled nightly has run since, on 2026-08-31.  A remote
 # exists (D-008, decided 2026-08-30), but nothing has been pushed to it and no
 # runner has ever started.  So this file is a proposal, not evidence.  Until a
 # runner has executed it and returned a transcript, the tool manifest's

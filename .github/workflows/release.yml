@@ -25,7 +25,7 @@
 # the pull-request pipeline runs.
 #
 # WINDOWS AND MACOS ARE NAMED BUT UNVERIFIABLE HERE.  This environment has one
-# Linux machine, and GitHub has never executed anything in this repository, so
+# Linux machine, and GitHub has executed only one scheduled nightly here, so
 # the two non-Linux matrix entries have never run. They are written down so that a later phase turns them on rather
 # than writes them; D-004 records that the macOS Percolator payload is x86-64
 # and runs under Rosetta 2 on Apple silicon.

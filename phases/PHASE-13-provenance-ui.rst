@@ -10,6 +10,23 @@ PHASE-13: Provenance UI and Reports
 :Contributes to: R-PROV-01..05
 :Proves: AC-PRV-01..09
 
+.. important::
+
+   **Do not build a viewer that holds ``provenance.json`` open, until the
+   Windows question below is answered.** Phase 04 finalises the document with
+   ``ATOMIC_MOVE``, and gate item 5's promise -- an interrupted finalise never
+   leaves a truncated ``provenance.json`` -- is proved by a concurrent reader
+   observing only whole documents. **That proof is POSIX-only.** On Windows, a
+   rename over a file another process holds open can fail with
+   ``AccessDeniedException``, and a provenance viewer is exactly such a process
+   -- as are a virus scanner and a file-sync client, neither of which the product
+   controls.
+
+   If Windows cannot replace an open file, **the repair is a retry policy or a
+   different finalisation strategy: a design change, not a test.** Settle that
+   before building the viewer, not after. See ``STATUS.rst``,
+   *Platform divergence, in two tiers*.
+
 Purpose
 -------
 Make the provenance record readable and exportable, and prove it is complete

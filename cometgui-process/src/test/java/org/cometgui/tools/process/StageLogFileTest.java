@@ -1,0 +1,511 @@
+/*
+ * CometGUI -- Comet to Percolator proteomics search workflow with provenance.
+ * Copyright (C) 2026 The CometGUI authors.
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License, version 3, as published
+ * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ * PARTICULAR PURPOSE. See the GNU General Public License for details.
+ *
+ * The full licence is the LICENSE file at the root of this repository. If it
+ * is missing, see <https://www.gnu.org/licenses/gpl-3.0.html>.
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+package org.cometgui.tools.process;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * The per-stage log file: its name, its refusal to destroy an earlier attempt, its flushing, its
+ * behaviour under two writing threads, and its refusal to fail loudly when the disk does.
+ *
+ * <p><strong>Every expected value is hand-typed.</strong> The file names and the line contents are
+ * written out in full rather than built by calling the code that builds them.
+ *
+ * <p>There is no fixed sleep here and there must never be one (PHASE-03 exit gate item 6). The one
+ * test with two threads in it synchronises on latches and on {@code Thread.join()}, both of which
+ * are real events.
+ */
+class StageLogFileTest {
+
+    /** A failure bound for something that is supposed to happen on its own. Never a delay. */
+    private static final int FAILURE_BOUND_SECONDS = 60;
+
+    /** A fixed instant, so that a whole file can be written out by hand in an assertion. */
+    private static final Instant AT = Instant.parse("2026-08-31T19:04:51.250Z");
+
+    /**
+     * A null the static analyser cannot see through; see {@code StageLogFormatTest} for why.
+     *
+     * @param <T> whatever the call site needs
+     * @return null
+     */
+    private static <T> T deliberateNull() {
+        List<T> holder = new ArrayList<>(1);
+        holder.add(null);
+        return holder.get(0);
+    }
+
+    @Nested
+    @DisplayName("the stage identifier, which becomes a file name")
+    class StageIdentifier {
+
+        @Test
+        @DisplayName("letters, digits, hyphen and underscore are accepted, up to 64 characters")
+        void accepted() {
+            assertEquals("comet", StageLogFile.checkedStageId("comet"));
+            assertEquals("percolator-3", StageLogFile.checkedStageId("percolator-3"));
+            assertEquals("pdv_view", StageLogFile.checkedStageId("pdv_view"));
+            assertEquals("A", StageLogFile.checkedStageId("A"));
+            assertEquals("0", StageLogFile.checkedStageId("0"));
+            String sixtyFour = "a".repeat(64);
+            assertEquals(sixtyFour, StageLogFile.checkedStageId(sixtyFour));
+        }
+
+        @Test
+        @DisplayName("a path traversal is rejected before it can become a file name")
+        void rejectsTraversal() {
+            assertRejected("..");
+            assertRejected("../etc/passwd");
+            assertRejected("/etc/passwd");
+            assertRejected("comet/../..");
+            assertRejected("comet\\..\\..");
+        }
+
+        @Test
+        @DisplayName("anything that is not a plain token is rejected")
+        void rejectsEverythingElse() {
+            assertRejected("");
+            assertRejected(" ");
+            assertRejected("comet stage");
+            assertRejected("comet.log");
+            assertRejected("comet\nstage");
+            assertRejected("comet\0");
+            assertRejected(" comet");
+            assertRejected("café");
+            assertRejected("a".repeat(65));
+        }
+
+        @Test
+        @DisplayName("the message quotes what was rejected, so the caller can see it")
+        void namesTheOffendingValue() {
+            IllegalArgumentException rejected =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> StageLogFile.checkedStageId("../etc/passwd"));
+
+            assertTrue(
+                    rejected.getMessage().contains("\"../etc/passwd\""),
+                    "the message should quote the value, but was: " + rejected.getMessage());
+        }
+
+        @Test
+        @DisplayName("rejects null, naming the argument")
+        void rejectsNull() {
+            assertEquals(
+                    "stageId",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () -> StageLogFile.checkedStageId(deliberateNull()))
+                            .getMessage());
+        }
+
+        private void assertRejected(String stageId) {
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> StageLogFile.checkedStageId(stageId),
+                    "\"" + stageId + "\" must not be allowed to become a file name");
+        }
+    }
+
+    @Nested
+    @DisplayName("naming the file")
+    class Naming {
+
+        @Test
+        @DisplayName("the first attempt is <stage>.log and later attempts are numbered")
+        void candidateNames() {
+            assertEquals("comet.log", StageLogFile.candidateName("comet", 0));
+            assertEquals("comet.1.log", StageLogFile.candidateName("comet", 1));
+            assertEquals("comet.2.log", StageLogFile.candidateName("comet", 2));
+            assertEquals("comet.99.log", StageLogFile.candidateName("comet", 99));
+        }
+
+        @Test
+        @DisplayName("a re-run never destroys the previous attempt's log")
+        void aRerunTakesTheNextName(@TempDir Path logs) throws IOException {
+            try (StageLogFile first = StageLogFile.create(logs, "comet")) {
+                first.append(AT, "stdout", "first attempt");
+            }
+            try (StageLogFile second = StageLogFile.create(logs, "comet")) {
+                second.append(AT, "stdout", "second attempt");
+            }
+            try (StageLogFile third = StageLogFile.create(logs, "comet")) {
+                third.append(AT, "stdout", "third attempt");
+
+                assertEquals(logs.resolve("comet.2.log"), third.file());
+            }
+
+            assertEquals(
+                    List.of("2026-08-31T19:04:51.250Z [stdout] first attempt"),
+                    Files.readAllLines(logs.resolve("comet.log"), StandardCharsets.UTF_8),
+                    "the first attempt's log must survive the second and third attempts");
+            assertEquals(
+                    List.of("2026-08-31T19:04:51.250Z [stdout] second attempt"),
+                    Files.readAllLines(logs.resolve("comet.1.log"), StandardCharsets.UTF_8));
+            assertEquals(
+                    List.of("2026-08-31T19:04:51.250Z [stdout] third attempt"),
+                    Files.readAllLines(logs.resolve("comet.2.log"), StandardCharsets.UTF_8));
+        }
+
+        @Test
+        @DisplayName("the log directory is created, with its parents, if it is not there")
+        void createsTheDirectory(@TempDir Path root) throws IOException {
+            Path logs = root.resolve("run-2026-08-31").resolve("logs");
+
+            try (StageLogFile log = StageLogFile.create(logs, "comet")) {
+                assertEquals(logs.resolve("comet.log"), log.file());
+            }
+
+            assertTrue(Files.isRegularFile(logs.resolve("comet.log")));
+        }
+
+        @Test
+        @DisplayName("when every name is taken it refuses rather than overwriting one")
+        void refusesWhenTheNamesRunOut(@TempDir Path logs) throws IOException {
+            for (int attempt = 0; attempt < StageLogFile.MAXIMUM_ATTEMPTS; attempt++) {
+                Files.writeString(
+                        logs.resolve(StageLogFile.candidateName("comet", attempt)),
+                        "attempt " + attempt + "\n",
+                        StandardCharsets.UTF_8);
+            }
+
+            IOException refused =
+                    assertThrows(IOException.class, () -> StageLogFile.create(logs, "comet"));
+
+            assertTrue(
+                    refused.getMessage().contains("refusing to overwrite"),
+                    "the message should say what it refused to do, but was: "
+                            + refused.getMessage());
+            assertEquals(
+                    List.of("attempt 0"),
+                    Files.readAllLines(logs.resolve("comet.log"), StandardCharsets.UTF_8),
+                    "and it must actually not have overwritten one");
+            assertFalse(
+                    Files.exists(logs.resolve("comet.100.log")),
+                    "a hundred and first name would be one past the documented limit");
+        }
+
+        @Test
+        @DisplayName("a dangerous stage identifier never reaches the file system")
+        void refusesADangerousIdentifier(@TempDir Path root) {
+            Path logs = root.resolve("logs");
+
+            assertThrows(
+                    IllegalArgumentException.class, () -> StageLogFile.create(logs, "../escaped"));
+
+            assertFalse(
+                    Files.exists(logs),
+                    "the identifier is checked before the directory is created, so nothing at all"
+                            + " should have happened");
+        }
+
+        @Test
+        @DisplayName("rejects a null directory, naming the argument")
+        void rejectsNullDirectory() {
+            assertEquals(
+                    "directory",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () -> StageLogFile.create(deliberateNull(), "comet"))
+                            .getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("writing")
+    class Writing {
+
+        @Test
+        @DisplayName("a line is on disk before the file is closed: it is flushed, not buffered")
+        void everyLineIsFlushed(@TempDir Path logs) throws IOException {
+            try (StageLogFile log = StageLogFile.create(logs, "comet")) {
+                assertTrue(log.append(AT, "cometgui", "stage comet started in /work"));
+                assertTrue(log.append(AT, "stdout", "Comet version 2024.01"));
+                assertTrue(log.append(AT, "stderr", "Search 12% complete"));
+
+                assertEquals(
+                        List.of(
+                                "2026-08-31T19:04:51.250Z [cometgui] stage comet started in /work",
+                                "2026-08-31T19:04:51.250Z [stdout] Comet version 2024.01",
+                                "2026-08-31T19:04:51.250Z [stderr] Search 12% complete"),
+                        Files.readAllLines(log.file(), StandardCharsets.UTF_8),
+                        "read while the file is still open, which is what 'as it arrives' means");
+            }
+        }
+
+        @Test
+        @DisplayName("lines are separated by \\n on every platform, and the file ends with one")
+        void theTerminator(@TempDir Path logs) throws IOException {
+            try (StageLogFile log = StageLogFile.create(logs, "comet")) {
+                log.append(AT, "stdout", "one");
+                log.append(AT, "stdout", "two");
+            }
+
+            assertEquals(
+                    "2026-08-31T19:04:51.250Z [stdout] one\n"
+                            + "2026-08-31T19:04:51.250Z [stdout] two\n",
+                    Files.readString(logs.resolve("comet.log"), StandardCharsets.UTF_8));
+        }
+
+        @Test
+        @DisplayName("non-ASCII text is written as UTF-8")
+        void utf8(@TempDir Path logs) throws IOException {
+            try (StageLogFile log = StageLogFile.create(logs, "comet")) {
+                log.append(AT, "stdout", "café über 日本語 ✓ αβγ");
+            }
+
+            assertEquals(
+                    "2026-08-31T19:04:51.250Z [stdout] café über 日本語 ✓ αβγ\n",
+                    Files.readString(logs.resolve("comet.log"), StandardCharsets.UTF_8));
+        }
+
+        @Test
+        @DisplayName("finish writes the last line and closes: a later append fails and is counted")
+        void finishCloses(@TempDir Path logs) throws IOException {
+            StageLogFile log = StageLogFile.create(logs, "comet");
+            log.append(AT, "stdout", "working");
+
+            assertTrue(log.finish(AT, "cometgui", "stage comet ended: exit code 0 after PT0S"));
+
+            assertFalse(
+                    log.append(AT, "stdout", "too late"),
+                    "the file is closed, so this write cannot succeed");
+            assertEquals(1L, log.failureCount());
+            assertEquals(
+                    List.of(
+                            "2026-08-31T19:04:51.250Z [stdout] working",
+                            "2026-08-31T19:04:51.250Z [cometgui] stage comet ended: exit code 0"
+                                    + " after PT0S"),
+                    Files.readAllLines(log.file(), StandardCharsets.UTF_8),
+                    "and the line that could not be written is not in the file");
+        }
+
+        @Test
+        @DisplayName("closing twice is not a failure")
+        void closeIsIdempotent(@TempDir Path logs) throws IOException {
+            StageLogFile log = StageLogFile.create(logs, "comet");
+            log.append(AT, "stdout", "working");
+
+            log.close();
+            log.close();
+
+            assertEquals(0L, log.failureCount());
+            assertEquals(Optional.empty(), log.firstFailure());
+        }
+
+        @Test
+        @DisplayName("rejects nulls, naming the argument")
+        void rejectsNulls(@TempDir Path logs) throws IOException {
+            try (StageLogFile log = StageLogFile.create(logs, "comet")) {
+                assertEquals(
+                        "at",
+                        assertThrows(
+                                        NullPointerException.class,
+                                        () -> log.append(deliberateNull(), "stdout", "x"))
+                                .getMessage());
+                assertEquals(
+                        "tag",
+                        assertThrows(
+                                        NullPointerException.class,
+                                        () -> log.append(AT, deliberateNull(), "x"))
+                                .getMessage());
+                assertEquals(
+                        "text",
+                        assertThrows(
+                                        NullPointerException.class,
+                                        () -> log.append(AT, "stdout", deliberateNull()))
+                                .getMessage());
+            }
+        }
+
+        @Test
+        @DisplayName("rejects a null file or writer")
+        void rejectsNullsInTheConstructor(@TempDir Path logs) {
+            assertEquals(
+                    "file",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () -> new StageLogFile(deliberateNull(), Writer.nullWriter()))
+                            .getMessage());
+            assertEquals(
+                    "writer",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () ->
+                                            new StageLogFile(
+                                                    logs.resolve("comet.log"), deliberateNull()))
+                            .getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("when the disk says no")
+    class WriteFailures {
+
+        @Test
+        @DisplayName("a failed write returns false, is counted and described, and does not throw")
+        void failedWritesAreCountedNotThrown(@TempDir Path logs) {
+            StageLogFile log = new StageLogFile(logs.resolve("comet.log"), new AlwaysFailing());
+
+            assertFalse(log.append(AT, "stdout", "one"));
+            assertFalse(log.append(AT, "stdout", "two"));
+
+            assertEquals(2L, log.failureCount());
+            assertEquals(
+                    Optional.of("java.io.IOException: No space left on device"),
+                    log.firstFailure(),
+                    "the FIRST failure is kept, so a later one cannot overwrite the diagnosis");
+        }
+
+        @Test
+        @DisplayName("finish reports a footer that could not be written, rather than swallowing it")
+        void finishReportsAFailedFooter(@TempDir Path logs) {
+            StageLogFile log = new StageLogFile(logs.resolve("comet.log"), new AlwaysFailing());
+
+            assertFalse(log.finish(AT, "cometgui", "stage comet ended: exit code 0 after PT0S"));
+
+            assertEquals(2L, log.failureCount(), "the footer that was not written, and the close");
+        }
+
+        @Test
+        @DisplayName("a failure to close is counted too: the last bytes may not have landed")
+        void failedCloseIsCounted(@TempDir Path logs) {
+            StageLogFile log = new StageLogFile(logs.resolve("comet.log"), new AlwaysFailing());
+
+            log.close();
+
+            assertEquals(1L, log.failureCount());
+            assertEquals(
+                    Optional.of("java.io.IOException: No space left on device"),
+                    log.firstFailure());
+        }
+
+        @Test
+        @DisplayName("a healthy file reports no failures at all")
+        void aHealthyFileReportsNothing(@TempDir Path logs) throws IOException {
+            try (StageLogFile log = StageLogFile.create(logs, "comet")) {
+                log.append(AT, "stdout", "working");
+
+                assertEquals(0L, log.failureCount());
+                assertEquals(Optional.empty(), log.firstFailure());
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("two threads, one file")
+    class Concurrency {
+
+        /** Lines written by each of the two threads. Enough that an unguarded write would tear. */
+        private static final int LINES_PER_STREAM = 500;
+
+        @Test
+        @DisplayName("no line is interleaved into another, and each writer keeps its own order")
+        void writesAreSerialised(@TempDir Path logs) throws IOException, InterruptedException {
+            StageLogFile log = StageLogFile.create(logs, "comet");
+            CountDownLatch bothReady = new CountDownLatch(2);
+            Thread out = writer(log, "stdout", "out", bothReady);
+            Thread err = writer(log, "stderr", "err", bothReady);
+
+            out.start();
+            err.start();
+            out.join();
+            err.join();
+            log.close();
+
+            List<String> lines = Files.readAllLines(log.file(), StandardCharsets.UTF_8);
+            assertEquals(2 * LINES_PER_STREAM, lines.size(), "every line, and no extra ones");
+            assertEquals(
+                    expected("stdout", "out"),
+                    lines.stream().filter(line -> line.contains("[stdout]")).toList(),
+                    "standard output's own lines, complete and in its own order");
+            assertEquals(
+                    expected("stderr", "err"),
+                    lines.stream().filter(line -> line.contains("[stderr]")).toList(),
+                    "standard error's own lines, complete and in its own order");
+            assertEquals(0L, log.failureCount());
+        }
+
+        private Thread writer(StageLogFile log, String tag, String text, CountDownLatch bothReady) {
+            return new Thread(
+                    () -> {
+                        bothReady.countDown();
+                        try {
+                            /* Both threads are released together, so the writes really do
+                             * contend rather than happening one after the other.  Giving up
+                             * here leaves lines missing, which the caller's count assertion
+                             * reports. */
+                            if (!bothReady.await(FAILURE_BOUND_SECONDS, TimeUnit.SECONDS)) {
+                                return;
+                            }
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                        for (int line = 0; line < LINES_PER_STREAM; line++) {
+                            log.append(AT, tag, text + " " + line);
+                        }
+                    },
+                    "stage-log-" + tag);
+        }
+
+        private List<String> expected(String tag, String text) {
+            return IntStream.range(0, LINES_PER_STREAM)
+                    .mapToObj(line -> "2026-08-31T19:04:51.250Z [" + tag + "] " + text + " " + line)
+                    .toList();
+        }
+    }
+
+    /** A writer whose every operation fails, the way a full disk does. */
+    private static final class AlwaysFailing extends Writer {
+
+        @Override
+        public void write(char[] buffer, int offset, int length) throws IOException {
+            throw new IOException("No space left on device");
+        }
+
+        @Override
+        public void flush() throws IOException {
+            throw new IOException("No space left on device");
+        }
+
+        @Override
+        public void close() throws IOException {
+            throw new IOException("No space left on device");
+        }
+    }
+}

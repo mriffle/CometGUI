@@ -20,6 +20,36 @@
  * termination, and explicit working directory and environment. This is the only package permitted
  * to construct a ProcessBuilder; an ArchUnit rule in cometgui-archtests enforces that (R-PROC-02).
  *
- * <p>Filled by phase 03 (process service).
+ * <p>The core, built by phase 03:
+ *
+ * <ul>
+ *   <li>{@link org.cometgui.tools.process.ProcessService} -- the {@code ProcessRunner}
+ *       implementation and the one {@code ProcessBuilder} in the product. It launches from an
+ *       argument array, in an explicit working directory, with an environment it constructs rather
+ *       than inherits ({@code R-PROC-04}), and closes the tool's standard input at once.
+ *   <li>{@link org.cometgui.tools.process.StartedProcess} -- the handle: exit code, duration from
+ *       the injected clock ({@code R-PROC-01}), and cancellation that kills descendants before
+ *       their parent.
+ *   <li>{@code StreamPump} and {@code LineSplitter} -- one daemon thread per stream, delivering
+ *       complete lines as they arrive and never accumulating output, with a per-line cap so that a
+ *       tool writing hundreds of megabytes without a newline cannot exhaust the heap ({@code
+ *       R-PROC-03}).
+ *   <li>{@code GuardedListener} and {@code ProcessTree} -- the two pieces of pure logic the rest
+ *       depends on: a listener that cannot break a pump by throwing, and the order in which a
+ *       process tree must be killed.
+ *   <li>{@link org.cometgui.tools.process.ProcessRedactor} -- {@code R-SEC-03}, applied to the
+ *       safely rendered display command, the captured environment and the console line. The rules
+ *       themselves live in {@code org.cometgui.domain.secrets}, shared with the provenance writers
+ *       so that the two cannot drift; what is process-specific is redacting each argument
+ *       <em>before</em> {@code ToolCommand.displayString()} escapes it, and costing nothing per
+ *       line when no credential is registered, which is every run of Comet, Percolator and PDV.
+ *   <li>{@link org.cometgui.tools.process.StageRunner} -- the stage layer a workflow step actually
+ *       uses: one {@link org.cometgui.tools.process.RunningStage} handle to cancel and to wait on,
+ *       one {@link org.cometgui.tools.process.StageOutcome} value at the end, every line written to
+ *       a per-stage log file <em>as it arrives</em> and flushed ({@code R-PROC-03}), the same line
+ *       appended to the console through a {@link org.cometgui.tools.process.RunMessageSink} -- an
+ *       append-only capability rather than the console itself -- and an optional per-stage timeout
+ *       that is off unless one is configured.
+ * </ul>
  */
 package org.cometgui.tools.process;

@@ -51,14 +51,24 @@
     CONSEQUENCE FOR ANYONE ADDING A PACKAGE: `mvn spotless:apply` will not add
     the header to a new package-info.java.  Copy it from a sibling.
 
-    PHASE 02 MUST EXTEND THIS, NOT DELETE IT.  Files derived from
-    Noble-Lab/CasanovoGUI keep their upstream copyright notices (D-001
-    obligation 2) and so cannot match this header.  Give them their own check:
-    a second maven-checkstyle-plugin <execution> with its own <headerLocation>
-    and <sourceDirectories> covering the derived tree, and narrow this one's
-    <sourceDirectories> to exclude it.  Deleting this module, or suppressing it
-    for the derived tree with nothing put in its place, is a weakening of a
-    gate and is rejected at sign-off.
+    PHASE 02 EXTENDED THIS, IT DID NOT DELETE IT (work unit 4).  Files derived
+    from Noble-Lab/CasanovoGUI keep their upstream copyright notices (D-001
+    obligation 2, R-SEC-01) and so cannot match this header.  They have their
+    own check: the `checkstyle-check-derived` execution in pom.xml, with its
+    own <headerLocation> (config/license/java-header-derived.txt), its own rule
+    set (config/checkstyle/checkstyle-derived.xml, a superset of this file),
+    and its own <outputFile>.  This execution excludes exactly the paths that
+    one includes, `**/derived/**/*.java`, so the two are disjoint, and
+    scripts/build.sh's file-set census fails the build if they ever stop
+    covering every .java file on disk between them.  (The exclusion is written
+    as <includes>/<excludes> on the executions rather than the
+    <sourceDirectories> this comment originally suggested, because
+    <sourceDirectories> cannot express it alongside includeTestSourceDirectory.)
+
+    Deleting this module, or suppressing it for the derived tree with nothing
+    put in its place, is a weakening of a gate and is rejected at sign-off; so
+    is deleting the second execution, which scripts/verify-quality-gates.sh
+    control 11 and the census both exist to catch.
   -->
   <module name="Header">
     <property name="headerFile" value="${checkstyle.header.file}"/>

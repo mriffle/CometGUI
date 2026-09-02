@@ -29,24 +29,24 @@ authoritative for its own scope and exit gate.
    * - `02 <PHASE-02-app-shell.rst>`_
      - Application Shell and Navigation
      - 01 (met)
-     - D-001 DECIDED -- reuse permitted; retain notices, record derivation.
-       Keep the ``D-009`` copyright placeholder; do not name an entity
-     - READY -- next, unblocked
+     - D-001 DECIDED -- reuse permitted; notices retained and derivation
+       recorded, enforced by a Checkstyle superset. ``D-009`` placeholder kept
+     - PASSED (signed off 2026-08-31)
    * - `03 <PHASE-03-process-service.rst>`_
      - Process Service
-     - 01, 02
+     - 01, 02 (both met)
      - --
-     - NOT STARTED
+     - PARTIAL (signed off 2026-09-01)
    * - `04 <PHASE-04-provenance-core.rst>`_
      - Hashing and Provenance Core
-     - 01, 03
+     - 01 (03 not required -- see Ordering notes)
      - --
-     - NOT STARTED
+     - PARTIAL (signed off 2026-09-02)
    * - `05 <PHASE-05-tool-registry.rst>`_
      - Tool Registry and Installer
      - 01, 03, 04
      - none open. D-002 (option C), D-003 and D-004 all DECIDED
-     - NOT STARTED
+     - IN PROGRESS (dispatched 2026-09-02)
    * - `06 <PHASE-06-comet-param-model.rst>`_
      - Comet Parameter Model
      - 01, 05
@@ -107,16 +107,29 @@ Ordering notes
 ==============
 
 The default order is numeric, and it is a dependency order rather than a
-schedule. Where dependencies allow, phases may overlap:
+schedule.
+
+.. important::
+
+   **Phases run ONE AT A TIME** (owner's decision, 2026-08-31). The notes below
+   describe which phases are *independent*, which still matters for ordering and
+   for spotting shared abstractions -- but independence is **no longer a licence
+   to overlap them**. Phases 03 and 04 were the last pair run concurrently, and
+   they independently built the same secret-redaction rule set in two sibling
+   modules without either being able to see the other. See *Why phases run one
+   at a time* in ``../ONBOARDING.rst``.
+
+Independence, for ordering purposes only:
 
 * 03 (process service) and 04 (provenance core) are independent of each
-  other after 01 and can run in parallel.
+  other after 01. **Run 03, sign it off, then run 04.**
 * 06 (parameter model) depends on 05 only for a real Comet binary to query;
   it is otherwise independent of 03, 04 and 05 and is the longest single
   piece of work in the project. Start it as early as a Comet binary exists.
 * 07 (parameter UI) cannot start before 06 has a stable model, and it is the
   second-longest piece.
-* 11 (PDV) is independent of 12 (Limelight) once 10 is done. It grew
+* 11 (PDV) is independent of 12 (Limelight) once 10 is done -- independent in
+  the dependency sense, still run one after the other. It grew
   materially on 2026-08-30: ``D-005`` added an **mzTab exporter** with its own
   fidelity suite, because PDV's control server accepts only mzTab. Treat it as
   two pieces -- the baseline integration, and the exporter -- and spike PDV's
@@ -152,11 +165,12 @@ Phase 01 from running, but the fourth caps the grade it can reach.
   ``https://github.com/mriffle/CometGUI.git`` (``D-008``). This was the residue
   Phases 00 and 01 shared: it left Phase 00's gate item 8 open and capped Phase
   01 at ``PARTIAL`` on gate item 6. **Both are now ordinary phase work.** Phase
-  01 proved every pipeline step locally (42 steps, 3 workflows) and named the
-  Windows and macOS matrix entries so that turning them on is configuration
-  rather than authorship. Two standing constraints follow: the repository may
-  move, so its URL lives in one place; and its history is published, so it is
-  never force-pushed or rewritten.
+  01 proved every pipeline step locally -- 42 steps across 3 workflows then,
+  45 across 4 since the Windows Percolator verification workflow was added on
+  2026-08-30 -- and named the Windows and macOS matrix entries so that turning
+  them on is configuration rather than authorship. Two standing constraints
+  follow: the repository may move, so its URL lives in one place; and its
+  history is published, so it is never force-pushed or rewritten.
 
 Phases 00-13 with their gates passed constitute a working,
 provenance-complete application. Phases 14-16 are what make it a release.

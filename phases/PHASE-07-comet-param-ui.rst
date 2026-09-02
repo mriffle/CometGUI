@@ -10,6 +10,20 @@ PHASE-07: Comet Parameter Editor UI
 :Contributes to: R-PARAM-03..10, R-CMT-01
 :Proves: AC-PAR-03, AC-PAR-04, AC-PAR-05, AC-PAR-07, AC-PAR-08, AC-PAR-09, AC-PAR-10
 
+.. note::
+
+   **This phase also owns the ``Settings`` navigation section**, assigned by
+   tier 1 on 2026-08-31. Its default outcome is **removal, not invention**: the
+   specification mentions application Settings once, permissively
+   ("Tool Manager and application Settings *may* be secondary navigation or
+   dialogs"), and requires nothing to be user-configurable at application level.
+   Phase 02 built it honestly as an empty pane that says it is empty, pinned by
+   a test. If no phase before this one has produced an application-level,
+   run-independent preference that cites an ``R-`` rule or ``AC-`` criterion,
+   **remove the section from navigation** rather than shipping a permanently
+   empty one or filling it with invented preferences. See ``STATUS.rst``,
+   *The Settings section: owner assigned, content deliberately empty*.
+
 Purpose
 -------
 The central product-design effort. The specification is explicit that this is

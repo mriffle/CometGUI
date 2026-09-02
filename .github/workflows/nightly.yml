@@ -17,9 +17,9 @@
 # Two steps are real: the documentation link check, which needs nothing that
 # does not exist yet, and the provisioning steps.
 #
-# NEVER RUN ON A SCHEDULE HERE.  GitHub has never executed this file -- nor any
-# other in this repository: 0 workflow runs as of 2026-08-30.  A remote exists
-# (D-008, decided 2026-08-30); nothing has been pushed to it.
+# NEVER RUN ON A SCHEDULE HERE.  As of 2026-09-02 this is the ONLY file GitHub
+# has executed in this repository: one scheduled run, which failed on a
+# Phase-15 stub exactly as designed.  No pull-request workflow has ever run.
 # scripts/ci/run-pipeline-locally.sh runs every step below on this machine and
 # requires each stub to fail and each real step to pass.
 
@@ -78,7 +78,7 @@ jobs:
 
   windows:
     # UNVERIFIABLE IN THIS ENVIRONMENT.  There is no non-Linux machine here and
-    # GitHub has never run anything, so this job has never run anywhere.  When
+    # This job has never run on a runner.  When
     # it first does, note that .gitattributes now pins *.sh to LF: without it
     # this step would have died on `set -Eeuo pipefail\r` before reaching the
     # stub.  It is named rather

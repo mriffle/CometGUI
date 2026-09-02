@@ -108,7 +108,7 @@ RAN=0
     printf ' PHASE-01 exit gate item 6 reads: "CI runs the pull-request pipeline on a pull\n'
     printf ' request and its failure modes are demonstrated, not assumed."\n'
     printf '\n'
-    printf '   NOT MET   "on a pull request". GitHub has never executed these workflow\n'
+    printf '   NOT MET   "on a pull request". No pull request has been opened, so these\n'
     printf '             files. A remote exists -- D-008 was decided on 2026-08-30, and\n'
     printf '             the git remote line above is it -- but nothing has been pushed\n'
     printf '             to it: the Actions API reported 0 workflow runs on 2026-08-30,\n'

@@ -27,8 +27,9 @@
 #    same build.
 #
 # WHAT THIS FILE HAS NOT BEEN SEEN TO DO.  It has never run on a pull request
-# -- or anywhere else.  GitHub has executed NO workflow in this repository at
-# all: the Actions API reported total_count = 0 runs on 2026-08-30.  A remote
+# -- or anywhere else.  GitHub has executed exactly ONE workflow in this
+# repository, a scheduled nightly on 2026-08-31; no pull-request workflow has
+# ever run, because no pull request has been opened.  A remote
 # does exist now (D-008, decided 2026-08-30) and nothing has been pushed to it.
 # PHASE-01 exit gate item 6 is therefore still only half met, and the half that
 # IS met is that every step below has been executed locally, by

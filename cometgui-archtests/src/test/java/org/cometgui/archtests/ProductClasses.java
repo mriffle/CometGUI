@@ -45,7 +45,9 @@ final class ProductClasses {
      *
      * <p>The list is a module map, not a package list. {@code org.cometgui.tools.process} is a
      * separate Maven module (cometgui-process) that shares the {@code org.cometgui.tools} prefix,
-     * so it is named separately and {@link #TOOLS_ADAPTERS} excludes it.
+     * so it is named separately here and {@link ClassImportCensusTest} does not count its classes
+     * towards {@code org.cometgui.tools}. That separation is this list's alone; {@link
+     * #TOOLS_ADAPTERS} does not make it, and its Javadoc says why.
      */
     static final List<String> MODULE_PACKAGES =
             List.of(
@@ -64,7 +66,22 @@ final class ProductClasses {
     /** The process service, the only place a process may be created (R-PROC-02). */
     static final String PROCESS_SERVICE = "org.cometgui.tools.process..";
 
-    /** Tool adapters: everything under {@code org.cometgui.tools} except the process service. */
+    /**
+     * Tool adapters: everything under {@code org.cometgui.tools}, <em>including</em> the process
+     * service, which lives at {@code org.cometgui.tools.process} and is therefore underneath this
+     * pattern.
+     *
+     * <p>This Javadoc used to say the pattern excluded the process service. It never did, and phase
+     * 03 corrected the sentence rather than the constant, because the constant is right. Its one
+     * use is {@code LayeringRulesTest.toolAdaptersDoNotDependOnUi}, and a process service that
+     * reached into a JavaFX control would break that rule for exactly the reason a Comet adapter
+     * would: R-PROC-03's pumps run on their own threads with no toolkit started. Narrowing the
+     * pattern to make the comment true would have taken the process service out of the reach of a
+     * rule that should cover it, which is a weakening.
+     *
+     * <p>A later phase that genuinely needs "the tool adapters and not the process service" should
+     * add a constant of its own and leave this one covering both.
+     */
     static final String TOOLS_ADAPTERS = "org.cometgui.tools..";
 
     private static final JavaClasses PRODUCT_CLASSES =

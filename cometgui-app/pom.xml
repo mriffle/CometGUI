@@ -15,6 +15,79 @@
   <name>CometGUI :: Application</name>
   <description>The assembled application: JavaFX bootstrap, dependency injection and configuration.</description>
 
+  <properties>
+    <!--
+      HEADLESS JAVAFX, REPLICATED FROM cometgui-ui/pom.xml ON PURPOSE.
+
+      This block is a near-copy of the one in cometgui-ui/pom.xml, and the
+      duplication is deliberate rather than an oversight.  The Monocle jar is
+      copied by maven-dependency-plugin into THIS module's own
+      target/monocle/, so the patch-module path below is module-relative; a
+      parent-level argLine naming a path that exists in only two of twelve
+      modules would break every other module's test run, which is worse than
+      two copies that a reader can diff.  If you change one, change the other
+      and say so in the phase handoff.
+
+      WHAT EACH PART IS FOR (the long version is in cometgui-ui/pom.xml and in
+      docs/feasibility/gui-automation-spike.rst, "The JVM options TestFX needs
+      on JDK 25"):
+
+      patch-module: the pinned Liberica JDK bundles JavaFX 25.0.4+1 but its
+      javafx.graphics contains no Monocle, and this host has no libX11, so the
+      GTK platform cannot load libglass.so.  org.testfx:openjfx-monocle
+      supplies a headless Glass platform.  It is patched INTO javafx.graphics
+      because that is a named system module whose PlatformFactory lookup cannot
+      see the unnamed module.
+
+      The add-exports/add-opens pairs are the NINE options the feasibility
+      document lists, kept WHOLE rather than trimmed to what today's tests
+      happen to need: the next work unit in this phase adds TestFX here, and
+      TestFX 4.0.18 reflectively instantiates MonoclePlatformFactory and
+      HeadlessPlatform and writes them into private static fields.  Trimming
+      the set now would only mean rediscovering it later from a stack trace.
+
+      ONE OPTION cometgui-ui DOES NOT HAVE.  Written here without its two
+      leading dashes, because an XML comment may not contain them; the real
+      option is in the property below.
+
+      enable-native-access=ALL-UNNAMED.  This module's
+      org.cometgui.app.config.FfmGlibcVersionSource calls
+      gnu_get_libc_version through java.lang.foreign, and on JDK 25 a
+      restricted method called from the unnamed module (the class path) prints
+      a WARNING unless native access is enabled for it.  The javafx.graphics
+      entry beside it is what Monocle itself needs; the two are separate
+      grants and both are required.  The packaged application of phase 16
+      needs the same option in its jpackage java-options.
+
+      LD_LIBRARY_PATH, FONTCONFIG_PATH, XDG_DATA_HOME and XDG_CACHE_HOME (in
+      the surefire block below) point at the project-local font stack.  Without
+      them a Scene containing any Control dies with "fontFactory is null".
+
+      PLATFORM SCOPE, stated honestly: this is the Linux headless recipe and
+      the library directory is amd64-specific, exactly as in cometgui-ui.  The
+      phase that adds macOS and Windows runners owns splitting it into
+      OS-activated profiles.
+    -->
+    <cometgui.monocleJar>${project.build.directory}/monocle/openjfx-monocle.jar</cometgui.monocleJar>
+    <cometgui.fontstackRoot>${maven.multiModuleProjectDirectory}/tools/fontstack-bookworm-20260829/root</cometgui.fontstackRoot>
+    <cometgui.surefire.extraArgLine>
+      --patch-module javafx.graphics=${cometgui.monocleJar}
+      --add-exports javafx.graphics/com.sun.javafx.tk=ALL-UNNAMED
+      --add-exports javafx.graphics/com.sun.glass.ui=ALL-UNNAMED
+      --add-opens javafx.graphics/com.sun.glass.ui=ALL-UNNAMED
+      --add-exports javafx.graphics/com.sun.glass.ui.monocle=ALL-UNNAMED
+      --add-opens javafx.graphics/com.sun.glass.ui.monocle=ALL-UNNAMED
+      --add-exports javafx.graphics/com.sun.javafx.application=ALL-UNNAMED
+      --add-opens javafx.graphics/com.sun.javafx.application=ALL-UNNAMED
+      --enable-native-access=javafx.graphics
+      --enable-native-access=ALL-UNNAMED
+      -Dglass.platform=Monocle
+      -Dmonocle.platform=Headless
+      -Dprism.order=sw
+      -Djava.awt.headless=true
+    </cometgui.surefire.extraArgLine>
+  </properties>
+
   <!--
     Only the edges the specification's layering permits are declared here.
     Adding one is an architectural change: say so in the phase handoff, and
@@ -61,5 +134,187 @@
       <groupId>org.cometgui</groupId>
       <artifactId>cometgui-ui</artifactId>
     </dependency>
+
+    <!--
+      AtlantaFX (phase 02): the JavaFX theme stylesheets the CasanovoGUI base
+      uses, driven from org.cometgui.app.config.derived.AtlantaFxThemes.  The
+      version is pinned in the parent's <dependencyManagement>.
+
+      THE EXCLUSION IS NOT OPTIONAL.  atlantafx-base declares
+      org.openjfx:javafx-controls at COMPILE scope.  Without the exclusion
+      `mvn -pl cometgui-app dependency:tree` reports six extra artefacts:
+
+          io.github.mkpaz:atlantafx-base:jar:2.1.0:compile
+          \- org.openjfx:javafx-controls:jar:23:compile
+             +- org.openjfx:javafx-controls:jar:linux:23:compile
+             \- org.openjfx:javafx-graphics:jar:23:compile
+                +- org.openjfx:javafx-graphics:jar:linux:23:compile
+                \- org.openjfx:javafx-base:jar:23:compile
+                   \- org.openjfx:javafx-base:jar:linux:23:compile
+
+      This project has NO org.openjfx dependency anywhere: JavaFX 25.0.4+1
+      comes from the pinned Liberica Full JDK as resolved system modules, and a
+      second (here: JavaFX 23) copy of the javafx.* packages on the class path
+      is exactly the breakage the parent POM's opening comment forbids.
+
+      JUNIT DOES NOT NEED EXCLUDING, checked rather than assumed.
+      atlantafx-base also declares junit-jupiter-api, junit-jupiter-engine and
+      assertj-core, but its own parent manages all three to <scope>test</scope>,
+      so none of them is transitive and none appears on this module's tree.  An
+      exclusion for them would be inert; if a future AtlantaFX changes that, the
+      tree will show it.
+    -->
+    <dependency>
+      <groupId>io.github.mkpaz</groupId>
+      <artifactId>atlantafx-base</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.openjfx</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!--
+      TestFX (phase 02, unit 8), the robot behind
+      org.cometgui.app.uidriver.TestFxUiDriver.  TEST SCOPE, here and in the
+      parent's <dependencyManagement>, and declared in no other module: it is
+      test machinery and must never reach a published artefact (R-TEST-06).
+      Phase 00's spike proved 4.0.18 against this JDK and JavaFX pair; the nine
+      JVM options it needs are already in this POM's argLine.
+
+      testfx-core and testfx-junit5 declare EUPL 1.1 in their POMs and pull
+      org.hamcrest:hamcrest, org.assertj:assertj-core and org.osgi:org.osgi.core
+      at RUNTIME scope, which Maven narrows to test scope here.  None is
+      redistributed with CometGUI; the licence audit is told so in the phase
+      handoff rather than being left to discover it.
+
+      NO EXCLUSION IS NEEDED, checked rather than assumed: testfx-core declares
+      org.testfx:openjfx-monocle only at test scope, so it is not transitive and
+      the Monocle jar this module patches into javafx.graphics stays the one
+      maven-dependency-plugin copies below.  `mvn -pl cometgui-app
+      dependency:tree` must keep showing no org.openjfx artefact and no
+      openjfx-monocle on the class path.
+    -->
+    <dependency>
+      <groupId>org.testfx</groupId>
+      <artifactId>testfx-core</artifactId>
+      <scope>test</scope>
+      <exclusions>
+        <!--
+          THE ASSERTJ EXCLUSION IS NOT OPTIONAL, and it is not a way of
+          quietening a gate.
+
+          testfx-core declares org.assertj:assertj-core 3.13.2 at RUNTIME
+          scope, which Maven narrows to test scope here.  That version carries
+          GHSA-rqfh-9r24-8c9r / CVE-2026-24400 (XML external entity processing
+          in `isXmlEqualTo`), and scripts/ci/dependency-scan.py fails the
+          supplychain stage on it, correctly.
+
+          Excluding it REMOVES the component rather than accepting it.  AssertJ
+          is used by exactly one part of TestFX, its optional assertion API:
+          `javap` over the 4.0.18 jar shows references to org/assertj only from
+          org/testfx/assertions/**, and nothing in this project imports that
+          package.  The FxUiDriver implementations use org.testfx.api.FxRobot
+          and JUnit's own assertions.  If that ever stops being true the tests
+          fail with NoClassDefFoundError, loudly, which is the right failure.
+
+          The alternatives were worse: an allowlist entry accepts a known
+          advisory for no benefit, and managing assertj-core to a fixed version
+          would add a dependency this project does not otherwise have.
+
+          org.hamcrest:hamcrest and org.osgi:org.osgi.core come the same way and
+          are NOT excluded: neither carries an advisory today, and TestFX's
+          matcher API and its OSGi activator are part of the library proper.
+        -->
+        <exclusion>
+          <groupId>org.assertj</groupId>
+          <artifactId>assertj-core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.testfx</groupId>
+      <artifactId>testfx-junit5</artifactId>
+      <scope>test</scope>
+      <exclusions>
+        <!--
+          The same exclusion, for the same reason, on the other coordinate that
+          brings assertj-core in: see the block above.  Checked rather than
+          assumed here too, `javap` over testfx-junit5 4.0.18 shows no class in
+          it referencing org/assertj at all.
+        -->
+        <exclusion>
+          <groupId>org.assertj</groupId>
+          <artifactId>assertj-core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
   </dependencies>
+  <build>
+    <plugins>
+      <!--
+        Monocle is fetched into THIS module's build directory and injected with
+        patch-module; it is deliberately NOT a <dependency>, because anything on
+        the test class path lands in the unnamed module where javafx.graphics
+        cannot see it.  The version is pinned in the parent POM.  cometgui-ui
+        has the same execution over the same artefact into its own target/.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>fetch-monocle</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.testfx</groupId>
+                  <artifactId>openjfx-monocle</artifactId>
+                  <version>${openjfx-monocle.version}</version>
+                  <type>jar</type>
+                  <outputDirectory>${project.build.directory}/monocle</outputDirectory>
+                  <destFileName>openjfx-monocle.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!--
+            One JVM per test class.  Phase 00 found that a shared fork lets one
+            toolkit-owning test break the next one's robot input; isolating the
+            JVMs is the fix, and relaxing the assertion would not have been.
+            It matters twice over here: the startup smoke test calls
+            Application.launch, which may be called at most once in a JVM.
+          -->
+          <reuseForks>false</reuseForks>
+          <!--
+            The forked JVM's environment, not system properties: the dynamic
+            linker and fontconfig read these at process start, so setting them
+            with -D would be too late and would do nothing.
+          -->
+          <environmentVariables>
+            <LD_LIBRARY_PATH>${cometgui.fontstackRoot}/usr/lib/x86_64-linux-gnu</LD_LIBRARY_PATH>
+            <FONTCONFIG_PATH>${cometgui.fontstackRoot}/etc/fonts</FONTCONFIG_PATH>
+            <XDG_DATA_HOME>${cometgui.fontstackRoot}/usr/share</XDG_DATA_HOME>
+            <!-- fontconfig's cache belongs in the build directory, not in the
+                 developer's home: no test may depend on home-directory state. -->
+            <XDG_CACHE_HOME>${project.build.directory}/fontconfig-cache</XDG_CACHE_HOME>
+          </environmentVariables>
+          <systemPropertyVariables>
+            <cometgui.fontstackRoot>${cometgui.fontstackRoot}</cometgui.fontstackRoot>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

@@ -25,8 +25,30 @@
     scripts/build.sh fails the build if real classes appear here while the
     switch is still true.
   -->
+  <!--
+    MUTATION GATE ON, AND NO LONGER INERT (phase 04).  R-TEST-02 names
+    "checksum and provenance code" and "secret redaction" as critical pure
+    logic, and pom.xml's <targetClasses> already lists org.cometgui.provenance.*
+    for exactly that reason.  Until this phase the module compiled nothing but
+    package-info classes, so the parent's default of `true` was correct: PIT
+    runs with failWhenNoMutations at its default, and would have failed a
+    module that had nothing to mutate.  The module now has real classes, so the
+    switch goes on, and scripts/build.sh's drift check fails the build if
+    critical-package code ever appears here with the gate off again.
+
+    VERIFIED REACHING THE CODE, NOT ASSUMED.  PIT matches its glob against the
+    fully qualified class name, so org.cometgui.provenance.* was expected to
+    cover the subpackages this phase creates.  A gate that silently matches
+    nothing is this project's signature defect, though, so the expectation was
+    checked by counting mutations per class in target/pit-reports/mutations.xml
+    once the first real class had landed: 8 mutations, every one of them in
+    org.cometgui.provenance.hashing.StreamingHashService.  Before that class
+    existed the module produced no PIT report at all, which is the "before"
+    number the after is compared against.
+  -->
   <properties>
     <cometgui.coverage.core.skip>false</cometgui.coverage.core.skip>
+    <cometgui.mutation.skip>false</cometgui.mutation.skip>
   </properties>
 
   <!--

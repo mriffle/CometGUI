@@ -68,6 +68,7 @@ readonly STAGES=(
 # ----------------------------------------------------------------- plumbing --
 MVN_OFFLINE=""
 ONLY=""
+CENSUS_ROOT=""
 STAGE_RESULTS=()
 
 usage() {
@@ -81,6 +82,14 @@ Options:
   --offline        Pass -o to Maven and require .venv to exist already.  Only
                    works once a previous online run has populated
                    _build/m2repo; it resolves nothing from the network.
+  --census-root DIR
+                   Run ONLY the format stage's file-set census, against DIR
+                   instead of the repository root, and exit.  DIR is a copy of
+                   the tree (a sandbox), so modules with no target/ are skipped
+                   rather than reported missing.  This exists so that
+                   scripts/verify-quality-gates.sh can prove the census fails on
+                   a damaged tree without damaging the working tree, and so that
+                   there is exactly one implementation of the census.
   --only ID[,ID]   Run only the named stages, in the order listed below.  This
                    exists so that the CI step scripts in scripts/ci/ can invoke
                    THIS script rather than reimplementing a stage: the local
@@ -320,6 +329,209 @@ count_occurrences() {
     printf '%s' "${count}"
 }
 
+# ------------------------------------------------------- the file census --
+#
+# PHASE 02 SPLIT EACH OF SPOTLESS AND CHECKSTYLE INTO TWO FILE SETS.  A file is
+# DERIVED if and only if its path contains a `/derived/` segment: it is reused
+# from Noble-Lab/CasanovoGUI, it keeps upstream's notices (D-001 obligation 2,
+# R-SEC-01), and it therefore carries a different licence header from every
+# other file.  The ordinary Spotless and Checkstyle executions exclude those
+# paths; a second execution of each covers exactly them, with its own header
+# and, for Checkstyle, its own rule set.
+#
+# EXCLUDING A FILE FROM A GATE IS ONLY LEGITIMATE WHILE SOMETHING ELSE COVERS
+# IT, so the census below proves, on every build, that:
+#
+#   1. the two sets together are EXACTLY the .java files on disk.  This is the
+#      hole that matters: a file excluded from set 1 whose path set 2's include
+#      pattern does not match would be checked by nothing at all, and the build
+#      would stay green and say so;
+#   2. the two sets are DISJOINT.  A file in both would be graded against two
+#      different licence headers and could pass neither, but the failure must be
+#      loud and named rather than mysterious;
+#   3. config/checkstyle/checkstyle-derived.xml remains a SUPERSET of
+#      config/checkstyle/checkstyle.xml.  Two rule sets that must stay in step
+#      drift, and a derived file held to a shorter list of rules than every
+#      other file is a weakened gate however green the build is.
+#
+# The check lives here, not only in scripts/verify-quality-gates.sh, because it
+# is free, needs no Maven run, and catches drift on the build that introduces it
+# rather than on the next full negative-control run.  verify-quality-gates.sh
+# proves it fails, by calling this script with --census-root against a sandbox
+# it has damaged.
+
+# The files one Spotless index certifies, as module-relative paths.  Line 1 is
+# the formatter's state hash; every line after it is "<path> <ISO timestamp>".
+# A missing index is an empty set here; whether that is allowed is the caller's
+# judgement, not this function's.
+spotless_index_files() {
+    [ -f "$1" ] || return 0
+    tail -n +2 -- "$1" | sed 's/[[:space:]][^[:space:]]*$//'
+}
+
+# The files one Checkstyle result names, as module-relative paths.
+checkstyle_result_files() {
+    local result="$1" module_dir="$2"
+    [ -f "${result}" ] || return 0
+    grep -o '<file name="[^"]*"' -- "${result}" \
+        | sed 's/^<file name="//; s/"$//' \
+        | sed "s|^${module_dir}/||"
+}
+
+# Every .java file under a module's source roots, as module-relative paths.
+java_sources_of() {
+    local root="$1" module="$2" dir
+    for dir in src/main/java src/test/java; do
+        [ -d "${root}/${module}/${dir}" ] || continue
+        ( cd "${root}/${module}" && find "${dir}" -name '*.java' -type f )
+    done
+}
+
+# The module names one Checkstyle rule set contains, sorted and deduplicated.
+checkstyle_modules_of() {
+    grep -o '<module name="[A-Za-z]*"' -- "$1" | sed 's/.*name="//; s/"//' | sort -u
+}
+
+# Compare one tool's two file sets for one module against what is on disk.
+# Prints its verdict; returns the number of failures found.
+census_sets() {
+    local tool="$1" module="$2" disk="$3" ordinary="$4" derived="$5" union="$6"
+    local failures=0 n_disk n_ord n_der overlap unchecked phantom
+    n_disk="$(wc -l < "${disk}")"
+    n_ord="$(wc -l < "${ordinary}")"
+    n_der="$(wc -l < "${derived}")"
+    sort -u "${ordinary}" "${derived}" >"${union}"
+
+    overlap="$(comm -12 "${ordinary}" "${derived}" | tr '\n' ' ')"
+    if [ -n "${overlap% }" ]; then
+        echo "   OVERLAP  ${module}: ${tool} put the same file in BOTH file sets: ${overlap}"
+        echo "            One file cannot satisfy two different licence headers.  The exclusion"
+        echo "            in one set and the include pattern in the other have stopped agreeing."
+        failures=$((failures + 1))
+    fi
+
+    unchecked="$(comm -23 "${disk}" "${union}" | tr '\n' ' ')"
+    if [ -n "${unchecked% }" ]; then
+        echo "   UNCHECKED ${module}: ${tool} inspected NEITHER file set for: ${unchecked}"
+        echo "            A file excluded from the ordinary set whose path the derived set's"
+        echo "            include pattern does not match is checked by nothing at all, and the"
+        echo "            build stays green.  That is the hole this census exists to close."
+        failures=$((failures + 1))
+    fi
+
+    phantom="$(comm -13 "${disk}" "${union}" | tr '\n' ' ')"
+    if [ -n "${phantom% }" ]; then
+        echo "   PHANTOM  ${module}: ${tool} reported file(s) that are not on disk: ${phantom}"
+        echo "            Stale output from an earlier tree; the evidence is not this build's."
+        failures=$((failures + 1))
+    fi
+
+    if [ $(( n_ord + n_der )) -ne "${n_disk}" ]; then
+        printf '   MISMATCH %s: %d .java source(s) on disk, %d ordinary + %d derived = %d seen by %s\n' \
+            "${module}" "${n_disk}" "${n_ord}" "${n_der}" "$(( n_ord + n_der ))" "${tool}"
+        failures=$((failures + 1))
+    fi
+
+    if [ "${failures}" -eq 0 ]; then
+        printf '   ok       %-28s %-10s %2d ordinary + %2d derived = %2d file(s) on disk\n' \
+            "${module}" "${tool}" "${n_ord}" "${n_der}" "${n_disk}"
+    fi
+    return "${failures}"
+}
+
+# The whole census.  <root> is the tree to inspect and <strict> is 1 for the
+# real build (every module must have produced evidence) and 0 for a sandbox,
+# where only the modules that were actually built have a target/.
+# Sets CENSUS_SPOTLESS_TOTAL and CENSUS_CHECKSTYLE_TOTAL; returns the failure
+# count rather than dying, so the caller decides what a failure means.
+CENSUS_SPOTLESS_TOTAL=0
+CENSUS_CHECKSTYLE_TOTAL=0
+format_census() {
+    local root="$1" strict="$2"
+    local failures=0 rc module tmp dropped errors main_cfg derived_cfg
+    CENSUS_SPOTLESS_TOTAL=0
+    CENSUS_CHECKSTYLE_TOTAL=0
+    tmp="$(mktemp -d)"
+
+    echo "-- Checkstyle rule sets: checkstyle-derived.xml must stay a superset of checkstyle.xml"
+    main_cfg="${root}/config/checkstyle/checkstyle.xml"
+    derived_cfg="${root}/config/checkstyle/checkstyle-derived.xml"
+    if [ ! -f "${main_cfg}" ] || [ ! -f "${derived_cfg}" ]; then
+        echo "   MISSING  config/checkstyle/checkstyle.xml or checkstyle-derived.xml under ${root}"
+        failures=$((failures + 1))
+    else
+        checkstyle_modules_of "${main_cfg}" >"${tmp}/cs-ordinary"
+        checkstyle_modules_of "${derived_cfg}" >"${tmp}/cs-derived"
+        dropped="$(comm -23 "${tmp}/cs-ordinary" "${tmp}/cs-derived" | tr '\n' ' ')"
+        if [ -n "${dropped% }" ]; then
+            echo "   DRIFT    checkstyle-derived.xml no longer contains: ${dropped}"
+            echo "            Derived files would be held to a SHORTER list of rules than every"
+            echo "            other file in the repository.  Put the module back; removing one to"
+            echo "            make a derived file pass is a weakening of a gate."
+            failures=$((failures + 1))
+        else
+            printf '   ok       %d module(s) in checkstyle.xml, every one present in checkstyle-derived.xml (%d there)\n' \
+                "$(wc -l < "${tmp}/cs-ordinary")" "$(wc -l < "${tmp}/cs-derived")"
+        fi
+    fi
+
+    echo "-- Spotless: target/spotless-index plus target/spotless-index-derived, exhaustive and disjoint"
+    for module in "${PRODUCT_MODULES[@]}" cometgui-archtests; do
+        [ -d "${root}/${module}" ] || continue
+        if [ "${strict}" -eq 0 ] && [ ! -f "${root}/${module}/target/spotless-index" ]; then
+            printf '   skip     %-28s not built in this tree\n' "${module}"
+            continue
+        fi
+        if [ ! -f "${root}/${module}/target/spotless-index" ]; then
+            echo "   MISSING  ${module}/target/spotless-index (did spotless:check run?)"
+            failures=$((failures + 1))
+            continue
+        fi
+        java_sources_of "${root}" "${module}" | sort >"${tmp}/disk"
+        spotless_index_files "${root}/${module}/target/spotless-index" | sort >"${tmp}/ord"
+        spotless_index_files "${root}/${module}/target/spotless-index-derived" | sort >"${tmp}/der"
+        rc=0
+        census_sets "Spotless" "${module}" "${tmp}/disk" "${tmp}/ord" "${tmp}/der" "${tmp}/union" || rc=$?
+        failures=$((failures + rc))
+        [ "${rc}" -ne 0 ] || CENSUS_SPOTLESS_TOTAL=$(( CENSUS_SPOTLESS_TOTAL + $(wc -l < "${tmp}/union") ))
+    done
+
+    echo "-- Checkstyle: target/checkstyle-result.xml plus target/checkstyle-result-derived.xml"
+    for module in "${PRODUCT_MODULES[@]}" cometgui-archtests; do
+        [ -d "${root}/${module}" ] || continue
+        if [ "${strict}" -eq 0 ] && [ ! -f "${root}/${module}/target/checkstyle-result.xml" ]; then
+            printf '   skip     %-28s not built in this tree\n' "${module}"
+            continue
+        fi
+        if [ ! -f "${root}/${module}/target/checkstyle-result.xml" ]; then
+            echo "   MISSING  ${module}/target/checkstyle-result.xml (did checkstyle:check run?)"
+            failures=$((failures + 1))
+            continue
+        fi
+        java_sources_of "${root}" "${module}" | sort >"${tmp}/disk"
+        checkstyle_result_files "${root}/${module}/target/checkstyle-result.xml" \
+            "${root}/${module}" | sort >"${tmp}/ord"
+        checkstyle_result_files "${root}/${module}/target/checkstyle-result-derived.xml" \
+            "${root}/${module}" | sort >"${tmp}/der"
+        rc=0
+        census_sets "Checkstyle" "${module}" "${tmp}/disk" "${tmp}/ord" "${tmp}/der" "${tmp}/union" || rc=$?
+        failures=$((failures + rc))
+        # A violation recorded in a result file of a build that passed means the
+        # plugin reported it and nothing acted on it.
+        errors=$(( $(count_occurrences "${root}/${module}/target/checkstyle-result.xml" '<error ') \
+                 + $(count_occurrences "${root}/${module}/target/checkstyle-result-derived.xml" '<error ') ))
+        if [ "${errors}" -ne 0 ]; then
+            echo "   VIOLATIONS ${module}: ${errors} Checkstyle error(s) in a build that passed"
+            failures=$((failures + 1))
+            rc=1
+        fi
+        [ "${rc}" -ne 0 ] || CENSUS_CHECKSTYLE_TOTAL=$(( CENSUS_CHECKSTYLE_TOTAL + $(wc -l < "${tmp}/union") ))
+    done
+
+    rm -rf "${tmp}"
+    return "${failures}"
+}
+
 stage_format() {
     # Spotless, Checkstyle and SpotBugs all run inside `mvn verify`, which the
     # build stage above already ran: Spotless and Checkstyle bound to validate,
@@ -329,8 +541,8 @@ stage_format() {
     # that is silently misconfigured exits 0 having analysed nothing, and the
     # build would be just as green.
     local failures=0 module expected
-    local index result xml compiled
-    local listed found errors classes missing bugs
+    local xml compiled
+    local classes missing bugs
     local total_spotless=0 total_checkstyle=0 total_classes=0
 
     # google-java-format reads jdk.compiler internals.  Without these exports
@@ -355,48 +567,11 @@ stage_format() {
         failures=$((failures + missing_exports))
     fi
 
-    echo "-- Spotless: target/spotless-index names every file it certified clean"
-    for module in "${PRODUCT_MODULES[@]}" cometgui-archtests; do
-        expected="$(count_java_sources "${module}")"
-        index="${ROOT}/${module}/target/spotless-index"
-        if [ ! -f "${index}" ]; then
-            echo "   MISSING  ${module}/target/spotless-index (did spotless:check run?)"
-            failures=$((failures + 1))
-            continue
-        fi
-        # First line is the formatter's state hash; one line per file after it.
-        listed=$(( $(wc -l < "${index}") - 1 ))
-        if [ "${listed}" -ne "${expected}" ]; then
-            echo "   MISMATCH ${module}: ${expected} .java source(s) on disk, ${listed} in spotless-index"
-            failures=$((failures + 1))
-        else
-            printf '   ok       %-28s %2d file(s) formatted and header-checked\n' "${module}" "${listed}"
-            total_spotless=$((total_spotless + listed))
-        fi
-    done
-
-    echo "-- Checkstyle: target/checkstyle-result.xml names every file it parsed"
-    for module in "${PRODUCT_MODULES[@]}" cometgui-archtests; do
-        expected="$(count_java_sources "${module}")"
-        result="${ROOT}/${module}/target/checkstyle-result.xml"
-        if [ ! -f "${result}" ]; then
-            echo "   MISSING  ${module}/target/checkstyle-result.xml (did checkstyle:check run?)"
-            failures=$((failures + 1))
-            continue
-        fi
-        found="$(count_occurrences "${result}" '<file name=')"
-        errors="$(count_occurrences "${result}" '<error ')"
-        if [ "${found}" -ne "${expected}" ]; then
-            echo "   MISMATCH ${module}: ${expected} .java source(s) on disk, ${found} in checkstyle-result.xml"
-            failures=$((failures + 1))
-        elif [ "${errors}" -ne 0 ]; then
-            echo "   VIOLATIONS ${module}: ${errors} Checkstyle error(s) in a build that passed"
-            failures=$((failures + 1))
-        else
-            printf '   ok       %-28s %2d file(s) checked, 0 violations\n' "${module}" "${found}"
-            total_checkstyle=$((total_checkstyle + found))
-        fi
-    done
+    local census_failures=0
+    format_census "${ROOT}" 1 || census_failures=$?
+    failures=$(( failures + census_failures ))
+    total_spotless="${CENSUS_SPOTLESS_TOTAL}"
+    total_checkstyle="${CENSUS_CHECKSTYLE_TOTAL}"
 
     echo "-- SpotBugs: target/spotbugsXml.xml reports how many classes it read"
     for module in "${PRODUCT_MODULES[@]}" cometgui-archtests; do
@@ -480,6 +655,33 @@ real_classes_of() {
         | sed 's|^\./||' | sort )
 }
 
+# Top-level classes a module compiled, fully qualified.  Inner classes are
+# dropped on both sides of the census below, because JaCoCo and PIT each report
+# them under their own names and comparing them would make the check fire on a
+# naming artefact rather than on a missing class.  Sorted AFTER the path is
+# turned into a dotted name: '/' and '.' do not sort alike, so sorting the paths
+# would hand comm two differently ordered lists and invent differences.
+compiled_class_names_of() {
+    real_classes_of "$1" | grep -v '[$]' | sed 's|[.]class$||; s|/|.|g' | LC_ALL=C sort
+}
+
+# The classes a module's JaCoCo report actually scored, fully qualified.
+jacoco_class_names_of() {
+    local xml="$1"
+    [ -f "${xml}" ] || return 0
+    grep -o '<class name="[^"]*"' "${xml}" 2>/dev/null \
+        | sed 's/.*name="//; s/"$//; s|/|.|g' | grep -v '[$]' | LC_ALL=C sort -u
+}
+
+# The classes PIT mutated, fully qualified, with inner classes folded into the
+# outer class they belong to.
+pit_class_names_of() {
+    local xml="$1"
+    [ -f "${xml}" ] || return 0
+    grep -o '<mutatedClass>[^<]*</mutatedClass>' "${xml}" 2>/dev/null \
+        | sed 's|</\?mutatedClass>||g; s/[$].*//' | LC_ALL=C sort -u
+}
+
 # True when a module's POM opts into one of the gate switches.
 module_opts_in() {
     local module="$1" property="$2"
@@ -553,6 +755,65 @@ stage_gates() {
     done
     [ "${measured}" -gt 0 ] \
         || { echo "   JACOCO MEASURED NO LINES AT ALL IN ANY MODULE"; failures=$((failures + 1)); }
+
+    echo "-- JaCoCo: every compiled class reached the coverage sample"
+    # THE POPULATION, NOT THE SCORE.  A coverage rule reports "All coverage
+    # checks have been met" over whatever is in its sample.  A class whose test
+    # does not compile, or which one command line quietly scoped out, is often
+    # absent from the report altogether -- and an absent class does not drag an
+    # average down, it silently leaves the sample.  The result is a real
+    # measurement over an incomplete population: the only defect shape this
+    # project has found that RE-RUNNING THE GATE CANNOT CATCH, because re-running
+    # reproduces the same clean figure.  Only auditing that the sample was whole
+    # catches it.
+    #
+    # Not hypothetical.  On 2026-08-31, in a tree where five units were landing
+    # at once, cometgui-provenance compiled 37 classes and jacoco.xml held 36:
+    # ManifestReader was carrying 79 NO_COVERAGE mutations while the build
+    # reported that every coverage check had been met.  The statement was true
+    # of the sample and false of the code.
+    #
+    # The module-level case above -- classes compiled, no jacoco.xml at all --
+    # was already checked.  This is the per-CLASS case, one line further down the
+    # same failure, and it is the one that bites when a single test is excluded.
+    local absent census_total
+    for module in "${PRODUCT_MODULES[@]}"; do
+        xml="${ROOT}/${module}/target/site/jacoco/jacoco.xml"
+        [ -f "${xml}" ] || continue
+        census_total="$(compiled_class_names_of "${module}" | wc -l)"
+        [ "${census_total}" -gt 0 ] || continue
+        absent="$(comm -23 \
+            <(compiled_class_names_of "${module}") \
+            <(jacoco_class_names_of "${xml}"))"
+        if [ -n "${absent}" ]; then
+            echo "   ABSENT   ${module}: compiled, but missing from jacoco.xml:"
+            printf '%s\n' "${absent}" | sed 's/^/              /'
+            echo "            This module's coverage figure is a real measurement"
+            echo "            over an incomplete population. Do not read it."
+            failures=$((failures + 1))
+        else
+            printf '   ok       %-28s %s compiled class(es), all %s in the sample\n' \
+                "${module}" "${census_total}" "${census_total}"
+        fi
+    done
+
+    echo "-- PIT: compiled classes carrying no mutations (a prompt, never a failure)"
+    # DELIBERATELY NOT AN ASSERTION.  An interface, an enum of constants, an
+    # exception with only a constructor or a record with no branches legitimately
+    # yields no mutations, so a rule here would fail honest code and would be
+    # weakened within a week.  It is printed for a person to judge instead.
+    local pit_xml unmutated
+    for module in "${PRODUCT_MODULES[@]}"; do
+        pit_xml="${ROOT}/${module}/target/pit-reports/mutations.xml"
+        [ -f "${pit_xml}" ] || continue
+        unmutated="$(comm -23 \
+            <(compiled_class_names_of "${module}") \
+            <(pit_class_names_of "${pit_xml}"))"
+        if [ -n "${unmutated}" ]; then
+            printf '   note     %-28s no PIT mutations; judge, do not assume:\n' "${module}"
+            printf '%s\n' "${unmutated}" | sed 's/^/              /'
+        fi
+    done
 
     echo "-- JaCoCo: a module holding gated code must have its gate switched on"
     local class_file prefix hit coverage_drift=0
@@ -751,12 +1012,27 @@ main() {
         case "$1" in
             --offline) MVN_OFFLINE="-o"; shift ;;
             --only) ONLY="${2:-}"; [ -n "${ONLY}" ] || die "--only needs a stage id"; shift 2 ;;
+            --census-root) CENSUS_ROOT="${2:-}"; [ -n "${CENSUS_ROOT}" ] || die "--census-root needs a directory"; shift 2 ;;
             -h|--help) usage; exit 0 ;;
             *) usage >&2; die "unknown option: $1" ;;
         esac
     done
 
     cd -- "${ROOT}"
+
+    # --census-root: the format stage's file-set census alone, against another
+    # tree.  Nothing else runs, nothing is built, and nothing is written.
+    if [ -n "${CENSUS_ROOT}" ]; then
+        [ -d "${CENSUS_ROOT}" ] || die "--census-root: no such directory: ${CENSUS_ROOT}"
+        printf 'Census of %s (a sandbox: modules with no target/ are skipped).\n\n' "${CENSUS_ROOT}"
+        local census_failures=0
+        format_census "${CENSUS_ROOT}" 0 || census_failures=$?
+        [ "${census_failures}" -eq 0 ] \
+            || die "${census_failures} file-set census check(s) failed in ${CENSUS_ROOT}."
+        printf '\nOK: both Spotless file sets and both Checkstyle file sets are exhaustive and\n'
+        printf '    disjoint, and checkstyle-derived.xml is a superset of checkstyle.xml.\n'
+        exit 0
+    fi
 
     # Select the stages to run, in STAGES order.  An id that names no stage is
     # fatal: a workflow step that quietly ran nothing because someone renamed a

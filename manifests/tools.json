@@ -1,0 +1,1185 @@
+{
+  "schemaVersion": 1,
+  "artefacts": [
+    {
+      "tool": "comet",
+      "version": "2026.02.2",
+      "releaseTag": "v2026.02.2",
+      "os": "linux",
+      "arch": "x86-64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/comet.linux.exe",
+      "sizeBytes": 7014400,
+      "sha256": "af515b6ed5a17efafff7277a6a9c73cee97e26d38f3c9b2a8da16adaa44e6d9e",
+      "md5": "2676766b123a09f284fa2b3f4efb73c1",
+      "expectedExecutablePath": "bin/comet",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.02.2/LICENSE",
+        "note": "upstream LICENSE at tag v2026.02.2 opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022); recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
+      },
+      "companions": [],
+      "capabilities": [
+        {
+          "capability": "PEPXML_OUTPUT",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by phase 00: a Comet search over two real mzML files wrote a .pep.xml beside each input"
+        },
+        {
+          "capability": "PIN_OUTPUT",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by phase 00: the same search wrote a .pin beside each input, and Percolator read both"
+        },
+        {
+          "capability": "COMPLETE_PARAMS_QUERY",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by phase 00: comet -q emitted 118 parameters against comet -p's 96, which is the difference R-PARAM-01 records"
+        }
+      ],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "comet",
+      "version": "2026.02.2",
+      "releaseTag": "v2026.02.2",
+      "os": "linux",
+      "arch": "aarch64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/comet.aarch64.linux.exe",
+      "sizeBytes": 6482904,
+      "sha256": "a8c5314d440fd56a15b16be1465e4ed74f3e0a0abe0afd293932452cbe8f5dcc",
+      "md5": "0d38a96be857e7834876cc83c910b42c",
+      "expectedExecutablePath": "bin/comet",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.02.2/LICENSE",
+        "note": "upstream LICENSE at tag v2026.02.2 opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022); recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
+      },
+      "companions": [],
+      "capabilities": [
+        {
+          "capability": "PEPXML_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet binary for linux-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "PIN_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet binary for linux-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "COMPLETE_PARAMS_QUERY",
+          "evidence": "unverified",
+          "note": "no Comet binary for linux-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        }
+      ],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "comet",
+      "version": "2026.02.2",
+      "releaseTag": "v2026.02.2",
+      "os": "macos",
+      "arch": "x86-64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/comet.macos.exe",
+      "sizeBytes": 3998328,
+      "sha256": "b248e8644d8a2034572223e613859cda9aa85fb00a06800fc3ae98411534db62",
+      "md5": "1981bb029e620cbe82b814a51938207d",
+      "expectedExecutablePath": "bin/comet",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.02.2/LICENSE",
+        "note": "upstream LICENSE at tag v2026.02.2 opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022); recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
+      },
+      "companions": [],
+      "capabilities": [
+        {
+          "capability": "PEPXML_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet binary for macos-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "PIN_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet binary for macos-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "COMPLETE_PARAMS_QUERY",
+          "evidence": "unverified",
+          "note": "no Comet binary for macos-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        }
+      ],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "comet",
+      "version": "2026.02.2",
+      "releaseTag": "v2026.02.2",
+      "os": "macos",
+      "arch": "aarch64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/comet.aarch64.macos.exe",
+      "sizeBytes": 3998328,
+      "sha256": "1b93ed1cf690026a75d80e1e0ce3ed57394bcd47ba5c8587441668c006e32f0e",
+      "md5": "2146efb5f845d35d58333649bdecba5f",
+      "expectedExecutablePath": "bin/comet",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.02.2/LICENSE",
+        "note": "upstream LICENSE at tag v2026.02.2 opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022); recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
+      },
+      "companions": [],
+      "capabilities": [
+        {
+          "capability": "PEPXML_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet binary for macos-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "PIN_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet binary for macos-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "COMPLETE_PARAMS_QUERY",
+          "evidence": "unverified",
+          "note": "no Comet binary for macos-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        }
+      ],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "comet",
+      "version": "2026.02.2",
+      "releaseTag": "v2026.02.2",
+      "os": "windows",
+      "arch": "x86-64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/comet.win64.exe",
+      "sizeBytes": 3452416,
+      "sha256": "5664e2152dcd6f0caf889c944967a9717654025dbcbc4f0f30e28daa7030f78b",
+      "md5": "7364cb0341676bde1756ed5765612b22",
+      "expectedExecutablePath": "bin/comet.exe",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.02.2/LICENSE",
+        "note": "upstream LICENSE at tag v2026.02.2 opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022); recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
+      },
+      "companions": [
+        {
+          "id": "comet-2026-02-2-thermo-cometwrapper",
+          "kind": "BARE_EXECUTABLE",
+          "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/CometWrapper.dll",
+          "sizeBytes": 4411392,
+          "sha256": "ccebde0d57c60dfcb6be602be27612d40f29eabbd5a6ffdd4113890e79a6b6fd",
+          "md5": "f520d1c63b692bc64429344564801578",
+          "runtimePrerequisite": true,
+          "gatesCapability": "THERMO_RAW_WINDOWS",
+          "note": "Comet reads Thermo RAW files on Windows only with this library installed beside comet.exe. R-TOOL-02 requires an install missing it not to advertise THERMO_RAW_WINDOWS; gatesCapability above makes that a fact in the manifest rather than a conditional in code.",
+          "members": [
+            {
+              "path": "CometWrapper.dll",
+              "sizeBytes": 4411392,
+              "sha256": "ccebde0d57c60dfcb6be602be27612d40f29eabbd5a6ffdd4113890e79a6b6fd",
+              "md5": "f520d1c63b692bc64429344564801578",
+              "installedPath": "bin/CometWrapper.dll"
+            }
+          ]
+        },
+        {
+          "id": "comet-2026-02-2-thermo-commoncore-data",
+          "kind": "BARE_EXECUTABLE",
+          "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/ThermoFisher.CommonCore.Data.dll",
+          "sizeBytes": 406016,
+          "sha256": "8b10b14f885c00619a90d0a8434d08098f3bdffcc260d59feb00ea8b7efbc139",
+          "md5": "a2280fe49a7a7e0a8d5dd3224da2fd05",
+          "runtimePrerequisite": true,
+          "gatesCapability": "THERMO_RAW_WINDOWS",
+          "note": "Comet reads Thermo RAW files on Windows only with this library installed beside comet.exe. R-TOOL-02 requires an install missing it not to advertise THERMO_RAW_WINDOWS; gatesCapability above makes that a fact in the manifest rather than a conditional in code.",
+          "members": [
+            {
+              "path": "ThermoFisher.CommonCore.Data.dll",
+              "sizeBytes": 406016,
+              "sha256": "8b10b14f885c00619a90d0a8434d08098f3bdffcc260d59feb00ea8b7efbc139",
+              "md5": "a2280fe49a7a7e0a8d5dd3224da2fd05",
+              "installedPath": "bin/ThermoFisher.CommonCore.Data.dll"
+            }
+          ]
+        },
+        {
+          "id": "comet-2026-02-2-thermo-commoncore-rawfilereader",
+          "kind": "BARE_EXECUTABLE",
+          "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/ThermoFisher.CommonCore.RawFileReader.dll",
+          "sizeBytes": 650752,
+          "sha256": "a9b2fc190367881c6541291caf57e114f7d305a10ba933ccbb0040d3a8a33888",
+          "md5": "dd9e2c51610f96b908d5e7f7de4cbfb5",
+          "runtimePrerequisite": true,
+          "gatesCapability": "THERMO_RAW_WINDOWS",
+          "note": "Comet reads Thermo RAW files on Windows only with this library installed beside comet.exe. R-TOOL-02 requires an install missing it not to advertise THERMO_RAW_WINDOWS; gatesCapability above makes that a fact in the manifest rather than a conditional in code.",
+          "members": [
+            {
+              "path": "ThermoFisher.CommonCore.RawFileReader.dll",
+              "sizeBytes": 650752,
+              "sha256": "a9b2fc190367881c6541291caf57e114f7d305a10ba933ccbb0040d3a8a33888",
+              "md5": "dd9e2c51610f96b908d5e7f7de4cbfb5",
+              "installedPath": "bin/ThermoFisher.CommonCore.RawFileReader.dll"
+            }
+          ]
+        }
+      ],
+      "capabilities": [
+        {
+          "capability": "PEPXML_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet binary for windows-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "PIN_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet binary for windows-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "COMPLETE_PARAMS_QUERY",
+          "evidence": "unverified",
+          "note": "no Comet binary for windows-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "THERMO_RAW_WINDOWS",
+          "evidence": "unverified",
+          "note": "no Comet binary for windows-x86-64 has ever been run anywhere in this project. This capability is additionally gated on the three Thermo companion downloads below: an install missing any of them must not advertise it (R-TOOL-02)."
+        }
+      ],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.07.1",
+      "releaseTag": "rel-3-07-01",
+      "os": "linux",
+      "arch": "x86-64",
+      "kind": "ZIP",
+      "url": "https://github.com/percolator/percolator/releases/download/rel-3-07-01/percolator-noxml-ubuntu-portable.zip",
+      "sizeBytes": 946303,
+      "sha256": "4d0e94af851884ff8ab6a2223e73cf28ba3ced28f6af863d4a76d541009b9dd1",
+      "md5": "9c86de1c45d2d93dae1ab43216b5864c",
+      "member": "percolator",
+      "memberSizeBytes": 2538632,
+      "memberSha256": "1ba38acf09520cc89d5ed907ed0382c4d23876a7e20ec3e91cbbaa2ed431237c",
+      "memberMd5": "0b77b68fd859639d7421f1c5e006ade5",
+      "installedPath": "bin/percolator",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/percolator/percolator/rel-3-07-01/license.txt",
+        "note": "upstream license.txt at this release tag states that percolator, qvality, sqt2pin and mzidentml2pin are distributed under the Apache License 2.0"
+      },
+      "companions": [
+        {
+          "id": "percolator-3-07-1-xsd-schemas-from-deb",
+          "kind": "DEB_PAYLOAD",
+          "url": "https://github.com/percolator/percolator/releases/download/rel-3-07-01/percolator-noxml-v3-07-linux-amd64.deb",
+          "sizeBytes": 1852660,
+          "sha256": "ea630bbcf8db380169e2d691ea5c3f15ee1b5d81a3f54281fde2f3aa23612f9e",
+          "md5": "9cc2fc3c44fc43509d402cbf69a000e1",
+          "runtimePrerequisite": false,
+          "gatesCapability": null,
+          "note": "No portable Percolator archive ships an XSD -- every one upstream publishes holds exactly one member, the bare executable -- so R-TOOL-02's two schemas are a second, small download from the matching noxml package. They are a provenance and validation asset and NOT a runtime prerequisite: phase 00 ran the binary with no XSD present and it wrote pout XML. The shipped percolator_out.xsd also declares majorVersion as use=\"required\" fixed=\"2\" while the 3.07.1 binary writes 3, so it cannot serve unmodified as a validation gate.",
+          "members": [
+            {
+              "path": "usr/share/xml/percolator/xml-pout-1-5/percolator_out.xsd",
+              "sizeBytes": 10388,
+              "sha256": "21204c89234b3b255fc05009ac6b956195573fce79020863f472ab64fd986865",
+              "md5": "593bb444f3685dbb9bfefdabdeaf4773",
+              "installedPath": "share/xml/percolator/xml-pout-1-5/percolator_out.xsd"
+            },
+            {
+              "path": "usr/share/xml/percolator/xml-pin-1-3/percolator_in.xsd",
+              "sizeBytes": 15457,
+              "sha256": "fa50a550ea01c9109197ad2c8c9efdcdad448fddd81c5ddcf54f13f8af280f4f",
+              "md5": "373a90cd51eb055cc89bd807334cd267",
+              "installedPath": "share/xml/percolator/xml-pin-1-3/percolator_in.xsd"
+            }
+          ]
+        }
+      ],
+      "capabilities": [
+        {
+          "capability": "XML_OUTPUT",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by phase 00 and again by phase 05 unit 0: percolator -X over a 64 target plus 64 decoy synthetic PIN exited 0 and wrote a percolator_out document carrying the http://per-colator.com/percolator_out/ namespace and exactly 64 psm elements"
+        },
+        {
+          "capability": "XML_DECOY_OUTPUT",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by phase 05 unit 0: percolator -X -Z over the same fixture exited 0 and wrote 128 psm elements with both p:decoy=true and p:decoy=false"
+        }
+      ],
+      "advisories": [
+        {
+          "id": "percolator.3-07-1-predates-i-spline-pep-regressor",
+          "text": "Percolator 3.07.1 predates 3.08's change of the default PEP regressor to I-splines, so its posterior error probabilities are computed the older way."
+        },
+        {
+          "id": "percolator.3-07-1-predates-pep-above-one-fix",
+          "text": "Percolator 3.07.1 predates the fix for PEP values exceeding 1.0 (upstream issue #394, fixed in 3.08.1 and 3.09), so a PEP above 1.0 can appear in its output."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": "2.34",
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.07.1",
+      "releaseTag": "rel-3-07-01",
+      "os": "macos",
+      "arch": "x86-64",
+      "kind": "ZIP",
+      "url": "https://github.com/percolator/percolator/releases/download/rel-3-07-01/percolator-noxml-osx-portable.zip",
+      "sizeBytes": 523390,
+      "sha256": "41d311cd0d131be2d1cc8dc5529af3db59a6ee9ac2cdf0094bd1e20acf69b955",
+      "md5": "bca3dda925521564a5e7987699f155f2",
+      "member": "Users/runner/work/percolator/percolator/build/percolator-noxml/src/percolator",
+      "memberSizeBytes": 1368048,
+      "memberSha256": "a071eaba560980212750e37a3e4e275875278191d35a87664b9061cdd550c306",
+      "memberMd5": "821767dfe05acb49a95769cb8615c14d",
+      "installedPath": "bin/percolator",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/percolator/percolator/rel-3-07-01/license.txt",
+        "note": "upstream license.txt at this release tag states that percolator, qvality, sqt2pin and mzidentml2pin are distributed under the Apache License 2.0"
+      },
+      "companions": [
+        {
+          "id": "percolator-3-07-1-xsd-schemas-from-pkg",
+          "kind": "PKG_PAYLOAD",
+          "url": "https://github.com/percolator/percolator/releases/download/rel-3-07-01/percolator-noxml-v3-07-osx-x86_64.pkg",
+          "sizeBytes": 999831,
+          "sha256": "7df4b831f50d357c3dc9596e16595117659e38b17f155ecc2cd8a43f26366c46",
+          "md5": "0227f12592e8c9dce2fd2fdf67eaf3d8",
+          "runtimePrerequisite": false,
+          "gatesCapability": null,
+          "note": "No portable Percolator archive ships an XSD -- every one upstream publishes holds exactly one member, the bare executable -- so R-TOOL-02's two schemas are a second, small download from the matching noxml package. They are a provenance and validation asset and NOT a runtime prerequisite: phase 00 ran the binary with no XSD present and it wrote pout XML. The shipped percolator_out.xsd also declares majorVersion as use=\"required\" fixed=\"2\" while the 3.07.1 binary writes 3, so it cannot serve unmodified as a validation gate. The .pkg prefixes the same two paths with usr/local/share where the .deb uses usr/share; the bytes are identical.",
+          "members": [
+            {
+              "path": "usr/local/share/xml/percolator/xml-pout-1-5/percolator_out.xsd",
+              "sizeBytes": 10388,
+              "sha256": "21204c89234b3b255fc05009ac6b956195573fce79020863f472ab64fd986865",
+              "md5": "593bb444f3685dbb9bfefdabdeaf4773",
+              "installedPath": "share/xml/percolator/xml-pout-1-5/percolator_out.xsd"
+            },
+            {
+              "path": "usr/local/share/xml/percolator/xml-pin-1-3/percolator_in.xsd",
+              "sizeBytes": 15457,
+              "sha256": "fa50a550ea01c9109197ad2c8c9efdcdad448fddd81c5ddcf54f13f8af280f4f",
+              "md5": "373a90cd51eb055cc89bd807334cd267",
+              "installedPath": "share/xml/percolator/xml-pin-1-3/percolator_in.xsd"
+            }
+          ]
+        }
+      ],
+      "capabilities": [
+        {
+          "capability": "XML_OUTPUT",
+          "evidence": "inferred-from-artefact-bytes",
+          "note": "no Percolator binary for macos-x86-64 has ever been run anywhere in this project. Phase 05 unit 2 read the extracted member (sha256 a071eaba5609...) and found the pout-XML writer literals xmloutput, decoy-xml-output, percolator_out, per-colator.com/percolator_out and pout.xml present in its bytes. That is an inference from bytes and the host probe decides on the machine (R-TOOL-07)."
+        },
+        {
+          "capability": "XML_DECOY_OUTPUT",
+          "evidence": "inferred-from-artefact-bytes",
+          "note": "no Percolator binary for macos-x86-64 has ever been run anywhere in this project. Phase 05 unit 2 read the extracted member (sha256 a071eaba5609...) and found the pout-XML writer literals xmloutput, decoy-xml-output, percolator_out, per-colator.com/percolator_out and pout.xml present in its bytes. That is an inference from bytes and the host probe decides on the machine (R-TOOL-07)."
+        }
+      ],
+      "advisories": [
+        {
+          "id": "percolator.3-07-1-predates-i-spline-pep-regressor",
+          "text": "Percolator 3.07.1 predates 3.08's change of the default PEP regressor to I-splines, so its posterior error probabilities are computed the older way."
+        },
+        {
+          "id": "percolator.3-07-1-predates-pep-above-one-fix",
+          "text": "Percolator 3.07.1 predates the fix for PEP values exceeding 1.0 (upstream issue #394, fixed in 3.08.1 and 3.09), so a PEP above 1.0 can appear in its output."
+        },
+        {
+          "id": "percolator.macos-x86-64-runs-under-rosetta-2",
+          "text": "This is an x86-64 macOS build. On Apple silicon it runs under Rosetta 2, which macOS does not install by default; CometGUI checks for it before the Percolator stage runs (D-004)."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": "12.7",
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.07.1",
+      "releaseTag": "rel-3-07-01",
+      "os": "windows",
+      "arch": "x86-64",
+      "kind": "ZIP",
+      "url": "https://github.com/percolator/percolator/releases/download/rel-3-07-01/percolator-noxml-windows-portable.zip",
+      "sizeBytes": 329022,
+      "sha256": "1510c2cfc8ce05822ac46e53954c7e6e5fa42305789fa94aad2f73657a0f94a2",
+      "md5": "0366a19740f9ee33a0b529ddea9ccff4",
+      "member": "percolator.exe",
+      "memberSizeBytes": 707072,
+      "memberSha256": "b9d9bbe82bc4a68d367a8cb00a0a22892b0b1cb516510fd0459d1df6805f059f",
+      "memberMd5": "a43f313c5dc9b14154cb872907bb4606",
+      "installedPath": "bin/percolator.exe",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/percolator/percolator/rel-3-07-01/license.txt",
+        "note": "upstream license.txt at this release tag states that percolator, qvality, sqt2pin and mzidentml2pin are distributed under the Apache License 2.0"
+      },
+      "companions": [
+        {
+          "id": "percolator-3-07-1-xsd-schemas-from-deb",
+          "kind": "DEB_PAYLOAD",
+          "url": "https://github.com/percolator/percolator/releases/download/rel-3-07-01/percolator-noxml-v3-07-linux-amd64.deb",
+          "sizeBytes": 1852660,
+          "sha256": "ea630bbcf8db380169e2d691ea5c3f15ee1b5d81a3f54281fde2f3aa23612f9e",
+          "md5": "9cc2fc3c44fc43509d402cbf69a000e1",
+          "runtimePrerequisite": false,
+          "gatesCapability": null,
+          "note": "No portable Percolator archive ships an XSD -- every one upstream publishes holds exactly one member, the bare executable -- so R-TOOL-02's two schemas are a second, small download from the matching noxml package. They are a provenance and validation asset and NOT a runtime prerequisite: phase 00 ran the binary with no XSD present and it wrote pout XML. The shipped percolator_out.xsd also declares majorVersion as use=\"required\" fixed=\"2\" while the 3.07.1 binary writes 3, so it cannot serve unmodified as a validation gate. WINDOWS TAKES THESE FROM THE LINUX .deb, which looks like a mistake and is not: D-002 option C deleted NSIS payload extraction, and the NSIS installer was the only Windows artefact carrying the schemas. The two files are byte-identical across the 3.06.5 .deb, the 3.07.1 .deb and the 3.07.1 .pkg, so the file Windows would have taken from the installer is this file. Tier 1 decided this on 2026-09-02; phase 05 unit 2 re-derived the byte-identity from all four packages.",
+          "members": [
+            {
+              "path": "usr/share/xml/percolator/xml-pout-1-5/percolator_out.xsd",
+              "sizeBytes": 10388,
+              "sha256": "21204c89234b3b255fc05009ac6b956195573fce79020863f472ab64fd986865",
+              "md5": "593bb444f3685dbb9bfefdabdeaf4773",
+              "installedPath": "share/xml/percolator/xml-pout-1-5/percolator_out.xsd"
+            },
+            {
+              "path": "usr/share/xml/percolator/xml-pin-1-3/percolator_in.xsd",
+              "sizeBytes": 15457,
+              "sha256": "fa50a550ea01c9109197ad2c8c9efdcdad448fddd81c5ddcf54f13f8af280f4f",
+              "md5": "373a90cd51eb055cc89bd807334cd267",
+              "installedPath": "share/xml/percolator/xml-pin-1-3/percolator_in.xsd"
+            }
+          ]
+        }
+      ],
+      "capabilities": [
+        {
+          "capability": "XML_OUTPUT",
+          "evidence": "inferred-from-artefact-bytes",
+          "note": "no Percolator binary for windows-x86-64 has ever been run anywhere in this project. Phase 05 unit 2 read the extracted member (sha256 b9d9bbe82bc4...) and found the pout-XML writer literals xmloutput, decoy-xml-output, percolator_out, per-colator.com/percolator_out and pout.xml present in its bytes. That is an inference from bytes and the host probe decides on the machine (R-TOOL-07)."
+        },
+        {
+          "capability": "XML_DECOY_OUTPUT",
+          "evidence": "inferred-from-artefact-bytes",
+          "note": "no Percolator binary for windows-x86-64 has ever been run anywhere in this project. Phase 05 unit 2 read the extracted member (sha256 b9d9bbe82bc4...) and found the pout-XML writer literals xmloutput, decoy-xml-output, percolator_out, per-colator.com/percolator_out and pout.xml present in its bytes. That is an inference from bytes and the host probe decides on the machine (R-TOOL-07)."
+        }
+      ],
+      "advisories": [
+        {
+          "id": "percolator.3-07-1-predates-i-spline-pep-regressor",
+          "text": "Percolator 3.07.1 predates 3.08's change of the default PEP regressor to I-splines, so its posterior error probabilities are computed the older way."
+        },
+        {
+          "id": "percolator.3-07-1-predates-pep-above-one-fix",
+          "text": "Percolator 3.07.1 predates the fix for PEP values exceeding 1.0 (upstream issue #394, fixed in 3.08.1 and 3.09), so a PEP above 1.0 can appear in its output."
+        },
+        {
+          "id": "percolator.windows-needs-visual-cpp-runtime",
+          "text": "The Windows portable archive is the bare executable and ships no Visual C++ runtime. The host must already provide MSVCP140.dll, VCRUNTIME140.dll, VCRUNTIME140_1.dll and VCOMP140.DLL; their absence is a loader failure naming the DLL, never \"not XML-capable\"."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": [
+          "MSVCP140.dll",
+          "VCRUNTIME140.dll",
+          "VCRUNTIME140_1.dll",
+          "VCOMP140.DLL"
+        ]
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.06.5",
+      "releaseTag": "rel-3-06-05",
+      "os": "linux",
+      "arch": "x86-64",
+      "kind": "ZIP",
+      "url": "https://github.com/percolator/percolator/releases/download/rel-3-06-05/percolator-noxml-linux-portable.zip",
+      "sizeBytes": 917285,
+      "sha256": "f9635334db24c7e7ebd11d8abf0401d8f3e419ac86fa51c9028190ef6b94655e",
+      "md5": "bf23d09144b8b801b1786d9107dee0c7",
+      "member": "percolator",
+      "memberSizeBytes": 2448768,
+      "memberSha256": "1f1034b4f265e0b45efe93f55eb4fdc09c698f1b916dde910889f9057a9cb76e",
+      "memberMd5": "b9eadd836ab6b319f960c0c9872844e3",
+      "installedPath": "bin/percolator",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/percolator/percolator/rel-3-06-05/license.txt",
+        "note": "upstream license.txt at this release tag states that percolator, qvality, sqt2pin and mzidentml2pin are distributed under the Apache License 2.0"
+      },
+      "companions": [
+        {
+          "id": "percolator-3-06-5-xsd-schemas-from-deb",
+          "kind": "DEB_PAYLOAD",
+          "url": "https://github.com/percolator/percolator/releases/download/rel-3-06-05/percolator-noxml-v3-06-linux-amd64.deb",
+          "sizeBytes": 1882696,
+          "sha256": "21278aa4089a956e1ab152b53ba9b710e490394cfdb505d5ed20052aa246ef3a",
+          "md5": "96b0b125351309d33dd8e47da9656e98",
+          "runtimePrerequisite": false,
+          "gatesCapability": null,
+          "note": "No portable Percolator archive ships an XSD -- every one upstream publishes holds exactly one member, the bare executable -- so R-TOOL-02's two schemas are a second, small download from the matching noxml package. They are a provenance and validation asset and NOT a runtime prerequisite: phase 00 ran the binary with no XSD present and it wrote pout XML. The shipped percolator_out.xsd also declares majorVersion as use=\"required\" fixed=\"2\" while the 3.07.1 binary writes 3, so it cannot serve unmodified as a validation gate.",
+          "members": [
+            {
+              "path": "usr/share/xml/percolator/xml-pout-1-5/percolator_out.xsd",
+              "sizeBytes": 10388,
+              "sha256": "21204c89234b3b255fc05009ac6b956195573fce79020863f472ab64fd986865",
+              "md5": "593bb444f3685dbb9bfefdabdeaf4773",
+              "installedPath": "share/xml/percolator/xml-pout-1-5/percolator_out.xsd"
+            },
+            {
+              "path": "usr/share/xml/percolator/xml-pin-1-3/percolator_in.xsd",
+              "sizeBytes": 15457,
+              "sha256": "fa50a550ea01c9109197ad2c8c9efdcdad448fddd81c5ddcf54f13f8af280f4f",
+              "md5": "373a90cd51eb055cc89bd807334cd267",
+              "installedPath": "share/xml/percolator/xml-pin-1-3/percolator_in.xsd"
+            }
+          ]
+        }
+      ],
+      "capabilities": [
+        {
+          "capability": "XML_OUTPUT",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by phase 00's noxml sweep: the functional probe over a 64 target plus 64 decoy synthetic PIN reported pout_xml true for this exact binary (sha256 1f1034b4f265...)"
+        },
+        {
+          "capability": "XML_DECOY_OUTPUT",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by phase 00's noxml sweep: the same probe reported pout_xml_decoys true for this exact binary"
+        }
+      ],
+      "advisories": [
+        {
+          "id": "percolator.3-06-5-is-two-release-lines-old",
+          "text": "Percolator 3.06.5 is two release lines behind current. It is carried for reach -- its Linux build needs only GLIBC_2.14 -- and is not a recommended default."
+        },
+        {
+          "id": "percolator.3-06-peptide-protein-ids",
+          "text": "Percolator 3.06-era behaviour around peptide protein identifiers is known to differ from later releases; check peptide-level protein assignments before relying on them."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": "2.14",
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.06.5",
+      "releaseTag": "rel-3-06-05",
+      "os": "macos",
+      "arch": "x86-64",
+      "kind": "ZIP",
+      "url": "https://github.com/percolator/percolator/releases/download/rel-3-06-05/percolator-noxml-osx-portable.zip",
+      "sizeBytes": 567116,
+      "sha256": "35652aceb3fc2f0335a8c9446291c99f13d5e361d0b3e32eb9a75a9d3987bb93",
+      "md5": "d5eda2d1c8185354b7f64a8cfa6745cd",
+      "member": "../my_build/percolator-noxml/src/percolator",
+      "memberSizeBytes": 1471048,
+      "memberSha256": "f6c627105bc22f90e0ce495ae6d69a319d222b57f39b683279e3023cafe44c27",
+      "memberMd5": "1bddfd8a1e2b957b299a3b2a8d2d9032",
+      "installedPath": "bin/percolator",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/percolator/percolator/rel-3-06-05/license.txt",
+        "note": "upstream license.txt at this release tag states that percolator, qvality, sqt2pin and mzidentml2pin are distributed under the Apache License 2.0"
+      },
+      "companions": [
+        {
+          "id": "percolator-3-06-5-xsd-schemas-from-pkg",
+          "kind": "PKG_PAYLOAD",
+          "url": "https://github.com/percolator/percolator/releases/download/rel-3-06-05/percolator-noxml-v3-06-osx-x86_64.pkg",
+          "sizeBytes": 1052756,
+          "sha256": "587e73f4fd33585da21c8149fda309b2afcfb617fb73f0f77ea2ac5acb584d63",
+          "md5": "fc21e6f60e6478b680f427bb7c772a1b",
+          "runtimePrerequisite": false,
+          "gatesCapability": null,
+          "note": "No portable Percolator archive ships an XSD -- every one upstream publishes holds exactly one member, the bare executable -- so R-TOOL-02's two schemas are a second, small download from the matching noxml package. They are a provenance and validation asset and NOT a runtime prerequisite: phase 00 ran the binary with no XSD present and it wrote pout XML. The shipped percolator_out.xsd also declares majorVersion as use=\"required\" fixed=\"2\" while the 3.07.1 binary writes 3, so it cannot serve unmodified as a validation gate. The .pkg prefixes the same two paths with usr/local/share where the .deb uses usr/share; the bytes are identical.",
+          "members": [
+            {
+              "path": "usr/local/share/xml/percolator/xml-pout-1-5/percolator_out.xsd",
+              "sizeBytes": 10388,
+              "sha256": "21204c89234b3b255fc05009ac6b956195573fce79020863f472ab64fd986865",
+              "md5": "593bb444f3685dbb9bfefdabdeaf4773",
+              "installedPath": "share/xml/percolator/xml-pout-1-5/percolator_out.xsd"
+            },
+            {
+              "path": "usr/local/share/xml/percolator/xml-pin-1-3/percolator_in.xsd",
+              "sizeBytes": 15457,
+              "sha256": "fa50a550ea01c9109197ad2c8c9efdcdad448fddd81c5ddcf54f13f8af280f4f",
+              "md5": "373a90cd51eb055cc89bd807334cd267",
+              "installedPath": "share/xml/percolator/xml-pin-1-3/percolator_in.xsd"
+            }
+          ]
+        }
+      ],
+      "capabilities": [
+        {
+          "capability": "XML_OUTPUT",
+          "evidence": "inferred-from-artefact-bytes",
+          "note": "no Percolator binary for macos-x86-64 has ever been run anywhere in this project. Phase 05 unit 2 read the extracted member (sha256 f6c627105bc2...) and found the pout-XML writer literals xmloutput, decoy-xml-output, percolator_out, per-colator.com/percolator_out and pout.xml present in its bytes. That is an inference from bytes and the host probe decides on the machine (R-TOOL-07)."
+        },
+        {
+          "capability": "XML_DECOY_OUTPUT",
+          "evidence": "inferred-from-artefact-bytes",
+          "note": "no Percolator binary for macos-x86-64 has ever been run anywhere in this project. Phase 05 unit 2 read the extracted member (sha256 f6c627105bc2...) and found the pout-XML writer literals xmloutput, decoy-xml-output, percolator_out, per-colator.com/percolator_out and pout.xml present in its bytes. That is an inference from bytes and the host probe decides on the machine (R-TOOL-07)."
+        }
+      ],
+      "advisories": [
+        {
+          "id": "percolator.3-06-5-is-two-release-lines-old",
+          "text": "Percolator 3.06.5 is two release lines behind current. It is carried for reach -- its Linux build needs only GLIBC_2.14 -- and is not a recommended default."
+        },
+        {
+          "id": "percolator.3-06-peptide-protein-ids",
+          "text": "Percolator 3.06-era behaviour around peptide protein identifiers is known to differ from later releases; check peptide-level protein assignments before relying on them."
+        },
+        {
+          "id": "percolator.macos-x86-64-runs-under-rosetta-2",
+          "text": "This is an x86-64 macOS build. On Apple silicon it runs under Rosetta 2, which macOS does not install by default; CometGUI checks for it before the Percolator stage runs (D-004)."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": "12.7",
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.06.5",
+      "releaseTag": "rel-3-06-05",
+      "os": "windows",
+      "arch": "x86-64",
+      "kind": "ZIP",
+      "url": "https://github.com/percolator/percolator/releases/download/rel-3-06-05/percolator-noxml-windows-portable.zip",
+      "sizeBytes": 351052,
+      "sha256": "a29adc133abd4ec40e2460c10e1274d8c68b5f57177a0b56b729a63c1d571f98",
+      "md5": "0e85f46096f45929b1a994a3f292253b",
+      "member": "percolator.exe",
+      "memberSizeBytes": 764416,
+      "memberSha256": "7839dee577fcba83ef19c40c399e6e257ee56b3d4d495a17ac8ce76e6d11e108",
+      "memberMd5": "59f97440f288712d3785f70e2d89b068",
+      "installedPath": "bin/percolator.exe",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/percolator/percolator/rel-3-06-05/license.txt",
+        "note": "upstream license.txt at this release tag states that percolator, qvality, sqt2pin and mzidentml2pin are distributed under the Apache License 2.0"
+      },
+      "companions": [
+        {
+          "id": "percolator-3-06-5-xsd-schemas-from-deb",
+          "kind": "DEB_PAYLOAD",
+          "url": "https://github.com/percolator/percolator/releases/download/rel-3-06-05/percolator-noxml-v3-06-linux-amd64.deb",
+          "sizeBytes": 1882696,
+          "sha256": "21278aa4089a956e1ab152b53ba9b710e490394cfdb505d5ed20052aa246ef3a",
+          "md5": "96b0b125351309d33dd8e47da9656e98",
+          "runtimePrerequisite": false,
+          "gatesCapability": null,
+          "note": "No portable Percolator archive ships an XSD -- every one upstream publishes holds exactly one member, the bare executable -- so R-TOOL-02's two schemas are a second, small download from the matching noxml package. They are a provenance and validation asset and NOT a runtime prerequisite: phase 00 ran the binary with no XSD present and it wrote pout XML. The shipped percolator_out.xsd also declares majorVersion as use=\"required\" fixed=\"2\" while the 3.07.1 binary writes 3, so it cannot serve unmodified as a validation gate. WINDOWS TAKES THESE FROM THE LINUX .deb, which looks like a mistake and is not: D-002 option C deleted NSIS payload extraction, and the NSIS installer was the only Windows artefact carrying the schemas. The two files are byte-identical across the 3.06.5 .deb, the 3.07.1 .deb and the 3.07.1 .pkg, so the file Windows would have taken from the installer is this file. Tier 1 decided this on 2026-09-02; phase 05 unit 2 re-derived the byte-identity from all four packages.",
+          "members": [
+            {
+              "path": "usr/share/xml/percolator/xml-pout-1-5/percolator_out.xsd",
+              "sizeBytes": 10388,
+              "sha256": "21204c89234b3b255fc05009ac6b956195573fce79020863f472ab64fd986865",
+              "md5": "593bb444f3685dbb9bfefdabdeaf4773",
+              "installedPath": "share/xml/percolator/xml-pout-1-5/percolator_out.xsd"
+            },
+            {
+              "path": "usr/share/xml/percolator/xml-pin-1-3/percolator_in.xsd",
+              "sizeBytes": 15457,
+              "sha256": "fa50a550ea01c9109197ad2c8c9efdcdad448fddd81c5ddcf54f13f8af280f4f",
+              "md5": "373a90cd51eb055cc89bd807334cd267",
+              "installedPath": "share/xml/percolator/xml-pin-1-3/percolator_in.xsd"
+            }
+          ]
+        }
+      ],
+      "capabilities": [
+        {
+          "capability": "XML_OUTPUT",
+          "evidence": "inferred-from-artefact-bytes",
+          "note": "no Percolator binary for windows-x86-64 has ever been run anywhere in this project. Phase 05 unit 2 read the extracted member (sha256 7839dee577fc...) and found the pout-XML writer literals xmloutput, decoy-xml-output, percolator_out, per-colator.com/percolator_out and pout.xml present in its bytes. That is an inference from bytes and the host probe decides on the machine (R-TOOL-07)."
+        },
+        {
+          "capability": "XML_DECOY_OUTPUT",
+          "evidence": "inferred-from-artefact-bytes",
+          "note": "no Percolator binary for windows-x86-64 has ever been run anywhere in this project. Phase 05 unit 2 read the extracted member (sha256 7839dee577fc...) and found the pout-XML writer literals xmloutput, decoy-xml-output, percolator_out, per-colator.com/percolator_out and pout.xml present in its bytes. That is an inference from bytes and the host probe decides on the machine (R-TOOL-07)."
+        }
+      ],
+      "advisories": [
+        {
+          "id": "percolator.3-06-5-is-two-release-lines-old",
+          "text": "Percolator 3.06.5 is two release lines behind current. It is carried for reach -- its Linux build needs only GLIBC_2.14 -- and is not a recommended default."
+        },
+        {
+          "id": "percolator.3-06-peptide-protein-ids",
+          "text": "Percolator 3.06-era behaviour around peptide protein identifiers is known to differ from later releases; check peptide-level protein assignments before relying on them."
+        },
+        {
+          "id": "percolator.windows-needs-visual-cpp-runtime",
+          "text": "The Windows portable archive is the bare executable and ships no Visual C++ runtime. The host must already provide MSVCP140.dll, VCRUNTIME140.dll, VCRUNTIME140_1.dll and VCOMP140.DLL; their absence is a loader failure naming the DLL, never \"not XML-capable\"."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": [
+          "MSVCP140.dll",
+          "VCRUNTIME140.dll",
+          "VCRUNTIME140_1.dll",
+          "VCOMP140.DLL"
+        ]
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.09",
+      "releaseTag": "rel-3-09",
+      "os": "macos",
+      "arch": "aarch64",
+      "kind": "ZIP",
+      "url": "https://github.com/percolator/percolator/releases/download/rel-3-09/percolator-osx-portable.zip",
+      "sizeBytes": 687916,
+      "sha256": "a52ab92e26b5397290a9b7284b46d396223396c0f4e619d69e7d66aed83412f5",
+      "md5": "7636e10c896c320bfafb8f4737221c28",
+      "member": "Users/runner/work/percolator/percolator/build/percolator/src/percolator",
+      "memberSizeBytes": 1782248,
+      "memberSha256": "f07159a51dab685c8481d5990a89afff7dfa77b6a547ddbd2024f050f145492a",
+      "memberMd5": "61f73a8824fee9d240b6ce235542584f",
+      "installedPath": "bin/percolator",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/percolator/percolator/rel-3-09/license.txt",
+        "note": "upstream license.txt at this release tag states that percolator, qvality, sqt2pin and mzidentml2pin are distributed under the Apache License 2.0"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [
+        {
+          "id": "percolator.3-09-writes-no-pout-xml",
+          "text": "Percolator 3.09 removed XML output, so it can never feed the Limelight converter, which requires Percolator pout XML. Phase 00 ran 3.09 on Linux and -X was rejected with exit 1; phase 05 found none of the pout-XML writer literals in the 3.09 macOS or Windows bytes either."
+        },
+        {
+          "id": "percolator.3-09-macos-needs-macos-15",
+          "text": "The Percolator 3.09 macOS build is arm64 with a macOS 15.0 floor, so it reaches fewer Macs than the 3.07.1 x86-64 build running under Rosetta 2."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": "15.0",
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.09",
+      "releaseTag": "rel-3-09",
+      "os": "windows",
+      "arch": "x86-64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/percolator/percolator/releases/download/rel-3-09/percolator.exe",
+      "sizeBytes": 640512,
+      "sha256": "1dd24985f0106f57b715a5b2973c25dcc6b8f0bb6cebca0542bbf79b710dfbbe",
+      "md5": "0436fd5083fb7575b7679e2cb3420029",
+      "expectedExecutablePath": "bin/percolator.exe",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/percolator/percolator/rel-3-09/license.txt",
+        "note": "upstream license.txt at this release tag states that percolator, qvality, sqt2pin and mzidentml2pin are distributed under the Apache License 2.0"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [
+        {
+          "id": "percolator.3-09-writes-no-pout-xml",
+          "text": "Percolator 3.09 removed XML output, so it can never feed the Limelight converter, which requires Percolator pout XML. Phase 00 ran 3.09 on Linux and -X was rejected with exit 1; phase 05 found none of the pout-XML writer literals in the 3.09 macOS or Windows bytes either."
+        },
+        {
+          "id": "percolator.windows-needs-visual-cpp-runtime",
+          "text": "The Windows portable archive is the bare executable and ships no Visual C++ runtime. The host must already provide MSVCP140.dll, VCRUNTIME140.dll, VCRUNTIME140_1.dll and VCOMP140.DLL; their absence is a loader failure naming the DLL, never \"not XML-capable\"."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": [
+          "MSVCP140.dll",
+          "VCRUNTIME140.dll",
+          "VCRUNTIME140_1.dll",
+          "VCOMP140.DLL"
+        ]
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "pdv",
+      "version": "2.7.0",
+      "releaseTag": "v2.7.0",
+      "os": "linux",
+      "arch": "x86-64",
+      "kind": "ZIP",
+      "url": "https://github.com/wenbostar/PDV/releases/download/v2.7.0/PDV-2.7.0.zip",
+      "sizeBytes": 103407417,
+      "sha256": "58f95a5663d70e885c59a6aea883d2dd783f9daa3ec0709fc932d09b4a1f7982",
+      "md5": "24bbd65d4837854f5cea057cfa2f123c",
+      "expectedExecutablePath": "PDV-2.7.0/PDV-2.7.0.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "GPL-3.0",
+        "url": "https://raw.githubusercontent.com/wenbostar/PDV/v2.7.0/LICENSE",
+        "note": "upstream LICENSE at tag v2.7.0 is the GPL-3.0 text while the pom.xml at the same tag declares the Apache Software License 2.0; the owner directed that PDV be treated as GPL-3.0, which constrains this project more than the Apache reading would, and phase 16 obtains the definitive answer from upstream"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [
+        {
+          "id": "pdv.upstream-licence-statements-disagree",
+          "text": "PDV's upstream LICENSE file says GPL-3.0 while its pom.xml says Apache-2.0. CometGUI treats PDV as GPL-3.0 by owner direction; phase 16 obtains the definitive answer."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "pdv",
+      "version": "2.7.0",
+      "releaseTag": "v2.7.0",
+      "os": "linux",
+      "arch": "aarch64",
+      "kind": "ZIP",
+      "url": "https://github.com/wenbostar/PDV/releases/download/v2.7.0/PDV-2.7.0.zip",
+      "sizeBytes": 103407417,
+      "sha256": "58f95a5663d70e885c59a6aea883d2dd783f9daa3ec0709fc932d09b4a1f7982",
+      "md5": "24bbd65d4837854f5cea057cfa2f123c",
+      "expectedExecutablePath": "PDV-2.7.0/PDV-2.7.0.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "GPL-3.0",
+        "url": "https://raw.githubusercontent.com/wenbostar/PDV/v2.7.0/LICENSE",
+        "note": "upstream LICENSE at tag v2.7.0 is the GPL-3.0 text while the pom.xml at the same tag declares the Apache Software License 2.0; the owner directed that PDV be treated as GPL-3.0, which constrains this project more than the Apache reading would, and phase 16 obtains the definitive answer from upstream"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [
+        {
+          "id": "pdv.upstream-licence-statements-disagree",
+          "text": "PDV's upstream LICENSE file says GPL-3.0 while its pom.xml says Apache-2.0. CometGUI treats PDV as GPL-3.0 by owner direction; phase 16 obtains the definitive answer."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "pdv",
+      "version": "2.7.0",
+      "releaseTag": "v2.7.0",
+      "os": "macos",
+      "arch": "x86-64",
+      "kind": "ZIP",
+      "url": "https://github.com/wenbostar/PDV/releases/download/v2.7.0/PDV-2.7.0.zip",
+      "sizeBytes": 103407417,
+      "sha256": "58f95a5663d70e885c59a6aea883d2dd783f9daa3ec0709fc932d09b4a1f7982",
+      "md5": "24bbd65d4837854f5cea057cfa2f123c",
+      "expectedExecutablePath": "PDV-2.7.0/PDV-2.7.0.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "GPL-3.0",
+        "url": "https://raw.githubusercontent.com/wenbostar/PDV/v2.7.0/LICENSE",
+        "note": "upstream LICENSE at tag v2.7.0 is the GPL-3.0 text while the pom.xml at the same tag declares the Apache Software License 2.0; the owner directed that PDV be treated as GPL-3.0, which constrains this project more than the Apache reading would, and phase 16 obtains the definitive answer from upstream"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [
+        {
+          "id": "pdv.upstream-licence-statements-disagree",
+          "text": "PDV's upstream LICENSE file says GPL-3.0 while its pom.xml says Apache-2.0. CometGUI treats PDV as GPL-3.0 by owner direction; phase 16 obtains the definitive answer."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "pdv",
+      "version": "2.7.0",
+      "releaseTag": "v2.7.0",
+      "os": "macos",
+      "arch": "aarch64",
+      "kind": "ZIP",
+      "url": "https://github.com/wenbostar/PDV/releases/download/v2.7.0/PDV-2.7.0.zip",
+      "sizeBytes": 103407417,
+      "sha256": "58f95a5663d70e885c59a6aea883d2dd783f9daa3ec0709fc932d09b4a1f7982",
+      "md5": "24bbd65d4837854f5cea057cfa2f123c",
+      "expectedExecutablePath": "PDV-2.7.0/PDV-2.7.0.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "GPL-3.0",
+        "url": "https://raw.githubusercontent.com/wenbostar/PDV/v2.7.0/LICENSE",
+        "note": "upstream LICENSE at tag v2.7.0 is the GPL-3.0 text while the pom.xml at the same tag declares the Apache Software License 2.0; the owner directed that PDV be treated as GPL-3.0, which constrains this project more than the Apache reading would, and phase 16 obtains the definitive answer from upstream"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [
+        {
+          "id": "pdv.upstream-licence-statements-disagree",
+          "text": "PDV's upstream LICENSE file says GPL-3.0 while its pom.xml says Apache-2.0. CometGUI treats PDV as GPL-3.0 by owner direction; phase 16 obtains the definitive answer."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "pdv",
+      "version": "2.7.0",
+      "releaseTag": "v2.7.0",
+      "os": "windows",
+      "arch": "x86-64",
+      "kind": "ZIP",
+      "url": "https://github.com/wenbostar/PDV/releases/download/v2.7.0/PDV-2.7.0.zip",
+      "sizeBytes": 103407417,
+      "sha256": "58f95a5663d70e885c59a6aea883d2dd783f9daa3ec0709fc932d09b4a1f7982",
+      "md5": "24bbd65d4837854f5cea057cfa2f123c",
+      "expectedExecutablePath": "PDV-2.7.0/PDV-2.7.0.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "GPL-3.0",
+        "url": "https://raw.githubusercontent.com/wenbostar/PDV/v2.7.0/LICENSE",
+        "note": "upstream LICENSE at tag v2.7.0 is the GPL-3.0 text while the pom.xml at the same tag declares the Apache Software License 2.0; the owner directed that PDV be treated as GPL-3.0, which constrains this project more than the Apache reading would, and phase 16 obtains the definitive answer from upstream"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [
+        {
+          "id": "pdv.upstream-licence-statements-disagree",
+          "text": "PDV's upstream LICENSE file says GPL-3.0 while its pom.xml says Apache-2.0. CometGUI treats PDV as GPL-3.0 by owner direction; phase 16 obtains the definitive answer."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "limelight-converter",
+      "version": "2.8.1",
+      "releaseTag": "v2.8.1",
+      "os": "linux",
+      "arch": "x86-64",
+      "kind": "JAR",
+      "url": "https://github.com/yeastrc/limelight-import-comet-percolator/releases/download/v2.8.1/cometPercolator2LimelightXML.jar",
+      "sizeBytes": 2762075,
+      "sha256": "843573396ce0654a0ac81582b378c496923e49dde71f40d750d890947774ece1",
+      "md5": "0dc33280f09daff7570d8d197bd87ecd",
+      "expectedExecutablePath": "cometPercolator2LimelightXML.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/yeastrc/limelight-import-comet-percolator/v2.8.1/LICENSE",
+        "note": "upstream LICENSE at tag v2.8.1 is the Apache License 2.0, agreeing with the repository licence field the phase 00 upstream survey read from the GitHub API"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "limelight-converter",
+      "version": "2.8.1",
+      "releaseTag": "v2.8.1",
+      "os": "linux",
+      "arch": "aarch64",
+      "kind": "JAR",
+      "url": "https://github.com/yeastrc/limelight-import-comet-percolator/releases/download/v2.8.1/cometPercolator2LimelightXML.jar",
+      "sizeBytes": 2762075,
+      "sha256": "843573396ce0654a0ac81582b378c496923e49dde71f40d750d890947774ece1",
+      "md5": "0dc33280f09daff7570d8d197bd87ecd",
+      "expectedExecutablePath": "cometPercolator2LimelightXML.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/yeastrc/limelight-import-comet-percolator/v2.8.1/LICENSE",
+        "note": "upstream LICENSE at tag v2.8.1 is the Apache License 2.0, agreeing with the repository licence field the phase 00 upstream survey read from the GitHub API"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "limelight-converter",
+      "version": "2.8.1",
+      "releaseTag": "v2.8.1",
+      "os": "macos",
+      "arch": "x86-64",
+      "kind": "JAR",
+      "url": "https://github.com/yeastrc/limelight-import-comet-percolator/releases/download/v2.8.1/cometPercolator2LimelightXML.jar",
+      "sizeBytes": 2762075,
+      "sha256": "843573396ce0654a0ac81582b378c496923e49dde71f40d750d890947774ece1",
+      "md5": "0dc33280f09daff7570d8d197bd87ecd",
+      "expectedExecutablePath": "cometPercolator2LimelightXML.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/yeastrc/limelight-import-comet-percolator/v2.8.1/LICENSE",
+        "note": "upstream LICENSE at tag v2.8.1 is the Apache License 2.0, agreeing with the repository licence field the phase 00 upstream survey read from the GitHub API"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "limelight-converter",
+      "version": "2.8.1",
+      "releaseTag": "v2.8.1",
+      "os": "macos",
+      "arch": "aarch64",
+      "kind": "JAR",
+      "url": "https://github.com/yeastrc/limelight-import-comet-percolator/releases/download/v2.8.1/cometPercolator2LimelightXML.jar",
+      "sizeBytes": 2762075,
+      "sha256": "843573396ce0654a0ac81582b378c496923e49dde71f40d750d890947774ece1",
+      "md5": "0dc33280f09daff7570d8d197bd87ecd",
+      "expectedExecutablePath": "cometPercolator2LimelightXML.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/yeastrc/limelight-import-comet-percolator/v2.8.1/LICENSE",
+        "note": "upstream LICENSE at tag v2.8.1 is the Apache License 2.0, agreeing with the repository licence field the phase 00 upstream survey read from the GitHub API"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "limelight-converter",
+      "version": "2.8.1",
+      "releaseTag": "v2.8.1",
+      "os": "windows",
+      "arch": "x86-64",
+      "kind": "JAR",
+      "url": "https://github.com/yeastrc/limelight-import-comet-percolator/releases/download/v2.8.1/cometPercolator2LimelightXML.jar",
+      "sizeBytes": 2762075,
+      "sha256": "843573396ce0654a0ac81582b378c496923e49dde71f40d750d890947774ece1",
+      "md5": "0dc33280f09daff7570d8d197bd87ecd",
+      "expectedExecutablePath": "cometPercolator2LimelightXML.jar",
+      "executable": false,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/yeastrc/limelight-import-comet-percolator/v2.8.1/LICENSE",
+        "note": "upstream LICENSE at tag v2.8.1 is the Apache License 2.0, agreeing with the repository licence field the phase 00 upstream survey read from the GitHub API"
+      },
+      "companions": [],
+      "capabilities": [],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    }
+  ]
+}

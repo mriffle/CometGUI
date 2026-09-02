@@ -1,0 +1,31 @@
+/*
+ * CometGUI -- Comet to Percolator proteomics search workflow with provenance.
+ * Copyright (C) 2026 The CometGUI authors.
+ *
+ * DERIVED FILE. This file is derived from Noble-Lab/CasanovoGUI and has been
+ * modified for CometGUI. Upstream project:
+ * <https://github.com/Noble-Lab/CasanovoGUI>, licensed GPL-3.0.
+ * Copyright (C) the CasanovoGUI authors.
+ *
+ * The attribution above is collective because upstream carries no per-file
+ * copyright notice: every CasanovoGUI source file begins with its package
+ * statement, and `grep -rl Copyright --include=*.java src` in a clone of that
+ * repository matches nothing. No notice was dropped in copying.
+ *
+ * WHICH upstream file, and at WHICH commit, is recorded per file in the
+ * documentation comment below, because this header block is fixed and
+ * identical in every derived file. config/checkstyle/checkstyle-derived.xml
+ * requires that record and fails the build when it is missing.
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License, version 3, as published
+ * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ * PARTICULAR PURPOSE. See the GNU General Public License for details.
+ *
+ * The full licence is the LICENSE file at the root of this repository. If it
+ * is missing, see <https://www.gnu.org/licenses/gpl-3.0.html>.
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+

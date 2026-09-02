@@ -15,10 +15,12 @@
  */
 
 /**
- * Application startup: the JavaFX Application subclass, the dependency-injection wiring, and the
- * composition root where the injectable clock, environment reader, process runner, downloader,
- * run-ID source and hash service are chosen (R-PROC-01).
+ * Application startup: the {@code javafx.application.Application} subclass and the {@code main}
+ * method that launches it.
  *
- * <p>Filled by phase 02 (application shell and navigation).
+ * <p>{@link org.cometgui.app.bootstrap.CometGuiApplication} builds the composition root, runs the
+ * host-baseline check of {@code R-PLAT-01}, applies the theme, and shows the shell. {@link
+ * org.cometgui.app.bootstrap.CometGuiLauncher} is the entry point {@code jpackage} names. The seams
+ * themselves are chosen in {@link org.cometgui.app.config}, not here.
  */
 package org.cometgui.app.bootstrap;

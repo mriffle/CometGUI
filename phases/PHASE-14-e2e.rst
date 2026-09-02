@@ -10,6 +10,15 @@ PHASE-14: GUI Automation and Packaged End-to-End Harness
 :Contributes to: R-TEST-04
 :Proves: AC-TST-05..09, AC-TST-12, AC-INS-01
 
+.. important::
+
+   **Assert the runner's locale; do not inherit it.** A CI runner that does not
+   export a UTF-8 locale makes every non-ASCII path test unrunnable, and the
+   coverage a real user's machine needs is silently skipped rather than failed.
+   The end-to-end harness must check ``sun.jnu.encoding`` and fail loudly if it
+   is not UTF-8. See ``STATUS.rst``, *Risks currently live*, item 1, and the
+   launcher obligation this phase proves, in ``PHASE-16-release.rst``.
+
 Purpose
 -------
 Prove, by driving the product the way a user drives it, that the claims are

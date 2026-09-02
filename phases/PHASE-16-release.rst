@@ -10,6 +10,19 @@ PHASE-16: Documentation and Release Qualification
 :Contributes to: R-DOC-03, R-DOC-04, R-DOC-05, R-SEC-01
 :Proves: AC-DOC-01, AC-DOC-02, AC-REL-02, AC-REL-03, AC-UX-01..06, AC-TST-07
 
+.. important::
+
+   **The packaged launcher must start the JVM in a UTF-8 locale.** Without an
+   exported ``LANG``/``LC_ALL``, ``sun.jnu.encoding`` is ``ANSI_X3.4-1968`` and
+   ``Path.of`` throws ``InvalidPathException`` on any non-ASCII path, before a
+   line of CometGUI runs. **Do not "fix" this with
+   ``-Dsun.jnu.encoding=UTF-8``**: it is resolved from the process environment
+   before system properties are applied, so the flag is accepted without error
+   and does nothing -- measured, not assumed. It must be the environment, which
+   ``jpackage --java-options`` cannot express. Carry this together with the
+   ``--enable-native-access=ALL-UNNAMED`` java-option Phase 02 left for this
+   phase. See ``STATUS.rst``, *Risks currently live*, item 1.
+
 Purpose
 -------
 Everything that stands between a working application and a release someone else

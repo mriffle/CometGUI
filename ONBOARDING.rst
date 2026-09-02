@@ -6,7 +6,7 @@ CometGUI -- Orchestrator Onboarding
 
 :Audience: Any main/orchestrating agent picking up this project
 :Read first: yes -- before any other document, and before any code
-:Last updated: 2026-08-29
+:Last updated: 2026-08-31
 
 If you read nothing else, read this page and then ``STATUS.rst``.
 
@@ -40,7 +40,7 @@ Three things make this harder than "shell out to a binary":
    checksum is recorded, and the test suite must independently prove the
    application's claims rather than assert that nothing threw.
 
-The full requirements live in ``specification.rst`` (revision 7). It is the
+The full requirements live in ``specification.rst`` (revision 10). It is the
 authority on *what* to build. This document is the authority on *how the work
 is run*.
 
@@ -83,7 +83,7 @@ Document map
      - Open decisions block the phases that name them.
    * - ``specification.rst``
      - What to build (``R-`` rules, ``AC-`` criteria)
-     - Revision 7. Amend by revision, never silently.
+     - Revision 10. Amend by revision, never silently.
    * - ``phases/index.rst``
      - The phase list and dependency order
      - Summary table; the phase files hold the detail.
@@ -134,9 +134,12 @@ You, if you are the top-level agent in the session.
 * Selects the next ready phase or phases and **spawns one fresh phase
   orchestrator subagent for each**. Does not implement phase work, and does not
   spawn phase agents directly.
-* May run two phase orchestrators concurrently where the dependency graph
-  allows it (see the ordering notes in ``phases/index.rst``), provided they do
-  not touch the same files.
+* **Runs exactly ONE phase orchestrator at a time.** The owner set this on
+  2026-08-31, after Phases 03 and 04 ran concurrently; those two were allowed to
+  finish, and nothing after them overlaps. It replaces an earlier permission to
+  run two at once on disjoint files. The reason is in
+  :ref:`onboarding-no-parallel-phases` and it is not a scheduling preference:
+  **file-level disjointness is not design-level disjointness.**
 * **Signs off each phase** (:ref:`sign-off`) by independently re-running the
   exit gate. The phase orchestrator's report is a claim to be checked, not
   evidence.
@@ -166,8 +169,16 @@ one phase, start to finish.
 * **Signs off every work unit before moving on** (:ref:`sign-off`). Unsigned
   work does not accumulate: a unit is accepted, sent back for rework, or
   explicitly recorded as deferred with a reason.
-* May run several phase agents concurrently when their units do not touch the
-  same files; serialises them when they do.
+* **Runs work units SERIALLY by default.** The owner set this on 2026-08-31:
+  *phase agents must not run in parallel if there is ANY chance they will step
+  on each other.* Parallelism is not the default with a collision test applied
+  to it -- **serial is the default**, and running two agents at once requires a
+  positive argument that collision is *impossible*, recorded in the work log
+  before they start. "They touch different files" is **not** that argument and
+  has already been shown to be false; see
+  :ref:`onboarding-what-agents-actually-share`. If in doubt, serialise. The cost
+  of a serial run is time; the cost of a collision is money, a corrupted
+  measurement and a defect that looks like someone's code.
 * Maintains ``handoffs/PHASE-nn-worklog.rst`` as it goes, and writes
   ``handoffs/PHASE-nn-handoff.rst`` before finishing -- whether the phase
   passed, stalled or was abandoned.
@@ -197,6 +208,86 @@ One fresh subagent per work unit, spawned by the phase orchestrator.
 An agent at any tier running out of context mid-task is expected, not
 exceptional. That is what the work log, the handoffs and frequent commits are
 for: a dead agent should cost one work unit, not a phase.
+
+.. _onboarding-no-parallel-phases:
+
+Why phases run one at a time
+============================
+
+Phases 03 and 04 were run concurrently on 2026-08-31, on genuinely disjoint
+paths, with each orchestrator briefed on the other's files. The path separation
+held perfectly. Three things went wrong anyway, and the third is the reason this
+rule exists.
+
+#. **``scripts/build.sh`` runs ``mvn clean verify`` at the repository root, in
+   the working tree.** Both orchestrators were told to run it before starting --
+   it is the project's one documented command -- so each deleted the other's
+   ``target/`` mid-build, and the resulting error named the victim's own code
+   rather than the collision. ``build.sh`` is written for a single worker in a
+   quiet tree.
+#. **An unfiltered ``spotless:apply`` reformatted 24 files across a module**,
+   including the other phase's in-progress work. Scope it with
+   ``-DspotlessFiles=`` when anyone else is live.
+#. **Both phases independently built a secret-redaction rule set.** Phase 03
+   wrote ``SecretNames`` and ``SecretValues`` in ``cometgui-process``; Phase 04
+   wrote ``SecretRedactor`` and ``SecretRegistry`` in ``cometgui-provenance``.
+   Those modules are **siblings** -- each depends on ``cometgui-domain``,
+   neither on the other -- so neither orchestrator could see the other's work,
+   and each was correctly staying inside its own paths. Within hours the two
+   keyword lists had already diverged, so a value would have been redacted in
+   the process log and **not** in the provenance record: precisely the silent,
+   security-relevant drift ``R-SEC-03`` exists to prevent. Only the tier above
+   both phases could see it, and only by reading the working tree rather than
+   either phase's report.
+
+.. _onboarding-what-agents-actually-share:
+
+What parallel agents actually share (the file list is not the answer)
+----------------------------------------------------------------------
+
+Every collision on 2026-08-31 happened between agents that were **respecting
+their file boundaries**. Source-file disjointness is necessary and nowhere near
+sufficient. Two agents in one checkout also share, at minimum:
+
+* **the Maven working tree.** ``scripts/build.sh`` runs ``mvn clean verify`` at
+  the repository *root*, which deletes ``target/`` under every module including
+  the one another agent is mid-build in;
+* **the local repository** ``_build/m2repo``, which is not safe for concurrent
+  writes even when the modules differ;
+* **the scratchpad directory.** Sibling agents share one root. Two agents wrote
+  ``inject.py`` to it; injections then ran the *other* agent's script, changed
+  nothing, and the suite went green -- a defect that silently stopped existing;
+* **formatter and linter invocations.** An unscoped ``spotless:apply``
+  reformatted 24 files across another agent's in-progress work;
+* **the strict documentation gate**, which is global: one short title underline
+  fails the build for everybody;
+* **the git index**, which is why work is committed by *exact file path* and
+  never by directory;
+* **each other's locks.** Two phase-local ``flock`` files do not serialise
+  against one another. A lock only works if both parties agree on it;
+* **the project documents the build reads as input.** ``scripts/ci/docs-build.sh``
+  discovers 45 of them, ``STATUS.rst`` among them, so *editing a document* while
+  another agent builds is interference exactly as *running a build* is. Tier 1
+  committed ``STATUS.rst`` three times inside a phase agent's build window on
+  2026-09-02 while scrupulously not running Maven, and the agent caught it. The
+  rule is not "do not run the build"; it is **"do not write anything the build
+  reads"**.
+
+And the measurement consequence, which is worse than the friction: **a coverage
+or mutation number taken while another agent is mid-landing is
+uninterpretable, and it can read HIGH.** A class whose test does not compile is
+often absent from the report entirely, and an absent class does not lower an
+average -- it leaves the sample. That is how "All coverage checks have been met"
+was once reported over a class carrying 79 uncovered mutations.
+
+The first two are hazards with cheap workarounds. The third is the argument:
+**two agents can respect every path boundary and still build the same thing
+twice.** File-level disjointness is not design-level disjointness, and no
+briefing about paths can prevent a duplicated abstraction, because neither party
+can see that it is duplicating anything.
+
+If two phases look parallelisable, treat that as a prompt to check for a shared
+abstraction between them -- not as a reason to overlap them.
 
 .. _sign-off:
 
@@ -314,13 +405,29 @@ Working conventions
 Environment
 -----------
 
-The working directory is ``/workspace``. As of 2026-08-28 the machine has 64
-cores, 376 GB RAM, ~7.3 TB free, ``git``, ``python3`` and ``node``, and network
-access to GitHub and PyPI. It has **no** JDK, Maven, Gradle or Docker.
+**The checkout is not at a fixed path, and no document should say it is.** It
+was created at ``/workspace`` and moved on 2026-08-31; documents written before
+that date still say ``/workspace`` and are stale rather than describing a second
+checkout. Derive the root instead::
+
+    cd "$(git rev-parse --show-toplevel)"
+
+As of 2026-08-28 the machine has 64 cores, 376 GB RAM, ~7.3 TB free, ``git``,
+``python3`` and ``node``, and network access to GitHub and PyPI. It has **no**
+JDK, Maven, Gradle or Docker.
 
 * Everything the project needs is installed **project-locally** -- a JDK and
   build tool under ``tools/<name>-<version>/``, Python tooling in a project
   virtualenv. Nothing goes on the host PATH, nothing uses ``sudo`` or ``apt``.
+  Source the toolchain with ``. tools/env.sh`` in every shell.
+* **A relocated checkout strands anything that recorded an absolute path.** The
+  2026-08-31 move broke ``tools/env.sh`` and 22 virtualenv console scripts, and
+  the only symptom Maven offered was ``The JAVA_HOME environment variable is not
+  defined correctly``. ``scripts/build.sh`` does not catch this: its toolchain
+  stage re-bootstraps only when ``tools/env.sh`` is *missing*, never when it is
+  merely wrong. Both are repaired and the generator now resolves the path at
+  source time, so the failure should not recur -- but treat that error message
+  as "a path moved", not "the JDK is broken".
 * Record every fetched tool's URL, version, date, SHA-256 and licence in the
   project's own environment manifest. The project is intended for publication;
   an unprovenanced toolchain is not reproducible.
