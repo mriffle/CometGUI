@@ -2049,3 +2049,83 @@ reports as much as to the one a tool returns.** The suite's own summary line is
 the evidence; the notification is not. Recorded because it is the fourth
 distinct form this trap has taken in this project, after the ``+`` separator,
 the ``package.*`` glob and the missing ``surefire.`` prefix.
+
+.. _p05-tier1-answers:
+
+Tier 1's answers, and both faults repaired at ``90d87fa``
+==========================================================
+
+Both faults in :ref:`p05-gate-retake` were repaired by tier 1 within hours of
+being reported, and all four questions were answered. Recorded here with what I
+checked myself, because "tier 1 says it is fixed" is not evidence any more than
+"the agent reported success" is.
+
+**What I verified rather than took.** ``git show 90d87fa -- scripts/verify-test-gates.sh``,
+read as a diff:
+
+* ``assert_pit_killed_everything`` no longer demands ``killed == generated``.
+  It now requires the SURVIVOR SET to equal a hand-typed list exactly --
+  ``org.cometgui.domain.tools.ToolVersion:214:ConditionalsBoundaryMutator``,
+  one entry. **This is stricter than what it replaced, in every direction that
+  matters**: a new survivor fails, a survivor that moves class or line fails,
+  and a listed survivor that is now *killed* fails too, so the list cannot
+  become a drawer that absorbs regressions. The ``generated > 0`` anti-vacuity
+  check is untouched. Nothing was lowered.
+* The sandbox gains ``cp -r manifests`` and a ``ln -s scratch``, each under the
+  rule already written above the copy loop -- the sandbox carries what the
+  build reads as INPUT -- and each with its reason in the file. A precondition
+  in ``main`` now ``die``\ s with an actionable message when
+  ``scratch/phase05/artefacts`` is absent, instead of letting it surface as 13
+  test failures inside a sandbox build.
+
+Tier 1 re-ran it: **37 assertions passed, 0 failed**, with control 8 quoting
+the census diagnostic and naming the class on the census's own line.
+
+**A standing rule this creates for every unit of this phase.** ``cometgui-domain``
+is mutation-critical and units 6 and 8 both touch it. **Adding an entry to that
+survivor list to make a build pass is a weakening and is forbidden.** The only
+honest reason to add one is a *new* equivalent mutant argued in the production
+code first and escalated. A unit that finds itself wanting to edit that list
+reports it to me instead.
+
+**One observation I am keeping rather than escalating.** The sandbox now
+symlinks the real ``scratch/`` rather than copying it -- correct, since it is
+146 MB and read-only by convention -- but a sandbox test that ever *wrote*
+there would corrupt the working tree's mirror. I re-derived the mirror's 32
+artefact and companion checksums before any of this and found 0 mismatches, so
+I have a baseline; I will re-derive them at the phase's closing measurement and
+say whether they still hold. Separately, ``pit_report_of`` falls back to the
+**working tree's** ``mutations.xml`` when the sandbox has none, which would
+grade the wrong tree -- it cannot bite here, because the baseline PIT run
+always precedes the assertion, but it is the ninth shape sitting one missing
+file away.
+
+The four answers, which bind the remaining units
+-------------------------------------------------
+
+#. **The re-scope is approved as proposed**, including unit 8's reuse for the
+   ``ToolManager`` runtime ahead of the UI. Order 6, 7, 8, 9, 10, 11, 12,
+   serial.
+#. **The macOS attempt on gate item 9 is approved**, as a **late unit after
+   unit 10**, so it does not displace the units other gate items depend on.
+   **The negative control is mandatory**: if leaving ``com.apple.quarantine``
+   set does not produce a refusal, the result is "this check cannot go red" and
+   is reported as such, never as a pass. It is **unit 13**, and it runs between
+   units 10 and 11. Its number is higher than its position deliberately --
+   renumbering 11 and 12 would invalidate references already committed in this
+   log, and a silently renumbered unit is the drift this project keeps paying
+   for.
+#. **Unit 12 may make the additive edit** registering
+   ``scripts/verify-install-gates.sh`` in ``scripts/verify-all-gates.sh``.
+   Additive only; never lower a floor; raising its own floor is expected.
+#. **``R-SEC-06`` is recorded plainly as vacuously satisfied**, because
+   ``D-002`` option C means the project builds no tool binaries, so the rule
+   has no subject in this phase. It is not delivered work and will not be
+   written up as any.
+
+**And one instruction that changes unit 8's scope.** The ``ToolOffer`` gap --
+a record whose Javadoc says *"everything a scientist is shown about a tool is
+expressible here, or it is not shown"*, carrying no download size, so the Tool
+Manager cannot tell a user that PDV is 99 MB -- is to be **fixed in unit 8, not
+deferred**. That is the port being the wrong shape, found before the UI rather
+than after, which is what unit 8 exists for.
