@@ -2046,6 +2046,49 @@ portable ``noxml`` binary and the ``noxml`` ``.deb`` binary print
 **byte-identical** help, 17928 characters each, both listing ``--xmloutput``
 and ``--decoy-xml-output``. A text probe discriminates nothing.
 
+.. _status-classhash-linenumbers:
+
+Injection protocol, sharpened: a class hash moves on a comment (2026-09-02)
+===========================================================================
+
+Phase 05's unit 3 agent reported a figure it could not reconcile rather than
+letting it pass: the same baseline class and the same one-line defect produced
+injected class hashes of ``210d3e9a…`` for the phase orchestrator and
+``a4a570b1…`` for the agent. It named the delta and guessed a different compile
+invocation. The instinct was right and the cause was not.
+
+**Measured at tier 1**, on two classes differing by nothing but one comment
+line::
+
+    A: 38282631c7a148e6a4ccee8cbaace25b
+    B: c3d05ea60179187520be8139ba94f46e   <- one comment line added
+    identical with -g:none? YES
+
+``javac`` records a **LineNumberTable** in debug info, so inserting a comment
+shifts every line below it and changes the compiled bytes. Stripping debug info
+makes the two byte-identical, which proves the difference is line-number
+metadata rather than behaviour. ``-Djacoco.skip=true`` is a red herring: JaCoCo
+instruments at runtime through a javaagent and does not rewrite
+``target/classes``.
+
+**The rule, refined rather than replaced:**
+
+* **"The compiled class hash MOVED" remains mandatory.** It is what proves an
+  edit reached the bytecode, and it is the only defence against the eighth
+  catalogued shape -- an injection that reaches the source and not the class.
+  Nothing about that changes.
+* **"Two agents' injected class hashes differ" is NOT evidence of different
+  defects.** Line numbers alone move it, so a mismatch between two tiers'
+  figures is usually formatting and must not be chased as a discrepancy.
+* **The cross-agent comparison is the injected SOURCE hash, or the observed
+  failure text** -- the first when two injections must provably be the same
+  defect, the second when only the falsified property matters.
+
+*Recorded also for how it surfaced.* The agent reported an unexplained number
+instead of dropping it, which is the behaviour this three-tier structure depends
+on and the one failure mode none of these gates can catch. It cost one message
+to resolve and would have cost a phase to discover late.
+
 Open decisions
 ==============
 
