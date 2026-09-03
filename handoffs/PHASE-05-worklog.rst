@@ -2129,3 +2129,128 @@ expressible here, or it is not shown"*, carrying no download size, so the Tool
 Manager cannot tell a user that PDV is 99 MB -- is to be **fixed in unit 8, not
 deferred**. That is the port being the wrong shape, found before the UI rather
 than after, which is what unit 8 exists for.
+
+.. _p05-u6-signoff:
+
+Unit 6 sign-off: sent back for one round
+=========================================
+
+**What I ran myself**, on the committed tree at ``9fd1ea8``, with nothing else
+building and ``git status --porcelain`` empty. Every figure below is from my own
+run, not from the agent's report.
+
+``bash scripts/build.sh``, with the exit status captured **into** the log rather
+than reported by a wrapper -- see :ref:`p05-exit-code-again` for why that
+matters::
+
+    185 report file(s): tests=3280 failures=0 errors=0 skipped=3
+    11/11 stages OK in 1302 seconds.  BUILD OK
+    === build.sh EXIT STATUS: 0 ===
+
+    ok  cometgui-domain   line 100.0% (834/834)  branch 100.0% (352/352)
+    ok  cometgui-domain   49 compiled class(es), all 49 in the sample
+    ok  cometgui-domain   369/370 mutations killed = 99.7%
+    ok  cometgui-install  line 100.0% (3101/3101)  branch 99.6% (1117/1121)
+    ok  cometgui-install  78 compiled class(es), all 78 in the sample
+    ok  cometgui-install  1285/1302 mutations killed = 98.6%
+    ok  8 architecture rule(s) checked, 0 failures
+    14 critical package prefix(es) read from pom.xml
+    ok  every module with critical-package code has its mutation gate on
+
+**Read out of ``mutations.xml`` rather than the console**, because the two
+disagree by the timeout count by design: ``cometgui-domain`` has **370
+mutations, 369 killed, and exactly one survivor** --
+``org.cometgui.domain.tools.ToolVersion:214:ConditionalsBoundaryMutator``, which
+is precisely the entry ``scripts/verify-test-gates.sh`` now pins. Nothing added,
+nothing moved, nothing newly killed, so that harness's hand-typed list still
+matches. ``cometgui-install`` has 1302 mutations and 17 non-kills, and I
+enumerated all 17: **not one is in ``org.cometgui.install.probe``.** They are
+the pre-existing ``archive``, ``download`` and ``cache`` residue from units 3,
+4 and 5.
+
+**Nothing was weakened, checked rather than assumed.** ``git diff 95daeef..9fd1ea8``
+over ``pom.xml``, every module POM, ``config/``, ``.mvn/``, ``scripts/``,
+``STATUS.rst``, ``DECISIONS.rst``, ``phases/``, ``ONBOARDING.rst``,
+``CLAUDE.md``, ``specification.rst`` and ``handoffs/`` is **empty**. No
+``@Disabled``, no ``<exclude``, no ``assumeTrue`` was introduced -- the only
+matches for those words in the diff are prose in Javadoc and ``@DisplayName``
+saying the tests do *not* skip.
+
+**One file, shipped once**, verified both ways: ``manifests/tools.json``,
+``cometgui-install/target/classes/tools.json`` and the member ``tools.json``
+**inside the built jar** all hash
+``fafe9d3299b2f30dc40fd6d8057178178531e2739484f81ed75d9b120ac02af0``.
+
+.. _p05-u6-injection:
+
+The defect I injected, which the unit did not catch
+----------------------------------------------------
+
+I did not choose it from the unit's acceptance conditions. Every candidate I
+drew from that list was already graded, and several were graded better than the
+list asked -- the manifest-versus-banner disagreement, the alternatives filter,
+the timeout cancellation and the "unknown C library leaves the C++ refusal
+standing" case all have their own tests, and none of them was a listed
+condition. So I asked the question :ref:`status-injection-from-outside` says to
+ask: **what silent behaviour does this code have that no condition names?**
+
+``ProbeGatedOffers.decide`` declares ``throws IOException``, and
+``LoadabilityCheck.refusalFor`` is documented as throwing "if the binary cannot
+be reached at all". **No test anywhere makes it throw.** So I made an
+unreachable binary *offered* instead of refused, which is the plausible-sounding
+reading -- "a binary we could not reach is not one we have judged"::
+
+    Optional<LoaderDiagnostic> refusal;
+    try {
+        refusal = refusalFor(record, check);
+    } catch (IOException unreachableBinary) {
+        refusal = Optional.empty();
+    }
+
+The injection **landed**, checked rather than assumed: the anchor occurred
+exactly once; the source hash went ``616a373b...`` to ``9bc032c4...``; the
+**compiled class** went ``1c8f3663...`` to ``a3a17301...``; and ``javap -c``
+shows the ``java/io/IOException`` catch in the bytecode.
+
+``mvn -o -pl cometgui-install test`` then reported::
+
+    Tests run: 944, Failures: 0, Errors: 0, Skipped: 1
+    BUILD SUCCESS
+    === mvn EXIT STATUS: 0 ===
+
+**944 tests passed with a tool that could not be started being offered to the
+user.** That is ``R-TOOL-06``'s last sentence -- *"A tool that fails loadability
+shall never be offered for selection"* -- and the second half of gate item 5,
+switched off for one way of failing.
+
+**It is this phase's own pattern again**: a rule graded at one point on an axis
+it does not depend on. The offered-set rule is graded thoroughly over *what the
+probe answers* and not at all over *whether the probe could answer*. The unit
+graded the axis it was told about.
+
+Restored with ``git checkout --``; source hash back to ``616a373b...``, the
+marker greps back out at zero occurrences, ``git status --porcelain`` empty.
+
+What the rework must do
+------------------------
+
+#. **Decide what an unreachable binary means, deliberately, and write the reason
+   down.** My steer, which the unit may argue against with evidence: the safe
+   direction is the one ``ProbeFailureKind.stage()`` already takes for an
+   ambiguous kind -- *"we did not establish that it starts"*, never *"we
+   established that it can be offered"*. Today the exception propagates out of
+   ``decide`` and the whole offer list fails, which is at least not "offer it";
+   whether it should instead become a ``Refusal`` carrying a diagnostic is the
+   unit's call. **"Offered" is not among the available answers.**
+#. **Grade it.** A test in which ``LoadabilityCheck`` throws.
+#. **Audit the unit for the same shape** -- every seam this unit declares with a
+   ``throws`` clause, and every path where a stage *cannot run* rather than
+   returning a verdict, including ``StagedToolProbe``'s and
+   ``HostCxxRuntime.highestGlibcxxIn``'s. Repairing only the defect I found is
+   the cheap response; unit 1 was sent back with the same instruction and the
+   audit found a second hole.
+#. **Prove it by re-injecting** the same defect and showing it go red, with the
+   ``Tests run:`` line.
+
+The unit is otherwise the strongest first submission this phase has had, and
+none of the rest of it is in question.
