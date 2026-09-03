@@ -2369,3 +2369,139 @@ test is unit work and because the agent should see the shape.
 **Unit 6 is not accepted yet.** Everything else about it stands: the rework is
 correct, the audit was real and is proved so by a defect it was not told about,
 and this is the last item.
+
+.. _p05-u6-accepted:
+
+Unit 6 ACCEPTED at ``c599c7e``, after two rounds
+=================================================
+
+**My own build**, quiet tree, ``git status --porcelain`` empty, exit status
+captured inside the log rather than reported by a wrapper::
+
+    185 report file(s): tests=3296 failures=0 errors=0 skipped=3
+    11/11 stages OK in 1183 seconds.  BUILD OK
+    === build.sh EXIT STATUS: 0 ===
+
+    ok  cometgui-domain   line 100.0% (834/834)  branch 100.0% (352/352)
+    ok  cometgui-domain   49 compiled class(es), all 49 in the sample
+    ok  cometgui-domain   369/370 mutations killed = 99.7%
+    ok  cometgui-install  line 100.0% (3114/3114)  branch 99.6% (1117/1121)
+    ok  cometgui-install  78 compiled class(es), all 78 in the sample
+    ok  cometgui-install  1290/1307 mutations killed = 98.6%
+    ok  8 architecture rule(s) checked, 0 failures
+    14 critical package prefix(es) read from pom.xml
+    ok  every module with critical-package code has its mutation gate on
+
+Read out of ``mutations.xml``: ``cometgui-domain``'s single survivor is still
+exactly ``ToolVersion:214:ConditionalsBoundaryMutator``, unmoved across all four
+of the unit's commits, so ``verify-test-gates.sh``'s pinned list still matches.
+**``org.cometgui.install.probe``: 201 mutations, 201 killed, no survivors and no
+timeouts.** ``manifests/tools.json`` unchanged at ``fafe9d32...``.
+
+The fix, and the control verified by me rather than taken
+----------------------------------------------------------
+
+``ManifestAlternatives`` now excludes the failing build by **download URL** --
+the key unit 2 established for one-row-per-download, and right here for the same
+reason. The two rejected keys are argued in the class: the version is wrong
+because one version can be two rows (this defect), and the platform is wrong in
+the other direction because one platform legitimately carries several versions,
+so keying on it would delete every alternative there is.
+
+The new tests run against the **shipped manifest**, not a fixture, which is what
+I asked for and is the guard against the third shape. ``cometFor`` derives the
+record from ``select`` on the real file and **throws if the manifest ever stops
+offering two Comet builds on Apple silicon**, so the case cannot quietly become
+vacuous.
+
+**I re-injected the old version key myself** rather than accepting the agent's
+report of its own control. Source ``3cc68522...`` to ``8b1840aa...``, compiled
+class ``95accfe4...`` to ``27e66470...``, and ``javap -c`` shows the
+``ArtefactRecord.url`` call sites drop to **0**. ``Tests run: 8, Failures: 2``,
+exit 1, failing **both ways round** with the product consequence in the
+message::
+
+    aSiblingRowOfTheSameVersionIsAnAlternative:81 ... R-PLAT-03 requires it to
+    be named ==> expected: <[comet 2026.02.2 macos-x86-64]> but was: <[]>
+    theSiblingRelationHoldsBothWays:99 the rule is about which ROW failed ...
+    ==> expected: <[comet 2026.02.2 macos-aarch64]> but was: <[]>
+
+Restored from the snapshot taken before injecting -- not with ``git checkout
+--``, which restores to ``HEAD`` and would have discarded anything uncommitted.
+Source hash back to ``3cc68522...``, marker greps out at zero, tree clean.
+
+The judgement call the agent asked me to check, and it is right
+----------------------------------------------------------------
+
+The agent flagged, rather than buried, that it **kept** a version comparison in
+``StagedToolProbe``'s identity stage -- ``!identified.equals(record.version())``
+-- and asked me to push on it. I checked it and I agree, on its own argument
+plus one thing I verified rather than took.
+
+The question that stage asks is *"is this binary the release the manifest
+pinned?"*, which the banner and the manifest both answer as a version; it is not
+*"is this the same download?"*, which only a URL or a digest can answer. Comet's
+two macOS rows genuinely **are** both 2026.02.2, so a row comparison there would
+be this defect's mirror image. The agent's load-bearing claim is that the
+SHA-256 verified earlier is what tells the two files apart, and I confirmed that
+from ``InstallStep`` rather than believing it: ``VERIFY_SHA256`` is **step 2**
+and ``PROBE`` is **step 6**, so the row is pinned by its digest four steps
+before a banner is ever read.
+
+I also reviewed the two test lambdas re-keyed from full-record equality to the
+URL. That is looser matching in a test helper, so I checked it is not a
+weakening: it changes only which candidate a scripted failure is routed to, both
+of my injections still bite through those tests, and it removes the worse
+problem of a test answering "same build?" by a different convention from the
+code under test.
+
+Nothing weakened, across all four commits
+------------------------------------------
+
+``git diff 95daeef..c599c7e`` over ``pom.xml``, every module POM, ``config/``,
+``.mvn/``, ``scripts/``, ``DECISIONS.rst``, ``phases/``, ``ONBOARDING.rst``,
+``CLAUDE.md`` and ``specification.rst`` is **empty**. No ``@Disabled``,
+``<exclude``, ``assumeTrue`` or ``@Ignore`` was added in any of the agent's four
+commits, checked by fixed-string search over each. ``STATUS.rst`` does appear in
+that range and is **not the agent's** -- it is tier 1's ``424f2e0``, and I
+checked the attribution rather than assuming, having nearly misread an earlier
+range the same way.
+
+A recurring delta, now twice, so it is a pattern rather than a one-off
+-----------------------------------------------------------------------
+
+The agent reported ``1289/1305`` on the rework and ``1291/1307`` here; my runs of
+the same two commits give ``1288/1305`` and ``1290/1307``, and the build's own
+lines agree with mine. One mutation each time, always in the safe direction, and
+the **package-level** figure is identical in every run -- ``199/199`` then
+``201/201``. The likely cause is a mutant sitting on the ``KILLED``/``TIMED_OUT``
+boundary, where ``build.sh`` counts only ``KILLED`` and load decides which side
+it lands on. **Nobody has demonstrated that**, so it is recorded rather than
+explained: the reactor-level mutation figure is load-sensitive at the timeout
+boundary and the package-level one is stable, and a reader comparing two runs
+should not go looking for a defect in the difference.
+
+Carried forward from unit 6
+----------------------------
+
+* **The download URL is how this product asks "is this the same build?"** Twice
+  in two rounds the hole was *a rule keyed on the wrong attribute of the right
+  idea* -- the offered-set rule graded over what the probe answers rather than
+  whether it could, and an exclusion keyed on the version rather than the row.
+  Both read correctly at the call site. **Unit 8 inherits ``select``,
+  ``ManifestAlternatives`` and ``ProbeGatedOffers`` together and is where "which
+  row is this?" is asked most often**, so its brief states the rule explicitly
+  rather than letting it be rediscovered a third time. The agent proposed this
+  itself.
+* **``ProbeGatedOffers.decide`` no longer throws.** One unreachable binary is one
+  refusal and the rest of the list survives. Unit 8 must not reintroduce a path
+  that collapses the offered set.
+* **``StagedToolProbe`` throws by name for PDV and the Limelight converter.**
+  Unit 7 owns the JVM-launch identity path, and until it lands, unit 10 cannot
+  install two of gate item 1's four tools.
+* **``CapabilityProber`` is the seam unit 7 implements**, stated in domain
+  vocabulary only so ``cometgui-tools`` can implement it without depending on
+  ``cometgui-install``.
+* **A failed capability probe must never become an empty capability set**, because
+  ``R-TOOL-08`` makes an empty set positive evidence of absence. Graded both ways
+  by the audit.
