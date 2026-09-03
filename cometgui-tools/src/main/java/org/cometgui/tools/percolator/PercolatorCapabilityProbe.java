@@ -92,16 +92,53 @@ public final class PercolatorCapabilityProbe {
     private static final String DECOYS_FILE = "decoys.pout.xml";
 
     private final ToolRunner runner;
+    private final int targetRows;
 
     /**
-     * Creates the probe.
+     * Creates the probe, with the fixture size {@code R-PERC-02} fixes.
      *
      * @param runner how one invocation is run and collected; every process in this product goes
      *     through the process service ({@code R-PROC-02})
      * @throws NullPointerException if {@code runner} is {@code null}
      */
     public PercolatorCapabilityProbe(ToolRunner runner) {
+        this(runner, SyntheticPin.PROBE_TARGET_ROWS);
+    }
+
+    /**
+     * Creates the probe with a chosen fixture size.
+     *
+     * <p><strong>This exists so that the fixture size can be shown to matter.</strong> {@code
+     * R-PERC-02} says 64 target and 64 decoy rows is sufficient and 8 and 8 is not, and the only
+     * way to demonstrate that claim rather than repeat it is to run this same probe, against the
+     * same binary, at both sizes and watch the verdict change -- {@code
+     * PercolatorRealBinaryTest.theNegativeControl} does exactly that. The size is a number from the
+     * requirement, not a knob for a caller: {@link #PercolatorCapabilityProbe(ToolRunner)} is what
+     * the product uses, and a test pins it to {@value SyntheticPin#PROBE_TARGET_ROWS}.
+     *
+     * @param runner how one invocation is run and collected
+     * @param targetRows how many target rows the fixture gets; the same number of decoy rows
+     *     follows
+     * @throws NullPointerException if {@code runner} is {@code null}
+     * @throws IllegalArgumentException if {@code targetRows} is not positive
+     */
+    public PercolatorCapabilityProbe(ToolRunner runner, int targetRows) {
         this.runner = Objects.requireNonNull(runner, "runner");
+        if (targetRows < 1) {
+            throw new IllegalArgumentException(
+                    "a synthetic PIN needs at least one target row, but was asked for "
+                            + targetRows);
+        }
+        this.targetRows = targetRows;
+    }
+
+    /**
+     * How many target rows this probe's fixture carries.
+     *
+     * @return the row count, {@value SyntheticPin#PROBE_TARGET_ROWS} for the product's own probe
+     */
+    public int targetRows() {
+        return targetRows;
     }
 
     /**
@@ -143,11 +180,11 @@ public final class PercolatorCapabilityProbe {
 
     private Set<ToolCapability> probeIn(Path workspace, ToolVersion version, Path executable)
             throws IOException {
-        Path pin = SyntheticPin.writeForCapabilityProbe(workspace);
+        Path pin = SyntheticPin.write(workspace, targetRows, SyntheticPin.PROBE_SEED);
         Set<ToolCapability> observed = EnumSet.noneOf(ToolCapability.class);
         Path targets = workspace.resolve(TARGETS_FILE);
         exercise(executable, workspace, version, List.of("-X", targets.toString(), pin.toString()));
-        if (writesDocument(targets, SyntheticPin.PROBE_TARGET_ROWS, false)) {
+        if (writesDocument(targets, targetRows, false)) {
             observed.add(ToolCapability.XML_OUTPUT);
         }
         Path decoys = workspace.resolve(DECOYS_FILE);
@@ -156,7 +193,7 @@ public final class PercolatorCapabilityProbe {
                 workspace,
                 version,
                 List.of("-X", decoys.toString(), "-Z", pin.toString()));
-        if (writesDocument(decoys, SyntheticPin.PROBE_TARGET_ROWS * 2, true)) {
+        if (writesDocument(decoys, targetRows * 2, true)) {
             observed.add(ToolCapability.XML_DECOY_OUTPUT);
         }
         return Collections.unmodifiableSet(observed);
