@@ -28,7 +28,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
+import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.domain.ports.ToolCommand;
+import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.ScriptedRunner;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -188,14 +190,19 @@ class ToolRunnerTest {
                                 "processes",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> new ToolRunner(null, Duration.ofSeconds(1)))
+                                                () ->
+                                                        new ToolRunner(
+                                                                Nulls.of(ProcessRunner.class),
+                                                                Duration.ofSeconds(1)))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "timeout",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> new ToolRunner(runner, null))
+                                                () ->
+                                                        new ToolRunner(
+                                                                runner, Nulls.of(Duration.class)))
                                         .getMessage()));
     }
 
@@ -219,7 +226,7 @@ class ToolRunnerTest {
                                                         new ToolRunner(
                                                                         runner,
                                                                         Duration.ofSeconds(5))
-                                                                .run(null))
+                                                                .run(Nulls.of(ToolCommand.class)))
                                         .getMessage()));
     }
 }

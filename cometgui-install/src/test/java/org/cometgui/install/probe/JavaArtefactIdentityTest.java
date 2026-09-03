@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.cometgui.domain.platform.GlibcVersion;
@@ -91,6 +92,10 @@ class JavaArtefactIdentityTest {
         }
     }
 
+    private static Path directoryOf(Path file) {
+        return Objects.requireNonNull(file.getParent(), "a staged artefact has a directory");
+    }
+
     private static ArtefactRecord pdv() throws IOException {
         return ProbeRecords.shipped()
                 .select(ProbeRecords.LINUX_X86_64, ToolName.PDV)
@@ -132,7 +137,7 @@ class JavaArtefactIdentityTest {
     void aJarIsIdentifiedThroughTheSeam(@TempDir Path staged) throws IOException {
         ArtefactRecord record = pdv();
         Path jar = staged.resolve(record.executablePath());
-        Files.createDirectories(jar.getParent());
+        Files.createDirectories(directoryOf(jar));
         Files.writeString(jar, "PK");
         RecordingIdentity identity = new RecordingIdentity("2.7.0");
         List<String> capabilityCalls = new ArrayList<>();
@@ -162,7 +167,7 @@ class JavaArtefactIdentityTest {
     void noProcessIsStartedForAJar(@TempDir Path staged) throws IOException {
         ArtefactRecord record = converter();
         Path jar = staged.resolve(record.executablePath());
-        Files.createDirectories(jar.toAbsolutePath().getParent());
+        Files.createDirectories(directoryOf(jar.toAbsolutePath()));
         Files.writeString(jar, "PK");
         ProcessRunner neverEntered =
                 (command, listener) -> {
@@ -194,7 +199,7 @@ class JavaArtefactIdentityTest {
     void loadabilityOfAnIdentifiedJar(@TempDir Path staged) throws IOException {
         ArtefactRecord record = pdv();
         Path jar = staged.resolve(record.executablePath());
-        Files.createDirectories(jar.getParent());
+        Files.createDirectories(directoryOf(jar));
         Files.writeString(jar, "PK");
 
         assertEquals(

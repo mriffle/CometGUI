@@ -34,6 +34,7 @@ import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.tools.limelight.LimelightConverterIdentity;
 import org.cometgui.tools.pdv.PdvJarIdentity;
 import org.cometgui.tools.process.ProcessService;
+import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.UpstreamArtefacts;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -65,8 +66,8 @@ class JavaToolIdentitiesTest {
                         "v2.7.0__PDV-2.7.0.zip",
                         "PDV-2.7.0/PDV-2.7.0.jar",
                         directory.resolve("pdv").resolve("PDV-2.7.0.jar"));
-        Path converter = directory.resolve("converter").resolve("converter.jar");
-        Files.createDirectories(converter.getParent());
+        Path converterDirectory = Files.createDirectories(directory.resolve("converter"));
+        Path converter = converterDirectory.resolve("converter.jar");
         Files.copy(
                 UpstreamArtefacts.artefact("v2.8.1__cometPercolator2LimelightXML.jar"),
                 converter,
@@ -133,28 +134,43 @@ class JavaToolIdentitiesTest {
                                 "tool",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> router.identify(null, LINUX, anything))
+                                                () ->
+                                                        router.identify(
+                                                                Nulls.of(ToolName.class),
+                                                                LINUX,
+                                                                anything))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "platform",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> router.identify(ToolName.PDV, null, anything))
+                                                () ->
+                                                        router.identify(
+                                                                ToolName.PDV,
+                                                                Nulls.of(HostPlatform.class),
+                                                                anything))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "jar",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> router.identify(ToolName.PDV, LINUX, null))
+                                                () ->
+                                                        router.identify(
+                                                                ToolName.PDV,
+                                                                LINUX,
+                                                                Nulls.of(Path.class)))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "pdv",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> new JavaToolIdentities(null, converter))
+                                                () ->
+                                                        new JavaToolIdentities(
+                                                                Nulls.of(PdvJarIdentity.class),
+                                                                converter))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -163,7 +179,10 @@ class JavaToolIdentitiesTest {
                                                 NullPointerException.class,
                                                 () ->
                                                         new JavaToolIdentities(
-                                                                new PdvJarIdentity(), null))
+                                                                new PdvJarIdentity(),
+                                                                Nulls.of(
+                                                                        LimelightConverterIdentity
+                                                                                .class)))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -172,7 +191,8 @@ class JavaToolIdentitiesTest {
                                                 NullPointerException.class,
                                                 () ->
                                                         JavaToolIdentities
-                                                                .usingThisApplicationsRuntime(null))
+                                                                .usingThisApplicationsRuntime(
+                                                                        Nulls.of(ToolRunner.class)))
                                         .getMessage()));
     }
 }

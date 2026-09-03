@@ -39,6 +39,7 @@ import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.tools.api.ToolRunner;
+import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.ScriptedRunner;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -369,7 +370,9 @@ class PercolatorCapabilityProbeTest {
                                 "runner",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> new PercolatorCapabilityProbe(null))
+                                                () ->
+                                                        new PercolatorCapabilityProbe(
+                                                                Nulls.of(ToolRunner.class)))
                                         .getMessage()));
     }
 
@@ -385,7 +388,12 @@ class PercolatorCapabilityProbeTest {
                                 "tool",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> probe.probe(null, V3071, LINUX, executable))
+                                                () ->
+                                                        probe.probe(
+                                                                Nulls.of(ToolName.class),
+                                                                V3071,
+                                                                LINUX,
+                                                                executable))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -395,7 +403,7 @@ class PercolatorCapabilityProbeTest {
                                                 () ->
                                                         probe.probe(
                                                                 ToolName.PERCOLATOR,
-                                                                null,
+                                                                Nulls.of(ToolVersion.class),
                                                                 LINUX,
                                                                 executable))
                                         .getMessage()),
@@ -408,7 +416,7 @@ class PercolatorCapabilityProbeTest {
                                                         probe.probe(
                                                                 ToolName.PERCOLATOR,
                                                                 V3071,
-                                                                null,
+                                                                Nulls.of(HostPlatform.class),
                                                                 executable))
                                         .getMessage()),
                 () ->
@@ -421,7 +429,7 @@ class PercolatorCapabilityProbeTest {
                                                                 ToolName.PERCOLATOR,
                                                                 V3071,
                                                                 LINUX,
-                                                                null))
+                                                                Nulls.of(Path.class)))
                                         .getMessage()));
     }
 
@@ -447,8 +455,7 @@ class PercolatorCapabilityProbeTest {
         try (Stream<Path> entries = Files.list(temporary)) {
             return entries.filter(
                             entry ->
-                                    entry.getFileName()
-                                            .toString()
+                                    String.valueOf(entry.getFileName())
                                             .startsWith("cometgui-percolator-probe-"))
                     .count();
         }

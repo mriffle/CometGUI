@@ -132,17 +132,18 @@ public final class SyntheticPin {
                     String.format(
                             Locale.ROOT, target ? "sp|P%05d|TEST" : "decoy_sp|P%05d|TEST", row);
             pin.append(
-                    String.format(
-                            Locale.ROOT,
-                            "psm%d\t%d\t%d\t1000.5\t1000.4\t%.4f\t%.4f\t%.4f\tK.%s.R\t%s\n",
-                            row,
-                            target ? 1 : -1,
-                            row,
-                            first,
-                            second,
-                            third,
-                            peptide,
-                            protein));
+                            String.format(
+                                    Locale.ROOT,
+                                    "psm%d\t%d\t%d\t1000.5\t1000.4\t%.4f\t%.4f\t%.4f\tK.%s.R\t%s",
+                                    row,
+                                    target ? 1 : -1,
+                                    row,
+                                    first,
+                                    second,
+                                    third,
+                                    peptide,
+                                    protein))
+                    .append('\n');
         }
         return pin.toString();
     }

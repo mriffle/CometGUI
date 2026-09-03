@@ -32,6 +32,7 @@ import org.cometgui.domain.tools.HostOperatingSystem;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.UpstreamArtefacts;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -206,21 +207,33 @@ class PdvJarIdentityTest {
                                 "tool",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> identity.identify(null, LINUX, jar))
+                                                () ->
+                                                        identity.identify(
+                                                                Nulls.of(ToolName.class),
+                                                                LINUX,
+                                                                jar))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "platform",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> identity.identify(ToolName.PDV, null, jar))
+                                                () ->
+                                                        identity.identify(
+                                                                ToolName.PDV,
+                                                                Nulls.of(HostPlatform.class),
+                                                                jar))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "jar",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> identity.identify(ToolName.PDV, LINUX, null))
+                                                () ->
+                                                        identity.identify(
+                                                                ToolName.PDV,
+                                                                LINUX,
+                                                                Nulls.of(Path.class)))
                                         .getMessage()));
     }
 }

@@ -133,6 +133,6 @@ public final class JarAttributes {
      * @return the attributes, immutable
      */
     public Map<String, String> all() {
-        return attributes;
+        return Map.copyOf(attributes);
     }
 }

@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -119,6 +120,10 @@ class StagedJavaToolProbeTest {
         return cursor;
     }
 
+    private static Path directoryOf(Path file) {
+        return Objects.requireNonNull(file.getParent(), "a staged artefact has a directory");
+    }
+
     private static Path artefact(String fileName) {
         Path file = repositoryRoot().resolve(MIRROR).resolve(fileName);
         if (!Files.isRegularFile(file)) {
@@ -164,7 +169,7 @@ class StagedJavaToolProbeTest {
     void pdvIsProbedEndToEnd(@TempDir Path staged) throws IOException {
         ArtefactRecord record = record(ToolName.PDV);
         Path jar = staged.resolve(record.executablePath());
-        Files.createDirectories(jar.getParent());
+        Files.createDirectories(directoryOf(jar));
         try (ZipFile zip = new ZipFile(artefact(PDV_ZIP).toFile())) {
             ZipEntry entry = zip.getEntry("PDV-2.7.0/PDV-2.7.0.jar");
             try (InputStream in = zip.getInputStream(entry)) {
@@ -201,7 +206,7 @@ class StagedJavaToolProbeTest {
     void theConverterIsProbedEndToEnd(@TempDir Path staged) throws IOException {
         ArtefactRecord record = record(ToolName.LIMELIGHT_CONVERTER);
         Path jar = staged.resolve(record.executablePath());
-        Files.createDirectories(jar.toAbsolutePath().getParent());
+        Files.createDirectories(directoryOf(jar.toAbsolutePath()));
         Files.copy(artefact(CONVERTER_JAR), jar, StandardCopyOption.REPLACE_EXISTING);
         RecordingProber capabilities = new RecordingProber();
 
@@ -225,7 +230,7 @@ class StagedJavaToolProbeTest {
     void aJarThatIsNotTheTool(@TempDir Path staged) throws IOException {
         ArtefactRecord record = record(ToolName.PDV);
         Path jar = staged.resolve(record.executablePath());
-        Files.createDirectories(jar.getParent());
+        Files.createDirectories(directoryOf(jar));
         Files.copy(artefact(CONVERTER_JAR), jar, StandardCopyOption.REPLACE_EXISTING);
         RecordingProber capabilities = new RecordingProber();
 

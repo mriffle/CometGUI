@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.UpstreamArtefacts;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -148,14 +149,16 @@ class JarAttributesTest {
                                 "name",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> JarAttributes.of(jar).value(null))
+                                                () ->
+                                                        JarAttributes.of(jar)
+                                                                .value(Nulls.of(String.class)))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "jar",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> JarAttributes.of(null))
+                                                () -> JarAttributes.of(Nulls.of(Path.class)))
                                         .getMessage()));
     }
 }

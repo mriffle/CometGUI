@@ -49,6 +49,7 @@ import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.process.ProcessService;
+import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.ScriptedRunner;
 import org.cometgui.tools.testing.UpstreamArtefacts;
 import org.junit.jupiter.api.DisplayName;
@@ -138,7 +139,8 @@ class LocalPercolatorRegistrationTest {
     @Test
     @DisplayName(
             "the real 3.07.1 binary registers, with the manifest's checksums and its probed set")
-    void theRealBinaryRegisters(@TempDir Path directory) throws Exception {
+    void theRealBinaryRegisters(@TempDir Path directory)
+            throws IOException, ToolRegistrationException {
         Path binary = realBinary(directory);
 
         RegisteredLocalBinary registered = realRegistrar().register(binary);
@@ -179,7 +181,7 @@ class LocalPercolatorRegistrationTest {
 
     @Test
     @DisplayName("the evidence note names the host and the file, so a reader can act on it")
-    void theEvidenceNote(@TempDir Path directory) throws Exception {
+    void theEvidenceNote(@TempDir Path directory) throws IOException, ToolRegistrationException {
         Path binary = realBinary(directory);
 
         RegisteredLocalBinary registered = realRegistrar().register(binary);
@@ -246,7 +248,7 @@ class LocalPercolatorRegistrationTest {
 
     @Test
     @DisplayName("exactly 3.05 registers, which is the boundary the floor is stated at")
-    void exactlyTheMinimum(@TempDir Path directory) throws Exception {
+    void exactlyTheMinimum(@TempDir Path directory) throws IOException, ToolRegistrationException {
         Path binary = Files.writeString(directory.resolve("percolator"), "not really");
         Path targets = directory.resolve("t.xml");
         ScriptedRunner runner =
@@ -501,7 +503,10 @@ class LocalPercolatorRegistrationTest {
                                                 NullPointerException.class,
                                                 () ->
                                                         new LocalPercolatorRegistration(
-                                                                null, probe, hashes(), HOST))
+                                                                Nulls.of(ToolRunner.class),
+                                                                probe,
+                                                                hashes(),
+                                                                HOST))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -510,7 +515,12 @@ class LocalPercolatorRegistrationTest {
                                                 NullPointerException.class,
                                                 () ->
                                                         new LocalPercolatorRegistration(
-                                                                runner, null, hashes(), HOST))
+                                                                runner,
+                                                                Nulls.of(
+                                                                        PercolatorCapabilityProbe
+                                                                                .class),
+                                                                hashes(),
+                                                                HOST))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -519,7 +529,10 @@ class LocalPercolatorRegistrationTest {
                                                 NullPointerException.class,
                                                 () ->
                                                         new LocalPercolatorRegistration(
-                                                                runner, probe, null, HOST))
+                                                                runner,
+                                                                probe,
+                                                                Nulls.of(HashService.class),
+                                                                HOST))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -528,7 +541,10 @@ class LocalPercolatorRegistrationTest {
                                                 NullPointerException.class,
                                                 () ->
                                                         new LocalPercolatorRegistration(
-                                                                runner, probe, hashes(), null))
+                                                                runner,
+                                                                probe,
+                                                                hashes(),
+                                                                Nulls.of(HostPlatform.class)))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -539,7 +555,7 @@ class LocalPercolatorRegistrationTest {
                                                         new LocalPercolatorRegistration(
                                                                         runner, probe, hashes(),
                                                                         HOST)
-                                                                .register(null))
+                                                                .register(Nulls.of(Path.class)))
                                         .getMessage()));
     }
 }

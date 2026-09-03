@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.Set;
 import org.cometgui.domain.ports.ToolCommand;
@@ -297,7 +298,8 @@ class PercolatorRealBinaryTest {
                 UpstreamArtefacts.sha256(payload),
                 "the 3.09 Debian payload is not the bytes unit 0 extracted");
         Path staged = directory.resolve("bin").resolve("percolator");
-        Files.createDirectories(staged.getParent());
+        Files.createDirectories(
+                Objects.requireNonNull(staged.getParent(), "the staged path has a directory"));
         Files.copy(payload, staged);
         Files.setPosixFilePermissions(
                 staged,

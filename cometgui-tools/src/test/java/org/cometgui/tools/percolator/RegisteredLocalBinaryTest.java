@@ -29,13 +29,20 @@ import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.tools.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** The registration record's own invariants: it cannot describe a managed or uninstalled tool. */
 class RegisteredLocalBinaryTest {
 
-    private static final Path BINARY = Path.of("/opt/percolator/bin/percolator");
+    /*
+     * Absolute because ToolOffer requires it, and derived rather than written out: SpotBugs
+     * reports a literal absolute path as DMI_HARDCODED_ABSOLUTE_FILENAME, and it is right that a
+     * test which never touches the file system should not name one machine's layout.
+     */
+    private static final Path BINARY =
+            Path.of("").toAbsolutePath().resolve("opt/percolator/bin/percolator");
     private static final FileHashes HASHES =
             new FileHashes(
                     "0b77b68fd859639d7421f1c5e006ade5",
@@ -108,7 +115,7 @@ class RegisteredLocalBinaryTest {
     @Test
     @DisplayName("the checksums must be of the file the offer names, so the paths must agree")
     void aDifferentPath() {
-        Path other = Path.of("/usr/local/bin/percolator");
+        Path other = Path.of("").toAbsolutePath().resolve("usr/local/bin/percolator");
 
         assertEquals(
                 "the registered path " + other + " is not the one the offer names: " + BINARY,
@@ -138,21 +145,29 @@ class RegisteredLocalBinaryTest {
                                                 NullPointerException.class,
                                                 () ->
                                                         new RegisteredLocalBinary(
-                                                                null, HASHES, BINARY))
+                                                                Nulls.of(ToolOffer.class),
+                                                                HASHES,
+                                                                BINARY))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "checksums",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> new RegisteredLocalBinary(good, null, BINARY))
+                                                () ->
+                                                        new RegisteredLocalBinary(
+                                                                good,
+                                                                Nulls.of(FileHashes.class),
+                                                                BINARY))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "binary",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> new RegisteredLocalBinary(good, HASHES, null))
+                                                () ->
+                                                        new RegisteredLocalBinary(
+                                                                good, HASHES, Nulls.of(Path.class)))
                                         .getMessage()));
     }
 }

@@ -41,6 +41,7 @@ import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.tools.api.CompanionGate;
 import org.cometgui.tools.api.ToolRunner;
+import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.ScriptedRunner;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -317,14 +318,19 @@ class CometCapabilityProbeTest {
                                 "platform",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> probe.gatedByCompanions(null, directory))
+                                                () ->
+                                                        probe.gatedByCompanions(
+                                                                Nulls.of(HostPlatform.class),
+                                                                directory))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "executable",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> probe.gatedByCompanions(WINDOWS, null))
+                                                () ->
+                                                        probe.gatedByCompanions(
+                                                                WINDOWS, Nulls.of(Path.class)))
                                         .getMessage()));
     }
 
@@ -419,8 +425,7 @@ class CometCapabilityProbeTest {
         try (Stream<Path> entries = Files.list(temporary)) {
             return entries.filter(
                             entry ->
-                                    entry.getFileName()
-                                            .toString()
+                                    String.valueOf(entry.getFileName())
                                             .startsWith("cometgui-comet-probe-"))
                     .count();
         }
@@ -451,7 +456,12 @@ class CometCapabilityProbeTest {
                                 "tool",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> probe.probe(null, VERSION, LINUX, binary))
+                                                () ->
+                                                        probe.probe(
+                                                                Nulls.of(ToolName.class),
+                                                                VERSION,
+                                                                LINUX,
+                                                                binary))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -461,7 +471,7 @@ class CometCapabilityProbeTest {
                                                 () ->
                                                         probe.probe(
                                                                 ToolName.COMET,
-                                                                null,
+                                                                Nulls.of(ToolVersion.class),
                                                                 LINUX,
                                                                 binary))
                                         .getMessage()),
@@ -474,7 +484,7 @@ class CometCapabilityProbeTest {
                                                         probe.probe(
                                                                 ToolName.COMET,
                                                                 VERSION,
-                                                                null,
+                                                                Nulls.of(HostPlatform.class),
                                                                 binary))
                                         .getMessage()),
                 () ->
@@ -487,14 +497,17 @@ class CometCapabilityProbeTest {
                                                                 ToolName.COMET,
                                                                 VERSION,
                                                                 LINUX,
-                                                                null))
+                                                                Nulls.of(Path.class)))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "runner",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> new CometCapabilityProbe(null, List.of()))
+                                                () ->
+                                                        new CometCapabilityProbe(
+                                                                Nulls.of(ToolRunner.class),
+                                                                List.of()))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -506,7 +519,7 @@ class CometCapabilityProbeTest {
                                                                 new ToolRunner(
                                                                         new ScriptedRunner(),
                                                                         Duration.ofSeconds(1)),
-                                                                null))
+                                                                Nulls.of(List.class)))
                                         .getMessage()));
     }
 }

@@ -23,13 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.Set;
 import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.ToolCapability;
+import org.cometgui.tools.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,6 +54,10 @@ class CompanionGateTest {
     private static CompanionGate gate() {
         return new CompanionGate(
                 ToolCapability.THERMO_RAW_WINDOWS, HostOperatingSystem.WINDOWS, THREE);
+    }
+
+    private static Path directoryOf(Path file) {
+        return Objects.requireNonNull(file.getParent(), "every staged file here has a directory");
     }
 
     private static Path executableWith(Path directory, String... present) throws IOException {
@@ -106,7 +113,7 @@ class CompanionGateTest {
     @DisplayName("a directory of the right name is not a companion file")
     void aDirectoryIsNotAFile(@TempDir Path directory) throws IOException {
         Path executable = executableWith(directory, "one.dll", "two.dll");
-        Files.createDirectory(executable.getParent().resolve("three.dll"));
+        Files.createDirectory(directoryOf(executable).resolve("three.dll"));
 
         assertFalse(gate().isOpenFor(WINDOWS, executable));
     }
@@ -129,8 +136,10 @@ class CompanionGateTest {
     @Test
     @DisplayName("an executable with no directory above it cannot have companions beside it")
     void anExecutableWithNoParent() {
+        Path fileSystemRoot = FileSystems.getDefault().getRootDirectories().iterator().next();
+
         assertFalse(
-                gate().isOpenFor(WINDOWS, Path.of("/")),
+                gate().isOpenFor(WINDOWS, fileSystemRoot),
                 "the file system root has no parent directory, so there is nowhere for a companion"
                         + " to be");
     }
@@ -243,14 +252,21 @@ class CompanionGateTest {
                                 "host",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> gate().isOpenFor(null, executable))
+                                                () ->
+                                                        gate().isOpenFor(
+                                                                        Nulls.of(
+                                                                                HostPlatform.class),
+                                                                        executable))
                                         .getMessage()),
                 () ->
                         assertEquals(
                                 "executable",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> gate().isOpenFor(WINDOWS, null))
+                                                () ->
+                                                        gate().isOpenFor(
+                                                                        WINDOWS,
+                                                                        Nulls.of(Path.class)))
                                         .getMessage()));
     }
 }

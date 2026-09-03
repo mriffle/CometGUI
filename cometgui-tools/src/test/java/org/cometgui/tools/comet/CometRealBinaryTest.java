@@ -28,6 +28,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.HostArchitecture;
@@ -77,6 +78,11 @@ class CometRealBinaryTest {
         return new ToolRunner(new ProcessService(Clock.systemUTC()), Duration.ofSeconds(60));
     }
 
+    private static Path directoryOf(Path file) {
+        return Objects.requireNonNull(
+                file.getParent(), "the staged binary is written into a directory");
+    }
+
     private static Path stage(Path directory) throws IOException {
         Path binary =
                 UpstreamArtefacts.executableCopy(
@@ -112,7 +118,7 @@ class CometRealBinaryTest {
     void theRealBinaryHasNoThermoCapability(@TempDir Path directory) throws IOException {
         Path binary = stage(directory);
         for (String companion : CometCompanionGates.thermoRawWindows().fileNames()) {
-            Files.writeString(binary.getParent().resolve(companion), "MZ");
+            Files.writeString(directoryOf(binary).resolve(companion), "MZ");
         }
 
         Set<ToolCapability> observed =
@@ -132,7 +138,7 @@ class CometRealBinaryTest {
     void theCompanionRuleGrantsIt(@TempDir Path directory) throws IOException {
         Path binary = stage(directory);
         for (String companion : CometCompanionGates.thermoRawWindows().fileNames()) {
-            Files.writeString(binary.getParent().resolve(companion), "MZ");
+            Files.writeString(directoryOf(binary).resolve(companion), "MZ");
         }
 
         Set<ToolCapability> observed =

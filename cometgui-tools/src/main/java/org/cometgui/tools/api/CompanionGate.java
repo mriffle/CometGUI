@@ -94,7 +94,7 @@ public record CompanionGate(
      */
     @Override
     public Set<String> fileNames() {
-        return fileNames;
+        return Set.copyOf(fileNames);
     }
 
     /**

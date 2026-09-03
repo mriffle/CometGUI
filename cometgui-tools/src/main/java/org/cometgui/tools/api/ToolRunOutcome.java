@@ -66,6 +66,30 @@ public record ToolRunOutcome(
     }
 
     /**
+     * The lines written to standard output, in order.
+     *
+     * <p>Immutable and copied, for the reason given on {@code
+     * org.cometgui.domain.ports.ToolCommand#argv()}, which SpotBugs reports as {@code
+     * EI_EXPOSE_REP}.
+     *
+     * @return the lines, immutable and possibly empty
+     */
+    @Override
+    public List<String> standardOutput() {
+        return List.copyOf(standardOutput);
+    }
+
+    /**
+     * The lines written to standard error, in order.
+     *
+     * @return the lines, immutable and possibly empty
+     */
+    @Override
+    public List<String> standardError() {
+        return List.copyOf(standardError);
+    }
+
+    /**
      * Whether the run was cancelled because it exceeded its timeout.
      *
      * @return {@code true} when there is no exit code

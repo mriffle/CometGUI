@@ -37,6 +37,7 @@ import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.tools.api.JavaRuntime;
 import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.process.ProcessService;
+import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.ScriptedRunner;
 import org.cometgui.tools.testing.UpstreamArtefacts;
 import org.junit.jupiter.api.DisplayName;
@@ -221,7 +222,11 @@ class LimelightConverterIdentityTest {
                                 "tool",
                                 assertThrows(
                                                 NullPointerException.class,
-                                                () -> identity.identify(null, LINUX, jar))
+                                                () ->
+                                                        identity.identify(
+                                                                Nulls.of(ToolName.class),
+                                                                LINUX,
+                                                                jar))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -231,7 +236,7 @@ class LimelightConverterIdentityTest {
                                                 () ->
                                                         identity.identify(
                                                                 ToolName.LIMELIGHT_CONVERTER,
-                                                                null,
+                                                                Nulls.of(HostPlatform.class),
                                                                 jar))
                                         .getMessage()),
                 () ->
@@ -243,7 +248,7 @@ class LimelightConverterIdentityTest {
                                                         identity.identify(
                                                                 ToolName.LIMELIGHT_CONVERTER,
                                                                 LINUX,
-                                                                null))
+                                                                Nulls.of(Path.class)))
                                         .getMessage()),
                 () ->
                         assertEquals(
@@ -252,7 +257,7 @@ class LimelightConverterIdentityTest {
                                                 NullPointerException.class,
                                                 () ->
                                                         new LimelightConverterIdentity(
-                                                                null,
+                                                                Nulls.of(ToolRunner.class),
                                                                 JavaRuntime.ofThisApplication()))
                                         .getMessage()),
                 () ->
@@ -265,7 +270,7 @@ class LimelightConverterIdentityTest {
                                                                 new ToolRunner(
                                                                         new ScriptedRunner(),
                                                                         Duration.ofSeconds(1)),
-                                                                null))
+                                                                Nulls.of(JavaRuntime.class)))
                                         .getMessage()));
     }
 

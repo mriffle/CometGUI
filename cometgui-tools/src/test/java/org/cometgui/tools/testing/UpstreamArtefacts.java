@@ -116,6 +116,15 @@ public final class UpstreamArtefacts {
         }
     }
 
+    private static Path parentOf(Path file) {
+        Path parent = file.getParent();
+        if (parent == null) {
+            throw new AssertionError(
+                    "a staged artefact needs a directory to go in, and " + file + " has none");
+        }
+        return parent;
+    }
+
     /**
      * Copies one named member out of a mirrored ZIP.
      *
@@ -134,7 +143,7 @@ public final class UpstreamArtefacts {
                 throw new AssertionError(
                         "the archive " + archive + " holds no member named \"" + member + "\"");
             }
-            Files.createDirectories(destination.getParent());
+            Files.createDirectories(parentOf(destination));
             try (InputStream in = zip.getInputStream(entry)) {
                 Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -172,7 +181,7 @@ public final class UpstreamArtefacts {
      * @throws IOException if it cannot be copied
      */
     public static Path executableCopy(String fileName, Path destination) throws IOException {
-        Files.createDirectories(destination.getParent());
+        Files.createDirectories(parentOf(destination));
         Files.copy(artefact(fileName), destination, StandardCopyOption.REPLACE_EXISTING);
         Files.setPosixFilePermissions(
                 destination,

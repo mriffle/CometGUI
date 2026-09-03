@@ -240,7 +240,7 @@ public final class PoutDocument {
      * @return the values, in the order first seen, immutable
      */
     public Set<String> psmDecoyValues() {
-        return psmDecoyValues;
+        return Set.copyOf(psmDecoyValues);
     }
 
     /**
