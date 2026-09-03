@@ -2820,3 +2820,58 @@ Carried forward, and two escalations
   anything**; later units should prefer ``{@link}`` where the target is real.
 * **Gate item 1's PDV and converter dependency is retired.** ``StagedToolProbe``
   no longer throws for them, so unit 10 is off the critical path.
+
+.. _p05-u8-cancelled:
+
+Unit 8 dispatched and cancelled, and the defect it found on the way out
+=======================================================================
+
+**The phase stops after unit 7 by owner instruction.** I had already dispatched
+unit 8 when that reached me, and my stop order reached the agent after it had
+committed ``be2edfc`` -- 24 files, about 5000 insertions.
+
+**It is reverted and the tree is at ``0630d6d``.** The agent reset its own
+commit and preserved it under the tag ``phase05-unit8-cancelled`` rather than
+leave it to the reflog, which is the right instinct: the work is recoverable
+without being in anyone's way. **Nobody verified it.** I ran no build on it,
+read no diff and injected nothing, because that is unit 8's sign-off and it is
+the work I was told not to start. Signing off a unit I had been instructed not
+to run would have been a worse answer than leaving it plainly marked as
+unjudged.
+
+*A collision worth recording.* The agent's ``git reset --hard`` would have
+discarded my uncommitted handoff draft had the two overlapped by a few minutes;
+they did not, and I checked rather than assumed. **An agent reverting its own
+work and an orchestrator writing a document are not obviously in conflict, and
+``reset --hard`` does not respect that distinction.**
+
+.. _p05-u8-cancel-defect:
+
+A live defect in signed-off code, reported by the cancelled unit
+------------------------------------------------------------------
+
+**Cancelling an install mid-download reports ``FAILED``, not ``CANCELLED``.**
+Reproduced three times against the real PDV artefact, cancelled at 4 MB over
+loopback: ``expected: <CANCELLED> but was: <FAILED>``.
+
+``InstallPipeline`` hands the same ``DownloadCancellation`` into the transfer;
+``HttpDownloader`` honours it between chunks and raises
+``DownloadCancelledException``; **nothing translates that into
+``InstallCancelledException``**, so it leaves ``ArtefactInstaller.install``
+through the ``catch (IOException)`` arm. ``InstallHandle.cancel()``'s Javadoc
+forbids exactly this in as many words.
+
+**Why unit 5's sign-off did not catch it, which is the part to carry:**
+``FakeFetcher`` ignores cancellation, so cancellation was graded **only at step
+boundaries** and never *inside* a transfer. Unit 5's interruption proof
+enumerates all eight steps and is sound; the axis it never varied is **where
+within a step the cancellation lands.** That is this phase's signature hole for
+the fourth time -- a rule graded at one point on an axis it does not depend on --
+and it is the fourth time it has been found by someone other than the unit that
+wrote it.
+
+It lands on the 99 MB PDV transfer that ``phases/PHASE-05-tool-registry.rst``
+singles out for deliberate cancellation testing, so unit 10 would have walked
+into it. **I have not verified the diagnosis myself**; it is recorded as the
+agent gave it, with its evidence, and the first thing to do with it is reproduce
+it rather than fix it.
