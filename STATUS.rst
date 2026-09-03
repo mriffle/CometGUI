@@ -2473,6 +2473,61 @@ overwrites its own backup, and ``git checkout --`` remains the right restore
 for a committed subject. What was missing is that the two failure modes have
 **opposite** remedies, so the rule cannot be stated as one instruction.
 
+.. _status-wrong-key:
+
+A recurring defect class: a rule keyed on the wrong attribute of the right idea
+===============================================================================
+
+Named by Phase 05's unit 6 agent, and hit three times in one module.
+
+* Dedupe keyed on the version **text** rather than the version.
+* A tool offered twice on Apple silicon, the second labelled ``TRANSLATED_ROSETTA_2``
+  -- a false statement about a Java program.
+* The ``R-PLAT-03`` alternatives list keyed on **version** where it meant
+  **row**. Comet 2026.02.2 ships two rows on ``macos-aarch64`` -- the native
+  build and the x86-64 build ``D-004`` says runs under Rosetta 2 -- so a failing
+  native build **filtered out its own sibling** and told the user
+  ``Alternatives: none known`` while a working managed build sat in the manifest.
+
+**Why it hides.** The wrong key is always a *plausible* key: version, platform
+and URL are each correct for some question. Every existing test passed all three
+times, because no fixture varied the one axis where two rows share the chosen
+attribute -- which is why both repairs were graded **against the shipped
+manifest** rather than a fixture.
+
+**The discipline.** Record in the code which key was chosen *and which were
+rejected and why*. Here URL is the key; version is wrong because one version can
+be two rows; platform is wrong in the other direction, because one platform
+legitimately carries several versions and keying on it would delete every
+alternative there is. One exception was left deliberately -- ``StagedToolProbe``
+compares versions because it asks "is this the release the manifest pinned?" --
+and was flagged upward rather than converted silently.
+
+Phases 08 to 13 are full of the same shape: matching a PSM to a spectrum, a
+provenance record to a run, a result row to a filter.
+
+.. _status-red-symmetry:
+
+A red result can be the harness's fault as easily as a green one can be a lie
+=============================================================================
+
+Phase 05's successor orchestrator injected a locale defect, the build went red,
+and the red was **its own Checkstyle violation** -- a marker comment pushed a
+line past 100 characters. Had it read that red as a result, it would have sent
+an agent back for something it had not done.
+
+Its own diagnosis is the useful part: *"I have been applying that rule to green
+results and had not been applying it symmetrically."* This project has spent
+weeks on green results that mean nothing. The mirror case is rarer and costs
+someone else's time rather than your own -- a false accusation against a tier
+that did its job. **Read why a build is red with the same suspicion you read why
+it is green.**
+
+A near-miss of the same family, caught before it did harm: a ``git diff A..B``
+over a range that also spanned tier 1's commits made an agent look as though it
+had edited files outside its lane. ``git show --stat <commit>`` answers "what
+did this change"; a range answers a different question.
+
 Open decisions
 ==============
 

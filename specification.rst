@@ -5,7 +5,7 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 10
+:Revision: 11
 :Revision date: 2026-08-30
 :Supersedes: Revision 9, 2026-08-30
 :Target application: Cross-platform Java desktop application
@@ -896,8 +896,18 @@ Consequences that the implementation must respect:
     ``percolator_out/15`` namespace and to contain the expected ``<psm>``
     count. The fixture shall be large enough that a capable binary does not
     abort on "median decoy score <= score at 1% FDR" -- 64 target and 64 decoy
-    rows is proven sufficient, 8 and 8 is not, and an over-small fixture makes
-    the probe report a false negative. A binary that fails to load is reported
+    rows is proven sufficient, and an over-small fixture makes the probe report
+    a false negative. *Amended in revision 11, from measurement.* Through
+    revision 10 this rule said "8 and 8 is not [sufficient]", which claims more
+    than the evidence supports: sweeping 50 seeds through the real 3.07.1
+    binary aborted **10 times out of 50** at 8+8 and **0 out of 50** at 64+64.
+    An under-sized fixture therefore makes the probe **unreliable** -- about one
+    draw in five misreports a capable binary -- rather than reliably wrong. That
+    strengthens the requirement rather than relaxing it: a probe that fails
+    intermittently is worse than one that fails always, because it cannot be
+    told from a real negative, and a negative control built on the old wording
+    would itself pass four times in five. Any negative control at 8+8 shall
+    therefore pin a seed measured to abort. A binary that fails to load is reported
     as a loader failure (``R-PLAT-03``), never as "not capable".
 
     The rule is evaluated against the enabled stages, so it has more than one
