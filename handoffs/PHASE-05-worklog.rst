@@ -2505,3 +2505,168 @@ Carried forward from unit 6
 * **A failed capability probe must never become an empty capability set**, because
   ``R-TOOL-08`` makes an empty set positive evidence of absence. Graded both ways
   by the audit.
+
+.. _p05-u7-signoff:
+
+Unit 7 sign-off: sent back for one round
+=========================================
+
+**What I ran myself**, on ``b0a92ec``, quiet tree, ``git status --porcelain``
+empty, exit status captured inside the log::
+
+    206 report file(s): tests=3511 failures=0 errors=0 skipped=3
+    11/11 stages OK in 1327 seconds.  BUILD OK
+    === build.sh EXIT STATUS: 0 ===
+
+    ok  cometgui-domain   line 100.0% (834/834)  branch 100.0% (352/352)
+    ok  cometgui-tools    line 98.5% (560/568)   branch 97.9% (195/199)
+    ok  cometgui-install  line 100.0% (3127/3127)  branch 99.6% (1119/1123)
+    ok  cometgui-domain   49 compiled class(es), all 49 in the sample
+    ok  cometgui-tools    18 compiled class(es), all 18 in the sample
+    ok  cometgui-install  79 compiled class(es), all 79 in the sample
+    ok  cometgui-domain   369/370 mutations killed = 99.7%
+    ok  cometgui-tools    220/222 mutations killed = 99.0%
+    ok  cometgui-install  1294/1311 mutations killed = 98.7%
+
+Read out of ``mutations.xml``: ``cometgui-domain``'s survivor is still exactly
+``ToolVersion:214:ConditionalsBoundaryMutator``; ``cometgui-tools``'s two
+non-kills are ``SyntheticPin:205:MathMutator`` and
+``ToolRunner$Collector:141:VoidMethodCallMutator``, **both argued in the
+production source** rather than hidden; ``cometgui-install``'s seventeen are the
+pre-existing ``archive``/``download``/``cache`` residue with **none in
+``probe``**. My figures match the agent's exactly this time -- no drift.
+
+**The mutation gate was flipped in the same commit as the first class**
+(``3d73193``), with its reasoning in the POM, and the coverage switch was
+deliberately left alone on the same argument ``cometgui-install`` gives. **39
+SpotBugs findings were fixed in the code and no exclusion filter was added** --
+I checked ``git diff`` over ``config/`` and it is empty.
+
+The excursion into unit 6's signed-off package: reviewed and accepted
+----------------------------------------------------------------------
+
+The agent changed four files outside its declared paths and **flagged all four
+itself**. I reviewed them rather than taking the summary.
+
+**The excursion was necessary and my brief was wrong.** I told unit 6 to declare
+``CapabilityProber`` "so ``cometgui-tools`` can implement it", and unit 6
+recorded the same idea for JAR identity: *"a JAR's identity needs a JVM
+launch"*. Executing it showed that is false in a specific way -- ``a .jar is not
+an executable file``, and ``LoadabilityProbe`` builds an argv of *the executable
+followed by the banner's arguments*, which for a JAR asks the operating system
+to execute a ZIP. No banner can reach a JAR, so a new seam was required.
+``JavaArtefactIdentity`` is that seam, in the same package, the same shape and
+the same domain-only vocabulary as ``CapabilityProber``.
+
+**It does not invalidate unit 6's sign-off, checked rather than assumed.** The
+change to ``StagedToolProbe`` is purely additive: a new optional field and a new
+seven-argument constructor, with **the six-argument constructor delegating to it
+with ``Optional.empty()``** so the old behaviour is bit-for-bit preserved. And
+the decisive evidence -- **unit 6's test files are untouched**.
+``git diff --name-only ce9c249..b0a92ec`` lists no unit 6 test except
+``JavaArtefactIdentityTest.java``, which ``--diff-filter=A`` confirms is a
+**new** file. So ``StagedToolProbeTest.aToolWithNoBannerFailsByName`` passes
+verbatim against the changed class, in my own green build.
+
+Two findings of the agent's that correct the record
+-----------------------------------------------------
+
+#. **PDV cannot print a version, on any host.** ``PDVCLI.PDVCLIMainClass
+   extends JFrame`` and builds the frame before reading its first argument, so
+   ``-h``, ``-v``, ``-V`` and ``--version`` all exit 1 with
+   ``java.awt.HeadlessException``, and ``-Djava.awt.headless=true`` is what
+   *causes* it. Identity is read from the JAR manifest's
+   ``Implementation-Version`` instead -- from bytes whose SHA-256 the installer
+   verified four steps earlier -- and the limit is recorded rather than dressed
+   up as a launch. **Unit 6's Javadoc claim that a JAR needs a JVM launch was
+   wrong for PDV and right for the converter**, which does print
+   ``cometPercolator2LimelightXML.jar v2.8.1`` and exit 0.
+#. **The 8-plus-8 false negative is probabilistic, not certain.** Swept over 50
+   seeds through the real 3.07.1 binary: **10 of 50 aborted at 8+8, 0 of 50 at
+   64+64.** So an under-sized fixture makes the probe *unreliable* -- roughly one
+   draw in five misreports a capable binary -- rather than reliably wrong. The
+   phase record and ``specification.rst`` both read as though 8+8 always fails.
+   The chosen seed 3071 is one of the ten, so the negative control still bites
+   deterministically. **Escalated to tier 1** as a possible specification
+   clarification; it strengthens the case for 64+64 rather than weakening it.
+
+The namespace, checked against the bytes as instructed: **``http://per-colator.com/percolator_out/15``**,
+in full, hand-typed as a production constant *and independently hand-typed in
+the test* so the expected value is not computed by the code under test. 3.06.5
+and 3.07.1 agree. The work log had quoted it one segment short, and the code now
+says so.
+
+.. _p05-u7-locale:
+
+The defect I injected, which the unit did not catch
+-----------------------------------------------------
+
+Chosen from outside the acceptance conditions, as always. ``SyntheticPin``
+formats the PIN's three feature columns with ``String.format(Locale.ROOT,
+"...%.4f...")``. The locale is pinned, correctly. **Nothing holds it there:
+there is no locale-varying test anywhere in ``cometgui-tools``** -- ``grep -rn
+Locale cometgui-tools/src/test`` returns nothing -- while ``cometgui-provenance``
+pins locale-sensitive paths in five separate test files.
+
+I removed the ``Locale.ROOT`` argument, which is the realistic mistake rather
+than an exotic one. ``mvn -o -pl cometgui-tools test`` reported **``Tests run:
+205, Failures: 0, Errors: 0``**, ``BUILD SUCCESS``, exit 0 -- and those 205
+include ``PercolatorRealBinaryTest``, seven tests that **execute the real 3.07.1
+binary** over the generated PIN.
+
+Then I proved the harm rather than arguing it. Running the compiled probe with
+the JVM default locale set to ``de_DE``::
+
+    INJECTED : psm0  1  0  1000.5  1000.4  1,0540  0,5052  -0,0032  K.VSL...
+               COMMAS IN ROW : 3 -- Percolator cannot parse this
+    BASELINE : psm0  1  0  1000.5  1000.4  1.0540  0.5052  -0.0032  K.VSL...
+               COMMAS IN ROW : 0 -- well formed regardless of host locale
+
+**So the guard is correct, load-bearing and unproven** -- unit 4's shape exactly,
+where all five XXE hardening calls could each be deleted with the suite green.
+*"A protection that cannot be observed to matter is indistinguishable from one
+that is absent."*
+
+**Why it matters more than a formatting nit.** The consequence is a malformed
+PIN, which Percolator refuses, which the probe reads as *"this build cannot
+write XML"* -- a **false negative on the one capability this unit exists to
+establish functionally**, which then removes the Limelight path for that user.
+``R-PERC-02`` exists because a textual probe gives false negatives; a
+locale-dependent functional probe reintroduces them through a different door.
+CometGUI is a desktop application for scientists, so a comma-decimal default
+locale is the ordinary case, not an exotic one.
+
+*A harness error of my own, recorded because it is the standing lesson in the
+other direction.* My first injection appended a marker comment that pushed the
+line to 126 characters and Checkstyle rejected it at 100. The build went red for
+**my** formatting rather than for the defect, and had I read the red as a result
+the unit would have been sent back for something it did not do. **A red result
+can be the harness's fault as easily as a green one can be a lie.** Re-injected
+with the marker on its own line.
+
+Restored from the snapshot taken before injecting -- source hash back to
+``ba79b8c8...``, marker greps out at zero, ``git status --porcelain`` empty.
+
+What the rework must do
+------------------------
+
+#. **Grade the locale.** Generate the PIN under at least a comma-decimal locale
+   (``de_DE`` or ``fr_FR``) and a non-ASCII-digit locale (the Thai-digit tag
+   this project already uses in ``cometgui-provenance``), and assert the bytes
+   are unchanged. ``%d`` and ``%05d`` are exposed to the second of those as
+   ``%.4f`` is to the first, so cover both format calls.
+#. **Prove it bites**: remove ``Locale.ROOT`` and show the new test go red, with
+   the ``Tests run:`` line.
+#. **Sweep the unit for the same shape** -- anything whose correctness depends
+   on an ambient JVM or OS default that no test varies. I swept for
+   locale-sensitive formatting myself and found only these two call sites, both
+   already correct, so this is about the *class* of assumption rather than more
+   instances of this one: default charset, default time zone, and the default
+   locale in any comparison or case conversion.
+
+The unit is otherwise excellent and nothing else in it is in question. I have
+not re-run ``scripts/verify-test-gates.sh`` myself yet -- the agent reports 37
+assertions, 0 failed, with control 0's pinned survivor set unchanged and control
+2 still biting now that ``org.cometgui.tools.comet`` holds four classes. **I
+will re-run it myself at acceptance**, since it is the harness this unit was
+most likely to disturb.
