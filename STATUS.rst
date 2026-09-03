@@ -2569,6 +2569,31 @@ than followed; a cheap check attached to the inconvenient act survives. This
 project has now produced the same lesson about locks, about process checks and
 about document commits.
 
+.. _status-parallel-locale:
+
+A forward risk: six test classes mutate global JVM state
+=========================================================
+
+Phase 05 unit 7 surfaced this rather than changing anything, and it is recorded
+because the phase that would be bitten by it is not the phase that wrote it.
+
+Six test classes now call ``Locale.setDefault`` -- five in ``cometgui-provenance``
+from Phase 04, and ``SyntheticPinTest.LocaleIndependence`` from Phase 05. They
+are **safe today**: no module enables parallel execution and JUnit is sequential
+by default, so no two of them can interleave.
+
+**They stop being safe the moment anyone turns parallel execution on**, which is
+a natural thing to reach for when the gate suite costs ~50 minutes and is
+growing. Two tests setting a different default locale at once would produce a
+failure that looks like a locale bug in production code and is not, and it would
+be intermittent -- the worst shape to debug. Whoever enables parallelism must
+add ``@ResourceLock(Resources.LOCALE)`` to all six in the same change, and
+``Locale.setDefault`` is worth grepping for at that moment rather than trusting
+this list to still be complete.
+
+Phase 15 owns performance and is the likely place; Phase 14 may reach for it
+first.
+
 Open decisions
 ==============
 
