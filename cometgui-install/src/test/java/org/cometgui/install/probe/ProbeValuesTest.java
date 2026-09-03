@@ -35,6 +35,7 @@ import org.cometgui.install.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** Tests for the small value types this package is stated in. */
@@ -114,6 +115,29 @@ class ProbeValuesTest {
                 assertThrows(
                                 IllegalArgumentException.class,
                                 () -> new ProbeContext(blank, List.of(), List.of()))
+                        .getMessage());
+    }
+
+    @ParameterizedTest(name = "[{index}] \"{0}\" -> \"{1}\"")
+    @CsvSource({
+        "bin/percolator, percolator",
+        "percolator, percolator",
+        "comet.exe, comet.exe",
+        "a/b/c/comet, comet",
+    })
+    @DisplayName("the subject of a diagnostic is the file the manifest installs, not its path")
+    void theSubjectIsTheInstalledFileName(String installedPath, String expected) {
+        assertEquals(expected, ProbeContext.subjectOf(installedPath));
+    }
+
+    @Test
+    @DisplayName("the subject derivation rejects a null path by name")
+    void theSubjectDerivationRejectsNull() {
+        assertEquals(
+                "installedPath",
+                assertThrows(
+                                NullPointerException.class,
+                                () -> ProbeContext.subjectOf(Nulls.of(String.class)))
                         .getMessage());
     }
 

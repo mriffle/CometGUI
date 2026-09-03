@@ -19,6 +19,7 @@ package org.cometgui.install.probe;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -188,6 +189,28 @@ class ExecutableFormatTest {
                                 Optional.empty(),
                                 ExecutableFormat.architectureOf(
                                         write(directory, "riscv", elfHeader(1, 243)))));
+    }
+
+    @Test
+    @DisplayName("a file that cannot be read is an IOException, never a guessed architecture")
+    void anUnreadableFileThrows(@TempDir Path directory) throws IOException {
+        Path unreadable = write(directory, "unreadable", elfHeader(1, 62));
+        assertTrue(unreadable.toFile().setReadable(false, false), "could not clear the read bit");
+
+        assertThrows(
+                IOException.class,
+                () -> ExecutableFormat.architectureOf(unreadable),
+                "an empty answer here would mean \"not an ELF file\", and the loadability probe"
+                        + " would then launch a binary whose architecture was never established;"
+                        + " the failure has to reach the caller so it becomes a refusal");
+    }
+
+    @Test
+    @DisplayName("a file that is not there is an IOException too, not an empty answer")
+    void anAbsentFileThrows(@TempDir Path directory) {
+        assertThrows(
+                IOException.class,
+                () -> ExecutableFormat.architectureOf(directory.resolve("gone")));
     }
 
     @Test

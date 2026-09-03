@@ -59,6 +59,30 @@ public record ProbeContext(
     }
 
     /**
+     * The file name to put in a diagnostic, from the path the manifest installs an artefact to.
+     *
+     * <p><strong>One derivation, used by everything in this package that needs a subject.</strong>
+     * {@link StagedToolProbe} needs it to probe an artefact and {@link ProbeGatedOffers} needs it
+     * to describe one it could not reach; two copies of "the segment after the last separator"
+     * would eventually disagree about the same record.
+     *
+     * <p>It reads the <em>manifest's</em> path rather than a resolved {@link java.nio.file.Path},
+     * and that is what makes it total: {@code Path.getFileName()} answers {@code null} for a root
+     * path, which would need a branch no real record can reach, and an unreachable branch is a
+     * mutation no honest test can kill. {@code ArtefactRecord} has already validated the value as a
+     * relative path inside the install directory.
+     *
+     * @param installedPath the artefact's install path, as {@code
+     *     org.cometgui.install.registry.ArtefactRecord#executablePath()} gives it
+     * @return the segment after the last {@code /}, or the whole value when there is none
+     * @throws NullPointerException if {@code installedPath} is {@code null}
+     */
+    public static String subjectOf(String installedPath) {
+        Objects.requireNonNull(installedPath, "installedPath");
+        return installedPath.substring(installedPath.lastIndexOf('/') + 1);
+    }
+
+    /**
      * The libraries the manifest declared, immutable.
      *
      * @return the libraries, possibly empty

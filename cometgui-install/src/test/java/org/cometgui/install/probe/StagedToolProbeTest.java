@@ -274,6 +274,91 @@ class StagedToolProbeTest {
     }
 
     @Test
+    @DisplayName(
+            "a staged entry that vanished fails by name, and the two ways it can vanish differ")
+    void aStagedEntryWhoseExecutableIsGone(@TempDir Path root) throws IOException {
+        ArtefactRecord record = ProbeRecords.shippedPercolator("3.07.1");
+        StagedToolProbe probe = probe(new RecordingProber());
+        Path wholeInstallGone = Files.createDirectories(root.resolve("emptied"));
+        Path onlyTheFileGone = root.resolve("half");
+        Files.createDirectories(onlyTheFileGone.resolve("bin"));
+
+        assertAll(
+                () ->
+                        assertTrue(
+                                assertThrows(
+                                                IOException.class,
+                                                () -> probe.probe(record, wholeInstallGone))
+                                        .getMessage()
+                                        .endsWith(
+                                                "has no directory to run in, so it cannot be"
+                                                        + " probed"),
+                                "the whole install is gone, so not even the directory the binary"
+                                        + " would run in is there"),
+                () ->
+                        assertTrue(
+                                assertThrows(
+                                                IOException.class,
+                                                () -> probe.probe(record, onlyTheFileGone))
+                                        .getMessage()
+                                        .endsWith("is not a regular file, so it cannot be probed"),
+                                "the directory survived and the payload did not, which is a"
+                                        + " different sentence and a different thing to go looking"
+                                        + " for"),
+                () ->
+                        assertTrue(
+                                assertThrows(
+                                                IOException.class,
+                                                () -> probe.loadabilityOf(record, wholeInstallGone))
+                                        .getMessage()
+                                        .endsWith(
+                                                "has no directory to run in, so it cannot be"
+                                                        + " probed"),
+                                "and the offered-set entry point fails the same way, which is what"
+                                        + " ProbeGatedOffers turns into one refusal"));
+    }
+
+    @Test
+    @DisplayName("a capability probe that FAILED never becomes a capability set that is empty")
+    void aFailedCapabilityProbeIsNotAnEmptyCapabilitySet(@TempDir Path staged) throws IOException {
+        ArtefactRecord record = ProbeRecords.shippedPercolator("3.07.1");
+        StagedBinaries.stage(StagedBinaries.percolator3071(), staged, record.executablePath());
+        CapabilityProber unableToRun =
+                (tool, version, platform, executable) -> {
+                    throw new IOException("the synthetic PIN could not be written");
+                };
+
+        IOException propagated =
+                assertThrows(IOException.class, () -> probe(unableToRun).probe(record, staged));
+
+        assertEquals(
+                "the synthetic PIN could not be written",
+                propagated.getMessage(),
+                "R-TOOL-08 says a capability is absent without positive evidence, and an EMPTY SET"
+                        + " is positive evidence of absence -- "
+                        + "\"this Percolator cannot write XML\" --"
+                        + " produced by a probe that never got an "
+                        + "answer. That is the exact confusion"
+                        + " ProbeStage exists to prevent, so the failure propagates and the install"
+                        + " stops");
+    }
+
+    @Test
+    @DisplayName(
+            "an empty capability set from a probe that RAN is a legitimate answer, not a"
+                    + " failure")
+    void anEmptyCapabilitySetFromAProbeThatRanIsAccepted(@TempDir Path staged) throws IOException {
+        ArtefactRecord record = ProbeRecords.shippedPercolator("3.07.1");
+        StagedBinaries.stage(StagedBinaries.percolator3071(), staged, record.executablePath());
+
+        assertEquals(
+                Set.of(),
+                probe((tool, version, platform, executable) -> Set.of()).probe(record, staged),
+                "\"it ran and found nothing\" and \"it could not run\" are different answers,"
+                        + " and only one of them is a failure");
+    }
+
+    @Test
     @DisplayName("loadabilityOf answers the loadability question alone, for the offered-set gate")
     void loadabilityAlone(@TempDir Path staged) throws IOException {
         ArtefactRecord working = ProbeRecords.shippedPercolator("3.07.1");

@@ -50,6 +50,32 @@ import org.cometgui.install.registry.ArtefactSelection;
  * <strong>is</strong> offered, because {@code R-PLAT-02} says compatibility is established by
  * executing the binary. {@code ProbeGatedOffersTest} grades exactly that: with the host's C++
  * runtime unknown and a {@code GLIBCXX} floor declared, the offer stands and the probe decides.
+ *
+ * <h2>A binary that could not be reached is one refusal, not the end of the list</h2>
+ *
+ * <p>A staged directory that has been deleted, a file that cannot be read, a tool this build has no
+ * version banner for: in each of those {@link LoadabilityCheck#refusalFor} fails rather than
+ * answering, and there are three things this class could do with that. <strong>Offering the
+ * artefact is not one of them</strong> -- {@code R-TOOL-06} says a tool that fails loadability is
+ * never offered, and a tool that was never <em>shown</em> to pass it has not passed it. Nor is
+ * letting the failure escape: {@code R-PLAT-03} requires a loader failure to be "a distinct,
+ * actionable diagnostic naming the host's version, the required version, and the available
+ * alternatives", never "an opaque non-zero exit" -- and no alternative can be named from a code
+ * path that has just discarded the whole offered set. {@code R-TOOL-06}'s sentence is about <em>a
+ * tool</em> leaving the list, not about the list ceasing to exist, so one unreachable binary must
+ * not blank the Tool Manager.
+ *
+ * <p>So it becomes <strong>one {@link Refusal}</strong>, with its own diagnostic and its own
+ * alternatives, and every other candidate is still decided. The kind is chosen the same way {@link
+ * LoadabilityProbe} chooses one for a process that would not start: the failure's whole cause chain
+ * goes through {@link LoaderOutputClassifier#fromStartFailure}, so a file whose permissions were
+ * cleared is reported as {@link org.cometgui.domain.tools.ProbeFailureKind#NOT_EXECUTABLE} and says
+ * so, and anything this project does not recognise falls to {@link
+ * org.cometgui.domain.tools.ProbeFailureKind#EXECUTION_FAILED} -- a {@code LOADABILITY} kind by
+ * unit 1's rule that an ambiguous kind takes the earliest stage, and one whose sentence is true of
+ * a probe that never ran: it did not start, and nothing it printed matched a loader failure this
+ * project recognises. One classifier decides both cases, so the two paths cannot drift into wording
+ * the other would not use.
  */
 public final class ProbeGatedOffers {
 
@@ -132,40 +158,54 @@ public final class ProbeGatedOffers {
     }
 
     private final HostRuntimeVersions versions;
+    private final LoaderOutputClassifier classifier;
     private final Function<ArtefactRecord, List<String>> alternatives;
 
     /**
      * Creates the gate.
      *
      * @param versions what this host's runtimes were established to be
+     * @param classifier turns the failure of a binary that could not be reached into the same kind
+     *     of diagnostic the loadability probe would have produced for it
      * @param alternatives what to offer instead of a refused artefact, usually {@link
      *     ManifestAlternatives#forArtefact}
-     * @throws NullPointerException if either argument is {@code null}
+     * @throws NullPointerException if any argument is {@code null}
      */
     public ProbeGatedOffers(
-            HostRuntimeVersions versions, Function<ArtefactRecord, List<String>> alternatives) {
+            HostRuntimeVersions versions,
+            LoaderOutputClassifier classifier,
+            Function<ArtefactRecord, List<String>> alternatives) {
         this.versions = Objects.requireNonNull(versions, "versions");
+        this.classifier = Objects.requireNonNull(classifier, "classifier");
         this.alternatives = Objects.requireNonNull(alternatives, "alternatives");
     }
 
     /**
      * Decides which of the manifest's selections for this host may be offered.
      *
+     * <p><strong>Does not throw when one candidate's binary cannot be reached.</strong> That
+     * candidate becomes a refusal with its own diagnostic and every other one is still decided; see
+     * this class's documentation for why neither offering it nor propagating the failure is
+     * available.
+     *
      * @param candidates what the manifest selected for this host
      * @param check runs a candidate's binary
      * @return the offered and the refused
-     * @throws IOException if a candidate's binary cannot be reached
      * @throws NullPointerException if either argument is {@code null}
      */
-    public Decision decide(List<ArtefactSelection> candidates, LoadabilityCheck check)
-            throws IOException {
+    public Decision decide(List<ArtefactSelection> candidates, LoadabilityCheck check) {
         Objects.requireNonNull(candidates, "candidates");
         Objects.requireNonNull(check, "check");
         List<ArtefactRecord> offered = new ArrayList<>();
         List<Refusal> refused = new ArrayList<>();
         for (ArtefactSelection candidate : candidates) {
             ArtefactRecord record = candidate.artefact();
-            Optional<LoaderDiagnostic> refusal = refusalFor(record, check);
+            Optional<LoaderDiagnostic> refusal;
+            try {
+                refusal = refusalFor(record, check);
+            } catch (IOException unreachable) {
+                refusal = Optional.of(unreachableRefusal(record, unreachable));
+            }
             if (refusal.isPresent()) {
                 refused.add(new Refusal(record, refusal.get()));
             } else {
@@ -173,6 +213,27 @@ public final class ProbeGatedOffers {
             }
         }
         return new Decision(offered, refused);
+    }
+
+    /*
+     * The WHOLE cause chain, through the same flattener the loadability probe uses on a start
+     * failure: the sentence that identifies the failure is usually the innermost one -- "Permission
+     * denied" under "could not start ToolCommand[...]" -- and a classifier given only the outermost
+     * message recognises nothing, which is how every start failure would become an unexplained one.
+     *
+     * Only IOException is caught.  A RuntimeException out of the check is a defect in this product,
+     * not a binary that could not be reached, and turning one into a refusal would report our own
+     * bug to a scientist as a fact about their machine.
+     */
+    private LoaderDiagnostic unreachableRefusal(ArtefactRecord record, IOException unreachable) {
+        ProbeContext context =
+                new ProbeContext(
+                        ProbeContext.subjectOf(record.executablePath()),
+                        record.minimumHostRequirements().requiredHostLibraries(),
+                        alternatives.apply(record));
+        return classifier
+                .fromStartFailure(LoadabilityProbe.wholeChain(unreachable), context)
+                .orElseGet(() -> classifier.of(ProbeFailureKind.EXECUTION_FAILED, context));
     }
 
     private Optional<LoaderDiagnostic> refusalFor(ArtefactRecord record, LoadabilityCheck check)

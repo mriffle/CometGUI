@@ -155,18 +155,9 @@ public final class StagedToolProbe implements ToolProbe {
                 .failure();
     }
 
-    /*
-     * The subject comes from the MANIFEST's install path rather than from the resolved file, and
-     * the difference is that this one cannot be absent: Path.getFileName() answers null for a root
-     * path, which would need a branch no real record can reach, and an unreachable branch is a
-     * mutation no honest test can kill.  ArtefactRecord has already validated the path as a
-     * relative one inside the install directory, so the segment after the last separator is a file
-     * name -- and a value that somehow were not is refused by ProbeContext, by name.
-     */
     private ProbeContext contextFor(ArtefactRecord record) {
-        String installedPath = record.executablePath();
         return new ProbeContext(
-                installedPath.substring(installedPath.lastIndexOf('/') + 1),
+                ProbeContext.subjectOf(record.executablePath()),
                 record.minimumHostRequirements().requiredHostLibraries(),
                 alternatives.apply(record));
     }

@@ -253,6 +253,166 @@ class ProbeGatedOffersTest {
     }
 
     @Test
+    @DisplayName("a binary that could not be REACHED is refused, and the rest of the list survives")
+    void anUnreachableBinaryIsRefusedAndDoesNotBlankTheList() throws IOException {
+        ArtefactRecord unreachable = ProbeRecords.shippedPercolator("3.07.1");
+
+        ProbeGatedOffers.Decision decision =
+                gate(DEBIAN_12)
+                        .decide(
+                                linuxPercolators(),
+                                record ->
+                                        record.equals(unreachable)
+                                                ? failWith(
+                                                        new java.io.FileNotFoundException(
+                                                                "/cache/percolator/3.7.1/bin/"
+                                                                        + "percolator"))
+                                                : Optional.empty());
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of("percolator 3.06.5 linux-x86-64"),
+                                describe(decision.offered()),
+                                "R-TOOL-06 takes ONE tool out of the list; a probe that could not"
+                                        + " run must not blank the Tool "
+                                        + "Manager, and offering a build"
+                                        + " nothing was established about is not available either"),
+                () -> assertEquals(1, decision.refused().size()),
+                () ->
+                        assertEquals(
+                                "percolator 3.07.1 linux-x86-64",
+                                decision.refused().get(0).artefact().describe()),
+                () ->
+                        assertEquals(
+                                ProbeFailureKind.EXECUTION_FAILED,
+                                decision.refused().get(0).diagnostic().kind(),
+                                "a failure this project does not recognise takes the earliest"
+                                        + " stage: we did not establish that it starts"),
+                () ->
+                        assertEquals(
+                                "This build cannot run on this host: percolator exited without"
+                                        + " starting, and its output matched no loader failure this"
+                                        + " project recognises. Required: not named by the loader."
+                                        + " Available on this host: none found. Alternatives:"
+                                        + " percolator 3.06.5 linux-x86-64.",
+                                decision.refused().get(0).diagnostic().message(),
+                                "R-PLAT-03 requires the alternatives to be named, and they cannot"
+                                        + " be named from a path that discarded the offered set"));
+    }
+
+    @Test
+    @DisplayName("the diagnostic is as specific as the failure's own words allow, from the CHAIN")
+    void theReasonIsReadFromTheWholeCauseChain() throws IOException {
+        ArtefactRecord unreachable = ProbeRecords.shippedPercolator("3.07.1");
+
+        ProbeGatedOffers.Decision decision =
+                gate(DEBIAN_12)
+                        .decide(
+                                linuxPercolators(),
+                                record ->
+                                        record.equals(unreachable)
+                                                ? failWith(
+                                                        new IOException(
+                                                                "could not start ToolCommand[...]",
+                                                                new IOException(
+                                                                        "Exec failed, error: 13"
+                                                                                + " (Permission"
+                                                                                + " denied)")))
+                                                : Optional.empty());
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                ProbeFailureKind.NOT_EXECUTABLE,
+                                decision.refused().get(0).diagnostic().kind(),
+                                "the words that identify the failure are in the CAUSE; a"
+                                        + " classifier given only the "
+                                        + "outermost message would report"
+                                        + " every start failure as an unexplained one"),
+                () ->
+                        assertEquals(
+                                "This build cannot run on this host: percolator is not executable"
+                                        + " on this host. Required: not "
+                                        + "named by the loader. Available"
+                                        + " on this host: none found. "
+                                        + "Alternatives: percolator 3.06.5"
+                                        + " linux-x86-64.",
+                                decision.refused().get(0).diagnostic().message()));
+    }
+
+    @Test
+    @DisplayName("a defect in this product is not turned into a fact about the user's machine")
+    void aRuntimeFailureIsNotAnUnreachableBinary() throws IOException {
+        ProbeGatedOffers gate = gate(DEBIAN_12);
+        List<ArtefactSelection> candidates = linuxPercolators();
+
+        assertEquals(
+                "a bug in this product, not a binary that could not be reached",
+                assertThrows(
+                                IllegalStateException.class,
+                                () ->
+                                        gate.decide(
+                                                candidates,
+                                                record -> {
+                                                    throw new IllegalStateException(
+                                                            "a bug in this product, not a binary"
+                                                                    + " that could not be reached");
+                                                }))
+                        .getMessage(),
+                "only IOException means \"could not be reached\"; swallowing everything would"
+                        + " report our own defect as a loader verdict about the user's host");
+    }
+
+    @Test
+    @EnabledOnOs(
+            value = OS.LINUX,
+            disabledReason = "this case stages the real Linux binaries from the artefact mirror")
+    @DisplayName("a real staged entry whose executable is gone is refused, not offered")
+    void aRealStagedEntryThatVanished(@TempDir Path root) throws IOException {
+        ArtefactRecord working = ProbeRecords.shippedPercolator("3.06.5");
+        ArtefactRecord vanished = ProbeRecords.shippedPercolator("3.07.1");
+        Map<ArtefactRecord, Path> staged = new HashMap<>();
+        staged.put(
+                working,
+                stage(
+                        root.resolve("working"),
+                        StagedBinaries.percolator3065(),
+                        working.executablePath()));
+        staged.put(vanished, java.nio.file.Files.createDirectories(root.resolve("emptied")));
+        StagedToolProbe probe = realProbe();
+
+        ProbeGatedOffers.Decision decision =
+                gate(DEBIAN_12)
+                        .decide(
+                                linuxPercolators(),
+                                record -> probe.loadabilityOf(record, staged.get(record)));
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of("percolator 3.06.5 linux-x86-64"),
+                                describe(decision.offered()),
+                                "the install whose payload is still there is still offered"),
+                () ->
+                        assertEquals(
+                                "percolator 3.07.1 linux-x86-64",
+                                decision.refused().get(0).artefact().describe()),
+                () ->
+                        assertEquals(
+                                "This build cannot run on this host: percolator exited without"
+                                        + " starting, and its output matched no loader failure this"
+                                        + " project recognises. Required: not named by the loader."
+                                        + " Available on this host: none found. Alternatives:"
+                                        + " percolator 3.06.5 linux-x86-64.",
+                                decision.refused().get(0).diagnostic().message()));
+    }
+
+    private static Optional<LoaderDiagnostic> failWith(IOException failure) throws IOException {
+        throw failure;
+    }
+
+    @Test
     @DisplayName("a decision copies both of its lists")
     void theDecisionCopiesItsLists() {
         List<ArtefactRecord> offered = new ArrayList<>();
@@ -326,6 +486,20 @@ class ProbeGatedOffersTest {
                                                 () ->
                                                         new ProbeGatedOffers(
                                                                 Nulls.of(HostRuntimeVersions.class),
+                                                                classifier(),
+                                                                record -> List.of()))
+                                        .getMessage()),
+                () ->
+                        assertEquals(
+                                "classifier",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () ->
+                                                        new ProbeGatedOffers(
+                                                                DEBIAN_12,
+                                                                Nulls.of(
+                                                                        LoaderOutputClassifier
+                                                                                .class),
                                                                 record -> List.of()))
                                         .getMessage()),
                 () ->
@@ -336,6 +510,7 @@ class ProbeGatedOffersTest {
                                                 () ->
                                                         new ProbeGatedOffers(
                                                                 DEBIAN_12,
+                                                                classifier(),
                                                                 Nulls.of(
                                                                         java.util.function.Function
                                                                                 .class)))
@@ -368,6 +543,7 @@ class ProbeGatedOffersTest {
     private static ProbeGatedOffers gate(HostRuntimeVersions versions) throws IOException {
         return new ProbeGatedOffers(
                 versions,
+                new LoaderOutputClassifier(ProbeRecords.LINUX_X86_64, versions),
                 new ManifestAlternatives(
                                 ProbeRecords.shipped(), ProbeRecords.LINUX_X86_64, versions)
                         ::forArtefact);
@@ -379,6 +555,10 @@ class ProbeGatedOffersTest {
 
     private static ArtefactSelection offer(ArtefactRecord record) {
         return new ArtefactSelection(record, ArtefactExecutability.NATIVE);
+    }
+
+    private static LoaderOutputClassifier classifier() {
+        return new LoaderOutputClassifier(ProbeRecords.LINUX_X86_64, DEBIAN_12);
     }
 
     private static List<String> describe(List<ArtefactRecord> records) {
