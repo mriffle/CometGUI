@@ -2254,3 +2254,118 @@ What the rework must do
 
 The unit is otherwise the strongest first submission this phase has had, and
 none of the rest of it is in question.
+
+.. _p05-u6-rework:
+
+Unit 6 rework: the audit was real, and one defect I found by reading
+=====================================================================
+
+**Reworked at ``704ce1c``.** The fix is the shape tier 1 ruled from the
+specification: ``ProbeGatedOffers.decide`` no longer declares ``throws
+IOException``, an unreachable binary becomes **one** ``Refusal`` carrying its
+own diagnostic and its own alternatives, and every other candidate is still
+decided. The reasoning is written into the class against the requirement text.
+The agent's commit touched **seven files, all under ``install/probe/``** -- I
+checked ``git show --stat 704ce1c`` rather than the range, because the range
+``9fd1ea8..704ce1c`` also contains my own sign-off commit and tier 1's session
+record, and reading the range would have shown two ``handoffs/`` files as though
+the agent had written them. It had not.
+
+**My own build on ``704ce1c``**, quiet tree, exit status captured inside the
+log::
+
+    185 report file(s): tests=3294 failures=0 errors=0 skipped=3
+    11/11 stages OK in 1227 seconds.  BUILD OK
+    === build.sh EXIT STATUS: 0 ===
+
+    ok  cometgui-domain   line 100.0% (834/834)  branch 100.0% (352/352)
+    ok  cometgui-domain   49 compiled class(es), all 49 in the sample
+    ok  cometgui-domain   369/370 mutations killed = 99.7%
+    ok  cometgui-install  line 100.0% (3113/3113)  branch 99.6% (1117/1121)
+    ok  cometgui-install  78 compiled class(es), all 78 in the sample
+    ok  cometgui-install  1288/1305 mutations killed = 98.6%
+    ok  8 architecture rule(s) checked, 0 failures
+
+Read out of ``mutations.xml``: ``cometgui-domain``'s single survivor is still
+exactly ``ToolVersion:214:ConditionalsBoundaryMutator``, unmoved, so the pinned
+list still matches. **``org.cometgui.install.probe``: 199 mutations, 199
+killed, no survivors and no timeouts.**
+
+**One unexplained delta, recorded rather than shrugged at.** The agent reported
+``1289/1305``; my run of the same commit reports ``1288/1305``, and the build's
+own line says ``1288``. One mutation, in the safe direction. The likely cause is
+a mutant landing on the ``KILLED``/``TIMED_OUT`` boundary under different load,
+and ``build.sh`` counts only ``KILLED`` -- but nobody has demonstrated that, and
+the probe package is ``199/199`` in both runs. This is the same shape as the
+``tests=2482`` versus ``2483`` delta in unit 2, and it is worth one sentence
+rather than nothing.
+
+The second, unannounced injection: the audit was real
+------------------------------------------------------
+
+I injected a defect the agent was not told about, again from outside its
+acceptance conditions and this time aimed at the rework itself: in
+``unreachableRefusal`` I replaced ``alternatives.apply(record)`` with
+``List.of()`` -- the plausible-sounding *"a binary we could not reach tells us
+nothing about what to try instead"*. It attacks precisely the ``R-PLAT-03``
+clause tier 1 ruled from, on the path the rework created, and it leaves the
+identical call in ``advanceRefusal`` untouched so only the new path changes.
+
+It **landed**: anchor unique, source ``4fa7bcd0...`` to ``da9b8ad2...``,
+compiled class ``21874adc...`` to ``8077f024...``, and ``javap -c`` shows the
+``Function.apply`` call sites drop from **2 to 1**.
+
+It **bit**: ``Tests run: 958, Failures: 3``, ``BUILD FAILURE``, exit 1. Three
+tests, each pinning the **whole** message hand-typed, and one of them on a real
+staged entry::
+
+    expected: <... Alternatives: percolator 3.06.5 linux-x86-64.>
+    but was:  <... Alternatives: none known -- registering a local binary is
+               the documented remedy.>
+
+So the rework graded the requirement, not merely the control flow. Restored from
+the snapshot taken before injecting -- source hash back to ``4fa7bcd0...``,
+marker greps back out at zero, ``git status --porcelain`` empty.
+
+.. _p05-u6-alternatives-defect:
+
+What I found by reading, which no injection would have shown me
+-----------------------------------------------------------------
+
+``ManifestAlternatives.forArtefact`` excludes candidates with::
+
+    .filter(candidate -> !candidate.version().equals(record.version()))
+
+The intent is right -- do not offer the build that just failed as somewhere to
+go instead -- but it is keyed on the **version** where it means the **row**, and
+this manifest has a case where those differ. Checked against the shipped file
+rather than argued: on ``macos-aarch64`` Comet 2026.02.2 has **two rows with two
+different files**, ``comet.aarch64.macos.exe`` (native) and ``comet.macos.exe``
+(x86-64, translated). They survive ``select`` as two genuine offers, because
+unit 2 keyed the one-row-per-download rule on the **URL** and these are two
+URLs; ``ShippedManifestTest.cometIsOfferedNativelyOnAppleSilicon`` exists
+precisely because both are offered, native first.
+
+**So if Comet's native build fails to load on an Apple silicon Mac, the x86-64
+build is filtered out of the alternatives because it shares a version, and the
+user is told "Alternatives: none known -- registering a local binary is the
+documented remedy."** That statement is false: there is a managed build in the
+manifest that ``D-004`` says runs there under Rosetta 2. ``R-PLAT-03`` requires
+the available alternatives to be named, and this is the one manifest case where
+the alternative is a sibling row rather than another version.
+
+**It is unit 2's lesson, one unit later.** A fixture built to exercise "another
+version of the same tool" contains exactly that and nothing awkward; the real
+manifest contains one tool with two builds of one version on one host. The four
+existing alternatives tests are all sound and none of them can see this, because
+none of them varies the axis where two rows share a version.
+
+The repair is to exclude the **row** rather than the version -- by download URL,
+which is the key unit 2 already established for exactly this reason, or by
+platform. It is a one-line change plus a test on the shipped manifest, and I am
+sending it back rather than making it myself, because a production rule with a
+test is unit work and because the agent should see the shape.
+
+**Unit 6 is not accepted yet.** Everything else about it stands: the rework is
+correct, the audit was real and is proved so by a defect it was not told about,
+and this is the last item.
