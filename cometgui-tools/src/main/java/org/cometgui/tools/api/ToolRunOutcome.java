@@ -127,9 +127,20 @@ public record ToolRunOutcome(
     /**
      * The lines of both streams joined for a diagnostic, error stream first.
      *
+     * <p>Joined with a plain {@code \n} rather than {@link System#lineSeparator()}, for the same
+     * reason {@code SyntheticPin} ends every row with one and the provenance JSON writer refuses
+     * it: this text is <strong>data</strong>, not display. It is embedded verbatim in the refusal
+     * messages of {@code PercolatorCapabilityProbe}, {@code CometCapabilityProbe}, {@code
+     * LimelightConverterIdentity} and {@code LocalPercolatorRegistration}, and those whole messages
+     * are pinned hand-typed by their tests. {@code System.lineSeparator()} is {@code \r\n} on
+     * Windows, which this product targets, so using it would make every one of those diagnostics --
+     * and every test that pins one -- differ by operating system while no test varied the
+     * separator. Rendering a diagnostic for a console is the console's job; {@code ConsolePane}
+     * does exactly that with its own separator.
+     *
      * @return the joined text, one line per element, never {@code null}
      */
     public String joinedOutput() {
-        return String.join(System.lineSeparator(), errorFirst());
+        return String.join("\n", errorFirst());
     }
 }

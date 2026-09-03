@@ -30,10 +30,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -182,8 +186,8 @@ class SyntheticPinTest {
     }
 
     @Test
-    @DisplayName("the numbers are formatted in the root locale, not the machine's")
-    void theNumbersUseADecimalPoint() {
+    @DisplayName("the first data row is exactly these ten columns, hand-typed")
+    void theFirstRowIsPinned() {
         String row = SyntheticPin.forCapabilityProbe().lines().skip(1).findFirst().orElseThrow();
 
         assertAll(
@@ -233,5 +237,137 @@ class SyntheticPinTest {
                                 IllegalArgumentException.class,
                                 () -> SyntheticPin.of(targetRows, SyntheticPin.PROBE_SEED))
                         .getMessage());
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Locale independence of the generated fixture.
+    // -----------------------------------------------------------------------------------
+
+    /**
+     * The fixture has to be the same bytes in Berlin, Ankara, Cairo and Bangkok.
+     *
+     * <p>{@link SyntheticPin} formats every numeric column through {@link String#format}, and a
+     * {@code String.format} given no explicit locale follows {@link
+     * java.util.Locale.Category#FORMAT}. Under a comma-decimal locale the three {@code %.4f}
+     * feature columns become {@code 1,0540}. Under a locale whose numbering system is not ASCII --
+     * Arabic-Indic, Thai, Devanagari, Bengali -- <strong>every</strong> numeric column changes, not
+     * only the decimals: the {@code %d} row index, the {@code %d} label, the {@code %d} scan number
+     * and the {@code %05d} protein accession all follow the locale's zero digit as well.
+     *
+     * <p>Percolator refuses a PIN like that, and {@link PercolatorCapabilityProbe} reads a refusal
+     * as "this build cannot write XML" -- a false negative on the one capability this unit exists
+     * to establish functionally, which would then withhold the Limelight stage from that user.
+     * {@code R-PERC-02} exists because a <em>textual</em> probe gives false negatives; a
+     * locale-dependent <em>functional</em> probe would reintroduce them through another door.
+     * CometGUI is a desktop application for scientists, so a comma-decimal default is the ordinary
+     * case rather than an exotic one.
+     *
+     * <p>The two {@code Locale.ROOT} arguments in {@link SyntheticPin} are what prevent this.
+     * Before this nested class existed, both could be deleted with the whole suite green -- and a
+     * protection that cannot be observed to matter is indistinguishable from one that is absent.
+     * The language tags are {@code StreamingHashServiceTest.LocaleIndependence}'s, which is this
+     * project's existing convention for the question, plus the comma-decimal locales that make the
+     * decimal separator's case on its own.
+     */
+    @Nested
+    @DisplayName("locale independence")
+    class LocaleIndependence {
+
+        /*
+         * One list, referenced by every test below.  Three copies of it could drift apart, and a
+         * locale covered by one test but not another is exactly the hole this class exists to
+         * close.
+         */
+        private static Stream<String> hostileLocales() {
+            return Stream.of(
+                    "de-DE",
+                    "fr-FR",
+                    "tr-TR",
+                    "ar-EG-u-nu-arab",
+                    "th-TH-u-nu-thai",
+                    "hi-IN-u-nu-deva",
+                    "bn-BD-u-nu-beng");
+        }
+
+        @ParameterizedTest(name = "[{index}] default locale {0}")
+        @MethodSource("hostileLocales")
+        @DisplayName("both fixtures are byte-identical under any default locale")
+        void theFixturesDoNotFollowTheDefaultLocale(String languageTag) {
+            Locale original = Locale.getDefault();
+            try {
+                Locale.setDefault(Locale.forLanguageTag(languageTag));
+
+                assertAll(
+                        () ->
+                                assertEquals(
+                                        SHA256_64,
+                                        sha256(SyntheticPin.forCapabilityProbe()),
+                                        "the 64 plus 64 fixture the real binary was run over"
+                                                + " changed under "
+                                                + languageTag),
+                        () ->
+                                assertEquals(
+                                        SHA256_8,
+                                        sha256(SyntheticPin.of(8, SyntheticPin.PROBE_SEED)),
+                                        "the negative control's fixture changed under "
+                                                + languageTag));
+            } finally {
+                Locale.setDefault(original);
+            }
+        }
+
+        @ParameterizedTest(name = "[{index}] default locale {0}")
+        @MethodSource("hostileLocales")
+        @DisplayName("both format call sites hold: the %d columns, the %05d accession, the %.4f")
+        void bothFormatCallSitesHold(String languageTag) {
+            Locale original = Locale.getDefault();
+            try {
+                Locale.setDefault(Locale.forLanguageTag(languageTag));
+                List<String> lines = SyntheticPin.of(1, SyntheticPin.PROBE_SEED).lines().toList();
+
+                assertAll(
+                        () -> assertEquals(SyntheticPin.HEADER, lines.get(0)),
+                        () ->
+                                assertEquals(
+                                        "psm0\t1\t0\t1000.5\t1000.4\t1.0540\t0.5052"
+                                                + "\t-0.0032\tK.VSLDLELLL.R\tsp|P00000|TEST",
+                                        lines.get(1)),
+                        () ->
+                                assertEquals(
+                                        "psm1\t-1\t1\t1000.5\t1000.4\t1.3881\t0.3340"
+                                                + "\t-0.2548\tK.SYCLERIWL.R\tdecoy_sp|P00001|TEST",
+                                        lines.get(2)));
+            } finally {
+                Locale.setDefault(original);
+            }
+        }
+
+        /*
+         * The category matters and is easy to get wrong.  String.format follows
+         * Locale.Category.FORMAT, not Locale.getDefault(), and the two differ on any machine
+         * whose LC_NUMERIC is not its LANG -- a German user of an English desktop, which is an
+         * ordinary Linux configuration rather than a contrived one.  Setting the whole default
+         * above happens to set both categories, so on its own it would not distinguish the two;
+         * this moves FORMAT alone.  cometgui-provenance's ApplicationRecordTest documents the
+         * same trap.
+         */
+        @ParameterizedTest(name = "[{index}] format-category locale {0}")
+        @MethodSource("hostileLocales")
+        @DisplayName("the FORMAT category alone does not move the fixture either")
+        void theFormatCategoryAloneDoesNotMoveIt(String languageTag) {
+            Locale original = Locale.getDefault(Locale.Category.FORMAT);
+            try {
+                Locale.setDefault(Locale.Category.FORMAT, Locale.forLanguageTag(languageTag));
+
+                assertEquals(
+                        SHA256_64,
+                        sha256(SyntheticPin.forCapabilityProbe()),
+                        "String.format follows Locale.Category.FORMAT, and the fixture moved when"
+                                + " only that category was set to "
+                                + languageTag);
+            } finally {
+                Locale.setDefault(Locale.Category.FORMAT, original);
+            }
+        }
     }
 }

@@ -70,11 +70,17 @@ public final class SyntheticPin {
     /**
      * The seed the probe's fixture is generated from.
      *
-     * <p>Arbitrary, fixed, and chosen from the fifty-seed sweep described on this class: at 64 plus
-     * 64 rows every one of the fifty succeeded, so no seed is better than another there; at 8 plus
-     * 8 rows this one reproduces the documented abort, which is what lets {@code
-     * PercolatorCapabilityProbeRealBinaryTest}'s negative control demonstrate the false negative
-     * with the fixture size as the only difference between the two runs.
+     * <p><strong>Measured, not arbitrary. Do not replace it with a random or "tidier"
+     * seed.</strong> At 64 plus 64 rows every one of the fifty seeds swept succeeded, so no seed is
+     * better than another there. At 8 plus 8 rows only ten of the fifty abort, and <em>this is one
+     * of the ten</em> -- verified by running the real 3.07.1 binary over it. That is what lets
+     * {@code PercolatorRealBinaryTest}'s negative control demonstrate the false negative with the
+     * fixture size as the only difference between the two runs.
+     *
+     * <p>{@code R-PERC-02}, as amended in specification revision 11 from this measurement, now
+     * requires exactly that: "any negative control at 8+8 shall pin a seed measured to abort". A
+     * seed chosen rather than measured would leave that control passing about four times in five
+     * while proving nothing -- which is the failure mode the amendment exists to prevent.
      */
     public static final long PROBE_SEED = 3071L;
 

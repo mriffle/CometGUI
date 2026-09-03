@@ -47,13 +47,28 @@ class ToolRunOutcomeTest {
         assertEquals(List.of("err one", "err two", "out one", "out two"), outcome.errorFirst());
     }
 
+    /*
+     * The expected value is hand-typed rather than built from System.lineSeparator().  Written
+     * the other way -- "first" + System.lineSeparator() + "second" -- it computed the expectation
+     * from the same ambient default as the code under test, so it passed on every platform
+     * whatever separator joinedOutput() chose, and the choice was unobservable.  That is the same
+     * shape as an unpinned locale: a protection nothing can see is indistinguishable from an
+     * absent one.
+     */
     @Test
-    @DisplayName("the joined output keeps that order and every line")
+    @DisplayName("the joined output keeps that order, every line, and a fixed newline")
     void joinedOutput() {
         ToolRunOutcome outcome =
                 new ToolRunOutcome(OptionalInt.of(1), List.of("second"), List.of("first"));
 
-        assertEquals("first" + System.lineSeparator() + "second", outcome.joinedOutput());
+        assertAll(
+                () -> assertEquals("first\nsecond", outcome.joinedOutput()),
+                () ->
+                        assertEquals(
+                                -1,
+                                outcome.joinedOutput().indexOf('\r'),
+                                "a carriage return here would make every probe's refusal message,"
+                                        + " and every test that pins one, differ on Windows"));
     }
 
     @ParameterizedTest(name = "[{index}] exit {0} -> timedOut={1} exitedZero={2}")
