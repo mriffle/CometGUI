@@ -2443,6 +2443,36 @@ completion notification reports **the wrapper's** exit code, not the wrapped
 command's -- the successor's notification said "exit code 0" while the suite
 exited 1, and reading only the notification would have reported a green suite.
 
+.. _status-restore-protocol:
+
+The restore protocol has a hole, found by an agent falling into it
+==================================================================
+
+The injection protocol says: *restore with* ``git checkout --`` *and confirm
+clean -- do not trust your own backup, since running an inject script twice
+overwrites it with the injected version.* Phase 05's unit 6 agent followed that
+and lost work, then reported it rather than quietly redoing it.
+
+**The hole:** ``git checkout --`` restores the file to **HEAD**, so it is only
+safe when everything you want to keep is already committed. The agent was
+injecting into a fix that was still **uncommitted**, so the restore discarded
+the defect *and the repair together*. It re-applied the fix and re-ran
+everything.
+
+**The protocol, corrected, and the order is the whole content:**
+
+#. **Commit the work first.** An injection is a test of committed code; if the
+   subject is uncommitted, commit it before injecting.
+#. Snapshot the file separately, then inject.
+#. Restore **from the snapshot**, not from ``HEAD``, when the working tree
+   holds anything the commit does not.
+#. Confirm the tree is clean *and* that the marker greps back out at zero.
+
+Both halves of the original warning still stand -- an inject script run twice
+overwrites its own backup, and ``git checkout --`` remains the right restore
+for a committed subject. What was missing is that the two failure modes have
+**opposite** remedies, so the rule cannot be stated as one instruction.
+
 Open decisions
 ==============
 
