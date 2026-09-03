@@ -262,7 +262,7 @@ class ProbeGatedOffersTest {
                         .decide(
                                 linuxPercolators(),
                                 record ->
-                                        record.equals(unreachable)
+                                        record.url().equals(unreachable.url())
                                                 ? failWith(
                                                         new java.io.FileNotFoundException(
                                                                 "/cache/percolator/3.7.1/bin/"
@@ -311,7 +311,7 @@ class ProbeGatedOffersTest {
                         .decide(
                                 linuxPercolators(),
                                 record ->
-                                        record.equals(unreachable)
+                                        record.url().equals(unreachable.url())
                                                 ? failWith(
                                                         new IOException(
                                                                 "could not start ToolCommand[...]",
@@ -408,6 +408,11 @@ class ProbeGatedOffersTest {
                                 decision.refused().get(0).diagnostic().message()));
     }
 
+    /*
+     * Routed on the download URL, the same key production uses to decide whether two rows are the
+     * same build.  A test that answered "is this the row that should fail?" a different way from
+     * the code under test would be grading its own convention rather than the product's.
+     */
     private static Optional<LoaderDiagnostic> failWith(IOException failure) throws IOException {
         throw failure;
     }

@@ -24,7 +24,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.cometgui.domain.platform.GlibcVersion;
+import org.cometgui.domain.tools.HostArchitecture;
+import org.cometgui.domain.tools.HostOperatingSystem;
 import org.cometgui.domain.tools.HostPlatform;
+import org.cometgui.domain.tools.ToolName;
 import org.cometgui.install.registry.ArtefactManifest;
 import org.cometgui.install.registry.ArtefactRecord;
 import org.cometgui.install.testing.Nulls;
@@ -62,6 +65,42 @@ class ManifestAlternativesTest {
         assertEquals(
                 List.of("percolator 3.06.5 linux-x86-64"),
                 alternatives(DEBIAN_12).forArtefact(percolator3071));
+    }
+
+    @Test
+    @DisplayName("the SIBLING ROW of a failing build is an alternative, even sharing its version")
+    void aSiblingRowOfTheSameVersionIsAnAlternative() throws IOException {
+        HostPlatform appleSilicon =
+                new HostPlatform(HostOperatingSystem.MACOS, HostArchitecture.AARCH64);
+        ArtefactRecord nativeComet = cometFor(appleSilicon, HostArchitecture.AARCH64);
+
+        List<String> alternatives =
+                new ManifestAlternatives(ProbeRecords.shipped(), appleSilicon, DEBIAN_12)
+                        .forArtefact(nativeComet);
+
+        assertEquals(
+                List.of("comet 2026.02.2 macos-x86-64"),
+                alternatives,
+                "Comet publishes TWO macOS builds of one version and D-004 says the x86-64 one runs"
+                        + " on Apple silicon under Rosetta 2, so "
+                        + "a native build that will not load has"
+                        + " somewhere to send the user -- and R-PLAT-03 requires it to be named."
+                        + " Excluding the failing build by VERSION rather than by row takes the"
+                        + " sibling with it and tells the scientist there is nothing else");
+    }
+
+    @Test
+    @DisplayName("and the translated row's own alternative is the native one, in the other order")
+    void theSiblingRelationHoldsBothWays() throws IOException {
+        HostPlatform appleSilicon =
+                new HostPlatform(HostOperatingSystem.MACOS, HostArchitecture.AARCH64);
+        ArtefactRecord translatedComet = cometFor(appleSilicon, HostArchitecture.X86_64);
+
+        assertEquals(
+                List.of("comet 2026.02.2 macos-aarch64"),
+                new ManifestAlternatives(ProbeRecords.shipped(), appleSilicon, DEBIAN_12)
+                        .forArtefact(translatedComet),
+                "the rule is about which ROW failed, not which of the two is preferred");
     }
 
     @Test
@@ -152,6 +191,30 @@ class ManifestAlternativesTest {
                                                         source.forArtefact(
                                                                 Nulls.of(ArtefactRecord.class)))
                                         .getMessage()));
+    }
+
+    /**
+     * The shipped Comet row built for one architecture, as selected on a given host.
+     *
+     * @param host the machine
+     * @param builtFor the architecture the row is built for
+     * @return the record
+     * @throws IOException if the manifest cannot be read
+     */
+    private static ArtefactRecord cometFor(HostPlatform host, HostArchitecture builtFor)
+            throws IOException {
+        return ProbeRecords.shipped().select(host, ToolName.COMET).stream()
+                .map(selection -> selection.artefact())
+                .filter(record -> record.platform().architecture() == builtFor)
+                .findFirst()
+                .orElseThrow(
+                        () ->
+                                new AssertionError(
+                                        "the shipped manifest offers no "
+                                                + builtFor.id()
+                                                + " Comet build on "
+                                                + host.id()
+                                                + "; this case exists because it offers two"));
     }
 
     private static ManifestAlternatives alternatives(HostRuntimeVersions versions)

@@ -209,6 +209,17 @@ public final class StagedToolProbe implements ToolProbe {
                                                         + searched.size()
                                                         + " line(s) of output were searched,"
                                                         + " standard error first"));
+        /*
+         * A VERSION comparison, and deliberately not a row comparison -- the mirror image of the
+         * keying mistake ManifestAlternatives had.  The question here is "is this binary the
+         * release the manifest pinned?", which the banner and the manifest both answer as a
+         * version; it is not "is this the same download?", which only a URL or a digest answers.
+         * ToolVersion.equals is numeric, so a manifest that spelled the release 3.7.1 would still
+         * match a binary printing 3.07.1, which is what makes this a comparison of releases rather
+         * than of spellings.  On Apple silicon Comet's two macOS rows share one version and that is
+         * correct: they ARE both 2026.02.2, and it is the SHA-256 verified two steps earlier that
+         * tells the two files apart.
+         */
         if (!identified.equals(record.version())) {
             throw new ProbeFailedException(
                     ProbeFailureKind.UNPARSEABLE_VERSION,

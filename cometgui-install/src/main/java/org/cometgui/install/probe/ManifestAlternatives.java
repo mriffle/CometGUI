@@ -40,6 +40,24 @@ import org.cometgui.install.registry.ArtefactSelection;
  * "try this instead" about a build that will fail the same way is worse than saying nothing. A
  * build whose floors are merely <em>undetermined</em> <strong>is</strong> offered: not knowing is
  * not a reason to withhold it, and {@code R-PLAT-02} makes the probe the authority.
+ *
+ * <h2>The failing build is excluded by its download, not by its version</h2>
+ *
+ * <p>"Do not send the user back to the build that just failed" is a rule about <strong>a
+ * row</strong>, and this manifest has a case where a row and a version are not the same thing.
+ * Comet 2026.02.2 publishes <em>two</em> macOS builds -- {@code comet.aarch64.macos.exe} and {@code
+ * comet.macos.exe} -- and on Apple silicon both are offered, native first, because {@code D-004}
+ * says the x86-64 one runs there under Rosetta 2. Keyed on the version, a native build that failed
+ * to load would take its own sibling out of the alternatives with it and the diagnostic would read
+ * "none known", which is false: there is a managed build in the manifest that runs on that machine.
+ *
+ * <p>So the key is the <strong>download URL</strong>, which is the key unit 2 established for the
+ * one-row-per-download rule and for the same reason -- Comet's two macOS builds are two different
+ * files with two different digests, while PDV's zip is one file carried on five platforms, and
+ * {@link ArtefactManifest#select} has already collapsed the second case before this class sees it.
+ * The platform would be the wrong key in the other direction: one platform legitimately carries
+ * several versions -- Percolator 3.07.1 and 3.06.5 are both {@code linux-x86-64} -- and excluding
+ * by platform would delete every alternative there is.
  */
 public final class ManifestAlternatives {
 
@@ -74,10 +92,20 @@ public final class ManifestAlternatives {
         Objects.requireNonNull(record, "record");
         return manifest.select(host, record.tool()).stream()
                 .map(ArtefactSelection::artefact)
-                .filter(candidate -> !candidate.version().equals(record.version()))
+                .filter(candidate -> !isTheSameDownloadAs(candidate, record))
                 .filter(this::couldRunHere)
                 .map(ArtefactRecord::describe)
                 .toList();
+    }
+
+    /*
+     * The URL, not the version and not the platform.  See this class's documentation: one version
+     * can be two rows (Comet's two macOS builds, D-004), and one platform can be several versions
+     * (Percolator 3.07.1 and 3.06.5 on linux-x86-64), so both of those keys answer a different
+     * question from the one being asked.
+     */
+    private static boolean isTheSameDownloadAs(ArtefactRecord candidate, ArtefactRecord record) {
+        return candidate.url().equals(record.url());
     }
 
     private boolean couldRunHere(ArtefactRecord candidate) {
