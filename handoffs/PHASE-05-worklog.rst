@@ -2670,3 +2670,153 @@ assertions, 0 failed, with control 0's pinned survivor set unchanged and control
 2 still biting now that ``org.cometgui.tools.comet`` holds four classes. **I
 will re-run it myself at acceptance**, since it is the harness this unit was
 most likely to disturb.
+
+.. _p05-u7-accepted:
+
+Unit 7 ACCEPTED at ``9e38f3b``, after one round
+================================================
+
+**My own build**, quiet tree, ``git status --porcelain`` empty, exit status
+captured inside the log::
+
+    206 report file(s): tests=3532 failures=0 errors=0 skipped=3
+    11/11 stages OK in 1331 seconds.  BUILD OK
+    === build.sh EXIT STATUS: 0 ===
+
+    ok  cometgui-domain   line 100.0% (834/834)  branch 100.0% (352/352)
+    ok  cometgui-tools    line 98.5% (560/568)   branch 97.9% (195/199)
+    ok  cometgui-install  line 100.0% (3127/3127)  branch 99.6% (1119/1123)
+    ok  cometgui-domain   49 / cometgui-tools 18 / cometgui-install 79 compiled
+                          class(es), all in the sample
+    ok  cometgui-domain   369/370   cometgui-tools 220/222   cometgui-install 1295/1311
+    ok  8 architecture rule(s) checked, 0 failures
+    14 critical package prefix(es); every module with critical-package code has
+       its mutation gate on
+
+3532 tests is 3511 plus the 21 the rework added. From ``mutations.xml``:
+``cometgui-domain``'s survivor is still exactly
+``ToolVersion:214:ConditionalsBoundaryMutator``; ``cometgui-tools``'s two
+non-kills are the same two, ``SyntheticPin`` having moved 205 to 211 because
+its Javadoc grew, both argued in the production source.
+
+The harness I said I would run, run in full
+--------------------------------------------
+
+``bash scripts/verify-test-gates.sh`` -- **not** delegated to the agent's
+report, because unit 7 is the unit most likely to disturb it::
+
+    SUMMARY: 37 assertion(s) passed, 0 failed, in 2947 seconds
+    Every gate rejected its defect and accepted the clean tree.
+    === verify-test-gates.sh EXIT STATUS: 0 ===
+
+The three lines that mattered:
+
+* **Control 0**: ``survivor set exactly the hand-typed
+  org.cometgui.domain.tools.ToolVersion:214:ConditionalsBoundaryMutator``. The
+  pinned list still matches and nothing was added to it.
+* **Control 2**: still bites with ``org.cometgui.tools.comet`` now holding four
+  real classes -- the specific risk I flagged when dispatching. All four
+  assertions pass, so the injected control remains the only violation in the
+  sandbox.
+* **Control 8**: ``the documented build command rejects the incomplete
+  population: rejected, exit 1``, quoting ``ABSENT   cometgui-domain: compiled,
+  but missing from jacoco.xml`` and naming the class on the census's own line.
+  That is **tier 1's repair confirmed by my own run** rather than by its report,
+  on the control that was red for the wrong reason for three days.
+
+The control the rework added, seen to fail by me
+-------------------------------------------------
+
+I removed ``Locale.ROOT`` from **both** call sites and dropped the now-unused
+import, which is the faithful edit rather than a contrived one::
+
+    Tests run: 226, Failures: 21, Errors: 0, Skipped: 0
+    the 64 plus 64 fixture the real binary was run over changed under de-DE
+    the negative control's fixture changed under de-DE
+
+**21 failures, every one of them ``SyntheticPinTest``, and not one other test in
+the module.** That last number is the measurement, not the first: it confirms
+the pre-existing 205 tests were completely blind to the defect, which is what I
+claimed when sending the unit back. Restored from the snapshot; hash back to
+``b5733847...``; tree clean.
+
+The seven locales are the five ``cometgui-provenance`` already uses plus two
+comma-decimal ones, copied rather than invented, and the expected values are
+**hand-typed SHA-256 digests and hand-typed rows** rather than recomputed. The
+third test per locale moves ``Locale.Category.FORMAT`` alone, because
+``String.format`` follows ``FORMAT`` and not ``getDefault()``, and the two differ
+on any machine whose ``LC_NUMERIC`` is not its ``LANG`` -- a German user of an
+English desktop. ``setDefault(Locale)`` alone would not have distinguished them.
+
+The agent underdescribed nothing and I underdescribed the damage
+------------------------------------------------------------------
+
+I framed this as a decimal-separator problem. It is not. Under ``th-TH`` the row
+comes back with Thai digits in place of every ASCII one -- the row index,
+the label, the scan number and the ``%05d`` accession all follow the locale's
+zero digit, as well as the three ``%.4f`` feature columns. **Every numeric column.**
+My instruction to cover both format call sites was right for a weaker reason
+than the real one.
+
+A second instance of the same class, found in its own code
+-----------------------------------------------------------
+
+``ToolRunOutcome.joinedOutput()`` joined with ``System.lineSeparator()`` **and
+its test computed the expected value with ``System.lineSeparator()`` too**, so
+the choice was unobservable on every platform -- the second catalogued shape
+sitting on top of an ambient default. That text is data, not display: it is
+embedded verbatim in five probe refusal messages whose whole text is pinned
+hand-typed, and ``lineSeparator()`` is ``\r\n`` on Windows, which this product
+targets. It now joins with ``"\n"`` and the test hand-types ``first\nsecond``.
+
+**The agent reported honestly that it could not make this go red on Linux** --
+both spellings agree here, which is exactly why nothing saw it -- and graded it
+at the JVM level under ``-Dline.separator`` instead, reporting that as a
+limitation rather than a pass. That is the correct handling of a defect whose
+demonstration this host cannot produce.
+
+*And a hypothesis it tested rather than reported.* It suspected
+``ClockRunIdSource`` and ``StageLogFormat``, which call
+``DateTimeFormatter.ofPattern`` with no locale where provenance's three pass
+``Locale.ROOT``. It measured instead of escalating: ``ofPattern`` uses
+``DecimalStyle.STANDARD``, so numeric-only patterns are immune and only text
+fields follow the locale. Both product patterns are numeric-only. **Not a
+finding, and it would have cost a round.**
+
+My own second harness error, recorded because it is now a pattern
+-------------------------------------------------------------------
+
+My first attempt at this verification went red on **Spotless**, not on the
+defect: removing both ``Locale.ROOT`` arguments left the ``java.util.Locale``
+import unused. In :ref:`p05-u7-locale` the same thing happened with Checkstyle's
+line length. **Twice in one unit my injection harness produced a red I could have
+mistaken for a result.** Both times I read *why* before concluding, which is the
+only reason it cost minutes rather than a wrongful rejection. The habit that
+saved it is the one tier 1 recorded in my name: ask why a build is red with the
+same suspicion as why it is green.
+
+Carried forward, and two escalations
+-------------------------------------
+
+* **``CLAUDE.md`` line 9 still reads "the requirements (revision 10)"** while
+  ``specification.rst`` is revision 11 at ``a4aeb80``. Tier 1's file and the
+  coding harness's entry point; the agent flagged it and did not edit it.
+  **Escalated.**
+* **The locale tests mutate global JVM state** through ``Locale.setDefault``, as
+  ``cometgui-provenance``'s five already do. Safe today -- no parallel
+  configuration in any POM, no ``junit-platform.properties``, and JUnit 5
+  defaults to sequential. **If parallel execution is ever enabled, all six need
+  ``@ResourceLock(Resources.LOCALE)`` or they go racy.** Escalated so it lands
+  wherever that decision is made rather than being discovered by a flake.
+* **The namespace is ``http://per-colator.com/percolator_out/15`` in full**, and
+  the work log quoted it one segment short through unit 6. It is hand-typed as
+  ``PoutDocument.NAMESPACE`` **and independently hand-typed in the test**, which
+  is what surfaced the discrepancy; a shared constant would have hidden it.
+* **``PROBE_SEED`` is measured, not chosen**, and its Javadoc now says so and
+  warns against tidying it into a random seed, per amended ``R-PERC-02``. While
+  there the agent found the comment cited ``PercolatorCapabilityProbeRealBinaryTest``,
+  a class that does not exist -- ``{@code}`` rather than ``{@link}``, so javadoc
+  never caught it. **A cross-reference written as ``{@code}`` is not checked by
+  anything**; later units should prefer ``{@link}`` where the target is real.
+* **Gate item 1's PDV and converter dependency is retired.** ``StagedToolProbe``
+  no longer throws for them, so unit 10 is off the critical path.
