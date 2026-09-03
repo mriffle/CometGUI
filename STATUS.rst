@@ -2528,6 +2528,47 @@ over a range that also spanned tier 1's commits made an agent look as though it
 had edited files outside its lane. ``git show --stat <commit>`` answers "what
 did this change"; a range answers a different question.
 
+.. _status-document-commit-rule:
+
+"Do not write what the build reads" was too blunt, and I broke it twice more
+============================================================================
+
+Tier 1 recorded that rule on 2026-09-02 after a phase agent caught it committing
+``STATUS.rst`` inside a build window. It then did the same thing twice more, the
+second time committing **specification.rst revision 11** about two minutes after
+the Phase 05 orchestrator dispatched a live agent. The orchestrator caught it
+and, instead of worrying, **checked**: five test files read ``specification.rst``
+-- ``SpecificationScenarioCoverageTest``, ``ProvenanceFormatDocumentationTest``,
+``FxUiDriver``, ``AccessibleNameEnumerationUiTest`` and a package doc -- and none
+keys on the amended section. Confirmed independently at tier 1: the only
+``R-PERC-02`` references in source are Javadoc, and the scenario test keys on
+*"Component tests with fake executables"*, untouched. **No hazard
+materialised.**
+
+**The orchestrator's refinement is better than my rule and replaces it:**
+
+  *A document-only commit into a live tree is cheap to make and cheap to check,
+  and the check is the part that keeps getting skipped.*
+
+So the rule is no longer "never write what the build reads" -- which is
+unworkable, since ``STATUS.rst`` is the project's live record and holding every
+entry until a phase ends is how findings get lost. It is:
+
+#. Prefer a quiet tree.
+#. If you commit a document into a live one, **identify what reads it and
+   confirm the change cannot reach those assertions** -- by grep, before the
+   next build, not after a red one.
+#. If a build then goes red somewhere unrelated, **the document commit is the
+   first hypothesis, not the agent.** That is :ref:`status-red-symmetry` applied
+   to one's own change, and it is the half most easily skipped, because
+   suspecting an agent is cheaper than suspecting yourself.
+
+**Recorded three times over because the repetition is the finding.** An
+absolute prohibition that is inconvenient enough gets quietly discarded rather
+than followed; a cheap check attached to the inconvenient act survives. This
+project has now produced the same lesson about locks, about process checks and
+about document commits.
+
 Open decisions
 ==============
 
