@@ -71,25 +71,32 @@ public record JavaRuntime(Path launcher) {
      *     cannot be probed at all
      */
     public static JavaRuntime ofThisApplication() throws IOException {
-        /*
-         * The host is read through HostPlatform.of, which is the domain's own detection rule and
-         * the only one in this product: a second "is this Windows?" test here would be the
-         * duplicated abstraction this project has already paid for twice, and it would be the one
-         * that decides whether the launcher is called java or java.exe.
-         */
-        HostPlatform host =
-                HostPlatform.of(System.getProperty("os.name"), System.getProperty("os.arch"))
-                        .orElseThrow(
-                                () ->
-                                        new IOException(
-                                                "this host is os.name=\""
-                                                        + System.getProperty("os.name")
-                                                        + "\" os.arch=\""
-                                                        + System.getProperty("os.arch")
-                                                        + "\", which CometGUI does not recognise,"
-                                                        + " so it cannot say what the Java"
-                                                        + " launcher is called here"));
-        return ofJavaHome(Path.of(System.getProperty("java.home")), host.operatingSystem());
+        return ofJavaHome(
+                Path.of(System.getProperty("java.home")),
+                operatingSystemOf(System.getProperty("os.name"), System.getProperty("os.arch")));
+    }
+
+    /*
+     * The host is read through HostPlatform.of, which is the domain's own detection rule and the
+     * only one in this product: a second "is this Windows?" test here would be the duplicated
+     * abstraction this project has already paid for twice, and it would be the one that decides
+     * whether the launcher is called java or java.exe.  Taken as parameters rather than read from
+     * the system properties inside, so that the refusal below is reachable from a test on a host
+     * this product does recognise.
+     */
+    static HostOperatingSystem operatingSystemOf(String osName, String osArch) throws IOException {
+        return HostPlatform.of(osName, osArch)
+                .orElseThrow(
+                        () ->
+                                new IOException(
+                                        "this host is os.name=\""
+                                                + osName
+                                                + "\" os.arch=\""
+                                                + osArch
+                                                + "\", which CometGUI does not recognise, so it"
+                                                + " cannot say what the Java launcher is called"
+                                                + " here"))
+                .operatingSystem();
     }
 
     /**

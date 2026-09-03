@@ -18,6 +18,8 @@
  * Limelight converter adapter: Percolator XML in, Limelight XML out, plus the cutoff and decoy
  * handling the converter needs.
  *
- * <p>Filled by phase 12 (Limelight conversion and upload).
+ * <p><strong>Phase 05 unit 7 landed the identity probe</strong>, which starts the JAR and reads the
+ * version it prints. The conversion itself, with its cutoff and decoy handling, is still phase
+ * 12's.
  */
 package org.cometgui.tools.limelight;

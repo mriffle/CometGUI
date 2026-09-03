@@ -18,7 +18,14 @@
  * The adapter contract shared by every tool: ToolAdapter, ToolCommand, ToolExecutionRequest,
  * ToolExecutionResult and their exceptions.
  *
- * <p>Filled by phase 08 (workflow engine and Comet adapter), which defines the contract the later
- * adapters implement.
+ * <p><strong>Phase 05 unit 7 landed the first half of it</strong>: what every probe needs to run a
+ * tool and read its answer -- {@code ToolRunner} over the process service, {@code ToolRunOutcome},
+ * the {@code JavaRuntime} that starts a JAR, the {@code JarAttributes} that read one, the {@code
+ * CompanionGate} that {@code R-TOOL-02} states as manifest data, and {@code JavaToolIdentities},
+ * which is the object the composition root hands the installer as its {@code JavaArtefactIdentity}.
+ *
+ * <p>{@code ToolAdapter}, {@code ToolExecutionRequest} and {@code ToolExecutionResult} -- the
+ * contract for <em>running a scientific stage</em> rather than probing a build -- are still phase
+ * 08's, which defines the contract the later adapters implement.
  */
 package org.cometgui.tools.api;

@@ -18,6 +18,9 @@
  * Comet adapter: per-spectrum-file invocation with distinct -N base names, output containment,
  * decoy validation and PIN merging.
  *
- * <p>Filled by phase 08 (workflow engine and Comet adapter).
+ * <p><strong>Phase 05 unit 7 landed the capability probe</strong>: {@code CometCapabilityProbe},
+ * which makes the binary write its own default and complete parameter files and reads what it
+ * declared, plus {@code R-TOOL-02}'s Thermo companion rule as a lookup over manifest data. The
+ * search invocation itself is still phase 08's.
  */
 package org.cometgui.tools.comet;

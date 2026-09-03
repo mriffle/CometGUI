@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
@@ -387,6 +388,42 @@ class CometCapabilityProbeTest {
                 probe(runner, List.of())
                         .probe(ToolName.COMET, VERSION, LINUX, executable(directory, List.of())),
                 "it started and said its name, so the absence was observed rather than assumed");
+    }
+
+    @Test
+    @DisplayName("no temporary workspace is left behind, whether the probe answers or refuses")
+    void theWorkspaceIsCleanedUp(@TempDir Path directory) throws IOException {
+        Path temporary = Path.of(System.getProperty("java.io.tmpdir"));
+        long before = countProbeWorkspaces(temporary);
+        probe(cometThatAnswersBoth(), List.of())
+                .probe(
+                        ToolName.COMET,
+                        VERSION,
+                        LINUX,
+                        executable(directory.resolve("good"), List.of()));
+        ScriptedRunner bad = new ScriptedRunner().thenPrints(126, List.of("no banner"), List.of());
+        assertThrows(
+                IOException.class,
+                () ->
+                        probe(bad, List.of())
+                                .probe(
+                                        ToolName.COMET,
+                                        VERSION,
+                                        LINUX,
+                                        executable(directory.resolve("bad"), List.of())));
+
+        assertEquals(before, countProbeWorkspaces(temporary));
+    }
+
+    private static long countProbeWorkspaces(Path temporary) throws IOException {
+        try (Stream<Path> entries = Files.list(temporary)) {
+            return entries.filter(
+                            entry ->
+                                    entry.getFileName()
+                                            .toString()
+                                            .startsWith("cometgui-comet-probe-"))
+                    .count();
+        }
     }
 
     @Test

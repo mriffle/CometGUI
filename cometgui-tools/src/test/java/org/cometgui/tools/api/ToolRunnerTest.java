@@ -97,6 +97,52 @@ class ToolRunnerTest {
     }
 
     @Test
+    @DisplayName("a finished run is reported as finished, promptly, not as a timeout")
+    void aFinishedRunIsNotATimeout(@TempDir Path directory) throws IOException {
+        ScriptedRunner runner = new ScriptedRunner().thenPrints(3, List.of("done"), List.of());
+        long startedAt = System.nanoTime();
+
+        ToolRunOutcome outcome =
+                new ToolRunner(runner, Duration.ofMillis(200)).run(command(directory));
+        long tookMillis = (System.nanoTime() - startedAt) / 1_000_000L;
+
+        assertAll(
+                () -> assertEquals(OptionalInt.of(3), outcome.exitCode()),
+                () ->
+                        assertTrue(
+                                tookMillis < 200,
+                                "a run whose exit was reported must not wait out the timeout; it"
+                                        + " took "
+                                        + tookMillis
+                                        + " ms against a 200 ms limit"));
+    }
+
+    @Test
+    @DisplayName("a thread interrupted while waiting gives up AND leaves the interrupt flag set")
+    void anInterruptedWait(@TempDir Path directory) throws IOException {
+        ScriptedRunner runner = new ScriptedRunner().thenNeverFinishes();
+        Thread.currentThread().interrupt();
+        try {
+            ToolRunOutcome outcome =
+                    new ToolRunner(runner, Duration.ofMillis(200)).run(command(directory));
+
+            assertAll(
+                    () ->
+                            assertTrue(
+                                    outcome.timedOut(),
+                                    "giving up on the wait is not the same as an exit code"),
+                    () ->
+                            assertTrue(
+                                    Thread.currentThread().isInterrupted(),
+                                    "the interrupt has to be restored, or a caller further up"
+                                            + " never learns it was asked to stop"),
+                    () -> assertTrue(runner.lastProcess().wasCancelled()));
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
     @DisplayName("a process that cannot be started propagates, because that is not an empty answer")
     void aProcessThatCannotStart(@TempDir Path directory) {
         ScriptedRunner runner = new ScriptedRunner().thenFailsToStart("no such file");

@@ -158,6 +158,35 @@ class JavaRuntimeTest {
     }
 
     @Test
+    @DisplayName("a host this product does not recognise is refused, quoting both properties")
+    void anUnrecognisedHost() {
+        assertAll(
+                () ->
+                        assertEquals(
+                                "this host is os.name=\"Plan 9\" os.arch=\"risc-v\", which"
+                                        + " CometGUI does not recognise, so it cannot say what the"
+                                        + " Java launcher is called here",
+                                assertThrows(
+                                                IOException.class,
+                                                () ->
+                                                        JavaRuntime.operatingSystemOf(
+                                                                "Plan 9", "risc-v"))
+                                        .getMessage()),
+                () ->
+                        assertEquals(
+                                HostOperatingSystem.LINUX,
+                                JavaRuntime.operatingSystemOf("Linux", "amd64")),
+                () ->
+                        assertEquals(
+                                HostOperatingSystem.WINDOWS,
+                                JavaRuntime.operatingSystemOf("Windows 11", "amd64")),
+                () ->
+                        assertEquals(
+                                HostOperatingSystem.MACOS,
+                                JavaRuntime.operatingSystemOf("Mac OS X", "aarch64")));
+    }
+
+    @Test
     @DisplayName("this application's own runtime is found, and it is a file that exists")
     void thisApplicationsRuntime() throws IOException {
         JavaRuntime runtime = JavaRuntime.ofThisApplication();

@@ -119,7 +119,7 @@ public final class SyntheticPin {
                             + targetRows);
         }
         SyntheticPin random = new SyntheticPin(seed);
-        StringBuilder pin = new StringBuilder(targetRows * 160);
+        StringBuilder pin = new StringBuilder();
         pin.append(HEADER).append('\n');
         for (int row = 0; row < targetRows * 2; row++) {
             boolean target = row % 2 == 0;
@@ -188,7 +188,18 @@ public final class SyntheticPin {
         return mixed ^ (mixed >>> 31);
     }
 
-    /* Strictly between 0 and 1: Box-Muller takes the logarithm of it, and log(0) is not finite. */
+    /*
+     * Strictly between 0 and 1: Box-Muller takes the logarithm of it, and log(0) is not finite.
+     *
+     * KNOWN EQUIVALENT MUTANT, recorded rather than left for someone to rediscover.  PIT's math
+     * mutator turns the `+ 1L` into `- 1L` and that mutant survives every test here -- necessarily,
+     * because the two differ by one part in 2^53, which the %.4f formatting of every feature column
+     * rounds away, so not one byte of the generated file changes.  The `+ 1L` is not decoration: it
+     * is what makes the value strictly positive when the shifted draw is exactly zero, which is the
+     * one draw in 2^53 where the mutant would produce a negative number, log(negative) = NaN and a
+     * fixture of NaNs.  No seed can be chosen to reach it, and a test that could not fail is worth
+     * less than the guard.
+     */
     private double uniform() {
         return ((next() >>> 11) + 1L) * 0x1.0p-53;
     }

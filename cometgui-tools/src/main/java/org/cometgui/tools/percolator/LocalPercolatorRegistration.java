@@ -185,7 +185,7 @@ public final class LocalPercolatorRegistration {
             throw new ToolRegistrationException(
                     "The file at " + binary + " has no directory to run in.");
         }
-        List<String> argv = new ArrayList<>(PercolatorBanner.VERSION_ARGUMENTS.size() + 1);
+        List<String> argv = new ArrayList<>();
         argv.add(binary.toString());
         argv.addAll(PercolatorBanner.VERSION_ARGUMENTS);
         try {
@@ -251,7 +251,7 @@ public final class LocalPercolatorRegistration {
     }
 
     private ToolOffer offer(Path binary, ToolVersion version, Set<ToolCapability> probed) {
-        List<DeclaredCapability> declared = new ArrayList<>(probed.size());
+        List<DeclaredCapability> declared = new ArrayList<>();
         for (ToolCapability capability : probed) {
             declared.add(
                     new DeclaredCapability(

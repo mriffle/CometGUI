@@ -123,6 +123,18 @@ public final class ToolRunner {
             append(standardError, line);
         }
 
+        /*
+         * KNOWN TIMED_OUT MUTANT, recorded rather than left for someone to rediscover, and the same
+         * one org.cometgui.install.probe.LoadabilityProbe's collector carries for the same reason.
+         * Removing the countDown below makes every run wait out its whole timeout twice and then
+         * report a timeout, so every behavioural test in this module fails -- but each of them
+         * takes two full timeouts to do it, and PIT abandons the run before the first assertion is
+         * reached.  It is therefore scored TIMED_OUT rather than KILLED, and scripts/build.sh
+         * counts only KILLED, so it counts against this module's score rather than being credited.
+         * The way to convert it into a kill is to shorten the real binaries' timeouts until two of
+         * them fit inside PIT's own, which would make the suite depend on how loaded the machine
+         * is; a flaky test is a worse thing to own than a scored non-kill.
+         */
         @Override
         public void onExit(int code) {
             exitCode.set(code);

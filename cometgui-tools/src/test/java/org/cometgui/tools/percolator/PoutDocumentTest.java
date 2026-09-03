@@ -19,6 +19,7 @@ package org.cometgui.tools.percolator;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
+import javax.xml.stream.XMLInputFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -296,6 +298,38 @@ class PoutDocumentTest {
                                 refused.getMessage().contains("the-secret-contents"),
                                 "the file's contents must not reach the diagnostic: "
                                         + refused.getMessage()));
+    }
+
+    @Test
+    @DisplayName("both hardening settings are FORCED from their unsafe values, not merely assumed")
+    void everySettingIsForcedFromItsUnsafeValue() {
+        XMLInputFactory unsafe = XMLInputFactory.newDefaultFactory();
+        unsafe.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.TRUE);
+        unsafe.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.TRUE);
+
+        XMLInputFactory hardened = PoutDocument.harden(unsafe);
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                Boolean.FALSE,
+                                hardened.getProperty(XMLInputFactory.SUPPORT_DTD),
+                                "a factory that arrived with DTD support ON must leave with it"
+                                        + " off, or the call is one that can be deleted with the"
+                                        + " suite green"),
+                () ->
+                        assertEquals(
+                                Boolean.FALSE,
+                                hardened.getProperty(
+                                        XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES)),
+                () -> assertSame(unsafe, hardened),
+                () ->
+                        assertEquals(
+                                "factory",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () -> PoutDocument.harden(null))
+                                        .getMessage()));
     }
 
     @Test

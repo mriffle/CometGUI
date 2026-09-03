@@ -270,7 +270,7 @@ class LimelightConverterIdentityTest {
     }
 
     @Test
-    @DisplayName("PDV cannot be identified the same way, and this is why: it needs a display")
+    @DisplayName("PDV cannot be identified the same way: no argument makes it print a version")
     void pdvCannotBeIdentifiedByRunningIt(@TempDir Path directory) throws IOException {
         Path pdv =
                 UpstreamArtefacts.member(
@@ -297,7 +297,13 @@ class LimelightConverterIdentityTest {
                                                                         "NoClassDefFoundError")),
                                 "PDV builds a JFrame before it reads its first argument, so on a"
                                         + " machine with no display no argument can make it print"
-                                        + " a version: "
+                                        + " a version. The JAR is staged here without its lib/"
+                                        + " directory, so what this run reaches first is the"
+                                        + " missing commons-cli class; with the whole archive"
+                                        + " extracted the same invocation was watched fail with"
+                                        + " java.awt.HeadlessException from"
+                                        + " PDVCLI.PDVCLIMainClass.<init> on 2026-09-03. Either"
+                                        + " way it says no version: "
                                         + outcome.joinedOutput()),
                 () ->
                         assertTrue(

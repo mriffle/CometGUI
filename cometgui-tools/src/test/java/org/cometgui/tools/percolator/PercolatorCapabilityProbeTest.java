@@ -352,6 +352,12 @@ class PercolatorCapabilityProbeTest {
                 () -> assertEquals(8, new PercolatorCapabilityProbe(runner, 8).targetRows()),
                 () ->
                         assertEquals(
+                                1,
+                                new PercolatorCapabilityProbe(runner, 1).targetRows(),
+                                "one target row is a fixture, however useless; the floor is at"
+                                        + " zero"),
+                () ->
+                        assertEquals(
                                 "a synthetic PIN needs at least one target row, but was asked for"
                                         + " 0",
                                 assertThrows(

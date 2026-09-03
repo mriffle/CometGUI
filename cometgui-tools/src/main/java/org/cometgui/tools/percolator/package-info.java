@@ -19,6 +19,9 @@
  * where the probed binary supports it, and version advisories. No version number may be hard-coded
  * as implying XML support.
  *
- * <p>Filled by phase 09 (Percolator adapter and versions).
+ * <p><strong>Phase 05 unit 7 landed the functional capability probe</strong> {@code R-PERC-02}
+ * requires -- {@code SyntheticPin}, {@code PoutDocument} and {@code PercolatorCapabilityProbe} --
+ * together with {@code R-TOOL-08}'s local binary registration. Command building for a real
+ * rescoring run, and the version advisories, are still phase 09's.
  */
 package org.cometgui.tools.percolator;

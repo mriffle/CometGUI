@@ -127,6 +127,15 @@ class CompanionGateTest {
     }
 
     @Test
+    @DisplayName("an executable with no directory above it cannot have companions beside it")
+    void anExecutableWithNoParent() {
+        assertFalse(
+                gate().isOpenFor(WINDOWS, Path.of("/")),
+                "the file system root has no parent directory, so there is nowhere for a companion"
+                        + " to be");
+    }
+
+    @Test
     @DisplayName("a gate with no names would open for everyone, so it is rejected")
     void aGateWithNoNames() {
         assertEquals(
@@ -143,7 +152,16 @@ class CompanionGateTest {
     }
 
     @ParameterizedTest(name = "[{index}] \"{0}\"")
-    @ValueSource(strings = {"lib/one.dll", "..\\one.dll", "/usr/lib/one.dll"})
+    @ValueSource(
+            strings = {
+                "lib/one.dll",
+                "..\\one.dll",
+                "/usr/lib/one.dll",
+                "/one.dll",
+                "\\one.dll",
+                "one.dll/",
+                "one.dll\\"
+            })
     @DisplayName("a path is not a name: a gate is about what sits beside the executable")
     void aPathIsNotAName(String path) {
         assertEquals(

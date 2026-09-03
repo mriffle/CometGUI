@@ -18,6 +18,8 @@
  * PDV adapter: opening a selected spectrum for visualisation and driving the CLI figure generation
  * used by the tests.
  *
- * <p>Filled by phase 11 (PDV integration).
+ * <p><strong>Phase 05 unit 7 landed the identity probe</strong>, which reads the version out of the
+ * JAR's own manifest because PDV has no version option and builds a Swing frame before reading its
+ * first argument. Opening a spectrum and driving the figure CLI are still phase 11's.
  */
 package org.cometgui.tools.pdv;

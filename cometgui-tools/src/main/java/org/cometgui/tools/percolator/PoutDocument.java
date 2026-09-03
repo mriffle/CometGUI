@@ -117,11 +117,18 @@ public final class PoutDocument {
         }
     }
 
+    /*
+     * The reader is NOT closed here, deliberately.  XMLStreamReader.close is documented as freeing
+     * the reader's own resources and explicitly as NOT closing the underlying input source, which
+     * is the InputStream this method's caller already closes; a close() call whose only effect is
+     * one nothing can observe is a line that can be deleted with the suite green, and phase 05 unit
+     * 4 spent a round on exactly that shape.  The file handle is what matters and
+     * JarAttributesTest's sibling in the archive suite proves the analogous point by naming open
+     * descriptors.
+     */
     private static PoutDocument parse(InputStream bytes, Path file) throws IOException {
-        XMLStreamReader reader = null;
         try {
-            reader = hardenedFactory().createXMLStreamReader(bytes);
-            return walk(reader);
+            return walk(harden(XMLInputFactory.newDefaultFactory()).createXMLStreamReader(bytes));
         } catch (XMLStreamException notADocument) {
             throw new IOException(
                     "the file Percolator wrote at "
@@ -129,18 +136,25 @@ public final class PoutDocument {
                             + " is not well-formed XML: "
                             + notADocument.getMessage(),
                     notADocument);
-        } finally {
-            closeQuietly(reader);
         }
     }
 
-    /*
-     * Forced, never assumed.  A factory whose defaults happen to be safe today is a protection that
-     * has never been seen to work, and this is the parser that reads a document written by a binary
-     * the user chose.
+    /**
+     * Forces a factory into the safe state, whatever state it arrived in.
+     *
+     * <p><strong>Forced, never assumed, and the difference is the whole point.</strong> A factory
+     * whose defaults happen to be safe today makes a hardening call that can be deleted with the
+     * whole suite still green -- which is a protection that has never been seen to work, and is
+     * what phase 05 unit 4 found five of in the {@code xar} table-of-contents parser. Taking the
+     * factory as a parameter is what lets a test hand this method one set to the <em>unsafe</em>
+     * value and require it back safe.
+     *
+     * @param factory the factory to harden
+     * @return the same factory, with DTD support and external entities off
+     * @throws NullPointerException if {@code factory} is {@code null}
      */
-    private static XMLInputFactory hardenedFactory() {
-        XMLInputFactory factory = XMLInputFactory.newDefaultFactory();
+    static XMLInputFactory harden(XMLInputFactory factory) {
+        Objects.requireNonNull(factory, "factory");
         factory.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
         factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
         return factory;
@@ -177,21 +191,6 @@ public final class PoutDocument {
                 psmCount,
                 peptideCount,
                 Collections.unmodifiableSet(decoyValues));
-    }
-
-    private static void closeQuietly(XMLStreamReader reader) {
-        if (reader == null) {
-            return;
-        }
-        try {
-            reader.close();
-        } catch (XMLStreamException alreadyBroken) {
-            /*
-             * The document has already been read or has already failed; a close that fails after
-             * that cannot change either verdict, and letting it replace the real diagnostic would
-             * send a reader to the wrong place.
-             */
-        }
     }
 
     /**

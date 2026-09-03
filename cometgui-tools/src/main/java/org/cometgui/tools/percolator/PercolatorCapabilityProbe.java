@@ -205,10 +205,10 @@ public final class PercolatorCapabilityProbe {
      * treating that as "this build cannot write XML" is the specific defect this phase exists to
      * avoid.
      */
-    private ToolRunOutcome exercise(
+    private void exercise(
             Path executable, Path workspace, ToolVersion version, List<String> arguments)
             throws IOException {
-        List<String> argv = new ArrayList<>(arguments.size() + 1);
+        List<String> argv = new ArrayList<>();
         argv.add(executable.toString());
         argv.addAll(arguments);
         ToolRunOutcome outcome = runner.run(new ToolCommand(argv, workspace, Map.of()));
@@ -236,7 +236,6 @@ public final class PercolatorCapabilityProbe {
                             + " saying: "
                             + outcome.joinedOutput());
         }
-        return outcome;
     }
 
     /*
