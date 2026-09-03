@@ -16,6 +16,29 @@
   <description>Adapters for Comet, Percolator, PDV and the Limelight converter: identify, probe, build commands, validate outputs.</description>
 
   <!--
+    MUTATION GATE ON, AND NO LONGER INERT (phase 05 unit 7).  pom.xml's
+    <targetClasses> lists org.cometgui.tools.* because R-TEST-02 names version
+    and capability rules as critical pure logic, and this module now holds the
+    functional capability probe R-PERC-02 requires: the rule that decides
+    whether a Percolator build can write pout XML, and therefore whether the
+    Limelight stage is offered at all.  Until this unit the module compiled
+    nothing but package-info classes, so the parent's default of `true` was
+    correct - PIT would have failed a module with nothing to mutate.
+    scripts/build.sh fails the build if critical-package code ever appears here
+    with the gate off again, and switching it back off to make a build pass is a
+    weakening of a gate and is a rejection at sign-off.
+
+    THE COVERAGE SWITCH IS DELIBERATELY NOT FLIPPED, for the same reason
+    cometgui-install gives: org.cometgui.tools is not one of the
+    specification's core-domain, parameter or provenance prefixes, so
+    cometgui.coverage.core.skip stays true and the mutation gate plus the
+    per-class coverage census are what hold this module.
+  -->
+  <properties>
+    <cometgui.mutation.skip>false</cometgui.mutation.skip>
+  </properties>
+
+  <!--
     Only the edges the specification's layering permits are declared here.
     Adding one is an architectural change: say so in the phase handoff, and
     expect the ArchUnit rules in cometgui-archtests to have an opinion.

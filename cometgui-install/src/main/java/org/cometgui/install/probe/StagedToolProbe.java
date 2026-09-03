@@ -63,12 +63,20 @@ import org.cometgui.install.registry.ArtefactRecord;
  *       implements in {@code org.cometgui.tools}.
  * </ol>
  *
- * <h2>What this unit does not know</h2>
+ * <h2>Native binaries and JARs take different routes through stages 1 and 2</h2>
  *
- * <p>It has banners for the two tools this project has watched print one -- Comet and Percolator.
- * PDV and the Limelight converter are Java artefacts whose identity needs a JVM launch, which
- * belongs with the other tool adapters, so asking this probe for one <strong>fails by name</strong>
- * rather than guessing or silently skipping the stage. Supplying those banners is what widens it.
+ * <p>It has {@link VersionBanner}s for the two tools this project has watched print one -- Comet
+ * and Percolator -- and those go through {@link LoadabilityProbe}, which runs the installed file
+ * with the banner's arguments.
+ *
+ * <p>PDV and the Limelight converter are JARs, and a JAR is not an executable file: the installed
+ * file is an argument to a launcher rather than the launcher. Phase 05 unit 6 expected a banner to
+ * be enough for them and it is not -- the argument array {@code LoadabilityProbe} builds is the
+ * executable followed by the banner's arguments, which for a JAR would ask the operating system to
+ * execute a ZIP file. So a tool with no banner is routed to {@link JavaArtefactIdentity} instead,
+ * which phase 05 unit 7 implements in {@code org.cometgui.tools}. A probe constructed without one
+ * still <strong>fails by name</strong> for those tools, exactly as before, rather than guessing or
+ * silently skipping the stage.
  */
 public final class StagedToolProbe implements ToolProbe {
 
@@ -78,6 +86,7 @@ public final class StagedToolProbe implements ToolProbe {
     private final CapabilityProber capabilities;
     private final Function<ArtefactRecord, List<String>> alternatives;
     private final Map<String, String> environment;
+    private final Optional<JavaArtefactIdentity> javaArtefacts;
 
     /**
      * Composes the three stages.
@@ -99,12 +108,63 @@ public final class StagedToolProbe implements ToolProbe {
             CapabilityProber capabilities,
             Function<ArtefactRecord, List<String>> alternatives,
             Map<String, String> environment) {
+        this(
+                loadability,
+                versions,
+                banners,
+                capabilities,
+                alternatives,
+                environment,
+                Optional.empty());
+    }
+
+    /**
+     * Composes the three stages, including the identity route for the tools installed as JARs.
+     *
+     * @param loadability stage 1 for a native binary
+     * @param versions what this host's runtimes were established to be, for the advance check
+     * @param banners how each native tool spells its version
+     * @param capabilities stage 3, implemented in {@code org.cometgui.tools}
+     * @param alternatives what to offer instead of a build that fails
+     * @param environment the environment every probe run gets
+     * @param javaArtefacts stages 1 and 2 for a tool with no banner -- PDV and the Limelight
+     *     converter -- implemented in {@code org.cometgui.tools}; see {@link JavaArtefactIdentity}
+     *     for why a banner cannot serve
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public StagedToolProbe(
+            LoadabilityProbe loadability,
+            HostRuntimeVersions versions,
+            Map<ToolName, VersionBanner> banners,
+            CapabilityProber capabilities,
+            Function<ArtefactRecord, List<String>> alternatives,
+            Map<String, String> environment,
+            JavaArtefactIdentity javaArtefacts) {
+        this(
+                loadability,
+                versions,
+                banners,
+                capabilities,
+                alternatives,
+                environment,
+                Optional.of(Objects.requireNonNull(javaArtefacts, "javaArtefacts")));
+    }
+
+    private StagedToolProbe(
+            LoadabilityProbe loadability,
+            HostRuntimeVersions versions,
+            Map<ToolName, VersionBanner> banners,
+            CapabilityProber capabilities,
+            Function<ArtefactRecord, List<String>> alternatives,
+            Map<String, String> environment,
+            Optional<JavaArtefactIdentity> javaArtefacts) {
         this.loadability = Objects.requireNonNull(loadability, "loadability");
         this.versions = Objects.requireNonNull(versions, "versions");
         this.banners = Map.copyOf(Objects.requireNonNull(banners, "banners"));
         this.capabilities = Objects.requireNonNull(capabilities, "capabilities");
         this.alternatives = Objects.requireNonNull(alternatives, "alternatives");
         this.environment = Map.copyOf(Objects.requireNonNull(environment, "environment"));
+        this.javaArtefacts = javaArtefacts;
     }
 
     /**
@@ -120,15 +180,9 @@ public final class StagedToolProbe implements ToolProbe {
         Objects.requireNonNull(record, "record");
         Objects.requireNonNull(stagedDirectory, "stagedDirectory");
         Path executable = stagedDirectory.resolve(record.executablePath());
-        VersionBanner banner = bannerFor(record);
         ProbeContext context = contextFor(record);
         refuseIfHostFallsShort(record, context);
-        LoadabilityResult started =
-                loadability.probe(executable, banner.arguments(), environment, context);
-        if (started.failure().isPresent()) {
-            throw refusal(started.failure().get());
-        }
-        ToolVersion identified = identify(record, banner, started);
+        ToolVersion identified = startAndIdentify(record, executable, context);
         return capabilities.probe(record.tool(), identified, loadability.host(), executable);
     }
 
@@ -150,8 +204,20 @@ public final class StagedToolProbe implements ToolProbe {
         Objects.requireNonNull(record, "record");
         Objects.requireNonNull(stagedDirectory, "stagedDirectory");
         Path executable = stagedDirectory.resolve(record.executablePath());
+        VersionBanner banner = banners.get(record.tool());
+        if (banner == null) {
+            /*
+             * A JAR.  There is no separate "does it start" question to ask of one: for the
+             * Limelight converter the identity IS a successful launch, and for PDV no launch can
+             * answer anything on a machine with no display, so a version read from the artefact is
+             * the strongest available answer and a failure to get one is the refusal.  Reported as
+             * a limit rather than dressed up: see JavaArtefactIdentity.
+             */
+            javaArtefactIdentity(record).identify(record.tool(), loadability.host(), executable);
+            return Optional.empty();
+        }
         return loadability
-                .probe(executable, bannerFor(record).arguments(), environment, contextFor(record))
+                .probe(executable, banner.arguments(), environment, contextFor(record))
                 .failure();
     }
 
@@ -162,19 +228,34 @@ public final class StagedToolProbe implements ToolProbe {
                 alternatives.apply(record));
     }
 
-    private VersionBanner bannerFor(ArtefactRecord record) throws IOException {
+    private ToolVersion startAndIdentify(
+            ArtefactRecord record, Path executable, ProbeContext context)
+            throws IOException, ProbeFailedException {
         VersionBanner banner = banners.get(record.tool());
         if (banner == null) {
-            throw new IOException(
-                    record.describe()
-                            + " cannot be probed: no version banner is configured for "
-                            + record.tool().id()
-                            + ", and this unit ships only the two it has watched a tool print."
-                            + " A Java artefact's identity needs a JVM launch, which belongs with"
-                            + " the tool adapters; supply a banner for it rather than letting the"
-                            + " identity stage be skipped.");
+            return javaArtefactIdentity(record)
+                    .identify(record.tool(), loadability.host(), executable);
         }
-        return banner;
+        LoadabilityResult started =
+                loadability.probe(executable, banner.arguments(), environment, context);
+        if (started.failure().isPresent()) {
+            throw refusal(started.failure().get());
+        }
+        return identify(record, banner, started);
+    }
+
+    private JavaArtefactIdentity javaArtefactIdentity(ArtefactRecord record) throws IOException {
+        return javaArtefacts.orElseThrow(
+                () ->
+                        new IOException(
+                                record.describe()
+                                        + " cannot be probed: no version banner is configured for "
+                                        + record.tool().id()
+                                        + ", and this unit ships only the two it has watched a tool"
+                                        + " print. A Java artefact's identity needs a JVM launch,"
+                                        + " which belongs with the tool adapters; supply a banner"
+                                        + " for it rather than letting the identity stage be"
+                                        + " skipped."));
     }
 
     private void refuseIfHostFallsShort(ArtefactRecord record, ProbeContext context)
