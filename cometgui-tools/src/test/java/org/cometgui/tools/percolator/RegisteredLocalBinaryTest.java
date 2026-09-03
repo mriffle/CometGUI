@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolName;
@@ -54,6 +55,12 @@ class RegisteredLocalBinaryTest {
                 ToolVersion.parse("3.07.1"),
                 origin,
                 state,
+                /*
+                 * A local binary has no download size and a managed one must have one: phase 05
+                 * unit 8 put that rule in ToolOffer, and this helper builds offers of both origins
+                 * on purpose, so it has to answer for both.
+                 */
+                origin == ToolOrigin.LOCAL ? OptionalLong.empty() : OptionalLong.of(946303L),
                 List.of(),
                 List.of(),
                 Optional.empty(),

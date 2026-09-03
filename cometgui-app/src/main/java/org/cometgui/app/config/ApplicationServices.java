@@ -74,6 +74,16 @@ import org.cometgui.domain.ports.RunIdSource;
  * arrives it needs to write to that same log; whoever wires it up decides then whether the log is
  * passed to both, and this class is deliberately not the place that decides it in advance.
  *
+ * <h2>Why the Tool Manager is composed next door and not here</h2>
+ *
+ * <p>Phase 05 unit 8 built {@link ToolManagerWiring}, which is where {@code cometgui-install} and
+ * {@code cometgui-tools} are introduced to each other -- this module is the only one that can see
+ * both. It is a separate class rather than a method here because of the sentence below: a Tool
+ * Manager needs a cache directory to write into, an executor to run installs on, and a downloader
+ * that owns an HTTP client with threads somebody has to close, and building one here would make
+ * this class a lifecycle object. It takes the seams this class hands out, so wiring it up is a
+ * matter of passing three arguments once the Tool Manager section exists.
+ *
  * <p>Instances are immutable and hold no I/O resources; {@link #forThisHost()} does no I/O either,
  * and in particular creates no directory.
  */

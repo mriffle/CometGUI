@@ -23,8 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.Set;
 import org.cometgui.domain.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -53,6 +56,23 @@ class ToolOfferTest {
 
     private static final ToolVersion PERCOLATOR_3_07_1 = ToolVersion.parse("3.07.1");
 
+    /**
+     * The length of {@code rel-3-07-01/percolator-noxml-ubuntu-portable.zip}, hand-typed from the
+     * shipped manifest. A real number rather than a round one, so that a rendering that dropped or
+     * rounded it would be visible.
+     */
+    private static final long PERCOLATOR_DOWNLOAD_BYTES = 946303L;
+
+    /** The length of {@code rel-3-09/percolator.exe}, the Windows 3.09 artefact, hand-typed. */
+    private static final long PERCOLATOR_3_09_DOWNLOAD_BYTES = 640512L;
+
+    /**
+     * PDV's artefact length, hand-typed from the shipped manifest -- the ninety-nine-megabyte
+     * download {@code phases/PHASE-05-tool-registry.rst} singles out, and the reason this component
+     * exists at all.
+     */
+    private static final long PDV_DOWNLOAD_BYTES = 103407417L;
+
     private static final DeclaredCapability XML_OBSERVED =
             new DeclaredCapability(
                     ToolCapability.XML_OUTPUT,
@@ -69,6 +89,16 @@ class ToolOfferTest {
             new ToolAdvisory(
                     "percolator.pep-regressor-changed-in-3-08",
                     "3.07.1 predates 3.08's change of default PEP regressor to I-splines.");
+
+    /**
+     * A download size has to be absent for a local binary and for a build with no artefact here,
+     * and present everywhere else, so both axes are read.
+     */
+    private static OptionalLong sizeFor(ToolOrigin origin, ToolInstallState state) {
+        return origin == ToolOrigin.LOCAL || state == ToolInstallState.UNAVAILABLE_ON_THIS_PLATFORM
+                ? OptionalLong.empty()
+                : OptionalLong.of(PERCOLATOR_DOWNLOAD_BYTES);
+    }
 
     /** An installed path has to be present when the state is INSTALLED, so states differ here. */
     private static Optional<Path> pathFor(ToolInstallState state) {
@@ -87,6 +117,7 @@ class ToolOfferTest {
                 PERCOLATOR_3_07_1,
                 ToolOrigin.MANAGED,
                 state,
+                sizeFor(ToolOrigin.MANAGED, state),
                 capabilities,
                 advisories,
                 Optional.empty(),
@@ -110,6 +141,7 @@ class ToolOfferTest {
                             PERCOLATOR_3_07_1,
                             ToolOrigin.MANAGED,
                             ToolInstallState.INSTALLED,
+                            OptionalLong.of(PERCOLATOR_DOWNLOAD_BYTES),
                             List.of(XML_OBSERVED, XML_DECOY_OBSERVED),
                             List.of(PEP_REGRESSOR),
                             Optional.empty(),
@@ -126,6 +158,12 @@ class ToolOfferTest {
                                     offer.capabilities()),
                     () -> assertEquals(List.of(PEP_REGRESSOR), offer.advisories()),
                     () -> assertEquals(Optional.empty(), offer.loaderDiagnostic()),
+                    () ->
+                            assertEquals(
+                                    OptionalLong.of(946303L),
+                                    offer.downloadSizeBytes(),
+                                    "the download size survives, hand-typed rather than read back"
+                                            + " from the constant it was built from"),
                     () -> assertEquals(Optional.of(installed), offer.installedPath()));
         }
 
@@ -146,6 +184,7 @@ class ToolOfferTest {
                             ToolVersion.parse("3.09"),
                             ToolOrigin.MANAGED,
                             ToolInstallState.HOST_REQUIREMENTS_NOT_MET,
+                            OptionalLong.of(PERCOLATOR_3_09_DOWNLOAD_BYTES),
                             List.of(),
                             List.of(),
                             Optional.of(diagnostic),
@@ -175,6 +214,7 @@ class ToolOfferTest {
                             PERCOLATOR_3_07_1,
                             origin,
                             ToolInstallState.INSTALLED,
+                            sizeFor(origin, ToolInstallState.INSTALLED),
                             List.of(),
                             List.of(),
                             Optional.empty(),
@@ -211,6 +251,7 @@ class ToolOfferTest {
         @EnumSource(ToolInstallState.class)
         @DisplayName("a capability of another tool is rejected in every state, for every mismatch")
         void aCapabilityOfAnotherToolIsRejected(ToolInstallState state) {
+            OptionalLong size = sizeFor(ToolOrigin.MANAGED, state);
             List<Executable> assertions = new ArrayList<>();
             for (ToolCapability capability : ToolCapability.values()) {
                 for (ToolName tool : ToolName.values()) {
@@ -238,6 +279,7 @@ class ToolOfferTest {
                                                                             PERCOLATOR_3_07_1,
                                                                             ToolOrigin.MANAGED,
                                                                             state,
+                                                                            size,
                                                                             List.of(declared),
                                                                             List.of(),
                                                                             Optional.empty(),
@@ -299,6 +341,9 @@ class ToolOfferTest {
                                                                     ToolVersion.parse("2026.02.2"),
                                                                     ToolOrigin.MANAGED,
                                                                     state,
+                                                                    sizeFor(
+                                                                            ToolOrigin.MANAGED,
+                                                                            state),
                                                                     List.of(
                                                                             pinObserved,
                                                                             pinUnverified),
@@ -419,8 +464,27 @@ class ToolOfferTest {
             List<ToolAdvisory> absentAdvisories = Nulls.of(List.class);
             Optional<LoaderDiagnostic> absentDiagnostic = Nulls.of(Optional.class);
             Optional<Path> absentPath = Nulls.of(Optional.class);
+            OptionalLong absentSize = Nulls.of(OptionalLong.class);
 
             assertAll(
+                    () ->
+                            assertEquals(
+                                    "downloadSizeBytes",
+                                    assertThrows(
+                                                    NullPointerException.class,
+                                                    () ->
+                                                            new ToolOffer(
+                                                                    ToolName.PERCOLATOR,
+                                                                    PERCOLATOR_3_07_1,
+                                                                    ToolOrigin.MANAGED,
+                                                                    state,
+                                                                    absentSize,
+                                                                    List.of(),
+                                                                    List.of(),
+                                                                    Optional.empty(),
+                                                                    pathFor(state)))
+                                            .getMessage(),
+                                    state.name()),
                     () ->
                             assertEquals(
                                     "tool",
@@ -432,6 +496,9 @@ class ToolOfferTest {
                                                                     PERCOLATOR_3_07_1,
                                                                     ToolOrigin.MANAGED,
                                                                     state,
+                                                                    sizeFor(
+                                                                            ToolOrigin.MANAGED,
+                                                                            state),
                                                                     List.of(),
                                                                     List.of(),
                                                                     Optional.empty(),
@@ -449,6 +516,9 @@ class ToolOfferTest {
                                                                     Nulls.of(ToolVersion.class),
                                                                     ToolOrigin.MANAGED,
                                                                     state,
+                                                                    sizeFor(
+                                                                            ToolOrigin.MANAGED,
+                                                                            state),
                                                                     List.of(),
                                                                     List.of(),
                                                                     Optional.empty(),
@@ -466,6 +536,9 @@ class ToolOfferTest {
                                                                     PERCOLATOR_3_07_1,
                                                                     Nulls.of(ToolOrigin.class),
                                                                     state,
+                                                                    sizeFor(
+                                                                            ToolOrigin.MANAGED,
+                                                                            state),
                                                                     List.of(),
                                                                     List.of(),
                                                                     Optional.empty(),
@@ -509,6 +582,9 @@ class ToolOfferTest {
                                                                     PERCOLATOR_3_07_1,
                                                                     ToolOrigin.MANAGED,
                                                                     state,
+                                                                    sizeFor(
+                                                                            ToolOrigin.MANAGED,
+                                                                            state),
                                                                     List.of(),
                                                                     List.of(),
                                                                     absentDiagnostic,
@@ -543,11 +619,230 @@ class ToolOfferTest {
                                                     PERCOLATOR_3_07_1,
                                                     ToolOrigin.MANAGED,
                                                     Nulls.of(ToolInstallState.class),
+                                                    OptionalLong.of(PERCOLATOR_DOWNLOAD_BYTES),
                                                     List.of(),
                                                     List.of(),
                                                     Optional.empty(),
                                                     Optional.empty()))
                             .getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("the download size (phase 05 unit 8)")
+    class DownloadSize {
+
+        private ToolOffer build(
+                ToolOrigin origin, ToolInstallState state, OptionalLong downloadSizeBytes) {
+            return new ToolOffer(
+                    ToolName.PERCOLATOR,
+                    PERCOLATOR_3_07_1,
+                    origin,
+                    state,
+                    downloadSizeBytes,
+                    List.of(),
+                    List.of(),
+                    Optional.empty(),
+                    pathFor(state));
+        }
+
+        private boolean accepts(
+                ToolOrigin origin, ToolInstallState state, OptionalLong downloadSizeBytes) {
+            try {
+                build(origin, state, downloadSizeBytes);
+                return true;
+            } catch (IllegalArgumentException refused) {
+                return false;
+            }
+        }
+
+        private Set<String> gridAccepting(OptionalLong downloadSizeBytes) {
+            Set<String> accepted = new LinkedHashSet<>();
+            for (ToolOrigin origin : ToolOrigin.values()) {
+                for (ToolInstallState state : ToolInstallState.values()) {
+                    if (accepts(origin, state, downloadSizeBytes)) {
+                        accepted.add(origin.name() + " " + state.name());
+                    }
+                }
+            }
+            return accepted;
+        }
+
+        @Test
+        @DisplayName("the Tool Manager can state PDV's ninety-nine megabytes")
+        void theSizeIsCarriedAndReadBack() {
+            ToolOffer pdv =
+                    new ToolOffer(
+                            ToolName.PDV,
+                            ToolVersion.parse("2.7.0"),
+                            ToolOrigin.MANAGED,
+                            ToolInstallState.NOT_INSTALLED,
+                            OptionalLong.of(PDV_DOWNLOAD_BYTES),
+                            List.of(),
+                            List.of(),
+                            Optional.empty(),
+                            Optional.empty());
+
+            assertAll(
+                    () -> assertEquals(OptionalLong.of(103407417L), pdv.downloadSizeBytes()),
+                    () -> assertEquals(103407417L, pdv.downloadSizeBytes().getAsLong()));
+        }
+
+        /*
+         * THE WHOLE GRID, both ways round.  Whether an offer has a download size depends on two
+         * components and on nothing else, so the rule is stated over the pair rather than over one
+         * of them with the other pinned at a single value -- which is the shape that let a blank
+         * note be accepted for one evidence constant and pass 108 tests.  Written as a set of
+         * hand-typed names rather than as a loop with an oracle, so that adding a state or an
+         * origin fails here rather than silently widening what is allowed, and so that switching
+         * the rule off for any one value shows up as a named entry appearing or vanishing.
+         */
+        @Test
+        @DisplayName(
+                "exactly seven of the twelve rows may have no download size, and which is pinned")
+        void theGridWithNoDownloadSizeIsPinned() {
+            assertEquals(
+                    new LinkedHashSet<>(
+                            List.of(
+                                    "MANAGED UNAVAILABLE_ON_THIS_PLATFORM",
+                                    "LOCAL NOT_INSTALLED",
+                                    "LOCAL INSTALLING",
+                                    "LOCAL INSTALLED",
+                                    "LOCAL FAILED",
+                                    "LOCAL UNAVAILABLE_ON_THIS_PLATFORM",
+                                    "LOCAL HOST_REQUIREMENTS_NOT_MET")),
+                    gridAccepting(OptionalLong.empty()),
+                    "a local binary was never downloaded, and a build with no artefact here has"
+                            + " nothing to download; every other row must be able to say what it"
+                            + " costs");
+        }
+
+        @Test
+        @DisplayName("exactly five of the twelve rows may have one, and which is pinned")
+        void theGridWithADownloadSizeIsPinned() {
+            assertEquals(
+                    new LinkedHashSet<>(
+                            List.of(
+                                    "MANAGED NOT_INSTALLED",
+                                    "MANAGED INSTALLING",
+                                    "MANAGED INSTALLED",
+                                    "MANAGED FAILED",
+                                    "MANAGED HOST_REQUIREMENTS_NOT_MET")),
+                    gridAccepting(OptionalLong.of(PERCOLATOR_DOWNLOAD_BYTES)),
+                    "a managed build with an artefact behind it is exactly the row that has a"
+                            + " download, and the two grids must not overlap");
+        }
+
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(
+                value = ToolInstallState.class,
+                names = {
+                    "NOT_INSTALLED",
+                    "INSTALLING",
+                    "INSTALLED",
+                    "FAILED",
+                    "HOST_REQUIREMENTS_NOT_MET"
+                })
+        @DisplayName("a managed offer with an artefact behind it is refused without a size")
+        void aManagedOfferNeedsASize(ToolInstallState state) {
+            assertEquals(
+                    "downloadSizeBytes is required for a managed offer in state "
+                            + state.name()
+                            + ": there is an artefact behind it and the manifest pins its length,"
+                            + " so an offer that cannot state it is one the Tool Manager cannot"
+                            + " warn anybody about",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () -> build(ToolOrigin.MANAGED, state, OptionalLong.empty()))
+                            .getMessage());
+        }
+
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("a local binary is refused a download size in every state, quoting it")
+        void aLocalBinaryIsRefusedASize(ToolInstallState state) {
+            assertEquals(
+                    "downloadSizeBytes must be absent, but was 946303: a local binary was not"
+                            + " downloaded, so it has no download size; CometGUI did not fetch it"
+                            + " and cannot say what fetching it would have cost",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () ->
+                                            build(
+                                                    ToolOrigin.LOCAL,
+                                                    state,
+                                                    OptionalLong.of(PERCOLATOR_DOWNLOAD_BYTES)))
+                            .getMessage(),
+                    state.name());
+        }
+
+        @Test
+        @DisplayName("a build with no artefact for this platform is refused one, quoting it")
+        void anUnavailableBuildIsRefusedASize() {
+            assertEquals(
+                    "downloadSizeBytes must be absent, but was 640512: upstream publishes no"
+                            + " artefact of this build for this platform, so there is no download"
+                            + " to size",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () ->
+                                            build(
+                                                    ToolOrigin.MANAGED,
+                                                    ToolInstallState.UNAVAILABLE_ON_THIS_PLATFORM,
+                                                    OptionalLong.of(
+                                                            PERCOLATOR_3_09_DOWNLOAD_BYTES)))
+                            .getMessage());
+        }
+
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(
+                value = ToolInstallState.class,
+                names = {
+                    "NOT_INSTALLED",
+                    "INSTALLING",
+                    "INSTALLED",
+                    "FAILED",
+                    "HOST_REQUIREMENTS_NOT_MET"
+                })
+        @DisplayName("a size of zero or less is refused in every state, and one byte is not")
+        void theSizeMustBePositive(ToolInstallState state) {
+            /*
+             * The boundary is reached from both sides in the same test: a one-byte download is
+             * absurd and is accepted, because the rule is about a number that means something
+             * rather than about a plausible artefact, and a zero-byte one is refused because a
+             * download of nothing is not a download.
+             */
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    "downloadSizeBytes must be positive when present, but was: 0",
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () ->
+                                                            build(
+                                                                    ToolOrigin.MANAGED,
+                                                                    state,
+                                                                    OptionalLong.of(0L)))
+                                            .getMessage(),
+                                    state.name()),
+                    () ->
+                            assertEquals(
+                                    "downloadSizeBytes must be positive when present, but was: -1",
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () ->
+                                                            build(
+                                                                    ToolOrigin.MANAGED,
+                                                                    state,
+                                                                    OptionalLong.of(-1L)))
+                                            .getMessage(),
+                                    state.name()),
+                    () ->
+                            assertEquals(
+                                    OptionalLong.of(1L),
+                                    build(ToolOrigin.MANAGED, state, OptionalLong.of(1L))
+                                            .downloadSizeBytes(),
+                                    state.name()));
         }
     }
 

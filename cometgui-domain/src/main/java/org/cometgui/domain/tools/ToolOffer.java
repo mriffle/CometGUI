@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 
 /**
@@ -46,10 +47,39 @@ import java.util.Set;
  * Nothing in this record lets a capability be attached to a tool it does not belong to: the
  * constructor rejects that outright.
  *
+ * <h2>Why the download size is here</h2>
+ *
+ * <p>Because the sentence at the top of this documentation is meant literally, and until phase 05
+ * unit 8 it was not true. PDV's artefact is <strong>103407417 bytes</strong> -- the one transfer
+ * {@code phases/PHASE-05-tool-registry.rst} singles out for deliberate cancellation testing -- and
+ * an offer that could not state that size left the Tool Manager unable to warn anyone before the
+ * transfer started. A user who is told the number can decide; one who is not finds out by waiting.
+ *
+ * <p>It is an {@link OptionalLong} because <strong>absent is a real answer, not a missing
+ * one</strong>, and it is absent in exactly two circumstances:
+ *
+ * <ul>
+ *   <li>a <strong>registered local binary</strong> ({@link ToolOrigin#LOCAL}), which was never
+ *       downloaded -- the file was already on the machine, and quoting a download size for it would
+ *       be inventing one;
+ *   <li>a build that is {@link ToolInstallState#UNAVAILABLE_ON_THIS_PLATFORM}, where upstream
+ *       publishes no artefact for this host at all, so there is no download to size.
+ * </ul>
+ *
+ * <p>Everywhere else it is <strong>required</strong>, and that is the point of the rule rather than
+ * a formality: a managed build this machine could fetch has a size in the manifest, so an offer for
+ * one that carried no size would be a Tool Manager row that silently cannot say what it is about to
+ * cost. It is the artefact's own download length -- what the manifest pins and what {@code
+ * R-SEC-02}'s SHA-256 is taken over -- not the installed size, which for PDV's 222-entry archive is
+ * a different and larger number.
+ *
  * @param tool which tool
  * @param version which version of it, as upstream names the release
  * @param origin whether CometGUI installed it or the user pointed at it
  * @param state what can be done with it on this machine
+ * @param downloadSizeBytes how many bytes fetching this build costs, from the manifest record it
+ *     comes from; positive when present, and absent only for a local binary or a build with no
+ *     artefact for this platform
  * @param capabilities what it can do, each with the evidence behind the claim; in the order the
  *     manifest or the probe produced them, with no capability named twice
  * @param advisories the caveats to show at selection time and record in provenance ({@code
@@ -63,6 +93,7 @@ public record ToolOffer(
         ToolVersion version,
         ToolOrigin origin,
         ToolInstallState state,
+        OptionalLong downloadSizeBytes,
         List<DeclaredCapability> capabilities,
         List<ToolAdvisory> advisories,
         Optional<LoaderDiagnostic> loaderDiagnostic,
@@ -73,19 +104,71 @@ public record ToolOffer(
      *
      * @throws NullPointerException if any component is {@code null}
      * @throws IllegalArgumentException if a capability belongs to another tool, if a capability or
-     *     an advisory identifier appears twice, if a present installed path is relative, or if an
-     *     installed offer names no path -- with a message naming the field and the rejected value
+     *     an advisory identifier appears twice, if a present installed path is relative, if an
+     *     installed offer names no path, or if the download size is present where there is no
+     *     download or absent where there is one -- with a message naming the field and the rejected
+     *     value
      */
     public ToolOffer {
         Objects.requireNonNull(tool, "tool");
         Objects.requireNonNull(version, "version");
         Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(state, "state");
+        Objects.requireNonNull(downloadSizeBytes, "downloadSizeBytes");
         capabilities = checkedCapabilities(capabilities, tool);
         advisories = checkedAdvisories(advisories);
         Objects.requireNonNull(loaderDiagnostic, "loaderDiagnostic");
         Objects.requireNonNull(installedPath, "installedPath");
         checkInstalledPath(state, installedPath);
+        checkDownloadSize(origin, state, downloadSizeBytes);
+    }
+
+    /*
+     * WHETHER THERE IS A DOWNLOAD AT ALL IS DECIDED BY TWO SEPARATE COMPONENTS, and both are
+     * checked, because each on its own would leave the other axis ungraded.  A local binary was
+     * never downloaded whatever its state, and a build with no artefact for this platform has no
+     * download whatever its origin -- so the rule is stated over the pair rather than over one of
+     * them with the other silently along for the ride.
+     */
+    private static void checkDownloadSize(
+            ToolOrigin origin, ToolInstallState state, OptionalLong downloadSizeBytes) {
+        if (origin == ToolOrigin.LOCAL) {
+            requireNoDownload(
+                    downloadSizeBytes,
+                    "a local binary was not downloaded, so it has no download size; CometGUI did"
+                            + " not fetch it and cannot say what fetching it would have cost");
+            return;
+        }
+        if (state == ToolInstallState.UNAVAILABLE_ON_THIS_PLATFORM) {
+            requireNoDownload(
+                    downloadSizeBytes,
+                    "upstream publishes no artefact of this build for this platform, so there is"
+                            + " no download to size");
+            return;
+        }
+        if (downloadSizeBytes.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "downloadSizeBytes is required for a managed offer in state "
+                            + state.name()
+                            + ": there is an artefact behind it and the manifest pins its length,"
+                            + " so an offer that cannot state it is one the Tool Manager cannot"
+                            + " warn anybody about");
+        }
+        if (downloadSizeBytes.getAsLong() <= 0) {
+            throw new IllegalArgumentException(
+                    "downloadSizeBytes must be positive when present, but was: "
+                            + downloadSizeBytes.getAsLong());
+        }
+    }
+
+    private static void requireNoDownload(OptionalLong downloadSizeBytes, String why) {
+        if (downloadSizeBytes.isPresent()) {
+            throw new IllegalArgumentException(
+                    "downloadSizeBytes must be absent, but was "
+                            + downloadSizeBytes.getAsLong()
+                            + ": "
+                            + why);
+        }
     }
 
     private static List<DeclaredCapability> checkedCapabilities(

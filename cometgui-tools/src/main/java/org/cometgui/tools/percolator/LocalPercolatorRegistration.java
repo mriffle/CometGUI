@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.ports.HashService;
@@ -270,6 +271,13 @@ public final class LocalPercolatorRegistration {
                 version,
                 ToolOrigin.LOCAL,
                 ToolInstallState.INSTALLED,
+                /*
+                 * NO DOWNLOAD SIZE, and the record refuses one here.  Phase 05 unit 8 gave
+                 * ToolOffer a download size so the Tool Manager can say what a managed build
+                 * costs to fetch; this binary was already on the machine, so CometGUI never
+                 * fetched it and has no such number to quote.
+                 */
+                OptionalLong.empty(),
                 declared,
                 List.of(UNMANAGED_ADVISORY),
                 Optional.empty(),
