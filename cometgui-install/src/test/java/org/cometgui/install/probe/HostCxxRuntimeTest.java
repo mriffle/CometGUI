@@ -201,6 +201,40 @@ class HostCxxRuntimeTest {
     }
 
     @Test
+    @DisplayName("an unreadable library and an absent memory map are both \"not established\"")
+    void whatCannotBeReadIsUndetermined(@TempDir Path directory) throws IOException {
+        Path aDirectory = Files.createDirectories(directory.resolve("nota.so"));
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                Optional.empty(),
+                                HostCxxRuntime.readQuietly(aDirectory),
+                                "a library that cannot be read leaves the version undetermined"
+                                        + " rather than failing an install"),
+                () ->
+                        assertEquals(
+                                Optional.empty(),
+                                HostCxxRuntime.readQuietly(directory.resolve("absent"))),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                HostCxxRuntime.readMappings(directory.resolve("no-such-maps")),
+                                "a host that publishes no memory map -- macOS, Windows, a"
+                                        + " container without procfs -- "
+                                        + "contributes no directories"));
+    }
+
+    @Test
+    @DisplayName("a mapped path that is the root itself names no file")
+    void theRootNamesNoFile() {
+        assertEquals(
+                List.of(),
+                HostCxxRuntime.mappedDirectories(List.of("7f00-7f01 r--p 00000000 08:01 101  /")),
+                "the root is a directory and not a library, and it has no parent to take");
+    }
+
+    @Test
     @DisplayName("the search takes the first directory that actually holds the library")
     void locateTakesTheFirstDirectoryThatHasIt(@TempDir Path root) throws IOException {
         Path empty = Files.createDirectories(root.resolve("empty"));

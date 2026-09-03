@@ -134,6 +134,38 @@ class LoadabilityProbeFakeTest {
     }
 
     @Test
+    @DisplayName("output on standard output alone is still output, so the build has started")
+    void outputOnStandardOutputAloneCounts(@TempDir Path staged) throws IOException {
+        Path executable = file(staged);
+
+        LoadabilityResult result =
+                probe(FakeRunner.emitting(List.of(), List.of("a line on stdout"), 1))
+                        .probe(executable, List.of(), Map.of(), context());
+
+        assertTrue(
+                result.started(),
+                "\"it printed nothing at all AND exited non-zero\" is the rule; printing on"
+                        + " either stream is printing");
+    }
+
+    @Test
+    @DisplayName("a path whose absolute form has no parent is refused before anything is launched")
+    void aPathWithNoParentAtAll(@TempDir Path staged) {
+        Path fileSystemRoot = java.util.Objects.requireNonNull(staged.getRoot(), "root");
+
+        IOException refused =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                probe(FakeRunner.emitting(List.of(), List.of(), 0))
+                                        .probe(fileSystemRoot, List.of(), Map.of(), context()));
+
+        assertTrue(
+                refused.getMessage().endsWith("has no directory to run in, so it cannot be probed"),
+                refused.getMessage());
+    }
+
+    @Test
     @DisplayName("the probe rejects a null argument by name")
     void nullArgumentsAreRejectedByName(@TempDir Path staged) throws IOException {
         LoadabilityProbe probe = probe(FakeRunner.emitting(List.of(), List.of(), 0));
@@ -178,6 +210,19 @@ class LoadabilityProbeFakeTest {
                                                                 classifier(),
                                                                 Nulls.of(HostPlatform.class),
                                                                 BRIEF))
+                                        .getMessage()),
+                () ->
+                        assertEquals(
+                                "timeout must be positive, but was: PT-1S",
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () ->
+                                                        new LoadabilityProbe(
+                                                                FakeRunner.emitting(
+                                                                        List.of(), List.of(), 0),
+                                                                classifier(),
+                                                                ProbeRecords.LINUX_X86_64,
+                                                                Duration.ofSeconds(-1)))
                                         .getMessage()),
                 () ->
                         assertEquals(

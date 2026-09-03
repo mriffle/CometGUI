@@ -125,7 +125,7 @@ public final class HostCxxRuntime {
      * one place that IOException is turned into that answer, so that hostGlibcxx() can be called
      * from a constructor without every caller handling a failure it cannot act on.
      */
-    private static Optional<GlibcVersion> readQuietly(Path library) {
+    static Optional<GlibcVersion> readQuietly(Path library) {
         try {
             return highestGlibcxxIn(library);
         } catch (IOException unreadable) {
@@ -149,7 +149,7 @@ public final class HostCxxRuntime {
      * @return the directories, in order and without repeats
      */
     static List<Path> searchDirectories() {
-        List<Path> directories = new ArrayList<>(mappedDirectories(readMappings()));
+        List<Path> directories = new ArrayList<>(mappedDirectories(readMappings(PROCESS_MAPPINGS)));
         for (String fallback : FALLBACK_DIRECTORIES) {
             directories.add(Path.of(fallback));
         }
@@ -161,9 +161,9 @@ public final class HostCxxRuntime {
      * not an error here.  It means the first source of directories has nothing to say and the
      * conventional list is all there is.
      */
-    private static List<String> readMappings() {
+    static List<String> readMappings(Path mappings) {
         try {
-            return Files.readAllLines(PROCESS_MAPPINGS, StandardCharsets.ISO_8859_1);
+            return Files.readAllLines(mappings, StandardCharsets.ISO_8859_1);
         } catch (IOException noProcfs) {
             return List.of();
         }
@@ -202,17 +202,23 @@ public final class HostCxxRuntime {
         if (slash < 0) {
             return Optional.empty();
         }
-        String candidate = line.substring(slash).strip();
-        if (candidate.isEmpty()) {
-            return Optional.empty();
-        }
-        Path path = Path.of(candidate);
+        /*
+         * The substring begins at the '/' and stripping cannot remove it, so the candidate is
+         * never empty and is always absolute; the one thing it can be is the root itself, which
+         * names a directory and no file.  There is deliberately no emptiness check: a branch no
+         * input can reach is a mutation no honest test can kill.
+         */
+        Path path = Path.of(line.substring(slash).strip());
         return path.getParent() == null ? Optional.empty() : Optional.of(path);
     }
 
+    /*
+     * A path that reached here has a parent, so it has a file name; requireNonNull states that to
+     * the reader and to SpotBugs without adding a branch that nothing can take.
+     */
     private static boolean isAnchor(Path mapped) {
-        Path name = mapped.getFileName();
-        return name != null && ANCHOR_LIBRARIES.contains(name.toString());
+        return ANCHOR_LIBRARIES.contains(
+                Objects.requireNonNull(mapped.getFileName(), "fileName").toString());
     }
 
     private static List<Path> dedupe(List<Path> paths) {
