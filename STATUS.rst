@@ -8,7 +8,9 @@ Project Status
    ``main`` published to the remote after GitHub push protection rejected the
    project's own seeded-secret decoy; **Phase 04 resumed, reworked once and
    signed off PARTIAL**)
-:Current phase: 05 -- **IN PROGRESS**, dispatched 2026-09-02. Phase 04 is
+:Current phase: 05 -- **STOPPED AFTER UNIT 7** on 2026-09-03 by owner
+   instruction, units 1-7 signed off (:ref:`status-p05-stopped`). Dispatched
+   2026-09-02. Phase 04 is
    **PARTIAL**, signed off 2026-09-02 on tier 1's own re-run and seven of its
    own defect injections; Phase 03 **PARTIAL**, 2026-09-01. Phases 00 and 01
    remain PARTIAL, both awaiting a pull request. The per-class census debt is
@@ -189,7 +191,7 @@ Phase board
        (:ref:`status-platform-divergence`).
    * - 05
      - Tool registry and installer
-     - IN PROGRESS
+     - IN PROGRESS -- **stopped after unit 7**
      - **Dispatched 2026-09-02** with a fresh phase orchestrator, briefed by
        ``handoffs/PHASE-05-BRIEF.rst`` and told its expected grade is PARTIAL:
        gate item 9 is macOS-only and cannot be executed here. The first phase
@@ -2593,6 +2595,76 @@ this list to still be complete.
 
 Phase 15 owns performance and is the likely place; Phase 14 may reach for it
 first.
+
+.. _status-p05-stopped:
+
+Phase 05 stopped after unit 7 (2026-09-03), by owner instruction
+================================================================
+
+**Units 1-7 signed off. Nothing landed-but-unsigned.** Every one was signed off
+by an orchestrator that read the diff, re-ran the build itself and injected a
+defect the unit had not tried; five of the seven were sent back at least once.
+``handoffs/PHASE-05-handoff.rst`` is rewritten for a successor.
+
+Gate items **3 and 4 met**; **2 and 8 partial**, proved at the installer and
+awaiting the UI; **1, 5, 6, 7** need units 8-10; **9** needs the macOS attempt
+(unit 13, authored but not run). Two orchestrators ran the phase; the first
+handed over after unit 5 on the owner's instruction, with context spend rather
+than context occupancy the trigger.
+
+.. _status-cancel-inside-a-step:
+
+A live defect in signed-off code, found on the way out
+------------------------------------------------------
+
+**Reported, not verified.** Unit 8's agent -- whose work was cancelled and
+preserved under tag ``phase05-unit8-cancelled`` -- found that **cancelling an
+install mid-download reports ``FAILED``, not ``CANCELLED``**, reproduced three
+times against the real PDV artefact at 4 MB::
+
+    expected: <CANCELLED> but was: <FAILED>
+
+Nothing translates ``DownloadCancelledException`` into
+``InstallCancelledException``, so it exits through ``catch (IOException)``, and
+``InstallHandle.cancel()``'s own Javadoc forbids exactly that.
+
+**Why unit 5's sign-off did not catch it, and why the sign-off still stands.**
+``FakeFetcher`` ignores cancellation, so cancellation was graded **only at step
+boundaries** and never *inside* a transfer. Unit 5's eight-step interruption
+proof is sound; the axis it never varied is **where within a step the cancel
+lands**. That is this phase's signature hole for the fourth time -- *a rule
+graded at one point on an axis it does not depend on* -- and the fourth time it
+was found by someone other than the unit that wrote it.
+
+It lands on the 99 MB PDV transfer that unit 10 owns and would have walked into.
+**Reproducing it is the first action in the handoff**, before unit 8 is planned.
+
+*Two process notes from the stop.* The unit 8 agent reverted its own ~5000-line
+commit and **preserved it under a tag** rather than leaving it to the reflog, on
+its own initiative. And its ``git reset --hard`` would have discarded the
+orchestrator's uncommitted handoff draft had the two overlapped by minutes:
+**an agent reverting its own work and an orchestrator writing a document are not
+obviously in conflict, and ``reset --hard`` does not respect the distinction.**
+
+.. _status-negative-search-is-a-signal:
+
+The failure to find anything is the signal
+-------------------------------------------
+
+The successor orchestrator's closing observation, and the sharpest statement of
+the method this project has produced. In unit 6 it burned **five** injection
+candidates drawn from the unit's own acceptance list, **every one already
+graded**, before it stopped and asked the different question -- *what silent
+behaviour does this code have that no acceptance condition names?* -- which
+then found a defect that had survived 944 tests.
+
+  **That failure to find anything was the signal, not the waste.**
+
+An acceptance list that answers every attack is not evidence of strength; it is
+evidence that you are attacking along the axes the author already considered.
+The moment several candidates come back already-covered is the moment to change
+the question, not to conclude the unit is sound. See
+:ref:`status-injection-from-outside`.
 
 Open decisions
 ==============

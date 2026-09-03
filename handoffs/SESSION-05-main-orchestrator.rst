@@ -5,8 +5,9 @@ SESSION-05 -- main orchestrator record
 :Session: 05
 :Tier: 1 -- main orchestrator
 :Started: 2026-09-01
-:Status: **IN PROGRESS** -- Phase 05 is live; this record is written
-   incrementally so that it is not written under pressure at the end
+:Status: **CLOSED** 2026-09-03. Phase 05 stopped after unit 7 by owner
+   instruction. The durable half of this record was written at ~57% context,
+   deliberately, rather than at the end
 :Authoritative state: ``STATUS.rst``, always. This file records *how the
    session went*, not where the project is.
 
@@ -35,7 +36,14 @@ What this session did
 * **Opened and merged PR #1**, which caused **the first execution of a Windows
   binary in this project's history** (:ref:`status-windows-first-execution`).
 * **Ran Phase 05** through two orchestrators, handing over after unit 5 on the
-  owner's instruction.
+  owner's instruction, and **stopping after unit 7** on the owner's instruction.
+  Units 1-7 signed off, nothing landed-but-unsigned
+  (:ref:`status-p05-stopped`).
+* **Amended ``specification.rst`` to revision 11**, correcting a claim
+  measurement disproved: an 8+8 probe fixture is *unreliable*, not reliably
+  insufficient -- 10 aborts in 50 seeds, against 0 in 50 at 64+64. The old
+  wording would have licensed a negative control that passed four times in
+  five.
 
 Decisions taken at tier 1, with their reasoning
 ================================================
@@ -109,6 +117,11 @@ tier enforcing the rule against it.**
 What the next main orchestrator inherits
 =========================================
 
+* **Phase 05 resumes at unit 8**, from ``handoffs/PHASE-05-handoff.rst``. Its
+  first action is to reproduce the cancel-inside-a-step defect
+  (:ref:`status-cancel-inside-a-step`), which is reported and **not verified**.
+  Unit 8's cancelled work is preserved at tag ``phase05-unit8-cancelled`` and
+  has been verified by nobody.
 * **Phases 00 and 01 need their gates re-run** before moving off PARTIAL. The
   evidence is in and both should pass -- PR #1 supplied the missing halves --
   but sign-off means running it, and it was deferred so as not to collide with
