@@ -3,28 +3,34 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-09-01
-:Updated by: Main orchestrator, session 05 (**Phase 03 signed off PARTIAL**;
-   ``main`` published to the remote after GitHub push protection rejected the
-   project's own seeded-secret decoy; **Phase 04 resumed, reworked once and
-   signed off PARTIAL**)
+:Updated: 2026-09-17
+:Updated by: Main orchestrator, session 07 (**Phase 00 item 8's contradiction
+   resolved on the owner's ruling, and the amendment carried into the code
+   that grades it**; the headline below corrected -- it had been describing a
+   pull request that was opened and merged on 2026-09-02)
 :Current phase: 05 -- **STOPPED AFTER UNIT 7** on 2026-09-03 by owner
    instruction, units 1-7 signed off (:ref:`status-p05-stopped`). Dispatched
    2026-09-02. Phase 04 is
    **PARTIAL**, signed off 2026-09-02 on tier 1's own re-run and seven of its
    own defect injections; Phase 03 **PARTIAL**, 2026-09-01. Phases 00 and 01
-   remain PARTIAL, both awaiting a pull request. The per-class census debt is
+   remain PARTIAL, but **neither is waiting on a pull request any more** --
+   #1 merged on 2026-09-02 and ran both pipelines. The per-class census debt is
    closed (:ref:`status-census-closed`).
 :Overall: The repository, build and every quality gate exist and have each been
-   seen to fail on a deliberate defect. Three phases are signed off -- 02
-   PASSED, 03 PARTIAL, 00 and 01 PARTIAL -- and 04 is in progress. What holds
-   Phases 00 and 01 at PARTIAL has narrowed twice: ``D-008`` supplied a remote
-   on 2026-08-30, session 04 pushed, and session 05 published ``main`` in full.
-   **What is left is one pull request**, which is the trigger both of their
-   outstanding items depend on and which nobody has opened. The Windows
-   verification harness is written, falsifiable and locally verified, and
-   GitHub has now executed exactly one workflow -- a scheduled nightly that
-   failed on a Phase-15 stub, by design. See :ref:`status-residue-01`,
+   seen to fail on a deliberate defect. Five phases are signed off -- 02
+   PASSED; 00, 01, 03 and 04 PARTIAL -- and Phase 05 is **stopped after unit 7
+   of 13** by owner instruction (:ref:`status-p05-stopped`). **Pull request #1
+   was opened and merged on 2026-09-02**, which closed what both of Phases 00
+   and 01's outstanding items were waiting on: ``pull-request.yml`` ran green
+   on a real pull request (2682 tests, 0 failures), and a ``windows-latest``
+   runner executed Percolator for the first time in this project's history
+   (:ref:`status-windows-first-execution`). Item 8's own wording then proved
+   unsatisfiable by the shipped artefact; that is **resolved as of 2026-09-17**
+   in the gate text *and* in the code that grades it
+   (:ref:`status-p00-item8-contradiction`). Live and unfixed: **the nightly has
+   failed every night since 2026-08-31**, and its first failing Phase-15 stub
+   skips every later step, so two real steps have never executed on a runner
+   (:ref:`status-nightly-masking`). See :ref:`status-residue-01`,
    :ref:`status-p02` and :ref:`status-session-05`.
 
 This file is the **only** authoritative record of where the project is. Update
@@ -74,8 +80,10 @@ What exists
      - State
      - Notes
    * - ``specification.rst``
-     - Revision 9
-     - Revision 9 records ``D-003`` (three managed Percolator versions,
+     - Revision 11
+     - Revision 11 is the file's own header as of 2026-09-17; this row said
+       revision 9 until then. Revision 9 records ``D-003`` (three managed
+       Percolator versions,
        ``R-PERC-12``); revision 8 recorded ``D-005`` (drive PDV through a
        generated mzTab, ``R-PDV-02``..``R-PDV-05``, ``AC-VIS-04``/``05``);
        revision 7 acted on the ``noxml`` discovery. Passes
@@ -143,8 +151,14 @@ Phase board
      - Feasibility, legal and upstream verification
      - PARTIAL
      - Signed off 2026-08-29. 9 of 10 gate items PASS on the main
-       orchestrator's own re-run; item 8 passes only on its second branch.
-       See :ref:`status-p00`.
+       orchestrator's own re-run. **Item 8's contradiction is resolved
+       (2026-09-17)**: the wording was amended on the owner's ruling and the
+       grading code now follows it, so the item rests on the 2026-09-02
+       Windows observations plus its documented-blocking-reason branch rather
+       than on an unsatisfiable clause. Promoting the phase to PASSED is a
+       sign-off action -- it needs all ten items re-run -- and has not been
+       taken. See :ref:`status-p00` and
+       :ref:`status-p00-item8-contradiction`.
    * - 01
      - Repository, build and quality skeleton
      - PARTIAL
@@ -2278,10 +2292,73 @@ this green run, and is unchanged.
 
 .. _status-p00-item8-contradiction:
 
-Phase 00 item 8 contradicts itself, and tier 1 will not quietly reword it
--------------------------------------------------------------------------
+Phase 00 item 8 contradicted itself -- **RESOLVED 2026-09-17**
+---------------------------------------------------------------
 
-**This is an escalation to the owner, not a decision.** Item 8 requires the
+:Status: **CLOSED.** The owner answered on 2026-09-02 and again on 2026-09-17:
+   *"Your suggestion sounds fine."* The proposal below was adopted verbatim.
+:Amended in: ``phases/PHASE-00-feasibility.rst`` item 8, commit ``ffbf143``
+   (2026-09-02)
+:Graded by: ``scripts/ci/windows_percolator_verify.py`` (2026-09-17)
+
+**This file was wrong for fifteen days, and that is the finding worth keeping.**
+The wording was amended on 2026-09-02 -- the phase document and
+``handoffs/SESSION-05-main-orchestrator.rst`` both record it as owner-approved,
+and commit ``ffbf143`` carries it -- but the section below was left standing as
+an open escalation. The authoritative file was the stale one, so a reader of
+``STATUS.rst`` alone would have gone on believing a decision was owed that had
+already been taken. **When a document's own rule is "if it disagrees with
+anything else, fix it here first", the failure mode is not that it lags; it is
+that it lags while claiming precedence.**
+
+**What was actually still broken on 2026-09-17, and it was not the prose.**
+The amendment never reached the code that grades the check.
+``windows_percolator_verify.py`` decided its exit status entirely from the
+seven-step checklist, which exercises the **NSIS installer payload** -- the
+XML-capable build that ``D-002`` option C removed from the product. Section 8,
+which exercises the binary CometGUI actually installs, explicitly *did not
+gate*. So on 2026-09-02 the shipped binary behaved perfectly and the job still
+went red, and it would have gone red on **every future pull request**, for a
+reason no change to this project could fix, about a binary it does not ship.
+That is the same defect this project keeps finding, in its other polarity: **a
+check that cannot go green is read exactly as often as one that cannot go
+red.**
+
+**The change, which is a net strengthening.** Three conditions on the shipped
+``noxml`` binary now gate the job where one did before: it must be observed to
+**start** (its own banner, not an exit code), it must write **usable Percolator
+XML**, and ``--xml-in`` must print the **XML_SUPPORT diagnostic** -- the
+positive control proving the detector works on that host, which until now
+reached only step 5's downgrade and the assertion table. Exactly one thing
+stopped gating, and it is item 8's own second branch -- *"or the blocking
+reason is documented precisely and the manifest does not claim it"*: the XML
+build **never started**. Verified rather than asserted before relying on it:
+the reason is documented at ``docs/feasibility/windows-artefact.rst`` lines
+432-443 (``0xC0000135``; ``xerces-c_3_1.dll`` imports 60 functions from an
+``MSVCR100.dll`` the payload does not ship), and ``manifests/tools.json``
+does not carry the XML build at all. A **NEGATIVE** from the checklist -- the
+XML build running and contradicting an inference -- still fails the job, and so
+does any other inconclusive cause, **a timeout included**.
+
+**Proved falsifiable rather than argued.** The new policy is two pure functions
+so the self-test can drive every branch without a Windows machine; ``--self-test``
+went from 34 cases to **49, 0 failed**. Then it was damaged twice, on this
+machine: letting the blocked branch rescue anything failed **G3, G4, G5** and
+exited 6, and accepting a timeout as the documented reason failed **G12** and
+exited 6. The clean tree exits 0. ``--check-only`` still runs the whole driver
+end to end here -- every pinned checksum matched upstream on 2026-09-17.
+
+**What this does NOT claim.** No Windows job was re-run today; the re-grade is
+from the 2026-09-02 observations already recorded above, not from fresh
+execution. The next pull request runs it. One run on one hosted image that
+supplies a Visual C++ runtime the ZIP does not carry still leaves the clean
+end-user machine, the standard-user account and macOS untested, and Phase 05's
+VC++ line is **not** discharged.
+
+The historical escalation follows, unedited, because the proposal it makes is
+the wording now in force.
+
+**This was an escalation to the owner, not a decision.** Item 8 requires the
 binary's ``--xml-in`` to **not** answer ``Compiler flag XML_SUPPORT was off``,
 and then, since ``D-002`` option C, requires "the same observations" of the
 portable ``noxml`` build. But the ``noxml`` build is *defined* by printing
@@ -2882,9 +2959,40 @@ Risks currently live
 Next action
 ===========
 
-Two things are ready, and they are independent of each other.
+.. warning::
 
-**1. Close the two gate items that now need only a pull request.** Superseded in
+   **Item 1 below is DONE and is retained only as history.** Pull request #1
+   was opened and merged on 2026-09-02; it ran ``pull-request.yml`` green on a
+   real pull request and put Percolator on a ``windows-latest`` runner for the
+   first time (:ref:`status-windows-first-execution`,
+   :ref:`status-p01-item6`). Phase 00 item 8's residual contradiction was
+   resolved on 2026-09-17 (:ref:`status-p00-item8-contradiction`). Nothing
+   below asking for a pull request to be opened is still owed.
+
+   **What is actually next, as of 2026-09-17:**
+
+   #. **The owner decides whether Phase 05 resumes** at unit 8 of 13. It was
+      stopped by instruction, not by a problem, and nothing has moved since
+      2026-09-03. ``handoffs/PHASE-05-handoff.rst`` is written for a
+      successor; its first instruction is to reproduce the live
+      cancel-mid-download defect (:ref:`status-cancel-inside-a-step`) before
+      unit 8 is planned.
+   #. **The nightly has failed every night since 2026-08-31** and its first
+      failing stub skips every later step, so the documentation link check and
+      the tool-manifest verification have still never executed on a runner.
+      The fix recorded in :ref:`status-nightly-masking` as "lands when that
+      branch merges" **did not land** -- the merge changed only comments in
+      ``nightly.yml``, and the step ordering is unchanged. It belongs to
+      whoever lands Phase 01's residue.
+   #. **Promoting Phase 00 to PASSED** is now possible but not done: it is a
+      sign-off action needing all ten gate items re-run, not a bookkeeping
+      edit.
+
+Two things were ready when this section was written, and they were independent
+of each other.
+
+**1. Close the two gate items that now need only a pull request.** *Done:
+superseded by pull request #1, merged 2026-09-02.* Superseded in
 part on 2026-08-31: the push has happened (:ref:`status-session-04`). ``main``
 is pushed -- **at** ``9abfe1b`` **as of 2026-09-01**, session 05 having
 published the remaining ninety-one commits (:ref:`status-session-05`) -- and
@@ -3035,6 +3143,33 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-09-17
+     - 00
+     - **Phase 00 item 8's contradiction resolved, in the gate text and in the
+       code that grades it.** The owner confirmed the 2026-09-02 proposal --
+       clause (iii) applies to the XML build; the ``noxml`` build must print
+       the diagnostic -- and directed that it not impede progress. Two things
+       were found in the doing. First, **this file had carried the escalation
+       as open for fifteen days** while ``phases/PHASE-00-feasibility.rst``
+       and the session-05 record both carried it as answered at ``ffbf143``:
+       the authoritative document was the stale one. Second, and the part that
+       mattered, **the amendment had never reached
+       ``scripts/ci/windows_percolator_verify.py``**, whose exit status was
+       decided entirely by the seven-step checklist over the **unshipped**
+       XML-capable build, with the shipped ``noxml`` binary explicitly not
+       gating. That job would have been red on every future pull request for a
+       reason no change could fix, about a binary the product does not ship.
+       The shipped binary now gates on three conditions where one gated
+       before (start, usable XML, the XML_SUPPORT positive control); the one
+       case that stopped gating is item 8's own documented-blocking-reason
+       branch, the XML build never *starting*, with both of that branch's
+       preconditions verified rather than assumed. A checklist NEGATIVE, and
+       every other inconclusive cause including a timeout, still fail the job.
+       Self-test 34 -> **49 cases, 0 failed**, then damaged twice on this
+       machine to prove the new pass branch can go red (G3/G4/G5 and G12, exit
+       6 each). No Windows job was re-run: the re-grade is from the 2026-09-02
+       observations, and the next pull request executes it.
+       See :ref:`status-p00-item8-contradiction`.
    * - 2026-08-30
      - --
      - **``D-003`` decided, and with it every open decision is answered.**

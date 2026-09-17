@@ -12,16 +12,32 @@
 # way."  scripts/ci/windows-percolator-verify.sh is that checklist; this file
 # is the only thing in the repository that can put it on a Windows machine.
 #
-# WHAT THIS FILE HAS NOT BEEN SEEN TO DO: anything at all.  GitHub has never
-# executed ANY workflow in this repository -- the Actions API reported
-# total_count = 0 runs on 2026-08-30, the day this file was written; one
-# scheduled nightly has run since, on 2026-08-31.  A remote
-# exists (D-008, decided 2026-08-30), but nothing has been pushed to it and no
-# runner has ever started.  So this file is a proposal, not evidence.  Until a
-# runner has executed it and returned a transcript, the tool manifest's
-# xml_capability stays `unverified-on-windows`, the feasibility basis keeps the
-# sentence "The binary was not executed on Windows.", and the words verified,
-# confirmed, proven and tested are not used of the Windows binary anywhere.
+# WHAT THIS FILE HAS BEEN SEEN TO DO, as of 2026-09-02: it ran, on pull
+# request #1, as run 33644055780 -- the first Windows execution in this
+# project's history.  The portable noxml binary the product installs started,
+# printed its 3.07.1 banner, wrote 148 272 bytes of Percolator XML (200 psm,
+# 200 peptide, parsed rather than grepped) and answered `--xml-in` with
+# `Compiler flag XML_SUPPORT was off`.  manifests/tools.json carries that as
+# `observed-by-execution` and names the run.  The XML-capable installer payload
+# -- which D-002 option C removed from the product -- never started: exit
+# 0xC0000135, its xerces-c_3_1.dll importing 60 functions from an MSVCR100.dll
+# the payload does not ship.  So the words verified, confirmed, proven and
+# tested are STILL not used of the Windows binary: one run, on one hosted image
+# that supplies a Visual C++ runtime the ZIP does not carry.  Observed is the
+# word this project permits, and observed is what the manifest says.
+#
+# WHAT DECIDES THIS JOB, since the owner amended Phase 00 gate item 8
+# (2026-09-02, confirmed 2026-09-17): the SHIPPED noxml binary.  It must start,
+# write usable XML and print the XML_SUPPORT diagnostic -- three gating
+# conditions where previously there was one.  The seven-step checklist over the
+# unshipped XML build still turns this job red on a NEGATIVE, but its failure
+# to START is item 8's documented-blocking-reason branch and no longer fails
+# the job.  Before that change this job could never go green again on any
+# future pull request, for a reason no change to this project could fix, about
+# a binary it does not ship -- and a check that cannot go green is read exactly
+# as often as one that cannot go red.  scripts/ci/windows_percolator_verify.py
+# --self-test carries the controls that prove the new pass branch can still
+# fail (group G).
 #
 # HOW IT IS TRIGGERED.  `pull_request` is the trigger that matters: opening the
 # branch that carries this file as a pull request against main is what runs it

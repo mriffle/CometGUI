@@ -55,6 +55,12 @@
 #   0  PASS: every checklist assertion held on Windows, each naming the value
 #      it observed.  Also a clean --check-only (which is NOT a pass: no Windows
 #      binary was executed) and a clean --self-test.
+#      Also PASS-XML-BLOCKED: the SHIPPED noxml binary -- the one D-002 option
+#      C installs -- met every requirement, and the XML-capable build, which
+#      the product does not ship, never started.  That is Phase 00 gate item
+#      8's documented-blocking-reason branch (amended by the owner 2026-09-02,
+#      confirmed 2026-09-17), and the verdict claims NOTHING about the XML
+#      build.  Any other reason for the checklist falling short is still a 2.
 #   1  NEGATIVE: the binary ran and the evidence contradicts an inference this
 #      project relies on.  A real finding, meant to be loud.
 #   2  INCONCLUSIVE: the binary did not run far enough for the test to mean

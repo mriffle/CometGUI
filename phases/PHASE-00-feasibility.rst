@@ -145,6 +145,21 @@ running the check. An item that cannot be verified has not passed.
       it. The verb "confirmed" also became "observed", a word this project
       permits about a binary it has actually run.
 
+      **Confirmed by the owner again on 2026-09-17, and carried into the code
+      that grades the item.** ``STATUS.rst`` had gone on carrying this as an
+      open escalation for fifteen days while the phase document and the
+      session record both carried it as answered -- the record disagreed with
+      itself, and the authoritative file was the one that was wrong. On the
+      same day the amendment reached
+      ``scripts/ci/windows_percolator_verify.py``, which until then decided
+      its exit status entirely from the seven-step checklist over the
+      **unshipped** XML build. The shipped ``noxml`` binary now gates: it must
+      start, write usable XML, and print the diagnostic. The XML build's
+      failure to *start* falls to this item's second branch -- the blocking
+      reason is documented and the manifest does not carry that artefact --
+      while a NEGATIVE from it still fails the job. See
+      :ref:`status-p00-item8-contradiction`.
+
    .. note::
 
       **Amended 2026-08-30 by the main orchestrator; strictly stronger than

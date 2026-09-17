@@ -106,11 +106,17 @@ EXIT_SELF_TEST_FAILED = 6
 
 VERDICT_EXIT = {
     "PASS": EXIT_PASS,
+    "PASS-XML-BLOCKED": EXIT_PASS,
     "NEGATIVE": EXIT_NEGATIVE,
     "INCONCLUSIVE": EXIT_INCONCLUSIVE,
     "HARNESS FAILURE": EXIT_HARNESS_FAILURE,
     "CHECK-ONLY": EXIT_PASS,
 }
+
+# The NTSTATUS a Windows process returns when the loader cannot resolve an
+# import.  Named because PASS-XML-BLOCKED below turns on it and a bare
+# 3221225781 in a conditional is unreadable.
+STATUS_DLL_NOT_FOUND = 3221225781                        # 0xC0000135
 
 # --------------------------------------------------------------------------
 # Pinned identities.  NONE OF THESE MAY BE RELAXED to make a run pass.  Each
@@ -673,6 +679,103 @@ def analyse_xml_in_control(rec):
 
 
 # --------------------------------------------------------------------------
+# What gates the job -- Phase 00 gate item 8, as amended
+# --------------------------------------------------------------------------
+#
+# WHY THIS SECTION EXISTS, AND WHAT CHANGED ON 2026-09-17.  Until today this
+# driver's exit status was decided entirely by the seven-step checklist, which
+# exercises the NSIS installer payload -- the XML-capable build.  D-002 option
+# C (2026-08-29) removed that artefact from the product: what CometGUI installs
+# on Windows is the portable noxml ZIP, which section 8 exercises and which did
+# not gate at all.  On 2026-09-02 the first Windows run made the consequence
+# concrete.  The shipped binary behaved perfectly -- it started, wrote 148 272
+# bytes of Percolator XML and printed the XML_SUPPORT diagnostic on --xml-in --
+# while the XML build never started (0xC0000135: its xerces-c_3_1.dll imports
+# 60 functions from MSVCR100.dll, which the payload does not carry), so the job
+# went red.  It would have gone red on every future pull request, for a reason
+# no future change could fix, about a binary the product does not ship.  A
+# check that cannot go green is as inert as one that cannot go red: nobody
+# reads it.
+#
+# The owner amended gate item 8 on 2026-09-02 and confirmed it on 2026-09-17.
+# This is that amendment reaching the code that grades the check, and it is a
+# NET STRENGTHENING.  What newly gates:
+#
+#   * the shipped noxml binary must be observed to START (its own banner),
+#   * it must write usable Percolator XML,
+#   * and it must print the XML_SUPPORT diagnostic on --xml-in -- the positive
+#     control proving the detector works on that host.
+#
+# Any of those failing now turns the job red; none of them did before.  What
+# stops gating is exactly one case, which is item 8's own second branch ("or
+# the blocking reason is documented precisely and the manifest does not claim
+# it"): the XML build NEVER STARTED.  The blocking reason is documented at
+# docs/feasibility/windows-artefact.rst, and manifests/tools.json does not
+# carry the XML build at all.  A NEGATIVE from the checklist -- the XML build
+# running and contradicting an inference -- still fails the job, and so does
+# any other inconclusive cause, a timeout included.
+
+# Ordering for "the worst thing observed".  SKIPPED ranks with OK because the
+# only path that produces it, --check-only, returns CHECK-ONLY before any of
+# this is consulted.
+_SEVERITY = {"SKIPPED": 0, "OK": 0, "INCONCLUSIVE": 1, "DIVERGENT": 2,
+             "NEGATIVE": 3}
+
+
+def _worst(statuses):
+    """The worst status in the list, with an UNKNOWN status ranked worst.
+
+    Deliberately fail-safe: the day someone adds a fourth status and forgets
+    this table, it must land on the red side of the verdict, never quietly
+    become a pass.  Case G16 in the self-test is that promise.
+    """
+    return max([_SEVERITY.get(s, _SEVERITY["NEGATIVE"]) for s in statuses]
+               or [0])
+
+
+def xml_build_never_started(records):
+    """True only for the ONE blocking reason item 8's second branch accepts.
+
+    Every captured run of the XML build lacks the version banner, AND at least
+    one of them either failed to launch or returned STATUS_DLL_NOT_FOUND.  A
+    single banner anywhere means the binary DID start, so the branch does not
+    apply and the checklist gates as it always did.  A timeout is not this
+    reason either: it leaves no proof of why the binary fell silent.
+    """
+    if not records:
+        return False
+    if any(markers_of(rec)["banner"] for rec in records):
+        return False
+    return any(rec["launch_error"]
+               or rec["exit_code"] == STATUS_DLL_NOT_FOUND
+               for rec in records)
+
+
+def decide_verdict(findings, xml_blocked):
+    """The job's verdict from the recorded findings.  Pure, so the self-test
+    can drive every branch of it without a Windows machine.
+
+    The shipped artefact must be clean for any passing verdict.  Only once it
+    is does the XML build's documented non-start become the second branch of
+    item 8 rather than an unexplained inconclusive.
+    """
+    shipped = _worst([e["finding"].status for e in findings
+                      if e["gating"] and e["group"] == "shipped"])
+    checklist = _worst([e["finding"].status for e in findings
+                        if e["gating"] and e["group"] == "xml-build"])
+
+    if shipped >= _SEVERITY["NEGATIVE"] or checklist >= _SEVERITY["NEGATIVE"]:
+        return "NEGATIVE"
+    if shipped > _SEVERITY["OK"]:
+        # The binary the product installs was not fully observed.  Nothing the
+        # XML build did or did not do can rescue that.
+        return "INCONCLUSIVE"
+    if checklist > _SEVERITY["OK"]:
+        return "PASS-XML-BLOCKED" if xml_blocked else "INCONCLUSIVE"
+    return "PASS"
+
+
+# --------------------------------------------------------------------------
 # The run
 # --------------------------------------------------------------------------
 
@@ -927,17 +1030,25 @@ def step6_privilege(t, assertions, launched):
 def section8(t, assertions, pin, check_only, findings, step5_finding):
     t.section("section 8, beyond the checklist: the artefact the product "
               "actually ships (D-002 option C)")
-    t.log("This is NOT part of the seven-step checklist, which is the gate and")
-    t.log("is unchanged above.  The owner took D-002 option C on 2026-08-29:")
+    t.log("This is NOT part of the seven-step checklist above, but since")
+    t.log("2026-09-17 it IS the gate: the owner's amendment to Phase 00 item 8")
+    t.log("makes the binary the product installs the one that decides this")
+    t.log("job.  The owner took D-002 option C on 2026-08-29:")
     t.log("Percolator's binary now comes from the PORTABLE noxml ZIP on every")
     t.log("tier-1 platform, so the checklist above exercises an artefact the")
     t.log("product no longer ships.  While a Windows machine is available,")
     t.log("this section exercises the binary the product WILL ship.")
     t.log()
-    t.log("This section reports its own verdict and does NOT gate the job's")
-    t.log("exit status, with one exception: if the noxml binary RUNS and yet")
-    t.log("writes no Percolator XML, or writes empty XML, that contradicts the")
-    t.log("premise D-002 option C was decided on and the job fails loudly.")
+    t.log("THIS SECTION GATES THE JOB.  All three of these must hold, and any")
+    t.log("one of them failing turns the job red:")
+    t.log("  * the binary is observed to START -- its own version banner, not")
+    t.log("    an exit code;")
+    t.log("  * it writes usable Percolator XML (the premise D-002 option C was")
+    t.log("    decided on);")
+    t.log("  * and --xml-in prints the XML_SUPPORT diagnostic, the positive")
+    t.log("    control proving the detector works on this host.")
+    t.log("Before 2026-09-17 only the middle one could fail the job, and only")
+    t.log("when the binary had already started.")
     t.log()
 
     zip_path = os.path.join(WORK_DIR, "percolator-noxml-windows-portable.zip")
@@ -990,7 +1101,7 @@ def section8(t, assertions, pin, check_only, findings, step5_finding):
         t.log("  --check-only: the noxml binary was NOT executed.")
         assertions.add("SKIPPED", "sect 8", "noxml execution",
                        "not executed (--check-only)")
-        return None, []
+        return []
 
     section_status = "OK"
     section_reasons = []
@@ -1027,7 +1138,6 @@ def section8(t, assertions, pin, check_only, findings, step5_finding):
     marks = markers_of(x_rec)
     ran = (not x_rec["launch_error"] and not x_rec["timed_out"]
            and marks["banner"])
-    gating = None
     if ran and (not pout["exists"] or pout["size"] == 0
                 or pout["psm_count"] == 0):
         section_status = "NEGATIVE"
@@ -1038,7 +1148,6 @@ def section8(t, assertions, pin, check_only, findings, step5_finding):
             "Limelight path consumes."
             % (pout["exists"], pout["size"], pout["psm_count"],
                fmt_exit(x_rec["exit_code"])))
-        gating = "NEGATIVE"
     elif not ran:
         section_status = "INCONCLUSIVE"
         section_reasons.append(
@@ -1078,6 +1187,16 @@ def section8(t, assertions, pin, check_only, findings, step5_finding):
               "so step 5's absence result rests on its own positive markers "
               "alone.")
 
+    # The positive control is part of what item 8 requires OF THE SHIPPED
+    # BINARY -- "for the noxml build the required observation is the opposite:
+    # it MUST answer Compiler flag XML_SUPPORT was off".  Until 2026-09-17 its
+    # result reached only step 5's downgrade and the assertion table, so a
+    # shipped binary that ran and stayed silent left this section OK.  It no
+    # longer can.
+    if _SEVERITY[control.status] > _SEVERITY[section_status]:
+        section_status = control.status
+        section_reasons.extend(control.reasons)
+
     t.log()
     t.kv("section 8 verdict", section_status)
     for reason in section_reasons:
@@ -1095,21 +1214,27 @@ def section8(t, assertions, pin, check_only, findings, step5_finding):
                    "sect 8", "XML_SUPPORT positive control",
                    "diagnostic %s" % ("present" if markers_of(xmlin_rec)
                                       ["xml_support_off"] else "ABSENT"))
-    record_finding(findings, "section 8  the portable noxml build",
+    record_finding(findings, "section 8  the portable noxml build (SHIPPED)",
                    Finding("section 8", section_status, section_reasons),
-                   gating=False)
-    return gating, records
+                   gating=True, group="shipped")
+    return records
 
 
-def record_finding(findings, label, finding, gating=True):
+def record_finding(findings, label, finding, gating=True, group="xml-build"):
     """Keep the Finding object itself, not a snapshot of its status.
+
+    `group` says which binary the finding is about: "xml-build" is the NSIS
+    installer payload the seven-step checklist exercises, "shipped" is the
+    portable noxml binary the product actually installs.  decide_verdict()
+    treats them differently, so the distinction has to survive to the verdict.
 
     Section 8 can DOWNGRADE step 5 after step 5 has already been recorded (see
     analyse_xml_in_control).  Storing a copy of the status here would freeze
     the pre-downgrade answer and report a result the harness had already
     decided it could not claim.
     """
-    findings.append({"label": label, "finding": finding, "gating": gating})
+    findings.append({"label": label, "finding": finding, "gating": gating,
+                     "group": group})
 
 
 def verdict_block(t, verdict, assertions, findings, notes):
@@ -1130,6 +1255,12 @@ def verdict_block(t, verdict, assertions, findings, notes):
           % EXIT_INCONCLUSIVE)
     t.log("  PASS             every checklist assertion held, each naming the")
     t.log("                   value it observed.                      exit %d"
+          % EXIT_PASS)
+    t.log("  PASS-XML-BLOCKED the SHIPPED noxml binary met every requirement,")
+    t.log("                   and the XML build -- not shipped since D-002")
+    t.log("                   option C -- never started, which is gate item")
+    t.log("                   8's documented-blocking-reason branch.  NOTHING")
+    t.log("                   is claimed about the XML build.         exit %d"
           % EXIT_PASS)
     t.log("  CHECK-ONLY       the platform-independent steps ran; NO WINDOWS")
     t.log("                   BINARY WAS EXECUTED.  This is not a pass. exit %d"
@@ -1287,8 +1418,8 @@ def run(check_only, t):
                  "product actually needs -- remains untested.")
 
     # ---- section 8
-    gating, _ = section8(t, assertions, pin, check_only, findings,
-                         step5_finding or Finding("step 5", "SKIPPED", []))
+    section8(t, assertions, pin, check_only, findings,
+             step5_finding or Finding("step 5", "SKIPPED", []))
 
     if not check_only:
         # Added AFTER section 8, because section 8's positive control can
@@ -1315,14 +1446,23 @@ def run(check_only, t):
                      "payload checksums, PIN generation, portable ZIP) and "
                      "establishes NOTHING about Windows.")
     else:
-        statuses = [entry["finding"].status for entry in findings
-                    if entry["gating"]]
-        if gating == "NEGATIVE" or "NEGATIVE" in statuses:
-            verdict = "NEGATIVE"
-        elif "INCONCLUSIVE" in statuses:
-            verdict = "INCONCLUSIVE"
-        else:
-            verdict = "PASS"
+        blocked = xml_build_never_started(launched)
+        verdict = decide_verdict(findings, blocked)
+        t.log()
+        t.kv("XML build never started (item 8's second branch)",
+             "YES -- %d captured run(s), no banner in any, and a launch error "
+             "or 0xC0000135 in at least one" % len(launched) if blocked
+             else "no")
+        if verdict == "PASS-XML-BLOCKED":
+            notes.append(
+                "PASS-XML-BLOCKED: the SHIPPED noxml binary met every "
+                "requirement, and the XML-capable build -- which D-002 option "
+                "C removed from the product -- never started.  That is Phase "
+                "00 gate item 8's second branch, 'or the blocking reason is "
+                "documented precisely and the manifest does not claim it': "
+                "the reason is at docs/feasibility/windows-artefact.rst and "
+                "manifests/tools.json does not carry the XML build.  NOTHING "
+                "is claimed about the XML build by this verdict.")
     verdict_block(t, verdict, assertions, findings, notes)
     return VERDICT_EXIT[verdict]
 
@@ -1571,6 +1711,66 @@ def self_test():
     case("F3 HARNESS FAILURE maps to a non-zero exit",
          VERDICT_EXIT["HARNESS FAILURE"], EXIT_HARNESS_FAILURE)
     case("F4 only PASS maps to 0", VERDICT_EXIT["PASS"], EXIT_PASS)
+
+    # ---- group G: what gates the job (Phase 00 item 8, amended 2026-09-17) --
+    #
+    # The whole point of the amendment is that the SHIPPED binary decides this
+    # job.  These cases exist so that the day someone widens the pass branch,
+    # a control goes red rather than a transcript quietly saying PASS.
+    print()
+
+    def _finding(group, status):
+        return {"label": group, "finding": Finding(group, status, []),
+                "gating": True, "group": group}
+
+    def _verdict(shipped, checklist, blocked):
+        return decide_verdict([_finding("shipped", shipped),
+                               _finding("xml-build", checklist)], blocked)
+
+    case("G1 shipped OK, XML build blocked -> the item's 2nd branch",
+         _verdict("OK", "INCONCLUSIVE", True), "PASS-XML-BLOCKED")
+    case("G2 shipped OK, XML build inconclusive for another reason",
+         _verdict("OK", "INCONCLUSIVE", False), "INCONCLUSIVE")
+    case("G3 blocked does NOT rescue an unobserved shipped binary",
+         _verdict("INCONCLUSIVE", "INCONCLUSIVE", True), "INCONCLUSIVE")
+    case("G4 blocked does NOT rescue a bad shipped binary",
+         _verdict("NEGATIVE", "INCONCLUSIVE", True), "NEGATIVE")
+    case("G5 a checklist NEGATIVE is never swallowed by blocked",
+         _verdict("OK", "NEGATIVE", True), "NEGATIVE")
+    case("G6 shipped DIVERGENT is not a pass",
+         _verdict("DIVERGENT", "OK", True), "INCONCLUSIVE")
+    case("G7 control: everything observed",
+         _verdict("OK", "OK", False), "PASS")
+    case("G8 PASS-XML-BLOCKED maps to 0",
+         VERDICT_EXIT["PASS-XML-BLOCKED"], EXIT_PASS)
+    case("G16 an UNKNOWN status is ranked worst, never a pass",
+         _verdict("OK", "SOMETHING-NEW-NOBODY-RANKED", True), "NEGATIVE")
+
+    # xml_build_never_started: the ONE blocking reason the branch accepts.
+    print()
+    case("G9 no banner anywhere, one 0xC0000135 -> blocked",
+         xml_build_never_started([_rec("", STATUS_DLL_NOT_FOUND),
+                                  _rec("", STATUS_DLL_NOT_FOUND)]), True)
+    case("G10 no banner anywhere, one launch error -> blocked",
+         xml_build_never_started([_rec("", None,
+                                       launch_error="FileNotFoundError")]),
+         True)
+    case("G11 a banner ANYWHERE means it started -> not blocked",
+         xml_build_never_started([_rec("", STATUS_DLL_NOT_FOUND),
+                                  _rec(LINUX_BANNER + "\n", 0)]), False)
+    case("G12 a timeout is not the documented reason -> not blocked",
+         xml_build_never_started([_rec("", None, timed_out=True)]), False)
+    case("G13 a plain non-zero exit is not it either -> not blocked",
+         xml_build_never_started([_rec("", 1)]), False)
+    case("G14 no records at all -> not blocked",
+         xml_build_never_started([]), False)
+
+    # The 2026-09-02 run, end to end: the shape this amendment was made for.
+    case("G15 the 2026-09-02 observation reproduces as PASS-XML-BLOCKED",
+         _verdict("OK", "INCONCLUSIVE",
+                  xml_build_never_started(
+                      [_rec("", STATUS_DLL_NOT_FOUND)] * 3)),
+         "PASS-XML-BLOCKED")
 
     failed = results.count(False)
     print()
