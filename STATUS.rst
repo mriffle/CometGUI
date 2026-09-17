@@ -4,13 +4,15 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-09-17
-:Updated by: Main orchestrator, session 07 (**Phase 00 item 8's contradiction
-   resolved on the owner's ruling, and the amendment carried into the code
-   that grades it**; the headline below corrected -- it had been describing a
-   pull request that was opened and merged on 2026-09-02)
-:Current phase: 05 -- **STOPPED AFTER UNIT 7** on 2026-09-03 by owner
-   instruction, units 1-7 signed off (:ref:`status-p05-stopped`). Dispatched
-   2026-09-02. Phase 04 is
+:Updated by: Main orchestrator, session 08 (**Phase 05 restarted at unit 8 on
+   the owner's instruction**; a fresh phase orchestrator dispatched with
+   ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst`` -- :ref:`status-p05-resumed`.
+   Session 07, earlier the same day, resolved Phase 00 item 8's contradiction
+   and carried the amendment into the code that grades it)
+:Current phase: 05 -- **RESUMED AT UNIT 8** on 2026-09-17 by owner
+   instruction, after being stopped after unit 7 on 2026-09-03
+   (:ref:`status-p05-resumed`, :ref:`status-p05-stopped`). Units 1-7 signed
+   off. Originally dispatched 2026-09-02. Phase 04 is
    **PARTIAL**, signed off 2026-09-02 on tier 1's own re-run and seven of its
    own defect injections; Phase 03 **PARTIAL**, 2026-09-01. Phases 00 and 01
    remain PARTIAL, but **neither is waiting on a pull request any more** --
@@ -18,8 +20,9 @@ Project Status
    closed (:ref:`status-census-closed`).
 :Overall: The repository, build and every quality gate exist and have each been
    seen to fail on a deliberate defect. Five phases are signed off -- 02
-   PASSED; 00, 01, 03 and 04 PARTIAL -- and Phase 05 is **stopped after unit 7
-   of 13** by owner instruction (:ref:`status-p05-stopped`). **Pull request #1
+   PASSED; 00, 01, 03 and 04 PARTIAL -- and Phase 05, stopped after unit 7 of
+   13 on 2026-09-03, is **running again from unit 8** on the owner's
+   instruction of 2026-09-17 (:ref:`status-p05-resumed`). **Pull request #1
    was opened and merged on 2026-09-02**, which closed what both of Phases 00
    and 01's outstanding items were waiting on: ``pull-request.yml`` ran green
    on a real pull request (2682 tests, 0 failures), and a ``windows-latest``
@@ -205,13 +208,17 @@ Phase board
        (:ref:`status-platform-divergence`).
    * - 05
      - Tool registry and installer
-     - IN PROGRESS -- **stopped after unit 7**
-     - **Dispatched 2026-09-02** with a fresh phase orchestrator, briefed by
-       ``handoffs/PHASE-05-BRIEF.rst`` and told its expected grade is PARTIAL:
-       gate item 9 is macOS-only and cannot be executed here. The first phase
-       to reach the network. Dependencies 01, 03 and 04 are all signed off and
-       no decision blocks it; the owner approved the network access on
-       2026-09-02.
+     - IN PROGRESS -- **resumed at unit 8**
+     - **Restarted 2026-09-17** on the owner's instruction, with a third fresh
+       phase orchestrator briefed by
+       ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst`` (:ref:`status-p05-resumed`).
+       Units 1-7 signed off; units 8, 9, 10, 13, 11, 12 remain, serially in
+       that order. Expected grade is still PARTIAL: gate item 9 is macOS-only.
+       *Originally dispatched 2026-09-02* -- the first phase to reach the
+       network, the owner having approved that access -- and **stopped after
+       unit 7 on 2026-09-03** by owner instruction
+       (:ref:`status-p05-stopped`). Dependencies 01, 03 and 04 are all signed
+       off and no decision blocks it.
    * - 06
      - Comet parameter model
      - NOT STARTED
@@ -2954,6 +2961,65 @@ Risks currently live
    fonts, so a ``Scene`` with any control dies on ``fontFactory is null``
    unless both are supplied.
 
+.. _status-p05-resumed:
+
+Phase 05 resumed at unit 8 (2026-09-17), by owner instruction
+=============================================================
+
+The owner restarted the phase on 2026-09-17: *"restart Phase 05 at unit 8"*.
+It had been stopped after unit 7 on 2026-09-03 by instruction, not by a
+problem, and nothing had moved in the fourteen days since
+(:ref:`status-p05-stopped`).
+
+**One phase orchestrator, freshly spawned, and it is the only phase live in
+this tree.** That is the owner's rule of 2026-08-31
+(:ref:`status-one-phase-at-a-time`) and nothing about a resumption relaxes it.
+It is the third orchestrator this phase has had; the second wrote
+``handoffs/PHASE-05-handoff.rst`` for exactly this moment and is not available
+to answer questions.
+
+Briefed by ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst``, which is tier 1's and
+not the phase's to edit. What tier 1 put in it beyond the read order:
+
+* **The starting sequence is the handoff's own**, not a new one: decide the
+  ``phase05-unit8-cancelled`` tag (read it, do not build on it); **reproduce
+  the cancellation defect before planning unit 8**
+  (:ref:`status-cancel-inside-a-step`) -- it is reported, not verified, by
+  anyone including tier 1, and a failure to reproduce is itself a finding;
+  then take a baseline with ``scripts/build.sh`` and
+  ``scripts/verify-all-gates.sh``.
+* **Units run 8, 9, 10, 13, 11, 12, serially**, in the predecessor's order and
+  under its numbering. No positive argument exists that any two cannot
+  collide, so none is offered.
+* **Four standing tier-1 directions**, restated so they are not re-opened: the
+  ``ToolOffer`` download-size gap is fixed in unit 8; the cancellation defect
+  is fixed or explicitly routed in unit 8, graded *inside* a transfer and not
+  only at step boundaries; additive registration of unit 12's
+  ``scripts/verify-install-gates.sh`` in ``verify-all-gates.sh`` is approved,
+  never lowering a floor; and **nothing is added to the pinned survivor set in
+  ``scripts/verify-test-gates.sh`` to make a build pass.**
+* **Unit 13 stops at tier 1's edge.** The macOS runner is reached by tier 1
+  pushing and dispatching, as it was for Windows; the orchestrator authors the
+  unit, proves what it can locally and escalates. Its negative control is
+  mandatory, and a control that does not bite is reported as "this check
+  cannot go red", never as a pass.
+* **The owner's build-economy rule of 2026-09-17** is carried in: the baseline
+  is taken once, and a documentation-only or CI-script-only change is verified
+  by the check that can go red for it rather than by a 23-minute full build.
+  Project rule 6 is satisfied by verifying what changed, not by re-running
+  everything.
+
+**Expected grade remains ``PARTIAL``**, and the orchestrator was told so before
+it planned anything. Gate item 9 needs macOS and no macOS binary has ever been
+executed anywhere in this project.
+
+Nothing Java-side moved while the phase was stopped, which is worth recording
+because it is what makes the handoff's figures still describable as this tree:
+the last commit touching any ``.java`` file or POM is ``9e38f3b``, and the four
+commits after it changed ``STATUS.rst``, ``phases/PHASE-00-feasibility.rst``,
+``.github/workflows/windows-percolator.yml`` and two CI scripts. That is a
+reason to expect the baseline to reproduce, **not** a reason to skip taking it.
+
 .. _status-next-action:
 
 Next action
@@ -2971,12 +3037,14 @@ Next action
 
    **What is actually next, as of 2026-09-17:**
 
-   #. **The owner decides whether Phase 05 resumes** at unit 8 of 13. It was
-      stopped by instruction, not by a problem, and nothing has moved since
-      2026-09-03. ``handoffs/PHASE-05-handoff.rst`` is written for a
-      successor; its first instruction is to reproduce the live
-      cancel-mid-download defect (:ref:`status-cancel-inside-a-step`) before
-      unit 8 is planned.
+   #. **Decided and under way: Phase 05 resumed at unit 8 of 13** on the
+      owner's instruction of 2026-09-17, with a fresh phase orchestrator
+      briefed by ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst``
+      (:ref:`status-p05-resumed`). Tier 1's next obligation to it is **unit
+      13's macOS runner** -- tier 1 pushes the branch and dispatches the
+      workflow, the phase does not -- and then **the phase gate itself**: nine
+      items, re-run by tier 1 with its own defect injections, not read from a
+      report.
    #. **The nightly has failed every night since 2026-08-31** and its first
       failing stub skips every later step, so the documentation link check and
       the tool-manifest verification have still never executed on a runner.
@@ -3143,6 +3211,25 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-09-17
+     - 05
+     - **Phase 05 restarted at unit 8 on the owner's instruction**, fourteen
+       days after it was stopped after unit 7 -- by instruction, not by a
+       problem. A third fresh phase orchestrator was spawned, the only phase
+       live in this tree, and briefed by
+       ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst``: the predecessor's own
+       starting sequence (decide the ``phase05-unit8-cancelled`` tag,
+       **reproduce the cancellation defect before planning unit 8**, then take
+       a baseline), units 8, 9, 10, 13, 11, 12 serially, four standing tier-1
+       directions restated so they are not re-opened, unit 13 stopping at tier
+       1's edge because the macOS runner is tier 1's to reach, and the owner's
+       build-economy rule of the same day. Expected grade stated up front as
+       **PARTIAL**: gate item 9 needs macOS and no macOS binary has ever been
+       executed anywhere in this project. Recorded because it is easy to lose:
+       **no ``.java`` file or POM changed while the phase was stopped**, so the
+       handoff's figures still describe this tree -- which is a reason to
+       expect the baseline to reproduce, not a reason to skip it.
+       See :ref:`status-p05-resumed`.
    * - 2026-09-17
      - 00
      - **Phase 00 item 8's contradiction resolved, in the gate text and in the
