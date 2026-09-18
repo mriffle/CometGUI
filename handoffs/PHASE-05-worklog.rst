@@ -2875,3 +2875,235 @@ singles out for deliberate cancellation testing, so unit 10 would have walked
 into it. **I have not verified the diagnosis myself**; it is recorded as the
 agent gave it, with its evidence, and the first thing to do with it is reproduce
 it rather than fix it.
+
+.. _p05-orchestrator-3:
+
+Third phase orchestrator: the restart at unit 8
+================================================
+
+:Taken over: 2026-09-17 at ``9167ab5``, with the tree clean
+:By: the third Phase-05 phase orchestrator (session 07)
+:Governed by: ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst``, which is tier 1's and
+   which I do not edit
+
+The phase was stopped after unit 7 on 2026-09-03 by owner instruction and
+restarted on 2026-09-17. Units 1 to 7 are signed off, nothing is
+landed-but-unsigned, and ``git status --porcelain`` was empty when I arrived.
+What follows is what I did before planning unit 8, in the order the resumption
+brief and my predecessor's handoff both prescribe: decide the tag, reproduce the
+reported defect, take the baseline.
+
+.. _p05-tag-ruling:
+
+The ``phase05-unit8-cancelled`` tag: read, not built on
+--------------------------------------------------------
+
+``be2edfc``, 24 files, 4997 insertions, **verified by nobody**. My ruling, which
+is my predecessor's recommendation and tier 1's endorsement of it: **it is a
+reading reference and not a starting point, and it is kept rather than deleted.**
+
+What I read of it, and why only this much. ``git show --stat`` for its shape,
+and its diff over the two files it changed in signed-off code --
+``InstallPipeline`` and ``InstallCancelledException``. I did not read its
+``ManagedToolManager``, its tests or its wiring, and I did not build it. The
+reason is not ceremony: unit 8's agent is a fresh one, and an orchestrator that
+has absorbed an unverified 596-line implementation will steer toward it while
+believing it is judging. What I took from the tag is one fact I could check
+independently -- that the cancellation translation is about ten lines in
+``runNextStep`` -- and one instruction to the unit: **say what, if anything, you
+took from it.**
+
+The tag stays. It costs nothing, it is plainly marked unjudged, and deleting the
+only copy of work somebody did is not a tidy-up.
+
+.. _p05-cancel-reproduced:
+
+The cancellation defect, reproduced by me before unit 8 was planned
+---------------------------------------------------------------------
+
+Reported at :ref:`p05-u8-cancel-defect` by the cancelled unit, **not verified by
+my predecessor and not by tier 1**. The resumption brief is explicit that a
+failure to reproduce would itself be the finding. It reproduces.
+
+I wrote my own diagnostic -- not the cancelled unit's test -- in
+``org.cometgui.install.cache``, ran it, and deleted it; the tree was clean
+before and after. It installs the **real** PDV artefact
+(``v2.7.0__PDV-2.7.0.zip``, 103 407 417 bytes from the gitignored mirror)
+through the real ``ArtefactInstaller``, the real ``VerifiedDownloader`` and the
+real ``HttpDownloader`` over a ``LoopbackHttpServer``, and trips the
+cancellation from the progress listener once 4 MB have arrived. A second test
+cancels **before step 1**, which is the axis unit 5 graded.
+
+::
+
+    MID-TRANSFER : threw org.cometgui.install.download.DownloadCancelledException:
+                   the download was cancelled after 4013980 byte(s) from
+                   http://127.0.0.1:40725/PDV-2.7.0.zip; the partial file and its
+                   resume state have been deleted and no destination file was created
+                   listener phases [DOWNLOADING, FAILED]
+                   ==> expected: <[CANCELLED]> but was: <[FAILED]>
+
+    STEP BOUNDARY: threw org.cometgui.install.cache.InstallCancelledException:
+                   the install of pdv 2.7.0 linux-x86-64 was cancelled before step 1,
+                   DOWNLOAD_TO_TEMPORARY_FILE; nothing was written to the tool cache
+                   listener phases [CANCELLED]
+
+    Tests run: 2, Failures: 1, Errors: 0, Skipped: 0
+    MVN EXIT STATUS: 1
+
+**The diagnosis is confirmed and it is confirmed in the shape that matters.**
+``DownloadCancelledException`` extends ``DownloadException`` extends
+``IOException``, so it leaves ``ArtefactInstaller.install`` through the
+``catch (IOException)`` arm; ``InstallCancelledException`` is a different type
+and is the only one the ``CANCELLED`` arm catches. The two runs differ in
+**nothing but where within step 1 the cancellation lands**, and they produce
+opposite terminal phases. That is the phase's signature hole stated as a
+measurement rather than as an argument.
+
+*A harness error of my own, recorded because it is the standing lesson.* My
+first attempt failed with ``url must be an absolute https URL ... but was
+"http://127.0.0.1:36735/PDV-2.7.0.zip"``, from ``ArtefactValues.downloadUrl``.
+That red was **mine, not the product's**: ``R-SEC-02``'s https rule is enforced
+on every manifest record, and unit 3's loopback carve-out lives one layer lower,
+in ``DownloadRequest``. A record cannot carry a loopback URL and should not be
+able to. The fix was to rewrite the source at the ``ArtefactFetcher`` seam --
+which is where production composes the real downloader -- so the transfer under
+test is still the real one. Had I read that red as a result I would have
+reported a manifest defect that does not exist. The rule unit 7 put in my
+predecessor's name holds: **ask why a build is red with the same suspicion as
+why it is green.**
+
+.. _p05-baseline-3:
+
+The baseline, taken once on a quiet tree
+------------------------------------------
+
+Taken at ``9167ab5`` before any work, with nothing else building and the exit
+status captured **inside** the log rather than reported by a wrapper.
+
+``bash scripts/build.sh``::
+
+    206 report file(s): tests=3532 failures=0 errors=0 skipped=3
+    11/11 stages OK in 1427 seconds.  BUILD OK
+    EXIT STATUS: 0
+
+    ok  cometgui-domain   line 100.0% (834/834)   branch 100.0% (352/352)
+    ok  cometgui-tools    line  98.5% (560/568)   branch  97.9% (195/199)
+    ok  cometgui-install  line 100.0% (3127/3127) branch  99.6% (1119/1123)
+    ok  cometgui-domain   49 compiled class(es), all 49 in the sample
+    ok  cometgui-tools    18 compiled class(es), all 18 in the sample
+    ok  cometgui-install  79 compiled class(es), all 79 in the sample
+    ok  cometgui-domain   369/370 mutations killed = 99.7%
+    ok  cometgui-tools    220/222 mutations killed = 99.0%
+    ok  cometgui-install  1294/1311 mutations killed = 98.7%
+    ok  8 architecture rule(s) checked, 0 failures
+
+Every figure the handoff asked me to reproduce, reproduces -- **with one
+one-mutation difference, in the direction the phase has already catalogued**:
+``cometgui-install`` reads 1294/1311 where unit 7's acceptance recorded
+1295/1311. The package-level figures are unchanged, which is exactly the
+signature my predecessor recorded twice for the ``KILLED``/``TIMED_OUT``
+boundary under different load, where ``build.sh`` counts only ``KILLED``.
+Nobody has demonstrated that cause and I am not claiming it; I am recording the
+third instance of the same one-mutation drift so that a later reader does not
+go hunting a defect inside it.
+
+**The artefact mirror, re-derived by me.** ``manifests/tools.json`` carries 32
+artefact and companion rows which resolve to **22 distinct files** -- several
+rows name one download, which is the specification's own consequence and unit
+2's finding. All 22 are present in ``scratch/phase05/artefacts`` and every one
+matches both its pinned SHA-256 and its pinned length: **0 mismatches, 0
+missing**. That answers my predecessor's open observation that the test-gate
+sandbox now *symlinks* the mirror rather than copying it, so a sandbox test that
+ever wrote there would corrupt the working tree's copy. It has not.
+
+.. _p05-gate-suite-green:
+
+The aggregate suite, re-taken -- and this time it is green
+------------------------------------------------------------
+
+``bash scripts/verify-all-gates.sh``, run by me at ``9167ab5``, 00:23 to
+01:28:59 UTC, exit status captured inside the log::
+
+    PASS  license       01:D-001         5          0s
+    PASS  workflows     01:6            19          1s
+    PASS  docs          01:2             1         21s
+    PASS  traceability  01:5             8          7s
+    PASS  sbom          01:6             8          3s
+    PASS  depscan       01:6            16          7s
+    PASS  pipeline      01:6            24         21s
+    PASS  quality       01:1, 6         42        132s
+    PASS  shell         02:1,2,4,5      30        175s
+    PASS  tests         01:3, 4         37       3271s
+    PASS  provenance    04:1,2,3,4,5,6  24        237s
+
+    11 control(s) passed, 0 failed, in 3875 seconds (64m35s).
+    Every gate was seen to reject its defect and accept the clean tree.
+    EXIT STATUS: 0
+
+**This is the figure my predecessor's handoff singled out as the one nobody had
+confirmed green end to end**, after the suite was found red at ``be5dd72`` and
+repaired by tier 1 at ``90d87fa``. It is now confirmed on this tree, by a run of
+mine, on a quiet tree. No floor was lowered and none needed to be; every
+control met or exceeded its recorded floor, and ``tests`` reports control 0's
+pinned survivor set still matching exactly.
+
+.. _p05-my-own-collision-2:
+
+And I overlapped tier 1, which is the fifth instance
+------------------------------------------------------
+
+Tier 1 began a timed ``build.sh --only gates`` run to measure a PIT thread-count
+change while my gate suite was still running its last control, having read a
+short-lived JVM at 01:26 as the end of my work. It was not: the suite ran to
+01:28:59. Both runs were Maven, both shared ``_build/m2repo``, and the overlap
+window is inside the measurement tier 1 was taking.
+
+I reported the exact end time rather than letting the comparison stand, and the
+"after" number was re-taken. **The rule this project keeps relearning is not
+"do not run the build" but "a commit, a quiet-looking process table and a
+plausible end time are all weaker evidence than the completion line in the
+log."** ``STATUS.rst`` records four previous instances, three tier 1's and one
+my predecessor's. This is the fifth, and the first between two tiers *both*
+believing the other had finished.
+
+.. _p05-mutation-drift-routed:
+
+The one-mutation drift, chased to a cause that is not mine to fix
+-------------------------------------------------------------------
+
+The 1294-versus-1295 delta I recorded above was chased by tier 1 during the same
+window, and the finding is now in ``STATUS.rst`` at ``status-mutation-drift``:
+``scripts/build.sh`` scores the 80% gate on ``status='KILLED'`` alone while PIT
+itself counts ``TIMED_OUT`` as detected, so **the gated number moves with
+machine load**. Tier 1's first conclusion -- that the thread count caused it --
+was falsified by its own full-reactor control, and the pin written on the
+strength of it was removed rather than left standing with a false rationale.
+
+**Whether ``build.sh`` should count ``TIMED_OUT`` as detected is a gate-semantics
+decision and neither tier 1 nor this phase has taken it.** I do not take it
+either. The operative rule for every remaining unit of this phase: **a
+``KILLED``/``TIMED_OUT`` flip between two runs is inconclusive and is re-run; a
+flip involving ``SURVIVED`` is a finding.** If a unit's work pushes a module
+near the 80% floor, it escalates rather than reasoning about the difference.
+
+.. _p05-streampump-routed:
+
+Routed to Phase 03, not absorbed: ``StreamPump.run:96``
+---------------------------------------------------------
+
+Handed to me by tier 1 to route rather than to fix, and recorded here because
+this log is where the phase's findings live. ``StreamPump.run:96`` is ``while
+(read >= 0)``; the surviving mutant makes it ``while (read > 0)``. The two
+differ **only when ``read()`` returns 0**, which an ``InputStreamReader`` does
+when a multi-byte character is split across a read boundary. ``StreamPumpTest``
+has eleven tests and none forces that, so the mutant is killed by the accident
+of how a stream happens to chunk, or not at all.
+
+It is this phase's signature shape in another phase's module: **a rule graded at
+one point on an axis it does not depend on.** It is the same defect unit 4 found
+in ``ArtefactExtractor``'s copy loop -- a container answering a read with zero
+bytes made the loop spin -- which is the evidence that a zero-byte read is a
+real event on this code path and not a theoretical one. ``cometgui-process`` is
+Phase 03's and this phase does not touch it. **Escalated to tier 1 for Phase
+03's residue, not fixed here.**
