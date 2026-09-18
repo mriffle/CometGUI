@@ -57,6 +57,7 @@ import org.cometgui.install.probe.HostRuntimeVersions;
 import org.cometgui.install.probe.LoaderOutputClassifier;
 import org.cometgui.install.probe.ManifestAlternatives;
 import org.cometgui.install.probe.ProbeGatedOffers;
+import org.cometgui.install.registry.ArtefactCompanion;
 import org.cometgui.install.registry.ArtefactManifest;
 import org.cometgui.install.registry.ArtefactRecord;
 import org.cometgui.install.registry.ArtefactSelection;
@@ -495,13 +496,29 @@ public final class ManagedToolManager implements ToolManager {
                 record.advisories(),
                 diagnostic,
                 installedPath,
-                /*
-                 * The length of the artefact itself, as the manifest pins it.  This is the number a
-                 * scientist is shown before starting a download -- PDV is 103 407 417 bytes -- and
-                 * it comes from the row rather than from the file on disk, so it is the same before
-                 * the download as after it.
-                 */
-                OptionalLong.of(record.sizeBytes()));
+                OptionalLong.of(wholeDownloadOf(record)));
+    }
+
+    /*
+     * HOW MANY BYTES WILL MOVE, which is the question a user asks before pressing Install -- and it
+     * is a question about step 1, not about one file.  Step 1 fetches the artefact AND every
+     * companion the record names, in one go, so quoting the artefact alone would describe
+     * Percolator 3.07.1 on Linux as a 946 303-byte download when the install really transfers
+     * 2 798 963: the .deb the two XSDs come out of is 1 852 660 of those bytes.  A number three
+     * times smaller than the transfer it names is a value that misstates what it reports, and
+     * unit 9 renders it under a label that makes it a claim to the user.
+     *
+     * Every length comes from the manifest rather than from a file on disk, so the figure is the
+     * same before the download as after it, and it is deliberately NOT the size of what ends up
+     * installed: an archive is unpacked and a payload is taken out of a package, so that is a
+     * different number and this record does not carry it.
+     */
+    private static long wholeDownloadOf(ArtefactRecord record) {
+        long bytes = record.sizeBytes();
+        for (ArtefactCompanion companion : record.companions()) {
+            bytes += companion.sizeBytes();
+        }
+        return bytes;
     }
 
     /*

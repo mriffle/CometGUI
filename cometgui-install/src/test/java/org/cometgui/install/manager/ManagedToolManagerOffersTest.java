@@ -36,6 +36,7 @@ import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.install.registry.ArtefactCompanion;
 import org.cometgui.install.registry.ArtefactManifest;
 import org.cometgui.install.registry.ArtefactRecord;
 import org.cometgui.install.registry.ArtefactSelection;
@@ -69,6 +70,20 @@ class ManagedToolManagerOffersTest {
                 + (offer.downloadSizeBytes().isPresent()
                         ? Long.toString(offer.downloadSizeBytes().getAsLong())
                         : "no-download");
+    }
+
+    /*
+     * The bytes an install of this row would move, added up here from the manifest's own fields.
+     * Deliberately written out a second time rather than calling the production summing method: an
+     * expected value computed by the code under test cannot fail, and the hand-written table below
+     * is the third statement of the same fact.
+     */
+    private static long everythingFetchedFor(ArtefactRecord record) {
+        long bytes = record.sizeBytes();
+        for (ArtefactCompanion companion : record.companions()) {
+            bytes += companion.sizeBytes();
+        }
+        return bytes;
     }
 
     /*
@@ -108,7 +123,7 @@ class ManagedToolManagerOffersTest {
                                     + " "
                                     + ToolInstallState.NOT_INSTALLED
                                     + " "
-                                    + selection.artefact().sizeBytes());
+                                    + everythingFetchedFor(selection.artefact()));
                 }
             }
         }
@@ -135,13 +150,19 @@ class ManagedToolManagerOffersTest {
          * same way the production code does, so it would agree with a shared misreading.  Six rows
          * -- Comet's one Linux build, Percolator's three releases of which 3.09 publishes nothing
          * for Linux at all, PDV and the converter.
+         *
+         * THE TWO PERCOLATOR FIGURES ARE SUMS AND THE OTHERS ARE NOT, which is why they are written
+         * out.  3.07.1 is 946 303 + 1 852 660 = 2 798 963 and 3.06.5 is 917 285 + 1 882 696 =
+         * 2 799 981, because each fetches the .deb its two XSDs are taken out of.  Comet, PDV and
+         * the converter name no companion, so their rows are one file and their numbers are the
+         * artefact lengths unchanged -- PDV in particular is still 103 407 417.
          */
         List<String> expected =
                 List.of(
                         "comet 2026.02.2 NOT_INSTALLED 7014400",
                         "percolator 3.09 UNAVAILABLE_ON_THIS_PLATFORM no-download",
-                        "percolator 3.07.1 NOT_INSTALLED 946303",
-                        "percolator 3.06.5 NOT_INSTALLED 917285",
+                        "percolator 3.07.1 NOT_INSTALLED 2798963",
+                        "percolator 3.06.5 NOT_INSTALLED 2799981",
                         "pdv 2.7.0 NOT_INSTALLED 103407417",
                         "limelight-converter 2.8.1 NOT_INSTALLED 2762075");
 
@@ -171,6 +192,13 @@ class ManagedToolManagerOffersTest {
                                 103_407_417L,
                                 pdv.sizeBytes(),
                                 "and that is the length manifests/tools.json pins for it"),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                pdv.companions(),
+                                "PDV names no companion, which is why the whole transfer and the"
+                                        + " artefact are the same number here and are not the same"
+                                        + " number for Percolator"),
                 () -> assertEquals(ToolOrigin.MANAGED, offer.origin()),
                 () -> assertEquals(Optional.empty(), offer.installedPath()));
     }
@@ -244,10 +272,10 @@ class ManagedToolManagerOffersTest {
                                 refused.loaderDiagnostic().orElseThrow().message()),
                 () ->
                         assertEquals(
-                                OptionalLong.of(946_303L),
+                                OptionalLong.of(2_798_963L),
                                 refused.downloadSizeBytes(),
-                                "the artefact exists and its length is known, even though this"
-                                        + " host may not fetch it"),
+                                "the artefact and its companion exist and their lengths are known,"
+                                        + " even though this host may not fetch them"),
                 () ->
                         assertEquals(
                                 ToolInstallState.NOT_INSTALLED,

@@ -45,10 +45,19 @@ import java.util.Set;
  * <p><strong>The download size is here because a scientist is shown it.</strong> PDV is a 103 407
  * 417-byte download and the Tool Manager has to be able to say so before asking anyone to start one
  * -- and, under this record's own rule that everything a scientist is shown about a tool is
- * expressible here, a size that is not a component is a size that is not shown. It is the length
- * the manifest pins for the artefact <em>this host</em> would fetch, so it is absent in exactly the
- * two cases where this host would fetch nothing: a {@link ToolOrigin#LOCAL} binary, which was
- * already on the machine, and a build that is {@link
+ * expressible here, a size that is not a component is a size that is not shown.
+ *
+ * <p><strong>It is the whole transfer, not one file.</strong> An install fetches the artefact and
+ * every companion the manifest names with it -- Percolator 3.07.1 on Linux is a 946 303-byte
+ * archive <em>and</em> the 1 852 660-byte {@code .deb} the two XSDs come out of, so the number is 2
+ * 798 963 -- because the question a user asks before pressing Install is how many bytes are about
+ * to move, and a figure three times smaller than the transfer it describes is a value that
+ * misstates what it reports. It is <em>not</em> the size of the installed files: an archive is
+ * unpacked and a payload is taken out of a package, so what lands on disk is a different number
+ * that this record does not carry.
+ *
+ * <p>It is absent in exactly the two cases where this host would fetch nothing: a {@link
+ * ToolOrigin#LOCAL} binary, which was already on the machine, and a build that is {@link
  * ToolInstallState#UNAVAILABLE_ON_THIS_PLATFORM}, for which no artefact exists here.
  *
  * <p>Capabilities arrive as {@link DeclaredCapability} rather than bare constants, so the interface
@@ -67,9 +76,10 @@ import java.util.Set;
  * @param loaderDiagnostic why the build will not run here, when it will not; absent otherwise
  * @param installedPath where the executable or JAR is, absolute; required when the state is {@link
  *     ToolInstallState#INSTALLED} and otherwise absent
- * @param downloadSizeBytes the length the manifest pins for this build's artefact on this host --
- *     the artefact itself, not counting any companion download; present exactly when this host has
- *     an artefact to fetch, and positive when it is present
+ * @param downloadSizeBytes how many bytes this host fetches to install the build: the artefact and
+ *     every companion the manifest names with it, added up, and not the size of the installed
+ *     files; present exactly when this host has an artefact to fetch, and positive when it is
+ *     present
  */
 public record ToolOffer(
         ToolName tool,
@@ -146,9 +156,9 @@ public record ToolOffer(
      * WHETHER THERE IS A DOWNLOAD IS A QUESTION ABOUT THIS HOST, AND IT HAS EXACTLY TWO NEGATIVE
      * ANSWERS.  A LOCAL binary was already on the machine, so CometGUI will fetch nothing for it;
      * a build UNAVAILABLE_ON_THIS_PLATFORM has no artefact here to fetch.  Everywhere else an
-     * artefact exists and its length is pinned by the manifest row the offer was built from, so an
-     * absent size there is the Tool Manager unable to say how large a download it is about to
-     * start -- which is the case this component was added for.
+     * artefact exists and the manifest row the offer was built from pins the length of every file
+     * that would be fetched, so an absent size there is the Tool Manager unable to say how large a
+     * download it is about to start -- which is the case this component was added for.
      *
      * The rule is keyed on the origin AND the state because neither alone answers it: a MANAGED
      * build can be one with no artefact here, and a LOCAL binary is in whatever state the

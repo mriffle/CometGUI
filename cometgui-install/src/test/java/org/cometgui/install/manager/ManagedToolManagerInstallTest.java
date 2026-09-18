@@ -169,9 +169,12 @@ class ManagedToolManagerInstallTest {
                                     row.capabilities().get(0).evidence()),
                     () ->
                             assertEquals(
-                                    OptionalLong.of(946_303L),
+                                    OptionalLong.of(2_798_963L),
                                     row.downloadSizeBytes(),
-                                    "an installed build still says how large its artefact was"),
+                                    "an installed build still says how large the transfer was:"
+                                            + " 946 303 for the archive and 1 852 660 for the .deb"
+                                            + " this install really fetched, both of them served"
+                                            + " above"),
                     () ->
                             assertEquals(
                                     List.of(record.url(), record.companions().get(0).url()),
