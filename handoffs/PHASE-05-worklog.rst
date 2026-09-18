@@ -3369,3 +3369,159 @@ Carried forward from unit 8
   runner, the hash service and the downloader -- residue from phases 03 and 04,
   not something unit 8 introduced or was asked to fix. **Unit 9 either wires it
   or names who does.**
+
+
+.. _p05-u9-signoff:
+
+Unit 9 ACCEPTED at ``1f35c25``, after two rounds
+==================================================
+
+**The unit**: the Tool Manager section a scientist looks at --
+``ToolManagerViewModel``, ``ToolRowViewModel``, ``ToolManagerPane``, the shell
+change that fills ``SectionId.TOOL_MANAGER``, eleven new stable identifiers, and
+the decision about how the running application obtains a ``ToolManager`` at all.
+
+**What I ran myself** on the accepted tree, quiet, exit status inside the log::
+
+    218 report file(s): tests=3657 failures=0 errors=0 skipped=3
+    11/11 stages OK in 1077 seconds.  BUILD OK
+    EXIT STATUS: 0
+
+    ok  cometgui-ui   16 compiled class(es), all 16 in the sample
+    ok  cometgui-app  10 compiled class(es), all 10 in the sample
+    ok  8 architecture rule(s) checked, 0 failures
+    ok  cometgui-domain   379/380   mutations killed = 99.7%
+    ok  cometgui-install  1355/1372 mutations killed = 98.7%
+
+Read out of ``mutations.xml``: ``cometgui-domain`` 380 mutations with **exactly
+one survivor, ``ToolVersion:214``**, the pinned entry unmoved;
+``cometgui-install`` 1372 with eleven survivors, every one the pre-existing
+``archive``/``download``/``cache`` residue, and
+**``org.cometgui.install.manager`` now 61 mutations, 61 killed, no survivors and
+no timeouts**.
+
+**The pinned tables were raised, not lowered**, which is the distinction that
+decides whether this is maintenance or a weakening:
+``PINNED_IDENTIFIER_COUNT`` 119 to **133**, every new literal hand-typed, plus a
+*reflective enumeration* of the ``toolRow*`` methods so a new one fails until it
+is pinned -- stricter than what it replaced. ``ViewModelIndependenceTest``'s
+hand-typed file list gained exactly the two new view models. Nothing was removed
+and no pattern loosened, and ``git diff`` over ``pom.xml``, the module POMs,
+``config/``, ``scripts/``, ``manifests/`` and the tier-1 documents is empty
+across all three commits.
+
+.. _p05-u9-first-rework:
+
+Sent back the first time: two findings the unit made against itself
+--------------------------------------------------------------------
+
+Both reported by the unit, both checked by me against the phase document rather
+than taken on trust.
+
+#. **A registered local binary never appeared in ``offers()``.**
+   ``phases/PHASE-05-tool-registry.rst`` puts *"installed, available,
+   unavailable-on-this-platform and **local** tools"* in this section's scope,
+   and ``registerLocalBinary`` handed its offer to the caller and kept nothing --
+   so the path the specification calls *the documented remedy wherever no
+   managed XML-capable build exists* produced a tool the Tool Manager could
+   never show. The view rendered a ``LOCAL`` row correctly; the port could not
+   supply one.
+#. **A terminal report raced the row it described.** ``ArtefactInstaller``
+   reports its one terminal phase from a ``finally`` block and
+   ``ManagedToolManager`` wrote its attempt map afterwards, so a listener that
+   re-read ``offers()`` on seeing ``DONE`` was told ``INSTALLING``. Under
+   ``Platform::runLater`` the queue latency hides it. **A defect hidden by
+   scheduling latency is not a fixed defect**, and I did not let unit 10 work
+   around it.
+
+Both were repaired inside ``org.cometgui.install.manager`` as excursions I
+authorised into unit 8's signed-off package. The unit's three decisions about
+local rows -- where the row sits, what a repeated path does, what a second path
+does -- are each argued beside the code, and **session scope is written into the
+Javadoc as my ruling** rather than left as an omission: persisting a
+registration needs a store no phase owns, since nothing in ``phases/index.rst``
+claims the Settings section. **Routed upward, not invented.**
+
+.. _p05-u9-hop:
+
+Sent back the second time: the defect I found by injection
+------------------------------------------------------------
+
+Chosen from outside the acceptance conditions, by asking what silent behaviour
+this code has that no condition names. ``ToolManagerViewModel`` puts every
+progress report back on the interface thread with one line::
+
+    progress -> uiThread.execute(() -> onProgress(row, progress))
+
+I removed the hop. **The whole tree stayed green** -- because every test in the
+unit passes ``Runnable::run``, and the axis nothing varied is *which thread the
+report arrives on*. In the running application that is one of
+``ToolManagerWiring.installThreads()``'s ``cometgui-install-N`` daemon threads.
+
+**And my first probe passed too, which is the part worth carrying.** I wrote a
+test with a live ``Scene`` and a real background thread and asserted that
+nothing was thrown -- and nothing was. **JavaFX raises no exception here**:
+mutating a property or an observable list that a live scene is watching, from
+another thread, is *undefined by the toolkit's contract rather than refused*. So
+my probe was a "did not throw" test, which this project forbids in as many
+words, and I had written one myself. The version that works **observes the
+thread**: a listener capturing ``Platform.isFxApplicationThread()`` at the
+moment the change arrives, and asserting first that a change arrived at all.
+
+With the hop removed it reports ``but it arrived on "cometgui-install-1"``; with
+it restored, the interface thread. The unit then graded **both** hazards through
+that one line rather than the one I named -- a mid-install report writes a
+*property* the labels show, a terminal report rebuilds the *observable list* the
+pane's children are drawn from -- and measured what had been ungraded: the four
+pre-existing suites, **57 tests, pass with the defect in place**.
+
+I re-ran the injection myself against the new tests rather than accepting the
+report: both fail, with the thread named in the message. This is unit 4's five
+XXE guards for the third time in this phase -- **a protection that cannot be
+observed to matter is indistinguishable from one that is absent.**
+
+.. _p05-stale-class:
+
+A fourth shape of a red that is not a result, and this one is new
+------------------------------------------------------------------
+
+Reported by the unit and worth the phase's memory. After restoring an injected
+file with ``cp -a``, **the same two tests failed again on a source that was
+byte-identical to the snapshot**. ``cp -a`` preserves the snapshot's mtime, so
+the restored source was *older* than the class the injection had compiled and
+Maven's incremental compiler kept the injected bytecode. ``sha256sum`` matched,
+the marker grepped out at zero, the source was right -- and the thing under test
+was not. ``javap`` found zero ``execute`` references in the stale class.
+
+The three earlier instances in this phase were a red caused by the harness
+(Checkstyle's line length, an orphaned import twice). **This one is different
+and worse: the evidence that was checked was correct.** The rule it adds:
+**after restoring, verify the compiled class, not only the source** -- or restore
+in a way that touches the file. ``build.sh`` runs ``mvn clean verify`` and is
+immune; a targeted ``mvn -pl`` run is not.
+
+Carried forward from unit 9
+----------------------------
+
+* **The Tool Manager shows local tools but cannot acquire one.** There is no
+  registration action, no file chooser, and ``org.cometgui.ui.dialogs`` is still
+  an empty package, so ``registerLocalBinary`` is reachable only from code.
+  **Gate item 7 does not require the interface** -- unlike item 1, which says
+  *"driven through the Tool Manager UI"* in as many words -- so this is named
+  residue rather than an unmet gate item. It is reported to tier 1 as such.
+* **A ``FAILED`` row still carries no reason**, unchanged from unit 8, and the
+  unit invented nothing to fill the gap.
+* **``DeclaredCapability.note()`` is not rendered** -- deliberate, the notes are
+  long; unit 11's documentation must not imply otherwise.
+* **The ``percolator.3-09-writes-no-pout-xml`` advisory is invisible on Linux**,
+  because advisories hang off rows and 3.09 has no Linux row. Unit 8's rule is
+  right and the consequence is real: the ``R-PERC-10``-shaped fact *"3.09 cannot
+  emit the XML Limelight needs"* is not said in the Tool Manager. Phase 09 owns
+  that sentence at selection time.
+* **There is no Refresh action.** Rows are read at startup and around an install,
+  so a tool installed outside the application is not noticed until restart.
+* **Row keys for unit 10**: ``<toolId>-<version with dots as underscores>-<1-based
+  ordinal>``, for example ``percolator-3_07_1-1``; controls are
+  ``UiIds.toolRow*(key)``; ``ToolManagerViewModel.refresh()`` is public and
+  idempotent. ``ToolManagerSectionUiTest`` expects six rows, which holds only
+  while nothing registers a local binary in it.
