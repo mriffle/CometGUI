@@ -262,6 +262,18 @@ final class ToolManagerHarness {
             return this;
         }
 
+        /**
+         * Registrars for more than one tool, for the rule that a local row sits with its own tool
+         * and with no other.
+         *
+         * @param toolRegistrars the registrars, by tool
+         * @return this builder
+         */
+        Builder registeringAll(Map<ToolName, LocalBinaryRegistrar> toolRegistrars) {
+            this.registrars = Map.copyOf(toolRegistrars);
+            return this;
+        }
+
         Builder installingOn(Executor executor) {
             this.installs = executor;
             return this;

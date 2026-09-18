@@ -36,6 +36,7 @@ import org.cometgui.domain.tools.CapabilityEvidence;
 import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.InstallHandle;
+import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgressListener;
 import org.cometgui.domain.tools.LoaderDiagnostic;
 import org.cometgui.domain.tools.ToolCapability;
@@ -47,7 +48,6 @@ import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.install.cache.ArtefactInstaller;
-import org.cometgui.install.cache.InstallCancelledException;
 import org.cometgui.install.cache.InstallationCheck;
 import org.cometgui.install.cache.InstallationMarker;
 import org.cometgui.install.cache.ToolCache;
@@ -150,6 +150,43 @@ public final class ManagedToolManager implements ToolManager {
     private final Map<String, ToolInstallState> attempts = new ConcurrentHashMap<>();
 
     /**
+     * The binaries the user pointed CometGUI at, by the path they named.
+     *
+     * <h2>Why they are held at all</h2>
+     *
+     * <p>{@code phases/PHASE-05-tool-registry.rst} puts "installed, available,
+     * unavailable-on-this-platform <em>and local</em> tools" in the Tool Manager's scope, and the
+     * specification's <em>Percolator installation modes</em> calls registering a local binary the
+     * documented remedy wherever no managed XML-capable build exists for a platform. A remedy whose
+     * result the Tool Manager cannot show is not a remedy, so {@link #registerLocalBinary} keeps
+     * what it registered and {@link #offers()} lists it.
+     *
+     * <h2>Keyed on the path, not on the tool and the version</h2>
+     *
+     * <p>The key is the absolute path the caller named, normalised. Registering the <strong>same
+     * path</strong> again replaces the row rather than adding one: the point of asking again is
+     * that the file may have changed, and {@link LinkedHashMap} keeps a replaced entry where it was
+     * so the row does not jump about while a user re-probes it. Registering a <strong>second,
+     * different path</strong> for the same tool adds a second row, because a user may hold several
+     * builds and the product's business is to show what exists rather than to choose between them.
+     *
+     * <p>It is <strong>not</strong> keyed on the tool and the version. Two different files can
+     * report the same version -- a rebuild, a copy kept beside an older one -- and collapsing them
+     * would hide one binary behind another, which is the same mistake the Tool Manager's own row
+     * identifiers exist to avoid. Two paths that happen to resolve to one file through a symbolic
+     * link are two rows; the path is what the user chose and what the row shows.
+     *
+     * <h2>This session only, and that is a stated boundary</h2>
+     *
+     * <p><strong>A registration does not survive a restart.</strong> Persisting one needs a store
+     * this phase does not own -- no phase in {@code phases/index.rst} claims the Settings section,
+     * which is where an application preference would live -- so after a restart the Tool Manager
+     * shows the managed rows and the user registers again. Written down here so that it is a limit
+     * somebody decided rather than one nobody noticed.
+     */
+    private final Map<Path, ToolOffer> registeredBinaries = new LinkedHashMap<>();
+
+    /**
      * Composes the runtime.
      *
      * <p>The cache is taken from the installer rather than passed separately: two of them would be
@@ -241,7 +278,29 @@ public final class ManagedToolManager implements ToolManager {
                             + "; every other tool is installed from the artefact manifest, where"
                             + " its checksum is pinned.");
         }
-        return checkedRegistration(tool, registrar.register(executable));
+        ToolOffer registered = checkedRegistration(tool, registrar.register(executable));
+        synchronized (registeredBinaries) {
+            registeredBinaries.put(executable.normalize(), registered);
+        }
+        return registered;
+    }
+
+    /**
+     * The binaries registered for one tool, in the order they were registered.
+     *
+     * @param tool the tool
+     * @return the offers, immutable and usually empty
+     */
+    private List<ToolOffer> registeredFor(ToolName tool) {
+        List<ToolOffer> theirs = new ArrayList<>();
+        synchronized (registeredBinaries) {
+            for (ToolOffer offer : registeredBinaries.values()) {
+                if (offer.tool() == tool) {
+                    theirs.add(offer);
+                }
+            }
+        }
+        return List.copyOf(theirs);
     }
 
     /*
@@ -324,6 +383,21 @@ public final class ManagedToolManager implements ToolManager {
                  */
             }
         }
+        /*
+         * A LOCAL BINARY IS STILL THIS TOOL, SO IT SITS WITH THIS TOOL -- after the releases
+         * CometGUI can install, in the order the user registered it.
+         *
+         * With the tool, because a reader looking for "what Percolator does this machine have"
+         * looks in one place and expects to find all of them; a group of managed rows followed by a
+         * separate group of local ones would make them hunt.
+         *
+         * After them, and not merged into the version ordering, because a registered binary is not
+         * a release the manifest knows about.  Its version comes from probing the user's own file
+         * and can be anything at all -- including a number the manifest also names -- so placing it
+         * among the managed rows by version would read as though CometGUI offered it, which is the
+         * one thing R-PERC-01 forbids the interface to imply.
+         */
+        offers.addAll(registeredFor(tool));
         return offers;
     }
 
@@ -592,23 +666,69 @@ public final class ManagedToolManager implements ToolManager {
                         + refusal.diagnostic().message());
     }
 
+    /*
+     * THE ROW AGREES WITH THE TERMINAL REPORT BEFORE THE LISTENER SEES IT.
+     *
+     * ArtefactInstaller sends exactly one terminal report, from a finally block, and then returns
+     * or lets the failure propagate.  This method used to write the attempt map afterwards, so a
+     * listener that re-read offers() the moment it saw DONE was told INSTALLING -- the install had
+     * finished and the port had not caught up.  With a real interface thread the listener's work is
+     * queued and this method wins the race before anything looks, which is exactly what made the
+     * defect invisible: it was hidden by scheduling latency, not by correctness, and a defect that
+     * only shows under one executor is this project's signature shape wearing a different coat.
+     *
+     * So the settle happens INSIDE the listener this class hands to the installer, before the
+     * caller's listener is called at all.  It is graded with the executor that loses -- an install
+     * run on the calling thread, with a listener that asks offers() synchronously.
+     */
     private void runInstall(
             ArtefactRecord record,
             InstallProgressListener listener,
             Cancellation cancellation,
             String entry) {
         try {
-            installer.install(record, listener, cancellation);
-            attempts.remove(entry);
-        } catch (InstallCancelledException cancelled) {
+            installer.install(record, settlingFirst(listener, entry), cancellation);
+        } catch (IOException | RuntimeException stopped) {
             /*
-             * CANCELLING IS NOT FAILING, and the row must not say it is.  Nothing was written to
-             * the tool cache, so the honest state is the one the build was in before the user
-             * pressed the button, and removing the entry is what makes ToolCache.verify say so.
+             * NOTHING LEFT TO DO HERE, AND DELIBERATELY NO SECOND PLACE THAT WRITES THE STATE.
+             * Every way out of ArtefactInstaller.install -- done, cancelled, failed -- reports its
+             * terminal phase before it returns or throws, and the listener above has already
+             * written the attempt map from it.  Writing it again here would be a second answer to
+             * "what state is this entry in", and the second answer would be on a branch no test can
+             * reach: a mutation no test can kill.  The throw is swallowed because this runs on an
+             * install thread, where an escape would kill the thread with nobody to catch it, and
+             * the row already says what happened.
              */
-            attempts.remove(entry);
-        } catch (IOException | RuntimeException failed) {
+        }
+    }
+
+    /**
+     * The caller's listener, with this manager's own state settled before every terminal report.
+     *
+     * @param listener the listener the caller gave to {@link #install}
+     * @param entry the cache key of the build being installed
+     * @return a listener that settles first and forwards second
+     */
+    private InstallProgressListener settlingFirst(InstallProgressListener listener, String entry) {
+        return progress -> {
+            if (progress.phase().isTerminal()) {
+                settle(entry, progress.phase());
+            }
+            listener.onInstallProgress(progress);
+        };
+    }
+
+    /*
+     * CANCELLING IS NOT FAILING, and the row must not say it is.  Nothing was written to the tool
+     * cache, so the honest state is the one the build was in before the user pressed the button,
+     * and removing the entry is what makes ToolCache.verify the whole truth again.  A finished
+     * install is removed for the same reason: the marker it wrote is now the answer.
+     */
+    private void settle(String entry, InstallPhase terminal) {
+        if (terminal == InstallPhase.FAILED) {
             attempts.put(entry, ToolInstallState.FAILED);
+        } else {
+            attempts.remove(entry);
         }
     }
 

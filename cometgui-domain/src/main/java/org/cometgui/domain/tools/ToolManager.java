@@ -79,6 +79,12 @@ public interface ToolManager {
      * capability, the capability is absent. This is the documented remedy wherever no managed build
      * is available for the platform, so it is a supported path rather than an escape hatch.
      *
+     * <p><strong>The registration is kept, and the binary appears in {@link #offers()} from here
+     * on.</strong> A remedy whose result the Tool Manager cannot show is not a remedy. How long an
+     * implementation keeps it is the implementation's to state; {@code
+     * org.cometgui.install.manager.ManagedToolManager} keeps it for as long as it lives and says so
+     * on the field that holds it.
+     *
      * @param tool which tool the binary is claimed to be
      * @param executable the absolute path of the executable or JAR
      * @return the offer for the registered binary, with {@link ToolOrigin#LOCAL}
