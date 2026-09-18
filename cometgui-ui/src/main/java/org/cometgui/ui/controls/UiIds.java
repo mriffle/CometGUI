@@ -18,6 +18,7 @@ package org.cometgui.ui.controls;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import org.cometgui.domain.log.MessageSeverity;
 import org.cometgui.domain.run.StageTag;
 import org.cometgui.ui.viewmodel.SectionId;
@@ -125,6 +126,22 @@ public final class UiIds {
 
     /** The console's "copy" action. */
     public static final String CONSOLE_COPY = "console-copy";
+
+    /** The Tool Manager section's content, below the section's own heading and note. */
+    public static final String TOOL_MANAGER_PANE = "tool-manager-pane";
+
+    /** The Tool Manager's one-line statement of what the list below it holds. */
+    public static final String TOOL_MANAGER_SUMMARY = "tool-manager-summary";
+
+    /** The container holding one row per tool build the port offered. */
+    public static final String TOOL_MANAGER_ROWS = "tool-manager-rows";
+
+    /**
+     * The shape a tool row key must have: lower-case words joined by single hyphens or underscores.
+     * See the note above {@link #toolRow(String)} for why a dot is rejected.
+     */
+    private static final Pattern TOOL_ROW_KEY_SHAPE =
+            Pattern.compile("[a-z0-9]+(?:[-_][a-z0-9]+)*");
 
     private UiIds() {}
 
@@ -274,5 +291,161 @@ public final class UiIds {
     public static String consoleSeverityFilter(MessageSeverity severity) {
         Objects.requireNonNull(severity, "severity");
         return CONSOLE_SEVERITY_FILTER + "-" + severity.name().toLowerCase(Locale.ROOT);
+    }
+
+    /*
+     * ONE TOOL BUILD IS ONE ROW, AND A ROW IS NOT NAMED AFTER ITS TOOL AND VERSION.  On Apple
+     * silicon Comet 2026.02.2 is two published builds and org.cometgui.domain.tools.ToolManager
+     * offers both, so an identifier built from the tool and the version alone would name two
+     * controls with one string and Scene.lookup would return whichever it reached first.  The key
+     * these methods take is therefore produced by the view-model, which is the one place that can
+     * see the whole offered list and can tell the second row of a release from the first.
+     *
+     * The key's shape is checked here rather than trusted, because these identifiers are looked up
+     * as CSS selectors: a dot in a key would be read as a style class and the lookup would
+     * silently find nothing, which is exactly the shape of failure this project's pinned
+     * identifiers exist to stop.
+     */
+
+    /**
+     * The identifier of one tool build's row.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return {@code "tool-row-"} followed by the key
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not lower-case words joined by single hyphens
+     *     or underscores, with a message quoting the rejected value
+     */
+    public static String toolRow(String rowKey) {
+        Objects.requireNonNull(rowKey, "rowKey");
+        if (!TOOL_ROW_KEY_SHAPE.matcher(rowKey).matches()) {
+            throw new IllegalArgumentException(
+                    "not a usable tool row key: \""
+                            + rowKey
+                            + "\" (expected lower-case words joined by single hyphens or"
+                            + " underscores, such as percolator-3_07_1-1; a dot would be read as a"
+                            + " style class by Scene.lookup and the control would never be found)");
+        }
+        return "tool-row-" + rowKey;
+    }
+
+    /**
+     * The identifier of the label naming the tool and version a row is for.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-name"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowName(String rowKey) {
+        return toolRow(rowKey) + "-name";
+    }
+
+    /**
+     * The identifier of the label stating a row's install state in words.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-state"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowState(String rowKey) {
+        return toolRow(rowKey) + "-state";
+    }
+
+    /**
+     * The identifier of the label listing what a build can do, each claim with its evidence.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-capabilities"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowCapabilities(String rowKey) {
+        return toolRow(rowKey) + "-capabilities";
+    }
+
+    /**
+     * The identifier of the label carrying a build's version advisories ({@code R-PERC-11}).
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-advisories"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowAdvisories(String rowKey) {
+        return toolRow(rowKey) + "-advisories";
+    }
+
+    /**
+     * The identifier of the label saying how many bytes installing a build would transfer.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-download"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowDownload(String rowKey) {
+        return toolRow(rowKey) + "-download";
+    }
+
+    /**
+     * The identifier of the label carrying a row's {@code R-PLAT-03} loader diagnostic.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-diagnostic"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowDiagnostic(String rowKey) {
+        return toolRow(rowKey) + "-diagnostic";
+    }
+
+    /**
+     * The identifier of the label naming where an installed build lives.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-path"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowPath(String rowKey) {
+        return toolRow(rowKey) + "-path";
+    }
+
+    /**
+     * The identifier of the label reporting where a running install has got to.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-progress"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowProgress(String rowKey) {
+        return toolRow(rowKey) + "-progress";
+    }
+
+    /**
+     * The identifier of a row's Install action.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-install"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowInstall(String rowKey) {
+        return toolRow(rowKey) + "-install";
+    }
+
+    /**
+     * The identifier of a row's Cancel action.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-cancel"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowCancel(String rowKey) {
+        return toolRow(rowKey) + "-cancel";
     }
 }

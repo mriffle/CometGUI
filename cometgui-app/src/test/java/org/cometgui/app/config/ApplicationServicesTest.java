@@ -45,6 +45,7 @@ import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.domain.ports.RunIdSource;
 import org.cometgui.domain.run.RunId;
+import org.cometgui.tools.process.ProcessService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -101,7 +102,13 @@ class ApplicationServicesTest {
                 () -> assertInstanceOf(PlatformFileSystemAccess.class, services.fileSystem()),
                 () -> assertInstanceOf(ClockRunIdSource.class, services.runIds()),
                 () -> assertInstanceOf(FfmGlibcVersionSource.class, services.glibcVersions()),
-                () -> assertEquals(Optional.empty(), services.processRunner()),
+                () ->
+                        assertInstanceOf(
+                                ProcessService.class,
+                                services.requireProcessRunner(),
+                                "phase 05 unit 9 wired the process seam: the Tool Manager's probes"
+                                        + " launch processes, and R-PROC-02 confines that to one"
+                                        + " service"),
                 () -> assertEquals(Optional.empty(), services.hashService()),
                 () -> assertEquals(Optional.empty(), services.downloader()));
     }
@@ -156,12 +163,12 @@ class ApplicationServicesTest {
     }
 
     @Test
-    @DisplayName("the three seams later phases own are absent, and say which phase owns them")
+    @DisplayName("a seam this class holds none of is absent, and says which phase owns it")
     void absentSeamsAreModelledExplicitly() {
         ApplicationServices services = ApplicationServices.forThisHost();
+        ApplicationServices nothingOptional = withOptionalSeams(null, null, null);
 
         assertAll(
-                () -> assertEquals(Optional.empty(), services.processRunner()),
                 () -> assertEquals(Optional.empty(), services.hashService()),
                 () -> assertEquals(Optional.empty(), services.downloader()),
                 () ->
@@ -171,8 +178,10 @@ class ApplicationServicesTest {
                                         + " phase 03",
                                 assertThrows(
                                                 IllegalStateException.class,
-                                                services::requireProcessRunner)
-                                        .getMessage()),
+                                                nothingOptional::requireProcessRunner)
+                                        .getMessage(),
+                                "forThisHost wires one now, so the diagnostic is proved on a wiring"
+                                        + " built without one rather than dropped"),
                 () ->
                         assertEquals(
                                 "the hash service is not wired yet:"

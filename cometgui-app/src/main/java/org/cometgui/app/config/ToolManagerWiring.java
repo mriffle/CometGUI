@@ -224,6 +224,126 @@ public final class ToolManagerWiring {
     }
 
     /**
+     * The Tool Manager for the machine this application is running on.
+     *
+     * <h2>Why the application asks here rather than through a seam on {@link ApplicationServices}
+     * </h2>
+     *
+     * <p>Unit 9 had two honest options and took this one, and the deciding fact is that
+     * <strong>{@code org.cometgui.domain.ports.Downloader} is not the seam the installer
+     * uses</strong>. An install resumes a partial transfer, is cancelled between chunks and reports
+     * what it did; that is {@code org.cometgui.install.download.ArtefactFetcher}, which the {@code
+     * Downloader} port cannot express. Wiring {@code HttpDownloader} into the composition root's
+     * {@code downloader()} seam would publish something that looks like the installer's downloader
+     * and is not one, which is a worse answer than leaving it absent and saying so. The hash
+     * service is composed here for the same reason in the other direction: the cache, the verifier
+     * and the installer must share <em>one</em> {@code HashService}, and this method is where that
+     * one is made.
+     *
+     * <p>What the composition root does supply is everything it already holds -- the clock, the
+     * environment the host platform is read from, the C and C++ runtime versions, the application
+     * data directory and, from this unit onward, the process seam -- so there is still exactly one
+     * process launcher in the running application.
+     *
+     * <h2>The cache root is the application data directory, and nothing creates it here</h2>
+     *
+     * <p>{@code ToolCache} said from the start that {@code cometgui-app}'s wiring decides the root
+     * through {@link org.cometgui.domain.ports.FileSystemAccess#applicationDataDirectory()}, and
+     * this is that wiring. No directory is created: reading the offered list only asks whether
+     * directories exist, and an install creates what it needs under a root it lays out itself.
+     * Inventing a location, or creating one at startup for a user who never opens the Tool Manager,
+     * would both be worse.
+     *
+     * @param services the composition root
+     * @param installThreads where an install runs, usually {@link #installThreads()}
+     * @return the manager, behind the port the user interface sees
+     * @throws ToolManagerUnavailableException if this platform is not one the product publishes
+     *     for, or if the artefact manifest or a probe seam cannot be read -- with a message written
+     *     for the person in front of the screen
+     * @throws NullPointerException if either argument is {@code null}
+     */
+    public static ToolManager forThisApplication(
+            ApplicationServices services, Executor installThreads)
+            throws ToolManagerUnavailableException {
+        Objects.requireNonNull(services, "services");
+        Objects.requireNonNull(installThreads, "installThreads");
+        HostPlatform host = hostOf(services);
+        ProcessRunner processes = processRunnerOf(services);
+        HostRuntimeVersions versions = HostRuntimeVersions.detect(services.glibcVersions());
+        try {
+            return toolManager(
+                    host,
+                    versions,
+                    services.fileSystem().applicationDataDirectory(),
+                    processes,
+                    services.clock(),
+                    installThreads);
+        } catch (IOException unreadable) {
+            throw new ToolManagerUnavailableException(
+                    "CometGUI cannot manage tool installations on this machine: "
+                            + unreadable.getMessage(),
+                    unreadable);
+        }
+    }
+
+    /**
+     * The process seam every probe runs through.
+     *
+     * <p>A composition root built without one is a supported configuration -- {@link
+     * ApplicationServices} models an absent seam as an absent seam, and a test that wants a shell
+     * without a process service builds one -- so it is reported the same way a machine the product
+     * publishes nothing for is, and <strong>not</strong> as an {@code IllegalStateException} that
+     * would stop the application starting at all. A Tool Manager is one section of a window; it is
+     * not a reason for the window not to appear.
+     *
+     * @param services the composition root
+     * @return the process runner it holds
+     * @throws ToolManagerUnavailableException if it holds none, naming the seam so that a developer
+     *     reading the section can tell this from a machine limitation
+     */
+    private static ProcessRunner processRunnerOf(ApplicationServices services)
+            throws ToolManagerUnavailableException {
+        return services.processRunner()
+                .orElseThrow(
+                        () ->
+                                new ToolManagerUnavailableException(
+                                        "CometGUI cannot manage tool installations in this"
+                                                + " configuration: it was started without a process"
+                                                + " service, and R-TOOL-06 establishes what a"
+                                                + " tool can do by running it. The seam that is"
+                                                + " missing is"
+                                                + " org.cometgui.domain.ports.ProcessRunner."));
+    }
+
+    /**
+     * The platform this application is running on, as the artefact manifest spells it.
+     *
+     * @param services the composition root, whose environment seam is the only place {@code
+     *     os.name} and {@code os.arch} are read
+     * @return the platform
+     * @throws ToolManagerUnavailableException if either property is unset, or if the pair is not
+     *     one this product supports -- naming the values that were rejected, because "unsupported"
+     *     with no value in it cannot be acted on
+     */
+    private static HostPlatform hostOf(ApplicationServices services)
+            throws ToolManagerUnavailableException {
+        String osName = services.environment().osName().orElse("");
+        String osArch = services.environment().osArch().orElse("");
+        return HostPlatform.of(osName, osArch)
+                .orElseThrow(
+                        () ->
+                                new ToolManagerUnavailableException(
+                                        "CometGUI manages tool installations on 64-bit Linux,"
+                                                + " macOS and Windows, and this machine reports"
+                                                + " os.name=\""
+                                                + osName
+                                                + "\" os.arch=\""
+                                                + osArch
+                                                + "\". Tools for it have to be installed by hand"
+                                                + " and registered as local binaries."));
+    }
+
+    /**
      * Daemon threads for installs, one per install, named so that a thread dump says what they are.
      *
      * <p>Daemon deliberately: a download the user has walked away from must not keep the

@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -211,6 +212,43 @@ class CometGuiApplicationStartupTest {
                             assertNotNull(
                                     entry, "no entry with id " + UiIds.navigationEntry(section)));
         }
+    }
+
+    @Test
+    @DisplayName("the running application produced a Tool Manager and filled its section")
+    void theRunningApplicationProducedAToolManager() throws InterruptedException {
+        Scene scene = onFxThread(stage::getScene);
+        Node pane = onFxThread(() -> scene.lookup("#" + UiIds.TOOL_MANAGER_PANE));
+        Label summary = onFxThread(() -> (Label) scene.lookup("#" + UiIds.TOOL_MANAGER_SUMMARY));
+        Node percolator =
+                onFxThread(() -> scene.lookup("#" + UiIds.toolRowName("percolator-3_07_1-1")));
+
+        assertAll(
+                () -> assertNotNull(pane, "the Tool Manager section has no content"),
+                () -> assertNotNull(summary, "the Tool Manager states nothing about what it holds"),
+                () ->
+                        assertNotEquals(
+                                "The tool list has not been read yet.",
+                                summary.getText(),
+                                "the application composed a Tool Manager but never read it, so the"
+                                        + " section a user opens would be empty"),
+                () ->
+                        assertTrue(
+                                summary.getText().endsWith(" tool builds on this host."),
+                                () ->
+                                        "the section did not list this host's builds; it said: "
+                                                + summary.getText()),
+                () ->
+                        assertNotNull(
+                                percolator,
+                                "percolator 3.07.1 is published for every platform this product"
+                                        + " supports, so the running application must have a row"
+                                        + " for it"),
+                () ->
+                        assertEquals(
+                                "percolator 3.07.1",
+                                ((Label) percolator).getText(),
+                                "the row names the release as upstream spells it"));
     }
 
     @Test

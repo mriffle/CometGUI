@@ -88,7 +88,7 @@ class ViewModelIndependenceTest {
     }
 
     @Test
-    @DisplayName("the scan actually reads this package's six classes and its package-info")
+    @DisplayName("the scan actually reads this package's eight classes and its package-info")
     void theScanIsNotVacuous() {
         Map<String, String> sources = ViewModelSources.all();
         assertEquals(
@@ -99,6 +99,8 @@ class ViewModelIndependenceTest {
                         "NonNullProperty.java",
                         "SectionId.java",
                         "StageStepperViewModel.java",
+                        "ToolManagerViewModel.java",
+                        "ToolRowViewModel.java",
                         "package-info.java"),
                 List.copyOf(sources.keySet()),
                 "a source scan that read the wrong or an empty directory would pass over anything");

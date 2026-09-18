@@ -95,7 +95,11 @@ final class SectionArrivals {
                         + " empty until something writes to it.");
         notes.put(
                 SectionId.TOOL_MANAGER,
-                "This section arrives in phase 05 (Tool Registry and Installer).");
+                "This section is live: phase 05 (Tool Registry and Installer) filled it. Every"
+                        + " tool build this machine can have is listed below -- including the ones"
+                        + " upstream does not publish for this platform and the ones this host"
+                        + " cannot run, because a build that is absent is a fact a user needs"
+                        + " rather than a row to hide.");
         notes.put(
                 SectionId.SETTINGS,
                 "No phase in phases/index.rst claims this section. It arrives with the first phase"

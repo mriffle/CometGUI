@@ -26,6 +26,7 @@ import org.cometgui.domain.ports.FileSystemAccess;
 import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.domain.ports.RunIdSource;
+import org.cometgui.tools.process.ProcessService;
 
 /**
  * The composition root: the one place where the injectable seams of {@code R-PROC-01} are chosen,
@@ -96,17 +97,21 @@ public final class ApplicationServices {
     private final Downloader downloader;
 
     /**
-     * Wires a set of services explicitly. The three seams later phases own may be {@code null},
-     * which is what "not delivered yet" means; every other argument is required.
+     * Wires a set of services explicitly. The two seams no caller consumes through this class yet
+     * may be {@code null}, which is what "nothing asks for it here" means; every other argument is
+     * required.
      *
      * @param clock the clock seam
      * @param environment the environment seam
      * @param fileSystem the filesystem seam
      * @param runIds the run-ID seam
      * @param glibcVersions the host's C library version, for the baseline check
-     * @param processRunner phase 03's process service, or {@code null} until it exists
-     * @param hashService phase 04's hash service, or {@code null} until it exists
-     * @param downloader phase 05's downloader, or {@code null} until it exists
+     * @param processRunner phase 03's process service, or {@code null} where nothing may launch a
+     *     process
+     * @param hashService phase 04's hash service, or {@code null} where nothing asks this class for
+     *     one
+     * @param downloader phase 05's downloader, or {@code null} where nothing asks this class for
+     *     one
      * @throws NullPointerException if any argument other than the last three is {@code null}
      */
     public ApplicationServices(
@@ -131,8 +136,22 @@ public final class ApplicationServices {
     /**
      * The services the application runs with on this machine: a UTC system clock, the real
      * environment, the real filesystem, a run-ID source over that clock, the foreign-function glibc
-     * probe, a message log at its default capacity, and nothing for the three seams later phases
-     * own.
+     * probe, and phase 03's process service over that same clock.
+     *
+     * <h2>Why the process seam is wired here and the other two are not</h2>
+     *
+     * <p>Phase 05 unit 9 wired it, because the Tool Manager is the first part of the running
+     * application that launches a process -- every probe runs the installed binary -- and {@code
+     * R-PROC-02} confines process creation to one service. One launcher in the application means it
+     * is held in the one place that composes the application.
+     *
+     * <p>The hash and download seams stay {@code null} deliberately, and not because their phases
+     * have not landed. The installer needs a <em>single</em> {@code HashService} shared by the tool
+     * cache, the artefact verifier and the install pipeline, and {@link
+     * ToolManagerWiring#toolManager} is where that one is made; and the installer's downloader is
+     * {@code org.cometgui.install.download.ArtefactFetcher}, which resumes, cancels and reports --
+     * not {@link Downloader}, which cannot express any of that. Publishing an instance of either
+     * here would offer a seam that looks like the installer's and is not one.
      *
      * <p>No I/O happens here. In particular no directory is created: {@link
      * FileSystemAccess#applicationDataDirectory()} computes a path and the caller that needs it
@@ -149,7 +168,7 @@ public final class ApplicationServices {
                 new PlatformFileSystemAccess(environment),
                 new ClockRunIdSource(clock),
                 new FfmGlibcVersionSource(),
-                null,
+                new ProcessService(clock),
                 null,
                 null);
     }
@@ -200,9 +219,9 @@ public final class ApplicationServices {
     }
 
     /**
-     * The process seam, if the phase that owns it has landed.
+     * The process seam.
      *
-     * @return the process runner, or empty until phase 03 delivers one
+     * @return the process runner, or empty when this wiring was built without one
      */
     public Optional<ProcessRunner> processRunner() {
         return Optional.ofNullable(processRunner);

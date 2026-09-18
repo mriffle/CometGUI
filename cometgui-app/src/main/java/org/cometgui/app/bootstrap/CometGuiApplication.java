@@ -18,9 +18,12 @@ package org.cometgui.app.bootstrap;
 
 import java.util.Objects;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import org.cometgui.app.config.ApplicationServices;
+import org.cometgui.app.config.ToolManagerUnavailableException;
+import org.cometgui.app.config.ToolManagerWiring;
 import org.cometgui.app.config.derived.AtlantaFxThemes;
 import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.log.LogMessage;
@@ -33,6 +36,7 @@ import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
 import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
+import org.cometgui.ui.viewmodel.ToolManagerViewModel;
 
 /**
  * The running application: build the composition root, check the host, build the shell, show the
@@ -172,16 +176,57 @@ public final class CometGuiApplication extends Application {
         HostBaselineViewModel hostBaseline = new HostBaselineViewModel(baseline);
         recordBaseline(hostBaseline);
 
+        ToolManagerViewModel toolManager = toolManagerViewModel();
+
         ShellView shell =
                 new ShellView(
                         new NavigationViewModel(),
                         hostBaseline,
                         new StageStepperViewModel(),
-                        new ConsoleViewModel(messageLog));
+                        new ConsoleViewModel(messageLog),
+                        toolManager);
+
+        /*
+         * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds
+         * verifies every installed tool against the checksums its completion marker records, so it
+         * is work rather than construction; doing it here means the window exists first and the
+         * Tool Manager's own view is already listening when the rows arrive.  This call is also
+         * what makes the section show real data at all -- a view-model nobody refreshes holds no
+         * rows, deliberately.
+         */
+        toolManager.refresh();
 
         primaryStage.setTitle(WINDOW_TITLE);
         primaryStage.setScene(new Scene(shell, INITIAL_WIDTH, INITIAL_HEIGHT));
         primaryStage.show();
+    }
+
+    /**
+     * The Tool Manager for this machine, or one that says why this machine has none.
+     *
+     * <p>The composition is {@link ToolManagerWiring#forThisApplication}'s, over the services this
+     * application was built with; the reason for that route, and for the cache root being the
+     * application data directory, is written down there. A machine the product publishes no
+     * artefacts for, an artefact manifest that cannot be read, and a composition root with no
+     * process service all leave the Tool Manager section explaining itself rather than empty --
+     * <strong>and none of them stops the window appearing</strong>. A Tool Manager is one section
+     * of a window.
+     *
+     * <p>The reason is not also written to the message log. Startup narrates exactly one thing
+     * there, the host-baseline outcome, and a second line would make that contract two; the
+     * sentence belongs where a user goes looking for it, which is the section itself.
+     *
+     * @return the view-model the Tool Manager section is built over
+     */
+    private ToolManagerViewModel toolManagerViewModel() {
+        try {
+            return new ToolManagerViewModel(
+                    ToolManagerWiring.forThisApplication(
+                            services, ToolManagerWiring.installThreads()),
+                    Platform::runLater);
+        } catch (ToolManagerUnavailableException unavailable) {
+            return ToolManagerViewModel.unavailable(unavailable.getMessage(), Platform::runLater);
+        }
     }
 
     /**

@@ -39,14 +39,18 @@ import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.platform.HostBaselineOutcome;
 import org.cometgui.domain.platform.HostBaselineReport;
 import org.cometgui.ui.controls.StageStepper;
+import org.cometgui.ui.controls.ToolManagerPane;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
 import org.cometgui.ui.testing.FxToolkit;
+import org.cometgui.ui.testing.ScriptedToolManager;
+import org.cometgui.ui.testing.ToolOffers;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
 import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
+import org.cometgui.ui.viewmodel.ToolManagerViewModel;
 import org.cometgui.workflow.state.WorkflowStage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +78,8 @@ class ShellViewTest {
 
     private StageStepperViewModel stepper;
 
+    private ToolManagerViewModel toolManager;
+
     private ShellView shell;
 
     private Scene scene;
@@ -92,9 +98,12 @@ class ShellViewTest {
                 new HostBaselineViewModel(
                         new HostBaselineReport(
                                 HostBaselineOutcome.SUPPORTED, "64-bit host, glibc 2.36."));
+        toolManager =
+                new ToolManagerViewModel(
+                        new ScriptedToolManager(ToolOffers.percolatorAvailable()), Runnable::run);
         FxToolkit.onFxThread(
                 () -> {
-                    shell = new ShellView(navigation, baseline, stepper, console);
+                    shell = new ShellView(navigation, baseline, stepper, console, toolManager);
                     scene = new Scene(shell, 1280, 800);
                     scene.getRoot().applyCss();
                     scene.getRoot().layout();
@@ -294,6 +303,46 @@ class ShellViewTest {
     }
 
     @Test
+    @DisplayName("the Tool Manager pane fills its section, and the arrival note is still there")
+    void theToolManagerPaneFillsItsSection() throws InterruptedException {
+        Node toolManagerPane = scene.lookup("#" + UiIds.TOOL_MANAGER_PANE);
+        Label note = (Label) scene.lookup("#" + UiIds.sectionNote(SectionId.TOOL_MANAGER));
+        Label summary = (Label) scene.lookup("#" + UiIds.TOOL_MANAGER_SUMMARY);
+        String beforeAnythingIsRead = summary.getText();
+
+        FxToolkit.onFxThread(toolManager::refresh);
+
+        assertAll(
+                () -> assertInstanceOf(ToolManagerPane.class, toolManagerPane),
+                () ->
+                        assertTrue(
+                                isDescendantOf(
+                                        toolManagerPane, shell.paneFor(SectionId.TOOL_MANAGER)),
+                                "the Tool Manager belongs to the Tool Manager pane"),
+                () ->
+                        assertEquals(
+                                SectionArrivals.noteFor(SectionId.TOOL_MANAGER),
+                                note.getText(),
+                                "filling a section does not delete the arrival-note mechanism the"
+                                        + " other nine sections still use"),
+                () ->
+                        assertTrue(
+                                note.getText().contains("phase 05"),
+                                () -> "the note no longer names its phase: " + note.getText()),
+                () ->
+                        assertEquals(
+                                "The tool list has not been read yet.",
+                                beforeAnythingIsRead,
+                                "building a shell must not read the port: that verifies every"
+                                        + " installed tool against its recorded checksums"),
+                () -> assertEquals("1 tool build on this host.", summary.getText()),
+                () ->
+                        assertNotNull(
+                                scene.lookup("#" + UiIds.toolRowName("percolator-3_07_1-1")),
+                                "the row is reachable from the shell's scene"));
+    }
+
+    @Test
     @DisplayName("a satisfied host baseline leaves the banner slot present but hidden")
     void aSatisfiedHostBaselineHidesTheBanner() {
         Label banner = (Label) scene.lookup("#" + UiIds.HOST_BASELINE_BANNER);
@@ -323,7 +372,9 @@ class ShellViewTest {
                                                 new NavigationViewModel(),
                                                 blocked,
                                                 new StageStepperViewModel(),
-                                                new ConsoleViewModel(new BoundedMessageLog(8))),
+                                                new ConsoleViewModel(new BoundedMessageLog(8)),
+                                                new ToolManagerViewModel(
+                                                        new ScriptedToolManager(), Runnable::run)),
                                         800,
                                         600));
         Label banner = (Label) other.lookup("#" + UiIds.HOST_BASELINE_BANNER);

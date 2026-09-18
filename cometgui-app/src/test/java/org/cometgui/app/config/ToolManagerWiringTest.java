@@ -18,6 +18,7 @@ package org.cometgui.app.config;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,7 +31,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.cometgui.app.testing.FakeEnvironment;
 import org.cometgui.domain.platform.GlibcVersion;
+import org.cometgui.domain.ports.EnvironmentReader;
 import org.cometgui.domain.ports.ProcessListener;
 import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.domain.ports.RunningProcess;
@@ -211,16 +214,49 @@ class ToolManagerWiringTest {
                         "percolator 3.06.5 NOT_INSTALLED",
                         "pdv 2.7.0 NOT_INSTALLED",
                         "limelight-converter 2.8.1 NOT_INSTALLED"),
-                offers.stream()
-                        .map(
-                                offer ->
-                                        offer.tool().id()
-                                                + " "
-                                                + offer.version().text()
-                                                + " "
-                                                + offer.state())
-                        .toList(),
+                described(offers),
                 "the whole runtime, composed as the application composes it, over an empty cache");
+    }
+
+    /**
+     * A composition root whose application data directory is this test's temporary one.
+     *
+     * <p>{@code XDG_DATA_HOME} rather than {@code user.home}, because that is the branch a Linux
+     * host takes and it keeps the test off the real home directory of whoever runs it.
+     *
+     * @return the services
+     */
+    private ApplicationServices servicesOverATemporaryHome() {
+        return servicesOver(
+                FakeEnvironment.linux64()
+                        .withVariable(
+                                PlatformFileSystemAccess.XDG_DATA_HOME_VARIABLE,
+                                temporary.resolve("data").toString()));
+    }
+
+    private static ApplicationServices servicesOver(FakeEnvironment environment) {
+        Clock clock = Clock.systemUTC();
+        return new ApplicationServices(
+                clock,
+                environment,
+                new PlatformFileSystemAccess(environment),
+                new ClockRunIdSource(clock),
+                () -> Optional.of(GlibcVersion.parse("2.36")),
+                new ProcessService(clock),
+                null,
+                null);
+    }
+
+    private static List<String> described(List<ToolOffer> offers) {
+        return offers.stream()
+                .map(
+                        offer ->
+                                offer.tool().id()
+                                        + " "
+                                        + offer.version().text()
+                                        + " "
+                                        + offer.state())
+                .toList();
     }
 
     private static boolean belongsToAJarTool(ToolCapability capability) {
@@ -236,6 +272,141 @@ class ToolManagerWiringTest {
                 new ProcessService(Clock.systemUTC()),
                 Clock.systemUTC(),
                 Runnable::run);
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    @DisplayName("the application composes a Tool Manager from the services it already holds")
+    void theApplicationComposesAToolManager() throws ToolManagerUnavailableException {
+        ApplicationServices services = servicesOverATemporaryHome();
+
+        ToolManager manager =
+                ToolManagerWiring.forThisApplication(services, ToolManagerWiring.installThreads());
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "comet 2026.02.2 NOT_INSTALLED",
+                                        "percolator 3.09 UNAVAILABLE_ON_THIS_PLATFORM",
+                                        "percolator 3.07.1 NOT_INSTALLED",
+                                        "percolator 3.06.5 NOT_INSTALLED",
+                                        "pdv 2.7.0 NOT_INSTALLED",
+                                        "limelight-converter 2.8.1 NOT_INSTALLED"),
+                                described(manager.offers()),
+                                "the route the running application takes, over the shipped"
+                                        + " manifest and this test's own data directory"),
+                () ->
+                        assertTrue(
+                                manager.toString()
+                                        .endsWith(
+                                                ", "
+                                                        + services.fileSystem()
+                                                                .applicationDataDirectory()
+                                                        + "]"),
+                                () ->
+                                        "the cache root must be the application data directory the"
+                                                + " composition root computes, not a location this"
+                                                + " wiring invented: "
+                                                + manager),
+                () ->
+                        assertFalse(
+                                Files.exists(services.fileSystem().applicationDataDirectory()),
+                                "composing a Tool Manager and reading its offers must create no"
+                                        + " directory; an install creates what it needs"));
+    }
+
+    @Test
+    @DisplayName("a platform the product publishes nothing for is explained, naming both values")
+    void anUnsupportedPlatformIsExplained() {
+        ApplicationServices services =
+                servicesOver(
+                        new FakeEnvironment()
+                                .withProperty(EnvironmentReader.OS_NAME_PROPERTY, "Plan 9")
+                                .withProperty(EnvironmentReader.OS_ARCH_PROPERTY, "386")
+                                .withProperty("user.home", "/home/tester"));
+
+        ToolManagerUnavailableException refused =
+                assertThrows(
+                        ToolManagerUnavailableException.class,
+                        () ->
+                                ToolManagerWiring.forThisApplication(
+                                        services, ToolManagerWiring.installThreads()));
+
+        assertEquals(
+                "CometGUI manages tool installations on 64-bit Linux, macOS and Windows, and this"
+                        + " machine reports os.name=\"Plan 9\" os.arch=\"386\". Tools for it have"
+                        + " to be installed by hand and registered as local binaries.",
+                refused.getMessage());
+    }
+
+    @Test
+    @DisplayName("a JVM that reports no os.name at all is explained rather than guessed at")
+    void aJvmThatReportsNothingIsExplained() {
+        ApplicationServices services =
+                servicesOver(new FakeEnvironment().withProperty("user.home", "/home/tester"));
+
+        ToolManagerUnavailableException refused =
+                assertThrows(
+                        ToolManagerUnavailableException.class,
+                        () ->
+                                ToolManagerWiring.forThisApplication(
+                                        services, ToolManagerWiring.installThreads()));
+
+        assertTrue(
+                refused.getMessage().contains("os.name=\"\" os.arch=\"\""),
+                () -> "the message must quote what was read, even when nothing was: " + refused);
+    }
+
+    @Test
+    @DisplayName("a shell built with no process service still starts, and the section says why")
+    void aCompositionRootWithNoProcessServiceIsExplained() {
+        FakeEnvironment environment = FakeEnvironment.linux64();
+        Clock clock = Clock.systemUTC();
+        ApplicationServices withoutProcesses =
+                new ApplicationServices(
+                        clock,
+                        environment,
+                        new PlatformFileSystemAccess(environment),
+                        new ClockRunIdSource(clock),
+                        () -> Optional.of(GlibcVersion.parse("2.36")),
+                        null,
+                        null,
+                        null);
+
+        ToolManagerUnavailableException refused =
+                assertThrows(
+                        ToolManagerUnavailableException.class,
+                        () ->
+                                ToolManagerWiring.forThisApplication(
+                                        withoutProcesses, ToolManagerWiring.installThreads()));
+
+        assertEquals(
+                "CometGUI cannot manage tool installations in this configuration: it was started"
+                        + " without a process service, and R-TOOL-06 establishes what a tool can do"
+                        + " by running it. The seam that is missing is"
+                        + " org.cometgui.domain.ports.ProcessRunner.",
+                refused.getMessage(),
+                "an absent seam is a fact about this wiring, not a programming error: reporting it"
+                        + " as one would stop the whole window appearing over one section");
+    }
+
+    @Test
+    @DisplayName("forThisApplication rejects a null service set and a null executor")
+    void forThisApplicationRejectsNulls() {
+        assertAll(
+                () ->
+                        assertThrows(
+                                NullPointerException.class,
+                                () ->
+                                        ToolManagerWiring.forThisApplication(
+                                                null, ToolManagerWiring.installThreads())),
+                () ->
+                        assertThrows(
+                                NullPointerException.class,
+                                () ->
+                                        ToolManagerWiring.forThisApplication(
+                                                servicesOverATemporaryHome(), null)));
     }
 
     @Test

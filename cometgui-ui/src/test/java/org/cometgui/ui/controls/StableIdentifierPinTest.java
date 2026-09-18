@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -107,12 +108,17 @@ class StableIdentifierPinTest {
             "cometgui-ui/src/test/java/org/cometgui/ui/controls/StableIdentifierPinTest.java";
 
     /**
-     * How many identifiers are pinned: 22 constants, 50 section identifiers, 24 stepper stage
-     * identifiers, 8 console stage filters, 7 stepper arrows, 4 branch identifiers and 4 severity
-     * filters. Stated so that deleting a whole category of pins is a failure rather than a smaller
-     * test.
+     * How many identifiers are pinned: 25 constants, 50 section identifiers, 24 stepper stage
+     * identifiers, 11 Tool Manager row identifiers, 8 console stage filters, 7 stepper arrows, 4
+     * branch identifiers and 4 severity filters. Stated so that deleting a whole category of pins
+     * is a failure rather than a smaller test.
+     *
+     * <p>Raised from 119 by phase 05 unit 9, which added the Tool Manager section's three
+     * containers and the eleven identifiers one tool build's row carries. Adding an entry because
+     * the thing it describes was added is maintenance; removing one, or lowering this number to
+     * make a build pass, is not.
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 119;
+    private static final int PINNED_IDENTIFIER_COUNT = 133;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -142,7 +148,43 @@ class StableIdentifierPinTest {
                     Map.entry("CONSOLE_STAGE_FILTER_ALL", "console-stage-filter-all"),
                     Map.entry("CONSOLE_SEVERITY_FILTER", "console-severity-filter"),
                     Map.entry("CONSOLE_CLEAR", "console-clear"),
-                    Map.entry("CONSOLE_COPY", "console-copy"));
+                    Map.entry("CONSOLE_COPY", "console-copy"),
+                    Map.entry("TOOL_MANAGER_PANE", "tool-manager-pane"),
+                    Map.entry("TOOL_MANAGER_SUMMARY", "tool-manager-summary"),
+                    Map.entry("TOOL_MANAGER_ROWS", "tool-manager-rows"));
+
+    /**
+     * The row key the Tool Manager's per-row identifiers are pinned for.
+     *
+     * <p>Typed out, and deliberately a real one: {@code ToolManagerViewModel} builds this key for
+     * Percolator 3.07.1's first offered build, with the version's dots written as underscores
+     * because a dot in an identifier is read by {@code Scene.lookup} as a style class. The ordinal
+     * is there because two offers can legitimately share a tool and a version.
+     */
+    private static final String PINNED_TOOL_ROW_KEY = "percolator-3_07_1-1";
+
+    /**
+     * Every identifier one Tool Manager row carries, by the {@link UiIds} method that produces it.
+     *
+     * <p>The keys of this map are method names and are used to enumerate what has to be pinned; the
+     * values are the identifiers and are typed out in full. {@code toolRowName} is written as
+     * {@code "tool-row-percolator-3_07_1-1-name"} rather than as the row identifier with a suffix
+     * appended, for the reason stated on this class: an expectation assembled from another
+     * expectation is not a pin.
+     */
+    private static final Map<String, String> TOOL_ROW =
+            Map.ofEntries(
+                    Map.entry("toolRow", "tool-row-percolator-3_07_1-1"),
+                    Map.entry("toolRowName", "tool-row-percolator-3_07_1-1-name"),
+                    Map.entry("toolRowState", "tool-row-percolator-3_07_1-1-state"),
+                    Map.entry("toolRowCapabilities", "tool-row-percolator-3_07_1-1-capabilities"),
+                    Map.entry("toolRowAdvisories", "tool-row-percolator-3_07_1-1-advisories"),
+                    Map.entry("toolRowDownload", "tool-row-percolator-3_07_1-1-download"),
+                    Map.entry("toolRowDiagnostic", "tool-row-percolator-3_07_1-1-diagnostic"),
+                    Map.entry("toolRowPath", "tool-row-percolator-3_07_1-1-path"),
+                    Map.entry("toolRowProgress", "tool-row-percolator-3_07_1-1-progress"),
+                    Map.entry("toolRowInstall", "tool-row-percolator-3_07_1-1-install"),
+                    Map.entry("toolRowCancel", "tool-row-percolator-3_07_1-1-cancel"));
 
     /** Each section's pane, as {@code UiIds.sectionPane} must spell it. */
     private static final Map<SectionId, String> SECTION_PANE =
@@ -454,6 +496,52 @@ class StableIdentifierPinTest {
                 "UiIds.CONSOLE_STAGE_FILTER_ALL");
     }
 
+    @Test
+    @DisplayName("every identifier a Tool Manager row carries still has its pinned spelling")
+    void toolRowIdentifiersAreExactlyTheseLiterals() throws ReflectiveOperationException {
+        for (Method method : toolRowIdentifierMethodsOfUiIds()) {
+            String pinned = TOOL_ROW.get(method.getName());
+            assertTrue(
+                    pinned != null,
+                    () ->
+                            "UiIds."
+                                    + method.getName()
+                                    + " is not pinned. "
+                                    + adviceFor("UiIds." + method.getName()));
+            assertPinned(
+                    pinned,
+                    method.invoke(null, PINNED_TOOL_ROW_KEY),
+                    "UiIds." + method.getName() + "(\"" + PINNED_TOOL_ROW_KEY + "\")");
+        }
+    }
+
+    @Test
+    @DisplayName("a new Tool Manager row identifier fails until it is pinned")
+    void everyToolRowIdentifierIsPinned() {
+        Set<String> declared = new TreeSet<>();
+        for (Method method : toolRowIdentifierMethodsOfUiIds()) {
+            declared.add(method.getName());
+        }
+        Set<String> unpinned = new TreeSet<>(declared);
+        unpinned.removeAll(TOOL_ROW.keySet());
+        assertTrue(
+                unpinned.isEmpty(),
+                () ->
+                        "UiIds builds Tool Manager row identifiers this table does not pin: "
+                                + String.join(", ", unpinned)
+                                + ". "
+                                + adviceFor("each new row identifier"));
+        Set<String> stale = new TreeSet<>(TOOL_ROW.keySet());
+        stale.removeAll(declared);
+        assertTrue(
+                stale.isEmpty(),
+                () ->
+                        "this table pins row identifiers UiIds no longer builds: "
+                                + String.join(", ", stale)
+                                + ". A pin for a control that no longer exists hides how much of"
+                                + " the surface is really covered.");
+    }
+
     // -----------------------------------------------------------------------------------------
     // Exhaustiveness: adding an identifier must fail here too, not only renaming one.
     // -----------------------------------------------------------------------------------------
@@ -569,6 +657,9 @@ class StableIdentifierPinTest {
         addPins(pins, "console severity filter for ", SEVERITY_FILTER);
         addListPins(pins, "arrow into stage ", ARROWS_INTO_STAGE);
         addListPins(pins, "branch row of stage ", STAGE_BRANCH);
+        for (Map.Entry<String, String> rowIdentifier : TOOL_ROW.entrySet()) {
+            pins.add(new Pin("UiIds." + rowIdentifier.getKey(), rowIdentifier.getValue()));
+        }
         return List.copyOf(pins);
     }
 
@@ -643,8 +734,44 @@ class StableIdentifierPinTest {
     }
 
     /**
+     * The {@link UiIds} methods that build one Tool Manager row's identifiers.
+     *
+     * <p>Enumerated reflectively, for the same reason the constants are: a table a new identifier
+     * can bypass rebuilds the hole this class exists to close, one method later.
+     *
+     * @return every public static {@code String} method taking one {@code String} whose name begins
+     *     {@code toolRow}
+     */
+    private static List<Method> toolRowIdentifierMethodsOfUiIds() {
+        List<Method> methods = new ArrayList<>();
+        for (Method method : UiIds.class.getDeclaredMethods()) {
+            int modifiers = method.getModifiers();
+            if (!method.isSynthetic()
+                    && method.getName().startsWith("toolRow")
+                    && method.getReturnType() == String.class
+                    && Modifier.isPublic(modifiers)
+                    && Modifier.isStatic(modifiers)
+                    && method.getParameterCount() == 1
+                    && method.getParameterTypes()[0] == String.class) {
+                methods.add(method);
+            }
+        }
+        assertTrue(
+                methods.size() >= TOOL_ROW.size(),
+                "reflection found "
+                        + methods.size()
+                        + " Tool Manager row identifier methods on UiIds but "
+                        + TOOL_ROW.size()
+                        + " are pinned: the reflective enumeration itself has stopped working, and"
+                        + " an enumeration that finds nothing would pass every check above.");
+        return methods;
+    }
+
+    /**
      * {@link UiIds}'s {@code public static final String} fields, found reflectively so that a
      * constant added without a pin is a failure rather than an omission nobody notices.
+     *
+     * @return every public static final {@code String} field it declares
      */
     private static List<Field> stableStringConstantsOfUiIds() {
         List<Field> constants = new ArrayList<>();

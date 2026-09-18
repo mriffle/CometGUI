@@ -34,6 +34,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.cometgui.ui.controls.StageStepper;
+import org.cometgui.ui.controls.ToolManagerPane;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
@@ -41,6 +42,7 @@ import org.cometgui.ui.viewmodel.HostBaselineViewModel;
 import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
+import org.cometgui.ui.viewmodel.ToolManagerViewModel;
 
 /**
  * The application shell: a header, a left navigation over every section, and a content area holding
@@ -121,23 +123,26 @@ public final class ShellView extends BorderPane {
     private final Label sectionTitle = new Label();
 
     /**
-     * The shell, over the four view-models it presents.
+     * The shell, over the five view-models it presents.
      *
      * @param navigation which sections there are and which one is selected
      * @param hostBaseline the startup host-baseline banner
      * @param stepper the Run screen's stage states
      * @param console the console's filters and the messages they admit
+     * @param toolManager the tool builds this machine may have, their states and their actions
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
             NavigationViewModel navigation,
             HostBaselineViewModel hostBaseline,
             StageStepperViewModel stepper,
-            ConsoleViewModel console) {
+            ConsoleViewModel console,
+            ToolManagerViewModel toolManager) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
         Objects.requireNonNull(console, "console");
+        Objects.requireNonNull(toolManager, "toolManager");
 
         setId(UiIds.SHELL_ROOT);
         content.setId(UiIds.CONTENT);
@@ -158,6 +163,18 @@ public final class ShellView extends BorderPane {
         ConsolePane consolePane = new ConsolePane(console, stepper.stagesInDrawOrder());
         panes.get(SectionId.CONSOLE).addContent(consolePane);
         VBox.setVgrow(consolePane, Priority.ALWAYS);
+
+        /*
+         * THE SECTION IS FILLED HERE AND ITS ARRIVAL NOTE STAYS.  SectionArrivals.noteFor throws
+         * for a section with no note, so the mechanism is not something a phase deletes as it
+         * lands: every other section still depends on it, and the Tool Manager's note now says
+         * what phase 05 put in the section rather than that it is coming.  The pane reads nothing
+         * on construction -- ToolManagerViewModel.refresh() is what asks the port, and the
+         * composition root calls it -- so building a shell verifies no checksums.
+         */
+        ToolManagerPane toolManagerPane = new ToolManagerPane(toolManager);
+        panes.get(SectionId.TOOL_MANAGER).addContent(toolManagerPane);
+        VBox.setVgrow(toolManagerPane, Priority.ALWAYS);
 
         setTop(buildHeader(hostBaseline));
         setLeft(buildNavigation());
