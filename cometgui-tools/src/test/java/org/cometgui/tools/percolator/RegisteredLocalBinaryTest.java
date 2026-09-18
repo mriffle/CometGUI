@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolName;
@@ -57,7 +58,11 @@ class RegisteredLocalBinaryTest {
                 List.of(),
                 List.of(),
                 Optional.empty(),
-                Optional.ofNullable(path));
+                Optional.ofNullable(path),
+                origin == ToolOrigin.MANAGED
+                                && state != ToolInstallState.UNAVAILABLE_ON_THIS_PLATFORM
+                        ? OptionalLong.of(946303L)
+                        : OptionalLong.empty());
     }
 
     @Test

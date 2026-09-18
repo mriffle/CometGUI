@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 
 /**
@@ -41,6 +42,15 @@ import java.util.Set;
  * here, the {@link LoaderDiagnostic} that says why -- so the Tool Manager can show an unavailable
  * build honestly instead of omitting it and leaving the user to wonder.
  *
+ * <p><strong>The download size is here because a scientist is shown it.</strong> PDV is a 103 407
+ * 417-byte download and the Tool Manager has to be able to say so before asking anyone to start one
+ * -- and, under this record's own rule that everything a scientist is shown about a tool is
+ * expressible here, a size that is not a component is a size that is not shown. It is the length
+ * the manifest pins for the artefact <em>this host</em> would fetch, so it is absent in exactly the
+ * two cases where this host would fetch nothing: a {@link ToolOrigin#LOCAL} binary, which was
+ * already on the machine, and a build that is {@link
+ * ToolInstallState#UNAVAILABLE_ON_THIS_PLATFORM}, for which no artefact exists here.
+ *
  * <p>Capabilities arrive as {@link DeclaredCapability} rather than bare constants, so the interface
  * can distinguish what was observed by execution from what was inferred from artefact bytes.
  * Nothing in this record lets a capability be attached to a tool it does not belong to: the
@@ -57,6 +67,9 @@ import java.util.Set;
  * @param loaderDiagnostic why the build will not run here, when it will not; absent otherwise
  * @param installedPath where the executable or JAR is, absolute; required when the state is {@link
  *     ToolInstallState#INSTALLED} and otherwise absent
+ * @param downloadSizeBytes the length the manifest pins for this build's artefact on this host --
+ *     the artefact itself, not counting any companion download; present exactly when this host has
+ *     an artefact to fetch, and positive when it is present
  */
 public record ToolOffer(
         ToolName tool,
@@ -66,7 +79,8 @@ public record ToolOffer(
         List<DeclaredCapability> capabilities,
         List<ToolAdvisory> advisories,
         Optional<LoaderDiagnostic> loaderDiagnostic,
-        Optional<Path> installedPath) {
+        Optional<Path> installedPath,
+        OptionalLong downloadSizeBytes) {
 
     /**
      * Validates the offer and takes defensive, immutable copies of both lists.
@@ -85,7 +99,9 @@ public record ToolOffer(
         advisories = checkedAdvisories(advisories);
         Objects.requireNonNull(loaderDiagnostic, "loaderDiagnostic");
         Objects.requireNonNull(installedPath, "installedPath");
+        Objects.requireNonNull(downloadSizeBytes, "downloadSizeBytes");
         checkInstalledPath(state, installedPath);
+        checkDownloadSize(origin, state, downloadSizeBytes);
     }
 
     private static List<DeclaredCapability> checkedCapabilities(
@@ -124,6 +140,51 @@ public record ToolOffer(
             }
         }
         return List.copyOf(copy);
+    }
+
+    /*
+     * WHETHER THERE IS A DOWNLOAD IS A QUESTION ABOUT THIS HOST, AND IT HAS EXACTLY TWO NEGATIVE
+     * ANSWERS.  A LOCAL binary was already on the machine, so CometGUI will fetch nothing for it;
+     * a build UNAVAILABLE_ON_THIS_PLATFORM has no artefact here to fetch.  Everywhere else an
+     * artefact exists and its length is pinned by the manifest row the offer was built from, so an
+     * absent size there is the Tool Manager unable to say how large a download it is about to
+     * start -- which is the case this component was added for.
+     *
+     * The rule is keyed on the origin AND the state because neither alone answers it: a MANAGED
+     * build can be one with no artefact here, and a LOCAL binary is in whatever state the
+     * registrar put it in.  It is deliberately not keyed on the installed path: an installed
+     * managed build was still downloaded, and its size is still what the Tool Manager shows for
+     * it.
+     */
+    private static void checkDownloadSize(
+            ToolOrigin origin, ToolInstallState state, OptionalLong downloadSizeBytes) {
+        boolean thereIsAnArtefactToFetch =
+                origin == ToolOrigin.MANAGED
+                        && state != ToolInstallState.UNAVAILABLE_ON_THIS_PLATFORM;
+        if (thereIsAnArtefactToFetch && downloadSizeBytes.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "downloadSizeBytes is required for a "
+                            + origin
+                            + " offer in state "
+                            + state
+                            + ": the manifest pins the length of the artefact this host would"
+                            + " fetch, and a Tool Manager that cannot say how large a download is"
+                            + " cannot honestly ask a user to start one");
+        }
+        if (!thereIsAnArtefactToFetch && downloadSizeBytes.isPresent()) {
+            throw new IllegalArgumentException(
+                    "downloadSizeBytes must be absent for a "
+                            + origin
+                            + " offer in state "
+                            + state
+                            + ", because this host would fetch nothing for it, but was: "
+                            + downloadSizeBytes.getAsLong());
+        }
+        if (downloadSizeBytes.isPresent() && downloadSizeBytes.getAsLong() <= 0) {
+            throw new IllegalArgumentException(
+                    "downloadSizeBytes must be positive, but was: "
+                            + downloadSizeBytes.getAsLong());
+        }
     }
 
     private static void checkInstalledPath(ToolInstallState state, Optional<Path> installedPath) {

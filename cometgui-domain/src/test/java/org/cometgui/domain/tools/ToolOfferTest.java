@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import org.cometgui.domain.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -70,6 +71,17 @@ class ToolOfferTest {
                     "percolator.pep-regressor-changed-in-3-08",
                     "3.07.1 predates 3.08's change of default PEP regressor to I-splines.");
 
+    /**
+     * The download size a MANAGED offer must carry in a given state: present in every state but the
+     * one where this host has no artefact to fetch. Hand-typed, not derived from the rule under
+     * test.
+     */
+    private static OptionalLong sizeFor(ToolInstallState state) {
+        return state == ToolInstallState.UNAVAILABLE_ON_THIS_PLATFORM
+                ? OptionalLong.empty()
+                : OptionalLong.of(946303L);
+    }
+
     /** An installed path has to be present when the state is INSTALLED, so states differ here. */
     private static Optional<Path> pathFor(ToolInstallState state) {
         return state == ToolInstallState.INSTALLED
@@ -90,7 +102,8 @@ class ToolOfferTest {
                 capabilities,
                 advisories,
                 Optional.empty(),
-                installedPath);
+                installedPath,
+                sizeFor(state));
     }
 
     @Nested
@@ -113,7 +126,8 @@ class ToolOfferTest {
                             List.of(XML_OBSERVED, XML_DECOY_OBSERVED),
                             List.of(PEP_REGRESSOR),
                             Optional.empty(),
-                            Optional.of(installed));
+                            Optional.of(installed),
+                            OptionalLong.of(946303L));
 
             assertAll(
                     () -> assertEquals(ToolName.PERCOLATOR, offer.tool()),
@@ -149,7 +163,8 @@ class ToolOfferTest {
                             List.of(),
                             List.of(),
                             Optional.of(diagnostic),
-                            Optional.empty());
+                            Optional.empty(),
+                            OptionalLong.of(640512L));
 
             assertAll(
                     () -> assertEquals(ToolInstallState.HOST_REQUIREMENTS_NOT_MET, offer.state()),
@@ -178,7 +193,10 @@ class ToolOfferTest {
                             List.of(),
                             List.of(),
                             Optional.empty(),
-                            Optional.of(Path.of("local-bin", "percolator").toAbsolutePath()));
+                            Optional.of(Path.of("local-bin", "percolator").toAbsolutePath()),
+                            origin == ToolOrigin.MANAGED
+                                    ? OptionalLong.of(946303L)
+                                    : OptionalLong.empty());
 
             assertAll(
                     () -> assertEquals(origin, offer.origin()),
@@ -241,7 +259,8 @@ class ToolOfferTest {
                                                                             List.of(declared),
                                                                             List.of(),
                                                                             Optional.empty(),
-                                                                            pathFor(state)))
+                                                                            pathFor(state),
+                                                                            sizeFor(state)))
                                                     .getMessage(),
                                             capability.id() + " on " + tool.id() + " in " + state));
                 }
@@ -304,7 +323,8 @@ class ToolOfferTest {
                                                                             pinUnverified),
                                                                     List.of(),
                                                                     Optional.empty(),
-                                                                    pathFor(state)))
+                                                                    pathFor(state),
+                                                                    sizeFor(state)))
                                             .getMessage(),
                                     "comet in " + state));
         }
@@ -435,7 +455,8 @@ class ToolOfferTest {
                                                                     List.of(),
                                                                     List.of(),
                                                                     Optional.empty(),
-                                                                    pathFor(state)))
+                                                                    pathFor(state),
+                                                                    sizeFor(state)))
                                             .getMessage(),
                                     state.name()),
                     () ->
@@ -452,7 +473,8 @@ class ToolOfferTest {
                                                                     List.of(),
                                                                     List.of(),
                                                                     Optional.empty(),
-                                                                    pathFor(state)))
+                                                                    pathFor(state),
+                                                                    sizeFor(state)))
                                             .getMessage(),
                                     state.name()),
                     () ->
@@ -469,7 +491,8 @@ class ToolOfferTest {
                                                                     List.of(),
                                                                     List.of(),
                                                                     Optional.empty(),
-                                                                    pathFor(state)))
+                                                                    pathFor(state),
+                                                                    sizeFor(state)))
                                             .getMessage(),
                                     state.name()),
                     () ->
@@ -512,7 +535,8 @@ class ToolOfferTest {
                                                                     List.of(),
                                                                     List.of(),
                                                                     absentDiagnostic,
-                                                                    pathFor(state)))
+                                                                    pathFor(state),
+                                                                    sizeFor(state)))
                                             .getMessage(),
                                     state.name()),
                     () ->
@@ -546,8 +570,162 @@ class ToolOfferTest {
                                                     List.of(),
                                                     List.of(),
                                                     Optional.empty(),
-                                                    Optional.empty()))
+                                                    Optional.empty(),
+                                                    OptionalLong.of(946303L)))
                             .getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("the download size")
+    class DownloadSize {
+
+        /**
+         * Builds an offer with the origin, the state and the size chosen independently, which is
+         * what makes the grid a grid: the rule under test reads all three and no helper may decide
+         * one of them on its behalf.
+         */
+        private ToolOffer build(
+                ToolOrigin origin, ToolInstallState state, OptionalLong downloadSizeBytes) {
+            return new ToolOffer(
+                    ToolName.PERCOLATOR,
+                    PERCOLATOR_3_07_1,
+                    origin,
+                    state,
+                    List.of(),
+                    List.of(),
+                    Optional.empty(),
+                    pathFor(state),
+                    downloadSizeBytes);
+        }
+
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(
+                value = ToolInstallState.class,
+                names = "UNAVAILABLE_ON_THIS_PLATFORM",
+                mode = EnumSource.Mode.EXCLUDE)
+        @DisplayName("a managed build with an artefact here carries its length, and must")
+        void aManagedOfferCarriesTheLengthWhereverAnArtefactExists(ToolInstallState state) {
+            ToolOffer offer = build(ToolOrigin.MANAGED, state, OptionalLong.of(103_407_417L));
+            IllegalArgumentException rejected =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> build(ToolOrigin.MANAGED, state, OptionalLong.empty()));
+
+            assertAll(
+                    () -> assertEquals(OptionalLong.of(103_407_417L), offer.downloadSizeBytes()),
+                    () -> assertEquals(103_407_417L, offer.downloadSizeBytes().getAsLong()),
+                    () ->
+                            assertEquals(
+                                    "downloadSizeBytes is required for a MANAGED offer in state "
+                                            + state
+                                            + ": the manifest pins the length of the artefact this"
+                                            + " host would fetch, and a Tool Manager that cannot"
+                                            + " say how large a download is cannot honestly ask a"
+                                            + " user to start one",
+                                    rejected.getMessage()));
+        }
+
+        @Test
+        @DisplayName("a build with no artefact for this platform carries no length, and must not")
+        void aBuildUnavailableHereCarriesNoLength() {
+            ToolInstallState unavailable = ToolInstallState.UNAVAILABLE_ON_THIS_PLATFORM;
+
+            ToolOffer offer = build(ToolOrigin.MANAGED, unavailable, OptionalLong.empty());
+            IllegalArgumentException rejected =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    build(
+                                            ToolOrigin.MANAGED,
+                                            unavailable,
+                                            OptionalLong.of(640_512L)));
+
+            assertAll(
+                    () -> assertEquals(OptionalLong.empty(), offer.downloadSizeBytes()),
+                    () ->
+                            assertEquals(
+                                    "downloadSizeBytes must be absent for a MANAGED offer in"
+                                            + " state UNAVAILABLE_ON_THIS_PLATFORM, because this"
+                                            + " host would fetch nothing for it, but was: 640512",
+                                    rejected.getMessage()));
+        }
+
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("a local binary carries no length in any state, because nothing was fetched")
+        void aLocalBinaryCarriesNoLength(ToolInstallState state) {
+            ToolOffer offer = build(ToolOrigin.LOCAL, state, OptionalLong.empty());
+            IllegalArgumentException rejected =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> build(ToolOrigin.LOCAL, state, OptionalLong.of(946_303L)));
+
+            assertAll(
+                    () -> assertEquals(OptionalLong.empty(), offer.downloadSizeBytes()),
+                    () ->
+                            assertEquals(
+                                    "downloadSizeBytes must be absent for a LOCAL offer in state "
+                                            + state
+                                            + ", because this host would fetch nothing for it, but"
+                                            + " was: 946303",
+                                    rejected.getMessage()));
+        }
+
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(
+                value = ToolInstallState.class,
+                names = "UNAVAILABLE_ON_THIS_PLATFORM",
+                mode = EnumSource.Mode.EXCLUDE)
+        @DisplayName("a length of zero or less is rejected in every state, quoting it")
+        void anImpossibleLengthIsRejected(ToolInstallState state) {
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    "downloadSizeBytes must be positive, but was: 0",
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () ->
+                                                            build(
+                                                                    ToolOrigin.MANAGED,
+                                                                    state,
+                                                                    OptionalLong.of(0L)))
+                                            .getMessage(),
+                                    state.name()),
+                    () ->
+                            assertEquals(
+                                    "downloadSizeBytes must be positive, but was: -1",
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () ->
+                                                            build(
+                                                                    ToolOrigin.MANAGED,
+                                                                    state,
+                                                                    OptionalLong.of(-1L)))
+                                            .getMessage(),
+                                    state.name()),
+                    () ->
+                            assertEquals(
+                                    1L,
+                                    build(ToolOrigin.MANAGED, state, OptionalLong.of(1L))
+                                            .downloadSizeBytes()
+                                            .getAsLong(),
+                                    "one byte is a length, and the boundary is at zero"));
+        }
+
+        @ParameterizedTest(name = "[{index}] state={0}")
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("a null length is rejected by name in every state")
+        void aNullLengthIsRejectedByName(ToolInstallState state) {
+            OptionalLong absent = Nulls.of(OptionalLong.class);
+
+            assertEquals(
+                    "downloadSizeBytes",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () -> build(ToolOrigin.MANAGED, state, absent))
+                            .getMessage(),
+                    state.name());
         }
     }
 

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.ports.HashService;
@@ -273,6 +274,14 @@ public final class LocalPercolatorRegistration {
                 declared,
                 List.of(UNMANAGED_ADVISORY),
                 Optional.empty(),
-                Optional.of(binary));
+                Optional.of(binary),
+                /*
+                 * NO DOWNLOAD SIZE, BECAUSE THERE WAS NO DOWNLOAD.  The user pointed CometGUI at a
+                 * file that was already on the machine; the number a managed offer carries is the
+                 * length of the artefact this host would fetch, and quoting the local file's own
+                 * length there would answer a different question from the one the Tool Manager
+                 * asks.
+                 */
+                OptionalLong.empty());
     }
 }

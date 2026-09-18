@@ -42,6 +42,7 @@ import org.cometgui.domain.tools.InstallProgressListener;
 import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.install.archive.ArtefactExtractor;
 import org.cometgui.install.download.DownloadCancellation;
+import org.cometgui.install.download.DownloadCancelledException;
 import org.cometgui.install.registry.ArchiveMember;
 import org.cometgui.install.registry.ArtefactCompanion;
 import org.cometgui.install.registry.ArtefactRecord;
@@ -60,9 +61,19 @@ import org.cometgui.provenance.json.CanonicalTimestamp;
  *
  * <p>Two reasons, and neither is testing. {@link org.cometgui.domain.tools.InstallHandle#cancel()}
  * promises that an install "stops when it reaches a point where it safely can", and a step boundary
- * is that point -- so cancellation is checked between steps and nowhere else. And {@code R-TOOL-04}
- * requires an interrupted install to leave nothing that reports itself installed, which is a claim
- * about every step boundary rather than about one of them.
+ * is one such point -- so cancellation is checked between steps. And {@code R-TOOL-04} requires an
+ * interrupted install to leave nothing that reports itself installed, which is a claim about every
+ * step boundary rather than about one of them.
+ *
+ * <p><strong>A step boundary is not the only such point, and this class used to say it
+ * was.</strong> The same {@link DownloadCancellation} is handed down into the transfer, which
+ * honours it between chunks, because a 99 MB download that could only stop at the end of its own
+ * step would not be cancellable at all. So a cancellation can arrive in the middle of step 1 as a
+ * {@link DownloadCancelledException}, and {@link #runNextStep()} translates it into an {@link
+ * InstallCancelledException}: every contract above this one -- {@link ArtefactInstaller#install}'s
+ * and {@code InstallHandle.cancel()}'s -- says a cancelled install is reported as {@link
+ * InstallPhase#CANCELLED} and never as {@link InstallPhase#FAILED}, and until phase 05 unit 8 a
+ * cancellation that landed inside the transfer was reported as a failure.
  *
  * <p>{@link ArtefactInstaller#install} is the ordinary way in and runs the loop itself. Driving the
  * steps by hand runs the same actions in the same order over the same object; it does not reach a
@@ -320,7 +331,23 @@ public final class InstallPipeline implements AutoCloseable {
             throw new InstallCancelledException(record.describe(), step);
         }
         report(step.phase());
-        actions.get(step).run();
+        try {
+            actions.get(step).run();
+        } catch (DownloadCancelledException cancelledMidTransfer) {
+            /*
+             * THE CALLER PRESSED CANCEL AND THE TRANSFER STOPPED WHERE IT WAS.  Translated rather
+             * than allowed to escape, because DownloadCancelledException is an IOException and
+             * ArtefactInstaller's catch (IOException) arm reports FAILED -- which is the one thing
+             * InstallHandle.cancel() says must never happen.
+             *
+             * THERE IS DELIBERATELY NO `&& cancellation.isCancelled()` CONJUNCT.  A transfer raises
+             * this exception only when the cancellation it was given said stop, and that
+             * cancellation is the one handed down four lines into download(); a second test of the
+             * same fact would be a clause whose false branch no input can reach -- invisible to
+             * coverage and to mutation both, which is a shape this project has already paid for.
+             */
+            throw new InstallCancelledException(record.describe(), step, cancelledMidTransfer);
+        }
         executed.add(step);
         nextIndex++;
         return step;

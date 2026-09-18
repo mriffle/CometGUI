@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.ports.HashService;
@@ -157,6 +158,12 @@ class LocalPercolatorRegistrationTest {
                 () -> assertEquals(ToolInstallState.INSTALLED, offer.state()),
                 () -> assertEquals(Optional.of(binary), offer.installedPath()),
                 () -> assertEquals(Optional.empty(), offer.loaderDiagnostic()),
+                () ->
+                        assertEquals(
+                                OptionalLong.empty(),
+                                offer.downloadSizeBytes(),
+                                "a registered local binary was never downloaded, so there is no"
+                                        + " download length to show for it"),
                 () ->
                         assertEquals(
                                 List.of(ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
