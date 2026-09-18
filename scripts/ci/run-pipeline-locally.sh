@@ -29,18 +29,20 @@
 #   * a Windows or macOS matrix entry is recorded as NOT RUN: this environment
 #     has one Linux machine.  Naming them is deliberate -- a later phase turns
 #     them on rather than discovering they were never written.  EVERY step of
-#     windows-percolator.yml is in that class: the whole point of that workflow
-#     is the one platform nothing here can execute, so this script can show
-#     that its steps are well-formed and nothing more.
+#     windows-percolator.yml and of macos-gatekeeper.yml is in that class: the
+#     whole point of those two workflows is the platforms nothing here can
+#     execute, so this script can show that their steps are well-formed and
+#     nothing more.
 #
 # Anything else -- a stub that passed, a real step that failed -- fails this
 # script, and it says which.
 #
 # Usage:
-#   bash scripts/ci/run-pipeline-locally.sh                 # all four
+#   bash scripts/ci/run-pipeline-locally.sh                 # all five
 #   bash scripts/ci/run-pipeline-locally.sh pull-request
 #   bash scripts/ci/run-pipeline-locally.sh nightly release
 #   bash scripts/ci/run-pipeline-locally.sh windows-percolator
+#   bash scripts/ci/run-pipeline-locally.sh macos-gatekeeper
 #   bash scripts/ci/run-pipeline-locally.sh --help
 #
 # Output: _build/ci-transcript/<workflow>/ per-step logs, and
@@ -67,12 +69,12 @@ declare -a WORKFLOWS=()
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -h|--help) usage; exit 0 ;;
-        pull-request|nightly|release|windows-percolator) WORKFLOWS+=("$1.yml"); shift ;;
+        pull-request|nightly|release|windows-percolator|macos-gatekeeper) WORKFLOWS+=("$1.yml"); shift ;;
         *) die "unknown argument: $1 (try --help)" ;;
     esac
 done
 [ "${#WORKFLOWS[@]}" -gt 0 ] || \
-    WORKFLOWS=(pull-request.yml nightly.yml release.yml windows-percolator.yml)
+    WORKFLOWS=(pull-request.yml nightly.yml release.yml windows-percolator.yml macos-gatekeeper.yml)
 
 PYTHON=""
 for candidate in "${PROJECT_ROOT}/.venv/bin/python" "$(command -v python3 || true)"; do
@@ -120,8 +122,9 @@ RAN=0
     printf '             with its exact command, and each behaved as it must: real steps\n'
     printf '             passed, stubs failed with exit %d naming the phase that owns them.\n' "${STUB_EXIT}"
     printf '             The rest are listed below and marked NOT RUN: every Windows and\n'
-    printf '             macOS entry, which is the whole of windows-percolator.yml. This\n'
-    printf '             environment has one Linux machine. Unverified is not passed.\n'
+    printf '             macOS entry, which is the whole of windows-percolator.yml and of\n'
+    printf '             macos-gatekeeper.yml. This environment has one Linux machine.\n'
+    printf '             Unverified is not passed.\n'
     printf '             The steps below were read out of .github/workflows/*.yml at run\n'
     printf '             time, so this transcript cannot describe a pipeline other than\n'
     printf '             the one in the repository.\n'

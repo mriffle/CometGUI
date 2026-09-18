@@ -35,8 +35,9 @@ What it verifies
 6. **Actions are pinned to a full 40-character commit SHA**, with no exception,
    for the same reason build plugins are pinned to a version -- and each
    workflow may use only the actions its own allowlist names.  Today that is
-   ``actions/checkout`` everywhere and ``actions/upload-artifact`` in
-   ``windows-percolator.yml`` and nowhere else.
+   ``actions/checkout`` everywhere and ``actions/upload-artifact`` in the two
+   platform-verification workflows, ``windows-percolator.yml`` and
+   ``macos-gatekeeper.yml``, and nowhere else.
 7. **Windows and macOS matrix entries are present where the specification
    requires them**, and never in the pull-request pipeline.
 8. **Every file in ``.github/workflows/`` is checked**, discovered by listing
@@ -105,7 +106,7 @@ workflows on this machine, so the transcript is produced from the workflow
 files themselves rather than from a hand-written copy of them.
 
 ``--self-test`` copies the workflows and scripts under ``_build/``, damages the
-copy nineteen ways and requires each damaged copy to be rejected and the
+copy twenty-three ways and requires each damaged copy to be rejected and the
 undamaged one accepted.  Nine damages are the original ones: renaming a script,
 removing its executable bit, deleting a required step, adding
 ``continue-on-error``, adding ``|| true``, putting a stub in the pull-request
@@ -118,7 +119,9 @@ action pinned to a tag rather than a SHA; an ``if:`` whose value is not
 a secret added to the Windows workflow; and four ways of quietly making that
 workflow pointless -- deleting its upload step, moving it off a Windows runner,
 pointing it at a different script, and dropping the ``if: always()`` that makes
-a failed run still return its transcript.  The working tree is never touched.
+a failed run still return its transcript.  Four more apply those same four
+damages to ``macos-gatekeeper.yml``, which can answer PHASE-05 gate item 9 and
+has never run.  The working tree is never touched.
 
 Exit status
 -----------
@@ -437,11 +440,15 @@ ACTION_PINNED_RE = re.compile(
 # Which actions a given workflow may use AT ALL, before pinning is considered.
 # The default is checkout and nothing else; a file gets more only by being
 # named here.  release.yml is deliberately absent: "checkout only, no secret,
-# no push" is what stops that pipeline publishing by accident, and the second
-# entry below must not become a precedent for relaxing it.
+# no push" is what stops that pipeline publishing by accident, and the two
+# entries below must not become a precedent for relaxing it.  Both are
+# platform-verification jobs on a machine this project cannot otherwise reach,
+# and both exist to hand back a transcript -- which is what the upload is for
+# and the only reason it is allowed.
 DEFAULT_ALLOWED_ACTIONS = (CHECKOUT_ACTION,)
 ALLOWED_ACTIONS = {
     "windows-percolator.yml": (CHECKOUT_ACTION, UPLOAD_ACTION),
+    "macos-gatekeeper.yml": (CHECKOUT_ACTION, UPLOAD_ACTION),
 }
 
 # Step keys, and the one condition any step may carry.  `if` was not permitted
@@ -463,6 +470,16 @@ REQUIRED_CONTENT = {
         "why": "PHASE-00 gate item 8: no Windows binary in this project has ever been "
                "executed, and this workflow is the only thing that can put the checklist "
                "in docs/feasibility/windows-artefact.rst on a Windows machine.",
+    },
+    "macos-gatekeeper.yml": {
+        "runner": "macos",
+        "script": "scripts/ci/macos-gatekeeper-verify.sh",
+        "uploads": True,
+        "permissions": {"contents": "read"},
+        "why": "PHASE-05 gate item 9: no macOS binary in this project has ever been "
+               "executed, R-PLAT-04's quarantine removal has never met a real "
+               "com.apple.quarantine attribute, and this workflow is the only thing that "
+               "can put that question on a Mac.",
     },
 }
 
@@ -818,10 +835,12 @@ def self_test(root: Path) -> int:
     pr = tree / ".github" / "workflows" / "pull-request.yml"
     rel = tree / ".github" / "workflows" / "release.yml"
     wp = tree / ".github" / "workflows" / "windows-percolator.yml"
+    mg = tree / ".github" / "workflows" / "macos-gatekeeper.yml"
     unknown = tree / ".github" / "workflows" / "an-unknown-workflow.yml"
     pristine_pr = pr.read_text(encoding="utf-8")
     pristine_rel = rel.read_text(encoding="utf-8")
     pristine_wp = wp.read_text(encoding="utf-8")
+    pristine_mg = mg.read_text(encoding="utf-8")
 
     results = []
 
@@ -837,6 +856,7 @@ def self_test(root: Path) -> int:
         pr.write_text(pristine_pr, encoding="utf-8")
         rel.write_text(pristine_rel, encoding="utf-8")
         wp.write_text(pristine_wp, encoding="utf-8")
+        mg.write_text(pristine_mg, encoding="utf-8")
         if unknown.exists():
             unknown.unlink()
 
@@ -1012,6 +1032,39 @@ def self_test(root: Path) -> int:
     case("verification step points elsewhere",
          lambda: wp.write_text(
              pristine_wp.replace("run: bash scripts/ci/windows-percolator-verify.sh",
+                                 "run: bash scripts/ci/docs-build.sh"),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    # ------------------------------------------------------------------
+    # The same four ways of leaving a platform-verification workflow in
+    # place while making it prove nothing, applied to the macOS one.  It is
+    # the only thing in this repository that can answer PHASE-05 gate item
+    # 9, and it has never run, so a defect in it would be invisible for as
+    # long as it takes someone to open a pull request.
+    # ------------------------------------------------------------------
+    case("macOS transcript upload step deleted",
+         lambda: mg.write_text(
+             pristine_mg[:pristine_mg.index(
+                 "      - name: Upload the transcript")].rstrip() + "\n",
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    case("if: always() dropped from the macOS upload",
+         lambda: mg.write_text(
+             pristine_mg.replace("        if: always()\n", ""),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    case("macOS job moved to ubuntu-latest",
+         lambda: mg.write_text(
+             pristine_mg.replace("runs-on: macos-latest", "runs-on: ubuntu-latest"),
+             encoding="utf-8"),
+         restore, EXIT_PROBLEMS)
+
+    case("macOS verification step points elsewhere",
+         lambda: mg.write_text(
+             pristine_mg.replace("run: bash scripts/ci/macos-gatekeeper-verify.sh",
                                  "run: bash scripts/ci/docs-build.sh"),
              encoding="utf-8"),
          restore, EXIT_PROBLEMS)
