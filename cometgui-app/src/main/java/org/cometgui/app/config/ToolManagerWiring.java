@@ -38,6 +38,7 @@ import org.cometgui.install.archive.ArtefactExtractor;
 import org.cometgui.install.cache.ArtefactInstaller;
 import org.cometgui.install.cache.PlatformFixups;
 import org.cometgui.install.cache.ToolCache;
+import org.cometgui.install.download.ArtefactFetcher;
 import org.cometgui.install.download.HttpDownloader;
 import org.cometgui.install.manager.LocalBinaryRegistrar;
 import org.cometgui.install.manager.ManagedToolManager;
@@ -168,6 +169,49 @@ public final class ToolManagerWiring {
             Clock clock,
             Executor installThreads)
             throws IOException {
+        return toolManager(
+                host, versions, cacheRoot, processes, clock, installThreads, new HttpDownloader());
+    }
+
+    /**
+     * The whole Tool Manager runtime, over one cache root and one artefact fetcher.
+     *
+     * <p><strong>Why the fetcher is a parameter.</strong> {@link ArtefactInstaller} has taken it as
+     * a constructor argument since unit 5, because {@code org.cometgui.install.download} is where
+     * the transfer lives and {@code org.cometgui.install.cache} is where the decision to keep the
+     * bytes lives. This method is simply the same seam, one level up, and the six-argument overload
+     * above -- the one the application calls -- passes the real {@link HttpDownloader} through it.
+     * There is no second composition and no branch that only a test reaches: the two entry points
+     * run the same lines with a different transport.
+     *
+     * <p>What that buys is the one thing the phase's first gate item asks for. The end-to-end
+     * install has to move the bytes upstream really publishes, and {@code ArtefactValues} requires
+     * every manifest URL to be {@code https} while a test server on a loopback literal is not --
+     * correctly, on both counts. Rewriting the source at this seam leaves the manifest, the
+     * SHA-256, the extraction, the atomic move, the marker and the probe exactly as they are in
+     * production, and swaps only where the socket points.
+     *
+     * @param host the machine in front of the user
+     * @param versions what that machine's runtimes were established to be
+     * @param cacheRoot where installed tools live; in production the application data directory
+     * @param processes the process seam
+     * @param clock the clock seam, read once per install for the completion marker
+     * @param installThreads where an install runs, usually {@link #installThreads()}
+     * @param fetcher how one artefact's bytes are moved onto disk
+     * @return the manager, behind the port the user interface sees
+     * @throws IOException if the manifest cannot be read or a probe seam cannot be built
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static ToolManager toolManager(
+            HostPlatform host,
+            HostRuntimeVersions versions,
+            Path cacheRoot,
+            ProcessRunner processes,
+            Clock clock,
+            Executor installThreads,
+            ArtefactFetcher fetcher)
+            throws IOException {
+        Objects.requireNonNull(fetcher, "fetcher");
         ArtefactManifest manifest = ArtefactManifestReader.readFromClasspath();
         HashService hashes = new StreamingHashService();
         ToolCache cache = new ToolCache(cacheRoot, hashes);
@@ -175,8 +219,7 @@ public final class ToolManagerWiring {
         ArtefactInstaller installer =
                 new ArtefactInstaller(
                         cache,
-                        new VerifiedDownloader(new HttpDownloader(), new ArtefactVerifier(hashes))
-                                ::fetch,
+                        new VerifiedDownloader(fetcher, new ArtefactVerifier(hashes))::fetch,
                         new ArtefactExtractor(),
                         new PlatformFixups(host.operatingSystem()),
                         probe,
