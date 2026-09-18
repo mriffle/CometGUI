@@ -3645,3 +3645,99 @@ Carried forward from unit 10
   ``TERMINAL_TIMEOUT_SECONDS`` is 600 to accommodate the upstream run. Unit 12
   should use ``install.setDisable(true)``, which fails immediately, rather than a
   no-op handler.
+
+.. _p05-u13-signoff:
+
+Unit 13 ACCEPTED at ``ca33d0d``, no rework -- and gate item 9 is still NOT MET
+==============================================================================
+
+**Read that heading twice.** The unit is accepted; the gate item is not met. Unit
+13 authors the job that could meet it and proves everything about that job which
+is provable on a machine with no Mac. **No macOS binary has been executed here or
+anywhere else in this project**, and nothing in this commit claims otherwise --
+the workflow's own header says what it has been seen to do, which is nothing.
+
+What it wrote: ``.github/workflows/macos-gatekeeper.yml`` (``macos-latest``,
+Apple silicon, modelled on the proven ``windows-percolator.yml``),
+``scripts/ci/macos-gatekeeper-verify.sh`` (the driver, with ``--self-test`` and
+``--check-only``), and ``scripts/ci/macos-gatekeeper/MacosGatekeeperProbe.java``,
+which is **the product half** -- ``HostPlatform.of``, ``ArtefactManifest.select``,
+``StreamingHashService``, ``PlatformFixups`` and ``CometBanner``, compiled on the
+runner from this checkout's own sources. ``xattr -d`` appears nowhere: the
+removal under test is the product's, not the shell's.
+
+**What I ran myself**, on the accepted tree, ``git status --porcelain`` empty::
+
+    bash scripts/ci/macos-gatekeeper-verify.sh --self-test
+        self-test OK -- 34/34 controls, every one seen to bite.      exit 0
+        "AND IT STILL PROVES NOTHING ABOUT GATEKEEPER."
+
+    bash scripts/ci/macos-gatekeeper-verify.sh --check-only
+        "--check-only COMPLETE, AND IT PROVES NOTHING ABOUT GATEKEEPER."   exit 0
+
+    bash scripts/ci/check-workflows.sh --self-test
+        self-test OK -- 23 damaged copies rejected (19 before)       exit 0
+
+    bash scripts/ci/run-pipeline-locally.sh macos-gatekeeper
+        3 step(s) across 1 workflow(s); 0 executed on this machine; 0 unexpected
+
+**The negative control exists, is reachable, and is graded.** ``decide_verdict``
+returns ``INCONCLUSIVE -- THIS CHECK CANNOT GO RED ON THIS MACHINE`` with exit 2
+when the quarantined binary runs, and the reason text carries **"THIS IS NOT A
+PASS and gate item 9 is NOT met by it"**. Self-test case B2 pins the exit code
+and B2b separately pins the words.
+
+**My injection, and why I chose that one.** The single most important line in
+this unit is the verdict a reader sees when the control fails to bite, so I
+weakened **only the wording** and left the exit code alone -- ``VERDICT=
+"INCONCLUSIVE -- the control did not bite"``. The self-test caught it:
+``SELF-TEST FAILED -- 1 of 34 controls did not behave as required``, exit 6.
+Restored, digest verified, tree clean.
+
+**That injection is the one the unit itself had already failed and fixed**, and
+it reported the failure rather than the fix: its first version asserted only the
+exit code, so a mutant deleting the "cannot go red" branch fell through to
+another branch with the same status **and passed**. It then gave every branch its
+own verdict words and had every case name the words it expects. That is this
+phase's signature defect -- an assertion too coarse to see a partial failure --
+found by the unit, in its own control, and repaired before submission.
+
+**No full build, deliberately.** Nothing Maven-built changed: no product source,
+no POM, no ``.rst``, and the probe's ``.java`` lives outside every module, so
+the reactor never compiles it. The checks that can go red for this change are
+the four above, and I ran all four. ``build.sh --only workflows`` is green.
+
+Additive changes to two of tier 1's scripts, checked rather than assumed
+------------------------------------------------------------------------
+
+``scripts/ci/check-workflows.py``/``.sh`` and ``run-pipeline-locally.sh`` were
+edited to know about the fifth workflow. **Every edit raises a number**: the
+damaged-copy count 19 to 23, the discovered workflow count 4 to 5. Nothing was
+lowered, no pattern loosened, and I confirmed the self-test still rejects every
+damaged copy.
+
+**One finding that is tier 1's, not this unit's.** ``scripts/verify-all-gates.sh``
+records ``GATE_FLOOR=9`` for the ``workflows`` control while that harness now
+grades **23** -- and its own comment says a floor *"is RAISED whenever a harness
+grows: a floor left behind lets a later removal go unnoticed, which is the whole
+point of having one."* The floor was already stale by ten before this unit and is
+now stale by fourteen, so fourteen controls could be deleted without the
+aggregate suite noticing. **Escalated to tier 1**; a candidate for unit 12's
+additive edit, which is approved for that file.
+
+Carried forward from unit 13
+-----------------------------
+
+* **Gate item 9 is unmet and stays unmet** until a macOS runner returns a
+  transcript with a control that bit. Tier 1 pushes the branch and dispatches
+  the job; the dispatch request is in the phase handoff.
+* **Three things cannot be known until it runs**, and all three are real
+  possibilities rather than formalities: whether Java's
+  ``UserDefinedFileAttributeView`` can see macOS's real ``com.apple.quarantine``
+  at all; whether a hosted runner enforces Gatekeeper as a clean end-user Mac
+  does; and whether the unsigned upstream Comet is refused for signature reasons
+  independent of quarantine. The first would be a defect in ``PlatformFixups``,
+  which the unit was told to report rather than fix.
+* **Rosetta 2 is reported and gates nothing.** The artefact under test is the
+  native ``aarch64`` Comet precisely so the Gatekeeper question is not entangled
+  with the translation question (``D-004``).
