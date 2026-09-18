@@ -3525,3 +3525,123 @@ Carried forward from unit 9
   ``UiIds.toolRow*(key)``; ``ToolManagerViewModel.refresh()`` is public and
   idempotent. ``ToolManagerSectionUiTest`` expects six rows, which holds only
   while nothing registers a local binary in it.
+
+.. _p05-u10-signoff:
+
+Unit 10 ACCEPTED at ``437ba32``, no rework
+===========================================
+
+**Gate items 1 and 2**, discharged by pressing the controls in the rendered Tool
+Manager rather than by calling the port. This is the second unit of this phase
+to need no rework, and like unit 5 the reason is that it graded itself before I
+did: four injections of its own, one of which survived and which it then
+explained rather than reported as a pass.
+
+**What I ran myself**, on the accepted tree, quiet, exit status inside the log::
+
+    11/11 stages OK in 1154 seconds.  BUILD OK
+    EXIT STATUS: 0
+    ok  cometgui-app  10 compiled class(es), all 10 in the sample
+    ok  8 architecture rule(s) checked, 0 failures
+    ok  cometgui-domain   379/380   mutations killed
+    ok  cometgui-install  1354/1372 mutations killed
+
+and then the two gate tests on their own, by me::
+
+    Tests run: 3, Failures: 0, Errors: 0  -- ToolManagerInstallUiTest      9.338 s
+    Tests run: 1, Failures: 0, Errors: 0  -- PdvCancelAndRestartUiTest     4.695 s
+    MVN EXIT STATUS: 0
+
+**Item 1 is met by the item's own wording.** The four tools install from an empty
+cache over real artefact bytes and real HTTP, through the real downloader,
+verifier, extractor, atomic move, marker and the real ``StagedToolProbe`` which
+executes both native binaries -- and the install is started by
+``clickOn(UiIds.toolRowInstall(key))``, **a real pointer movement to the
+control's screen bounds and a real button press**, not a fired action event. I
+read that in ``ShownToolManager`` rather than taking it from the report. The
+capability sets are asserted at the label a scientist reads and are hand-typed:
+``PEPXML_OUTPUT (observed-by-execution), PIN_OUTPUT (observed-by-execution),
+COMPLETE_PARAMS_QUERY (observed-by-execution)`` for Comet, ``XML_OUTPUT
+(observed-by-execution), XML_DECOY_OUTPUT (observed-by-execution)`` for
+Percolator, and ``Capabilities: none declared`` for the two JARs -- which is the
+complete answer rather than a missing one, since no ``ToolCapability`` constant
+belongs to either.
+
+**Item 2 is met**, and the assertion is on the recorded argument arrays of a
+process runner that really launches processes -- it launches twenty in the
+neighbouring test -- so an empty record means nothing ran rather than that
+nothing was watched. One byte flipped, length unchanged and asserted unchanged.
+
+**The PDV cancellation, with the evidence I asked for.** Cancelled through the
+row's own control at **20 004 761** of 103 407 417 bytes; the row reads
+``Cancelled``, not failed; between the attempts the cache holds exactly one file,
+an empty lock; the second attempt runs 0 to 103 407 417. And the direct evidence
+that the partial was deleted rather than resumed: ``served.ranges()`` is
+``[empty, empty]`` -- **two requests, neither ranged**.
+
+Two corrections the unit made to my brief, both right
+------------------------------------------------------
+
+I wrote the brief and I was wrong twice. PDV installs under ``tools/pdv/2.7/``,
+not ``2.7.0``: ``ToolVersion`` drops trailing zero components and the cache uses
+the normalised form, which unit 5 recorded and I had not carried into my wording.
+And ``Files.isExecutable`` is **false** for the two JARs -- the manifest marks
+neither executable and ``PlatformFixups`` correctly does not chmod them -- so a
+blanket "installed path is executable" assertion would have been wrong about
+half the tools. The unit asserted membership of a hand-typed set instead. **An
+agent that corrects its brief with evidence is doing the job the brief exists
+for.**
+
+My injection, and the fifth harness error of this phase -- mine
+----------------------------------------------------------------
+
+I injected at the installer's own ``R-SEC-02`` boundary, step 2's re-hash, whose
+comment says *"in a correct product this cannot fire, which is the point"*. I
+replaced ``if (!actual.sha256().equals(pinned.sha256()))`` with ``if (false)`` --
+asking whether that defence-in-depth check is ever actually reached, since a
+check that is never reached is as inert as one that is never red. **It bit**:
+``CacheEdgeCasesTest.aSourceThatKeepsTheLengthAndChangesTheBytesIsRefused``,
+1005 tests, 1 failure. Unit 5 wrote precisely the test the comment describes -- a
+source that hands over bytes it says are verified and are not -- so the boundary
+is reached and graded. Restored, digest verified, class touched afterwards.
+
+*Then I made the error tier 1 had warned me about this same day.* Running the two
+gate tests on their own as ``mvn -o -pl cometgui-app test``, I got **four errors,
+all ``NoClassDefFoundError: org/cometgui/ui/viewmodel/ToolManagerViewModel``** --
+on code nobody had touched, in a build that had just passed 11/11. A
+single-module reactor does not rebuild ``cometgui-ui``. Tier 1 hit the same shape
+hours earlier and wrote it down: *"if you ever see that error, suspect the
+reactor before the code."* With ``-am`` all four pass. **The warning worked, and
+it is the only reason I did not spend the afternoon reading unit 9's view model
+for a defect that was not there.**
+
+Carried forward from unit 10
+-----------------------------
+
+* **Reading the offered list launches three processes and takes 353 ms on the
+  interface thread** with four tools installed -- Comet's banner, Percolator's
+  banner and a whole second JVM for the converter, because the offered-set gate
+  asks loadability of every installed build. Unit 8 measured ``ToolCache.verify``
+  at 6 ms and I recorded that; **the loadability gate is the part neither of us
+  measured**, and it is twenty times larger. The process count is now pinned by
+  an assertion so it cannot grow unnoticed; the latency is not. The port's
+  promise that ``offers()`` is safe to call from the JavaFX application thread is
+  the thing under strain, and a later phase should either cache a probe result
+  against the recorded checksum or move the read off the interface thread.
+* **An injection that survived, and the unit was right not to claim it.**
+  Neutering ``ArtefactVerifier``'s SHA-256 comparison left three tests green,
+  because a flipped byte in a zip also fails to extract and because
+  ``VerificationResult``'s constructor independently re-states the rule. Three
+  independent statements of ``R-SEC-02`` is not a hole; a test too coarse to say
+  which one fired is a thin assertion, and the unit added the phase-sequence
+  assertion ``[DOWNLOADING, FAILED]`` to close it. **Unit 12 must not build a
+  control out of that injection expecting a red.**
+* **The opt-in real-upstream run works**: 115 982 855 bytes from five URLs across
+  three GitHub repositories, 11.4 s, behind ``-Dcometgui.install.upstream=true``,
+  with an always-on companion pinning the five transfers to the shipped manifest
+  so the gate is not vacuous when the flag is absent. Handed to tier 1 with the
+  command.
+* **A disconnected control costs ten minutes to detect**, because
+  ``TERMINAL_TIMEOUT_SECONDS`` is 600 to accommodate the upstream run. Unit 12
+  should use ``install.setDisable(true)``, which fails immediately, rather than a
+  no-op handler.
