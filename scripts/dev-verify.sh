@@ -137,6 +137,14 @@ build_in_flight() {
             case "${arg}" in
                 org.codehaus.plexus.classworlds.launcher.Launcher) matched=1; break ;;
                 */scripts/build.sh|scripts/build.sh)               matched=1; break ;;
+                # The gate harnesses run Maven inside sandboxes under _build/
+                # and share _build/m2repo. This guard missed them on
+                # 2026-09-18: it called the tree quiet at 01:26:08 while
+                # verify-all-gates.sh still had 173 seconds to run, and a
+                # timing was taken across the overlap and had to be thrown
+                # away. A suite that builds is a build.
+                */scripts/verify-all-gates.sh|scripts/verify-all-gates.sh) matched=1; break ;;
+                */scripts/verify-*-gates.sh|scripts/verify-*-gates.sh)     matched=1; break ;;
             esac
         done < "${d}/cmdline" 2>/dev/null
         [ "${matched}" -eq 1 ] || continue
@@ -363,7 +371,7 @@ else
                 printf '\n   %s  (threads=%s, history=%s)\n' "${m}" "${PIT_THREADS}" \
                     "$( [ -f "${hist}" ] && echo "reusing $(wc -c < "${hist}") bytes" || echo "none yet -- this run is full" )"
                 mvn -B -o -Dmaven.repo.local="${M2REPO}" -pl "${m}" \
-                    -Dthreads="${PIT_THREADS}" \
+                    -Dcometgui.pit.threads="${PIT_THREADS}" \
                     -DhistoryInputFile="${hist}" -DhistoryOutputFile="${hist}" \
                     test-compile org.pitest:pitest-maven:mutationCoverage \
                     > "${WORKDIR}/pit-${m}.log" 2>&1 \

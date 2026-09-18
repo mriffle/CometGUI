@@ -895,8 +895,19 @@ stage_gates() {
     # test-compile prefix is needed rather than the bare goal: a goal-only
     # invocation cannot resolve reactor dependencies to their target/classes and
     # fails on the first module that has a sibling dependency.
-    echo "+ mvn -B ${MVN_OFFLINE} -Dmaven.repo.local=${M2REPO} test-compile org.pitest:pitest-maven:mutationCoverage"
+    # PIT is the largest single cost in this script.  Scale it to the machine:
+    # half the cores, capped at 16, FLOORED AT 4 so this can never be slower
+    # than the committed default on a small CI runner.  Wall clock only -- the
+    # mutants, the survivors and the 80% threshold are unaffected.
+    local pit_cores pit_threads
+    pit_cores="$(nproc 2>/dev/null || echo 4)"
+    pit_threads=$(( pit_cores / 2 ))
+    [ "${pit_threads}" -gt 16 ] && pit_threads=16
+    [ "${pit_threads}" -lt 4 ] && pit_threads=4
+    echo "   PIT threads: ${pit_threads} (${pit_cores} cores; floor 4, cap 16)"
+    echo "+ mvn -B ${MVN_OFFLINE} -Dmaven.repo.local=${M2REPO} -Dcometgui.pit.threads=${pit_threads} test-compile org.pitest:pitest-maven:mutationCoverage"
     mvn -B ${MVN_OFFLINE} -Dmaven.repo.local="${M2REPO}" \
+        -Dcometgui.pit.threads="${pit_threads}" \
         test-compile org.pitest:pitest-maven:mutationCoverage > "${ROOT}/_build/pitest.log" 2>&1 \
         || { sed -n '/ERROR/p' "${ROOT}/_build/pitest.log" | head -20; \
              die "PIT failed. Full log: _build/pitest.log"; }

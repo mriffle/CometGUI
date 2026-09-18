@@ -3020,6 +3020,140 @@ commits after it changed ``STATUS.rst``, ``phases/PHASE-00-feasibility.rst``,
 ``.github/workflows/windows-percolator.yml`` and two CI scripts. That is a
 reason to expect the baseline to reproduce, **not** a reason to skip taking it.
 
+.. _status-pit-threads:
+
+PIT's thread count, and a gate whose reading depends on the weather (2026-09-18)
+================================================================================
+
+The owner, twice in two days: *"I do not want to re-run the whole build to test
+when we don't need to"* (2026-09-17) and *"We are wasting way too much time
+waiting for tests to run. Can we be more granular about this and only run
+relevant tests to changes?"* (2026-09-18). Treat build wall clock as a standing
+constraint.
+
+**Where the time actually goes, measured on a quiet tree by the Phase 05
+orchestrator's own baseline at** ``9167ab5``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 40
+
+   * - What
+     - Wall clock
+     - Note
+   * - ``scripts/build.sh``, all 11 stages
+     - 1427 s
+     - 3532 tests, 0 failures
+   * - -- of which the ``gates`` stage
+     - **1056 s**
+     - **74% of the build**, almost all of it PIT
+   * - ``scripts/verify-all-gates.sh``, 11 controls
+     - 3875 s
+     - -- of which the ``tests`` control alone is 3271 s
+   * - **A full sign-off**
+     - **~88 min**
+     - Not the ~23 min this file implied before today
+
+So "run fewer tests" was the smaller lever. PIT was configured with
+``<threads>4</threads>`` on a **64-core** machine.
+
+What changed
+------------
+
+``cometgui.pit.threads`` is now a property. **Its committed default is 4**, so a
+CI runner with 2-4 cores behaves exactly as before; ``scripts/build.sh``
+computes half the cores, capped at 16 and **floored at 4**, so the computed
+value can only ever help. Measured, on a quiet tree, one run each:
+
+* threads=4: ``gates`` **1056 s** (the baseline)
+* threads=16: **647 s** -- a **39% cut**, about 7 minutes off every build
+* threads=32: **623 s** -- within noise of 16, so the cap is 16. The extra
+  concurrency bought nothing and only raised contention.
+
+**This is a wall-clock knob and nothing else, and that was checked rather than
+asserted.** Every mutation's class, method, line, mutator, index and status was
+compared before and after across all six mutation-gated modules: at threads=16,
+**five of six were byte-identical over 2720 mutations**.
+
+.. _status-mutation-drift:
+
+The finding underneath it: the gate is scored on a number that drifts
+---------------------------------------------------------------------
+
+The sixth module was not identical, and chasing that is what produced the part
+worth keeping.
+
+``scripts/build.sh`` scores the 80% gate on ``status='KILLED'`` **alone**::
+
+    killed="$(grep -c "status='KILLED'" "${pit_xml}" || true)"
+    ...
+    if [ "${score_x10}" -lt 800 ]; then   # fails the stage
+
+**PIT itself counts** ``TIMED_OUT`` **as detected.** So a mutant that sits on
+the KILLED/TIMED_OUT boundary moves the *gated* number in the failing direction
+whenever the machine is busier, while PIT's own verdict on it does not change.
+
+A handful of mutants in ``cometgui-process`` and ``cometgui-install`` sit
+exactly there, and were seen to move:
+
+* ``RunningStage.isAlive:99`` -- ``KILLED`` <-> ``TIMED_OUT``
+* ``StageRunner.startStage:198`` -- ``TIMED_OUT`` <-> ``KILLED``
+* ``StreamPump.run:96`` -- ``SURVIVED`` <-> ``KILLED``
+* ``cometgui-install`` -- 1294 vs 1295 killed, which is the **fourth**
+  observation of a drift the phase had already recorded three times
+
+**It is not caused by the thread count, and a first pass wrongly concluded that
+it was.** A single-module run at threads=4 reproduced the baseline byte for
+byte, which looked like proof; a full reactor run with ``cometgui-process``
+pinned back to 4 threads drifted anyway, **and took ``cometgui-install`` with
+it**. The single-module control was too clean an environment to show the
+effect. Concurrency raises the frequency; it is not the cause. A pin written on
+the strength of the wrong conclusion was removed rather than left in with a
+rationale that had been falsified.
+
+**Nothing is at risk today** -- the tightest margin is ``cometgui-process`` at
+90.2% against an 80% floor -- but this is a gate whose reading depends on load,
+and it will bite when a module is near the floor. **Whether ``build.sh`` should
+count ``TIMED_OUT`` as detected, the way PIT does, is a gate-semantics decision
+and is deliberately NOT taken here.** It is recorded so it is decided rather
+than discovered.
+
+One concrete test gap fell out of it: ``StreamPump.run:96`` is
+``while (read >= 0)``, and the surviving mutant makes it ``while (read > 0)``.
+Those differ **only when** ``read()`` **returns 0** -- an
+``InputStreamReader`` decoding a multi-byte character split across a read
+boundary. ``StreamPumpTest`` has eleven tests and none forces that, so the
+mutant is killed by accident of stream chunking or not at all. That belongs to
+whoever owns ``cometgui-process``.
+
+``scripts/dev-verify.sh``: the inner loop
+-----------------------------------------
+
+New, additive, and **not a gate**. It maps the current diff to the Maven modules
+it can break, runs those with their dependencies and dependents and no
+``clean``, and routes a documentation-only change to the Sphinx gate without
+starting Maven at all. ``--mutation`` adds incremental PIT using a history file
+under ``_build/``.
+
+Selection is precisely how a check stops being *reached*, so it is built against
+that: it prints what it did **not** run, refuses to be selective when the root
+``pom.xml`` changed (exit 3), and treats a Maven run that exits 0 having
+executed **zero** tests as RED (exit 4). Freshness is judged against a marker
+file touched at the start of the run, not against the clock.
+
+Two false positives in its collision guard were found **by running it** and
+fixed: ``build\.sh`` also matches ``docs-build.sh``, and matching whole command
+lines matched stale shells that merely *mentioned* the path. A third gap was
+found the hard way -- it called the tree quiet at 01:26:08 while
+``verify-all-gates.sh`` still had 173 seconds to run, and a timing taken across
+that overlap had to be thrown away. It now scans argv token by token, excludes
+its own ancestry, and treats the gate harnesses as builds, because a suite that
+builds is a build.
+
+**The boundary does not move.** A unit is signed off, and a phase gate graded,
+by ``scripts/build.sh`` and ``scripts/verify-all-gates.sh`` run in full on a
+quiet tree. What changes is that nobody pays 88 minutes after every edit.
+
 .. _status-next-action:
 
 Next action

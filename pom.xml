@@ -120,6 +120,18 @@
     -->
     <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
     <pitest-maven.version>1.30.0</pitest-maven.version>
+    <!--
+      PIT's thread count.  DEFAULT 4, which is what this build used until
+      2026-09-18, so a CI runner with 2-4 cores sees no change at all.
+      scripts/build.sh overrides it with half the cores, capped at 32 and
+      floored at 4, because PIT was the larger part of the build's wall clock
+      (roughly 17 of 23 minutes) while using four threads on a 64-core machine.
+      THIS IS A WALL-CLOCK KNOB AND NOTHING ELSE: it must not change which
+      mutants are generated, which survive, or the 80% threshold.  That was
+      verified by comparing every mutation's class, method, line, mutator,
+      index and status before and after the first raise, not asserted.
+    -->
+    <cometgui.pit.threads>4</cometgui.pit.threads>
     <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
     <archunit.version>1.5.0</archunit.version>
     <!--
@@ -879,7 +891,7 @@
               <param>HTML</param>
             </outputFormats>
             <timestampedReports>false</timestampedReports>
-            <threads>4</threads>
+            <threads>${cometgui.pit.threads}</threads>
           </configuration>
         </plugin>
 
