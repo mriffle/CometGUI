@@ -35,6 +35,12 @@ exclude_patterns = [
     # The HTML output lands inside the source tree (docs/_build/html), because
     # R-DOC-05 fixes that exact command line.
     "_build",
+    # Generated reStructuredText fragments pulled into pages with `.. include::`
+    # (Phase 05 unit 11, see the extension point below). They are not documents
+    # and must never be read as such; `.. include::` reads them directly, so
+    # excluding them here costs nothing and stops one ever becoming an orphan
+    # page if it is given a .rst suffix by mistake.
+    "_generated",
     "requirements.txt",
     "Thumbs.db",
     ".DS_Store",
@@ -149,8 +155,68 @@ def _generate_traceability_report(app):
     )
 
 
+#
+# Phase 05 unit 11: the tool-artefact fragments, generated the same way and for
+# the same reason. platform_support.rst's artefact matrix and
+# developer/tool_registry.rst's provenance table are restatements of
+# manifests/tools.json -- the platforms each build is published for, the size of
+# each transfer, the capability each row declares and on what evidence, and
+# every URL, digest and licence the installer pins. Typed into a page, that is a
+# second copy of the manifest with nothing keeping it in step. Generated here,
+# there is no stored copy to diverge, and a manifest the generator refuses fails
+# the documentation build instead of producing a page that is quietly wrong.
+#
+# The pages pull the fragments in with `.. include::`, which is read after this
+# handler has run, so a fresh clone (where docs/_generated/ does not exist)
+# builds. A missing fragment is an error under -W, not a silently empty page.
+
+
+def _generate_tool_matrix(app):
+    """builder-inited handler: write docs/_generated/*.rsti or fail the build."""
+    root = _project_root(_CONF_DIR)
+    if root is None:
+        raise ExtensionError(
+            f"toolmatrix: no project root at or above {_CONF_DIR} (looked for a directory "
+            "holding both specification.rst and phases/). The tool artefact manifest "
+            "cannot be found, so the platform matrix and the artefact provenance table "
+            "cannot be generated."
+        )
+    scripts_dir = str(root / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        import toolmatrix
+    except ImportError as error:  # pragma: no cover - environment failure
+        raise ExtensionError(
+            f"toolmatrix: cannot import the generator from {scripts_dir}: {error}"
+        ) from None
+
+    out_dir = Path(app.srcdir) / toolmatrix.OUTPUT_RELATIVE_DIR
+    try:
+        summary = toolmatrix.generate(root, out_dir)
+    except toolmatrix.ToolMatrixError as error:
+        raise ExtensionError(
+            "toolmatrix: the tool artefact manifest was rejected, so the documentation "
+            "build fails rather than publishing a platform matrix built from it.\n\n"
+            f"{error}\n\n"
+            "Fix manifests/tools.json, or scripts/toolmatrix.py, and run "
+            "`python3 scripts/toolmatrix.py --check`."
+        ) from None
+
+    _LOGGER.info(
+        "[toolmatrix] wrote %s: %d artefact record(s), %d companion archive(s), "
+        "%d platform(s), manifest sha256 %s",
+        ", ".join(str(path.relative_to(Path(app.srcdir))) for path in summary["written"]),
+        summary["artefacts"],
+        summary["companions"],
+        summary["platforms"],
+        summary["digest"],
+    )
+
+
 def setup(app):
     app.connect("builder-inited", _generate_traceability_report)
+    app.connect("builder-inited", _generate_tool_matrix)
     return {
         "version": "1.0",
         "parallel_read_safe": True,

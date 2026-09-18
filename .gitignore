@@ -16,3 +16,8 @@ __pycache__/
 # at build time from the checked-in mapping file rather than by hand.
 docs/_build/
 docs/developer/traceability.rst
+
+# The tool-artefact fragments, generated during the documentation build by
+# scripts/toolmatrix.py from manifests/tools.json (phase 05 unit 11) and pulled
+# into docs/platform_support.rst and docs/developer/tool_registry.rst.
+docs/_generated/
