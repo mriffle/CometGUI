@@ -3741,3 +3741,86 @@ Carried forward from unit 13
 * **Rosetta 2 is reported and gates nothing.** The artefact under test is the
   native ``aarch64`` Comet precisely so the Gatekeeper question is not entangled
   with the translation question (``D-004``).
+
+.. _p05-u11-signoff:
+
+Unit 11 ACCEPTED at ``9a33bb4``, no rework
+===========================================
+
+Three pages -- ``docs/developer/tool_registry.rst`` (the design and unit 0's
+artefact provenance table), ``docs/tool_manager.rst`` (what a scientist sees)
+and the artefact table in ``docs/platform_support.rst``, whose final wording
+stays Phase 16's.
+
+**The tables are generated and I proved it myself rather than reading the
+claim.** ``scripts/toolmatrix.py`` renders two reST fragments from
+``manifests/tools.json``; ``docs/conf.py`` calls it from a ``builder-inited``
+handler before Sphinx reads the source tree -- the same pattern the traceability
+report already uses -- and the fragments are gitignored, so **there is no
+committed copy to diverge**.
+
+*My own reaction test.* I rendered the fragments twice, once from the real
+manifest and once from a **copy** in which I had changed PDV's ``sizeBytes`` to
+999::
+
+    < Rendered from manifests/tools.json (SHA-256 fafe9d3299b2f30d...)
+    > Rendered from manifests/tools.json (SHA-256 2d35fee4d5309eaa...)
+    <      - 103 407 417
+    >      - 999
+
+The real manifest was untouched throughout -- ``git status --porcelain`` empty
+before and after. Note the fragment carries **the digest of the manifest it was
+rendered from**, which is what makes a stale table self-identifying.
+
+*My own injection, aimed at whether the mechanism is wired at all.* The unit
+demonstrated five validation failures; I asked a different question -- what if
+the generator silently does **nothing**? I made ``generate()`` return early when
+the output directory already exists, which is the plausible-sounding "the
+fragments are already there from the last build"::
+
+    sphinx.errors.ExtensionError: Handler <function _generate_tool_matrix ...>
+    for event 'builder-inited' threw an exception (exception: 'written')
+    docs-build.sh: FAILED -- the published documentation build did not pass.
+    DOCS EXIT: 1
+
+So a generator that produces nothing **fails the build** rather than leaving
+yesterday's tables in place. That is the property that makes "generated" mean
+something, and it is now observed rather than assumed. Restored, digest
+verified, tree clean.
+
+*The honesty check, run by me.* ``grep -E -i '\b(verified|confirmed|proven|
+tested)\b'`` over the three pages, narrowed to lines that also name ``macos``,
+``windows``, ``aarch64`` or ``x86-64``, returns **nothing**. All three pages say
+plainly that no macOS binary has ever been executed anywhere in this project and
+that gate item 9 is not met, and the single Windows ``observed-by-execution``
+row is described as one run on one hosted runner rather than as a clean
+end-user machine.
+
+``bash scripts/ci/docs-build.sh`` on the accepted tree: ``PASSED``, exit 0. **No
+Maven build, deliberately**: nothing Maven-built changed, and the check that can
+go red for a documentation change is the documentation gate.
+
+Two corrections the unit made to its own draft, both by reading the code
+-------------------------------------------------------------------------
+
+It had written that Percolator 3.09 has **no row** on Linux. It has one --
+``UNAVAILABLE_ON_THIS_PLATFORM``, with no capabilities and no advisories -- and
+the page now distinguishes *not published for this platform* from *cannot run on
+this host*, which are two different rows with two different messages. It had
+also called the xar hardening four settings while listing five. **An agent that
+checks its own draft against the code rather than against the work log is doing
+the thing the documentation exists for.**
+
+Carried forward from unit 11
+-----------------------------
+
+* **The generator has no automated falsifiability harness.** Its five validation
+  injections were demonstrated by hand and are reproducible from the recipe in
+  the unit's report, but nothing re-runs them. Honest residue, and unit 12's
+  natural home.
+* **A control over the generator must assert the inner diagnostic**, not the
+  outer ``ExtensionError`` sentence, which is identical for every rejection and
+  would pass on a defect nobody injected.
+* **A green docs build now proves the generator ran**: the build log carries
+  ``[toolmatrix] wrote ... 23 artefact record(s) ... manifest sha256 fafe9d32...``,
+  which is a cheap non-vacuity check.
