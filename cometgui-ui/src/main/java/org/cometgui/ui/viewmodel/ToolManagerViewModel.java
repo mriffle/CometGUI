@@ -72,6 +72,18 @@ import org.cometgui.domain.tools.ToolOffer;
  * <p>Everything else is called on the interface thread: {@link #refresh()}, {@link #install} and
  * {@link #cancel} all touch the observable row list, which is the toolkit's to read while it
  * paints.
+ *
+ * <p><strong>What the executor is in the running application, and what it is in tests.</strong> The
+ * composition root passes the toolkit's own "run this later on the interface thread" call, and an
+ * install's reports arrive on one of the installer's own background threads -- named {@code
+ * cometgui-install-N}. Without that hop this class would write a property and rebuild a list that a
+ * live scene is watching, from another thread; the toolkit does not refuse that, it leaves it
+ * undefined, which is a worse failure than an exception because nothing reports it. A caller
+ * passing {@code Runnable::run} is therefore asking for reports to be applied on whatever thread
+ * raised them. Every test in this package does exactly that, on purpose, because it makes the
+ * sequences deterministic -- but it is a <em>test convention and not the production shape</em>,
+ * which is why the hop is graded on its own, with a real background thread and a live scene, by
+ * {@code org.cometgui.ui.controls.ProgressReachesTheInterfaceThreadTest}.
  */
 public final class ToolManagerViewModel {
 
@@ -103,9 +115,11 @@ public final class ToolManagerViewModel {
      * A Tool Manager over the port.
      *
      * @param tools the manager the application composed for this host
-     * @param uiThread how a progress report gets back onto the interface thread; the view passes
-     *     the toolkit's own "run this later on the interface thread" call and a test passes {@code
-     *     Runnable::run}
+     * @param uiThread how a progress report gets back onto the interface thread; the composition
+     *     root passes the toolkit's own "run this later on the interface thread" call, and a test
+     *     passes {@code Runnable::run} for a deterministic sequence -- which applies reports on
+     *     whatever thread raised them, so anything with a live scene in front of it must pass the
+     *     real one
      * @throws NullPointerException if either argument is {@code null}
      */
     public ToolManagerViewModel(ToolManager tools, Executor uiThread) {
