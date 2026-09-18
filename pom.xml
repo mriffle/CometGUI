@@ -878,6 +878,14 @@
                    invisible to coverage.  The unit measured 239/241 against this package
                    itself before I gated it. -->
               <param>org.cometgui.install.cache.*</param>
+              <!-- Added by phase 05 before unit 8, which lands the runtime behind
+                   org.cometgui.domain.tools.ToolManager: the composition that decides which
+                   builds a scientist is OFFERED (R-PERC-01, R-TOOL-06), what install state
+                   each is in (R-TOOL-04) and whether a cancelled install is reported as
+                   cancelled rather than failed.  A mutation in any of those is invisible to
+                   coverage and visible to a user.  Adding a package STRENGTHENS this gate;
+                   the list is never narrowed. -->
+              <param>org.cometgui.install.manager.*</param>
               <!-- stage invalidation rules -->
               <param>org.cometgui.workflow.state.*</param>
             </targetClasses>
