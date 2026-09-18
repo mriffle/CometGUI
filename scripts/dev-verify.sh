@@ -277,14 +277,22 @@ if [ "${#JAVA_MODULES[@]}" -eq 0 ]; then
     fi
 else
     # ------------------------------------------------------------ the Maven run
-    banner "Maven: the changed modules, their dependencies and their dependents"
+    banner "Maven: the closed set of modules this change can break"
     printf '   changed:  %s\n' "${JAVA_MODULES[*]}"
-    printf '   selector: -pl %s -am -amd  (deps AND dependents: a change here can\n' "$(IFS=,; echo "${JAVA_MODULES[*]}")"
-    printf '             break anything downstream, and this says so rather than hiding it)\n'
+    REACTOR="$(python3 "${ROOT}/scripts/dev-verify-closure.py" "${JAVA_MODULES[@]}")"
+    [ -n "${REACTOR}" ] || die "could not compute the module closure; refusing to guess."
+    REACTOR_COUNT="$(printf '%s' "${REACTOR}" | tr ',' '\n' | grep -c .)"
+    ALL_COUNT="$(ls -d "${ROOT}"/cometgui-*/ 2>/dev/null | wc -l)"
+    printf '   closure:  %s of %s module(s): %s\n' "${REACTOR_COUNT}" "${ALL_COUNT}" "${REACTOR}"
+    if [ "${REACTOR_COUNT}" -ge "${ALL_COUNT}" ]; then
+        printf '   NOTE:     that is the WHOLE reactor. cometgui-app and cometgui-archtests\n'
+        printf '             depend on every module, so almost any change reaches them.\n'
+        printf '             Module scoping saves nothing here.\n'
+    fi
     printf '   goal:     %s, with no `clean` -- unchanged sources are not recompiled\n' "${MVN_GOAL}"
 
     if [ "${DRY_RUN}" -eq 1 ]; then
-        note "WOULD RUN: mvn -B -o -pl $(IFS=,; echo "${JAVA_MODULES[*]}") -am -amd ${MVN_GOAL}"
+        note "WOULD RUN: mvn -B -o -pl ${REACTOR} ${MVN_GOAL}"
         [ "${RUN_MUTATION}" -eq 1 ] && note "WOULD RUN: PIT with a history file, over the mutation-gated subset"
         NOT_RUN+=("everything -- this was a --dry-run")
         banner "What this run did NOT do"
@@ -304,7 +312,7 @@ else
 
     set +e
     mvn -B -o -Dmaven.repo.local="${M2REPO}" \
-        -pl "$(IFS=,; echo "${JAVA_MODULES[*]}")" -am -amd \
+        -pl "${REACTOR}" \
         "${MVN_GOAL}" 2>&1 | tee "${WORKDIR}/maven.log"
     MVN_STATUS="${PIPESTATUS[0]}"
     set -e
@@ -314,10 +322,16 @@ else
     fresh_reports=0 fresh_tests=0 fresh_failures=0
     while IFS= read -r report; do
         fresh_reports=$(( fresh_reports + 1 ))
-        counts="$(sed -n 's/.*tests="\([0-9]*\)".*failures="\([0-9]*\)".*errors="\([0-9]*\)".*/\1 \2 \3/p' "${report}" | head -1)"
-        [ -n "${counts}" ] || continue
-        fresh_tests=$(( fresh_tests + $(echo "${counts}" | cut -d' ' -f1) ))
-        fresh_failures=$(( fresh_failures + $(echo "${counts}" | cut -d' ' -f2) + $(echo "${counts}" | cut -d' ' -f3) ))
+        # Surefire writes tests/errors/skipped/failures IN THAT ORDER. An
+        # earlier sed here assumed tests/failures/errors, matched nothing, and
+        # reported "0 tests" for a run of thousands -- which would have tripped
+        # the zero-tests-is-red branch on every healthy run. Match by name.
+        counts="$(grep -o 'tests="[0-9]*"\|failures="[0-9]*"\|errors="[0-9]*"' "${report}" \
+            | head -3 | sed 's/[^0-9]//g' | tr '\n' ' ')"
+        set -- ${counts}
+        [ "$#" -eq 3 ] || continue
+        fresh_tests=$(( fresh_tests + $1 ))
+        fresh_failures=$(( fresh_failures + $2 + $3 ))
     done < <(find "${ROOT}" -path "${ROOT}/_build" -prune -o \
                   -path '*/target/surefire-reports/TEST-*.xml' -newer "${WORKDIR}/.run-started" -print 2>/dev/null)
 
@@ -389,7 +403,8 @@ else
        signal; the gate run in scripts/build.sh uses no history file")
         fi
     else
-        NOT_RUN+=("PIT entirely (no --mutation). It is ~17 of build.sh's ~23 minutes.")
+        NOT_RUN+=("PIT entirely (no --mutation). Measured 2026-09-18: the gates stage
+       is 647s of build.sh's 1020s, and verify-all-gates.sh is a further 3875s.")
     fi
 fi
 
