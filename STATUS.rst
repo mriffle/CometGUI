@@ -3,16 +3,19 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-09-17
+:Updated: 2026-09-18
 :Updated by: Main orchestrator, session 08 (**Phase 05 restarted at unit 8 on
    the owner's instruction**; a fresh phase orchestrator dispatched with
    ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst`` -- :ref:`status-p05-resumed`.
    Session 07, earlier the same day, resolved Phase 00 item 8's contradiction
    and carried the amendment into the code that grades it)
-:Current phase: 05 -- **RESUMED AT UNIT 8** on 2026-09-17 by owner
-   instruction, after being stopped after unit 7 on 2026-09-03
-   (:ref:`status-p05-resumed`, :ref:`status-p05-stopped`). Units 1-7 signed
-   off. Originally dispatched 2026-09-02. Phase 04 is
+:Current phase: 05 -- **STOPPED AGAIN on 2026-09-18 by owner instruction**,
+   this time **mid-unit-12** (:ref:`status-p05-stopped-again`). Units 1-11 and
+   13 accepted by the phase orchestrators; **unit 12 unfinished and its draft
+   preserved under a tag, off** ``main``. **Tier 1 has verified none of units
+   8-13 and has not re-run the exit gate**, so the phase is INCOMPLETE and
+   UNSIGNED. Restarted at unit 8 on 2026-09-17
+   (:ref:`status-p05-resumed`); originally dispatched 2026-09-02. Phase 04 is
    **PARTIAL**, signed off 2026-09-02 on tier 1's own re-run and seven of its
    own defect injections; Phase 03 **PARTIAL**, 2026-09-01. Phases 00 and 01
    remain PARTIAL, but **neither is waiting on a pull request any more** --
@@ -20,9 +23,11 @@ Project Status
    closed (:ref:`status-census-closed`).
 :Overall: The repository, build and every quality gate exist and have each been
    seen to fail on a deliberate defect. Five phases are signed off -- 02
-   PASSED; 00, 01, 03 and 04 PARTIAL -- and Phase 05, stopped after unit 7 of
-   13 on 2026-09-03, is **running again from unit 8** on the owner's
-   instruction of 2026-09-17 (:ref:`status-p05-resumed`). **Pull request #1
+   PASSED; 00, 01, 03 and 04 PARTIAL -- and Phase 05 is **INCOMPLETE and
+   UNSIGNED**: twelve of its thirteen units are accepted by the phase
+   orchestrators, but it was stopped mid-unit-12 on 2026-09-18 before it could
+   report, so **no tier-1 sign-off of units 8-13 or of the exit gate has ever
+   happened** (:ref:`status-p05-stopped-again`). **Pull request #1
    was opened and merged on 2026-09-02**, which closed what both of Phases 00
    and 01's outstanding items were waiting on: ``pull-request.yml`` ran green
    on a real pull request (2682 tests, 0 failures), and a ``windows-latest``
@@ -208,9 +213,16 @@ Phase board
        (:ref:`status-platform-divergence`).
    * - 05
      - Tool registry and installer
-     - IN PROGRESS -- **resumed at unit 8**
-     - **Restarted 2026-09-17** on the owner's instruction, with a third fresh
-       phase orchestrator briefed by
+     - INCOMPLETE -- **stopped mid-unit-12, UNSIGNED**
+     - **Stopped 2026-09-18 by owner instruction, mid-unit-12**
+       (:ref:`status-p05-stopped-again`). Units 8, 9, 10, 13 and 11 accepted by
+       the phase orchestrator -- three after rework -- and the inherited
+       cancel-mid-download defect reproduced and fixed. **Unit 12 unfinished**;
+       its 640-line draft is preserved at tag ``phase05-unit12-unfinished``,
+       off ``main``, unread and unrun. **Tier 1 verified none of units 8-13 and
+       never re-ran the gate**, so nothing here is signed off. Expected grade
+       when someone does: PARTIAL, on gate item 9.
+       *Restarted 2026-09-17* with a third fresh phase orchestrator briefed by
        ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst`` (:ref:`status-p05-resumed`).
        Units 1-7 signed off; units 8, 9, 10, 13, 11, 12 remain, serially in
        that order. Expected grade is still PARTIAL: gate item 9 is macOS-only.
@@ -3154,6 +3166,48 @@ builds is a build.
 by ``scripts/build.sh`` and ``scripts/verify-all-gates.sh`` run in full on a
 quiet tree. What changes is that nobody pays 88 minutes after every edit.
 
+.. _status-p05-stopped-again:
+
+Phase 05 stopped a second time (2026-09-18), mid-unit-12, by owner instruction
+==============================================================================
+
+The owner stopped the phase on 2026-09-18, first asking that it finish unit 12
+and then revising that to stopping immediately. Both agents were stopped
+cleanly: the phase orchestrator, which was waiting for unit 12's commit, and
+the unit 12 agent, whose last words were *"I have every injection reconnoitred
+and biting. Now I'll write the harness."*
+
+**What the phase achieved between 02:53 and 13:50.** Five units accepted --
+8 (``7bab20d``, one round), 9 (``1f35c25``, two rounds), 10 (``437ba32``),
+13 (``ca33d0d``) and 11 (``9a33bb4``) -- each signed off by an orchestrator
+that read the diff, re-ran the build and injected a defect the unit had not
+tried. The cancel-mid-download defect inherited from the first stop was
+**reproduced** (``68f182d``) **and fixed inside unit 8**. Unit 13 was accepted
+explicitly as *authored and never run*, with **gate item 9 recorded NOT MET**
+rather than allowing an unrun check to read as a pass.
+
+**What is NOT true, and must not be allowed to drift into being true.** Tier 1
+**has verified none of units 8 through 13**, and **has not re-run the phase exit
+gate**. The phase was stopped before it reported, so the sign-off that normally
+follows never happened. The gate table in
+``handoffs/PHASE-05-handoff.rst`` is the phase's own record, faithfully
+transcribed by tier 1 and **not a tier-1 verification**. Phase 05 is therefore
+**INCOMPLETE and UNSIGNED**, not PARTIAL -- PARTIAL is a grade, and no grade has
+been awarded.
+
+**Unit 12's draft is preserved off** ``main``. 640 lines of
+``scripts/verify-install-gates.sh``, at tag ``phase05-unit12-unfinished``,
+unread and unrun, following the precedent set for the cancelled unit 8 so that
+unsigned work does not accumulate in the tree.
+
+Three tier-1 debts carry forward, none of them the phase's to pay: the **macOS
+runner** for gate item 9, the **~88-minute phase sign-off**, and the
+**``TIMED_OUT`` counting decision** (:ref:`status-mutation-drift`).
+
+Handoffs written at tier 1 because the phase could not write its own:
+``handoffs/PHASE-05-handoff.rst`` (rewritten for a successor) and
+``handoffs/SESSION-08-main-orchestrator.rst``.
+
 .. _status-next-action:
 
 Next action
@@ -3171,14 +3225,12 @@ Next action
 
    **What is actually next, as of 2026-09-17:**
 
-   #. **Decided and under way: Phase 05 resumed at unit 8 of 13** on the
-      owner's instruction of 2026-09-17, with a fresh phase orchestrator
-      briefed by ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst``
-      (:ref:`status-p05-resumed`). Tier 1's next obligation to it is **unit
-      13's macOS runner** -- tier 1 pushes the branch and dispatches the
-      workflow, the phase does not -- and then **the phase gate itself**: nine
-      items, re-run by tier 1 with its own defect injections, not read from a
-      report.
+   #. **Phase 05 is stopped and UNSIGNED** (:ref:`status-p05-stopped-again`).
+      Nothing is running. Whoever picks it up owes, in this order: **unit 12**
+      (unfinished, draft at tag ``phase05-unit12-unfinished``), the **macOS
+      runner** for gate item 9, and then the **phase sign-off** -- nine items
+      re-run by tier 1 with its own defect injections, roughly 88 minutes of
+      machine time. Start from ``handoffs/PHASE-05-handoff.rst``.
    #. **The nightly has failed every night since 2026-08-31** and its first
       failing stub skips every later step, so the documentation link check and
       the tool-manifest verification have still never executed on a runner.
@@ -3345,6 +3397,32 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-09-18
+     - 05
+     - **Phase 05 stopped a second time by owner instruction, mid-unit-12, and
+       is INCOMPLETE and UNSIGNED.** Units 8, 9, 10, 13 and 11 accepted by the
+       phase orchestrator, three of them after rework; the inherited
+       cancel-mid-download defect reproduced and fixed in unit 8; unit 13
+       accepted as authored-and-never-run with gate item 9 recorded NOT MET.
+       Unit 12's 640-line draft preserved at tag
+       ``phase05-unit12-unfinished``, off ``main``, unread and unrun. **Tier 1
+       verified none of units 8-13 and never re-ran the exit gate**, so the
+       phase has no grade -- not PARTIAL, none. Handoffs written at tier 1
+       because the phase was stopped before it could write its own.
+       See :ref:`status-p05-stopped-again`.
+   * - 2026-09-18
+     - --
+     - **PIT's thread count raised, and a gate found to be scored on a number
+       that drifts.** ``gates`` 1056s -> 647s, a 39% cut, after the owner said
+       twice in two days that build wall clock was too high. Verified as wall
+       clock only by comparing every mutation's status before and after: five
+       of six modules byte-identical over 2720 mutations. The sixth exposed
+       that ``build.sh`` scores the 80% gate on ``KILLED`` alone while PIT
+       counts ``TIMED_OUT`` as detected, so the gated number moves with machine
+       load; **that counting question is deliberately left undecided.** Also
+       added ``scripts/dev-verify.sh``, the inner loop, which is not a gate.
+       A first diagnosis blamed the thread count on the strength of a control
+       run in isolation, and was wrong. See :ref:`status-pit-threads`.
    * - 2026-09-17
      - 05
      - **Phase 05 restarted at unit 8 on the owner's instruction**, fourteen
