@@ -3107,3 +3107,265 @@ bytes made the loop spin -- which is the evidence that a zero-byte read is a
 real event on this code path and not a theoretical one. ``cometgui-process`` is
 Phase 03's and this phase does not touch it. **Escalated to tier 1 for Phase
 03's residue, not fixed here.**
+
+.. _p05-u8-dispatch:
+
+Unit 8 dispatched: the Tool Manager runtime behind the domain port
+====================================================================
+
+Dispatched 2026-09-18 to a fresh phase agent, with the tree at ``e124740`` and
+nothing else live in it. The unit is my predecessor's re-scope, unchanged:
+``org.cometgui.domain.tools.ToolManager`` had no implementation and no unit
+producing one, and it is what gate items 1, 2, 5, 7 and 8 actually run through.
+
+Its brief carried three things beyond the scope: tier 1's standing direction
+that the ``ToolOffer`` download-size gap is **fixed here, not deferred**; the
+cancellation defect **fixed and graded inside a transfer**, with my own
+reproduction and the ``ArtefactValues``/``DownloadRequest`` https finding handed
+over so the agent did not have to rediscover it; and the URL-is-the-key rule,
+because this unit inherits ``select``, ``ManifestAlternatives`` and
+``ProbeGatedOffers`` together.
+
+**I added ``org.cometgui.install.manager.*`` to ``<targetClasses>`` myself**, at
+``e124740``, before dispatching -- the precedent units 3, 4 and 5 set, so that
+only one party edits the reactor. The prefix is inert until the unit's first
+class lands and binds it from that moment. ``build.sh``'s census only flags a
+module that *compiles* a class under a prefix, so an empty prefix cannot fail a
+build; ``cometgui-install``'s mutation switch was already on.
+
+.. _p05-u8-signoff:
+
+Unit 8 sign-off: sent back for one item
+========================================
+
+**What I ran myself**, on the committed tree at ``85d100c``, quiet tree, ``git
+status --porcelain`` empty, exit status captured inside the log rather than
+reported by a wrapper::
+
+    211 report file(s): tests=3590 failures=0 errors=0 skipped=3
+    11/11 stages OK in 993 seconds.  BUILD OK
+    EXIT STATUS: 0
+
+    ok  cometgui-domain   line 100.0% (846/846)    branch 100.0% (368/368)
+    ok  cometgui-install  line 100.0% (3327/3327)  branch  99.6% (1177/1181)
+    ok  cometgui-app      line  91.8% (192/209)    branch  84.8% (28/33)
+    ok  cometgui-domain   49 compiled class(es), all 49 in the sample
+    ok  cometgui-install  81 compiled class(es), all 81 in the sample
+    ok  cometgui-app       9 compiled class(es), all  9 in the sample
+    ok  cometgui-domain   379/380   mutations killed = 99.7%
+    ok  cometgui-install  1346/1363 mutations killed = 98.7%
+    ok  8 architecture rule(s) checked, 0 failures
+
+3590 tests is the baseline's 3532 plus 58. The census grew by exactly the
+classes the unit added -- ``cometgui-install`` 79 to 81, ``cometgui-app`` 8 to 9
+-- which is the check that a class whose test does not compile cannot leave the
+sample unnoticed.
+
+**Read out of ``mutations.xml`` rather than the console**, because the two
+differ by the timeout count by design. ``cometgui-domain``: 380 mutations, 379
+killed, **exactly one survivor, ``ToolVersion:214:ConditionalsBoundaryMutator``**
+-- unmoved, so ``verify-test-gates.sh``'s hand-typed pinned list still matches
+and nothing was added to it. ``cometgui-install``: 1363 mutations, 11 survivors
+and 6 timeouts, and I enumerated all seventeen: **not one is in
+``org.cometgui.install.manager``**. The package's single non-kill is
+``ManagedToolManager:218:VoidMethodCallMutator``, ``TIMED_OUT`` -- removing the
+``installThreads.execute`` call means the install never starts, so the listener's
+latch never counts down and PIT's own timeout fires. It is detected by PIT and
+not by ``build.sh``, which counts ``KILLED`` alone; that is the open
+gate-semantics question recorded at ``status-mutation-drift`` and neither the
+unit nor I touched it.
+
+*My reactor figure for ``cometgui-install`` is 1346/1363 where the agent
+reported 1344/1363.* Two mutations, in the safe direction, package figures
+identical -- the same load-sensitive ``KILLED``/``TIMED_OUT`` boundary recorded
+three times before. Inconclusive by the standing rule, and re-running it would
+answer nothing.
+
+**Nothing weakened, checked rather than assumed.** ``git diff e124740..85d100c``
+over ``pom.xml``, every module POM, ``config/``, ``.mvn/``, ``scripts/``,
+``manifests/``, ``STATUS.rst``, ``DECISIONS.rst``, ``phases/``, ``handoffs/``,
+``ONBOARDING.rst``, ``CLAUDE.md`` and ``specification.rst`` is **empty**. A
+fixed-string search over the whole diff for ``@Disabled``, ``@Ignore``,
+``assumeTrue``, ``<exclude``, ``SuppressWarnings``, ``SuppressFBWarnings`` and
+``.skip=true`` on added lines returns **nothing**.
+
+.. _p05-u8-injections:
+
+Two injections of mine: one bit, one survived and I do not claim it as a hole
+------------------------------------------------------------------------------
+
+**The one that bit**, run to prove the suite I was running is capable of
+failing: in ``ManagedToolManager.refusalFor`` I replaced ``return
+loadability.refusalFor(record);`` with ``return Optional.empty();`` -- the
+plausible-sounding *"a build we installed once is one we know starts"*. Anchor
+unique; source ``84cf7524...`` to ``5bb62ce1...``; **compiled class
+``48fa5acf...`` to ``4225c2f7...``**, so it reached the bytecode. It failed
+``Tests run: 996, Failures: 2``, exit 1, on
+``anInstalledBuildThatNoLongerStartsIsNotOffered`` (three failures inside one
+``assertAll``) and ``anInstalledBuildThatNoLongerStartsCannotBeInstalledAgain``
+-- ``R-TOOL-06``'s last sentence, graded both at the offered set and at the
+install entry point.
+
+**The one that survived, and the honest reading of it.** In
+``ManagedToolManager.offerFor`` I added a conjunct so that an entry which
+verifies wins over an install that is running::
+
+    if (attempt == ToolInstallState.INSTALLING && verified == null) {
+
+It landed -- compiled class ``48fa5acf...`` to ``ab30d614...`` -- and **996
+tests passed with it in place**. The axis nothing varies is *what state the
+cache was in when an install started*: every install test begins from an empty
+cache, so ``verified`` is always ``null`` there.
+
+**I am not reporting that as a hole, because I could not show it is a defect.**
+I looked for a case where an install runs for any length of time over an entry
+that already verifies, and there is none: ``ArtefactInstaller.begin`` verifies
+first and returns an already-installed entry immediately, so the window is the
+few milliseconds of a lock acquisition and a marker check, and in that window
+*"the tool is installed"* and *"an install is running"* are both true. A
+survived injection is evidence of a hole only when the behaviour it changes can
+be shown to matter, and this project's own rule is to prove harm rather than
+argue it -- unit 7's locale injection was proved by running the probe under
+``de_DE``. I recorded it because the reasoning is worth more to the next reader
+than the result.
+
+*And one concern I measured instead of reporting.* Reading ``offers()`` I
+noticed it calls ``ToolCache.verify`` for every installed row, and ``verify``
+re-hashes what the marker records -- on a method the port promises is safe to
+call from the JavaFX application thread. PDV is a 103 MB download, so this
+looked like a UI freeze waiting for unit 9. It is not: PDV's manifest row
+installs one file, ``PDV-2.7.0/PDV-2.7.0.jar``, which is **1 343 276 bytes**
+inside a 222-entry archive, and SHA-256 plus MD5 over it takes **6 ms** on this
+machine. The 99 MB is bundled libraries the marker does not record. **Measured,
+not assumed, and it is fine.**
+
+Sent back for one item: the download size must be the download
+----------------------------------------------------------------
+
+The unit reported this itself as a judgement call for me, which is the right
+handling, and the call is mine: **``downloadSizeBytes`` is artefact plus
+companions, not the artefact alone.**
+
+Percolator 3.07.1 on Linux fetches a 946 303-byte portable zip **and** an
+1 852 660-byte ``.deb`` for the two XSD companions -- 2 798 963 bytes -- while
+the offer as submitted says 946 303. The component exists so the Tool Manager
+can tell a scientist how many bytes are about to move; a figure three times
+smaller than the transfer it describes is :ref:`the eleventh shape
+<p05-eleventh-shape>`, a value that misstates what it reports, landing in a
+number a user acts on rather than in an error message. PDV has no companion, so
+tier 1's own figure of 103 407 417 does not move.
+
+The rework is four lines of production code and a hand-typed expectation on the
+shipped manifest, plus the proof that the new assertion goes red on the old
+value. Everything else in the unit stands and it was told not to touch it.
+
+.. _p05-u8-accepted:
+
+Unit 8 ACCEPTED at ``7bab20d``, after one round
+================================================
+
+The rework is the one item I asked for and nothing else: four files, of which
+two are the tests. ``ToolOffer``'s change is documentation only -- no validation
+moved -- and ``ManagedToolManager.wholeDownloadOf`` sums the artefact and every
+companion the record names.
+
+**My own build**, quiet tree, ``git status --porcelain`` empty, exit status
+captured inside the log::
+
+    211 report file(s): tests=3590 failures=0 errors=0 skipped=3
+    11/11 stages OK in 1119 seconds.  BUILD OK
+    EXIT STATUS: 0
+
+    ok  cometgui-domain   49 compiled class(es), all 49 in the sample
+    ok  cometgui-install  81 compiled class(es), all 81 in the sample
+    ok  cometgui-app       9 compiled class(es), all  9 in the sample
+    ok  cometgui-domain   379/380   mutations killed = 99.7%
+    ok  cometgui-install  1347/1365 mutations killed = 98.6%
+    ok  8 architecture rule(s) checked, 0 failures
+
+**Survivor sets, read out of ``mutations.xml``.** ``cometgui-domain``: 380
+mutations, **exactly one SURVIVED, still
+``ToolVersion:214:ConditionalsBoundaryMutator``** -- the pinned entry, unmoved,
+nothing added to the list. ``cometgui-install``: 1365 mutations, 11 SURVIVED and
+I enumerated every one -- ``ExtractionGuard`` 181 and 603, ``ZipArchiveReader``
+334 twice and 367, ``HttpDownloader`` 507 and 579, ``InstallPipeline`` 254,
+``PkgPayloadReader`` 245 and 399, ``BoundedEntryStream`` 90 -- **all of them the
+pre-existing ``archive``/``download``/``cache`` residue from units 3, 4 and 5,
+and not one in ``org.cometgui.install.manager``**, which carries 54 mutations,
+53 killed and one ``TIMED_OUT``.
+
+**The new assertion seen to fail, by me rather than by its report.** I put the
+artefact-only value back -- ``return record.sizeBytes();`` in place of the
+summing loop, anchor unique, marker grepped back out, compiled class
+``e51119c3...`` then ``cf1449d6...`` -- and it failed **four** assertions across
+both test classes, including the end-to-end row of an install that really
+fetched both files over loopback::
+
+    an installed build still says how large the transfer was: 946 303 for the
+    archive and 1 852 660 for the .deb this install really fetched, both of them
+    served above ==> expected: <OptionalLong[2798963]> but was: <OptionalLong[946303]>
+
+    expected: <[... percolator 3.07.1 NOT_INSTALLED 2798963, percolator 3.06.5
+    NOT_INSTALLED 2799981 ...]>
+     but was: <[... percolator 3.07.1 NOT_INSTALLED 946303, percolator 3.06.5
+    NOT_INSTALLED 917285 ...]>
+
+Restored from the snapshot rather than with ``git checkout --``; digest verified
+with ``sha256sum -c``; marker greps out at zero; tree clean.
+
+*My third harness error of this phase, and the same one twice in its history.*
+My first attempt at that injection went red on **Spotless**, not on the defect:
+replacing the loop left ``import ...ArtefactCompanion`` unused. That is exactly
+what happened to my predecessor twice in unit 7 -- once Checkstyle's line
+length, once an unused import from the same cause. Had I read it as a result I
+would have had a "failure" that never ran a test. I removed the import and
+re-ran, and the second run is the evidence above. **A red result can be the
+harness's fault as easily as a green one can be a lie**, and this trap is now on
+record three times in one phase.
+
+Nothing weakened across both commits: ``git diff e124740..7bab20d`` over
+``pom.xml``, every module POM, ``config/``, ``.mvn/``, ``scripts/``,
+``manifests/``, ``STATUS.rst``, ``DECISIONS.rst``, ``phases/`` and ``handoffs/``
+is empty, and no ``@Disabled``, ``assumeTrue``, ``<exclude`` or suppression was
+added on any line.
+
+.. _p05-u8-carried:
+
+Carried forward from unit 8
+----------------------------
+
+* **The port cannot name a row when one release is two rows, and unit 9 is where
+  it bites.** ``install(ToolName, ToolVersion, listener)`` names a *release*, but
+  Comet 2026.02.2 is two macOS files with two digests, and on Apple silicon
+  ``select`` offers **both** -- so ``offers()`` emits two ``ToolOffer``\ s
+  identical in every component a view can render, and a user cannot tell them
+  apart or choose between them. The unit takes the first offered row, which
+  ``select`` orders native before translated, and says so in the source. **The
+  proposal, which I endorse and route to unit 9 and tier 1:** ``ToolOffer``
+  gains the artefact's ``HostPlatform`` and ``ArtefactExecutability``, and
+  ``ToolManager`` gains ``install(ToolOffer, InstallProgressListener)``. It
+  cannot bite on any platform this project can execute today, which is precisely
+  why it must be written down rather than discovered on the first Apple silicon
+  Mac.
+* **A failed install's reason never reaches the port.** ``ToolOffer``'s only
+  reason-carrying component is ``loaderDiagnostic``, and a checksum failure, an
+  extraction rejection or a probe failure carries none -- so a ``FAILED`` row
+  says only ``FAILED``. The unit reported this rather than fabricating a
+  diagnostic, which is the right call. Unit 9 needs one of these; the cheapest
+  is for ``ProbeFailedException`` to carry the ``LoaderDiagnostic`` it already
+  renders.
+* **``offers()`` calls ``ToolCache.verify`` for every installed row, and
+  ``verify`` re-hashes.** I measured it rather than reporting it: PDV's row
+  installs one 1 343 276-byte jar out of a 222-entry archive, and SHA-256 plus
+  MD5 over it is **6 ms**. Not a freeze, and not a finding -- recorded so that
+  nobody re-measures it.
+* **The download size is the transfer, not what lands on disk.** The two
+  Percolator rows fetch 2.8 MB to install one binary and two XSDs. If unit 9
+  wants to show space-required as well, that is a second number and a second
+  decision.
+* **Nothing in the running application builds a Tool Manager.**
+  ``ToolManagerWiring.toolManager(...)`` is called only from its own test, and
+  ``ApplicationServices.forThisHost()`` still passes ``null`` for the process
+  runner, the hash service and the downloader -- residue from phases 03 and 04,
+  not something unit 8 introduced or was asked to fix. **Unit 9 either wires it
+  or names who does.**
