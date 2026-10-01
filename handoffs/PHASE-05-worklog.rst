@@ -4187,3 +4187,51 @@ Residue, named
   Stale since Phase 04; not this unit's paths. Reported, not edited.
 
 **Unit 12 accepted.** All thirteen units of Phase 05 are now accepted.
+
+.. _p05-u14-dispatch:
+
+Unit 14 ordered and dispatched: the macOS quarantine fix-up does nothing
+=========================================================================
+
+Ordered by the owner on 2026-10-01 and briefed by tier 1 in
+``handoffs/PHASE-05-UNIT14-BRIEF.rst`` (``157f731``), which I do not edit. Tier 1
+ran ``macos-gatekeeper.yml`` at ``49423fb`` -- the first execution of anything
+on macOS in this project -- and the transcript shows ``/usr/bin/xattr -p``
+reading ``com.apple.quarantine`` before **and after** ``PlatformFixups`` ran,
+while the product's ``UserDefinedFileAttributeView`` reported no attributes at
+all and ``quarantineCleared`` empty. ``R-PLAT-04`` is undelivered on the one
+platform it exists for, and the class comment asserts the premise that failed.
+It is the third shape: proved on Linux, through a stand-in production does not
+use on macOS.
+
+**What I checked before dispatching.** The JDK this project builds with ships
+only its Linux platform sources: ``tools/liberica-jdk-25.0.4.1+1/lib/src.zip``
+holds ``UnixUserDefinedFileAttributeView`` and
+``LinuxUserDefinedFileAttributeView`` and no macOS implementation. So the
+diagnosis has to be read from the upstream OpenJDK sources for macOS, cited by
+path and revision, rather than inferred. I have not done that diagnosis myself
+and do not record a guess here.
+
+**Acceptance conditions**, from the brief, given to the agent verbatim:
+
+#. ``PlatformFixups`` removes ``com.apple.quarantine`` on macOS and reports
+   truthfully what it removed; anything it could not clear is **reported as
+   such**, never swallowed. A process, if one is used, goes through the
+   project's process launcher and the layering rules.
+#. The class comment and ``PlatformFixupsTest`` stop claiming that the Linux
+   run proves macOS behaviour; the Linux test is labelled as proof of the
+   Linux branch.
+#. ``scripts/ci/macos-gatekeeper-verify.sh`` gains a verdict, independent of
+   the Gatekeeper control, that fails with a distinct exit code and words in
+   the transcript when ``xattr -p`` still finds the attribute after the
+   product's fix-up; its ``--self-test`` proves that branch bites.
+#. A control in ``scripts/verify-install-gates.sh`` for the part of the fix
+   that runs on Linux, and the ``install`` floor raised to match.
+#. Committed on local ``main``, not pushed. **Accepted only when the runner
+   shows** ``xattr`` **no longer finds the attribute after the product's
+   fix-up.** Tier 1 pushes and dispatches.
+
+Verification at this tier: the diff; ``bash scripts/dev-verify.sh --mutation``;
+the macOS script's ``--self-test``; ``bash scripts/verify-all-gates.sh --only
+install`` and ``--only workflows`` if a workflow changes; ``docs-build.sh``;
+and an injection of my own.
