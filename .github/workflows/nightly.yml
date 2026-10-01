@@ -7,19 +7,25 @@
 # verification that every managed tool URL and checksum in the manifest is
 # still reachable and unchanged (R-TEST-08).
 #
-# ALMOST ALL OF IT IS A STUB TODAY, AND EVERY STUB EXITS 70, NOT 0.
+# MOST OF IT IS A STUB TODAY, AND EVERY STUB EXITS 70, NOT 0.
 # PHASE-01's job is to install the pipeline before the work it drives exists;
 # the phase document permits nightly steps to be stubs "that fail loudly rather
 # than silently passing".  scripts/ci/stub-lib.sh is what makes that literal:
 # each stub prints which phase owns the real check and exits non-zero.  A green
-# nightly today would mean nothing; a red one names exactly what is missing.
+# stub would mean nothing; a red one names exactly what is missing.
 #
-# Two steps are real: the documentation link check, which needs nothing that
-# does not exist yet, and the provisioning steps.
+# ONE JOB PER CHECK, AND THAT IS THE FIX FOR A REAL DEFECT.  Until 2026-10-01
+# every Linux step ran in one job, in order, and GitHub aborts a job at its
+# first failing step -- so the first stub (step 6) skipped the documentation
+# link check (step 11), the one real check here, every night from 2026-08-31.
+# A check that is never reached is as inert as one that can never go red
+# (STATUS.rst, status-nightly-masking).  Jobs run independently, so a stub can
+# no longer hide anything: the "real checks" job is graded on its own, and each
+# stub is its own red line naming its owner.  The run as a whole stays red
+# until Phase 15 replaces the stubs; that is the honest state, and nothing may
+# be added to mark a step as allowed to fail, or to swallow its exit status
+# (scripts/ci/check-workflows.sh refuses both).
 #
-# NEVER RUN ON A SCHEDULE HERE.  As of 2026-09-02 this is the ONLY file GitHub
-# has executed in this repository: one scheduled run, which failed on a
-# Phase-15 stub exactly as designed.  No pull-request workflow has ever run.
 # scripts/ci/run-pipeline-locally.sh runs every step below on this machine and
 # requires each stub to fail and each real step to pass.
 
@@ -39,7 +45,8 @@ defaults:
 
 jobs:
   linux:
-    name: Nightly (Linux)
+    # The real checks: provisioning, then the documentation link check.
+    name: "Nightly (Linux): real checks"
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -55,23 +62,71 @@ jobs:
       - name: Project virtualenv for the documentation toolchain
         run: bash scripts/ci/python-env.sh
 
+      - name: Documentation link check
+        run: bash scripts/ci/nightly-linkcheck.sh
+
+  version-matrix:
+    name: "Nightly (Linux): version matrix (stub, Phase 15)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
       - name: Broader Comet and Percolator version matrix
         run: bash scripts/ci/nightly-version-matrix.sh
+
+  large-dataset:
+    name: "Nightly (Linux): large dataset (stub, Phase 15)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Larger real dataset regression
         run: bash scripts/ci/nightly-large-dataset.sh
 
+  determinism:
+    name: "Nightly (Linux): determinism (stub, Phase 15)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
       - name: Determinism comparisons
         run: bash scripts/ci/nightly-determinism.sh
+
+  performance:
+    name: "Nightly (Linux): performance (stub, Phase 15)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Performance metrics
         run: bash scripts/ci/nightly-performance.sh
 
+  gui-tests:
+    name: "Nightly (Linux): GUI suites (stub, Phase 15)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
       - name: Headless and native GUI test suites
         run: bash scripts/ci/nightly-gui-tests.sh
 
-      - name: Documentation link check
-        run: bash scripts/ci/nightly-linkcheck.sh
+  manifest-verify:
+    name: "Nightly (Linux): tool manifest (stub, Phase 15)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Tool manifest verification (R-TEST-08)
         run: bash scripts/ci/nightly-manifest-verify.sh

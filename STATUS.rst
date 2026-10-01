@@ -908,6 +908,16 @@ opened**, which is the one action this session was asked to stop short of.
 A new finding: the nightly's real step never runs on a real runner
 ------------------------------------------------------------------
 
+.. note::
+
+   **Fixed 2026-10-01 by tier 1, on the owner's instruction.** ``nightly.yml``
+   now runs one job per check: a "real checks" job (provisioning, then the
+   link check) and one job per stub, so no stub can skip anything. The run as
+   a whole stays red until Phase 15 replaces the stubs -- the honest state; no
+   step may be allowed to fail. Locally: link check ``PASSED -- 24 external
+   link(s) resolved``; ``check-workflows`` 23 damaged copies rejected; every
+   nightly step classified as expected by ``run-pipeline-locally.sh``.
+
 ``nightly.yml`` runs its steps in one job, in order, and GitHub aborts a job at
 the first failing step. The order is four Phase-15 stubs (version matrix, large
 dataset, determinism, performance), then a Phase-15 GUI stub, then
