@@ -514,6 +514,54 @@ decide_verdict() {
 }
 
 # ---------------------------------------------------------------------------
+# xattr_says_gone OUTPUT STATUS -- the ONE observed value the attribute
+# verdict's pass rests on: does `/usr/bin/xattr -p com.apple.quarantine FILE`
+# say the attribute is absent?  Pure: prints "yes" or "no".
+#
+#   OUTPUT  everything xattr -p printed, both streams
+#   STATUS  its exit status, CAPTURED rather than discarded with `|| true`
+#
+# "yes" needs BOTH a non-zero exit AND a line ending in macOS's own wording,
+# "No such xattr: com.apple.quarantine" (its form on macOS is
+# "xattr: FILE: No such xattr: NAME"; the FILE part varies, so the match is
+# anchored on the attribute name at the end of the line, tolerating only
+# trailing white space).  Everything else is "no":
+#   * a printed value with exit 0 is the attribute, present;
+#   * EMPTY output is "not shown gone", never "gone": an xattr that failed
+#     silently -- killed, missing, or redirected away -- prints exactly that,
+#     and "I saw nothing" is not evidence of absence;
+#   * any other error ("No such file", "Operation not permitted") says
+#     nothing about the attribute;
+#   * "No such xattr" for a DIFFERENT name is about that name;
+#   * the right wording with exit 0 contradicts itself, and is not believed.
+# Group H of --self-test drives every one of these.
+# ---------------------------------------------------------------------------
+xattr_says_gone() {
+    local output="$1" status="$2"
+    case "${status}" in
+        ""|*[!0-9]*) printf 'no\n'; return 0 ;;
+    esac
+    if [ "${status}" -ne 0 ] && printf '%s\n' "${output}" \
+            | grep -q -E ': No such xattr: com\.apple\.quarantine[[:space:]]*$'; then
+        printf 'yes\n'
+    else
+        printf 'no\n'
+    fi
+}
+
+# xattr_lists_quarantine LISTING -- step 1's decision: does the output of
+# `/usr/bin/xattr FILE` (one attribute name per line) name com.apple.quarantine?
+# Pure: prints "yes" or "no".  A WHOLE line must be the name, so
+# com.apple.quarantine.other or a "No such file" message never counts.
+xattr_lists_quarantine() {
+    if printf '%s\n' "$1" | grep -q -x -F 'com.apple.quarantine'; then
+        printf 'yes\n'
+    else
+        printf 'no\n'
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # decide_attribute_verdict -- R-PLAT-04 alone, graded by /usr/bin/xattr, and
 # INDEPENDENT of whether the Gatekeeper control bit.  Sets ATTR_VERDICT and
 # ATTR_VERDICT_WHY and RETURNS AN EXIT STATUS: 0, EXIT_HARNESS or
@@ -845,9 +893,10 @@ real_run() {
         say "    /usr/bin/xattr is missing on this machine; it is macOS's own tool"
         say "    and this check needs it as the independent witness."
     elif /usr/bin/xattr -w com.apple.quarantine "${quarantine_value}" -- "${binary}" 2>>"${TRANSCRIPT}"; then
-        local read_back names
+        local read_back names listing
         read_back="$(/usr/bin/xattr -p com.apple.quarantine -- "${binary}" 2>>"${TRANSCRIPT}" || true)"
-        names="$(/usr/bin/xattr -- "${binary}" 2>>"${TRANSCRIPT}" | tr '\n' ' ' || true)"
+        listing="$(/usr/bin/xattr -- "${binary}" 2>>"${TRANSCRIPT}" || true)"
+        names="$(printf '%s' "${listing}" | tr '\n' ' ')"
         observe "xattr -w wrote" "${quarantine_value}"
         observe "xattr -p read back" "${read_back:-<nothing>}"
         observe "xattr lists" "${names:-<nothing>}"
@@ -860,9 +909,7 @@ real_run() {
         # control needs is an attribute for Gatekeeper to refuse.  The value is
         # compared too, and reported, because a value macOS rewrote on the way
         # in would be worth knowing about -- but it does not make the step fail.
-        case " ${names} " in
-            *" com.apple.quarantine "*) attr_set="yes" ;;
-        esac
+        attr_set="$(xattr_lists_quarantine "${listing}")"
         if [ "${read_back}" = "${quarantine_value}" ]; then
             observe "the value survived the round trip" "yes"
         else
@@ -936,12 +983,11 @@ real_run() {
     observe "the product reports clearing the installed executable" "${fixup_listed}"
     observe "the product reports NOT clearing the installed executable" "${product_not_cleared}"
 
-    local gone_xattr="no" gone_java="no" after_xattr
-    after_xattr="$(/usr/bin/xattr -p com.apple.quarantine -- "${binary}" 2>&1 || true)"
+    local gone_xattr="no" gone_java="no" after_xattr after_status=0
+    after_xattr="$(/usr/bin/xattr -p com.apple.quarantine -- "${binary}" 2>&1)" || after_status=$?
     observe "xattr -p after the fix-up" "${after_xattr:-<empty>}"
-    case "${after_xattr}" in
-        *"No such xattr"*|"") gone_xattr="yes" ;;
-    esac
+    observe "and its exit status" "${after_status}"
+    gone_xattr="$(xattr_says_gone "${after_xattr}" "${after_status}")"
     observe "xattr says the attribute is gone" "${gone_xattr}"
     probe "${WORK}/attrs-after.txt" attrs --file "${binary}" || true
     if [ "$(kv "${WORK}/attrs-after.txt" 'attrs.quarantine.present')" = "false" ]; then
@@ -1233,8 +1279,8 @@ self_test() {
     fi
     # A floor, so that a control quietly deleted later is visible as a number
     # that went down rather than as a green run.
-    if [ "${total}" -lt 57 ]; then
-        printf '%s: SELF-TEST FAILED -- only %d controls ran; the recorded floor is 57.\n' \
+    if [ "${total}" -lt 71 ]; then
+        printf '%s: SELF-TEST FAILED -- only %d controls ran; the recorded floor is 71.\n' \
             "${SCRIPT_NAME}" "${total}" >&2
         return "${EXIT_SELF_TEST_FAILED}"
     fi
@@ -1342,6 +1388,80 @@ self_test_attribute() {
     [ "${got}" = "no" ] \
         && record yes "G4 no report at all names nothing" "missing file -> ${got}" \
         || record no "G4 no report at all names nothing" "-> ${got}"
+
+    printf '\nH. reading xattr itself -- the observations both verdicts rest on\n'
+    local f="/x/cache/bin/comet"
+    expect_gone no  "H1 the value printed, exit 0: present" \
+        "0081;68b6f0a0;CometGUI-gate-item-9;00000000-0000-0000-0000-000000000000" 0
+    expect_gone yes "H2 'No such xattr: com.apple.quarantine', exit 1: gone" \
+        "xattr: ${f}: No such xattr: com.apple.quarantine" 1
+    expect_gone no  "H3 EMPTY output, exit 1: not shown gone" "" 1
+    expect_gone no  "H4 EMPTY output, exit 0: not shown gone" "" 0
+    expect_gone no  "H5 'No such file', exit 1: says nothing" \
+        "xattr: ${f}: No such file: ${f}" 1
+    expect_gone no  "H6 'No such xattr' for ANOTHER name: not this one" \
+        "xattr: ${f}: No such xattr: com.apple.provenance" 1
+    expect_gone no  "H7 a longer name ending the line: not this one" \
+        "xattr: ${f}: No such xattr: com.apple.quarantine.other" 1
+    expect_gone no  "H8 the right words with exit 0: contradiction" \
+        "xattr: ${f}: No such xattr: com.apple.quarantine" 0
+    expect_gone no  "H9 no exit status captured: not shown gone" \
+        "xattr: ${f}: No such xattr: com.apple.quarantine" ""
+    expect_listed yes "H10 the listing names it on a line of its own" \
+        "com.apple.provenance
+com.apple.quarantine"
+    expect_listed no  "H11 a listing without it" "com.apple.provenance"
+    expect_listed no  "H12 a longer name is not the name" "com.apple.quarantine.other"
+    expect_listed no  "H13 an empty listing" ""
+    # H14 -- STRUCTURAL, and labelled so: the real run cannot be executed off a
+    # Mac, so this reads real_run's own text.  Every assignment to gone_xattr
+    # and attr_set in it must be the declared default or a call to the pure
+    # functions above -- an inline parse beside them (the always-"gone" arm
+    # that lived here until unit 14's rework) would bypass group H entirely.
+    local body stray
+    body="$(awk '/^real_run\(\) \{/ { on = 1 } on { print } on && /^\}/ { exit }' "${BASH_SOURCE[0]}")"
+    stray="$(printf '%s\n' "${body}" | grep -n -E '(gone_xattr|attr_set)=' \
+        | grep -v -E 'local .*(gone_xattr|attr_set)="no"' \
+        | grep -v -F 'gone_xattr="$(xattr_says_gone "${after_xattr}" "${after_status}")"' \
+        | grep -v -F 'attr_set="$(xattr_lists_quarantine "${listing}")"' || true)"
+    if [ -n "${body}" ] && [ -z "${stray}" ] \
+        && [ "$(printf '%s\n' "${body}" | grep -c -F 'gone_xattr="$(xattr_says_gone "${after_xattr}" "${after_status}")"')" = "1" ] \
+        && [ "$(printf '%s\n' "${body}" | grep -c -F 'attr_set="$(xattr_lists_quarantine "${listing}")"')" = "1" ]; then
+        record yes "H14 STRUCTURAL: the real run decides only through H's functions" \
+            "gone_xattr and attr_set are each set once, by xattr_says_gone / xattr_lists_quarantine"
+    else
+        record no "H14 STRUCTURAL: the real run decides only through H's functions" \
+            "real_run sets them some other way: $(printf '%s' "${stray:-<a call is missing>}" | tr '\n' '|')"
+    fi
+}
+
+# expect_gone EXPECTED LABEL OUTPUT STATUS -- xattr_says_gone, with the input
+# words printed beside the answer so the case says what it read.
+expect_gone() {
+    local expected="$1" label="$2" output="$3" status="$4" actual
+    actual="$(xattr_says_gone "${output}" "${status}")"
+    if [ "${actual}" = "${expected}" ]; then
+        SELF_TEST_PASSES=$((SELF_TEST_PASSES + 1))
+        printf '  ok    %-52s -> gone=%s  [exit %s] "%s"\n' "${label}" "${actual}" "${status:-?}" "${output}"
+    else
+        SELF_TEST_FAILURES=$((SELF_TEST_FAILURES + 1))
+        printf '  FAIL  %-52s -> gone=%s, expected gone=%s  [exit %s] "%s"\n' \
+            "${label}" "${actual}" "${expected}" "${status:-?}" "${output}"
+    fi
+}
+
+# expect_listed EXPECTED LABEL LISTING -- xattr_lists_quarantine, likewise.
+expect_listed() {
+    local expected="$1" label="$2" listing="$3" actual
+    actual="$(xattr_lists_quarantine "${listing}")"
+    if [ "${actual}" = "${expected}" ]; then
+        SELF_TEST_PASSES=$((SELF_TEST_PASSES + 1))
+        printf '  ok    %-52s -> listed=%s  "%s"\n' "${label}" "${actual}" "$(printf '%s' "${listing}" | tr '\n' '|')"
+    else
+        SELF_TEST_FAILURES=$((SELF_TEST_FAILURES + 1))
+        printf '  FAIL  %-52s -> listed=%s, expected listed=%s  "%s"\n' \
+            "${label}" "${actual}" "${expected}" "$(printf '%s' "${listing}" | tr '\n' '|')"
+    fi
 }
 
 # Group C in full: the quarantine attribute, removed by the product's own code,
