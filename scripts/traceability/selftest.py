@@ -48,8 +48,12 @@ from .model import SourceError
 # reports the real map as broken and the harness then -- correctly -- refuses to
 # grade any case. That is exactly what happened when AC-TST-02..04 were pointed
 # at scripts/verify-test-gates.sh, which is not under scripts/ci.
+#
+# manifests/ is copied because docs/conf.py generates the tool platform matrix
+# from manifests/tools.json (PHASE-05 unit 11) and fails the build without it;
+# a copy that omits it never reaches the defect this harness injects.
 _COPY_FILES = ("specification.rst", "STATUS.rst", "DECISIONS.rst")
-_COPY_TREES = ("phases", "docs", "scripts")
+_COPY_TREES = ("phases", "docs", "scripts", "manifests")
 _IGNORE = shutil.ignore_patterns("_build", "__pycache__", "*.pyc")
 
 
