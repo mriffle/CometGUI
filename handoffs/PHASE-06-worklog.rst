@@ -289,7 +289,52 @@ Sign-off entries
 Unit 1
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-01 at ``8218876``, no rework.** One fresh agent; 19 paths,
+all inside its brief. No main class (as briefed), so the mutation switch is
+still off and the JaCoCo gate still inert.
+
+What I ran and saw:
+
+* Read the whole diff: ``pom.xml`` (``cometgui-provenance`` compile scope,
+  ``cometgui-process`` test scope, nothing else), thirteen test classes under
+  ``org.cometgui.params.comet.fixtures``, the fixtures, a nested
+  ``fixtures/comet/.gitattributes`` with ``* -text`` (the agent's addition, so a
+  Windows ``core.autocrlf`` checkout cannot change the fixture bytes -- kept),
+  the architecture-table row, and the new *Fixtures* section of
+  ``docs/developer/comet_parameter_schema.rst``.
+* **Fixtures against my own independent capture** (taken before dispatch, see
+  *Starting state*): ``git show HEAD:<fixture> | cmp -`` -> identical for both
+  ``comet-q.params`` and ``comet-p.params``; ``sha256sum -c SHA256SUMS`` -> both
+  OK.
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS`` in
+  2m40s (the ``-am`` closure now includes provenance and process, hence slower
+  than the 9 s measured at the start). Surefire XML: 34 tests, 0 failures, 0
+  skipped, six classes; both real-binary dynamic tests executed.
+* **Injection 1** (``DeclarationLines``, anchor ``^`` removed so a name inside
+  a comment counts): class hash ``9fad581f`` -> ``15966eb2``; 5 failures,
+  including ``completeDeclares118`` -- ``COMPLETE declares a name twice, so a
+  count of lines is not a count of names ==> expected: <122> but was: <120>``.
+  Restored, ``sha256sum -c`` OK.
+* **Injection 2** (``UpstreamMirror.stage``'s checksum comparison made
+  vacuous). My first form ``if (false && ...)`` was **stopped by Checkstyle**
+  (``SimplifyBooleanExpression``) before any test ran, and my harness reported
+  ``BYTECODE UNCHANGED`` rather than a pass -- the trap the brief names.
+  Re-injected as ``!actual.equals(actual)``: class ``2299be4d`` ->
+  ``3455e016``; ``UpstreamMirrorTest.aChecksumMismatchFails`` -- ``Expected
+  java.lang.AssertionError to be thrown, but nothing was thrown.`` Restored,
+  ``sha256sum -c`` OK.
+* ``bash scripts/verify-all-gates.sh --only docs --only traceability`` ->
+  ``2 control(s) passed, 0 failed, in 32 seconds``.
+* **Not run here, deliberately:** ``--only tests``. Its sandbox copies module
+  ``src`` and links ``scratch/`` and copies ``manifests/`` (read in
+  ``scripts/verify-test-gates.sh``), so the new tests have what they need; I
+  run it at unit 2's sign-off, where the mutation switch flips and the first
+  main classes land, which is what that harness's census controls grade.
+
+Noted: **tier 1 committed** ``51d8db1`` and ``72d5101`` (``nightly.yml``,
+``STATUS.rst``) **while unit 1 was building**. The agent saw one
+``docs-build.sh`` run exit 3 (12 pages missing after "build succeeded") that
+passed unchanged on re-run; probably that overlap, unconfirmed. Reported upward.
 
 .. _p06-u2-signoff:
 
@@ -353,5 +398,10 @@ None yet.
 Blockers escalated
 ==================
 
-None yet. Reported upward, not blocking: the phase document's "eleven other
-parameters" should read twelve (see *Starting state*).
+None yet. Reported upward, not blocking:
+
+* the phase document's "eleven other parameters" should read twelve (see
+  *Starting state*);
+* tier 1 committed ``STATUS.rst`` and ``nightly.yml`` inside unit 1's build
+  window; one documentation build in that window failed and then passed
+  unchanged (unit 1 sign-off).
