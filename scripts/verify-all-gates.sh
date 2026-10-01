@@ -348,8 +348,9 @@ ever been opened.  The remote has existed since D-008 was decided on
 Phase-15 stub by design.  No pull-request workflow has run.  The pipeline
 control proves every step on this machine instead, and says so.  PHASE-05 exit
 gate item 9 -- a managed tool executing on macOS without a Gatekeeper refusal
--- is NOT MET: no macOS binary has been executed in this project, and the
-install control only requires the words that say so to still be there.
+-- is NOT MET: a hosted macOS runner did not refuse a quarantined binary
+(run 36918810975), so it cannot show acceptance either, and the install control
+only requires the words that say so to still be there.
 USAGE
 }
 
@@ -623,8 +624,9 @@ main() {
     printf '  the tests control rather than injected twice; the shell control fails if\n'
     printf '  that harness ever loses it.\n'
     printf '  PHASE-05 item 9 -- a managed tool executing on macOS without a Gatekeeper\n'
-    printf '  refusal -- is NOT MET and is not listed above: no macOS binary has been\n'
-    printf '  executed in this project. The install control only delegates it.\n'
+    printf '  refusal -- is NOT MET and is not listed above: a hosted macOS runner does\n'
+    printf '  not refuse a quarantined binary, so it cannot show acceptance. The install\n'
+    printf '  control only delegates it.\n'
 
     printf '\n  %d control(s) passed, %d failed, in %d seconds (%dm%02ds).\n' \
         "${PASSED}" "${FAILED}" "${total}" "$((total / 60))" "$((total % 60))"
