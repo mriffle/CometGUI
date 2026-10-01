@@ -39,5 +39,27 @@
       <groupId>org.cometgui</groupId>
       <artifactId>cometgui-domain</artifactId>
     </dependency>
+    <!--
+      Phase 06 decision D6-2 (handoffs/PHASE-06-worklog.rst): the curated
+      parameter metadata, and in tests the artefact manifest, are read with the
+      project's one JSON reader, org.cometgui.provenance.json.JsonReader, not a
+      second one.  The same edge cometgui-install already has; no cycle is
+      possible, since cometgui-provenance depends only on cometgui-domain.
+    -->
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-provenance</artifactId>
+    </dependency>
+    <!--
+      Phase 06 decision D6-3: TEST scope only.  The fixture tests run the real
+      pinned Comet binary through the one process launcher,
+      org.cometgui.tools.process.ProcessService.  Main code reaches processes
+      only through the domain ProcessRunner port and never names this module.
+    -->
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-process</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

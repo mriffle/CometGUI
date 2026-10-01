@@ -74,8 +74,10 @@ deliberately does not.
 
    * - ``cometgui-params-comet``
      - ``org.cometgui.params.comet``
-     - ``domain``
-     - **Empty.** Phase 06.
+     - ``domain``, ``provenance`` (for its one JSON reader); ``process`` at
+       **test** scope only, to run the real Comet binary in fixture tests
+     - **Empty.** Phase 06. No main class yet; its tests and the real
+       ``comet -q``/``-p`` fixtures they check have landed.
 
    * - ``cometgui-params-percolator``
      - ``org.cometgui.params.percolator``
