@@ -74,7 +74,7 @@ final class InstallHarness {
     InstallHarness(Path root, RecordingProbe probe, HostOperatingSystem host) {
         this.root = root;
         this.probe = probe;
-        this.fixups = new PlatformFixups(host);
+        this.fixups = new PlatformFixups(host, ScriptedXattr.NEVER_CALLED);
         StreamingHashService hashes = new StreamingHashService();
         this.cache = new ToolCache(root, hashes);
         VerifiedDownloader downloader =

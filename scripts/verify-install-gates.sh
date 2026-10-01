@@ -81,6 +81,13 @@
 #   18  R-PERC-02 [recorded, unit 7]: Locale.ROOT removed from the synthetic
 #       PIN, so the functional probe's fixture follows the host locale.
 #       Supports item 1's "probes each successfully"
+#   19  R-PLAT-04 [NEW at unit 14, not from the record]: PlatformFixups's
+#       macOS branch with its re-check removed, so a `/usr/bin/xattr -d` that
+#       exits 0 and changes nothing is believed and the file reported cleared --
+#       the silent no-op macos-gatekeeper run 36918810975 found, in the one
+#       shape a process can take it.  Graded on Linux through the scripted
+#       ProcessRunner production calls; NOT evidence of what xattr does on a
+#       Mac, which only the macos-gatekeeper workflow can show
 #   G   R-DOC-06 / R-PERC-12 [recorded, unit 11]: scripts/toolmatrix.py, the
 #       documentation-table generator.  The clean manifest renders and the
 #       output names the manifest's own digest; the five recorded manifest
@@ -105,6 +112,11 @@
 # WHAT IT DOES NOT COVER, said plainly rather than left to be discovered:
 #
 #   * Item 9 is not met; see control M.
+#   * Control 19 grades R-PLAT-04's macOS branch against a scripted
+#     /usr/bin/xattr.  Whether the real xattr on a real Mac lists and deletes
+#     com.apple.quarantine the way the script stands in for it is graded only
+#     by scripts/ci/macos-gatekeeper-verify.sh's ATTRIBUTE VERDICT, on a
+#     macOS runner, and by nothing here.
 #   * Item 3 names four attacks.  Two have recorded injections (absolute path
 #     via the drive letter, and the xar XXE guard).  Traversal, symlink and the
 #     decompression bomb each have their own tests and NO recorded injection
@@ -258,6 +270,7 @@ readonly ALTERNATIVES="${MOD_INSTALL}/${J}/install/probe/ManifestAlternatives.ja
 readonly COMPANION_GATE="${MOD_TOOLS}/${J}/tools/api/CompanionGate.java"
 readonly LOCAL_PERCOLATOR="${MOD_TOOLS}/${J}/tools/percolator/LocalPercolatorRegistration.java"
 readonly MANIFEST_CLASS="${MOD_INSTALL}/${J}/install/registry/ArtefactManifest.java"
+readonly PLATFORM_FIXUPS="${MOD_INSTALL}/${J}/install/cache/PlatformFixups.java"
 readonly SYNTHETIC_PIN="${MOD_TOOLS}/${J}/tools/percolator/SyntheticPin.java"
 
 # The generator and the file it validates (control G).
@@ -280,7 +293,7 @@ readonly -a QUIET=(
 )
 
 # Every control id, in the order they run.  Cheap and Maven-free first.
-readonly -a ALL_CONTROLS=(G M 1 2 3 6 8 9 10 11 12 13 16 17 14 15 18 4 5 7 H)
+readonly -a ALL_CONTROLS=(G M 1 2 3 6 8 9 10 19 11 12 13 16 17 14 15 18 4 5 7 H)
 
 PASSED=0
 FAILED=0
@@ -892,6 +905,7 @@ readonly SEL_15="LocalPercolatorRegistrationTest#tooOld+exactlyTheMinimum"
 readonly SEL_16="ShippedManifestTest#aPlatformIndependentDownloadIsOfferedOnce+cometIsOfferedNativelyOnAppleSilicon,ArtefactManifestTest#selectionIsOrdered"
 readonly SEL_17="ManagedToolManagerInstallTest#anInstallRunsEndToEndThroughThePort,ManagedToolManagerOffersTest#theRowsAScientistSeesOnLinux"
 readonly SEL_18="SyntheticPinTest\$LocaleIndependence#theFixturesDoNotFollowTheDefaultLocale+bothFormatCallSitesHold"
+readonly SEL_19="PlatformFixupsTest#aDeletionThatChangesNothingIsReportedAsNotCleared+onMacOsEveryQuarantinedFileIsClearedThroughXattr+onOtherHostsTheAttributeIsNotTouched"
 
 # control_target ID -- "RUN_MODULE SELECTORS" for a Java control, empty for
 # the others.  The baseline covers exactly the selected controls' targets, so
@@ -916,6 +930,7 @@ control_target() {
         16) printf '%s %s' "${MOD_INSTALL}" "${SEL_16}" ;;
         17) printf '%s %s' "${MOD_INSTALL}" "${SEL_17}" ;;
         18) printf '%s %s' "${MOD_TOOLS}" "${SEL_18}" ;;
+        19) printf '%s %s' "${MOD_INSTALL}" "${SEL_19}" ;;
         G|M) ;;
         *) die "no control '$1'. Controls: ${ALL_CONTROLS[*]}" 2 ;;
     esac
@@ -1168,6 +1183,32 @@ control_10() {
         '        int present = countPayloadEntries(directory);' \
         '        int present = marker.payloadEntryCount();'
     restore_pristine "${TOOL_CACHE}"
+    end_control
+}
+
+control_19() {
+    begin_control "19" "R-PLAT-04 [NEW at unit 14, not from the record]: a deletion believed, not re-checked"
+    # NOT FROM THE RECORD.  The defect macos-gatekeeper run 36918810975 found
+    # was a fix-up that changed nothing and reported nothing.  Unit 14 moved the
+    # removal to /usr/bin/xattr and made the step LIST AGAIN after deleting, so
+    # a deletion that exits 0 and leaves the attribute is a named failure.
+    # This removes that re-check.  The scripted xattr standing in for the real
+    # one is the ProcessRunner port production calls; what the real xattr does
+    # on a Mac is not graded here (see the header).  The Linux branch's test is
+    # selected too and is required to STAY GREEN: the injection is in the macOS
+    # branch alone.
+    java_control_inject "the deletion is believed, not re-checked" "${PLATFORM_FIXUPS}" \
+        "${MOD_INSTALL}" "${SEL_19}" regex \
+        'PlatformFixupsTest\.aDeletionThatChangesNothingIsReportedAsNotCleared:[0-9]+ Expected org\.cometgui\.install\.cache\.QuarantineNotClearedException to be thrown, but nothing was thrown\.' \
+        '            if (quarantined(absolute, workingDirectory)) {' \
+        '            if (false) {'
+    assert_log_contains "and the faithful run no longer lists the file again after deleting from it" \
+        "${DIRTY_LOG}" 'listed, deleted, and listed AGAIN: a deletion is re-checked, never assumed'
+    assert_testcase "the silent no-op is believed" failed \
+        "${MOD_INSTALL}" PlatformFixupsTest aDeletionThatChangesNothingIsReportedAsNotCleared
+    assert_testcase "the Linux branch's test stays green: the injection is in the macOS branch" passed \
+        "${MOD_INSTALL}" PlatformFixupsTest onOtherHostsTheAttributeIsNotTouched
+    restore_pristine "${PLATFORM_FIXUPS}"
     end_control
 }
 
@@ -1708,7 +1749,7 @@ run_control() {
         5) control_5 ;; 6) control_6 ;; 7) control_7 ;; 8) control_8 ;;
         9) control_9 ;; 10) control_10 ;; 11) control_11 ;; 12) control_12 ;;
         13) control_13 ;; 14) control_14 ;; 15) control_15 ;; 16) control_16 ;;
-        17) control_17 ;; 18) control_18 ;;
+        17) control_17 ;; 18) control_18 ;; 19) control_19 ;;
         G) control_G ;; M) control_M ;; H) control_H ;;
         *) die "no control '$1'. Controls: ${ALL_CONTROLS[*]}" 2 ;;
     esac
@@ -1835,6 +1876,8 @@ main() {
     printf '\n  PHASE-05 exit gate items 1, 2, 3, 4, 5 and 8 were proved here from the\n'
     printf '  injections recorded in handoffs/PHASE-05-worklog.rst, and items 6 and 7 by\n'
     printf '  controls NEW at unit 12 that the record did not have.\n'
+    printf '  R-PLAT-04: control 19 (NEW at unit 14) grades the macOS quarantine branch on\n'
+    printf '  Linux, against a scripted xattr. What xattr does on a Mac is NOT graded here.\n'
     printf '  Item 9 is NOT MET: no macOS binary has ever been executed in this project.\n'
     printf '  Control M is a delegation to %s and covers nothing.\n' "${GATEKEEPER}"
     printf '  The harness reports an injection that reached the source but not the\n'

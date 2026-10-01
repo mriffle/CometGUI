@@ -190,7 +190,12 @@ final class ToolManagerHarness {
                         cache,
                         new VerifiedDownloader(fetcher, new ArtefactVerifier(hashes))::fetch,
                         new ArtefactExtractor(),
-                        new PlatformFixups(HostOperatingSystem.LINUX),
+                        new PlatformFixups(
+                                HostOperatingSystem.LINUX,
+                                (command, listener) -> {
+                                    throw new AssertionError(
+                                            "the Linux fix-ups started a process: " + command);
+                                }),
                         probe,
                         hashes,
                         Clock.systemUTC());

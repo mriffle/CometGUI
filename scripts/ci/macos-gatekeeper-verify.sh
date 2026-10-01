@@ -5,23 +5,37 @@
 #   "On macOS, a freshly installed managed tool executes without a Gatekeeper
 #    refusal."
 #
-# WHY THIS FILE EXISTS.  No macOS binary has ever been executed anywhere in
-# this project.  R-PLAT-04 requires the com.apple.quarantine extended attribute
-# to be cleared from everything the tool cache will execute, and
-# org.cometgui.install.cache.PlatformFixups does that through Java's
-# UserDefinedFileAttributeView.  Its Javadoc is careful about what that proves:
-# the removal is exercised on Linux against an attribute NAMED
-# com.apple.quarantine -- tier A under STATUS.rst's two-tier rule -- and it
-# does not claim that macOS's Gatekeeper then accepts the binary.  Whether that
-# Java view can even SEE the real attribute on macOS, which stores extended
-# attributes in its own namespace, is unknown.  This script is the only thing
-# in the repository that can find out, and it finds out by execution.
+# WHY THIS FILE EXISTS.  R-PLAT-04 requires the com.apple.quarantine extended
+# attribute to be cleared from everything the tool cache will execute, and
+# org.cometgui.install.cache.PlatformFixups is the product code that does it.
+# This script is the only thing in the repository that can show, by
+# execution on a Mac, whether it does -- and whether Gatekeeper then runs the
+# binary, which is a separate question (gate item 9).
 #
-# WHAT THIS FILE HAS BEEN SEEN TO DO, as of 2026-09-18: NOTHING.  It has never
-# run on a Mac.  No line below may be read as a statement about macOS until a
-# macOS runner has executed it and returned a transcript; the words verified,
-# confirmed, proven and tested are not used of macOS anywhere in this
-# repository, and this script's own verdict block says so on every path.
+# WHAT THIS FILE HAS BEEN SEEN TO DO.  It ran on a Mac once, as
+# macos-gatekeeper run 36918810975 (2026-10-01, at 49423fb, macos-latest,
+# Apple silicon, Temurin 21.0.12.1).  Two findings: the Gatekeeper control did
+# not bite (INCONCLUSIVE, exit 2), and PlatformFixups as it then was removed
+# NOTHING -- /usr/bin/xattr -p read the attribute before and after it, because
+# it used Java's UserDefinedFileAttributeView, which on macOS prefixes "user."
+# to every name and so never reaches com.apple.quarantine (PlatformFixups'
+# class comment cites the JDK source).  Phase 05 unit 14 changed the product to
+# run /usr/bin/xattr through its process service, and added the ATTRIBUTE
+# VERDICT below.  That change has NOT run on a Mac when this comment was
+# written; the words verified, confirmed, proven and tested are not used of
+# macOS anywhere in this repository, and this script's own verdict block says
+# so on every path.
+#
+# THE ATTRIBUTE VERDICT IS INDEPENDENT OF THE GATEKEEPER CONTROL.  Whether
+# Gatekeeper refuses a quarantined binary on a hosted runner is something the
+# runner may simply not show, and when the control does not bite, everything
+# about GATEKEEPER after it is uninterpretable.  The attribute is different:
+# /usr/bin/xattr -p reads it directly, whatever Gatekeeper does.  So the run
+# reaches TWO verdicts.  decide_attribute_verdict grades the product's fix-up
+# against what xattr reads before and after it, and against what the product's
+# own FixupReport claims; decide_verdict grades Gatekeeper as before.  An
+# attribute failure exits 7 whatever the Gatekeeper verdict is.  That is a
+# check that CAN go red on a hosted runner, which is the point of it.
 #
 # ============================================================================
 # THE NEGATIVE CONTROL IS THE WHOLE POINT
@@ -37,16 +51,18 @@
 # argument:
 #
 #   step 1  set com.apple.quarantine on the installed binary ITSELF, with
-#           /usr/bin/xattr, and prove it is set by reading it back -- with
-#           xattr AND with the product's own Java view, because whether Java
-#           can see it is half the question.
+#           /usr/bin/xattr, and prove it is set by reading it back with xattr.
+#           The JDK's own view is asked too and REPORTED: run 36918810975
+#           showed it cannot see the attribute, and it grades nothing.
 #   step 2  run the binary with the attribute STILL SET, and record exactly
 #           what happens: exit status, signal, stderr.  THIS IS THE CONTROL.
 #           It must bite.
-#   step 3  run the product's fix-up -- PlatformFixups, through product code,
-#           never `xattr -d` -- and show the attribute gone, read back by both
-#           witnesses, with the product's own FixupReport naming the file it
-#           cleared.
+#   step 3  run the product's fix-up -- PlatformFixups, through product code
+#           and the product's own process service; this script never runs
+#           `xattr -d` itself -- then read the attribute back with
+#           `xattr -p` and grade the product's FixupReport against it.  That
+#           is the ATTRIBUTE VERDICT, and it does not wait for step 2's
+#           control to mean anything.
 #   step 4  run the binary again, unchanged in every other respect, and
 #           require Comet's own version banner and its comet.params.new.
 #
@@ -124,6 +140,15 @@
 #   5  MISUSE: bad arguments, or no usable JDK 17+ was found.
 #   6  SELF-TEST FAILED: a control did not bite, or an undamaged case was
 #      rejected.
+#   7  ATTRIBUTE FAILED: independent of Gatekeeper, /usr/bin/xattr -p still
+#      finds com.apple.quarantine after the product's fix-up, or the product's
+#      FixupReport disagrees with what xattr observed (it claims a removal
+#      xattr does not see, reports a failure xattr does not see, or does not
+#      report a removal xattr does see).  Takes precedence over 1 and 2: it is
+#      the one finding on this machine that does not depend on Gatekeeper.
+#
+# Exit 0 needs BOTH verdicts to pass; an attribute that is cleared under a
+# Gatekeeper control that did not bite still exits 2.
 #
 # THIS IS NOT A STUB.  It deliberately does not use the project's
 # unimplemented-step helper under scripts/ci/: run-pipeline-locally.sh
@@ -144,6 +169,7 @@ EXIT_HARNESS=3
 EXIT_REFUSED=4
 EXIT_MISUSE=5
 EXIT_SELF_TEST_FAILED=6
+EXIT_ATTRIBUTE_FAILED=7
 
 WORK="${PROJECT_ROOT}/_build/macos-gatekeeper"
 TRANSCRIPT="${WORK}/transcript.txt"
@@ -176,6 +202,8 @@ TIMED_OUT=0
 RUN_STATUS=0
 VERDICT=""
 VERDICT_WHY=""
+ATTR_VERDICT=""
+ATTR_VERDICT_WHY=""
 
 # --------------------------------------------------------------- plumbing --
 
@@ -485,6 +513,129 @@ decide_verdict() {
     return "${EXIT_PASS}"
 }
 
+# ---------------------------------------------------------------------------
+# decide_attribute_verdict -- R-PLAT-04 alone, graded by /usr/bin/xattr, and
+# INDEPENDENT of whether the Gatekeeper control bit.  Sets ATTR_VERDICT and
+# ATTR_VERDICT_WHY and RETURNS AN EXIT STATUS: 0, EXIT_HARNESS or
+# EXIT_ATTRIBUTE_FAILED.
+#
+#   decide_attribute_verdict ATTR_SET GONE_XATTR PRODUCT_CLEARED \
+#                            PRODUCT_NOT_CLEARED PRODUCT_OUTCOME
+#
+#     ATTR_SET             xattr listed the attribute before the fix-up (yes/no)
+#     GONE_XATTR           xattr -p no longer finds it after the fix-up (yes/no)
+#     PRODUCT_CLEARED      FixupReport.quarantineCleared() names the file
+#     PRODUCT_NOT_CLEARED  FixupReport.quarantineNotCleared() names the file
+#     PRODUCT_OUTCOME      the probe's fixup.outcome, for the words only
+#
+# Every failure branch has its own words, and the order is arranged so that
+# deleting any one branch changes the verdict a --self-test case reads (group
+# E), rather than reaching the same words by another route.  The fourth branch
+# is the exact shape of run 36918810975: present before, present after, and
+# the product reporting nothing.
+# ---------------------------------------------------------------------------
+decide_attribute_verdict() {
+    local attr_set="$1" gone="$2" cleared="$3" not_cleared="$4" outcome="${5:-<no answer>}"
+
+    if [ "${attr_set}" != "yes" ]; then
+        ATTR_VERDICT="ATTRIBUTE NOT GRADED -- XATTR NEVER SAW IT SET"
+        ATTR_VERDICT_WHY="/usr/bin/xattr did not list com.apple.quarantine on the installed binary before the fix-up, so there was nothing for the product to remove and its fix-up cannot be graded."
+        return "${EXIT_HARNESS}"
+    fi
+    if [ "${gone}" != "yes" ] && [ "${cleared}" = "yes" ]; then
+        ATTR_VERDICT="ATTRIBUTE FAILED -- THE PRODUCT CLAIMS A REMOVAL /usr/bin/xattr DOES NOT SEE"
+        ATTR_VERDICT_WHY="FixupReport.quarantineCleared() names the installed binary, and /usr/bin/xattr -p still reads com.apple.quarantine on it after the fix-up. The product's report is false. R-PLAT-04 is not delivered, whatever Gatekeeper did."
+        return "${EXIT_ATTRIBUTE_FAILED}"
+    fi
+    if [ "${gone}" != "yes" ] && [ "${not_cleared}" = "yes" ]; then
+        ATTR_VERDICT="ATTRIBUTE FAILED -- IT SURVIVED THE FIX-UP, AND THE PRODUCT SAID SO"
+        ATTR_VERDICT_WHY="/usr/bin/xattr -p still reads com.apple.quarantine after the fix-up. The product reported the file as NOT cleared (fixup.outcome=${outcome}; its reason is in the probe output above), so it failed honestly -- but R-PLAT-04 is not delivered, whatever Gatekeeper did."
+        return "${EXIT_ATTRIBUTE_FAILED}"
+    fi
+    if [ "${gone}" != "yes" ]; then
+        ATTR_VERDICT="ATTRIBUTE FAILED -- IT SURVIVED THE FIX-UP, AND THE PRODUCT REPORTED NOTHING"
+        ATTR_VERDICT_WHY="/usr/bin/xattr -p still reads com.apple.quarantine after the fix-up, and the product's report named the file neither cleared nor not cleared (fixup.outcome=${outcome}). That is the silent no-op macos-gatekeeper run 36918810975 found. R-PLAT-04 is not delivered, whatever Gatekeeper did."
+        return "${EXIT_ATTRIBUTE_FAILED}"
+    fi
+    if [ "${not_cleared}" = "yes" ]; then
+        ATTR_VERDICT="ATTRIBUTE FAILED -- THE PRODUCT REPORTS A FAILURE /usr/bin/xattr DOES NOT SEE"
+        ATTR_VERDICT_WHY="/usr/bin/xattr -p no longer finds com.apple.quarantine, and FixupReport.quarantineNotCleared() names the installed binary anyway (fixup.outcome=${outcome}). The product's account disagrees with what xattr observed, so it cannot be trusted either way."
+        return "${EXIT_ATTRIBUTE_FAILED}"
+    fi
+    if [ "${cleared}" != "yes" ]; then
+        ATTR_VERDICT="ATTRIBUTE FAILED -- GONE, BUT THE PRODUCT DID NOT REPORT REMOVING IT"
+        ATTR_VERDICT_WHY="/usr/bin/xattr saw com.apple.quarantine before the fix-up and not after it, and FixupReport.quarantineCleared() does not name the installed binary (fixup.outcome=${outcome}). Something removed it, and the product's report does not say the product did."
+        return "${EXIT_ATTRIBUTE_FAILED}"
+    fi
+    ATTR_VERDICT="ATTRIBUTE CLEARED -- /usr/bin/xattr AND THE PRODUCT'S REPORT AGREE"
+    ATTR_VERDICT_WHY="/usr/bin/xattr listed com.apple.quarantine before the product's fix-up and xattr -p does not find it after, and FixupReport.quarantineCleared() names the installed binary. This is ONE observation on ONE hosted macOS image, and it says nothing about whether Gatekeeper then runs the binary: that is the other verdict."
+    return "${EXIT_PASS}"
+}
+
+# combine_exits GATEKEEPER_STATUS ATTRIBUTE_STATUS -- the script's exit status.
+# An attribute failure wins: it is the one finding that does not depend on
+# Gatekeeper.  Otherwise the Gatekeeper verdict decides, and only when that is
+# a pass does an ungraded attribute (EXIT_HARNESS) surface.
+combine_exits() {
+    local gate="$1" attribute="$2"
+    if [ "${attribute}" -eq "${EXIT_ATTRIBUTE_FAILED}" ]; then
+        printf '%s\n' "${EXIT_ATTRIBUTE_FAILED}"
+    elif [ "${gate}" -ne "${EXIT_PASS}" ]; then
+        printf '%s\n' "${gate}"
+    else
+        printf '%s\n' "${attribute}"
+    fi
+}
+
+# names_value FILE LIST VALUE -- "yes" if the probe output in FILE carries
+# probe.LIST.<n>=VALUE for some index n, "no" otherwise.  Only the indexed
+# entries count: probe.LIST.count and probe.LIST.<n>.reason are not entries.
+names_value() {
+    local file="$1" list="$2" value="$3"
+    if [ -f "${file}" ] && awk -v prefix="probe.${list}." -v want="${value}" '
+            index($0, prefix) == 1 {
+                rest = substr($0, length(prefix) + 1)
+                eq = index(rest, "=")
+                if (eq > 1 && substr(rest, 1, eq - 1) ~ /^[0-9]+$/ &&
+                        substr(rest, eq + 1) == want) { found = 1 }
+            }
+            END { exit (found ? 0 : 1) }' "${file}"; then
+        printf 'yes\n'
+    else
+        printf 'no\n'
+    fi
+}
+
+# conclude GATE_STATUS ATTRIBUTE_STATUS -- prints both verdicts, the attribute
+# first, and returns the combined exit status.  The real run ends here, and so
+# does --self-test case F7, which is what proves the attribute verdict reaches
+# the transcript and the exit status rather than only being computed.
+conclude() {
+    local gate="$1" attribute="$2" status
+    status="$(combine_exits "${gate}" "${attribute}")"
+    attribute_block "${attribute}"
+    verdict_block "${gate}"
+    say "EXIT STATUS: ${status} (Gatekeeper verdict exit ${gate}, attribute verdict exit ${attribute})"
+    return "${status}"
+}
+
+attribute_block() {
+    local status="$1"
+    say ""
+    rule
+    say "ATTRIBUTE VERDICT: ${ATTR_VERDICT}  (exit ${status})"
+    say "  graded by /usr/bin/xattr, independent of the Gatekeeper control below"
+    say ""
+    printf '%s\n' "${ATTR_VERDICT_WHY}" | fold -s -w 72 | sed 's/^/  /' >>"${TRANSCRIPT}"
+    printf '%s\n' "${ATTR_VERDICT_WHY}" | fold -s -w 72 | sed 's/^/  /' || true
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        {
+            printf '### macos-gatekeeper attribute: %s\n\n' "${ATTR_VERDICT}"
+            printf '%s\n\n' "${ATTR_VERDICT_WHY}"
+        } >>"${GITHUB_STEP_SUMMARY}" 2>/dev/null || true
+    fi
+}
+
 # ============================================================================
 # --check-only
 # ============================================================================
@@ -548,7 +699,8 @@ check_only() {
 
     rule
     say "--check-only COMPLETE, AND IT PROVES NOTHING ABOUT GATEKEEPER."
-    say "No macOS binary has been executed here or anywhere else in this project."
+    say "No macOS binary has been executed here. On a Mac, Comet has run once (run"
+    say "36918810975), under a Gatekeeper control that did not bite."
     say "What this says is only that the probe compiles against the product's"
     say "sources and that manifests/tools.json offers an Apple silicon Mac a"
     say "native Comet. Gate item 9 stays UNMET until a macOS runner has executed"
@@ -718,10 +870,11 @@ real_run() {
                 "NO -- wrote \"${quarantine_value}\", read back \"${read_back}\""
         fi
         if [ "${java_sees}" != "true" ]; then
-            say "    NOTE, AND IT IS A FINDING IN ITSELF: /usr/bin/xattr can see the"
-            say "    attribute and Java's UserDefinedFileAttributeView cannot. That is"
-            say "    the API PlatformFixups removes it with, so the fix-up cannot"
-            say "    possibly work here, and step 3 below will say so with values."
+            say "    NOTE: /usr/bin/xattr can see the attribute and Java's"
+            say "    UserDefinedFileAttributeView cannot. That is EXPECTED since run"
+            say "    36918810975: the JDK's macOS view prefixes \"user.\" to every name"
+            say "    (PlatformFixups' class comment cites the source), and PlatformFixups"
+            say "    no longer uses that view. It is reported, and grades nothing."
         fi
     else
         say "    xattr -w FAILED; see the transcript above."
@@ -761,17 +914,27 @@ real_run() {
 
     say ""
     rule
-    say "[9] STEP 3 OF 4 -- the PRODUCT's fix-up. PlatformFixups, not xattr -d."
+    say "[9] STEP 3 OF 4 -- the PRODUCT's fix-up. PlatformFixups runs /usr/bin/xattr"
+    say "    itself, through the product's process service; this script does not."
     probe "${WORK}/fixup.txt" fixup --dir "${cache}" --manifest "${MANIFEST}" --tool comet || true
-    local fixup_host cleared_count cleared_0 fixup_listed="no"
+    local fixup_host fixup_outcome cleared_count cleared_0 not_cleared_count
+    local fixup_listed product_not_cleared
     fixup_host="$(kv "${WORK}/fixup.txt" 'fixup.host')"
+    fixup_outcome="$(kv "${WORK}/fixup.txt" 'fixup.outcome')"
     cleared_count="$(kv "${WORK}/fixup.txt" 'fixup.quarantineCleared.count')"
     cleared_0="$(kv "${WORK}/fixup.txt" 'fixup.quarantineCleared.0')"
+    not_cleared_count="$(kv "${WORK}/fixup.txt" 'fixup.quarantineNotCleared.count')"
     observe "PlatformFixups host" "${fixup_host}"
+    observe "the product's fix-up outcome" "${fixup_outcome:-<no answer>}"
     observe "FixupReport.quarantineCleared().size()" "${cleared_count:-<no answer>}"
     observe "FixupReport.quarantineCleared().get(0)" "${cleared_0:-<none>}"
-    if [ "${cleared_0}" = "${install_path}" ]; then fixup_listed="yes"; fi
+    observe "FixupReport.quarantineNotCleared().size()" "${not_cleared_count:-<no answer>}"
+    observe "and the product's reason for the first" \
+        "$(kv "${WORK}/fixup.txt" 'fixup.quarantineNotCleared.0.reason')"
+    fixup_listed="$(names_value "${WORK}/fixup.txt" fixup.quarantineCleared "${install_path}")"
+    product_not_cleared="$(names_value "${WORK}/fixup.txt" fixup.quarantineNotCleared "${install_path}")"
     observe "the product reports clearing the installed executable" "${fixup_listed}"
+    observe "the product reports NOT clearing the installed executable" "${product_not_cleared}"
 
     local gone_xattr="no" gone_java="no" after_xattr
     after_xattr="$(/usr/bin/xattr -p com.apple.quarantine -- "${binary}" 2>&1 || true)"
@@ -819,11 +982,13 @@ real_run() {
     observe "because" "$(why_of "${post_line}")"
     if [ "${post_status}" -eq 0 ] && [ "${params_written}" = "yes" ]; then post_clean="yes"; fi
 
-    local status=0
+    local status=0 attribute_status=0
+    decide_attribute_verdict "${attr_set}" "${gone_xattr}" "${fixup_listed}" \
+        "${product_not_cleared}" "${fixup_outcome}" || attribute_status=$?
     decide_verdict "${host_source}" "${host_platform}" "${attr_set}" "${control}" \
         "${gone_xattr}" "${gone_java}" "${fixup_listed}" "${post}" "${post_clean}" || status=$?
-    verdict_block "${status}"
-    return "${status}"
+    conclude "${status}" "${attribute_status}" || return $?
+    return 0
 }
 
 verdict_block() {
@@ -893,6 +1058,35 @@ expect_verdict() {
         SELF_TEST_FAILURES=$((SELF_TEST_FAILURES + 1))
         printf '  FAIL  %-52s -> exit %s "%s", expected exit %s "%s"\n' \
             "${label}" "${actual}" "${VERDICT}" "${expected}" "${want}"
+    fi
+}
+
+# expect_attribute EXPECTED_EXIT EXPECTED_VERDICT LABEL <five decide_attribute_verdict args>
+# The words are part of the assertion, for the reason expect_verdict gives.
+expect_attribute() {
+    local expected="$1" want="$2" label="$3"; shift 3
+    local actual=0
+    decide_attribute_verdict "$@" || actual=$?
+    if [ "${actual}" = "${expected}" ] && [ "${ATTR_VERDICT}" = "${want}" ]; then
+        SELF_TEST_PASSES=$((SELF_TEST_PASSES + 1))
+        printf '  ok    %-52s -> exit %s  %s\n' "${label}" "${actual}" "${ATTR_VERDICT}"
+    else
+        SELF_TEST_FAILURES=$((SELF_TEST_FAILURES + 1))
+        printf '  FAIL  %-52s -> exit %s "%s", expected exit %s "%s"\n' \
+            "${label}" "${actual}" "${ATTR_VERDICT}" "${expected}" "${want}"
+    fi
+}
+
+# expect_combined EXPECTED LABEL GATE ATTRIBUTE
+expect_combined() {
+    local expected="$1" label="$2" actual
+    actual="$(combine_exits "$3" "$4")"
+    if [ "${actual}" = "${expected}" ]; then
+        SELF_TEST_PASSES=$((SELF_TEST_PASSES + 1))
+        printf '  ok    %-52s -> exit %s\n' "${label}" "${actual}"
+    else
+        SELF_TEST_FAILURES=$((SELF_TEST_FAILURES + 1))
+        printf '  FAIL  %-52s -> exit %s, expected %s\n' "${label}" "${actual}" "${expected}"
     fi
 }
 
@@ -994,7 +1188,7 @@ self_test() {
         system-properties linux-x86-64 yes REFUSED yes yes yes RAN yes
 
     # --- group C: the product code the real run leans on --------------------
-    printf '\nC. the PRODUCT code, exercised here (tier A: the macOS branch, on Linux)\n'
+    printf '\nC. the PRODUCT code, exercised here (on Linux: the macOS branch FAILS, named; the rest is real)\n'
     if ! find_jdk; then
         printf '  FAIL  no usable JDK %s+ on this machine; group C cannot run, and a\n' "${MINIMUM_JAVA}"
         printf '        skipped control is not a passed one.\n'
@@ -1027,6 +1221,8 @@ self_test() {
         && record yes "D2 an unknown argument is misuse" "exit ${status}" \
         || record no "D2 an unknown argument is misuse" "exit ${status}, expected ${EXIT_MISUSE}"
 
+    self_test_attribute
+
     printf '\n'
     local total=$((SELF_TEST_PASSES + SELF_TEST_FAILURES))
     if [ "${SELF_TEST_FAILURES}" -ne 0 ]; then
@@ -1037,16 +1233,115 @@ self_test() {
     fi
     # A floor, so that a control quietly deleted later is visible as a number
     # that went down rather than as a green run.
-    if [ "${total}" -lt 34 ]; then
-        printf '%s: SELF-TEST FAILED -- only %d controls ran; the recorded floor is 34.\n' \
+    if [ "${total}" -lt 57 ]; then
+        printf '%s: SELF-TEST FAILED -- only %d controls ran; the recorded floor is 57.\n' \
             "${SCRIPT_NAME}" "${total}" >&2
         return "${EXIT_SELF_TEST_FAILED}"
     fi
     printf '%s: self-test OK -- %d/%d controls, every one seen to bite.\n' \
         "${SCRIPT_NAME}" "${SELF_TEST_PASSES}" "${total}"
-    printf '%s: AND IT STILL PROVES NOTHING ABOUT GATEKEEPER. No macOS binary has\n' "${SCRIPT_NAME}"
-    printf '%s: been executed here or anywhere else in this project.\n' "${SCRIPT_NAME}"
+    printf '%s: AND IT STILL PROVES NOTHING ABOUT GATEKEEPER, OR ABOUT xattr ON A MAC.\n' "${SCRIPT_NAME}"
+    printf '%s: No macOS binary has been executed here.\n' "${SCRIPT_NAME}"
     return "${EXIT_PASS}"
+}
+
+# Groups E, F and G: the attribute verdict, independent of Gatekeeper.  Every
+# case names the words it expects, and is arranged so that DELETING the branch
+# it aims at produces different words (unit 13's lesson: an exit status alone
+# let a deleted branch fall through to another with the same status).
+self_test_attribute() {
+    printf '\nE. decide_attribute_verdict -- R-PLAT-04 graded by xattr, whatever Gatekeeper did\n'
+    expect_attribute 0 "ATTRIBUTE CLEARED -- /usr/bin/xattr AND THE PRODUCT'S REPORT AGREE" \
+        "E1 seen before, gone after, the product names it" yes yes yes no completed
+    expect_attribute 3 "ATTRIBUTE NOT GRADED -- XATTR NEVER SAW IT SET" \
+        "E2 xattr never saw it set" no yes yes no completed
+    expect_attribute 7 "ATTRIBUTE FAILED -- THE PRODUCT CLAIMS A REMOVAL /usr/bin/xattr DOES NOT SEE" \
+        "E3 the product claims cleared, xattr still sees it" yes no yes no completed
+    expect_attribute 7 "ATTRIBUTE FAILED -- IT SURVIVED THE FIX-UP, AND THE PRODUCT SAID SO" \
+        "E4 still there, and the product reports not cleared" yes no no yes not-cleared
+    expect_attribute 7 "ATTRIBUTE FAILED -- IT SURVIVED THE FIX-UP, AND THE PRODUCT REPORTED NOTHING" \
+        "E5 RUN 36918810975 REPLAYED: still there, report silent" yes no no no completed
+    expect_attribute 7 "ATTRIBUTE FAILED -- THE PRODUCT REPORTS A FAILURE /usr/bin/xattr DOES NOT SEE" \
+        "E6 gone, and the product reports not cleared" yes yes no yes not-cleared
+    expect_attribute 7 "ATTRIBUTE FAILED -- GONE, BUT THE PRODUCT DID NOT REPORT REMOVING IT" \
+        "E7 gone, and the product did not report removing it" yes yes no no completed
+    expect_attribute 7 "ATTRIBUTE FAILED -- THE PRODUCT REPORTS A FAILURE /usr/bin/xattr DOES NOT SEE" \
+        "E8 gone, and the report contradicts itself" yes yes yes yes not-cleared
+    # E9: the failure says it does not depend on Gatekeeper, in its own words.
+    decide_attribute_verdict yes no no no completed || true
+    case "${ATTR_VERDICT_WHY}" in
+        *"whatever Gatekeeper did"*)
+            record yes "E9 a failure says it stands whatever Gatekeeper did" \
+                "the reason carries the words whatever Gatekeeper did" ;;
+        *)
+            record no "E9 a failure says it stands whatever Gatekeeper did" \
+                "the reason does not say so: ${ATTR_VERDICT_WHY}" ;;
+    esac
+
+    printf '\nF. the exit status, and both verdicts reaching the transcript\n'
+    expect_combined 7 "F1 Gatekeeper cannot go red, attribute failed" 2 7
+    expect_combined 2 "F2 Gatekeeper cannot go red, attribute cleared" 2 0
+    expect_combined 0 "F3 both pass" 0 0
+    expect_combined 7 "F4 Gatekeeper passed, attribute failed" 0 7
+    expect_combined 7 "F5 Gatekeeper negative, attribute failed" 1 7
+    expect_combined 3 "F6 Gatekeeper passed, attribute ungraded" 0 3
+    expect_combined 3 "F7 Gatekeeper harness failure, attribute cleared" 3 0
+    # F8 -- run 36918810975's observations, through conclude(), which is where
+    # the real run ends: the exit status AND the transcript lines.
+    local status=0
+    : >"${TRANSCRIPT}"
+    decide_attribute_verdict yes no no no completed || true
+    decide_verdict system-properties macos-aarch64 yes RAN no yes no RAN yes || true
+    conclude "${EXIT_INCONCLUSIVE}" "${EXIT_ATTRIBUTE_FAILED}" >/dev/null 2>&1 || status=$?
+    if [ "${status}" -eq "${EXIT_ATTRIBUTE_FAILED}" ] \
+        && grep -qF "ATTRIBUTE VERDICT: ATTRIBUTE FAILED -- IT SURVIVED THE FIX-UP, AND THE PRODUCT REPORTED NOTHING  (exit 7)" "${TRANSCRIPT}" \
+        && grep -qF "VERDICT: INCONCLUSIVE -- THIS CHECK CANNOT GO RED ON THIS MACHINE  (exit 2)" "${TRANSCRIPT}" \
+        && grep -qF "EXIT STATUS: 7 (Gatekeeper verdict exit 2, attribute verdict exit 7)" "${TRANSCRIPT}"; then
+        record yes "F8 run 36918810975 replayed through conclude: exit 7" \
+            "both verdict lines and EXIT STATUS: 7 are in the transcript"
+    else
+        record no "F8 run 36918810975 replayed through conclude: exit 7" \
+            "exit ${status}; transcript: $(grep -E 'VERDICT|EXIT STATUS' "${TRANSCRIPT}" | tr '\n' '|')"
+    fi
+    # F9 -- the outcome this unit hopes for on the runner: the attribute
+    # cleared under a control that did not bite.  Still exit 2, still NOT MET.
+    status=0
+    : >"${TRANSCRIPT}"
+    decide_attribute_verdict yes yes yes no completed || true
+    decide_verdict system-properties macos-aarch64 yes RAN yes yes yes RAN yes || true
+    conclude "${EXIT_INCONCLUSIVE}" "${EXIT_PASS}" >/dev/null 2>&1 || status=$?
+    if [ "${status}" -eq "${EXIT_INCONCLUSIVE}" ] \
+        && grep -qF "ATTRIBUTE VERDICT: ATTRIBUTE CLEARED -- /usr/bin/xattr AND THE PRODUCT'S REPORT AGREE  (exit 0)" "${TRANSCRIPT}" \
+        && grep -qF "PHASE-05 exit gate item 9 is NOT met by this run." "${TRANSCRIPT}"; then
+        record yes "F9 attribute cleared, control unbitten: exit 2, item 9 NOT met" \
+            "a cleared attribute is not a Gatekeeper pass, and the transcript says so"
+    else
+        record no "F9 attribute cleared, control unbitten: exit 2, item 9 NOT met" \
+            "exit ${status}; transcript: $(grep -E 'VERDICT|NOT met' "${TRANSCRIPT}" | tr '\n' '|')"
+    fi
+
+    printf '\nG. names_value -- reading the product report the verdict is graded against\n'
+    local fixture="${WORK}/selftest-report.txt"
+    printf '%s\n' 'probe.fixup.quarantineCleared.count=1' 'probe.fixup.quarantineCleared.0=bin/comet' \
+        'probe.fixup.quarantineNotCleared.count=1' 'probe.fixup.quarantineNotCleared.0=lib/x.dylib' \
+        'probe.fixup.quarantineNotCleared.0.reason=bin/comet' >"${fixture}"
+    local got
+    got="$(names_value "${fixture}" fixup.quarantineCleared bin/comet)"
+    [ "${got}" = "yes" ] \
+        && record yes "G1 an indexed entry is found" "quarantineCleared names bin/comet -> ${got}" \
+        || record no "G1 an indexed entry is found" "-> ${got}"
+    got="$(names_value "${fixture}" fixup.quarantineNotCleared bin/comet)"
+    [ "${got}" = "no" ] \
+        && record yes "G2 a .reason line is not an entry" "quarantineNotCleared does not name bin/comet -> ${got}" \
+        || record no "G2 a .reason line is not an entry" "-> ${got}"
+    got="$(names_value "${fixture}" fixup.quarantineCleared bin/comet.bak)"
+    [ "${got}" = "no" ] \
+        && record yes "G3 a different value is not a match" "bin/comet.bak -> ${got}" \
+        || record no "G3 a different value is not a match" "-> ${got}"
+    got="$(names_value "${WORK}/no-such-report.txt" fixup.quarantineCleared bin/comet)"
+    [ "${got}" = "no" ] \
+        && record yes "G4 no report at all names nothing" "missing file -> ${got}" \
+        || record no "G4 no report at all names nothing" "-> ${got}"
 }
 
 # Group C in full: the quarantine attribute, removed by the product's own code,
@@ -1057,7 +1352,10 @@ self_test_product() {
     local sandbox="${WORK}/selftest-product"
     local file quarantine="com.apple.quarantine"
 
-    # C1 -- the macOS branch removes it.
+    # C1 -- a real extended attribute on this file system.  On Linux the JDK
+    # stores it as user.com.apple.quarantine: it is NOT the attribute the macOS
+    # branch removes, and it is used only to show the non-macOS branch (C4)
+    # leaving an attribute alone.
     rm -rf -- "${sandbox}"; mkdir -p -- "${sandbox}/bin"
     file="${sandbox}/bin/comet"; printf 'not a real binary' >"${file}"; chmod 644 -- "${file}"
     if ! probe "${WORK}/st-set.txt" set-attr --file "${file}" --value "0081;selftest" >/dev/null 2>&1; then
@@ -1066,21 +1364,52 @@ self_test_product() {
         return
     fi
     record yes "C1 an attribute named ${quarantine} can be set here" \
-        "read back = $(kv "${WORK}/st-set.txt" 'setattr.readBack')"
-    probe "${WORK}/st-fixup.txt" fixup --dir "${sandbox}" --manifest "${MANIFEST}" --tool comet \
-        --os-name "Mac OS X" --os-arch aarch64 >/dev/null 2>&1 || true
-    probe "${WORK}/st-after.txt" attrs --file "${file}" >/dev/null 2>&1 || true
-    local cleared present
-    cleared="$(kv "${WORK}/st-fixup.txt" 'fixup.quarantineCleared.0')"
-    present="$(kv "${WORK}/st-after.txt" 'attrs.quarantine.present')"
-    [ "${cleared}" = "bin/comet" ] && [ "${present}" = "false" ] \
-        && record yes "C2 PlatformFixups (macos branch) removes it" \
-            "FixupReport cleared [${cleared}], attribute present afterwards = ${present}" \
-        || record no "C2 PlatformFixups (macos branch) removes it" \
-            "FixupReport cleared [${cleared:-<nothing>}], present afterwards = ${present}"
+        "read back = $(kv "${WORK}/st-set.txt" 'setattr.readBack') (on Linux: user.${quarantine})"
 
-    # C3 -- THE CONTROL for C2: without the fix-up the attribute is still there,
-    # so C2's "gone" is not something that was never set.
+    # C2 -- THE macOS BRANCH, THROUGH THE REAL PROCESS SERVICE, on a machine
+    # with no /usr/bin/xattr.  Its one honest outcome here is a NAMED failure:
+    # the silent no-op run 36918810975 found must be impossible.  This proves
+    # the product's failure path and the probe's printing of it; it proves
+    # nothing about what /usr/bin/xattr does on a Mac.
+    local outcome not_cleared reason cleared_count
+    if [ "$(uname -s)" = "Darwin" ]; then
+        record yes "C2 macOS branch with no xattr is a named failure (skipped)" \
+            "this machine IS a Mac, and has /usr/bin/xattr; the real run grades it"
+        record yes "C2b the attribute verdict reads it as a failure (skipped)" \
+            "this machine IS a Mac"
+    else
+        probe "${WORK}/st-fixup.txt" fixup --dir "${sandbox}" --manifest "${MANIFEST}" --tool comet \
+            --os-name "Mac OS X" --os-arch aarch64 >/dev/null 2>&1 || true
+        outcome="$(kv "${WORK}/st-fixup.txt" 'fixup.outcome')"
+        not_cleared="$(kv "${WORK}/st-fixup.txt" 'fixup.quarantineNotCleared.0')"
+        reason="$(kv "${WORK}/st-fixup.txt" 'fixup.quarantineNotCleared.0.reason')"
+        cleared_count="$(kv "${WORK}/st-fixup.txt" 'fixup.quarantineCleared.count')"
+        case "${reason}" in
+            "bin/comet: /usr/bin/xattr could not be started: could not start"*)
+                [ "${outcome}" = "not-cleared" ] && [ "${not_cleared}" = "bin/comet" ] \
+                    && [ "${cleared_count}" = "0" ] \
+                    && record yes "C2 macOS branch with no xattr here is a NAMED failure" \
+                        "outcome=${outcome}, not cleared [${not_cleared}], cleared ${cleared_count}" \
+                    || record no "C2 macOS branch with no xattr here is a NAMED failure" \
+                        "outcome=${outcome:-?}, not cleared [${not_cleared:-?}], cleared ${cleared_count:-?}" ;;
+            *)
+                record no "C2 macOS branch with no xattr here is a NAMED failure" \
+                    "outcome=${outcome:-?}, reason: ${reason:-<none>}" ;;
+        esac
+        # C2b -- the PRODUCT's real report, fed to the attribute verdict as the
+        # real run feeds it, with xattr's two readings SUPPLIED (yes, then
+        # still present): the verdict must read the report as an honest failure.
+        decide_attribute_verdict yes no \
+            "$(names_value "${WORK}/st-fixup.txt" fixup.quarantineCleared bin/comet)" \
+            "$(names_value "${WORK}/st-fixup.txt" fixup.quarantineNotCleared bin/comet)" \
+            "${outcome}" || true
+        [ "${ATTR_VERDICT}" = "ATTRIBUTE FAILED -- IT SURVIVED THE FIX-UP, AND THE PRODUCT SAID SO" ] \
+            && record yes "C2b the attribute verdict reads that report as a failure" "${ATTR_VERDICT}" \
+            || record no "C2b the attribute verdict reads that report as a failure" "${ATTR_VERDICT}"
+    fi
+
+    # C3 -- THE CONTROL for C4: without the fix-up the attribute is still there,
+    # so C4's "still present" is not something that was never set.
     rm -rf -- "${sandbox}"; mkdir -p -- "${sandbox}/bin"
     file="${sandbox}/bin/comet"; printf 'not a real binary' >"${file}"; chmod 644 -- "${file}"
     probe "${WORK}/st-set2.txt" set-attr --file "${file}" --value "0081;selftest" >/dev/null 2>&1 || true

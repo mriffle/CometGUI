@@ -22,6 +22,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.UserDefinedFileAttributeView;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -32,12 +33,14 @@ import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.install.cache.FixupReport;
 import org.cometgui.install.cache.PlatformFixups;
+import org.cometgui.install.cache.QuarantineNotClearedException;
 import org.cometgui.install.registry.ArtefactManifest;
 import org.cometgui.install.registry.ArtefactManifestReader;
 import org.cometgui.install.registry.ArtefactRecord;
 import org.cometgui.install.registry.ArtefactSelection;
 import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.tools.comet.CometBanner;
+import org.cometgui.tools.process.ProcessService;
 
 /**
  * The half of the macOS Gatekeeper check that has to be PRODUCT code, exposed to a shell driver.
@@ -57,13 +60,19 @@ import org.cometgui.tools.comet.CometBanner;
  *       over {@code manifests/tools.json};
  *   <li>whether the downloaded bytes are the pinned bytes -- {@link StreamingHashService};
  *   <li>whether the quarantine attribute is removed -- {@link PlatformFixups}, the class {@code
- *       R-PLAT-04} names, invoked exactly as the install pipeline's step 5 invokes it;
+ *       R-PLAT-04} names, invoked exactly as the install pipeline's step 5 invokes it, with the
+ *       product's own {@link ProcessService} as its process launcher, as the application wires it;
  *   <li>whether Comet's own code was reached -- {@link CometBanner}.
  * </ul>
  *
- * <p>The shell driver contributes what only a shell can: {@code /usr/bin/xattr}, which is an
- * INDEPENDENT witness to what Java's {@link UserDefinedFileAttributeView} claims, and the raw exit
- * status and signal of the binary under test.
+ * <p>The shell driver contributes what only a shell can: {@code /usr/bin/xattr -p}, the
+ * INDEPENDENT witness to whether the attribute is there, read by the driver and never by the
+ * product, and the raw exit status and signal of the binary under test. Since phase 05 unit 14 the
+ * product's fix-up itself runs {@code /usr/bin/xattr} too (Java's {@link
+ * UserDefinedFileAttributeView} cannot reach the raw attribute on macOS -- see {@link
+ * PlatformFixups}), so the witness and the thing witnessed are the same program; what keeps the
+ * witness independent is that the driver runs it itself, after the product has finished, and
+ * compares what it reads with what the product's report claims.
  *
  * <h2>What this file is NOT</h2>
  *
@@ -265,10 +274,11 @@ public final class MacosGatekeeperProbe {
     // --------------------------------------------------------------- attrs --
 
     /*
-     * WHAT JAVA CAN SEE.  On macOS this is the interesting half of the question: the product
-     * removes the attribute through UserDefinedFileAttributeView, and whether that view reaches
-     * macOS's own extended-attribute namespace at all has never been observed by this project.
-     * Printing the names Java lists, beside what /usr/bin/xattr lists, is how the driver finds out.
+     * WHAT JAVA CAN SEE -- REPORTED, NOT A WITNESS.  macos-gatekeeper run 36918810975 showed this
+     * view listing nothing on a file /usr/bin/xattr showed quarantined, and the JDK source says why:
+     * the Unix view the macOS provider inherits prefixes "user." to every name, so on macOS this
+     * reads user.com.apple.quarantine, a different attribute.  It is printed beside xattr's answer
+     * because the contrast is itself the diagnosis, and it decides nothing about the real attribute.
      */
     private static int attrs(Options options) throws IOException {
         Path file = options.requireFile();
@@ -303,9 +313,9 @@ public final class MacosGatekeeperProbe {
 
     /*
      * SELF-TEST ONLY, and the driver never calls it on macOS: there /usr/bin/xattr writes the
-     * attribute, so the writer and the reader are different programs.  On Linux there is no xattr
-     * command on this project's host, so the self-test writes through the same API the product
-     * reads -- which is a weaker witness, and the driver's transcript says so in those words.
+     * attribute.  On Linux this writes user.com.apple.quarantine through Java's view, which is what
+     * the self-test needs to show the NON-macOS branch leaving an attribute alone.  It is not the
+     * attribute the macOS branch removes, and the self-test does not pretend it is.
      */
     private static int setAttribute(Options options) throws IOException {
         Path file = options.requireFile();
@@ -330,10 +340,14 @@ public final class MacosGatekeeperProbe {
     // --------------------------------------------------------------- fixup --
 
     /*
-     * THE STEP UNDER TEST.  PlatformFixups.forHost(host).apply(directory, record) is exactly what
-     * ArtefactInstaller's step 5 does, on a record the product itself selected from the manifest.
-     * The report is printed in full, because "the attribute is gone" and "the product removed it"
-     * are different claims and only the second one is the one R-PLAT-04 makes.
+     * THE STEP UNDER TEST.  PlatformFixups.forHost(host, processes).apply(directory, record) is
+     * exactly what ArtefactInstaller's step 5 does, on a record the product itself selected from
+     * the manifest, with the product's own ProcessService as ToolManagerWiring passes it.  The
+     * report is printed in full, because "the attribute is gone" and "the product removed it" are
+     * different claims and only the second one is the one R-PLAT-04 makes.  A step that could not
+     * clear a file throws QuarantineNotClearedException carrying the same report; that is printed
+     * too, as fixup.outcome=not-cleared with one reason per file, and is an ANSWER, not a failure of
+     * this probe -- the driver grades it against what /usr/bin/xattr reads afterwards.
      */
     private static int fixup(Options options) throws IOException {
         printHost(options);
@@ -347,14 +361,25 @@ public final class MacosGatekeeperProbe {
         }
         ArtefactRecord record = offers.get(0).artefact();
         Path directory = options.requireDirectory();
-        PlatformFixups fixups = PlatformFixups.forHost(platform);
+        PlatformFixups fixups =
+                PlatformFixups.forHost(platform, new ProcessService(Clock.systemUTC()));
         print("fixup.class", fixups.getClass().getName());
         print("fixup.host", fixups.host().id());
         print("fixup.directory", directory.toString());
         print("fixup.record", record.tool().id() + " " + record.version().text() + " "
                 + record.platform().id());
         print("fixup.record.executablePath", record.executablePath());
-        FixupReport report = fixups.apply(directory, record);
+        FixupReport report;
+        List<String> reasons = List.of();
+        try {
+            report = fixups.apply(directory, record);
+            print("fixup.outcome", "completed");
+        } catch (QuarantineNotClearedException notCleared) {
+            report = notCleared.report();
+            reasons = notCleared.reasons();
+            print("fixup.outcome", "not-cleared");
+            print("fixup.exception", notCleared.getMessage());
+        }
         print("fixup.changedNothing", Boolean.toString(report.changedNothing()));
         print("fixup.madeExecutable.count", Integer.toString(report.madeExecutable().size()));
         for (int index = 0; index < report.madeExecutable().size(); index++) {
@@ -364,6 +389,12 @@ public final class MacosGatekeeperProbe {
                 Integer.toString(report.quarantineCleared().size()));
         for (int index = 0; index < report.quarantineCleared().size(); index++) {
             print("fixup.quarantineCleared." + index, report.quarantineCleared().get(index));
+        }
+        print("fixup.quarantineNotCleared.count",
+                Integer.toString(report.quarantineNotCleared().size()));
+        for (int index = 0; index < report.quarantineNotCleared().size(); index++) {
+            print("fixup.quarantineNotCleared." + index, report.quarantineNotCleared().get(index));
+            print("fixup.quarantineNotCleared." + index + ".reason", reasons.get(index));
         }
         return OK;
     }

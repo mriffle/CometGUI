@@ -573,7 +573,7 @@ class InstallRejectionTest {
                         cache,
                         lying,
                         new org.cometgui.install.archive.ArtefactExtractor(),
-                        new PlatformFixups(HostOperatingSystem.LINUX),
+                        new PlatformFixups(HostOperatingSystem.LINUX, ScriptedXattr.NEVER_CALLED),
                         probe,
                         new org.cometgui.provenance.hashing.StreamingHashService(),
                         java.time.Clock.systemUTC());

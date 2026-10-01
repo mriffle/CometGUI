@@ -224,14 +224,21 @@ class CacheEdgeCasesTest {
         try (FileSystem zip = FileSystems.newFileSystem(archive, Map.of("create", "true"))) {
             Files.write(zip.getPath("comet.exe"), binary);
 
+            /*
+             * The executable-bit half only.  Until unit 14 this ran a macOS host and read "no
+             * user-defined attribute view" as "nothing to clear"; the macOS branch no longer asks
+             * that view (PlatformFixups says why), and a file it cannot hand to /usr/bin/xattr is
+             * now a named failure -- PlatformFixupsTest#aFileOutsideTheDefaultFileSystemIsNamed.
+             */
             FixupReport report =
-                    new PlatformFixups(HostOperatingSystem.MACOS).apply(zip.getPath("/"), record);
+                    new PlatformFixups(HostOperatingSystem.LINUX, ScriptedXattr.NEVER_CALLED)
+                            .apply(zip.getPath("/"), record);
 
             assertTrue(
                     report.changedNothing(),
-                    "a file system that publishes neither POSIX permissions nor user-defined"
-                            + " attributes -- which is the shape Windows has -- leaves both"
-                            + " fix-ups with nothing to do, and that is not an error");
+                    "a file system that publishes no POSIX permissions -- which is the shape"
+                            + " Windows has -- leaves the executable-bit fix-up with nothing to"
+                            + " do, and that is not an error");
         }
     }
 
@@ -463,7 +470,7 @@ class CacheEdgeCasesTest {
                                                     swapped.length)));
                         },
                         new org.cometgui.install.archive.ArtefactExtractor(),
-                        new PlatformFixups(HostOperatingSystem.LINUX),
+                        new PlatformFixups(HostOperatingSystem.LINUX, ScriptedXattr.NEVER_CALLED),
                         probe,
                         new org.cometgui.provenance.hashing.StreamingHashService(),
                         java.time.Clock.systemUTC());
@@ -530,7 +537,7 @@ class CacheEdgeCasesTest {
                         new ToolCache(temporary.resolve("cache"), hashes),
                         lying,
                         new org.cometgui.install.archive.ArtefactExtractor(),
-                        new PlatformFixups(HostOperatingSystem.LINUX),
+                        new PlatformFixups(HostOperatingSystem.LINUX, ScriptedXattr.NEVER_CALLED),
                         probe,
                         hashes,
                         java.time.Clock.systemUTC());

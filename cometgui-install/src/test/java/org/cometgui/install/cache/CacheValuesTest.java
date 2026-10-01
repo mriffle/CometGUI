@@ -340,7 +340,7 @@ class CacheValuesTest {
                     throw new java.io.IOException("this test never downloads anything");
                 },
                 new ArtefactExtractor(),
-                new PlatformFixups(HostOperatingSystem.LINUX),
+                new PlatformFixups(HostOperatingSystem.LINUX, ScriptedXattr.NEVER_CALLED),
                 (record, staged) -> java.util.Set.of(),
                 hashes,
                 Clock.systemUTC());

@@ -3,23 +3,23 @@
 # WHY THIS FILE EXISTS.  "On macOS, a freshly installed managed tool executes
 # without a Gatekeeper refusal" is the one item of Phase 05's exit gate that no
 # machine in this project can answer.  No macOS binary has ever been executed
-# anywhere in this repository.  R-PLAT-04 requires com.apple.quarantine to be
-# cleared from everything the tool cache will execute, and
-# org.cometgui.install.cache.PlatformFixups does that through Java's
-# UserDefinedFileAttributeView -- exercised on Linux against an attribute NAMED
-# com.apple.quarantine, which is tier A under STATUS.rst's two-tier rule and is
-# explicitly NOT a claim that Gatekeeper then accepts the binary.  Whether that
-# Java view can even see the real attribute on macOS, which keeps extended
-# attributes in its own namespace, is unknown.  This workflow is the only thing
-# in the repository that can find out.
+# anywhere in this repository but here.  R-PLAT-04 requires com.apple.quarantine
+# to be cleared from everything the tool cache will execute, and
+# org.cometgui.install.cache.PlatformFixups is the product code that does it.
+# This workflow is the only thing in the repository that can show whether it
+# does, on a Mac.
 #
-# WHAT THIS FILE HAS BEEN SEEN TO DO: NOTHING.  As of 2026-09-18 it has never
-# run.  It was authored on a Linux machine, its driver's --self-test and
-# --check-only modes were run there, and no line of it has executed on a Mac.
-# Nothing in this repository may be read as a statement about macOS until a
-# runner has returned a transcript, and this comment is where that transcript
-# gets recorded when it does -- the way windows-percolator.yml records run
-# 33644055780.
+# WHAT THIS FILE HAS BEEN SEEN TO DO.  Run 36918810975 (2026-10-01, at
+# 49423fb, macos-latest, Apple silicon, Temurin 21.0.12.1): the Gatekeeper
+# control did not bite (INCONCLUSIVE, exit 2), and PlatformFixups as it then
+# was removed nothing -- it used Java's UserDefinedFileAttributeView, which on
+# macOS prefixes "user." to every name and never reaches com.apple.quarantine.
+# Phase 05 unit 14 moved the removal to /usr/bin/xattr, run through the
+# product's process service, and gave the driver an ATTRIBUTE VERDICT graded
+# by `xattr -p` independently of Gatekeeper (exit 7 when it fails).  That
+# change has not run here when this comment was written; the next run's
+# transcript is recorded here when it has -- the way windows-percolator.yml
+# records run 33644055780.
 #
 # THE NEGATIVE CONTROL IS THE WHOLE JOB.  A `curl` download sets no
 # com.apple.quarantine: LaunchServices sets it, and a CI runner fetching bytes
@@ -44,10 +44,11 @@
 # depend on it.  Whether Rosetta 2 is present is REPORTED by the driver, in its
 # own clearly labelled section, and gates nothing.
 #
-# THE JOB MUST BE ABLE TO FAIL, AND SAY WHY.  The driver exits 1 for a negative
-# finding about R-PLAT-04, 2 for an inconclusive run (the "cannot go red"
-# branch among them), 3 for a harness failure, 4 if this is not a Mac at all,
-# and every assertion in the transcript names the value it observed rather than
+# THE JOB MUST BE ABLE TO FAIL, AND SAY WHY.  The driver exits 7 when the
+# attribute survives the product's fix-up or the product's report disagrees
+# with xattr, whatever Gatekeeper did; otherwise 1 for a negative finding about
+# R-PLAT-04, 2 for an inconclusive run (the "cannot go red" branch among them),
+# 3 for a harness failure, 4 if this is not a Mac at all, and every assertion in the transcript names the value it observed rather than
 # relying on an exit code.  `if: always()` on the upload is why a FAILING run
 # still returns its evidence, which is precisely the case a negative result
 # needs; the driver also prints the transcript to stdout, so the job log

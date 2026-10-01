@@ -17,20 +17,30 @@
 package org.cometgui.install.cache;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.UserDefinedFileAttributeView;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.cometgui.domain.ports.ProcessListener;
+import org.cometgui.domain.ports.ProcessRunner;
+import org.cometgui.domain.ports.RunningProcess;
+import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.HostOperatingSystem;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.install.registry.ArtefactRecord;
@@ -50,39 +60,116 @@ import org.cometgui.install.registry.ArtefactRecord;
  * other get it only where they can already read the file. Setting all three unconditionally would
  * make a file executable by users who cannot read it, which is a permission nobody asked for.
  *
- * <h2>{@code R-PLAT-04} -- the macOS quarantine attribute, and what is honestly known about it</h2>
+ * <h2>{@code R-PLAT-04} -- the macOS quarantine attribute</h2>
  *
  * <p><em>"On macOS, every file extracted or downloaded into the tool cache that will be executed
  * shall have its {@code com.apple.quarantine} extended attribute cleared."</em> Gatekeeper refuses
  * to run a quarantined binary with a dialog a background application cannot dismiss, so the
- * attribute is removed from every file in the install directory -- every file, not only the
- * executable, because a helper library loaded by a quarantined path fails the same way.
+ * attribute is removed from every regular file in the install directory -- every file, not only the
+ * executable, because a helper library loaded by a quarantined path fails the same way. Symbolic
+ * links are not followed and not touched: following one would clear an attribute outside the
+ * install.
  *
- * <p><strong>What has been executed, and what has not.</strong> The removal itself runs on this
- * Linux host: {@link UserDefinedFileAttributeView} is the same API on both platforms, and Linux
- * stores the attribute under the {@code user.} namespace while macOS stores it raw, so the code
- * that lists and deletes it is <em>the same code</em> and is exercised here against a real
- * attribute of that name. By {@code STATUS.rst}'s two-tier rule that makes it <strong>tier
- * A</strong> -- a divergent branch executed here by a faithful stand-in -- and not residue.
+ * <h3>Why this runs {@code /usr/bin/xattr} and not Java's attribute view</h3>
  *
- * <p><strong>What is not proved, and is not claimed.</strong> That macOS's Gatekeeper then accepts
- * the binary. No macOS machine exists in this project and no macOS binary has ever been executed
- * anywhere in it, so exit gate item 9 of this phase cannot be met here and this class does not
- * pretend otherwise. What is proved is that a file carrying an attribute called {@code
- * com.apple.quarantine} does not carry one afterwards.
+ * <p>Until phase 05 unit 14 this class removed the attribute through {@link
+ * java.nio.file.attribute.UserDefinedFileAttributeView}, on the premise that the JDK stores names
+ * under {@code user.} on Linux and raw on macOS, so the same code would reach the same attribute on
+ * both. <strong>That premise is false, and the first macOS run in this project showed it</strong>
+ * (macos-gatekeeper workflow run 36918810975, {@code macos-latest}, Temurin 21.0.12.1): {@code
+ * /usr/bin/xattr} read {@code com.apple.quarantine} before and after the old code ran, the Java
+ * view listed no attribute at all, and the report said nothing had been cleared.
  *
- * <p>Note also that CometGUI's own downloads are written by this application through {@code
- * java.net.http} and are not quarantined by LaunchServices in the first place; the step is
- * defensive, and {@link FixupReport#quarantineCleared()} reports what was actually removed rather
- * than what was attempted, so a run that removed nothing says so.
+ * <p>The JDK source says why, and it says it for every JDK this product can run on. On macOS the
+ * provider is {@code sun.nio.fs.BsdFileSystemProvider}, which answers a request for the view with
+ * {@code new BsdUserDefinedFileAttributeView(file, followLinks)}; that class overrides only {@code
+ * maxNameLength()} and inherits everything else from {@code
+ * sun.nio.fs.UnixUserDefinedFileAttributeView} -- the <em>same</em> class Linux uses -- whose
+ * {@code nameAsBytes} prepends {@code "user."} to every name it is given and whose {@code list()}
+ * keeps only names starting with {@code "user."} and strips the prefix. Read at OpenJDK tags {@code
+ * jdk-21.0.12+8} (openjdk/jdk21u), {@code jdk-21+35} and {@code jdk-25+36} (openjdk/jdk); the
+ * project's own Liberica 25.0.4.1 {@code src.zip} carries the identical Unix class. So on macOS the
+ * view can neither see nor delete {@code com.apple.quarantine}: asked to delete it, it would delete
+ * {@code user.com.apple.quarantine}, a different attribute that nothing sets. There is no Java API
+ * in the JDK that reaches a raw macOS attribute name.
+ *
+ * <p>So on a macOS host each regular file is handled with macOS's own tool, through the product's
+ * one process launcher (the {@link ProcessRunner} port, implemented only by the process service, as
+ * {@code R-PROC-02} and its ArchUnit rule require), always as an argument array and never through a
+ * shell:
+ *
+ * <ol>
+ *   <li>{@code /usr/bin/xattr -- FILE} lists the file's attribute names, one per line;
+ *   <li>only if {@code com.apple.quarantine} is among them, {@code /usr/bin/xattr -d
+ *       com.apple.quarantine -- FILE} deletes it, and must exit 0;
+ *   <li>then the names are listed <strong>again</strong>, and the file is reported cleared only if
+ *       the attribute is no longer among them. A deletion is re-checked, never assumed.
+ * </ol>
+ *
+ * <p>The process environment is constructed, as the process service requires: {@code PATH} names
+ * only the system directories, so a {@code /usr/bin/xattr} that is itself a wrapper finds its
+ * interpreter, and nothing from the user's shell reaches it.
+ *
+ * <h3>A file that cannot be cleared is a failure, and is named</h3>
+ *
+ * <p>The old code's defect was that it could change nothing and say nothing. So now every regular
+ * file ends in exactly one of three places: carried no attribute (not listed), {@linkplain
+ * FixupReport#quarantineCleared() cleared}, or {@linkplain FixupReport#quarantineNotCleared() not
+ * cleared} with the reason -- {@code /usr/bin/xattr} could not be started, exited non-zero, did not
+ * finish within the timeout, or exited 0 and left the attribute in place. If any file is not
+ * cleared the step throws {@link QuarantineNotClearedException}, which names each file and why and
+ * carries the whole report, and the install fails -- the same outcome a failed attribute change has
+ * always had in this step, and better than an installed tool Gatekeeper will refuse the first time
+ * a scientist runs it. A step that cannot even ask {@code xattr} is not a step that may report
+ * success.
+ *
+ * <h3>What has been executed where, and what has not</h3>
+ *
+ * <p><strong>On Linux</strong> the macOS branch is graded by {@code PlatformFixupsTest} through a
+ * scripted {@link ProcessRunner} -- the port production calls -- standing in for {@code
+ * /usr/bin/xattr}: the exact argument arrays, the order, the re-check, and every failure path. The
+ * real process service is also run against the macOS branch on Linux, where there is no {@code
+ * /usr/bin/xattr}, and the result is a named failure, not a silent pass. <strong>None of that is
+ * evidence about macOS.</strong> Whether {@code /usr/bin/xattr} on a real Mac lists and deletes the
+ * attribute the way the script stands in for it can be shown only by the macos-gatekeeper workflow,
+ * which reads the attribute back with {@code xattr -p} after this step and grades this report
+ * against what it sees. Until that workflow has run on this code and said so, the macOS branch is
+ * unverified.
+ *
+ * <p>Gatekeeper accepting the binary afterwards is a separate question (phase 05 exit gate item 9)
+ * that this class does not answer and does not claim.
+ *
+ * <p>CometGUI's own downloads are written by this application through {@code java.net.http} and are
+ * not quarantined by LaunchServices in the first place; the step is defensive, and {@link
+ * FixupReport#quarantineCleared()} reports what was actually removed rather than what was
+ * attempted, so a run that removed nothing says so.
  */
 public final class PlatformFixups {
 
     /** The extended attribute macOS marks a downloaded file with. */
     public static final String QUARANTINE_ATTRIBUTE = "com.apple.quarantine";
 
+    /** macOS's own extended-attribute tool, named absolutely so no search path chooses it. */
+    public static final String XATTR = "/usr/bin/xattr";
+
+    /** How long one {@code xattr} invocation may take before it is cancelled and reported. */
+    static final Duration XATTR_TIMEOUT = Duration.ofSeconds(30);
+
+    /*
+     * The constructed environment (R-PROC-04): the process service passes a tool nothing it was not
+     * given.  The system directories only, so a wrapper script finds its interpreter.
+     */
+    private static final Map<String, String> XATTR_ENVIRONMENT =
+            Map.of("PATH", "/usr/bin:/bin:/usr/sbin:/sbin");
+
     /** Which host this is, which decides whether the quarantine step runs. */
     private final HostOperatingSystem host;
+
+    /** The product's one process launcher, through which {@code xattr} is run. */
+    private final ProcessRunner processes;
+
+    /** How long one {@code xattr} invocation may take. */
+    private final Duration timeout;
 
     /**
      * Creates the fix-ups for a host.
@@ -90,21 +177,38 @@ public final class PlatformFixups {
      * @param host the operating system this application is running on -- <strong>not</strong> the
      *     platform the artefact was built for; a macOS artefact installed under emulation is still
      *     installed on the host that has the quarantine attribute
-     * @throws NullPointerException if {@code host} is {@code null}
+     * @param processes the process launcher {@code /usr/bin/xattr} is run through on macOS; on any
+     *     other host it is never called
+     * @throws NullPointerException if either argument is {@code null}
      */
-    public PlatformFixups(HostOperatingSystem host) {
+    public PlatformFixups(HostOperatingSystem host, ProcessRunner processes) {
+        this(host, processes, XATTR_TIMEOUT);
+    }
+
+    /*
+     * The timeout is a constructor argument only so that a test can reach the timed-out path in
+     * milliseconds rather than half a minute; production always takes XATTR_TIMEOUT above.
+     */
+    PlatformFixups(HostOperatingSystem host, ProcessRunner processes, Duration timeout) {
         this.host = Objects.requireNonNull(host, "host");
+        this.processes = Objects.requireNonNull(processes, "processes");
+        this.timeout = Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isNegative() || timeout.isZero()) {
+            throw new IllegalArgumentException("timeout must be positive, but was: " + timeout);
+        }
     }
 
     /**
      * Creates the fix-ups for the operating-system half of a host platform.
      *
      * @param host the host platform
+     * @param processes the process launcher, used on macOS only
      * @return the fix-ups
-     * @throws NullPointerException if {@code host} is {@code null}
+     * @throws NullPointerException if either argument is {@code null}
      */
-    public static PlatformFixups forHost(HostPlatform host) {
-        return new PlatformFixups(Objects.requireNonNull(host, "host").operatingSystem());
+    public static PlatformFixups forHost(HostPlatform host, ProcessRunner processes) {
+        return new PlatformFixups(
+                Objects.requireNonNull(host, "host").operatingSystem(), processes);
     }
 
     /**
@@ -122,7 +226,12 @@ public final class PlatformFixups {
      * @param directory the directory holding the extracted files
      * @param record the manifest record, which says whether the installed file is an executable
      * @return what was changed
-     * @throws IOException if a permission or an attribute cannot be changed
+     * @throws QuarantineNotClearedException on macOS, if any regular file could not be shown free
+     *     of {@code com.apple.quarantine} afterwards; it names each such file and carries the
+     *     report
+     * @throws InterruptedIOException if the thread was interrupted while {@code xattr} ran; the
+     *     interrupt status is restored and the process is asked to stop
+     * @throws IOException if a permission cannot be changed or the directory cannot be walked
      * @throws NullPointerException if either argument is {@code null}
      */
     public FixupReport apply(Path directory, ArtefactRecord record) throws IOException {
@@ -135,9 +244,17 @@ public final class PlatformFixups {
                 madeExecutable.add(relative);
             }
         }
-        List<String> quarantineCleared =
-                host == HostOperatingSystem.MACOS ? clearQuarantine(directory) : List.of();
-        return new FixupReport(madeExecutable, quarantineCleared);
+        if (host != HostOperatingSystem.MACOS) {
+            return new FixupReport(madeExecutable, List.of());
+        }
+        Quarantine quarantine = new Quarantine();
+        clearQuarantine(directory, quarantine);
+        FixupReport report =
+                new FixupReport(madeExecutable, quarantine.cleared, quarantine.notCleared);
+        if (!quarantine.notCleared.isEmpty()) {
+            throw new QuarantineNotClearedException(report, quarantine.reasons);
+        }
+        return report;
     }
 
     /*
@@ -167,37 +284,123 @@ public final class PlatformFixups {
         return true;
     }
 
-    private static List<String> clearQuarantine(Path directory) throws IOException {
-        List<String> cleared = new ArrayList<>();
+    private void clearQuarantine(Path directory, Quarantine quarantine) throws IOException {
         Files.walkFileTree(
                 directory,
                 new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attributes)
                             throws IOException {
-                        if (attributes.isRegularFile() && removeQuarantine(file)) {
-                            cleared.add(relative(directory, file));
+                        if (attributes.isRegularFile()) {
+                            clearOne(directory, file, quarantine);
                         }
                         return FileVisitResult.CONTINUE;
                     }
                 });
-        return cleared;
     }
 
     /*
-     * LIST FIRST, THEN DELETE.  Deleting an attribute that is not there throws on both platforms,
-     * and a caught-and-ignored exception here would make the step report success whatever happened.
-     * Asking first means the returned list is a record of what was actually removed.
+     * LIST, DELETE, LIST AGAIN.  Listing first means a file that never carried the attribute is not
+     * reported as cleared; listing again means a deletion that exited 0 and changed nothing -- the
+     * exact shape of the defect this replaced -- is reported as not cleared rather than believed.
      */
-    private static boolean removeQuarantine(Path file) throws IOException {
-        UserDefinedFileAttributeView attributes =
-                Files.getFileAttributeView(
-                        file, UserDefinedFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
-        if (attributes == null || !attributes.list().contains(QUARANTINE_ATTRIBUTE)) {
-            return false;
+    private void clearOne(Path directory, Path file, Quarantine quarantine)
+            throws InterruptedIOException {
+        String relative = relative(directory, file);
+        try {
+            if (!file.getFileSystem().equals(FileSystems.getDefault())) {
+                throw new NotCleared(
+                        "it is not on the operating system's file system, so "
+                                + XATTR
+                                + " cannot be given its path");
+            }
+            Path absolute = file.toAbsolutePath();
+            Path workingDirectory = directory.toAbsolutePath();
+            if (!quarantined(absolute, workingDirectory)) {
+                return;
+            }
+            Output deleted =
+                    run(
+                            List.of(XATTR, "-d", QUARANTINE_ATTRIBUTE, "--", absolute.toString()),
+                            workingDirectory);
+            if (deleted.exitCode != 0) {
+                throw new NotCleared(XATTR + " -d " + deleted.describe());
+            }
+            if (quarantined(absolute, workingDirectory)) {
+                throw new NotCleared(
+                        XATTR
+                                + " -d exited 0 and "
+                                + QUARANTINE_ATTRIBUTE
+                                + " is still listed afterwards");
+            }
+            quarantine.cleared.add(relative);
+        } catch (NotCleared failure) {
+            quarantine.notCleared.add(relative);
+            quarantine.reasons.add(relative + ": " + failure.getMessage());
         }
-        attributes.delete(QUARANTINE_ATTRIBUTE);
-        return true;
+    }
+
+    private boolean quarantined(Path absolute, Path workingDirectory)
+            throws NotCleared, InterruptedIOException {
+        Output listed = run(List.of(XATTR, "--", absolute.toString()), workingDirectory);
+        if (listed.exitCode != 0) {
+            throw new NotCleared(XATTR + " could not list its attributes: " + listed.describe());
+        }
+        for (String name : listed.standardOutput) {
+            if (name.strip().equals(QUARANTINE_ATTRIBUTE)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Output run(List<String> argv, Path workingDirectory)
+            throws NotCleared, InterruptedIOException {
+        Collector collector = new Collector();
+        RunningProcess process;
+        try {
+            process =
+                    processes.start(
+                            new ToolCommand(argv, workingDirectory, XATTR_ENVIRONMENT), collector);
+        } catch (IOException notStarted) {
+            throw new NotCleared(XATTR + " could not be started: " + wholeChain(notStarted));
+        }
+        boolean finished;
+        try {
+            finished = collector.finished.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            process.requestCancellation();
+            Thread.currentThread().interrupt();
+            InterruptedIOException stopped =
+                    new InterruptedIOException(
+                            "interrupted while waiting for " + XATTR + " to finish");
+            stopped.initCause(interrupted);
+            throw stopped;
+        }
+        if (!finished) {
+            process.requestCancellation();
+            throw new NotCleared(
+                    XATTR
+                            + " did not finish within "
+                            + timeout.toMillis()
+                            + " ms and was cancelled");
+        }
+        return collector.output();
+    }
+
+    /*
+     * The process service wraps what the runtime threw -- "could not start ToolCommand[...]" -- and
+     * the part a reader needs, "error=2, No such file or directory", is in the cause.
+     */
+    private static String wholeChain(Throwable failure) {
+        StringBuilder joined = new StringBuilder();
+        for (Throwable link = failure; link != null; link = link.getCause()) {
+            if (joined.length() > 0) {
+                joined.append(" | ");
+            }
+            joined.append(link.getMessage());
+        }
+        return joined.toString();
     }
 
     private static String relative(Path directory, Path file) {
@@ -219,5 +422,80 @@ public final class PlatformFixups {
     @Override
     public String toString() {
         return "PlatformFixups[host=" + host.id() + "]";
+    }
+
+    /** What the quarantine step found, file by file, in the order the walk visited them. */
+    private static final class Quarantine {
+        private final List<String> cleared = new ArrayList<>();
+        private final List<String> notCleared = new ArrayList<>();
+        private final List<String> reasons = new ArrayList<>();
+    }
+
+    /** Why one file could not be shown free of the attribute. Never escapes this class. */
+    private static final class NotCleared extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        NotCleared(String reason) {
+            super(reason);
+        }
+    }
+
+    /** What one {@code xattr} run printed, and how it ended. */
+    private static final class Output {
+        private final int exitCode;
+        private final List<String> standardOutput;
+        private final List<String> standardError;
+
+        Output(int exitCode, List<String> standardOutput, List<String> standardError) {
+            this.exitCode = exitCode;
+            this.standardOutput = standardOutput;
+            this.standardError = standardError;
+        }
+
+        String describe() {
+            return "exited "
+                    + exitCode
+                    + (standardError.isEmpty()
+                            ? " and wrote nothing to standard error"
+                            : ": " + String.join(" / ", standardError));
+        }
+    }
+
+    /*
+     * Waits for onExit, not for the process: the port promises onExit after the last output line,
+     * so a listing read after it is complete.
+     */
+    private static final class Collector implements ProcessListener {
+        private final List<String> standardOutput = Collections.synchronizedList(new ArrayList<>());
+        private final List<String> standardError = Collections.synchronizedList(new ArrayList<>());
+        private final AtomicInteger exitCode = new AtomicInteger();
+        private final CountDownLatch finished = new CountDownLatch(1);
+
+        @Override
+        public void onStandardOutput(String line) {
+            standardOutput.add(line);
+        }
+
+        @Override
+        public void onStandardError(String line) {
+            standardError.add(line);
+        }
+
+        @Override
+        public void onExit(int code) {
+            exitCode.set(code);
+            finished.countDown();
+        }
+
+        Output output() {
+            synchronized (standardOutput) {
+                synchronized (standardError) {
+                    return new Output(
+                            exitCode.get(),
+                            List.copyOf(standardOutput),
+                            List.copyOf(standardError));
+                }
+            }
+        }
     }
 }

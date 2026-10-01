@@ -221,7 +221,7 @@ public final class ToolManagerWiring {
                         cache,
                         new VerifiedDownloader(fetcher, new ArtefactVerifier(hashes))::fetch,
                         new ArtefactExtractor(),
-                        new PlatformFixups(host.operatingSystem()),
+                        new PlatformFixups(host.operatingSystem(), processes),
                         probe,
                         hashes,
                         clock);

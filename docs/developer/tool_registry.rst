@@ -687,16 +687,19 @@ managed tools install from an empty cache and probe, driven through the Tool
 Manager interface. Install times measured on the development machine: Comet 275
 ms, Percolator 1412 ms, PDV 2200 ms, the converter 653 ms.
 
-**macOS is unverified.** No macOS binary has ever been executed anywhere in
-this project, on any machine. Phase 05's exit gate item 9 -- a freshly
-installed managed tool executing on macOS without a Gatekeeper refusal -- is
-**not met**. The job that could meet it exists and has never run; everything
-about it that can be graded on a machine with no Mac has been graded, and the
-result of the run itself is unknown. Three things cannot be known until it
-runs, and all three are real possibilities: whether Java's extended-attribute
-view can see macOS's ``com.apple.quarantine`` at all, whether a hosted runner
-enforces Gatekeeper the way a clean end-user Mac does, and whether an unsigned
-upstream binary is refused for signature reasons independent of quarantine.
+**macOS is unverified.** Phase 05's exit gate item 9 -- a freshly installed
+managed tool executing on macOS without a Gatekeeper refusal -- is **not met**.
+The job that could meet it has run once, as macos-gatekeeper run 36918810975 on
+a hosted ``macos-latest`` runner, and it settled one question and left one
+open. Java's extended-attribute view cannot see macOS's
+``com.apple.quarantine`` at all: the JDK's macOS view prefixes ``user.`` to
+every attribute name, so the quarantine removal as it then was removed nothing.
+Phase 05 unit 14 moved the removal to ``/usr/bin/xattr``, run through the
+product's process service, and the job now grades the attribute with
+``xattr -p`` on its own; that change has not yet run on a Mac. The question
+left open is Gatekeeper's: on that runner a quarantined binary ran anyway, so
+the job could not go red there, and whether an unsigned upstream binary is
+refused for signature reasons independent of quarantine is still unknown.
 
 **Windows has one execution, on one hosted image.** A ``windows-latest`` runner
 executed Percolator 3.07.1's portable ``noxml`` binary once, which is why that
