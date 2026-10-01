@@ -3824,3 +3824,106 @@ Carried forward from unit 11
 * **A green docs build now proves the generator ran**: the build log carries
   ``[toolmatrix] wrote ... 23 artefact record(s) ... manifest sha256 fafe9d32...``,
   which is a cheap non-vacuity check.
+
+.. _p05-orchestrator-4:
+
+Fourth phase orchestrator: unit 12, resumed 2026-10-01
+=======================================================
+
+:Taken over: 2026-10-01 at ``3f32fde``, with the tree clean
+:By: the fourth Phase-05 phase orchestrator (session 09)
+:Governed by: ``handoffs/PHASE-05-UNIT12-BRIEF.rst``, which is tier 1's and
+   which I do not edit
+
+Units 1-11 and 13 are accepted and are not mine to revisit. My job is unit 12
+and a report. **No opening baseline was taken**, by the brief's explicit
+instruction, which supersedes the 2026-09-18 handoff's step 3: nothing has
+touched Java or a POM since ``9a33bb4``, and the owner has now said three
+times that full builds cost too much. ``scripts/build.sh`` and
+``scripts/verify-all-gates.sh`` are not run in full at this tier; tier 1 runs
+them once, at the exit gate.
+
+.. _p05-u12-draft-ruling:
+
+The ``phase05-unit12-unfinished`` draft: read, and not the starting point
+---------------------------------------------------------------------------
+
+**A correction to the record first.** ``handoffs/PHASE-05-handoff.rst`` and
+``STATUS.rst`` both call the draft 640 lines. ``git show
+phase05-unit12-unfinished:scripts/verify-install-gates.sh | wc -l`` reports
+**1292**; 640 is roughly where its plumbing ends and its first control begins.
+Nothing turns on the number, but a figure repeated in two authoritative
+documents should be the measured one.
+
+What I read: the whole header and all of the plumbing, and the list of its
+sixteen control functions. Its plumbing is ``scripts/verify-provenance-gates.sh``'s
+almost line for line, plus one genuine addition -- after every restoration it
+compares the compiled class against a digest taken from the clean baseline,
+which is unit 9's stale-class finding (:ref:`p05-stale-class`) turned into a
+check. Its fifteen named test classes all exist in the tree; I checked each by
+path rather than trusting the names.
+
+What it lacks, measured against the work log and the unit brief:
+
+* **no control over unit 11's generator** -- the brief routes those five
+  injections to unit 12 by name;
+* **no control for unit 1's injection** (``DeclaredCapability``'s added
+  conjunct), although :ref:`p05-tenth-shape` says in as many words that unit
+  12 carries it;
+* it proves a *restoration* reached the bytecode but never that an
+  *injection* did -- the eighth shape is checked on the way out and not on the
+  way in;
+* no ``install.setDisable(true)`` control through the real Tool Manager, which
+  the brief names;
+* no registration in ``scripts/verify-all-gates.sh`` and no correction of the
+  stale ``workflows`` floor.
+
+**Ruling, which is tier 1's direction and my own reading:** unit 12 is written
+from the work log. The unit agent may lift pieces of the draft it has read and
+understood -- the plumbing is sound and is the sibling's -- but every control
+it keeps is held to the same standard as one it wrote: seen red, for a reason
+it chose, with the injected class proved changed and the restored class proved
+clean. The tag stays where it is and is not merged or checked out onto
+``main``.
+
+.. _p05-u12-dispatch:
+
+Unit 12 dispatched
+------------------
+
+**Acceptance conditions**, given to the agent verbatim:
+
+#. ``scripts/verify-install-gates.sh`` in ``verify-provenance-gates.sh``'s
+   shape: ``git archive HEAD`` sandbox, anchored exactly-once injections into
+   **production** code, the narrowest command that should catch each, a red
+   **with the expected diagnostic** (the inner one, never a generic sentence),
+   then green once restored.
+#. Every injection proved to have landed -- source differs from pristine **and
+   the compiled class differs from the clean baseline** -- and every
+   restoration proved clean in the bytecode.
+#. A harness self-control: a control whose injection does not land is reported
+   as a **harness failure**, never as a pass.
+#. Unit 11's five generator injections encoded, each asserting the generator's
+   own diagnostic, at least one of them through the real Sphinx hook.
+#. Unit 10's ``ArtefactVerifier`` neutering **not** built into a control
+   expecting the old tests to go red; the ``[DOWNLOADING, FAILED]``
+   phase-sequence assertion graded instead, or argued against.
+#. Each control builds and tests one closed module set (``-pl X -am``), never
+   the reactor and never ``scripts/build.sh``; the total wall clock measured
+   and recorded.
+#. Registered additively in ``scripts/verify-all-gates.sh`` with a floor equal
+   to the number of controls it grades; the ``workflows`` floor raised from 9
+   to its measured count. No floor lowered.
+
+**Verification at this tier will be**: the diff, read; the harness run by me
+in full; ``bash scripts/verify-all-gates.sh --only`` for the two gates the edit
+touches; ``bash -n`` on both scripts; ``scripts/ci/docs-build.sh`` for the two
+``.rst`` files I write; and at least two injections of my own, one of them
+into the harness.
+
+**There is no shell linter in this project**, checked rather than assumed: no
+``shellcheck`` under ``tools/`` or ``.venv/bin``, and no stage of
+``scripts/build.sh`` that reads ``scripts/*.sh``. ``scripts/verify-shell-gates.sh``
+is Phase 02's JavaFX *application-shell* harness, not a shell-script gate, and
+nothing unit 12 changes can reach it. So the shell checks are ``bash -n`` and
+the harness's own run.
