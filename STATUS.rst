@@ -917,6 +917,11 @@ A new finding: the nightly's real step never runs on a real runner
    step may be allowed to fail. Locally: link check ``PASSED -- 24 external
    link(s) resolved``; ``check-workflows`` 23 damaged copies rejected; every
    nightly step classified as expected by ``run-pipeline-locally.sh``.
+   **Confirmed on GitHub**, run 36942251154 at ``51d8db1``: "real checks"
+   job green, its log reading ``nightly-linkcheck.sh: PASSED -- 24 external
+   link(s) resolved, none broken`` -- the link check's first execution on a
+   runner. Every stub job, and the Windows RAW job (its first execution
+   anywhere), failed with ``exit code 70`` naming PHASE-15, as designed.
 
 ``nightly.yml`` runs its steps in one job, in order, and GitHub aborts a job at
 the first failing step. The order is four Phase-15 stubs (version matrix, large
