@@ -4,47 +4,30 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-10-01
-:Updated by: Main orchestrator, session 08 (**Phase 05 restarted at unit 8 on
-   the owner's instruction**; a fresh phase orchestrator dispatched with
-   ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst`` -- :ref:`status-p05-resumed`.
-   Session 07, earlier the same day, resolved Phase 00 item 8's contradiction
-   and carried the amendment into the code that grades it)
-:Current phase: 05 -- **RESUMED AT UNIT 12 on 2026-10-01** by owner
-   instruction; one fresh phase orchestrator, briefed by
-   ``handoffs/PHASE-05-UNIT12-BRIEF.rst``, which also carries the owner's
-   third instruction to stop running the full build as routine (full build and
-   gate suite once per phase, at the exit gate, by tier 1). Previously
-   **STOPPED on 2026-09-18 by owner instruction**,
-   **mid-unit-12** (:ref:`status-p05-stopped-again`). Units 1-11 and
-   13 accepted by the phase orchestrators; **unit 12 unfinished and its draft
-   preserved under a tag, off** ``main``. **Tier 1 has verified none of units
-   8-13 and has not re-run the exit gate**, so the phase is INCOMPLETE and
-   UNSIGNED. Restarted at unit 8 on 2026-09-17
-   (:ref:`status-p05-resumed`); originally dispatched 2026-09-02. Phase 04 is
-   **PARTIAL**, signed off 2026-09-02 on tier 1's own re-run and seven of its
-   own defect injections; Phase 03 **PARTIAL**, 2026-09-01. Phases 00 and 01
-   remain PARTIAL, but **neither is waiting on a pull request any more** --
-   #1 merged on 2026-09-02 and ran both pipelines. The per-class census debt is
-   closed (:ref:`status-census-closed`).
-:Overall: The repository, build and every quality gate exist and have each been
-   seen to fail on a deliberate defect. Five phases are signed off -- 02
-   PASSED; 00, 01, 03 and 04 PARTIAL -- and Phase 05 is **INCOMPLETE and
-   UNSIGNED**: twelve of its thirteen units are accepted by the phase
-   orchestrators, but it was stopped mid-unit-12 on 2026-09-18 before it could
-   report, so **no tier-1 sign-off of units 8-13 or of the exit gate has ever
-   happened** (:ref:`status-p05-stopped-again`). **Pull request #1
-   was opened and merged on 2026-09-02**, which closed what both of Phases 00
-   and 01's outstanding items were waiting on: ``pull-request.yml`` ran green
-   on a real pull request (2682 tests, 0 failures), and a ``windows-latest``
-   runner executed Percolator for the first time in this project's history
-   (:ref:`status-windows-first-execution`). Item 8's own wording then proved
-   unsatisfiable by the shipped artefact; that is **resolved as of 2026-09-17**
-   in the gate text *and* in the code that grades it
-   (:ref:`status-p00-item8-contradiction`). Live and unfixed: **the nightly has
-   failed every night since 2026-08-31**, and its first failing Phase-15 stub
-   skips every later step, so two real steps have never executed on a runner
-   (:ref:`status-nightly-masking`). See :ref:`status-residue-01`,
-   :ref:`status-p02` and :ref:`status-session-05`.
+:Updated by: Main orchestrator, session 09 (**Phase 05 signed off PARTIAL**
+   and **Phase 06 dispatched**, both on the owner's instruction of
+   2026-10-01 -- :ref:`status-p05-signed`)
+:Current phase: 06 -- Comet Parameter Model, **dispatched 2026-10-01**: one
+   fresh phase orchestrator, briefed by ``handoffs/PHASE-06-BRIEF.rst``, the
+   only phase live in the tree. Phase 05 is **PARTIAL**, signed off 2026-10-01
+   on tier 1's own full re-run of the exit gate, a fixed ``traceability``
+   harness, three of its own defect injections and two macOS runner
+   transcripts; the one unmet item is gate item 9 (Gatekeeper acceptance),
+   which a hosted runner cannot settle (:ref:`status-p05-signed`). Phases 03
+   and 04 **PARTIAL**; 00 and 01 **PARTIAL**; 02 **PASSED**.
+:Overall: Six phases are signed off -- 02 PASSED; 00, 01, 03, 04 and 05
+   PARTIAL. The repository, build and every quality gate exist and have each
+   been seen to fail on a deliberate defect. **A macOS runner executed Comet
+   for the first time on 2026-10-01** and exposed a real defect -- the
+   ``com.apple.quarantine`` fix-up was a no-op on macOS -- fixed in Phase 05
+   unit 14 and confirmed on a second macOS run. **Build economy is a standing
+   owner rule** (said three times): the full ``scripts/build.sh`` plus
+   ``scripts/verify-all-gates.sh`` (~85 minutes) runs once per phase, at the
+   exit gate, by tier 1. Live and unfixed: **the nightly has failed every night
+   since 2026-08-31** (:ref:`status-nightly-masking`), and
+   ``scripts/dev-verify.sh --mutation`` is broken
+   (:ref:`status-p05-signed`). Pull request #1 merged 2026-09-02; Windows ran
+   Percolator (:ref:`status-windows-first-execution`).
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -3213,6 +3196,89 @@ Handoffs written at tier 1 because the phase could not write its own:
 ``handoffs/PHASE-05-handoff.rst`` (rewritten for a successor) and
 ``handoffs/SESSION-08-main-orchestrator.rst``.
 
+.. _status-p05-signed:
+
+Phase 05 signed off PARTIAL (2026-10-01)
+========================================
+
+The owner resumed the phase at unit 12 on 2026-10-01 and instructed tier 1,
+once everything was green, to commit, push and dispatch the next phase; and,
+mid-run, *not to stop on a red gate but to fix it*.
+
+**Units.** Fourteen, all accepted by the phase orchestrator. Unit 12
+(``scripts/verify-install-gates.sh``, ``534c5b6``) assembled the phase's
+injections into a harness of 83 controls; the 640-line draft at tag
+``phase05-unit12-unfinished`` (actually 1292 lines) was read and not used.
+**Unit 14 was added by the owner** after tier 1's macOS run (below).
+
+**The first macOS execution in the project's history.** Tier 1 pushed ``main``
+and dispatched ``macos-gatekeeper.yml``: run 36918810975 at ``49423fb``. Two
+findings. (1) The Gatekeeper negative control **did not bite** -- a binary
+carrying ``com.apple.quarantine`` ran on the hosted runner -- so the verdict
+was ``INCONCLUSIVE -- THIS CHECK CANNOT GO RED ON THIS MACHINE``, as designed.
+(2) **``PlatformFixups`` never saw the attribute**: ``/usr/bin/xattr`` read it
+before and after the product's fix-up, which reported nothing cleared. Root
+cause (unit 14, from OpenJDK sources): the macOS
+``UserDefinedFileAttributeView`` prefixes every name with ``user.``, so Java
+can neither see nor delete ``com.apple.quarantine``. The class comment had
+asserted the opposite and the only test ran on Linux -- shape 3 of the
+signature defect. Unit 14 (``f097997``) clears it with ``/usr/bin/xattr``
+through the process service, fails the install on any file it cannot clear,
+and adds an attribute verdict to the macOS script that **can** go red on a
+hosted runner. Run 36930720796 at ``b2cb40b`` (branch
+``phase05-unit14-quarantine``): attribute present before
+(``0081;6abed46e;CometGUI-gate-item-9;…``), ``No such xattr:
+com.apple.quarantine`` after, product reports ``bin/comet`` cleared --
+``ATTRIBUTE CLEARED``. Tier 1 read both transcripts itself.
+
+**Tier 1's exit-gate run**, at ``d0e4f20`` on a quiet tree:
+``scripts/build.sh`` 11/11 stages in 1207 s; ``scripts/verify-all-gates.sh``
+11 of 12 controls passed in 3873 s, ``install`` at 88 controls in 241 s,
+``tests`` 2977 s. **``traceability`` was red**: unit 11 made ``docs/conf.py``
+read ``manifests/tools.json``, and the traceability self-test's sandbox copy
+omitted ``manifests/``, so the strict build crashed before reaching the
+injected defect. Nobody had run ``--only traceability`` after unit 11. Fixed at
+``33f6873`` (copy ``manifests/``; no rule or floor changed); re-run alone:
+``PASS traceability: 8 injected defects caught``, strict build fails on the
+defect and passes without it.
+
+**Tier 1's own injections**, into ``ExtractionGuard`` (gate item 3, whose
+traversal/symlink/bomb attacks have tests but no harness control), each run
+over the 279 archive tests, restored and verified with ``sha256sum -c``:
+
+* write-through-symlink check disabled -- 5 failures, e.g. ``AttackMatrixTest
+  writeThroughSafeSymlink ZIP expected <WRITE_THROUGH_SYMLINK> but was
+  <EXPECTED_FILE_MISSING>``;
+* expansion-ratio limit loosened 1000x -- 6 failures in
+  ``DecompressionBombTest`` (all four archive kinds plus the floor test);
+* ``..`` traversal check neutered -- 19 failures.
+
+Tier 1's own instrument failed twice first -- Spotless, then Checkstyle,
+rejected the marker comment so no test ran and stale reports read green. Caught
+because the script printed the Maven exit code and the report counts; fixed by
+deleting reports before each run. Shape 6, in tier 1's hands.
+
+**Grade: PARTIAL.** Items 1-8 met. Item 9 -- a freshly installed tool runs on
+macOS without a Gatekeeper refusal -- **NOT MET**: a hosted runner does not
+refuse a quarantined binary, so it cannot show acceptance either. Its
+precondition (the attribute is cleared) is now proved on a real Mac.
+
+**Residue carried forward:**
+
+* ``scripts/dev-verify.sh --mutation`` is **broken**: pitest-maven 1.30.0
+  removed built-in incremental history (``History has been enabled but no
+  history plugin has been installed/activated``). Tier 1's to repair; Phase
+  06's brief uses class-targeted PIT instead.
+* Gate item 3's attack tests have **no harness control** in
+  ``verify-install-gates.sh``; tier 1's injections above show the tests bite.
+* The work log's claim that unit 10's ``[DOWNLOADING, FAILED]`` assertion
+  closes the ``ArtefactVerifier`` neutering is wrong (unit 12 reproduced it);
+  ``VerificationResult`` re-states the rule, so the product is safe.
+* ``docs/developer/testing.rst`` is stale about the aggregate's controls.
+* The ``TIMED_OUT`` mutation-counting decision remains the owner's
+  (:ref:`status-mutation-drift`).
+* The nightly's step ordering (:ref:`status-nightly-masking`).
+
 .. _status-next-action:
 
 Next action
@@ -3228,7 +3294,10 @@ Next action
    resolved on 2026-09-17 (:ref:`status-p00-item8-contradiction`). Nothing
    below asking for a pull request to be opened is still owed.
 
-   **What is actually next, as of 2026-09-17:**
+   **Superseded 2026-10-01:** Phase 05 is signed off PARTIAL and Phase 06 is
+   dispatched (:ref:`status-p05-signed`). The list below is history.
+
+   **What was next, as of 2026-09-17:**
 
    #. **Phase 05 is stopped and UNSIGNED** (:ref:`status-p05-stopped-again`).
       Nothing is running. Whoever picks it up owes, in this order: **unit 12**

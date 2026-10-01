@@ -3,7 +3,7 @@ PHASE-05: Tool Registry and Installer
 =====================================
 
 :Phase: 05
-:Status: NOT STARTED
+:Status: PARTIAL (signed off 2026-10-01)
 :Depends on: 01, 03, 04
 :Blocked by decisions: none. D-002, D-003 and D-004 are all DECIDED --
    see In scope.

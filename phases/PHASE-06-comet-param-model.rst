@@ -3,7 +3,7 @@ PHASE-06: Comet Parameter Model
 ===============================
 
 :Phase: 06
-:Status: NOT STARTED
+:Status: IN PROGRESS (dispatched 2026-10-01)
 :Depends on: 01, 05
 :Blocked by decisions: none
 :Delivers: R-PARAM-01..12, R-DOC-04, R-TEST-01
