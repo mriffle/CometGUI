@@ -922,6 +922,9 @@ A new finding: the nightly's real step never runs on a real runner
    link(s) resolved, none broken`` -- the link check's first execution on a
    runner. Every stub job, and the Windows RAW job (its first execution
    anywhere), failed with ``exit code 70`` naming PHASE-15, as designed.
+   **Owner's decision, 2026-10-01:** leave the scheduled nightly as it is --
+   red, with a daily failure email, until Phase 15 replaces the stubs. Do not
+   pause the schedule or split the stubs out to make it green.
 
 ``nightly.yml`` runs its steps in one job, in order, and GitHub aborts a job at
 the first failing step. The order is four Phase-15 stubs (version matrix, large
