@@ -84,6 +84,7 @@ readonly -a ALL_GATES=(
     shell
     tests
     provenance
+    install
 )
 
 PASSED=0
@@ -116,7 +117,11 @@ declare -a COVERED=()
 #                coverage and mutation injections against the grown tree and
 #                added control 6's proof that the coverage gate accepts the
 #                defect the mutation gate rejects.  shell: 30 on 2026-08-30,
-#                when phase 02 unit 10 first shipped it.)
+#                when phase 02 unit 10 first shipped it.  workflows: 9 on
+#                2026-08-29, 23 on 2026-10-01, measured by phase 05 unit 12 --
+#                it had grown to 19 and then 23 without the floor following.
+#                install: 83 on 2026-10-01, phase 05 unit 12's first shipping
+#                count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -138,11 +143,11 @@ gate_spec() {
             ;;
         workflows)
             GATE_ITEMS="6"
-            GATE_DEFECT="nineteen damaged copies of .github/ -- a renamed step script, a dropped required step, continue-on-error, a trailing || true, a git push added to release.yml, an unknown workflow naming a missing script, an action outside a workflow allowlist, an action pinned to a tag, and the if: always() dropped from the transcript upload"
+            GATE_DEFECT="twenty-three damaged copies of .github/ -- a renamed step script, a dropped required step, continue-on-error, a trailing || true, a git push added to release.yml, an unknown workflow naming a missing script, an action outside a workflow allowlist, an action pinned to a tag, and the if: always() dropped from the transcript upload; and, for the Windows and the macOS Gatekeeper workflows, the transcript upload deleted, its if: always() dropped, the job moved to ubuntu-latest and the verification step pointed elsewhere"
             GATE_SCRIPT="scripts/ci/check-workflows.sh"
             GATE_ARGS=(--self-test)
             GATE_PROOF=("self-test OK" "the undamaged one accepted")
-            GATE_FLOOR=9
+            GATE_FLOOR=23
             GATE_UNIT="damaged copies rejected"
             ;;
         docs)
@@ -242,6 +247,21 @@ gate_spec() {
             GATE_FLOOR=24
             GATE_UNIT="controls"
             ;;
+        install)
+            GATE_PHASE="05"
+            GATE_ITEMS="1,2,3,4,5,6,7,8"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-05-worklog.rst, each into production code in a git-archive sandbox and each proved to have reached the bytecode: a mid-transfer cancel reported as FAILED, resumed progress counted from the resume point, a progress report delivered off the JavaFX thread, the real Tool Manager's Install control disabled, the step-2 re-hash disabled, a corrupted artefact let out of the transfer step so only the [DOWNLOADING, FAILED] phase sequence sees it, a drive letter never seen, the xar DOCTYPE guard deleted, a lost file counted from the marker, a build that no longer starts offered, an unreachable binary's refusal naming no alternatives, alternatives keyed on the version, the offer order inverted, the download size quoting the artefact alone, Locale.ROOT removed from the probe's PIN, a blank note accepted for UNVERIFIED evidence; NEW at unit 12, a Thermo companion gate that ignores a missing DLL (item 6) and a local Percolator floor of 3.04 (item 7); five damaged manifests the documentation-table generator must reject with each one's own diagnostic, one through the Sphinx hook, and a generator that writes nothing; and, as a control on the harness itself, an injection that reached the source but not the bytecode, which must be reported as a HARNESS ERROR. Item 9 (macOS) is NOT MET and is only delegated"
+            GATE_SCRIPT="scripts/verify-install-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-05 exit gate items 1, 2, 3, 4, 5 and 8 were proved here"
+                "Item 9 is NOT MET"
+                "bytecode as a HARNESS ERROR, not as a pass"
+            )
+            GATE_FLOOR=83
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -274,6 +294,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) assertion(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         provenance)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        install)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -281,8 +303,8 @@ gate_count() {
 usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
-that every PHASE-01, PHASE-02 and PHASE-04 gate still fails on the defect it
-exists to catch.
+that every PHASE-01, PHASE-02, PHASE-04 and PHASE-05 gate still fails on the
+defect it exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -323,7 +345,10 @@ needs GitHub to run the pipeline ON A PULL REQUEST, and no pull request has
 ever been opened.  The remote has existed since D-008 was decided on
 2026-08-30 and main is pushed; one scheduled nightly has run and failed on a
 Phase-15 stub by design.  No pull-request workflow has run.  The pipeline
-control proves every step on this machine instead, and says so.
+control proves every step on this machine instead, and says so.  PHASE-05 exit
+gate item 9 -- a managed tool executing on macOS without a Gatekeeper refusal
+-- is NOT MET: no macOS binary has been executed in this project, and the
+install control only requires the words that say so to still be there.
 USAGE
 }
 
@@ -353,8 +378,8 @@ list_gates() {
         printf '  %-13s %-9s injects: %s\n\n' "" "" "${GATE_DEFECT}"
     done
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
-    printf '  PHASE-02, 04:n of PHASE-04.  Every phase numbers its items from one, so the\n'
-    printf '  phase is always named rather than inferred.\n'
+    printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05.  Every phase numbers its items\n'
+    printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
     printf '  build; 3 ArchUnit layering; 4 coverage; 5 traceability; 6 CI pipelines.\n'
     printf '  PHASE-02 items: 1 every section reachable by mouse and by keyboard alone;\n'
@@ -367,9 +392,17 @@ list_gates() {
     printf '  parsable event log with usable history; 5 atomic finalisation; 6 a seeded\n'
     printf '  secret corpus appearing nowhere in JSON, RST or logs; 7 no surviving\n'
     printf '  mutation in hashing and redaction, which the tests control above proves.\n'
+    printf '  PHASE-05 items: 1 four tools installed through the Tool Manager UI; 2 a\n'
+    printf '  corrupted download rejected and never executed; 3 archive traversal,\n'
+    printf '  absolute-path, symlink and bomb attacks rejected; 4 an interrupted install\n'
+    printf '  never reports itself installed; 5 the R-PLAT-03 diagnostic and no offer of\n'
+    printf '  a tool that cannot load; 6 no THERMO_RAW_WINDOWS without the Thermo DLLs;\n'
+    printf '  7 a local Percolator below 3.05 rejected; 8 no offer absent from the\n'
+    printf '  manifest; 9 macOS without a Gatekeeper refusal -- NOT MET, delegated only.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
-    printf '  phases/PHASE-02-app-shell.rst and phases/PHASE-04-provenance-core.rst.\n\n'
+    printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst and\n'
+    printf '  phases/PHASE-05-tool-registry.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -531,7 +564,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02 and PHASE-04 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04 and PHASE-05 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -569,7 +602,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04; do
+    for phase in 01 02 04 05; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"
@@ -588,6 +621,9 @@ main() {
     printf '  dependency -- is the same rule PHASE-01 item 3 installs, so it is proved by\n'
     printf '  the tests control rather than injected twice; the shell control fails if\n'
     printf '  that harness ever loses it.\n'
+    printf '  PHASE-05 item 9 -- a managed tool executing on macOS without a Gatekeeper\n'
+    printf '  refusal -- is NOT MET and is not listed above: no macOS binary has been\n'
+    printf '  executed in this project. The install control only delegates it.\n'
 
     printf '\n  %d control(s) passed, %d failed, in %d seconds (%dm%02ds).\n' \
         "${PASSED}" "${FAILED}" "${total}" "$((total / 60))" "$((total % 60))"
