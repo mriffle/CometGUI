@@ -4235,3 +4235,131 @@ Verification at this tier: the diff; ``bash scripts/dev-verify.sh --mutation``;
 the macOS script's ``--self-test``; ``bash scripts/verify-all-gates.sh --only
 install`` and ``--only workflows`` if a workflow changes; ``docs-build.sh``;
 and an injection of my own.
+
+.. _p05-u14-signoff:
+
+Unit 14 signed off locally at ``f097997`` -- READY FOR THE RUNNER, NOT ACCEPTED
+================================================================================
+
+Two commits by the unit agent, one round of rework: ``a087f25`` (the fix) and
+``f097997`` (the rework I asked for). **The unit is not accepted** until tier 1's
+macOS run shows ``xattr`` no longer finding ``com.apple.quarantine`` after the
+product's fix-up. Gate item 9 stays NOT MET whatever that run shows.
+
+The diagnosis, from source
+--------------------------
+
+On macOS ``BsdFileSystemProvider`` returns a ``BsdUserDefinedFileAttributeView``,
+which overrides only ``maxNameLength()`` and inherits ``UnixUserDefinedFileAttributeView``
+-- the Linux class -- whose ``nameAsBytes`` prepends ``"user."`` and whose
+``list()`` keeps only ``user.``-prefixed names. So Java can neither see nor
+delete the raw ``com.apple.quarantine``; asked to delete it, it deletes
+``user.com.apple.quarantine``. The agent read
+``src/java.base/macosx/classes/sun/nio/fs/BsdUserDefinedFileAttributeView.java``,
+``.../macosx/.../BsdFileSystemProvider.java`` and
+``src/java.base/unix/classes/sun/nio/fs/UnixUserDefinedFileAttributeView.java`` at
+``jdk-21.0.12+8`` (openjdk/jdk21u, ``9de4f68c``), ``jdk-21+35`` (``890adb64``) and
+``jdk-25+36`` (``6c48f4ed``); the citation is in ``PlatformFixups``'s class
+comment. I did not re-read the upstream files; I confirmed that the project's
+own ``src.zip`` carries the Unix class only.
+
+The fix
+-------
+
+``PlatformFixups`` runs ``/usr/bin/xattr`` through the ``ProcessRunner`` port,
+as argument arrays, with a constructed ``PATH``-only environment and a 30 s
+timeout: list, delete only if listed, **list again**. ``FixupReport`` gains
+``quarantineNotCleared``; any file not shown clear throws the new
+``QuarantineNotClearedException`` naming each file and why, so the install
+fails rather than reporting a silent no-op. The Linux branch is unchanged and
+starts no process. The class comment and ``PlatformFixupsTest`` now say plainly
+that the Linux run proves nothing about macOS.
+
+**One edit outside the agent's paths, accepted by me as wiring:**
+``ToolManagerWiring`` passes the process runner to ``PlatformFixups`` (one
+line). Without it the tree does not compile, and the application would build a
+fixer that cannot start ``xattr``. No dependency or layering edge was added;
+ArchUnit is green.
+
+What I ran
+----------
+
+* The whole diff, read.
+* ``bash scripts/dev-verify.sh --since 4f49616 --mutation``: the Maven half is
+  ``BUILD SUCCESS`` over every module, ArchUnit included; **the PIT half fails
+  inside dev-verify itself** -- ``History has been enabled but no history
+  plugin has been installed/activated`` (PIT 1.30.0 against dev-verify's
+  ``historyInputFile``/``historyOutputFile``). Tier 1's tool; escalated.
+* PIT run directly, ``mvn -o -pl cometgui-install test-compile
+  org.pitest:pitest-maven:mutationCoverage`` without the history flags, read
+  from ``mutations.xml``: ``PlatformFixups`` 48/48, ``FixupReport`` 7/7,
+  ``QuarantineNotClearedException`` 5/5; module 1383/1400;
+  ``org.cometgui.install.cache`` 268/271 against the agent's 269 -- the
+  difference is ``ArtefactInstaller:217`` ``TIMED_OUT``, a ``KILLED``/``TIMED_OUT``
+  flip in untouched code, inconclusive by the standing rule. The only survivor
+  is the pre-existing ``InstallPipeline:254``. Pinned survivor set untouched.
+* ``macos-gatekeeper-verify.sh --self-test``: 34 -> 57 at ``a087f25``, **71/71**
+  at ``f097997``, exit 0. ``--check-only``: exit 0.
+* Two macOS risks checked rather than left to the runner: ``xattr -- FILE`` and
+  ``xattr -p ... -- FILE`` already ran on the runner at ``49423fb`` (driver lines
+  697-698 and 777 there), and the probe -- which now pulls ``ProcessService``
+  in -- compiles with ``javac --release 21`` locally; the driver compiles it at
+  ``--release 17`` and ``--check-only`` passed doing so.
+* ``bash scripts/verify-all-gates.sh --only workflows``: 23, exit 0 (the workflow
+  changed in comments only). ``docs-build.sh``: PASSED.
+* ``bash scripts/verify-all-gates.sh --only install``: ``PASS install: 88
+  controls in 255s``, exit 0. Control 19 (new, unit 14): the re-check removed
+  with ``if (false)``; red with ``PlatformFixupsTest.aDeletionThatChangesNothingIsReportedAsNotCleared:265
+  Expected org.cometgui.install.cache.QuarantineNotClearedException to be
+  thrown, but nothing was thrown.`` Floor **83 -> 88**, raised only.
+
+My injections
+-------------
+
+#. **Product, bit.** The deletion aimed at ``"user." + QUARANTINE_ATTRIBUTE`` --
+   the JDK defect's own shape. Compiled class ``3868ffe8`` -> ``60bb98dd``;
+   ``PlatformFixupsTest`` ``Tests run: 19, Failures: 4``, two naming the argv
+   ``[/usr/bin/xattr, -d, user.com.apple.quarantine, --, ...]``. Restored,
+   ``sha256sum -c`` OK, class back to ``3868ffe8``.
+#. **Driver, SURVIVED at** ``a087f25`` **-- the rework.** The ``xattr -p``
+   parse at step [9] forced to ``gone_xattr="yes"``: ``--self-test`` stayed
+   57/57. That parse is the one observed value the new verdict's pass rests
+   on, and it also read EMPTY output as "gone". Sent back.
+#. **The same injection at** ``f097997``: exit 6, ``SELF-TEST FAILED -- 1 of
+   71``, ``FAIL H14 STRUCTURAL ... real_run sets them some other way: 228:
+   gone_xattr="yes"``.
+#. **A new one at** ``f097997``: ``xattr_says_gone`` no longer requiring a
+   non-zero exit. Exit 6, ``FAIL H8 the right words with exit 0:
+   contradiction -> gone=yes, expected gone=no``. Both restored with
+   ``sha256sum -c`` OK; tree clean.
+
+The rework: ``xattr_says_gone OUTPUT STATUS`` answers "gone" only on a non-zero
+exit **and** a line ending ``: No such xattr: com.apple.quarantine``; empty
+output, any other error, another attribute's name, exit 0 or no status are
+"not shown gone". Step 1's ``attr_set`` decision is ``xattr_lists_quarantine``
+(a whole line equal to the name). Group H, 14 cases, grades both, and H14 is a
+structural text check that the live run decides only through them -- the only
+grade the live call sites can get off a Mac.
+
+What the runner must show, and the one residual risk
+-----------------------------------------------------
+
+Accept on ``ATTRIBUTE VERDICT: ATTRIBUTE CLEARED -- /usr/bin/xattr AND THE
+PRODUCT'S REPORT AGREE  (exit 0)``, with, under step [9], ``xattr -p after the
+fix-up`` reading ``... No such xattr: com.apple.quarantine``, ``and its exit
+status`` non-zero, ``xattr says the attribute is gone = yes`` and ``the product
+reports clearing the installed executable = yes``. The job still exits 2 on a
+hosted runner (the Gatekeeper control does not bite there). Send back on any
+``ATTRIBUTE FAILED -- ...`` (exit 7).
+
+**Residual risk:** no transcript has yet shown macOS's wording for an ABSENT
+attribute, so ``xattr_says_gone``'s pattern is unobserved in its "gone"
+direction. If the attribute really is gone but worded otherwise, the verdict
+reads ``ATTRIBUTE FAILED -- IT SURVIVED ...`` or ``... GONE, BUT ...``; the raw
+``xattr -p after the fix-up`` line decides whether the matcher or the product
+is wrong. The error is in the safe direction: it can fail a good fix, never pass
+a bad one.
+
+Stale text, not this unit's: ``scripts/verify-all-gates.sh`` and ``STATUS.rst``
+still say no macOS binary has been executed in this project; run 36918810975
+changed that.

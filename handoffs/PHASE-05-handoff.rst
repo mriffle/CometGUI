@@ -56,6 +56,14 @@ neutering, as the work log claimed -- reproduced at unit 12 sign-off. Not a
 product hole (``R-SEC-02`` is stated three times); a record and a test comment
 that overstate. Control 7 grades the defect that assertion really does catch.
 
+**Unit 14, added 2026-10-01 by owner order** (``handoffs/PHASE-05-UNIT14-BRIEF.rst``):
+the first macOS run (36918810975) showed ``PlatformFixups`` removing nothing,
+because the JDK's macOS attribute view prefixes ``user.`` to every name. The fix
+-- ``/usr/bin/xattr`` through the process service, re-checked, failures named --
+is signed off locally at ``f097997`` and **waits on tier 1's next macOS run**;
+it is not accepted until that run reads ``ATTRIBUTE CLEARED``. Install floor now
+88. See the work log's :ref:`p05-u14-signoff`.
+
 The sections below are the 2026-09-18 text, unchanged except where this
 update supersedes them.
 
