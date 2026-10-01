@@ -182,10 +182,13 @@
 # cometgui-app because gate item 1 is literally "driven through the Tool
 # Manager UI", and that window is assembled there.
 #
-# A CLASS SELECTOR DROPS @Nested TESTS, SILENTLY.  Measured while writing this
-# script: `-Dtest=SyntheticPinTest` ran 16 tests and none of the seven-locale
-# tests in its @Nested class, and `-Dtest=HttpDownloaderTest` ran nothing.  So
-# every run here is checked against surefire's XML: a bare class selector is
+# A CLASS SELECTOR IN A LIST WITH A Class#method SELECTOR DROPS @Nested TESTS,
+# SILENTLY.  Measured while writing this script (surefire 3.5.6): alone,
+# `-Dtest=SyntheticPinTest` runs 37 tests including the seven locale cases in
+# its @Nested class; in a list beside any Class#method entry it runs 16 and
+# none of them, and HttpDownloaderTest, all of whose tests are @Nested, runs
+# nothing.  The baseline and the final clean run here are such lists.  So
+# every run is checked against surefire's XML: a bare class selector is
 # refused for a class with a @Nested class, and every method a selector names
 # must appear in the report -- or it is a harness error.
 #
@@ -574,11 +577,11 @@ verify_classes_ran() {
         [ "${count}" -ge 1 ] \
             || harness_error "${selector} executed ${count} tests in $(rel "${log}"). A selection that runs no test cannot prove or disprove a gate."
         if [ "${selector}" = "${selector%%#*}" ]; then
-            # A CLASS SELECTOR SILENTLY DROPS @Nested TESTS.  Measured in this
-            # sandbox: -Dtest=SyntheticPinTest ran 16 tests and not one of the
-            # locale tests in its @Nested class, and -Dtest=HttpDownloaderTest
-            # ran nothing at all.  So a bare class selector is allowed only for
-            # a class with no @Nested class; anything else names its methods.
+            # A CLASS SELECTOR BESIDE A Class#method SELECTOR SILENTLY DROPS
+            # @Nested TESTS (see the header: SyntheticPinTest ran 16 tests and
+            # none of its nested locale tests).  So a bare class selector is
+            # allowed only for a class with no @Nested class; anything else
+            # names its methods.
             source="$(cd -- "${SANDBOX}" && find "${module}/src/test/java" -name "${class}.java" -type f | head -1)"
             if grep -q '@Nested' "${SANDBOX}/${source}"; then
                 harness_error "the selector ${selector} names a class with @Nested tests, and surefire drops those from a class selector without a word. Name the nested class and its methods (Outer\$Inner#method)."
