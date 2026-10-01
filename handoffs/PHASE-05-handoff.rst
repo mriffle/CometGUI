@@ -3,11 +3,13 @@ PHASE-05 handoff -- Tool Registry and Installer (to a successor)
 ====================================================================
 
 :Phase: 05
-:Written: 2026-09-18
+:Written: 2026-09-18 by tier 1; **updated 2026-10-01** by the fourth phase
+   orchestrator after unit 12 -- see :ref:`p05h2-unit12`
 :Written by: **The main orchestrator (tier 1), not the phase orchestrator.**
    That matters and is not a formality -- see :ref:`p05h2-who`.
-:Outcome: **INCOMPLETE. Units 1-11 and 13 accepted; unit 12 unfinished.**
-   Stopped by owner instruction mid-unit-12, not because anything is wrong.
+:Outcome: **All thirteen units accepted by the phase orchestrators** (unit 12
+   on 2026-10-01 at ``534c5b6``). **Still unsigned by tier 1**: the exit gate
+   has not been re-run, and gate item 9 is NOT MET.
 :Supersedes: the handoff of 2026-09-03 (units 1-7), in git history at
    ``874bb23``. Treat any copy of that you find as stale.
 :Records: ``handoffs/PHASE-05-worklog.rst`` -- **this document is the map; the
@@ -16,6 +18,46 @@ PHASE-05 handoff -- Tool Registry and Installer (to a successor)
 .. contents:: Contents
    :depth: 2
    :local:
+
+.. _p05h2-unit12:
+
+Update of 2026-10-01: unit 12 accepted, and what is left
+=========================================================
+
+The owner resumed the phase at unit 12 on 2026-10-01 under
+``handoffs/PHASE-05-UNIT12-BRIEF.rst``. One fresh unit agent wrote
+``scripts/verify-install-gates.sh`` from the work log (the
+``phase05-unit12-unfinished`` draft was read and not used as the starting
+point; it is **1292 lines, not 640** as this document said below) and
+registered it additively in ``scripts/verify-all-gates.sh``. Accepted at
+``534c5b6`` with no rework; the evidence is the work log's
+:ref:`p05-u12-signoff`, and the decision record before dispatch is
+:ref:`p05-u12-draft-ruling`.
+
+* ``bash scripts/verify-all-gates.sh --only install`` -> ``PASS install: 83
+  controls in 248s``, items ``1,2,3,4,5,6,7,8``. **The harness costs about
+  four minutes.** Each control builds one closed module set (``-pl X -am``).
+* Floors in ``scripts/verify-all-gates.sh``: ``workflows`` **9 -> 23**
+  (measured); ``install`` **new, 83**. None lowered.
+* Items 6 and 7 are graded by two controls **new at unit 12** -- the record
+  had no injection for either -- labelled so in the harness.
+* **Item 9 remains NOT MET.** Control M only requires the gatekeeper driver
+  to keep saying so.
+
+**What is left, all of it tier 1's:** the macOS runner for gate item 9; the
+phase exit-gate re-run (``scripts/build.sh`` then ``scripts/verify-all-gates.sh``
+in full, now about four minutes longer than before); the ``TIMED_OUT``
+counting question. **No baseline was taken in this session, by instruction**,
+so tier 1's exit-gate run is the first full run since 2026-09-17.
+
+**One correction to the record, escalated:** the ``[DOWNLOADING, FAILED]``
+assertion unit 10 added does **not** catch its ``ArtefactVerifier``
+neutering, as the work log claimed -- reproduced at unit 12 sign-off. Not a
+product hole (``R-SEC-02`` is stated three times); a record and a test comment
+that overstate. Control 7 grades the defect that assertion really does catch.
+
+The sections below are the 2026-09-18 text, unchanged except where this
+update supersedes them.
 
 .. _p05h2-who:
 
@@ -132,8 +174,8 @@ Units, and who accepted them
 
    * - 12
      - ``scripts/verify-install-gates.sh``
-     - **UNFINISHED**
-     - Untracked draft in the tree. See above.
+     - **Accepted** (2026-10-01)
+     - ``534c5b6``, no rework. 83 controls, 248 s. See :ref:`p05h2-unit12`.
 
 The cancellation defect your predecessor inherited **was reproduced and fixed**:
 the reproduction is at ``68f182d`` and the fix landed inside unit 8.
@@ -216,12 +258,13 @@ Tier 1's own debts, which are not the phase's to pay
 Residue, named
 ==============
 
-* **Unit 11's generator has no automated falsifiability harness.** Its five
-  validation injections were demonstrated by hand and are reproducible from the
-  recipe in the unit's report, but nothing re-runs them. Unit 11 called unit 12
-  its natural home. A control over the generator must assert the **inner**
-  diagnostic, not the outer ``ExtensionError`` sentence, which is identical for
-  every rejection and would pass on a defect nobody injected.
+* *Closed 2026-10-01:* unit 11's generator now has its harness -- control G
+  of ``scripts/verify-install-gates.sh``, each of the five injections graded on
+  its own inner diagnostic, one through the Sphinx hook.
+* **Gate item 3's traversal, symlink and bomb attacks have no injection** in
+  the harness; only the absolute-path and XXE halves are graded there.
+* ``docs/developer/testing.rst``'s falsifiability section still says the
+  aggregate "runs all ten" and names neither ``provenance`` nor ``install``.
 * **A test gap in** ``cometgui-process``, **which is Phase 03's module, not
   this one's.** ``StreamPump.run:96`` is ``while (read >= 0)``; the surviving
   mutant makes it ``while (read > 0)``. Those differ **only when** ``read()``
@@ -248,6 +291,11 @@ pass.**
 
 The first thing to do
 =====================
+
+*Superseded on 2026-10-01 for steps 2 and 3:* the draft was decided (step 2,
+:ref:`p05-u12-draft-ruling`) and **no baseline is to be taken** (step 3) --
+the owner's build-economy instruction. What remains is tier 1's exit-gate run
+and the macOS runner, :ref:`p05h2-unit12`.
 
 #. Read ``handoffs/PHASE-05-worklog.rst`` in full. For units 8-13 it is the
    only evidence that exists, and it is what makes those sign-offs checkable

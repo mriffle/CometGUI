@@ -3927,3 +3927,263 @@ into the harness.
 is Phase 02's JavaFX *application-shell* harness, not a shell-script gate, and
 nothing unit 12 changes can reach it. So the shell checks are ``bash -n`` and
 the harness's own run.
+
+.. _p05-u12-signoff:
+
+Unit 12 ACCEPTED at ``534c5b6``, no rework
+==========================================
+
+Two commits by the unit agent: ``e5ec1b6`` (``scripts/verify-install-gates.sh``,
+mode ``100755``, and the additive edit to ``scripts/verify-all-gates.sh``) and
+``534c5b6`` (a comment-only narrowing of one explanation in the harness). ``git
+show --stat`` over both lists exactly those two files; nothing else in the tree
+changed.
+
+What I read
+-----------
+
+The whole diff. The harness is ``verify-provenance-gates.sh``'s shape -- a
+``git archive HEAD`` sandbox, exactly-once anchors, pristine copies, graded reds,
+a control H -- with three things the sibling does not have, each of which I
+read rather than took:
+
+* **the injection is proved in the bytecode, both ways.** After every dirty run
+  the damaged source's class set (``Foo.class`` and ``Foo$*.class``) must
+  differ from the clean baseline, and every *other* class in the run's closed
+  module set must be identical to it. The draft checked only the second half,
+  on the way out;
+* **the clean re-run is batched**, argued in the header: each module's bytecode
+  is digested once after the baseline passes, every dirty run re-proves the
+  rest of its module identical, and one final clean run over the same selectors
+  must pass and leave every module byte-identical to the baseline;
+* **surefire's XML is read per method**, because the agent measured that a
+  class selector beside a ``Class#method`` selector silently drops ``@Nested``
+  tests (``SyntheticPinTest`` ran 16 tests and none of its locale cases). A bare
+  class selector for a class with ``@Nested`` is now a harness error.
+
+Every Maven command is ``mvn -B -o -pl <module> -am test -Dtest=...``: a closed
+set, never the reactor, never ``build.sh``, never PIT. The ``verify-all-gates.sh``
+edit is additive: an ``install`` control (``GATE_PHASE="05"``, items
+``1,2,3,4,5,6,7,8`` stated individually, floor **83**), ``05`` added to the
+per-phase summary loop, the usage and list text, and the stale ``workflows``
+floor **raised 9 -> 23** with its defect text updated. **No floor lowered**,
+no other control changed, nothing added to the pinned survivor set, and
+``scripts/build.sh`` untouched.
+
+What I ran, and what I saw
+--------------------------
+
+``bash -n`` on both scripts: clean. Then the only two aggregate runs this
+change can affect::
+
+    bash scripts/verify-all-gates.sh --only workflows
+      PASS  workflows: 23 damaged copies rejected in 0s          exit 0
+
+    bash scripts/verify-all-gates.sh --only install
+      PASS  install: 83 controls in 248s
+      PHASE-05 exit gate items covered by the controls that passed: 1,2,3,4,5,6,7,8
+      1 control(s) passed, 0 failed, in 248 seconds (4m08s).     exit 0
+      real 4m8.053s
+
+Inside it, ``SUMMARY: 83 control(s) passed, 0 failed, in 248 seconds``. Per
+control: baseline 33 s, G 16, M 3, the eighteen Java controls 6-12 s each, H
+7, the final clean run 29. **The harness costs about four minutes**, against
+fifty-four for ``verify-test-gates.sh``. ``git status --porcelain`` was empty
+after the run.
+
+The controls, each with the diagnostic it asserts
+--------------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 6 14 38 42
+
+   * - #
+     - Item / module
+     - Injection
+     - Diagnostic required
+
+   * - 1
+     - R-TOOL-08 / domain
+     - unit 1's added conjunct ``&& evidence != CapabilityEvidence.UNVERIFIED``
+     - ``expected: <[OBSERVED_BY_EXECUTION, INFERRED_FROM_ARTEFACT_BYTES,
+       UNVERIFIED]> but was: <[OBSERVED_BY_EXECUTION,
+       INFERRED_FROM_ARTEFACT_BYTES]>``
+   * - 2
+     - 1 / install
+     - unit 8's cancellation translation removed
+     - ``never FAILED: a user who cancelled has not encountered an error ==>
+       expected: <CANCELLED> but was: <FAILED>``; both step-boundary tests
+       required green
+   * - 3
+     - 1 / install
+     - unit 3's resumed progress from the resume point
+     - ``expected: <1500000> but was: <N>``; ``expected: <2000000> but was:
+       <500000>``
+   * - 4
+     - 1 / ui
+     - unit 9's ``uiThread.execute`` hop removed
+     - ``... but it arrived on "cometgui-install-N"``, for the property and the
+       row list
+   * - 5
+     - 1 / app
+     - ``install.setDisable(true)`` in the real Tool Manager
+     - ``comet-2026_02_2-1's Install control is disabled before anything is
+       installed ==> expected: <true> but was: <false>``, and not the 600 s
+       timeout
+   * - 6
+     - 2 / install
+     - unit 10's step-2 re-hash ``if (false)``
+     - ``the probe was called for comet 2026.02.2 linux-x86-64 ... (R-SEC-02,
+       gate item 2)``
+   * - 7
+     - 2 / app
+     - ``VerifiedDownloader``'s acceptance test ``if (true)``, so a rejected
+       artefact leaves step 1
+     - ``expected: <[DOWNLOADING, FAILED]> but was: <[DOWNLOADING, VERIFYING,
+       FAILED]>``, exactly one of nine assertions failing, no process launched
+   * - 8
+     - 3 / install
+     - unit 4's ``hasDriveLetter`` returning false
+     - ``accepted as an archive name: "C:/x"``, and as a manifest path
+   * - 9
+     - 3 / install
+     - unit 4's ``DISALLOW_DOCTYPE`` deleted
+     - ``a DOCTYPE declaration must be refused outright ...``
+   * - 10
+     - 4 / install
+     - unit 5's entry count read from the marker
+     - ``expected: <CONTENT_COUNT_MISMATCH> but was: <INSTALLED>``
+   * - 11
+     - 5 / install
+     - unit 8's ``refusalFor`` answering ``Optional.empty()``
+     - ``R-TOOL-06: a tool that fails loadability is never offered ==>
+       expected: <[]> ...``
+   * - 12
+     - 5 / install
+     - unit 6's unreachable refusal naming no alternatives
+     - ``expected: <...Alternatives: percolator 3.06.5 linux-x86-64.> but was:
+       <...Alternatives: none known``
+   * - 13
+     - 5 / install
+     - unit 6's alternatives keyed on the version
+     - ``expected: <[comet 2026.02.2 macos-x86-64]> but was: <[]>``, both ways
+   * - 14
+     - 6 / tools
+     - **NEW at unit 12**: a companion gate ignoring a missing DLL
+     - ``R-TOOL-02: an install missing them shall not advertise it``; the
+       all-three-present test required green
+   * - 15
+     - 7 / tools
+     - **NEW at unit 12**: the local-Percolator floor at 3.04
+     - ``tooOld ... expected: <...ToolRegistrationException> but was:
+       <java.lang.AssertionError>``; ``exactlyTheMinimum`` required green
+   * - 16
+     - 8 / install
+     - unit 2's second ordering key inverted
+     - ``pdv is a JAR ... expected: <NATIVE> but was: <TRANSLATED_ROSETTA_2>``
+   * - 17
+     - R-TOOL-01 / install
+     - unit 8's download size as the artefact alone
+     - ``expected: <OptionalLong[2798963]> but was: <OptionalLong[946303]>``
+   * - 18
+     - R-PERC-02 / tools
+     - unit 7's ``Locale.ROOT`` removed
+     - ``the 64 plus 64 fixture the real binary was run over changed under
+       de-DE``, and ``th-TH-u-nu-thai``
+   * - G
+     - unit 11's generator
+     - the five recorded manifest injections, into the sandbox copy only;
+       ``generate()`` returning early
+     - each one's own inner text -- ``missing the required field "sha256"``,
+       ``names the platform "plan9-x86-64"``, ``has the download URL
+       'http://...'``, ``on the evidence 'rumoured'``, ``uses the word
+       "verified"`` -- the last also through the sandbox ``docs-build.sh``;
+       the clean build must log ``[toolmatrix] wrote ... manifest sha256
+       <digest>``; the early return fails with ``exception: 'written'``
+   * - M
+     - 9, **delegation only**
+     - none
+     - the gatekeeper driver still says ``THIS IS NOT A PASS`` and ``THIS CHECK
+       CANNOT GO RED``, and its own ``--self-test`` passes. Item 9 stays NOT MET
+   * - H
+     - the harness
+     - a replacement equal to its anchor; a missing anchor; a manifest edit
+       that changes nothing; a same-line comment (source changed, bytecode
+       not, a real Maven run); a green run graded as red; a red without the
+       expected text
+     - each refused as a HARNESS ERROR or a recorded failure
+
+Two injections of mine, both into the harness, neither of which H tries
+------------------------------------------------------------------------
+
+Each made in the working copy of ``scripts/verify-install-gates.sh`` after a
+backup to my private scratch directory, anchor matched exactly once, marker
+grepped in and back out, restored with ``cp -p`` and proved with ``sha256sum
+-c`` (``OK``), and ``git status --porcelain`` empty afterwards.
+
+**A. Every injection silently fails to land.** ``replace_once``'s Python wrote
+``text`` instead of ``text.replace(old, new)``, so the harness itself never
+injects anything -- a plumbing defect, not a control spec. ``bash
+scripts/verify-install-gates.sh --only 10``::
+
+    HARNESS ERROR: (entry count read from the marker) cometgui-install/src/main/
+    java/org/cometgui/install/cache/ToolCache.java is byte-identical to the
+    pristine copy. The defect was not injected and the control would have
+    tested nothing.                                              EXIT=4
+
+No SUMMARY line and no pass marker.
+
+**B. The restoration overwrites the backup instead.** ``restore_pristine``'s
+``cp`` reversed, so the damaged file is copied over the pristine one -- the
+"running an inject script twice overwrites the backup" trap the original brief
+warns about. The source-level checks are fooled by construction: ``cmp`` agrees
+and the harness prints ``restored ... (byte-identical to the pristine copy, and
+touched)``. ``--only 10,11``::
+
+    PASS  entry count read from the marker: rejected, exit 1
+    restored .../ToolCache.java (byte-identical to the pristine copy, and touched)
+    HARNESS ERROR: _build/install-gate-logs/11-dirty.log: 1 class(es) in
+    cometgui-install differ from the clean baseline although no control damaged
+    them: org/cometgui/install/cache/ToolCache.class. ...         EXIT=4
+
+**The bytecode comparison caught a restoration the source checks had passed**,
+on the very next run in that module. Had the fooled control been the last in
+its module, the final clean run's comparison is the same check. That is the
+property the batched clean re-run rests on, and it is now observed, not argued.
+
+A finding of the agent's, reproduced by me, which corrects this log
+---------------------------------------------------------------------
+
+Unit 10's "Carried forward" says the ``[DOWNLOADING, FAILED]`` phase-sequence
+assertion was added **to close** the ``ArtefactVerifier`` neutering. **It does
+not.** Measured by me in the sandbox: ``actual.sha256().equals(expected.sha256())``
+replaced by ``true``; compiled ``ArtefactVerifier.class`` ``f5ec887c...`` to
+``0277d69a...`` (the agent's figures exactly);
+``mvn -o -pl cometgui-app -am test
+-Dtest=ToolManagerInstallUiTest#aCorruptedArtefactIsRejectedAndNothingIsExecuted``
+-> ``tests="1" failures="0"``, ``BUILD SUCCESS``. ``VerificationResult``'s
+constructor re-states the rule, so the install still fails inside step 1 and the
+phases are still ``[DOWNLOADING, FAILED]``.
+
+That is **not a product hole** -- ``R-SEC-02`` is stated three times and the
+artefact is still rejected before anything executes -- but it is a record that
+overstates, and the test's own comment overstates in the same words. The
+assertion *does* grade a real defect: control 7 is the one injection only it
+can see. The test file is unit 10's and was not edited. **Escalated to tier 1**
+as a correction to the record, not as a defect.
+
+Residue, named
+--------------
+
+* **Gate item 3's traversal, symlink and decompression-bomb attacks** have
+  their own tests and no recorded injection; the harness claims only the
+  absolute-path and XXE halves.
+* **Items 6 and 7** are covered by two controls new at unit 12, labelled so in
+  the harness, and held to the same standard; they are not history.
+* **Item 9 is NOT MET.** Control M is a delegation and covers nothing.
+* ``docs/developer/testing.rst``'s falsifiability section still says the
+  aggregate "runs all ten" and lists neither ``provenance`` nor ``install``.
+  Stale since Phase 04; not this unit's paths. Reported, not edited.
+
+**Unit 12 accepted.** All thirteen units of Phase 05 are now accepted.
