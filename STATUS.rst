@@ -3,14 +3,19 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-09-18
+:Updated: 2026-10-01
 :Updated by: Main orchestrator, session 08 (**Phase 05 restarted at unit 8 on
    the owner's instruction**; a fresh phase orchestrator dispatched with
    ``handoffs/PHASE-05-RESUMPTION-BRIEF.rst`` -- :ref:`status-p05-resumed`.
    Session 07, earlier the same day, resolved Phase 00 item 8's contradiction
    and carried the amendment into the code that grades it)
-:Current phase: 05 -- **STOPPED AGAIN on 2026-09-18 by owner instruction**,
-   this time **mid-unit-12** (:ref:`status-p05-stopped-again`). Units 1-11 and
+:Current phase: 05 -- **RESUMED AT UNIT 12 on 2026-10-01** by owner
+   instruction; one fresh phase orchestrator, briefed by
+   ``handoffs/PHASE-05-UNIT12-BRIEF.rst``, which also carries the owner's
+   third instruction to stop running the full build as routine (full build and
+   gate suite once per phase, at the exit gate, by tier 1). Previously
+   **STOPPED on 2026-09-18 by owner instruction**,
+   **mid-unit-12** (:ref:`status-p05-stopped-again`). Units 1-11 and
    13 accepted by the phase orchestrators; **unit 12 unfinished and its draft
    preserved under a tag, off** ``main``. **Tier 1 has verified none of units
    8-13 and has not re-run the exit gate**, so the phase is INCOMPLETE and
