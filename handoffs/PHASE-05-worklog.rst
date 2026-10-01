@@ -4363,3 +4363,45 @@ a bad one.
 Stale text, not this unit's: ``scripts/verify-all-gates.sh`` and ``STATUS.rst``
 still say no macOS binary has been executed in this project; run 36918810975
 changed that.
+
+.. _p05-u14-accepted:
+
+Unit 14 ACCEPTED at ``f097997``, on the macOS runner's evidence
+================================================================
+
+Tier 1 pushed branch ``phase05-unit14-quarantine`` at ``b2cb40b`` and ran
+``macos-gatekeeper.yml``: run **36930720796**
+(https://github.com/mriffle/CometGUI/actions/runs/36930720796). Tier 1 read the
+transcript and relayed it to me; **I have not read the transcript myself** --
+I cannot reach GitHub's artefacts from here -- so the lines below are tier 1's
+reading, recorded as such:
+
+* step [7]: ``xattr -p`` read back
+  ``0081;6abed46e;CometGUI-gate-item-9;C885E41C-E938-4625-AF86-AA0B9C84DF1C``
+  before the fix-up -- the attribute was really set;
+* step [9]: ``probe.fixup.quarantineCleared.0=bin/comet``,
+  ``quarantineNotCleared.count=0``;
+  ``xattr -p after the fix-up = xattr: .../cache/bin/comet: No such xattr:
+  com.apple.quarantine``, ``and its exit status = 1``, ``xattr says the
+  attribute is gone = yes``;
+* ``ATTRIBUTE VERDICT: ATTRIBUTE CLEARED -- /usr/bin/xattr AND THE PRODUCT'S
+  REPORT AGREE (exit 0)``.
+
+That is the acceptance condition the brief set, met: ``xattr`` no longer finds
+the attribute after the product's fix-up, **and** the product's report says the
+product removed it. **R-PLAT-04 is now observed delivered on one hosted macOS
+image** (``macos-latest``, Apple silicon), for the one file the job installs. It
+is one observation, not a promise about every Mac.
+
+**The residual risk recorded at sign-off is settled.** macOS's wording for an
+absent attribute had never been seen; ``xattr_says_gone``'s pattern was a
+reasoned guess. The runner printed exactly ``No such xattr:
+com.apple.quarantine`` with exit status 1, and the matcher answered ``yes``.
+
+**Gate item 9 is unchanged: NOT MET.** The Gatekeeper verdict of the same run
+is still ``INCONCLUSIVE`` (exit 2) -- a hosted runner did not refuse a
+quarantined binary, so it cannot show acceptance either. Unit 14 neither claims
+nor changes that.
+
+**Unit 14 accepted.** All fourteen units of Phase 05 are accepted. No build or
+test was run for this entry, by tier 1's instruction; it is documentation only.

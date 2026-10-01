@@ -7,9 +7,11 @@ PHASE-05 handoff -- Tool Registry and Installer (to a successor)
    orchestrator after unit 12 -- see :ref:`p05h2-unit12`
 :Written by: **The main orchestrator (tier 1), not the phase orchestrator.**
    That matters and is not a formality -- see :ref:`p05h2-who`.
-:Outcome: **All thirteen units accepted by the phase orchestrators** (unit 12
-   on 2026-10-01 at ``534c5b6``). **Still unsigned by tier 1**: the exit gate
-   has not been re-run, and gate item 9 is NOT MET.
+:Outcome: **All fourteen units accepted by the phase orchestrators** (unit 12
+   at ``534c5b6``, unit 14 at ``f097997`` on macOS run 36930720796, both
+   2026-10-01). **Expected grade PARTIAL, on gate item 9 alone.** Still
+   unsigned by tier 1: the exit gate is tier 1's to re-run. See
+   :ref:`p05h2-final`.
 :Supersedes: the handoff of 2026-09-03 (units 1-7), in git history at
    ``874bb23``. Treat any copy of that you find as stale.
 :Records: ``handoffs/PHASE-05-worklog.rst`` -- **this document is the map; the
@@ -18,6 +20,133 @@ PHASE-05 handoff -- Tool Registry and Installer (to a successor)
 .. contents:: Contents
    :depth: 2
    :local:
+
+.. _p05h2-final:
+
+Final report of the phase orchestrator, 2026-10-01
+===================================================
+
+**All fourteen work units are accepted.** Units 1-11 and 13 by earlier
+orchestrators, unit 12 (``534c5b6``) and unit 14 (``f097997``) by me; every
+sign-off is in ``handoffs/PHASE-05-worklog.rst`` with what was run and what was
+seen. The work log is the proof; this section is the map.
+
+.. list-table:: Units
+   :header-rows: 1
+   :widths: 6 44 50
+
+   * - #
+     - Unit
+     - Accepted
+   * - 1-7
+     - Domain vocabulary, manifest, downloader, extraction, atomic install,
+       probes, tool adapters
+     - 2026-09-02/03, five of seven after rework
+   * - 8
+     - Tool Manager runtime behind the port
+     - ``7bab20d``, one round
+   * - 9
+     - Tool Manager UI and wiring
+     - ``1f35c25``, two rounds
+   * - 10
+     - End-to-end install through the UI; PDV cancel and restart
+     - ``437ba32``, no rework
+   * - 11
+     - Documentation, tables generated from the manifest
+     - ``9a33bb4``, no rework
+   * - 12
+     - ``scripts/verify-install-gates.sh``, registered in
+       ``verify-all-gates.sh``
+     - ``534c5b6``, no rework
+   * - 13
+     - macOS Gatekeeper job, authored
+     - ``ca33d0d``; first run 36918810975 on 2026-10-01
+   * - 14
+     - macOS quarantine removal through ``/usr/bin/xattr``
+     - ``f097997``, one round; accepted on macOS run 36930720796
+
+.. list-table:: The nine exit gate items -- THE PHASE'S OWN CLAIMS, for tier 1 to re-run
+   :header-rows: 1
+   :widths: 5 15 80
+
+   * - #
+     - Phase's claim
+     - Evidence, and the check that re-proves it
+   * - 1
+     - Met
+     - Unit 10: four tools installed from an empty cache by pressing the Tool
+       Manager's own controls (``ToolManagerInstallUiTest``), PDV cancelled
+       mid-transfer and restarted (``PdvCancelAndRestartUiTest``).
+       Falsified by ``verify-install-gates.sh`` controls 2, 3, 4, 5.
+   * - 2
+     - Met
+     - Unit 3 at the installer, unit 10 through the UI with a recording
+       process runner showing nothing launched. Controls 6 and 7.
+   * - 3
+     - Met
+     - Unit 4: each attack per multi-entry kind, the real ``../`` upstream zip
+       rejected whole. Controls 8 and 9 grade the absolute-path and XXE
+       halves; **traversal, symlink and bomb have tests but no harness
+       control**.
+   * - 4
+     - Met
+     - Unit 5: interruption in a real second JVM after each of the eight
+       steps; unit 8: cancellation inside a transfer. Control 10.
+   * - 5
+     - Met
+     - Units 6 and 8: the ``R-PLAT-03`` diagnostic with alternatives; a tool
+       failing loadability not offered. Controls 11, 12, 13.
+   * - 6
+     - Met
+     - Unit 7: Thermo DLL capability graded both ways. Control 14 (new at
+       unit 12).
+   * - 7
+     - Met
+     - Unit 7: below-3.05 rejected, a valid binary registered. Control 15 (new
+       at unit 12). The interface has no registration action (named residue).
+   * - 8
+     - Met
+     - Units 2 and 9: selection from the manifest, offered set driven from it.
+       Control 16.
+   * - 9
+     - **NOT MET**
+     - Two macOS runs (36918810975, 36930720796): the Gatekeeper negative
+       control **did not bite** on a hosted runner -- a quarantined binary ran
+       -- so the verdict is ``INCONCLUSIVE``, and acceptance cannot be shown
+       either. What run 36930720796 **does** show is ``R-PLAT-04``: the
+       product's fix-up removes ``com.apple.quarantine`` and says so
+       (``ATTRIBUTE CLEARED``). That is a precondition of item 9, not item 9.
+
+**Expected grade: PARTIAL, on gate item 9 alone.** Item 9 is unverified
+behaviour on a platform this project can reach only through a hosted runner
+that does not enforce Gatekeeper as a clean end-user Mac does; no amount of
+work inside this phase changes that.
+
+**How to re-run the claims.** ``bash scripts/build.sh`` (11 stages; tier 1
+measured 1136 s at ``49423fb``), then ``bash scripts/verify-all-gates.sh``
+in full -- now with the ``install`` control at floor **88** (about four and a
+half minutes) and ``workflows`` at **23**. Neither was run by me in full, by
+the owner's build-economy instruction; every narrower check I ran is in the
+work log.
+
+**Residue, named.**
+
+* Gate item 3's traversal, symlink and bomb attacks: tested, not in the
+  harness.
+* The ``[DOWNLOADING, FAILED]`` assertion does not catch unit 10's
+  ``ArtefactVerifier`` neutering, contrary to the work log's unit-10 entry and
+  the test's own comment; not a product hole (``R-SEC-02`` is stated three
+  times). Escalated.
+* ``scripts/dev-verify.sh --mutation`` fails on PIT 1.30.0's history flags.
+  Escalated; tier 1 has it.
+* Stale "no macOS binary has run" wording in ``scripts/verify-all-gates.sh``
+  and ``STATUS.rst``; ``docs/developer/testing.rst`` lists neither the
+  ``provenance`` nor the ``install`` control. Tier 1's files.
+* Carried from earlier units and unchanged: the ``StreamPump`` zero-read gap
+  (Phase 03), six ``Locale.setDefault`` test classes, no Refresh action, no
+  local-binary registration action in the interface, a ``FAILED`` row carries
+  no reason, ``offers()`` launches processes on the interface thread (353 ms
+  measured), and the ``TIMED_OUT`` counting question, which is the owner's.
 
 .. _p05h2-unit12:
 
