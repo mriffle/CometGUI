@@ -435,7 +435,53 @@ metadata (unit 4's).
 Unit 3
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-02 at ``4e48146``, no rework.** One fresh agent; 32 paths,
+inside its brief (new package ``org.cometgui.params.comet.value``;
+``VariableModField``/``VariableModLayout`` in ``schema``; the loader now reads
+and checks ``versions[].variableModTuple`` instead of requiring ``null``).
+
+What I ran and saw:
+
+* Read the diff and the layout added to the JSON (eight fields, pairs allowed
+  on ``COUNT`` and ``NEUTRAL_LOSS``). **Checked the cited source myself**:
+  ``Comet.cpp`` at tag ``v2026.02.2`` (raw GitHub, 1208 lines), lines 552-621
+  read the tuple with ``sscanf(szParamVal, "%lf %31s %d %511s %d %d %d %s"``,
+  split the neutral loss on ``,`` into ``dNeutralLoss``/``dNeutralLoss2``, and
+  the count into min/max when it holds a ``,`` -- exactly the layout encoded.
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``
+  (7m35s on this machine); module ``Tests run: 580, Failures: 0, Errors: 0,
+  Skipped: 0``; JaCoCo LINE 1424/1430, BRANCH 567/571; 66 compiled classes,
+  66 in ``jacoco.xml``.
+* PIT, module alone, POM ``targetClasses`` (1m32s): **542/548 = 98.9 %**
+  killed (``build.sh`` scoring). Non-kills are unit 2's: the two
+  ``ParamsLineReader:137`` equivalents, three ``ParamsLineReader`` timeouts
+  (lines 78, 87) and ``CometParameterSchemaProvider$Collector:289``. Every
+  class unit 3 added was mutated; the unmutated set is unit 2's nine
+  null-check-only types, unchanged.
+* **Injection 1** (``VariableModCodec`` writes ``max,min`` instead of
+  ``min,max``): class ``6f0b9922`` -> ``0de97de6``; 30 round-trip failures,
+  e.g. ``min,max count ==> expected: <79.966331 STY 0 2,4 -1 0 0 0.0> but was:
+  <79.966331 STY 0 4,2 -1 0 0 0.0>``. Restored, ``sha256sum -c`` OK.
+* **Injection 2** (``TolerancePair.parse`` takes the absolute value of the
+  lower bound -- the sign of a normally-negative tolerance lost): class
+  ``990322d6`` -> ``8ae84a76``; ``StructuredValuesTest.readsTheRealDefaults``
+  -- ``expected: <-20.0> but was: <20.0>`` -- and ``keepsSignAndScale``.
+  Restored, ``sha256sum -c`` OK.
+* ``bash scripts/verify-all-gates.sh --only docs --only traceability`` ->
+  ``2 control(s) passed, 0 failed, in 47 seconds``. ``git status`` clean.
+
+Inherited by later units, from the agent's report: decimals are written with
+``BigDecimal.toPlainString()`` (digits and scale kept exactly, so
+``15.9949`` stays and ``15.994915`` stays; ``+`` and exponents normalised);
+the enzyme table is written with Comet's own column widths 4/23/7/12, so the
+default table is byte-identical; a duplicate enzyme number is refused (Comet
+would silently use the later row); only ``variable_mod01``..``15`` exist even
+though ``-q``'s comment invites more (``VMODS = 15``). Two parameters Comet
+2026.02.2 **reads but ``-q`` does not write** -- ``ms1_mass_range`` and
+``precursor_NL_ions`` -- are not in the metadata, so an imported file using
+them meets the unknown-parameter path (preserved and reported, ``R-PARAM-07``);
+recorded for the handoff, not a gate item. Upstream: ``mass_offsets``' reading
+loop appears never to advance past a non-numeric token (read, not run).
 
 .. _p06-u4-signoff:
 
