@@ -32,8 +32,11 @@ import org.cometgui.params.comet.model.Diagnostic;
  * @param model the model, present exactly when no finding is an error
  * @param diagnostics every finding, ordered by the first line it concerns; findings about the file
  *     as a whole first
+ * @param comments the file's comment structure as imported ({@code R-PARAM-05}), kept whether or
+ *     not the parse succeeded
  */
-public record ParseResult(Optional<CometParameters> model, List<Diagnostic> diagnostics) {
+public record ParseResult(
+        Optional<CometParameters> model, List<Diagnostic> diagnostics, ImportedComments comments) {
 
     /**
      * Validates the all-or-nothing rule.
@@ -44,6 +47,7 @@ public record ParseResult(Optional<CometParameters> model, List<Diagnostic> diag
     public ParseResult {
         Objects.requireNonNull(model, "model");
         diagnostics = List.copyOf(diagnostics);
+        Objects.requireNonNull(comments, "comments");
         boolean failed = diagnostics.stream().anyMatch(Diagnostic::isError);
         if (failed == model.isPresent()) {
             throw new IllegalArgumentException(

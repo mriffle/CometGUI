@@ -71,6 +71,10 @@ import org.cometgui.params.comet.value.ValueSyntaxException;
  * ValueOrigin#IMPORTED}; one it does not declare takes the schema default, with origin {@link
  * ValueOrigin#COMET_DEFAULT}. An empty value is a value: {@code peff_obo =} imports the empty text,
  * not the default.
+ *
+ * <p>The file's comment structure is preserved on {@link ParseResult#comments()} ({@code
+ * R-PARAM-05}): the marker line, each modelled parameter's block comment, inline comment and
+ * continuation lines, and the comments around the enzyme table.
  */
 public final class CometParamsParser {
 
@@ -128,6 +132,21 @@ public final class CometParamsParser {
 
         private final List<String> commentsAbove = new ArrayList<>();
 
+        private final List<String> blockAbove = new ArrayList<>();
+
+        private final Map<String, Declared> declaredComments = new LinkedHashMap<>();
+
+        /** The declaration whose continuation lines may follow, until a non-continuation line. */
+        private Optional<Declared> continuing = Optional.empty();
+
+        private final List<String> beforeTable = new ArrayList<>();
+
+        private final List<String> inTable = new ArrayList<>();
+
+        private boolean pastTableHeader;
+
+        private Optional<String> markerLine = Optional.empty();
+
         Run(ParamsText lines) {
             this.lines = lines;
         }
@@ -154,7 +173,7 @@ public final class CometParamsParser {
             Optional<EnzymeTable> table = enzymeTable();
             found.sort(Comparator.comparingInt(d -> d.lines().isEmpty() ? 0 : d.lines().get(0)));
             if (found.stream().anyMatch(Diagnostic::isError)) {
-                return new ParseResult(Optional.empty(), found);
+                return new ParseResult(Optional.empty(), found, comments());
             }
             List<ParameterEntry> entries = new ArrayList<>();
             for (ParameterDefinition definition : metadata.parametersFor(selected)) {
@@ -170,7 +189,7 @@ public final class CometParamsParser {
             CometParameters model =
                     CometParameters.of(
                             metadata, selected, entries, table.orElseThrow(), unknowns, found);
-            return new ParseResult(Optional.of(model), found);
+            return new ParseResult(Optional.of(model), found, comments());
         }
 
         private void versionMarker() {
@@ -253,13 +272,63 @@ public final class CometParamsParser {
 
         private void walk(ParamsLine line) {
             switch (line) {
-                case ParamsLine.Comment comment -> commentsAbove.add(content(comment.text()));
+                case ParamsLine.Comment comment -> {
+                    String text = content(comment.text());
+                    commentsAbove.add(text);
+                    if (continuing.isPresent() && Character.isWhitespace(text.charAt(0))) {
+                        continuing.get().continuation().add(text);
+                    } else {
+                        continuing = Optional.empty();
+                        structure(text);
+                    }
+                }
+                case ParamsLine.Blank blank -> {
+                    commentsAbove.clear();
+                    continuing = Optional.empty();
+                    structure(content(blank.text()));
+                }
                 case ParamsLine.Declaration declaration -> {
+                    continuing = Optional.empty();
                     declaration(declaration);
                     commentsAbove.clear();
+                    blockAbove.clear();
                 }
-                default -> commentsAbove.clear();
+                case ParamsLine.EnzymeHeader header -> {
+                    // No declaration follows the header (the line reader makes one malformed),
+                    // so neither comment buffer is read again; they are not cleared here.
+                    beforeTable.addAll(blockAbove);
+                    pastTableHeader = true;
+                }
+                case ParamsLine.VersionMarker marker -> {
+                    commentsAbove.clear();
+                    if (markerLine.isEmpty()) {
+                        markerLine = Optional.of(content(marker.text()));
+                    }
+                }
+                default -> continuing = Optional.empty();
             }
+        }
+
+        /** Records a comment or blank line of the file's comment structure (R-PARAM-05). */
+        private void structure(String text) {
+            if (pastTableHeader) {
+                inTable.add(text);
+            } else {
+                blockAbove.add(text);
+            }
+        }
+
+        private ImportedComments comments() {
+            Map<String, ImportedComments.ParameterComments> parameters = new LinkedHashMap<>();
+            declaredComments.forEach(
+                    (name, collected) ->
+                            parameters.put(
+                                    name,
+                                    new ImportedComments.ParameterComments(
+                                            collected.above(),
+                                            collected.inline(),
+                                            collected.continuation())));
+            return new ImportedComments(markerLine, parameters, beforeTable, inTable);
         }
 
         private void declaration(ParamsLine.Declaration line) {
@@ -284,6 +353,11 @@ public final class CometParamsParser {
             }
             Optional<ParameterDefinition> definition = metadata.parameter(name);
             if (definition.isPresent() && definition.get().supportedVersions().contains(selected)) {
+                Declared collecting =
+                        new Declared(
+                                List.copyOf(blockAbove), line.inlineComment(), new ArrayList<>());
+                declaredComments.put(name, collecting);
+                continuing = Optional.of(collecting);
                 try {
                     values.put(name, codec.parse(definition.get(), line.value()));
                 } catch (ValueSyntaxException unreadable) {
@@ -399,6 +473,10 @@ public final class CometParamsParser {
             return readable ? Optional.of(new EnzymeTable(rows)) : Optional.empty();
         }
     }
+
+    /** One declared modelled parameter's comments while the walk is still collecting them. */
+    private record Declared(
+            List<String> above, Optional<String> inline, List<String> continuation) {}
 
     private static String content(String raw) {
         return raw.endsWith("\r") ? raw.substring(0, raw.length() - 1) : raw;

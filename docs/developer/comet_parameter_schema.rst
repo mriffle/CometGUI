@@ -778,6 +778,10 @@ It holds:
 * the **diagnostics** of the parse that produced it -- warnings only, since a
   parse with an error produces no model.
 
+The imported comments of modelled parameters are not on the model -- two
+models with the same values are equal whatever comments their files carried
+-- but on the parse result (:ref:`dev-comet-parameter-parser`).
+
 It is immutable. ``withValue(name, value, origin)``, ``withText(name, text,
 origin)`` (text read as the parameter's kind), ``withOrigin(name, origin)``,
 ``resetToDefault(name)``, ``withEnzymeTable(table)`` and
@@ -913,11 +917,37 @@ Parsing the real ``-p`` fixture gives 96 ``IMPORTED`` entries and exactly the
 22 ``-q``-only parameters at ``COMET_DEFAULT``, every value equal to the
 ``-q`` model's.
 
-The file's comment structure (``R-PARAM-05``) is preserved where it cannot be
-re-derived: an unknown parameter keeps its inline comment and the whole-line
-comments directly above it -- up to the nearest blank line, declaration or
-version marker -- and both are written back with it. Comments on modelled
-parameters are not imported; the writer emits the curated ones. A CRLF file
+The comment structure (``R-PARAM-05``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The parser **preserves the whole comment structure of the imported file**, on
+``ParseResult.comments()`` -- an immutable ``ImportedComments``, present
+whether or not the parse succeeded:
+
+* ``marker()``: the imported ``# comet_version`` line, verbatim;
+* ``of(name)`` / ``parameters()``, for every modelled parameter the file
+  declared, in file order: ``above()``, every comment and blank line (blank as
+  an empty string) between the previous declaration and this one;
+  ``inline()``, the trailing comment on its line; and ``continuation()``,
+  indented comment lines directly under it -- Comet's own ``-q`` output
+  continues ``sample_enzyme_number``'s comment on such a line;
+* ``beforeEnzymeTable()`` and ``inEnzymeTable()``: the comment and blank lines
+  between the last declaration and ``[COMET_ENZYME_INFO]``, and after it.
+
+Lines are kept as written, minus a CRLF file's ``\r``. For the real ``-q``
+fixture, ``of("search_enzyme_number").above()`` is ``["", "#", "# search
+enzyme", "#"]``, and every one of the file's comment and blank lines lands in
+exactly one of these places (``ImportedCommentsTest``). Unknown parameters
+carry their own comments on ``UnknownParameter`` -- the whole-line comments
+directly above, up to the nearest blank line, declaration or marker, and the
+inline comment -- because the writer writes those back.
+
+What the **canonical writer** emits is a different, smaller thing, as
+``R-PARAM-05`` asks: the marker *regenerated* for the selected version, the
+*curated* inline comments from the schema, and the imported comments of
+unknown parameters only (:ref:`dev-comet-parameter-canonical`). The imported
+comments of modelled parameters are kept for the editor and for diffs, not
+re-emitted, so the canonical text depends on the model alone. A CRLF file
 parses to the same model as its LF twin.
 
 The duplicate policy

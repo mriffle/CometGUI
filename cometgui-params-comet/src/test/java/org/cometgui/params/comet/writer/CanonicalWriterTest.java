@@ -87,6 +87,18 @@ class CanonicalWriterTest {
         }
 
         @Test
+        @DisplayName("A is the exact text signed off at 14e43da (SHA-256 f381afe1...d62b)")
+        void textUnchanged() throws java.security.NoSuchAlgorithmException {
+            assertEquals(
+                    "f381afe1d48749d49a0bb5e97a0375be7e691f3c6bfa2f740e96589b4502d62b",
+                    java.util.HexFormat.of()
+                            .formatHex(
+                                    java.security.MessageDigest.getInstance("SHA-256")
+                                            .digest(first)));
+            assertEquals(10_656, first.length);
+        }
+
+        @Test
         @DisplayName("parse(A) has the same values, the same table and no finding")
         void secondParseIsTheSameModel() {
             ParseResult again = parse(text(first));
