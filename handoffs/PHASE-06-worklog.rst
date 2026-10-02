@@ -616,7 +616,83 @@ developer page records it as Phase 08's, but **no phase document assigns it**.
 Unit 6
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-02 at ``a24a8d0``, no rework.** One fresh agent; 55 files:
+``presets/`` (10 classes) with ``comet-presets.json`` (low-low, high-low,
+high-high -- **no project presets**, each candidate either duplicated workflow
+enforcement or needed values Comet does not document; I agree), ``migration/``
+(6 classes), a **real Comet 2024.01.0** migration fixture, a ``2024.01.0``
+version record in the metadata (one-neutral-loss tuple layout, two default
+overrides, 109 parameters ranged from 2024.01.0), and four schema classes
+changed beyond the brief's list (``CometVersionRecord`` gains ``defaults``;
+``CuratedMetadata.parametersFor`` applies a version's overrides;
+``SchemaDrift`` and ``CometParameterSchema`` use the version's own
+definition). I read those diffs; they are what makes per-version defaults true
+rather than 2026's defaults stamped on 2024, and the drift test now checks the
+2024 curation against the real 2024 output.
+
+What I ran and saw:
+
+* **The older binary, independently**: downloaded
+  ``https://github.com/UWPR/Comet/releases/download/v2024.01.0/comet.linux.exe``
+  myself -> SHA-256 ``2834f928...a942379``, equal to the agent's copy in
+  ``scratch/phase06/artefacts/`` (gitignored; **not** in
+  ``manifests/tools.json``). Ran ``-q`` in an empty directory: marker
+  ``2024.01 rev. 0 (f00df0c)``; ``git show HEAD:<migration fixture> | cmp -``
+  -> identical.
+* **Presets against upstream**: fetched Comet's own
+  ``parameters_202602/comet.params.low-low``, ``.high-low``, ``.high-high``;
+  the eight deltas of each preset (precursor tolerance pair and units,
+  tolerance type, ``isotope_error``, ``fragment_bin_tol``,
+  ``fragment_bin_offset``, ``theoretical_fragment_ions``) equal the files'
+  values exactly.
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``;
+  module ``Tests run: 976, Failures: 0, Errors: 0, Skipped: 0``; **136
+  compiled classes, 136 in ``jacoco.xml``**.
+* PIT, module alone: **1095/1102** killed; ``presets`` 113/113,
+  ``migration`` 53/53, ``schema`` 326/327, ``validation`` 180/181, ``model``
+  97/97, ``writer`` 30/30, ``value`` 200/200, ``parser`` 96/101. The seven
+  non-kills are the ones accepted at units 2 and 5.
+* **Injection 1** (an applied preset row stamped ``USER`` instead of
+  ``PRESET``): ``PresetDiff.class`` ``b4d5dd24`` -> ``88247c50``; 3 failures,
+  ``applySelectedChangesOnlyTheSelection`` -- ``expected: <PRESET> but was:
+  <USER>`` -- ``applyAll``, ``aConvertedDeltaIsReportedAndApplied``.
+  Restored, ``sha256sum -c`` OK.
+* **Injection 2** (a parameter new in the target reported ``CARRIED``
+  instead of ``ADDED``): ``SchemaMigration.class`` ``7fd098b0`` ->
+  ``4ea090d6``; 6 errors, all from ``MigrationEntry``'s own invariant --
+  ``index_search_type: only an ADDED parameter has no source value, and it has
+  none; this one is CARRIED``. Red by a **designed product guard**, not a test
+  assertion; recorded as such. Restored, OK.
+* **Injection 3** (migration leaves an added parameter out of the model, by
+  line 141): class ``4ea090d6`` -> ``d0c94fc4``; 6 errors from
+  ``CometParameters``' completeness invariant -- ``index_search_type is
+  modelled for Comet 2026.02.2 and has no value; every modelled parameter
+  needs one``. A model missing a parameter **cannot be constructed** -- the
+  strongest form of gate item 9's "drops a parameter". Restored, OK. (My
+  injection script's anchor counter is line-based and refused the multi-line
+  anchor -- ``ANCHOR MATCHES 3 TIMES`` -- so I injected by line number.)
+* ``--only docs --only traceability`` -> ``2 control(s) passed, 0 failed, in
+  33 seconds``. ``git status`` clean.
+
+Reported by the agent and carried upward:
+
+* **Comet ``v2026.03.0`` was released upstream on 2026-10-01**, after this
+  tree's manifest. Its notes: new residue codes ``^`` and ``$`` (the tuple
+  codec refuses them), ``-p`` no longer writes ``index_search_type`` and
+  ``-q`` writes ``-1``, an undefined enzyme number becomes an error,
+  ``add_U_selenocysteine`` and the spectral-library MS-level name fixed. The
+  release matrix is Phase 05's/tier 1's; nothing done here. When it is added,
+  unit 1's matrix test fails until its fixtures are captured, and the drift
+  test will then report the differences -- which is the mechanism working.
+* For tier 1's exit-gate ``--only tests``: ``MigrationFixtureRealBinaryTest``
+  needs ``scratch/phase06/artefacts/v2024.01.0__comet.linux.exe`` (it fails,
+  never skips, without it). ``verify-test-gates.sh`` symlinks the whole of
+  ``scratch/`` but its precondition checks only ``scratch/phase05``. Present on
+  this machine.
+* Curated for 2024.01.0: version record, tuple layout, two default overrides,
+  version ranges -- **not** per-version help, choices, bounds or inline
+  comments (a 2024 file is written with 2026's comments and validated with
+  2026's rules). Migrated unknowns carry line 0 in messages.
 
 .. _p06-u7-signoff:
 
@@ -659,4 +735,8 @@ None yet. Reported upward, not blocking:
   unit 2 agent in ``cometgui-ui`` (unit 2 sign-off);
 * the specification's "selected index and search options are compatible"
   validation item needs the filesystem and no phase document assigns it
-  (unit 5 sign-off).
+  (unit 5 sign-off);
+* Comet ``v2026.03.0`` released upstream 2026-10-01; the release matrix does
+  not have it (unit 6 sign-off);
+* the exit-gate ``--only tests`` run needs ``scratch/phase06/artefacts/`` as
+  well as ``scratch/phase05/artefacts/`` (unit 6 sign-off).
