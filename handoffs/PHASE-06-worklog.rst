@@ -341,7 +341,94 @@ passed unchanged on re-run; probably that overlap, unconfirmed. Reported upward.
 Unit 2
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-02 at ``e53ecb5``, no rework.** One fresh agent; 46 files,
+all inside its brief. The agent finished without delivering its report; tier 1
+pointed this out and I fetched the report by message. I worked from the commit
+and diff in the meantime.
+
+What was built: ``schema/`` (30 classes -- definition model, 14 value kinds, 14
+categories, ``MetadataLoader`` over ``JsonReader``, ``CometVersionMarker``,
+discovery, drift as a value, ``CometParameterSchemaProvider`` over the domain
+``ProcessRunner``), ``parser/`` (``ParamsLineReader``, line classification
+only), ``comet-parameters.json`` (118 parameters modelled, **empty** internal
+allow-list), the mutation switch on.
+
+What I ran and saw:
+
+* Read the diff and the JSON. Spot-checked enum labels against upstream:
+  ``isotope_error`` carries values 6 and 7, which the binary's own ``-q``
+  comment (0-5) and the specification's example omit; Comet's 2026.02 page
+  says "Valid values are 0 through 7" -- the metadata is right.
+  ``num_enzyme_termini`` 8/9 match the ``-q`` comment. Kinds: 37 decimal,
+  17 integer enum, 15 tuple, 14 integer, 9 boolean, 7 ion-series, 5 path,
+  3 enzyme reference, 3 integer range, 2 pair members, 2 decimal ranges,
+  2 strings, 1 string enum, 1 decimal list. Visibility 57/46/15.
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``;
+  module ``Tests run: 217, Failures: 0, Errors: 0, Skipped: 0``; JaCoCo
+  "All coverage checks have been met", LINE 901/906, BRANCH 315/317.
+* **Population audit:** 42 compiled classes (no ``package-info``) and 42
+  classes in ``jacoco.xml``. PIT mutated 21; the 9 top-level classes it did
+  not (``ParamsLine``, ``Choice``, ``CometVersionRecord``,
+  ``DiscoveredParameter``, ``DiscoveryMode``, ``DriftFinding``,
+  ``InternalParameter``, ``MalformedDumpException``, ``VisibilityLevel``) were
+  read: records, enums and an exception whose only statements are
+  ``Objects.requireNonNull`` calls, which PIT's default mutators do not mutate.
+  Nothing with logic is missing.
+* **PIT, the module alone, with the POM's own ``targetClasses``** (tier 1's
+  instruction): ``mvn -B -o -Dmaven.repo.local=_build/m2repo -pl
+  cometgui-params-comet test-compile org.pitest:pitest-maven:mutationCoverage``
+  -> exit 0 in 3m04s; scored as ``scripts/build.sh`` scores it
+  (``status='KILLED'`` over ``mutations.xml``): **310/316 = 98.1 %** (4
+  ``TIMED_OUT``, 2 ``SURVIVED``, both ``ParamsLineReader:137`` boundary
+  mutants argued equivalent in a comment there; I agree -- a line starting with
+  ``#`` never reaches that branch). With ``-am`` PIT fails in
+  ``cometgui-domain`` ("No mutations found") when ``-DtargetClasses`` is
+  narrowed, so the module-alone form is the one later units use; it resolves
+  upstream modules from ``_build/m2repo`` jars of 2026-09-18 (the agent checked
+  that nothing it uses changed since).
+* **The switch goes red:** with ``MetadataLoaderTest``, ``SchemaDriftTest``,
+  ``SchemaDriftFixtureTest``, ``BundledMetadataTest``,
+  ``CometParameterSchemaProviderTest`` and ``ParamsLineReaderTest`` moved aside
+  (four alone left 264/316 = 83.5 %, still green), PIT exits 1 with
+  ``Mutation score of 78 is below threshold of 80`` and the ``build.sh``
+  scoring reads **244/316 = 77.2 %**. Restored; ``sha256sum -c`` all OK;
+  ``git status`` clean.
+* **Injection 1** (``SchemaDrift.sameValue`` compares only the first token of
+  a default). My first form ``index < 1`` went red **for the wrong reason** --
+  21 ``ArrayIndexOutOfBounds`` errors on empty defaults -- so I did not count
+  it. Re-injected as ``index < Math.min(1, left.length)``: class
+  ``756c4f92`` -> ``452ece0d``; exactly one failure,
+  ``SchemaDriftTest.defaultDiffersInAPartialDump`` -- ``PARTIAL_DISCOVERY:
+  declared 10, modelled 9, allow-listed 1, findings 0 ==> expected: <1> but
+  was: <0>``. **Thin:** one constructed test is all that guards a later-token
+  default (``variable_mod01``'s ``15.9949 M 0 3 -1 0 0 0.0``); noted for unit
+  8's harness.
+* **Injection 2** (``MetadataLoader`` duplicate-name check never matches):
+  class ``760e5840`` -> ``14138057``;
+  ``MetadataLoaderTest.aDuplicateNameIsRejected`` -- ``Expected
+  ...InvalidMetadataException to be thrown, but nothing was thrown.``
+* ArchUnit: ``mvn -B -o -pl cometgui-archtests -am test
+  -Dtest='org.cometgui.archtests.**' -Dsurefire.failIfNoSpecifiedTests=false``
+  -> ``Tests run: 21, Failures: 0``, ``BUILD SUCCESS``.
+* Docs: the agent's ``--only docs --only traceability`` ran green (2 controls,
+  71 s); I re-run both on this sign-off commit.
+* **``--only tests`` not run, by tier 1's instruction** (2026-10-02: it took
+  2977 s at the Phase 05 exit gate; tier 1 runs it once, at this phase's exit
+  gate). I had started it and stopped it on that instruction; it works in
+  ``_build/test-gate-sandbox`` and the tree was untouched. **For tier 1's
+  exit-gate run:** the unit 2 agent ran it once, in a loaded window, and its
+  control 7 failed with ``cometgui-ui``'s
+  ``ProgressReachesTheInterfaceThreadTest.aTerminalReportRebuildsTheRowListOnTheInterfaceThread``
+  timing out after 30 s inside the sandbox ``build.sh`` while
+  ``cometgui-params-comet`` built SUCCESS there. Unexplained, unreproduced,
+  and not in this phase's module.
+
+Findings recorded by the agent that later units inherit: Comet 2026.02.2's
+reader ignores ``spectral_library_ms_level`` (it looks for
+``speclib_ms_level``) and ``add_U_selenocysteine``; where documentation and
+source disagree the source at the tag wins; every number in the JSON is a
+string (``JsonReader`` rejects fractions); inline comments are not yet in the
+metadata (unit 4's).
 
 .. _p06-u3-signoff:
 
@@ -404,4 +491,6 @@ None yet. Reported upward, not blocking:
   *Starting state*);
 * tier 1 committed ``STATUS.rst`` and ``nightly.yml`` inside unit 1's build
   window; one documentation build in that window failed and then passed
-  unchanged (unit 1 sign-off).
+  unchanged (unit 1 sign-off);
+* for tier 1's exit-gate ``--only tests`` run: one sandbox failure seen by the
+  unit 2 agent in ``cometgui-ui`` (unit 2 sign-off).
