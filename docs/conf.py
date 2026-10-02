@@ -65,6 +65,25 @@ html_static_path = []
 html_title = "CometGUI documentation"
 
 
+# -- Link check (scripts/ci/nightly-linkcheck.sh) ------------------------------
+#
+# The developer pages cite Comet's source by line, as
+# https://github.com/UWPR/Comet/blob/<tag>/<file>#L<n>-L<m>.  GitHub draws those
+# line anchors in the browser with JavaScript; they are never in the HTML the
+# builder fetches, so checking them reports "Anchor not found" for every one,
+# right or wrong, and fetching a large source page once per anchor drew 504s and
+# 429s from GitHub (Phase 06 exit gate, 2026-10-02: 57 "broken", none of them a
+# missing file).  So for GitHub source views the anchor is not checked and the
+# URL still is: a renamed file or a mistyped tag stays red.  What this does not
+# prove is that a cited line range is the right one; the citations name a fixed
+# release tag, so the lines cannot drift under them.
+linkcheck_anchors_ignore_for_url = [r"https://github\.com/[^/]+/[^/]+/blob/.*"]
+# Gentler on one host: fewer parallel requests, and wait out a 429 rather than
+# reporting it broken.
+linkcheck_workers = 4
+linkcheck_rate_limit_timeout = 600.0
+
+
 # -- Extension points --------------------------------------------------------
 #
 # R-DOC-03: the traceability report is generated here, during the documentation
