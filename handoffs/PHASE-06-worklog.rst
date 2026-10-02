@@ -488,7 +488,67 @@ loop appears never to advance past a non-numeric token (read, not run).
 Unit 4
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-02 at ``de95807``, after one round of rework.** First
+commit ``14e43da`` (33 files: new ``model`` package -- ``CometParameters``,
+``ParameterEntry``, sealed ``ParameterValue``, ``ValueOrigin``,
+``UnknownParameter``, ``Diagnostic``; ``CometParamsParser``/``ParseResult``;
+``CanonicalParamsWriter``/``WrittenParams``; a curated ``inlineComment`` on all
+118 parameters, 87 of them Comet's own ``-q`` text; ``value/Numbers`` made
+public, visibility only -- I read that diff). Rework ``de95807`` (7 files).
+
+**Rejection, round 1** (recorded under *Rejections and rework*): the agent's
+report said imported comments on modelled parameters were not kept. ``R-PARAM-05``
+says "The parser shall preserve the file's comment structure: the leading
+``# comet_version`` marker line, block comments between parameters, and inline
+trailing comments." Sent back; the rework added ``parser/ImportedComments`` on
+``ParseResult`` (marker, per-parameter block comments, inline comment,
+continuation lines, the lines around the enzyme table), left the canonical
+writer and the model's equality untouched, and pinned the canonical text's
+SHA-256 (``f381afe1...d62b``, 10 656 bytes) in ``CanonicalWriterTest.textUnchanged``
+so the rework provably did not move it.
+
+What I ran and saw, on ``de95807``:
+
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``
+  (2m58s); module ``Tests run: 690, Failures: 0, Errors: 0, Skipped: 0``;
+  JaCoCo LINE 2039/2046, BRANCH 771/777; **93 compiled classes, 93 in
+  ``jacoco.xml``**.
+* PIT, module alone, POM ``targetClasses``: **722/728 = 99.2 %** killed
+  (``build.sh`` scoring); per package ``model`` 89/89, ``writer`` 30/30,
+  ``value`` 200/200, ``schema`` 307/308, ``parser`` 96/101. All six non-kills
+  are unit 2's, already accepted (``ParamsLineReader:137`` x2 equivalent;
+  ``ParamsLineReader:78``/``87`` and the provider's ``Collector:289``
+  ``TIMED_OUT``). **No survivor in ``model``, ``parser`` (unit 4's code) or
+  ``writer``.**
+* **Injection 1** (the writer silently skips every parameter whose value text
+  is empty -- ``peff_obo``, ``mass_offsets``... dropped): class ``2a55b941`` ->
+  ``61be8a33``; 4 failures in *gate item 1*, e.g. ``textUnchanged`` --
+  ``expected: <f381afe1...d62b> but was: <185bce30...f38a>`` -- plus
+  ``valuesAsComet``, ``secondParseIsTheSameModel``, ``inlineComments``.
+  Restored, ``sha256sum -c`` OK.
+* **Injection 2** (the parser stamps declared values ``COMET_DEFAULT`` instead
+  of ``IMPORTED``): ``CometParamsParser$Run.class`` ``55f17fd9`` ->
+  ``50209b96``; 6 failures, e.g. ``realDefaultsFile`` -- the default-origin set
+  expected as the 22 ``-q``-only names, was every one of the 118 -- and
+  ``everyParameterImported``, ``emptyIsAValue``, ``customEnzymeSurvives``.
+  Restored, ``sha256sum -c`` OK.
+* ``CometReadsCanonicalRealBinaryTest`` executed (surefire: 1 test, 0
+  failures): the real binary given the canonical file behaves exactly as given
+  its own ``-q`` file (same warning, same "input file not found", exit 1). The
+  agent states plainly what that does **not** prove -- that Comet interprets
+  each value as the model means it.
+* ``--only docs --only traceability`` -> ``2 control(s) passed, 0 failed, in 36
+  seconds``. ``git status`` clean.
+
+Inherited from the agent's findings, all cited to the source at the tag:
+Comet looks for the marker only in the first seven lines (the writer's header
+goes after it; confirmed on the real binary: 7 comment lines before the marker
+refused, 6 accepted); Comet keeps the last of two duplicate declarations --
+**our policy is to refuse the file, naming both lines (a choice, open to
+review)**; Comet's undefined-enzyme checks never fire (the writer's refusal is
+the only guard); Comet reads only the first token of a text value; the
+canonical form does not reproduce Comet's section comments (the parse result
+keeps them).
 
 .. _p06-u5-signoff:
 
@@ -521,7 +581,10 @@ Not yet dispatched.
 Rejections and rework
 =====================
 
-None yet.
+* **Unit 4, round 1 (``14e43da``)** -- sent back on ``R-PARAM-05``: the parser
+  discarded block and inline comments of modelled parameters. Reworked at
+  ``de95807`` without moving the canonical output (its SHA-256 is now pinned by
+  a test). Accepted.
 
 Deferred
 ========
