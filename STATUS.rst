@@ -4,30 +4,25 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-10-01
-:Updated by: Main orchestrator, session 09 (**Phase 05 signed off PARTIAL**
-   and **Phase 06 dispatched**, both on the owner's instruction of
-   2026-10-01 -- :ref:`status-p05-signed`)
-:Current phase: 06 -- Comet Parameter Model, **dispatched 2026-10-01**: one
-   fresh phase orchestrator, briefed by ``handoffs/PHASE-06-BRIEF.rst``, the
-   only phase live in the tree. Phase 05 is **PARTIAL**, signed off 2026-10-01
-   on tier 1's own full re-run of the exit gate, a fixed ``traceability``
-   harness, three of its own defect injections and two macOS runner
-   transcripts; the one unmet item is gate item 9 (Gatekeeper acceptance),
-   which a hosted runner cannot settle (:ref:`status-p05-signed`). Phases 03
-   and 04 **PARTIAL**; 00 and 01 **PARTIAL**; 02 **PASSED**.
-:Overall: Six phases are signed off -- 02 PASSED; 00, 01, 03, 04 and 05
-   PARTIAL. The repository, build and every quality gate exist and have each
-   been seen to fail on a deliberate defect. **A macOS runner executed Comet
-   for the first time on 2026-10-01** and exposed a real defect -- the
-   ``com.apple.quarantine`` fix-up was a no-op on macOS -- fixed in Phase 05
-   unit 14 and confirmed on a second macOS run. **Build economy is a standing
-   owner rule** (said three times): the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (~85 minutes) runs once per phase, at the
-   exit gate, by tier 1. Live and unfixed: **the nightly has failed every night
-   since 2026-08-31** (:ref:`status-nightly-masking`), and
-   ``scripts/dev-verify.sh --mutation`` is broken
-   (:ref:`status-p05-signed`). Pull request #1 merged 2026-09-02; Windows ran
-   Percolator (:ref:`status-windows-first-execution`).
+:Updated by: Main orchestrator, session 09 (**Phase 06 signed off PASSED**
+   on 2026-10-02 -- :ref:`status-p06-signed`; earlier, Phase 05 signed off
+   PARTIAL and the nightly fixed -- :ref:`status-p05-signed`)
+:Current phase: **none -- PAUSED by the owner's instruction** ("pause when
+   phase 6 is green"). Phase 06 is **PASSED**, signed off 2026-10-02 on tier
+   1's full exit-gate run, two red controls fixed at the root, a re-run of the
+   ``tests`` control and three of tier 1's own injections. Phase 07 (Comet
+   Parameter Editor UI) is next and is **not dispatched**; it waits for the
+   owner.
+:Overall: Seven phases are signed off -- 02 and 06 PASSED; 00, 01, 03, 04 and
+   05 PARTIAL. The repository, build and every quality gate exist and have each
+   been seen to fail on a deliberate defect. **Build economy is a standing
+   owner rule**: the full ``scripts/build.sh`` plus
+   ``scripts/verify-all-gates.sh`` (~105 minutes now) runs once per phase, at
+   the exit gate, by tier 1. Open owner decisions: how ``build.sh`` scores the
+   mutation gate (``TIMED_OUT``, and module-wide versus per-package --
+   :ref:`status-p06-signed`); Comet 2026.03.0 is out and not in the matrix.
+   The nightly is red **by the owner's decision** until Phase 15 replaces its
+   stubs (:ref:`status-nightly-masking`).
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -3213,6 +3208,100 @@ runner** for gate item 9, the **~88-minute phase sign-off**, and the
 Handoffs written at tier 1 because the phase could not write its own:
 ``handoffs/PHASE-05-handoff.rst`` (rewritten for a successor) and
 ``handoffs/SESSION-08-main-orchestrator.rst``.
+
+.. _status-p06-signed:
+
+Phase 06 signed off (2026-10-02)
+================================
+
+Dispatched 2026-10-01 with ``handoffs/PHASE-06-BRIEF.rst``; the owner asked
+tier 1 to pause once it was green. Eight serial units, all accepted by the
+phase orchestrator, one sent back once (unit 4: the parser discarded imported
+comments, ``R-PARAM-05``). Every unit was signed off with module-scoped PIT and
+at least two production-code injections of the orchestrator's own; the 50-minute
+``tests`` control was deferred to tier 1 on the owner's build-economy rule.
+Record: ``handoffs/PHASE-06-handoff.rst`` and ``handoffs/PHASE-06-worklog.rst``.
+
+**What exists.** ``org.cometgui.params.comet``: real ``comet -q``/``-p``
+fixtures for 2026.02.2 (and a 2024.01.0 fixture for migration), pinned by
+SHA-256; the schema and curated metadata for all 118 parameters with a drift
+test; typed values for all fifteen variable-modification slots and the enzyme
+table; parser, canonical ``Locale.ROOT`` writer and value-origin tracking;
+per-field and cross-field validation; presets as deltas, diffs and schema
+migration; the generated ``reference/comet_parameters_generated.rst``; and
+``scripts/verify-param-gates.sh`` (68 controls, about 4.5 minutes), registered
+in ``scripts/verify-all-gates.sh`` with floor 68.
+
+**Tier 1's exit-gate run**, at ``8ffe626`` on a quiet tree:
+``scripts/build.sh`` 11/11 stages in 1375 s; ``scripts/verify-all-gates.sh``
+11 of 13 controls passed in 4940 s, ``params`` 68 controls in 267 s. Two red,
+both fixed rather than waived:
+
+* ``pipeline`` -- the nightly link check reported 57 links "broken", all
+  GitHub source citations by line that Phase 06 added (25 "Anchor not found",
+  20 504s, 12 429s). GitHub draws line anchors with JavaScript, so the builder
+  can never see them. Fixed at ``110229d``: anchors are not checked for
+  ``github.com/*/blob/*`` and the URL still is, with fewer workers and a 600 s
+  rate-limit wait. Proved on a probe (a real cited line passes; a misspelled
+  file and a bogus tag each fail 404). Full check: 198 links resolved, none
+  broken, 1039 s. The other 23 pipeline steps had classified as expected in the
+  failing run.
+* ``tests`` -- control 5 failed because
+  ``ProgressReachesTheInterfaceThreadTest.aTerminalReportRebuildsTheRowListOnTheInterfaceThread``
+  (Phase 05 unit 9) timed out inside the sandbox build; seen once before by a
+  Phase 06 unit agent. Root cause, found by a tier-1 fix agent: the **test**
+  listened on a ``rows()`` view it did not keep, and JavaFX's unmodifiable view
+  observes its source only weakly, so a garbage collection between registering
+  and the report dropped the listener. Memory pressure, not CPU load, triggered
+  it (old test failed 12/30 with a 1 MB young generation; fixed test passed
+  100/100 there and 30/30 under 64 busy processes). Fixed at ``230a24d``, tests
+  only; a sibling test had the same latent shape and was fixed too. Production
+  was correct throughout: ``ToolManagerPane`` and ``StageStepper`` hold their
+  views in fields, as ``rows()``'s javadoc requires. Two production injections
+  still turn the test red. The ``tests`` control was then re-run alone:
+  ``PASS tests``, 37 assertions passed, 0 failed, 2949 s.
+
+**Tier 1's own injections**, into ``cometgui-params-comet`` over its 976
+tests, each landed, restored and verified with ``sha256sum -c``:
+
+* duplicate parameter declarations accepted silently -- 3 failures, e.g.
+  ``CometParamsParserTest ... a parse with an error must produce no model``;
+* duplicate enzyme numbers accepted by the parser -- caught by
+  ``CometParamsParserTest.duplicateEnzymeNumber`` through a second safeguard
+  (the enzyme table refuses the duplicate itself);
+* the writer emits the terminus code in the terminal-distance field -- 263
+  failures, e.g. ``expected: <15.9949 M 0 3 -1 0 0> but was: <15.9949 M 0 3 0 0
+  0>``.
+
+Tier 1 also re-read the three surviving mutants the phase argued equivalent
+(``ParamsLineReader:137`` x2, ``VariableModRules:178``) against the code and
+agrees: none is reachable.
+
+**Grade: PASSED.** All nine exit-gate items met on the phase's evidence and
+tier 1's re-run. One honest limit, which the gate does not ask for: only Linux
+x86-64 Comet output has been captured.
+
+**Residue and escalations carried forward:**
+
+* ``scripts/build.sh``'s mutation gate is **module-wide**: with the validation
+  tests gutted, validation fell to 37.5% while the module stayed at 88.7%, so
+  ``build.sh`` passes; only ``verify-param-gates.sh``'s per-package grade
+  catches it. How ``build.sh`` scores is the owner's decision, alongside the
+  ``TIMED_OUT`` question (:ref:`status-mutation-drift`).
+* **Comet 2026.03.0** was released upstream on 2026-10-01 and is not in the
+  release matrix.
+* The specification's "selected index and search options are compatible"
+  validation needs the filesystem (the database's ``.idx``) and **no phase owns
+  it**.
+* ``scripts/verify-test-gates.sh``'s precondition checks
+  ``scratch/phase05/artefacts`` but not ``scratch/phase06/artefacts``, which
+  the sandbox build now also needs.
+* ``phases/PHASE-06-comet-param-model.rst`` says ``-p`` misses "eleven other
+  parameters"; the real number is twelve (the specification is right).
+* Design note: ``cometgui-params-comet`` now depends on ``cometgui-provenance``
+  so the project keeps one JSON reader (``docs/developer/architecture.rst``).
+* The nightly link check now takes about 17 minutes, because it waits out
+  GitHub's rate limits.
 
 .. _status-p05-signed:
 

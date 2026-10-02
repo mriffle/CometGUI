@@ -51,7 +51,7 @@ authoritative for its own scope and exit gate.
      - Comet Parameter Model
      - 01, 05
      - --
-     - IN PROGRESS (dispatched 2026-10-01)
+     - PASSED (signed off 2026-10-02)
    * - `07 <PHASE-07-comet-param-ui.rst>`_
      - Comet Parameter Editor UI
      - 02, 06

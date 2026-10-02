@@ -3,7 +3,7 @@ PHASE-06: Comet Parameter Model
 ===============================
 
 :Phase: 06
-:Status: IN PROGRESS (dispatched 2026-10-01)
+:Status: PASSED (signed off 2026-10-02)
 :Depends on: 01, 05
 :Blocked by decisions: none
 :Delivers: R-PARAM-01..12, R-DOC-04, R-TEST-01
@@ -88,7 +88,7 @@ Risks and notes
 ---------------
 
 * Building the schema from ``comet -p`` instead of ``-q`` silently loses ten
-  variable-modification slots and eleven other parameters. This is the
+  variable-modification slots and twelve other parameters. This is the
   specific failure this phase exists to prevent.
 
 Handoff
