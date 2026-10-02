@@ -54,10 +54,13 @@ import org.cometgui.provenance.json.JsonValue;
  * tolerance-pair member may not carry the generic ordering rule.
  *
  * <p>Each version record carries its variable-modification tuple layout ({@code R-PARAM-09}),
- * checked by {@link VariableModLayout}'s own rules; a parameter named as Comet names a tuple slot
- * ({@code variable_mod} and two digits) must be of kind {@link ValueKind#VARIABLE_MOD_TUPLE} and
- * the other way round; and a tuple default must hold as many fields as the layout of every version
- * it claims.
+ * checked by {@link VariableModLayout}'s own rules, and the defaults that release writes where they
+ * differ from a parameter's curated one: each override must name a parameter whose range claims the
+ * version, once, with an {@code https://} source, and a value that passes every rule the curated
+ * default must pass and is not the curated default itself; a parameter named as Comet names a tuple
+ * slot ({@code variable_mod} and two digits) must be of kind {@link ValueKind#VARIABLE_MOD_TUPLE}
+ * and the other way round; and a tuple default must hold as many fields as the layout of every
+ * version it claims.
  *
  * <p>The format is documented in {@code docs/developer/comet_parameter_schema.rst}; the
  * documentation generator reads the same file with Python's standard library.
@@ -96,7 +99,15 @@ public final class MetadataLoader {
                     "parameters");
 
     private static final List<String> VERSION_FIELDS =
-            List.of("version", "marker", "parameterPages", "source", "variableModTuple");
+            List.of(
+                    "version",
+                    "marker",
+                    "parameterPages",
+                    "source",
+                    "variableModTuple",
+                    "defaults");
+
+    private static final List<String> OVERRIDE_FIELDS = List.of("name", "default", "source");
 
     private static final List<String> TUPLE_FIELDS = List.of("source", "fields");
 
@@ -182,22 +193,96 @@ public final class MetadataLoader {
                             + " only");
         }
         top.text("description");
-        List<CometVersionRecord> versions = versions(top);
+        List<PendingVersion> pending = versions(top);
         categories(top);
-        List<ParameterDefinition> parameters = parameters(top, versions);
+        List<ParameterDefinition> parameters =
+                parameters(top, pending.stream().map(PendingVersion::record).toList());
+        List<CometVersionRecord> versions = new ArrayList<>();
+        for (PendingVersion version : pending) {
+            versions.add(version.withDefaults(overrides(version, parameters)));
+        }
         tupleDefaults(parameters, versions);
         List<InternalParameter> internal = internal(top, parameters);
         EnzymeTableMetadata enzymeTable = enzymeTable(top, parameters);
         return new CuratedMetadata(SCHEMA_VERSION, versions, parameters, internal, enzymeTable);
     }
 
-    private static List<CometVersionRecord> versions(Node top) {
+    /**
+     * A version record read before the parameters it overrides defaults for.
+     *
+     * @param record the record, without its overrides
+     * @param node where it is, for reporting an override
+     */
+    private record PendingVersion(CometVersionRecord record, Node node) {
+
+        CometVersionRecord withDefaults(Map<String, String> defaults) {
+            return new CometVersionRecord(
+                    record.version(),
+                    record.marker(),
+                    record.parameterPages(),
+                    record.source(),
+                    record.variableModTuple(),
+                    defaults);
+        }
+    }
+
+    private static Map<String, String> overrides(
+            PendingVersion pending, List<ParameterDefinition> parameters) {
+        Node version = pending.node();
+        ToolVersion curated = pending.record().version();
+        List<JsonValue> array = version.array("defaults");
+        Map<String, String> defaults = new LinkedHashMap<>();
+        for (int index = 0; index < array.size(); index++) {
+            Node entry = Node.of(array.get(index), version.where(), "defaults[" + index + "]");
+            entry.onlyFields(OVERRIDE_FIELDS);
+            String name = entry.text("name");
+            Node named = entry.renamed(version.where() + " default override for \"" + name + "\"");
+            ParameterDefinition definition =
+                    parameters.stream()
+                            .filter(p -> p.name().equals(name))
+                            .findFirst()
+                            .orElseThrow(
+                                    () -> named.failure("name", "is not a modelled parameter"));
+            if (!definition.supportedVersions().contains(curated)) {
+                throw named.failure(
+                        "name",
+                        "is not modelled for Comet "
+                                + curated.text()
+                                + ", so that version has no default for it");
+            }
+            if (defaults.containsKey(name)) {
+                throw named.failure("name", "is overridden twice");
+            }
+            String value = named.string("default");
+            checkDefault(
+                    named,
+                    definition.kind(),
+                    definition.serialization(),
+                    value,
+                    definition.minimum(),
+                    definition.maximum(),
+                    definition.choices());
+            if (value.equals(definition.defaultValue())) {
+                throw named.failure(
+                        "default",
+                        "\""
+                                + value
+                                + "\" repeats the parameter's own curated default; an override"
+                                + " records only a difference");
+            }
+            named.url("source");
+            defaults.put(name, value);
+        }
+        return defaults;
+    }
+
+    private static List<PendingVersion> versions(Node top) {
         List<JsonValue> array = top.array("versions");
         if (array.isEmpty()) {
             throw top.failure(
                     "versions", "is empty; the metadata must name the Comet versions it describes");
         }
-        List<CometVersionRecord> records = new ArrayList<>();
+        List<PendingVersion> records = new ArrayList<>();
         Set<ToolVersion> seen = new HashSet<>();
         for (int index = 0; index < array.size(); index++) {
             Node node = Node.of(array.get(index), "versions[" + index + "]", "versions");
@@ -225,8 +310,10 @@ public final class MetadataLoader {
             String parameterPages = node.url("parameterPages");
             String source = node.url("source");
             records.add(
-                    new CometVersionRecord(
-                            version, marker, parameterPages, source, tupleLayout(node)));
+                    new PendingVersion(
+                            new CometVersionRecord(
+                                    version, marker, parameterPages, source, tupleLayout(node)),
+                            node));
         }
         return records;
     }
@@ -264,8 +351,10 @@ public final class MetadataLoader {
             if (definition.kind() != ValueKind.VARIABLE_MOD_TUPLE) {
                 continue;
             }
-            int fields = definition.defaultValue().split("\\s+").length;
             for (CometVersionRecord record : versions) {
+                String value =
+                        record.defaultOverride(definition.name()).orElse(definition.defaultValue());
+                int fields = value.split("\\s+").length;
                 int expected = record.variableModTuple().fields().size();
                 if (definition.supportedVersions().contains(record.version())
                         && fields != expected) {
@@ -273,7 +362,7 @@ public final class MetadataLoader {
                             "parameter \"" + definition.name() + "\"",
                             "default",
                             "\""
-                                    + definition.defaultValue()
+                                    + value
                                     + "\" holds "
                                     + fields
                                     + " fields, and the tuple layout of Comet "

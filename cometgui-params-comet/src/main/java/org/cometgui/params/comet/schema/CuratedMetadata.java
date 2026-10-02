@@ -79,7 +79,9 @@ public record CuratedMetadata(
     }
 
     /**
-     * The definition of one parameter, whatever versions it claims.
+     * The definition of one parameter, whatever versions it claims, with the parameter's own
+     * curated default -- not any version's override of it ({@link CometVersionRecord#defaults()}).
+     * For the definition as one version has it, use {@link #parameter(String, ToolVersion)}.
      *
      * @param name the parameter name
      * @return the definition, or empty if the parameter is not modelled
@@ -90,14 +92,60 @@ public record CuratedMetadata(
     }
 
     /**
-     * The definitions that claim a version, in metadata order.
+     * The definition of one parameter as one version has it: present only if its range claims the
+     * version, and carrying that version's default.
+     *
+     * @param name the parameter name
+     * @param version the Comet version
+     * @return the definition, or empty if the parameter is not modelled for that version
+     */
+    public Optional<ParameterDefinition> parameter(String name, ToolVersion version) {
+        Objects.requireNonNull(version, "version");
+        return parameter(name)
+                .filter(p -> p.supportedVersions().contains(version))
+                .map(p -> forVersion(p, version));
+    }
+
+    /**
+     * The definitions that claim a version, in metadata order, each carrying that version's
+     * default: the curated default, or the version record's override of it where the version's own
+     * {@code -q} output writes another value.
      *
      * @param version the Comet version
      * @return the definitions whose version range contains it
      */
     public List<ParameterDefinition> parametersFor(ToolVersion version) {
         Objects.requireNonNull(version, "version");
-        return parameters.stream().filter(p -> p.supportedVersions().contains(version)).toList();
+        return parameters.stream()
+                .filter(p -> p.supportedVersions().contains(version))
+                .map(p -> forVersion(p, version))
+                .toList();
+    }
+
+    private ParameterDefinition forVersion(ParameterDefinition definition, ToolVersion version) {
+        Optional<String> override =
+                version(version).flatMap(record -> record.defaultOverride(definition.name()));
+        if (override.isEmpty()) {
+            return definition;
+        }
+        return new ParameterDefinition(
+                definition.name(),
+                definition.displayName(),
+                definition.category(),
+                definition.kind(),
+                definition.visibility(),
+                override.get(),
+                definition.minimum(),
+                definition.maximum(),
+                definition.choices(),
+                definition.shortHelp(),
+                definition.inlineComment(),
+                definition.detailedHelpRef(),
+                definition.supportedVersions(),
+                definition.serialization(),
+                definition.validators(),
+                definition.aliases(),
+                definition.related());
     }
 
     /**

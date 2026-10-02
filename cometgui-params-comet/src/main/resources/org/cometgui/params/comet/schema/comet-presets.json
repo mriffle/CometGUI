@@ -1,0 +1,159 @@
+{
+  "presetFormat": 1,
+  "description": "CometGUI's built-in Comet parameter presets: versioned configuration deltas, each listing only the parameters it sets, as value text in the parameter's own comet.params syntax, with the Comet version and metadata schemaVersion it was made against and a citation for every value. Read by org.cometgui.params.comet.presets.PresetLoader; format described in docs/developer/comet_parameter_schema.rst.",
+  "presets": [
+    {
+      "id": "low-low",
+      "displayName": "Low-res precursor, low-res fragments",
+      "description": "Low-resolution MS1 and low-resolution (ion trap) MS/MS: a 3 amu precursor window applied to the singly charged mass, no isotope offsets, and ~1 Da fragment bins. The values of Comet's own comet.params.low-low example.",
+      "origin": "BUILT_IN",
+      "cometVersion": "2026.02.2",
+      "schemaVersion": 1,
+      "source": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low",
+      "deltas": [
+        {
+          "parameter": "peptide_mass_tolerance_upper",
+          "value": "3.0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low line 13: peptide_mass_tolerance_upper = 3.0 (fetched 2026-10-02, SHA-256 53c2782ad8de4775d2f686a6b76828d87487b66e0932bea32ca32ce7ebf73c5b); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_upper.html"
+        },
+        {
+          "parameter": "peptide_mass_tolerance_lower",
+          "value": "-3.0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low line 14: peptide_mass_tolerance_lower = -3.0 (fetched 2026-10-02, SHA-256 53c2782ad8de4775d2f686a6b76828d87487b66e0932bea32ca32ce7ebf73c5b); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_lower.html"
+        },
+        {
+          "parameter": "peptide_mass_units",
+          "value": "0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low line 15: peptide_mass_units = 0 (fetched 2026-10-02, SHA-256 53c2782ad8de4775d2f686a6b76828d87487b66e0932bea32ca32ce7ebf73c5b); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_units.html"
+        },
+        {
+          "parameter": "precursor_tolerance_type",
+          "value": "0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low line 16: precursor_tolerance_type = 0 (fetched 2026-10-02, SHA-256 53c2782ad8de4775d2f686a6b76828d87487b66e0932bea32ca32ce7ebf73c5b); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/precursor_tolerance_type.html"
+        },
+        {
+          "parameter": "isotope_error",
+          "value": "0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low line 17: isotope_error = 0 (fetched 2026-10-02, SHA-256 53c2782ad8de4775d2f686a6b76828d87487b66e0932bea32ca32ce7ebf73c5b); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/isotope_error.html"
+        },
+        {
+          "parameter": "fragment_bin_tol",
+          "value": "1.0005",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low line 47: fragment_bin_tol = 1.0005 (fetched 2026-10-02, SHA-256 53c2782ad8de4775d2f686a6b76828d87487b66e0932bea32ca32ce7ebf73c5b); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_tol.html; Comet's fragment_bin_offset page: \"For ion trap data with a fragment_bin_tol of 1.0005, it is recommended to set fragment_bin_offset to 0.4\"; Comet 2026.02.2's own -q output, line 74: \"ion trap ms/ms: 1.0005 tolerance, 0.4 offset (mono masses), theoretical_fragment_ions = 1\""
+        },
+        {
+          "parameter": "fragment_bin_offset",
+          "value": "0.4",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low line 48: fragment_bin_offset = 0.4 (fetched 2026-10-02, SHA-256 53c2782ad8de4775d2f686a6b76828d87487b66e0932bea32ca32ce7ebf73c5b); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_offset.html; Comet's fragment_bin_offset page: \"For ion trap data with a fragment_bin_tol of 1.0005, it is recommended to set fragment_bin_offset to 0.4\"; Comet 2026.02.2 -q output, line 74"
+        },
+        {
+          "parameter": "theoretical_fragment_ions",
+          "value": "1",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low line 49: theoretical_fragment_ions = 1 (fetched 2026-10-02, SHA-256 53c2782ad8de4775d2f686a6b76828d87487b66e0932bea32ca32ce7ebf73c5b); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/theoretical_fragment_ions.html; Comet's theoretical_fragment_ions page: \"For extremely coarse fragment_bin_tol values such as the historical ~1 Da bins, a theoretical_fragment_ions value of 1 is optimal\"; Comet 2026.02.2 -q output, line 74"
+        }
+      ]
+    },
+    {
+      "id": "high-low",
+      "displayName": "High-res precursor, low-res fragments",
+      "description": "High-resolution MS1 with low-resolution (ion trap) MS/MS: a 20 ppm precursor window with isotope offsets 0, +1 and +2, and ~1 Da fragment bins. The values of Comet's own comet.params.high-low example.",
+      "origin": "BUILT_IN",
+      "cometVersion": "2026.02.2",
+      "schemaVersion": 1,
+      "source": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low",
+      "deltas": [
+        {
+          "parameter": "peptide_mass_tolerance_upper",
+          "value": "20.0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low line 13: peptide_mass_tolerance_upper = 20.0 (fetched 2026-10-02, SHA-256 d3addcf29858dfb94d7123ae3303ca8c96248d22afbb7e244cfd909954ed0e0d); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_upper.html"
+        },
+        {
+          "parameter": "peptide_mass_tolerance_lower",
+          "value": "-20.0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low line 14: peptide_mass_tolerance_lower = -20.0 (fetched 2026-10-02, SHA-256 d3addcf29858dfb94d7123ae3303ca8c96248d22afbb7e244cfd909954ed0e0d); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_lower.html"
+        },
+        {
+          "parameter": "peptide_mass_units",
+          "value": "2",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low line 15: peptide_mass_units = 2 (fetched 2026-10-02, SHA-256 d3addcf29858dfb94d7123ae3303ca8c96248d22afbb7e244cfd909954ed0e0d); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_units.html"
+        },
+        {
+          "parameter": "precursor_tolerance_type",
+          "value": "1",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low line 16: precursor_tolerance_type = 1 (fetched 2026-10-02, SHA-256 d3addcf29858dfb94d7123ae3303ca8c96248d22afbb7e244cfd909954ed0e0d); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/precursor_tolerance_type.html"
+        },
+        {
+          "parameter": "isotope_error",
+          "value": "2",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low line 17: isotope_error = 2 (fetched 2026-10-02, SHA-256 d3addcf29858dfb94d7123ae3303ca8c96248d22afbb7e244cfd909954ed0e0d); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/isotope_error.html"
+        },
+        {
+          "parameter": "fragment_bin_tol",
+          "value": "1.0005",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low line 47: fragment_bin_tol = 1.0005 (fetched 2026-10-02, SHA-256 d3addcf29858dfb94d7123ae3303ca8c96248d22afbb7e244cfd909954ed0e0d); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_tol.html; Comet's fragment_bin_offset page: \"For ion trap data with a fragment_bin_tol of 1.0005, it is recommended to set fragment_bin_offset to 0.4\"; Comet 2026.02.2's own -q output, line 74: \"ion trap ms/ms: 1.0005 tolerance, 0.4 offset (mono masses), theoretical_fragment_ions = 1\""
+        },
+        {
+          "parameter": "fragment_bin_offset",
+          "value": "0.4",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low line 48: fragment_bin_offset = 0.4 (fetched 2026-10-02, SHA-256 d3addcf29858dfb94d7123ae3303ca8c96248d22afbb7e244cfd909954ed0e0d); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_offset.html; Comet's fragment_bin_offset page: \"For ion trap data with a fragment_bin_tol of 1.0005, it is recommended to set fragment_bin_offset to 0.4\"; Comet 2026.02.2 -q output, line 74"
+        },
+        {
+          "parameter": "theoretical_fragment_ions",
+          "value": "1",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low line 49: theoretical_fragment_ions = 1 (fetched 2026-10-02, SHA-256 d3addcf29858dfb94d7123ae3303ca8c96248d22afbb7e244cfd909954ed0e0d); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/theoretical_fragment_ions.html; Comet's theoretical_fragment_ions page: \"For extremely coarse fragment_bin_tol values such as the historical ~1 Da bins, a theoretical_fragment_ions value of 1 is optimal\"; Comet 2026.02.2 -q output, line 74"
+        }
+      ]
+    },
+    {
+      "id": "high-high",
+      "displayName": "High-res precursor, high-res fragments",
+      "description": "High-resolution MS1 and high-resolution MS/MS: a 20 ppm precursor window with isotope offsets 0, +1 and +2, and 0.02 Da fragment bins. The values of Comet's own comet.params.high-high example, which are also comet -q's defaults.",
+      "origin": "BUILT_IN",
+      "cometVersion": "2026.02.2",
+      "schemaVersion": 1,
+      "source": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high",
+      "deltas": [
+        {
+          "parameter": "peptide_mass_tolerance_upper",
+          "value": "20.0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high line 13: peptide_mass_tolerance_upper = 20.0 (fetched 2026-10-02, SHA-256 112d894313513da67c1699f427ee522a816661681fc8234ea2a6b4a7b02f3db2); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_upper.html"
+        },
+        {
+          "parameter": "peptide_mass_tolerance_lower",
+          "value": "-20.0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high line 14: peptide_mass_tolerance_lower = -20.0 (fetched 2026-10-02, SHA-256 112d894313513da67c1699f427ee522a816661681fc8234ea2a6b4a7b02f3db2); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_lower.html"
+        },
+        {
+          "parameter": "peptide_mass_units",
+          "value": "2",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high line 15: peptide_mass_units = 2 (fetched 2026-10-02, SHA-256 112d894313513da67c1699f427ee522a816661681fc8234ea2a6b4a7b02f3db2); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_units.html"
+        },
+        {
+          "parameter": "precursor_tolerance_type",
+          "value": "1",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high line 16: precursor_tolerance_type = 1 (fetched 2026-10-02, SHA-256 112d894313513da67c1699f427ee522a816661681fc8234ea2a6b4a7b02f3db2); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/precursor_tolerance_type.html"
+        },
+        {
+          "parameter": "isotope_error",
+          "value": "2",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high line 17: isotope_error = 2 (fetched 2026-10-02, SHA-256 112d894313513da67c1699f427ee522a816661681fc8234ea2a6b4a7b02f3db2); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/isotope_error.html"
+        },
+        {
+          "parameter": "fragment_bin_tol",
+          "value": "0.02",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high line 47: fragment_bin_tol = 0.02 (fetched 2026-10-02, SHA-256 112d894313513da67c1699f427ee522a816661681fc8234ea2a6b4a7b02f3db2); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_tol.html; Comet's fragment_bin_offset page: \"For high-res MS/MS data, one might use a fragment_bin_tol of 0.02 and a corresponding fragment_bin_offset of 0.0\"; Comet 2026.02.2's own -q output, line 75: \"high res ms/ms: 0.02 tolerance, 0.0 offset (mono masses), theoretical_fragment_ions = 0\""
+        },
+        {
+          "parameter": "fragment_bin_offset",
+          "value": "0.0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high line 48: fragment_bin_offset = 0.0 (fetched 2026-10-02, SHA-256 112d894313513da67c1699f427ee522a816661681fc8234ea2a6b4a7b02f3db2); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_offset.html; Comet's fragment_bin_offset page: \"For high-res MS/MS data, one might use a fragment_bin_tol of 0.02 and a corresponding fragment_bin_offset of 0.0\"; Comet 2026.02.2 -q output, line 75"
+        },
+        {
+          "parameter": "theoretical_fragment_ions",
+          "value": "0",
+          "citation": "https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high line 49: theoretical_fragment_ions = 0 (fetched 2026-10-02, SHA-256 112d894313513da67c1699f427ee522a816661681fc8234ea2a6b4a7b02f3db2); parameter page https://uwpr.github.io/Comet/parameters/parameters_202602/theoretical_fragment_ions.html; Comet's theoretical_fragment_ions page: \"for narrower bins, such as ... ~0.02 for high-res MS/MS spectra, a value of 0 is optimal\"; Comet 2026.02.2 -q output, line 75"
+        }
+      ]
+    }
+  ]
+}

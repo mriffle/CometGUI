@@ -1,0 +1,7 @@
+# Comet parameter fixtures are the exact bytes `comet -q` / `comet -p` wrote,
+# pinned by the SHA256SUMS beside them and re-proved against the real binary on
+# every Linux build.  Git must never convert their line endings on checkout
+# (core.autocrlf=true is the default on GitHub's windows-latest runner), or
+# SHA256SUMS and the byte-equality tests fail there.  See the root
+# .gitattributes for why the project does not use a blanket `* text=auto`.
+* -text

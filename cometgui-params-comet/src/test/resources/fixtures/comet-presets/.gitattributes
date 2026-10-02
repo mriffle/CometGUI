@@ -1,0 +1,5 @@
+# Comet's own example parameter files, downloaded unmodified from its 2026.02
+# documentation pages and pinned by the SHA256SUMS beside them.  Git must never
+# convert their line endings on checkout (core.autocrlf=true on a Windows
+# runner), or the checksums fail there.
+* -text

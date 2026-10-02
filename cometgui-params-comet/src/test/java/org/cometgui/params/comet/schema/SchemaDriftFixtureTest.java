@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.cometgui.params.comet.fixtures.CometFixtures;
 import org.cometgui.params.comet.fixtures.CometManifest;
+import org.cometgui.params.comet.fixtures.MigrationFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -149,6 +150,37 @@ class SchemaDriftFixtureTest {
         assertEquals(DriftFinding.Kind.UNMODELLED, report.findings().get(0).kind());
         assertEquals("variable_mod15", report.findings().get(0).parameter());
         assertEquals(117, report.modelled());
+    }
+
+    @Test
+    @DisplayName("the migration fixture's Comet 2024.01.0 -q: 109 declared = 109 modelled, clean")
+    void theOlderReleaseHasNoDrift() throws IOException {
+        DriftReport report =
+                SchemaDrift.compare(
+                        SchemaDiscovery.discover(
+                                MigrationFixtures.text(CometFixtures.Mode.COMPLETE),
+                                DiscoveryMode.COMPLETE),
+                        BUNDLED);
+        System.out.println("[drift] " + report.describe());
+        assertTrue(report.isClean(), () -> "schema drift:\n" + report.describe());
+        assertEquals(
+                List.of(109, 109, 0),
+                List.of(report.declared(), report.modelled(), report.allowListed()),
+                "[declared, modelled, allow-listed] for Comet 2024.01.0");
+    }
+
+    @Test
+    @DisplayName(
+            "the migration fixture's Comet 2024.01.0 -p: PARTIAL_DISCOVERY, 87 declared, clean")
+    void theOlderReleasesPartialDumpHasNoDrift() throws IOException {
+        DriftReport report =
+                SchemaDrift.compare(
+                        SchemaDiscovery.discover(
+                                MigrationFixtures.text(CometFixtures.Mode.DEFAULTS),
+                                DiscoveryMode.PARTIAL_DISCOVERY),
+                        BUNDLED);
+        assertTrue(report.isClean(), report::describe);
+        assertEquals(List.of(87, 87), List.of(report.declared(), report.modelled()));
     }
 
     private static CuratedMetadata without(CuratedMetadata metadata, String name) {

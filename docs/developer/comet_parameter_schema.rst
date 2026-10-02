@@ -14,10 +14,11 @@ Comet parameter schema
    enzyme table, the tolerance pair, the ranges, the mass-offset list and the
    ion-series family (unit 3); the typed model with value origins, the parser,
    the canonical writer and write-once hashing (unit 4); validation, with the
-   workflow-enforced outputs and the decoy source on the model (unit 5).
-   Presets, migration and the generator behind
-   :doc:`../reference/comet_parameters_generated` (``R-DOC-04``) are still to
-   come; where this page mentions them it describes intent, not the product.
+   workflow-enforced outputs and the decoy source on the model (unit 5);
+   presets, diffs, schema migration and a second, real Comet version to migrate
+   from (unit 6). The generator behind
+   :doc:`../reference/comet_parameters_generated` (``R-DOC-04``) is still to
+   come; where this page mentions it it describes intent, not the product.
 
 What this page will cover
 =========================
@@ -254,7 +255,8 @@ Top level::
       "description": "...",
       "versions":    [ { "version", "marker", "parameterPages", "source",
                          "variableModTuple": { "source",
-                                               "fields": [ { "field", "kind", "pair" } ] } } ],
+                                               "fields": [ { "field", "kind", "pair" } ] },
+                         "defaults": [ { "name", "default", "source" } ] } ],
       "categories":  [ { "id", "displayName" } ],         // exactly the fourteen
       "enzymeTable": { "header", "helpUrl", "rowFormat",
                        "senseChoices": [ { "value", "label" } ],
@@ -272,6 +274,45 @@ variable-modification tuple layout, in Comet's reading order -- see
 ``VariableModField`` constant, ``kind`` its ``VariableModField.Kind``
 (``DECIMAL``, ``INTEGER`` or ``RESIDUES``) and ``pair`` a JSON boolean, the
 only booleans in the file.
+
+``defaults`` lists the parameters whose default **that release** writes
+differently from the parameter's curated ``default``, each with the
+``https://`` source line that writes it; it is empty for most releases. Two
+records exist (:ref:`dev-comet-parameter-older-release`):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 26 60
+
+   * - ``version``
+     - ``marker``
+     - What else it records
+   * - ``2026.02.2``
+     - ``2026.02 rev. 2 (6edec91)``
+     - The release matrix's version. Neutral loss and count both take a
+       comma pair. ``defaults`` empty: every curated default is its own.
+   * - ``2024.01.0``
+     - ``2024.01 rev. 0 (f00df0c)``
+     - The migration fixture's release, not offered to users. The neutral loss
+       takes **one** value -- Comet 2024.01.0 reads it with ``%lf`` [V24T]_
+       -- and the count takes ``min,max``. ``defaults``:
+       ``fragindex_num_spectrumpeaks = 100`` and
+       ``fragindex_skipreadprecursors = 0`` [V24D]_, where 2026.02.2 writes
+       ``150`` and ``1``.
+
+``CuratedMetadata.parametersFor(version)`` and ``parameter(name, version)``
+give each definition **with that version's default** -- the override where
+there is one -- so the parser's defaults, ``CometParameters.defaults``,
+``resetToDefault`` and the drift test all use the version's own value.
+``parameter(name)`` alone gives the curated definition, whatever the version.
+
+A parameter's ``versions`` range is a claim about the **curated** releases:
+``from`` must be one of them, and the claim is checked against each curated
+release's real ``-q`` output by the drift test. Releases between two curated
+ones are not described -- the parser and the codecs refuse a version the
+metadata has no record of -- so ``"from": "2026.02.2"`` on
+``pinfile_protein_delimiter`` says that Comet 2024.01.0 does not declare it,
+not that 2024.01.1 (which introduced it) does not have it.
 
 One parameter::
 
@@ -306,7 +347,10 @@ flag, not a number of the right shape for a numeric kind, outside its own
 bounds on a non-numeric kind, or ``min`` above ``max``; a version range that
 does not start at a curated version or ends before it starts; an
 ``inlineComment`` that is not a string or ``null``, is blank, holds a line
-break, or has white space at either end; a tolerance-pair
+break, or has white space at either end; a version's default override that
+names a parameter which is not modelled, or not modelled for that version, or
+that is overridden twice, has no ``https://`` source, repeats the curated
+default, or breaks any rule a curated default must keep; a tolerance-pair
 member carrying the generic ``ordered_range`` rule (``R-PARAM-04``); a related
 parameter that is unknown, the parameter itself, or named twice; a help or
 source reference that is not ``https://``; an allow-list entry without a
@@ -476,6 +520,15 @@ the enumeration unit 1's ``FixtureMatrixTest`` already requires fixtures for
 118 declared, 118 modelled, 0 allow-listed. It also proves the partial rule
 against the real ``-p`` fixture: none of the 22 ``-q``-only parameters is
 reported, and a parameter removed from the metadata still is.
+
+It also runs against the **migration fixture's** real Comet 2024.01.0 output
+(:ref:`dev-comet-parameter-older-release`): ``-q`` 109 declared, 109 modelled,
+0 allow-listed, no finding; ``-p`` (``PARTIAL_DISCOVERY``) 87 and 87.
+``OlderReleaseCurationTest`` proves that what is curated about 2024.01.0 is
+checked rather than trusted: stripping the two default overrides makes the
+drift test report exactly those two ``DEFAULT_DIFFERS``; claiming a
+2026-only parameter for 2024.01.0 is reported ``NOT_DECLARED``; and dropping
+2024.01.0 from a parameter it declares is reported ``UNMODELLED``.
 
 To add a Comet version: capture its fixtures (*Fixtures*, above), add its
 ``versions`` record, and run the module's tests. Each finding is a decision
@@ -1501,6 +1554,441 @@ The specification's *Comet validation* list
    * - Parameters unavailable in the selected version are blocked
      - Here (``version.parameter_unavailable``).
 
+
+.. _dev-comet-parameter-presets:
+
+Presets
+=======
+
+Package ``org.cometgui.params.comet.presets``. A preset is a **versioned
+configuration delta, not a replacement file** (*Presets* in the
+specification): a ``Preset`` names the Comet version and the metadata
+``schemaVersion`` it was made against and lists only the parameters it sets,
+each a ``PresetDelta`` -- the parameter and its value text in the
+parameter's own ``comet.params`` syntax, exactly as it would follow ``name =``.
+A preset changes nothing by itself.
+
+The format
+----------
+
+Built-in presets are the JSON resource
+``cometgui-params-comet/src/main/resources/org/cometgui/params/comet/schema/comet-presets.json``,
+beside the metadata, read by ``PresetLoader`` with the project's one JSON
+reader. A user's presets have the same form (``PresetJson.write``); keeping
+them in a project file is a later phase's. Every field is always present,
+``null`` where absent::
+
+    {
+      "presetFormat": 1,
+      "description": "...",
+      "presets": [
+        {
+          "id": "low-low",                       // [a-z0-9][a-z0-9-]*, unique
+          "displayName": "...", "description": "...",
+          "origin": "BUILT_IN",                  // or "USER"
+          "cometVersion": "2026.02.2",           // a curated version, required
+          "schemaVersion": 1,                    // the metadata's
+          "source": "https://...",               // built-in: required; user: null
+          "deltas": [ { "parameter": "fragment_bin_tol",
+                        "value": "1.0005",
+                        "citation": "https://... line 47: ..." } ]  // built-in: required
+        }
+      ]
+    }
+
+``PresetLoader`` refuses, naming the preset and the field: a missing, blank,
+unreadable or uncurated ``cometVersion``; another ``schemaVersion``; a
+parameter the metadata does not model at all, or does not model for the
+preset's version; a value the parameter's codec cannot read for that version
+(so a preset can never hold a value the model could not); an id that is not
+one or is used twice; no deltas, or a parameter set twice; a built-in without
+its ``source`` or a citation; a ``source`` or citation with no ``https://``
+reference; and any field missing or unknown. ``PresetJson.write`` reads its
+own output back and refuses to return a document that does not load as the
+same presets -- the JSON writer passes every string through the project's
+secret rules, so a value that looked like a credential would otherwise be
+saved changed.
+
+``Preset.fromModel(id, name, description, model, parameters)`` makes a user's
+preset from a parameter set: the named parameters' current text, the set's
+Comet version and schema, deltas in schema order.
+
+.. _dev-comet-parameter-builtin-presets:
+
+The built-in presets
+--------------------
+
+Comet's own documentation for the 2026.02 release publishes an example
+parameter file for each of the conventional instrument-resolution patterns
+[CPLL]_ [CPHL]_ [CPHH]_. The three built-in presets are those files' values,
+and only for the parameters on which the three files differ from one another
+-- eight, the same eight in each preset, so that applying any one of them
+sets every instrument-resolution parameter:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 22 22 22
+
+   * - Parameter
+     - ``low-low``
+     - ``high-low``
+     - ``high-high``
+   * - ``peptide_mass_tolerance_upper``
+     - ``3.0``
+     - ``20.0``
+     - ``20.0``
+   * - ``peptide_mass_tolerance_lower``
+     - ``-3.0``
+     - ``-20.0``
+     - ``-20.0``
+   * - ``peptide_mass_units``
+     - ``0`` (amu)
+     - ``2`` (ppm)
+     - ``2`` (ppm)
+   * - ``precursor_tolerance_type``
+     - ``0`` (MH+)
+     - ``1`` (precursor m/z)
+     - ``1`` (precursor m/z)
+   * - ``isotope_error``
+     - ``0`` (off)
+     - ``2`` (0, +1, +2)
+     - ``2`` (0, +1, +2)
+   * - ``fragment_bin_tol``
+     - ``1.0005``
+     - ``1.0005``
+     - ``0.02``
+   * - ``fragment_bin_offset``
+     - ``0.4``
+     - ``0.4``
+     - ``0.0``
+   * - ``theoretical_fragment_ions``
+     - ``1``
+     - ``1``
+     - ``0``
+
+``high-high`` is also exactly ``comet -q``'s defaults for 2026.02.2. Each delta
+cites its example file, the line that declares it, and the file's SHA-256 as
+fetched on 2026-10-02, plus the parameter's own page; the fragment values also
+cite the pages' own recommendations -- "For ion trap data with a
+fragment_bin_tol of 1.0005, it is recommended to set fragment_bin_offset to
+0.4. For high-res MS/MS data, one might use a fragment_bin_tol of 0.02 and a
+corresponding fragment_bin_offset of 0.0" [FBO]_; "For extremely coarse
+fragment_bin_tol values such as the historical ~1 Da bins, a
+theoretical_fragment_ions value of 1 is optimal ... ~0.02 for high-res MS/MS
+spectra, a value of 0 is optimal" [TFI]_ -- and ``comet -q``'s own comment
+block (lines 74-75 of the 2026.02.2 fixture: "ion trap ms/ms: 1.0005
+tolerance, 0.4 offset (mono masses), theoretical_fragment_ions = 1" and "high
+res ms/ms: 0.02 tolerance, 0.0 offset (mono masses), theoretical_fragment_ions
+= 0, spectrum_batch_size = 15000"). ``spectrum_batch_size`` is not in any
+preset: the three example files all keep ``15000``.
+
+**The citations are checked, not trusted.** The three example files are
+checked in unmodified under
+``src/test/resources/fixtures/comet-presets/parameters_202602/`` with a
+``SHA256SUMS`` (they are Comet's documentation, Apache-2.0, like the ``-q``
+output). ``BuiltInPresetCitationTest`` requires every citation to name its
+file, line, value and that file's SHA-256, the cited line to declare exactly
+the preset's value, and each preset to set exactly the parameters on which
+the three files differ.
+
+Two findings from reading upstream rather than copying it:
+
+* The **2024.01** page set's ``comet.params.low-low`` holds the high-resolution
+  fragment settings (``0.02``, ``0.0``, ``0``), contradicting its own name,
+  its ``-q`` comment and the ``fragment_bin_offset`` page; the 2026.02 file
+  corrects it. The presets cite 2026.02.
+* The 2026.02 example files are marked ``# comet_version 2026.02 rev. 0``;
+  every value they give for the eight parameters reads under 2026.02.2's
+  codecs, which the loader proves on every load.
+
+**No project presets.** The specification asks for "a minimal set of clearly
+named project presets". None is shipped: every candidate considered either
+duplicates what the workflow already enforces (``R-CMT-01``'s outputs, the
+decoy rules) or would set scientific values Comet's documentation does not
+give. Fewer is better than invented; this is a decision for review, not an
+omission.
+
+.. _dev-comet-parameter-diffs:
+
+Diffs and applying a preset
+---------------------------
+
+A diff is a list of ``DiffRow``: *Parameter, Current, Preset* -- a kind
+(``PARAMETER``, ``ENZYME_ROW``, ``UNKNOWN_PARAMETER``), a key, and the two
+sides' text, either side empty where it does not have the thing. A row exists
+only for a difference; texts are compared as the canonical writer writes them,
+and an origin alone is never a difference.
+
+``PresetDiff.of(model, preset)`` (``AC-PAR-08``, headless half):
+
+#. runs the **compatibility check** of the preset against the model's Comet
+   version -- one entry per delta, see below;
+#. makes one ``PARAMETER`` row per delta the version can take whose text
+   differs from the model's, **in schema order**. A delta whose value the
+   model already has makes no row: ``high-high`` against the real ``-q``
+   defaults has none, ``low-low`` has exactly the eight in the table above.
+
+Nothing changes: the model is immutable. ``applyAll()`` or
+``applySelected(names)`` return an ``AppliedPreset`` -- a **new** model in which
+exactly the applied rows hold the preset's text with origin ``PRESET``, every
+other parameter keeping its value and origin; the applied rows; the
+**validation** of the new model (``CometValidator.standard()``), so a preset
+that makes a configuration invalid is reported, not hidden; and the
+compatibility check again. Selecting a parameter that is not a row of the
+diff is refused, naming it and the rows; selecting none changes nothing.
+
+``ParameterDiff.between(current, other)`` is the diff between two parameter
+sets of **one** version -- Expert mode's "versus the selected preset or
+defaults" and "versus the last saved": every modelled parameter that differs,
+in schema order; then every enzyme-table row that differs or exists on one
+side only, by number; then every unknown parameter that differs or exists on
+one side only. Two sets of different versions are refused: that comparison is
+a migration.
+
+The compatibility check
+-----------------------
+
+A user's preset records the Comet version it was made for; applying it to a
+set of another version runs ``VersionConversion`` (shared with migration,
+below) on every delta, and ``CompatibilityReport`` holds **one entry per
+delta**, in the preset's order, so nothing can go missing between a preset
+and its diff:
+
+``SAME``
+    The target takes the value as the same text.
+``CONVERTED``
+    The value's syntax changed between the versions; it is rewritten for the
+    target with the same meaning, reported in ``converted()``, and the row
+    shows the target's text.
+``NOT_IN_TARGET``
+    The target version has no such parameter.
+``NOT_CONVERTIBLE``
+    The target has the parameter but cannot hold the value -- two neutral
+    losses where the target's tuple takes one.
+
+The last two are ``problems()``: never a row, never applied, and carried
+into the ``AppliedPreset`` so the editor can show them. A user's preset made
+on 2026.02.2 with ``pinfile_protein_delimiter``, a two-loss
+``variable_mod02`` and ``num_threads``, applied to a real 2024.01.0 set,
+reports the first two and diffs only ``num_threads`` (``CompatibilityTest``).
+The built-in presets apply to a 2024.01.0 set with every delta ``SAME``.
+
+.. _dev-comet-parameter-migration:
+
+Schema migration
+================
+
+Package ``org.cometgui.params.comet.migration``.
+``SchemaMigration.migrate(model, targetVersion)`` moves a parameter set from
+its Comet version's schema to another's and returns a ``MigrationResult``: the
+source model (unchanged), the new model, and a ``MigrationReport`` with **one
+entry per parameter** of either version and per unknown parameter.
+``SchemaMigration.migrateFile(metadata, text, target)`` reads a file as the
+version its own ``# comet_version`` marker names and migrates that; a file
+with no marker, an uncurated or unreadable one, or one that does not parse as
+that version is refused with a ``MigrationException`` saying which.
+
+**Migration is explicit** (``R-TOOL-09``): nothing in the parser, the writer
+or the model calls it; a file of one version imported for another is read as
+the selected version with ``R-PARAM-06``'s mismatch warning, never silently
+migrated. The rules, per parameter:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 74
+
+   * - Outcome
+     - When, and what the new model holds
+   * - ``CARRIED``
+     - Modelled in both versions and the target writes the same text: carried
+       with its origin.
+   * - ``RESHAPED``
+     - Modelled in both; the value written in the target's syntax with the
+       same meaning -- a variable-modification tuple re-laid-out for the
+       target's field layout -- with its origin.
+   * - ``ADDED``
+     - New in the target: the target version's default, origin
+       ``COMET_DEFAULT``.
+   * - ``REMOVED_KEPT_AS_UNKNOWN``
+     - Not a parameter of the target: kept as an unknown parameter with its
+       value text and curated inline comment -- never dropped
+       (``R-PARAM-07``) -- and therefore blocked by validation
+       (``version.parameter_unavailable``) until the user removes it. Its
+       ``line`` is ``SchemaMigration.NOT_FROM_A_FILE`` (0): it was declared
+       on no line of any file.
+   * - ``UNKNOWN_CARRIED``
+     - An unknown parameter of the source the target does not model either:
+       kept exactly as imported.
+   * - ``UNKNOWN_ADOPTED``
+     - An unknown parameter of the source the target models: read as the
+       target's parameter, origin ``IMPORTED``.
+   * - ``NEEDS_ATTENTION``
+     - The target has the parameter but cannot hold the value with its
+       meaning (two neutral losses into 2024.01.0's one-loss tuple; an
+       adopted unknown whose text is not of the target's kind). The new model
+       holds the target's default; the source value is in the report. Nothing
+       is guessed.
+
+The enzyme table is the file's content, not the schema's, and is carried
+unchanged (Comet 2024.01.0's own default table differs from 2026.02.2's in
+rows 6, 8 and 9; a migrated file keeps whatever table it had). The new model
+carries no parse diagnostics; the source keeps its own.
+
+``VersionConversion`` is the one value rule migration and the preset
+compatibility check share: read the text under the **source** version's codec,
+write the typed value under the **target**'s. For every kind but the tuple the
+two codecs are the same; a tuple's field layout is the version's, and the
+target codec refuses a value it cannot hold -- a non-default value in a field
+its tuple lacks, or a pair where it takes one value -- which is reported, not
+dropped.
+
+The two real Comet versions differ by nine parameters, all new in 2026.02.2,
+and in no tuple field: their layouts have the same eight fields in the same
+order and differ only in whether the neutral loss takes a pair. So with real
+data every shared parameter is ``CARRIED``. ``RESHAPED`` and the
+missing-field case are proved on a CONSTRUCTED third version (``2099.01.0``,
+test input built on the bundled metadata in ``ConstructedVersions``) with a
+reordered and a seven-field layout.
+
+What the real migration proves
+------------------------------
+
+``RealMigrationTest``, both directions, with the expected parameters derived
+from the two real dumps **and** typed by hand (each checking the other):
+
+* **2024.01.0 to 2026.02.2** (via ``migrateFile`` on the real ``-q`` file):
+  ``ADDED`` is exactly ``index_search_type``, ``compoundmods_file``,
+  ``spectral_library_name``, ``spectral_library_ms_level``,
+  ``protein_modslist_file``, ``print_ascorepro_score``,
+  ``pinfile_protein_delimiter``, ``min_precursor_charge`` and
+  ``percentage_base_peak``, each at 2026.02.2's default with origin
+  ``COMET_DEFAULT``; nothing is removed; the 109 others are ``CARRIED`` with
+  their text and origin (so ``fragindex_num_spectrumpeaks`` stays the file's
+  ``100``); every tuple is the same typed value, and a CONSTRUCTED old-form
+  edit (``79.966331 STY 0 2,4 -1 0 -1 97.976896``) is carried into the new
+  layout. The result writes, re-parses with no diagnostic to the same values,
+  and validates with exactly ``workflow_enforced.output_off`` (2024.01.0's
+  ``-q`` also has ``output_percolatorfile = 0``) -- and with nothing once the
+  workflow's outputs are enforced.
+* **2026.02.2 to 2024.01.0**: the nine are ``REMOVED_KEPT_AS_UNKNOWN``, kept
+  with their text, blocked by validation, written in the unknown-parameter
+  section and read back by the 2024.01.0 parser; a two-loss tuple is
+  ``NEEDS_ATTENTION``.
+
+.. _dev-comet-parameter-older-release:
+
+The migration fixture: Comet 2024.01.0
+--------------------------------------
+
+A real migration test needs a second Comet version's real output, and the
+release matrix holds one. **Comet 2024.01.0** is the oldest release with
+``-q`` (its release notes: "comet -q will generate a comet.params.new file
+with a more complete list"), and predates the two-neutral-loss form
+(2025.01.0), so its tuple layout differs from 2026.02.2's.
+
+It is **not** in ``manifests/tools.json`` -- that is the product's install
+matrix, and an older Comet is not offered to users -- and its fixtures sit
+beside, not inside, the matrix's::
+
+    cometgui-params-comet/src/test/resources/fixtures/comet-migration/
+        .gitattributes                         (* -text, as fixtures/comet/)
+        2024.01.0/linux-x86-64/comet-q.params  10 415 bytes
+        2024.01.0/linux-x86-64/comet-p.params   8 746 bytes
+        2024.01.0/linux-x86-64/SHA256SUMS
+
+so ``FixtureMatrixTest`` neither counts nor requires them
+(``MigrationFixtureRealBinaryTest.theOlderReleaseIsNotOffered`` proves the
+version is not in the manifest and the matrix check still passes).
+
+Capture record:
+
+.. list-table::
+   :widths: 22 78
+
+   * - Release
+     - ``v2024.01.0``, tag commit ``f00df0c79e00379dc65830ae8bc6eac2d7d2eb64``
+       (``git ls-remote``), published 2024-05-31
+   * - Artefact
+     - ``https://github.com/UWPR/Comet/releases/download/v2024.01.0/comet.linux.exe``,
+       6 889 456 bytes (the size the GitHub release API lists; upstream
+       publishes no digest)
+   * - SHA-256
+     - ``2834f928594ae57a1fdc0f4a5591bfc0e2b5c91e3e9c33a5ab2e9f508a942379``
+       -- two independent downloads on 2026-10-02 agreed; pinned in
+       ``MigrationFixtures.ROW`` (test sources), the one place it is recorded
+       in code
+   * - Licence
+     - Apache-2.0: ``LICENSE`` at the tag is the plain Apache License 2.0 text
+       (10 173 bytes, SHA-256 ``a6cba85b...3ff9``); 2026.02.2's adds a
+       copyright line and an embedded MIT section. Nothing in it bears on
+       checking in the tool's own output.
+   * - Mirror
+     - ``scratch/phase06/artefacts/v2024.01.0__comet.linux.exe`` (gitignored)
+   * - Captured
+     - 2026-10-02, on linux/x86-64, through ``ProcessService``
+   * - ``-q``
+     - 10 415 bytes, SHA-256 ``005e4b9e2ead140a0fb64bb4e20057f2863959848f9adeb12c01ea7880049cab``;
+       first line ``# comet_version 2024.01 rev. 0 (f00df0c)``; 109
+       declarations
+   * - ``-p``
+     - 8 746 bytes, SHA-256 ``3dab8b034925c01eb2935a0400524de4021daea0d82c11580b4a533722cc052c``;
+       87 declarations, all also in ``-q``, with the same values
+
+The commands, from the repository root, with the toolchain sourced and the
+module's test classes compiled::
+
+    $ mkdir -p scratch/phase06/artefacts
+    $ curl -sSL -o scratch/phase06/artefacts/v2024.01.0__comet.linux.exe \
+        https://github.com/UWPR/Comet/releases/download/v2024.01.0/comet.linux.exe
+    $ sha256sum scratch/phase06/artefacts/v2024.01.0__comet.linux.exe   # must be 2834f928...2379
+    $ cp scratch/phase06/artefacts/v2024.01.0__comet.linux.exe _build/p06-u6/bin/comet
+    $ chmod 700 _build/p06-u6/bin/comet
+    $ java -cp cometgui-params-comet/target/test-classes:cometgui-process/target/cometgui-process-0.1.0-SNAPSHOT.jar:cometgui-domain/target/cometgui-domain-0.1.0-SNAPSHOT.jar \
+        _build/p06-u6/Capture.java _build/p06-u6/bin/comet _build/p06-u6/cap1
+
+where ``Capture.java`` is a single-file launcher that calls
+``ParameterFileCapture.capture(binary, mode, emptyDirectory)`` -- the unit 1
+helper that runs ``[binary, -q]`` or ``[binary, -p]`` through
+``ProcessService`` in an empty directory with an empty environment, requires
+exit 0, and returns ``comet.params.new`` -- once per mode. The two files were
+copied unmodified to ``comet-q.params`` and ``comet-p.params``, and
+``SHA256SUMS`` written with ``sha256sum comet-p.params comet-q.params``.
+
+**To refill the mirror**, run the first three commands above.
+``MigrationFixtureRealBinaryTest`` (Linux only, like the other real-binary
+tests) stages the binary from the mirror, checks its SHA-256 against
+``MigrationFixtures.ROW`` before running it, runs ``-q`` and ``-p`` through
+``ProcessService``, and requires the fixtures to equal its output byte for
+byte. A missing binary **fails** with these instructions, and a binary with
+another SHA-256 is refused before it is run; neither skips. The staging is
+unit 1's ``UpstreamMirror``, extended to take the mirror directory and what
+pins the checksum, not copied.
+
+What the metadata curates about 2024.01.0 -- and only what migration needs --
+is its version record, its tuple layout, its two different defaults, and the
+version ranges: the 109 parameters it declares claim it (``"from":
+"2024.01.0"``), the nine it lacks do not. Help text, choices, bounds and
+inline comments are 2026.02.2's and are not re-curated for 2024.01.0: for
+example ``-q`` 2024.01.0's own comment on ``fragindex_skipreadprecursors``
+("high mass cutoff for fragment ions") is an upstream copy error, and a
+2024.01.0 canonical file is written with 2026.02.2's comments.
+
+Citations for presets and migration
+-----------------------------------
+
+.. [CPLL] https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.low-low
+   -- fetched 2026-10-02, 9 879 bytes, SHA-256 ``53c2782a...3c5b``.
+.. [CPHL] https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-low
+   -- fetched 2026-10-02, 9 879 bytes, SHA-256 ``d3addcf2...ed0e0d``.
+.. [CPHH] https://uwpr.github.io/Comet/parameters/parameters_202602/comet.params.high-high
+   -- fetched 2026-10-02, 9 879 bytes, SHA-256 ``112d8943...02f3db2``.
+.. [FBO] https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_offset.html
+.. [TFI] https://uwpr.github.io/Comet/parameters/parameters_202602/theoretical_fragment_ions.html
+.. [V24T] https://github.com/UWPR/Comet/blob/v2024.01.0/Comet.cpp#L567-L601
+   -- the 2024.01.0 tuple reader: ``"%lf %31s %d %511s %d %d %d %lf"``, a
+   comma accepted only in the count.
+.. [V24D] https://github.com/UWPR/Comet/blob/v2024.01.0/Comet.cpp#L1697-L1700
+   -- what 2024.01.0's ``-q`` writes for the fragment-index parameters.
 
 .. _dev-comet-parameter-comet-reads:
 

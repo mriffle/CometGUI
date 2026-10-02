@@ -54,6 +54,12 @@ public final class UpstreamMirror {
     /** The artefact manifest, relative to the repository root. */
     public static final String MANIFEST = "manifests/tools.json";
 
+    /**
+     * Where the release-matrix binaries are pinned: the manifest, which {@link #stage(Path,
+     * CometManifest.Row, Path)} checks against.
+     */
+    public static final String MANIFEST_PIN = MANIFEST;
+
     private static final String REFILL =
             " The mirror is gitignored and holds the bytes upstream publishes, named"
                     + " <releaseTag>__<file name from the manifest URL>. Refill it by downloading"
@@ -116,8 +122,22 @@ public final class UpstreamMirror {
      * @throws AssertionError if it is not there, with a message saying how to refill the mirror
      */
     public static Path artefact(Path root, CometManifest.Row row) {
+        return artefact(root, MIRROR, row, REFILL);
+    }
+
+    /**
+     * One artefact in a given gitignored mirror directory under a repository root.
+     *
+     * @param root the repository root
+     * @param mirror the mirror directory, relative to the root
+     * @param row the row naming the artefact, its URL and its pinned SHA-256
+     * @param refill how to refill that mirror, appended to the failure
+     * @return the mirrored file
+     * @throws AssertionError if it is not there
+     */
+    public static Path artefact(Path root, String mirror, CometManifest.Row row, String refill) {
         String fileName = mirrorFileName(row);
-        Path file = root.resolve(MIRROR).resolve(fileName);
+        Path file = root.resolve(mirror).resolve(fileName);
         if (!Files.isRegularFile(file)) {
             throw new AssertionError(
                     "the real Comet "
@@ -129,7 +149,7 @@ public final class UpstreamMirror {
                             + "\" is not in the mirror at "
                             + file
                             + "."
-                            + REFILL);
+                            + refill);
         }
         return file;
     }
@@ -147,7 +167,34 @@ public final class UpstreamMirror {
      */
     public static Path stage(Path root, CometManifest.Row row, Path destination)
             throws IOException {
-        Path source = artefact(root, row);
+        return stage(root, MIRROR, row, destination, MANIFEST_PIN, REFILL);
+    }
+
+    /**
+     * Copies a binary out of a given mirror to {@code destination}, makes it executable, and checks
+     * its SHA-256 against the row's pin before returning it -- the same rules as {@link
+     * #stage(Path, CometManifest.Row, Path)}, for a binary pinned somewhere other than the manifest
+     * (the older Comet release behind the migration fixtures, which is not in the release matrix).
+     *
+     * @param root the repository root holding the mirror
+     * @param mirror the mirror directory, relative to the root
+     * @param row the row naming the binary and its pinned SHA-256
+     * @param destination where to put it
+     * @param pinnedBy what pins the SHA-256, for the failure message
+     * @param refill how to refill that mirror, appended to a failure
+     * @return {@code destination}, executable and verified
+     * @throws IOException if it cannot be copied or read
+     * @throws AssertionError if the artefact is absent or its SHA-256 is not the pinned one
+     */
+    public static Path stage(
+            Path root,
+            String mirror,
+            CometManifest.Row row,
+            Path destination,
+            String pinnedBy,
+            String refill)
+            throws IOException {
+        Path source = artefact(root, mirror, row, refill);
         Path parent = destination.toAbsolutePath().getParent();
         if (parent == null) {
             throw new AssertionError("a staged binary needs a directory, and has none");
@@ -171,11 +218,13 @@ public final class UpstreamMirror {
                             + source
                             + " has SHA-256 "
                             + actual
-                            + " but manifests/tools.json pins "
+                            + " but "
+                            + pinnedBy
+                            + " pins "
                             + row.sha256()
                             + "; it is not the binary the fixtures were captured from and is not"
                             + " run. Delete it and refill the mirror."
-                            + REFILL);
+                            + refill);
         }
         return destination;
     }

@@ -89,9 +89,7 @@ public final class SchemaDrift {
         int modelled = 0;
         int allowListed = 0;
         for (DiscoveredParameter declared : discovered.parameters()) {
-            Optional<ParameterDefinition> definition =
-                    metadata.parameter(declared.name())
-                            .filter(d -> d.supportedVersions().contains(version));
+            Optional<ParameterDefinition> definition = metadata.parameter(declared.name(), version);
             if (definition.isPresent()) {
                 modelled++;
                 compareDefault(declared, definition.get(), version, findings);

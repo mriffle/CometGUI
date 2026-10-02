@@ -59,8 +59,7 @@ public record CometParameterSchema(
      */
     public List<ParameterDefinition> definitions() {
         return discovered.parameters().stream()
-                .flatMap(p -> metadata.parameter(p.name()).stream())
-                .filter(d -> d.supportedVersions().contains(drift.version()))
+                .flatMap(p -> metadata.parameter(p.name(), drift.version()).stream())
                 .toList();
     }
 }
