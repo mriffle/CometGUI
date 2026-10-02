@@ -14,14 +14,22 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+package org.cometgui.params.comet.schema;
+
+import java.util.Objects;
+
 /**
- * Reading comet.params files: scalar types, enzyme table, variable-modification tuples, comments,
- * unknown parameters, duplicates and malformed lines. Nothing imported may be silently lost.
+ * One allowed value of an enumerated parameter, with what it means.
  *
- * <p>{@link org.cometgui.params.comet.parser.ParamsLineReader} is the one place that knows how a
- * comet.params line is shaped: it classifies every line (version marker, comment, blank,
- * declaration, enzyme-table header and rows, malformed with its line number) and interprets
- * nothing. Schema discovery reads it today; the typed parser is built on it. Phase 06 (Comet
- * parameter model).
+ * @param value the value exactly as {@code comet.params} spells it, such as {@code 2} or {@code
+ *     ETD+SA}
+ * @param label what the value means, for the combo box and the reference page
  */
-package org.cometgui.params.comet.parser;
+public record Choice(String value, String label) {
+
+    /** Validates the components. */
+    public Choice {
+        Objects.requireNonNull(value, "value");
+        Objects.requireNonNull(label, "label");
+    }
+}

@@ -14,14 +14,21 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+package org.cometgui.params.comet.schema;
+
 /**
- * Reading comet.params files: scalar types, enzyme table, variable-modification tuples, comments,
- * unknown parameters, duplicates and malformed lines. Nothing imported may be silently lost.
- *
- * <p>{@link org.cometgui.params.comet.parser.ParamsLineReader} is the one place that knows how a
- * comet.params line is shaped: it classifies every line (version marker, comment, blank,
- * declaration, enzyme-table header and rows, malformed with its line number) and interprets
- * nothing. Schema discovery reads it today; the typed parser is built on it. Phase 06 (Comet
- * parameter model).
+ * The lowest editor level at which a parameter is shown (specification, <em>Parameter editor
+ * levels</em>). A parameter shown in {@link #ESSENTIALS} also appears in Advanced, under its
+ * category, and every parameter appears in Expert's raw text.
  */
-package org.cometgui.params.comet.parser;
+public enum VisibilityLevel {
+
+    /** The common workflow-defining controls. */
+    ESSENTIALS,
+
+    /** Grouped by scientific concept; every supported user-relevant parameter. */
+    ADVANCED,
+
+    /** Raw text, and parameters few searches need. */
+    EXPERT
+}

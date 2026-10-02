@@ -14,14 +14,24 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+package org.cometgui.params.comet.schema;
+
+import java.io.Serial;
+
 /**
- * Reading comet.params files: scalar types, enzyme table, variable-modification tuples, comments,
- * unknown parameters, duplicates and malformed lines. Nothing imported may be silently lost.
- *
- * <p>{@link org.cometgui.params.comet.parser.ParamsLineReader} is the one place that knows how a
- * comet.params line is shaped: it classifies every line (version marker, comment, blank,
- * declaration, enzyme-table header and rows, malformed with its line number) and interprets
- * nothing. Schema discovery reads it today; the typed parser is built on it. Phase 06 (Comet
- * parameter model).
+ * Thrown when text offered as a Comet parameter dump is not one: a malformed line, a name declared
+ * twice, no version marker on the first line, or no enzyme table. The message names the line.
  */
-package org.cometgui.params.comet.parser;
+public final class MalformedDumpException extends RuntimeException {
+
+    @Serial private static final long serialVersionUID = 1L;
+
+    /**
+     * Creates the exception.
+     *
+     * @param message what is wrong and on which line
+     */
+    public MalformedDumpException(String message) {
+        super(message);
+    }
+}

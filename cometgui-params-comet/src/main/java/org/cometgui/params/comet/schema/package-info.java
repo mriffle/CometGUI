@@ -15,9 +15,15 @@
  */
 
 /**
- * The versioned parameter schema: the definition of each parameter derived from comet -q output
- * plus curated metadata, and the source of the generated reference documentation (R-DOC-04).
+ * The versioned parameter schema: what a Comet binary declares about its own parameters (comet -q,
+ * or comet -p marked PARTIAL_DISCOVERY), the curated metadata that says what each one means, and
+ * the drift between the two (R-PARAM-01, R-PARAM-02, R-PARAM-03, AC-PAR-01, AC-PAR-02).
  *
- * <p>Filled by phase 06 (Comet parameter model).
+ * <p>{@link org.cometgui.params.comet.schema.MetadataLoader} reads the curated metadata file, which
+ * is also the source of the generated reference documentation (R-DOC-04). {@link
+ * org.cometgui.params.comet.schema.SchemaDiscovery} reads a dump, {@link
+ * org.cometgui.params.comet.schema.SchemaDrift} compares the two, and {@link
+ * org.cometgui.params.comet.schema.CometParameterSchemaProvider} runs the binary through the domain
+ * ProcessRunner port to produce a dump. Phase 06 (Comet parameter model).
  */
 package org.cometgui.params.comet.schema;

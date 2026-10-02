@@ -1,0 +1,3690 @@
+{
+  "schemaVersion": 1,
+  "description": "Curated metadata for the parameters of Comet's comet.params file: what Comet's own -q output cannot say (display names, categories, help, enum labels, relationships, visibility, version ranges). Read by org.cometgui.params.comet.schema.MetadataLoader and by the documentation generator; format described in docs/developer/comet_parameter_schema.rst.",
+  "versions": [
+    {
+      "version": "2026.02.2",
+      "marker": "2026.02 rev. 2 (6edec91)",
+      "parameterPages": "https://uwpr.github.io/Comet/parameters/parameters_202602/",
+      "source": "https://github.com/UWPR/Comet/tree/v2026.02.2",
+      "variableModTuple": null
+    }
+  ],
+  "categories": [
+    {
+      "id": "database_peff",
+      "displayName": "Database and PEFF"
+    },
+    {
+      "id": "cpu_execution",
+      "displayName": "CPU and execution"
+    },
+    {
+      "id": "precursor_mass",
+      "displayName": "Precursor mass and isotope handling"
+    },
+    {
+      "id": "digestion_enzymes",
+      "displayName": "Digestion and enzymes"
+    },
+    {
+      "id": "fragment_scoring",
+      "displayName": "Fragment-ion scoring"
+    },
+    {
+      "id": "fragment_index",
+      "displayName": "Fragment-ion and peptide-index search options"
+    },
+    {
+      "id": "spectrum_filters",
+      "displayName": "Spectrum, scan and charge filters"
+    },
+    {
+      "id": "spectral_processing",
+      "displayName": "Spectral pre-processing"
+    },
+    {
+      "id": "search_ranges",
+      "displayName": "Search ranges and peptide constraints"
+    },
+    {
+      "id": "output",
+      "displayName": "Output options"
+    },
+    {
+      "id": "ms1_realtime",
+      "displayName": "MS1 and real-time-search options"
+    },
+    {
+      "id": "static_mods",
+      "displayName": "Static modifications"
+    },
+    {
+      "id": "variable_mods",
+      "displayName": "Variable modifications"
+    },
+    {
+      "id": "misc",
+      "displayName": "Miscellaneous and version-specific options"
+    }
+  ],
+  "enzymeTable": {
+    "header": "[COMET_ENZYME_INFO]",
+    "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/search_enzyme_number.html",
+    "rowFormat": "number. name sense cut-residues no-cut-residues",
+    "senseChoices": [
+      {
+        "value": "0",
+        "label": "Cleaves on the N-terminal side of the cut residues"
+      },
+      {
+        "value": "1",
+        "label": "Cleaves on the C-terminal side of the cut residues"
+      }
+    ],
+    "referencedBy": [
+      "search_enzyme_number",
+      "search_enzyme2_number",
+      "sample_enzyme_number"
+    ]
+  },
+  "internal": [],
+  "parameters": [
+    {
+      "name": "database_name",
+      "displayName": "Sequence database (FASTA)",
+      "category": "database_peff",
+      "kind": "FILE_PATH",
+      "visibility": "ESSENTIALS",
+      "default": "/some/path/db.fasta",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Path to the protein or nucleotide FASTA file to search, or to a Comet .idx index built from one. Comet has no default; the value -q writes is a placeholder.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/database_name.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "path"
+      ],
+      "aliases": [
+        "fasta",
+        "protein database",
+        "sequence database"
+      ],
+      "related": [
+        "decoy_search",
+        "index_search_type",
+        "peff_format"
+      ]
+    },
+    {
+      "name": "decoy_search",
+      "displayName": "Internal decoy search",
+      "category": "database_peff",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ESSENTIALS",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "No internal decoys"
+        },
+        {
+          "value": "1",
+          "label": "Concatenated: targets and decoys compete, one result per spectrum"
+        },
+        {
+          "value": "2",
+          "label": "Separate: targets and decoys searched and reported separately"
+        }
+      ],
+      "shortHelp": "Whether Comet generates reversed decoy peptides itself, and whether targets and decoys compete for one result per spectrum or are reported separately.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/decoy_search.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "target decoy",
+        "decoy",
+        "reverse database"
+      ],
+      "related": [
+        "decoy_prefix",
+        "search_enzyme_number"
+      ]
+    },
+    {
+      "name": "index_search_type",
+      "displayName": "Index type for an index built on demand",
+      "category": "fragment_index",
+      "kind": "INTEGER_ENUM",
+      "visibility": "EXPERT",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "Peptide index (PI_DB)"
+        },
+        {
+          "value": "1",
+          "label": "Fragment-ion index (FI_DB)"
+        }
+      ],
+      "shortHelp": "Used only when database_name names an .idx file that does not exist yet and is built from its FASTA: chooses whether that index is a peptide index or a fragment-ion index. An existing .idx records its own type and this value is then ignored. New in 2026.02.2.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/index_search_type.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "idx",
+        "peptide index",
+        "fragment index"
+      ],
+      "related": [
+        "database_name"
+      ]
+    },
+    {
+      "name": "num_threads",
+      "displayName": "Search threads",
+      "category": "cpu_execution",
+      "kind": "INTEGER",
+      "visibility": "ESSENTIALS",
+      "default": "0",
+      "min": null,
+      "max": "128",
+      "choices": [],
+      "shortHelp": "Number of search threads. 0 uses one thread per CPU core; a negative value uses that many fewer than the core count. The NSLOTS environment variable, when set, overrides it.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/num_threads.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "threads",
+        "cpu",
+        "cores",
+        "parallel"
+      ],
+      "related": [
+        "spectrum_batch_size"
+      ]
+    },
+    {
+      "name": "peff_format",
+      "displayName": "PEFF database format",
+      "category": "database_peff",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "Plain FASTA (PEFF annotations ignored)"
+        },
+        {
+          "value": "1",
+          "label": "PEFF: PSI-MOD modifications and variants"
+        },
+        {
+          "value": "2",
+          "label": "PEFF: Unimod modifications and variants"
+        },
+        {
+          "value": "3",
+          "label": "PEFF: PSI-MOD modifications only, no variants"
+        },
+        {
+          "value": "4",
+          "label": "PEFF: Unimod modifications only, no variants"
+        },
+        {
+          "value": "5",
+          "label": "PEFF: variants only, no modifications"
+        }
+      ],
+      "shortHelp": "Whether database_name is plain FASTA or PEFF, and which PEFF annotations (modifications, amino-acid variants, or both) are searched.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peff_format.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "peff",
+        "variants",
+        "psi-mod",
+        "unimod"
+      ],
+      "related": [
+        "peff_obo",
+        "database_name"
+      ]
+    },
+    {
+      "name": "peff_obo",
+      "displayName": "PEFF modification ontology (OBO) file",
+      "category": "database_peff",
+      "kind": "FILE_PATH",
+      "visibility": "ADVANCED",
+      "default": "",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Path to the PSI-MOD or Unimod OBO file that defines the modifications named in a PEFF database. Ignored when peff_format is 0; empty means no file.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peff_obo.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "EMPTY_ALLOWED",
+      "validators": [
+        "path"
+      ],
+      "aliases": [
+        "obo",
+        "peff"
+      ],
+      "related": [
+        "peff_format"
+      ]
+    },
+    {
+      "name": "compoundmods_file",
+      "displayName": "Compound modification masses file",
+      "category": "variable_mods",
+      "kind": "FILE_PATH",
+      "visibility": "EXPERT",
+      "default": "",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Path to a text file of masses, one per line, used for a multi-modification search on 'J' residues. Empty means no file. Comet's parameter pages for 2026.02 do not describe it; this text follows the comment -q writes and the source.",
+      "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L936",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "EMPTY_ALLOWED",
+      "validators": [
+        "path"
+      ],
+      "aliases": [
+        "compound mods",
+        "J residue"
+      ],
+      "related": [
+        "add_J_user_amino_acid"
+      ]
+    },
+    {
+      "name": "spectral_library_name",
+      "displayName": "Spectral library file",
+      "category": "ms1_realtime",
+      "kind": "FILE_PATH",
+      "visibility": "EXPERT",
+      "default": "/some/path/speclib.file",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Path to a spectral library. Not described on Comet's 2026.02 parameter pages; the value -q writes is a placeholder.",
+      "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L937",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "path"
+      ],
+      "aliases": [
+        "spectral library",
+        "speclib"
+      ],
+      "related": [
+        "spectral_library_ms_level"
+      ]
+    },
+    {
+      "name": "spectral_library_ms_level",
+      "displayName": "Spectral library MS level",
+      "category": "ms1_realtime",
+      "kind": "INTEGER_ENUM",
+      "visibility": "EXPERT",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "1",
+          "label": "MS1"
+        },
+        {
+          "value": "2",
+          "label": "MS2"
+        },
+        {
+          "value": "3",
+          "label": "MS3"
+        }
+      ],
+      "shortHelp": "MS level of the spectral-library spectra. Caution: Comet 2026.02.2 writes this name with -q, but its own parameter reader looks for speclib_ms_level and its search code for spectraL_library_ms_level, so a value given under this name is ignored by that release.",
+      "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L938",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "spectral library"
+      ],
+      "related": [
+        "spectral_library_name"
+      ]
+    },
+    {
+      "name": "peptide_mass_tolerance_upper",
+      "displayName": "Precursor tolerance, upper bound",
+      "category": "precursor_mass",
+      "kind": "TOLERANCE_PAIR_MEMBER",
+      "visibility": "ESSENTIALS",
+      "default": "20.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Upper edge of the precursor mass window, in peptide_mass_units. Mass error is experimental minus theoretical, so this is normally positive.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_upper.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "signed_tolerance_pair"
+      ],
+      "aliases": [
+        "precursor tolerance",
+        "mass tolerance",
+        "ppm",
+        "precursor window"
+      ],
+      "related": [
+        "peptide_mass_tolerance_lower",
+        "peptide_mass_units",
+        "precursor_tolerance_type",
+        "isotope_error"
+      ]
+    },
+    {
+      "name": "peptide_mass_tolerance_lower",
+      "displayName": "Precursor tolerance, lower bound",
+      "category": "precursor_mass",
+      "kind": "TOLERANCE_PAIR_MEMBER",
+      "visibility": "ESSENTIALS",
+      "default": "-20.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Lower edge of the precursor mass window, in peptide_mass_units. It is normally negative; a same-signed window is legal but deliberate (for example an open-modification search).",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_lower.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "signed_tolerance_pair"
+      ],
+      "aliases": [
+        "precursor tolerance",
+        "mass tolerance",
+        "ppm",
+        "precursor window"
+      ],
+      "related": [
+        "peptide_mass_tolerance_upper",
+        "peptide_mass_units",
+        "precursor_tolerance_type",
+        "isotope_error"
+      ]
+    },
+    {
+      "name": "peptide_mass_units",
+      "displayName": "Precursor tolerance units",
+      "category": "precursor_mass",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ESSENTIALS",
+      "default": "2",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "amu (daltons)"
+        },
+        {
+          "value": "1",
+          "label": "mmu (millidaltons)"
+        },
+        {
+          "value": "2",
+          "label": "ppm"
+        }
+      ],
+      "shortHelp": "Units of the two precursor tolerance bounds.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_units.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "precursor tolerance",
+        "ppm",
+        "dalton"
+      ],
+      "related": [
+        "peptide_mass_tolerance_upper",
+        "peptide_mass_tolerance_lower",
+        "precursor_tolerance_type"
+      ]
+    },
+    {
+      "name": "precursor_tolerance_type",
+      "displayName": "Precursor tolerance applies to",
+      "category": "precursor_mass",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ESSENTIALS",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "Singly protonated peptide mass (MH+)"
+        },
+        {
+          "value": "1",
+          "label": "Precursor m/z"
+        }
+      ],
+      "shortHelp": "Whether an amu or mmu tolerance is applied to the singly protonated peptide mass or to the precursor m/z. Ignored for ppm tolerances.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/precursor_tolerance_type.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "precursor tolerance"
+      ],
+      "related": [
+        "peptide_mass_units",
+        "peptide_mass_tolerance_upper",
+        "peptide_mass_tolerance_lower"
+      ]
+    },
+    {
+      "name": "isotope_error",
+      "displayName": "Precursor isotope offsets",
+      "category": "precursor_mass",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ESSENTIALS",
+      "default": "2",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "Off: monoisotopic mass only"
+        },
+        {
+          "value": "1",
+          "label": "0, +1"
+        },
+        {
+          "value": "2",
+          "label": "0, +1, +2"
+        },
+        {
+          "value": "3",
+          "label": "0, +1, +2, +3"
+        },
+        {
+          "value": "4",
+          "label": "-1, 0, +1, +2, +3"
+        },
+        {
+          "value": "5",
+          "label": "-1, 0, +1"
+        },
+        {
+          "value": "6",
+          "label": "-3, -2, -1, 0, +1, +2, +3"
+        },
+        {
+          "value": "7",
+          "label": "-8, -4, 0, +4, +8 (for +4/+8 stable-isotope labels)"
+        }
+      ],
+      "shortHelp": "Lets a narrow precursor tolerance still match when the instrument picked a 13C isotope peak rather than the monoisotopic one, by also searching the listed isotope offsets. The source accepts 0 to 7; the comment -q writes lists only 0 to 5.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/isotope_error.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "C13 error",
+        "isotope",
+        "monoisotopic peak"
+      ],
+      "related": [
+        "peptide_mass_tolerance_upper",
+        "peptide_mass_tolerance_lower"
+      ]
+    },
+    {
+      "name": "mass_type_parent",
+      "displayName": "Precursor mass type",
+      "category": "precursor_mass",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "Average masses"
+        },
+        {
+          "value": "1",
+          "label": "Monoisotopic masses"
+        }
+      ],
+      "shortHelp": "Whether peptide (precursor) masses are calculated from average or monoisotopic element masses.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/mass_type_parent.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "monoisotopic",
+        "average mass"
+      ],
+      "related": [
+        "mass_type_fragment"
+      ]
+    },
+    {
+      "name": "mass_type_fragment",
+      "displayName": "Fragment mass type",
+      "category": "fragment_scoring",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "Average masses"
+        },
+        {
+          "value": "1",
+          "label": "Monoisotopic masses"
+        }
+      ],
+      "shortHelp": "Whether fragment-ion masses are calculated from average or monoisotopic element masses.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/mass_type_fragment.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "monoisotopic",
+        "average mass"
+      ],
+      "related": [
+        "mass_type_parent"
+      ]
+    },
+    {
+      "name": "search_enzyme_number",
+      "displayName": "Search enzyme",
+      "category": "digestion_enzymes",
+      "kind": "ENZYME_REFERENCE",
+      "visibility": "ESSENTIALS",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Number of the enzyme, in the [COMET_ENZYME_INFO] table at the end of the file, whose cleavage rule generates candidate peptides.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/search_enzyme_number.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "enzyme_in_table"
+      ],
+      "aliases": [
+        "enzyme",
+        "trypsin",
+        "protease",
+        "digestion"
+      ],
+      "related": [
+        "search_enzyme2_number",
+        "num_enzyme_termini",
+        "allowed_missed_cleavage",
+        "sample_enzyme_number"
+      ]
+    },
+    {
+      "name": "search_enzyme2_number",
+      "displayName": "Second search enzyme",
+      "category": "digestion_enzymes",
+      "kind": "ENZYME_REFERENCE",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Optional second enzyme from the [COMET_ENZYME_INFO] table, applied together with the first. 0 means no second enzyme.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/search_enzyme2_number.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "enzyme_in_table"
+      ],
+      "aliases": [
+        "enzyme",
+        "second enzyme",
+        "protease"
+      ],
+      "related": [
+        "search_enzyme_number",
+        "num_enzyme_termini",
+        "allowed_missed_cleavage"
+      ]
+    },
+    {
+      "name": "sample_enzyme_number",
+      "displayName": "Sample enzyme (pepXML annotation)",
+      "category": "digestion_enzymes",
+      "kind": "ENZYME_REFERENCE",
+      "visibility": "ADVANCED",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Enzyme recorded in pepXML as the one applied to the sample; it does not change the search. Useful when the search enzyme differs, for example a non-specific search of a tryptic digest.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/sample_enzyme_number.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "enzyme_in_table"
+      ],
+      "aliases": [
+        "enzyme",
+        "pepxml"
+      ],
+      "related": [
+        "search_enzyme_number",
+        "output_pepxmlfile"
+      ]
+    },
+    {
+      "name": "num_enzyme_termini",
+      "displayName": "Enzymatic termini",
+      "category": "digestion_enzymes",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ESSENTIALS",
+      "default": "2",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "1",
+          "label": "Semi-specific: at least one terminus"
+        },
+        {
+          "value": "2",
+          "label": "Fully specific: both termini"
+        },
+        {
+          "value": "8",
+          "label": "Semi-specific: N-terminus specific, C-terminus unspecific"
+        },
+        {
+          "value": "9",
+          "label": "Semi-specific: C-terminus specific, N-terminus unspecific"
+        }
+      ],
+      "shortHelp": "How many peptide termini must follow the search enzyme's rule: both (fully specific), at least one (semi-specific), or one named terminus.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/num_enzyme_termini.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "semi-tryptic",
+        "fully tryptic",
+        "specificity",
+        "termini"
+      ],
+      "related": [
+        "search_enzyme_number",
+        "allowed_missed_cleavage"
+      ]
+    },
+    {
+      "name": "allowed_missed_cleavage",
+      "displayName": "Allowed missed cleavages",
+      "category": "digestion_enzymes",
+      "kind": "INTEGER",
+      "visibility": "ESSENTIALS",
+      "default": "2",
+      "min": "0",
+      "max": "5",
+      "choices": [],
+      "shortHelp": "Maximum number of internal cleavage sites the enzyme skipped within one peptide. Not applied to a non-specific search. The comment -q writes gives 5 as the maximum.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/allowed_missed_cleavage.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "missed cleavage",
+        "missed cleavages"
+      ],
+      "related": [
+        "search_enzyme_number",
+        "num_enzyme_termini"
+      ]
+    },
+    {
+      "name": "variable_mod01",
+      "displayName": "Variable modification 1",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "15.9949 M 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod02",
+      "displayName": "Variable modification 2",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod03",
+      "displayName": "Variable modification 3",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod04",
+      "displayName": "Variable modification 4",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod05",
+      "displayName": "Variable modification 5",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod06",
+      "displayName": "Variable modification 6",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod07",
+      "displayName": "Variable modification 7",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod08",
+      "displayName": "Variable modification 8",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod09",
+      "displayName": "Variable modification 9",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod10",
+      "displayName": "Variable modification 10",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod11",
+      "displayName": "Variable modification 11",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod12",
+      "displayName": "Variable modification 12",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod13",
+      "displayName": "Variable modification 13",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod14",
+      "displayName": "Variable modification 14",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "variable_mod15",
+      "displayName": "Variable modification 15",
+      "category": "variable_mods",
+      "kind": "VARIABLE_MOD_TUPLE",
+      "visibility": "ESSENTIALS",
+      "default": "0.0 X 0 3 -1 0 0 0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TUPLE",
+      "validators": [
+        "variable_mod_tuple"
+      ],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "oxidation",
+        "phosphorylation"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "require_variable_mod",
+        "protein_modslist_file"
+      ]
+    },
+    {
+      "name": "max_variable_mods_in_peptide",
+      "displayName": "Maximum variable modifications per peptide",
+      "category": "variable_mods",
+      "kind": "INTEGER",
+      "visibility": "ADVANCED",
+      "default": "5",
+      "min": "0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Upper limit on the total number of variably modified residues in one peptide, across all variable-modification slots. 0 allows none.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/max_variable_mods_in_peptide.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "variable modification",
+        "PTM"
+      ],
+      "related": [
+        "variable_mod01",
+        "require_variable_mod"
+      ]
+    },
+    {
+      "name": "require_variable_mod",
+      "displayName": "Require a variable modification",
+      "category": "variable_mods",
+      "kind": "BOOLEAN_FLAG",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "When on, only peptides carrying at least one variable modification are analysed.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/require_variable_mod.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "variable modification",
+        "PTM",
+        "enrichment"
+      ],
+      "related": [
+        "max_variable_mods_in_peptide",
+        "variable_mod01"
+      ]
+    },
+    {
+      "name": "protein_modslist_file",
+      "displayName": "Protein-restricted modifications file",
+      "category": "variable_mods",
+      "kind": "FILE_PATH",
+      "visibility": "EXPERT",
+      "default": "",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Path to a text file pairing variable-modification slot numbers with protein accession substrings, so that a slot is applied only to matching proteins. Empty means no restriction.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/protein_modslist_file.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "EMPTY_ALLOWED",
+      "validators": [
+        "path"
+      ],
+      "aliases": [
+        "variable modification"
+      ],
+      "related": [
+        "variable_mod01"
+      ]
+    },
+    {
+      "name": "fragment_bin_tol",
+      "displayName": "Fragment bin width",
+      "category": "fragment_scoring",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.02",
+      "min": "0.01",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Width of the m/z bins MS/MS peaks are stored in, which acts as the fragment tolerance. About 0.02 suits high-resolution MS/MS and about 1.0005 ion-trap MS/MS; narrower bins use more memory. Comet's minimum is 0.01.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_tol.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "fragment tolerance",
+        "fragment mass tolerance",
+        "bin size"
+      ],
+      "related": [
+        "fragment_bin_offset",
+        "theoretical_fragment_ions",
+        "spectrum_batch_size"
+      ]
+    },
+    {
+      "name": "fragment_bin_offset",
+      "displayName": "Fragment bin offset",
+      "category": "fragment_scoring",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0",
+      "min": "0.0",
+      "max": "1.0",
+      "choices": [],
+      "shortHelp": "Where each fragment bin starts, as a fraction (0.0 to 1.0) of the bin width. 0.0 goes with high-resolution 0.02 bins and 0.4 with ion-trap 1.0005 bins.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_offset.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "fragment tolerance",
+        "bin offset"
+      ],
+      "related": [
+        "fragment_bin_tol"
+      ]
+    },
+    {
+      "name": "theoretical_fragment_ions",
+      "displayName": "Flanking-bin scoring",
+      "category": "fragment_scoring",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "Use flanking bins"
+        },
+        {
+          "value": "1",
+          "label": "Central bin only (M peak)"
+        }
+      ],
+      "shortHelp": "Whether the fast correlation score also counts half of each neighbouring bin's intensity. Flanking bins suit narrow bins; the central bin alone suits very coarse (about 1 Da) bins.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/theoretical_fragment_ions.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "flanking peaks",
+        "xcorr"
+      ],
+      "related": [
+        "fragment_bin_tol"
+      ]
+    },
+    {
+      "name": "use_A_ions",
+      "displayName": "Score a ions",
+      "category": "fragment_scoring",
+      "kind": "ION_SERIES_FLAG",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether a-type fragment ions are considered when scoring.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_A_ions.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "ion series",
+        "a ions",
+        "fragmentation"
+      ],
+      "related": [
+        "use_B_ions",
+        "use_C_ions",
+        "use_X_ions",
+        "use_Y_ions",
+        "use_Z_ions",
+        "use_Z1_ions",
+        "use_NL_ions"
+      ]
+    },
+    {
+      "name": "use_B_ions",
+      "displayName": "Score b ions",
+      "category": "fragment_scoring",
+      "kind": "ION_SERIES_FLAG",
+      "visibility": "ADVANCED",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether b-type fragment ions are considered when scoring.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_B_ions.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "ion series",
+        "b ions",
+        "fragmentation"
+      ],
+      "related": [
+        "use_A_ions",
+        "use_C_ions",
+        "use_X_ions",
+        "use_Y_ions",
+        "use_Z_ions",
+        "use_Z1_ions",
+        "use_NL_ions"
+      ]
+    },
+    {
+      "name": "use_C_ions",
+      "displayName": "Score c ions",
+      "category": "fragment_scoring",
+      "kind": "ION_SERIES_FLAG",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether c-type fragment ions are considered when scoring.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_C_ions.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "ion series",
+        "c ions",
+        "fragmentation"
+      ],
+      "related": [
+        "use_A_ions",
+        "use_B_ions",
+        "use_X_ions",
+        "use_Y_ions",
+        "use_Z_ions",
+        "use_Z1_ions",
+        "use_NL_ions"
+      ]
+    },
+    {
+      "name": "use_X_ions",
+      "displayName": "Score x ions",
+      "category": "fragment_scoring",
+      "kind": "ION_SERIES_FLAG",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether x-type fragment ions are considered when scoring.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_X_ions.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "ion series",
+        "x ions",
+        "fragmentation"
+      ],
+      "related": [
+        "use_A_ions",
+        "use_B_ions",
+        "use_C_ions",
+        "use_Y_ions",
+        "use_Z_ions",
+        "use_Z1_ions",
+        "use_NL_ions"
+      ]
+    },
+    {
+      "name": "use_Y_ions",
+      "displayName": "Score y ions",
+      "category": "fragment_scoring",
+      "kind": "ION_SERIES_FLAG",
+      "visibility": "ADVANCED",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether y-type fragment ions are considered when scoring.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_Y_ions.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "ion series",
+        "y ions",
+        "fragmentation"
+      ],
+      "related": [
+        "use_A_ions",
+        "use_B_ions",
+        "use_C_ions",
+        "use_X_ions",
+        "use_Z_ions",
+        "use_Z1_ions",
+        "use_NL_ions"
+      ]
+    },
+    {
+      "name": "use_Z_ions",
+      "displayName": "Score z ions",
+      "category": "fragment_scoring",
+      "kind": "ION_SERIES_FLAG",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether z-type fragment ions are considered when scoring.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_Z_ions.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "ion series",
+        "z ions",
+        "fragmentation"
+      ],
+      "related": [
+        "use_A_ions",
+        "use_B_ions",
+        "use_C_ions",
+        "use_X_ions",
+        "use_Y_ions",
+        "use_Z1_ions",
+        "use_NL_ions"
+      ]
+    },
+    {
+      "name": "use_Z1_ions",
+      "displayName": "Score z+1 ions",
+      "category": "fragment_scoring",
+      "kind": "ION_SERIES_FLAG",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether z-dot + 1 fragment ions, typical of ETD and ECD spectra, are considered when scoring.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_Z1_ions.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "ion series",
+        "z+1 ions",
+        "etd"
+      ],
+      "related": [
+        "use_A_ions",
+        "use_B_ions",
+        "use_C_ions",
+        "use_X_ions",
+        "use_Y_ions",
+        "use_Z_ions",
+        "use_NL_ions"
+      ]
+    },
+    {
+      "name": "use_NL_ions",
+      "displayName": "Score water and ammonia losses",
+      "category": "fragment_scoring",
+      "kind": "BOOLEAN_FLAG",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether b and y ions that lost NH3 or H2O are also scored; Comet applies this to singly charged fragments only.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_NL_ions.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "neutral loss",
+        "ion series"
+      ],
+      "related": [
+        "use_B_ions",
+        "use_Y_ions"
+      ]
+    },
+    {
+      "name": "fragindex_min_ions_score",
+      "displayName": "Fragment index: minimum matched ions to score",
+      "category": "fragment_index",
+      "kind": "INTEGER",
+      "visibility": "EXPERT",
+      "default": "3",
+      "min": "1",
+      "max": null,
+      "choices": [],
+      "shortHelp": "A candidate must match at least this many fragment-index peaks to be scored by xcorr. Scoring more candidates fills out the score histogram used for E-values.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_min_ions_score.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "fragment index"
+      ],
+      "related": [
+        "fragindex_min_ions_report"
+      ]
+    },
+    {
+      "name": "fragindex_min_ions_report",
+      "displayName": "Fragment index: minimum matched ions to report",
+      "category": "fragment_index",
+      "kind": "INTEGER",
+      "visibility": "EXPERT",
+      "default": "3",
+      "min": "1",
+      "max": null,
+      "choices": [],
+      "shortHelp": "A candidate must match at least this many fragment-index peaks to be reported; normally equal to or larger than fragindex_min_ions_score.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_min_ions_report.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "fragment index"
+      ],
+      "related": [
+        "fragindex_min_ions_score"
+      ]
+    },
+    {
+      "name": "fragindex_num_spectrumpeaks",
+      "displayName": "Fragment index: query peaks per spectrum",
+      "category": "fragment_index",
+      "kind": "INTEGER",
+      "visibility": "EXPERT",
+      "default": "150",
+      "min": "1",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Number of most intense binned peaks from each spectrum queried against the fragment index. More peaks are slower; too few can lose correct peptides. Configurable from 2026.02.0.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_num_spectrumpeaks.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "fragment index"
+      ],
+      "related": [
+        "fragment_bin_tol"
+      ]
+    },
+    {
+      "name": "fragindex_min_fragmentmass",
+      "displayName": "Fragment index: lowest fragment mass",
+      "category": "fragment_index",
+      "kind": "DECIMAL",
+      "visibility": "EXPERT",
+      "default": "200.0",
+      "min": "200.0",
+      "max": "2000.0",
+      "choices": [],
+      "shortHelp": "Smallest singly charged fragment mass put into the fragment index. Comet ignores a value outside 200 to 2000.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_min_fragmentmass.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "fragment index"
+      ],
+      "related": [
+        "fragindex_max_fragmentmass"
+      ]
+    },
+    {
+      "name": "fragindex_max_fragmentmass",
+      "displayName": "Fragment index: highest fragment mass",
+      "category": "fragment_index",
+      "kind": "DECIMAL",
+      "visibility": "EXPERT",
+      "default": "2000.0",
+      "min": "200.0",
+      "max": "2000.0",
+      "choices": [],
+      "shortHelp": "Largest singly charged fragment mass put into the fragment index. Comet ignores a value outside 200 to 2000.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_max_fragmentmass.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "fragment index"
+      ],
+      "related": [
+        "fragindex_min_fragmentmass"
+      ]
+    },
+    {
+      "name": "fragindex_skipreadprecursors",
+      "displayName": "Fragment index: skip reading precursors",
+      "category": "fragment_index",
+      "kind": "BOOLEAN_FLAG",
+      "visibility": "EXPERT",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "When off, Comet first reads every precursor mass in the inputs and indexes only peptides that could match one; when on (the default), it indexes every peptide in digest_mass_range.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_skipreadprecursors.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "fragment index"
+      ],
+      "related": [
+        "digest_mass_range"
+      ]
+    },
+    {
+      "name": "output_sqtfile",
+      "displayName": "Write SQT",
+      "category": "output",
+      "kind": "BOOLEAN_FLAG",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether results are also written as an .sqt file.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_sqtfile.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "sqt",
+        "output"
+      ],
+      "related": [
+        "print_expect_score"
+      ]
+    },
+    {
+      "name": "output_txtfile",
+      "displayName": "Write tab-delimited text",
+      "category": "output",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "No"
+        },
+        {
+          "value": "1",
+          "label": "Yes"
+        },
+        {
+          "value": "2",
+          "label": "Yes, Crux-formatted (per the -q comment)"
+        }
+      ],
+      "shortHelp": "Whether results are also written as a tab-delimited .txt file. The comment -q writes offers 2 for a Crux-formatted file; the 2026.02.2 parameter code treats any non-zero value as 'write'.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_txtfile.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "txt",
+        "tsv",
+        "output"
+      ],
+      "related": []
+    },
+    {
+      "name": "output_pepxmlfile",
+      "displayName": "Write pepXML",
+      "category": "output",
+      "kind": "BOOLEAN_FLAG",
+      "visibility": "ESSENTIALS",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether results are written as pepXML. The CometGUI workflow requires it.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_pepxmlfile.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "workflow_enforced"
+      ],
+      "aliases": [
+        "pepxml",
+        "output"
+      ],
+      "related": [
+        "output_percolatorfile",
+        "sample_enzyme_number"
+      ]
+    },
+    {
+      "name": "output_mzidentmlfile",
+      "displayName": "Write mzIdentML",
+      "category": "output",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "No"
+        },
+        {
+          "value": "1",
+          "label": "Yes"
+        },
+        {
+          "value": "2",
+          "label": "Yes, including protein sequences"
+        }
+      ],
+      "shortHelp": "Whether results are also written as mzIdentML, optionally with protein sequences.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_mzidentmlfile.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "mzid",
+        "mzidentml",
+        "output"
+      ],
+      "related": []
+    },
+    {
+      "name": "output_percolatorfile",
+      "displayName": "Write Percolator input (PIN)",
+      "category": "output",
+      "kind": "BOOLEAN_FLAG",
+      "visibility": "ESSENTIALS",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Whether a Percolator .pin file is written. The CometGUI workflow requires it, because Percolator rescoring reads it.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_percolatorfile.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "workflow_enforced"
+      ],
+      "aliases": [
+        "pin",
+        "percolator",
+        "output"
+      ],
+      "related": [
+        "output_pepxmlfile",
+        "pinfile_protein_delimiter",
+        "decoy_search"
+      ]
+    },
+    {
+      "name": "print_expect_score",
+      "displayName": "Report E-value in SQT",
+      "category": "output",
+      "kind": "BOOLEAN_FLAG",
+      "visibility": "EXPERT",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "In SQT output only, whether the E-value replaces the preliminary Sp score column.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/print_expect_score.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "expect",
+        "e-value",
+        "sqt"
+      ],
+      "related": [
+        "output_sqtfile"
+      ]
+    },
+    {
+      "name": "print_ascorepro_score",
+      "displayName": "AScorePro localisation",
+      "category": "output",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "-1",
+          "label": "Localise all variable modifications"
+        },
+        {
+          "value": "0",
+          "label": "Off"
+        },
+        {
+          "value": "1",
+          "label": "Localise variable_mod01"
+        },
+        {
+          "value": "2",
+          "label": "Localise variable_mod02"
+        },
+        {
+          "value": "3",
+          "label": "Localise variable_mod03"
+        },
+        {
+          "value": "4",
+          "label": "Localise variable_mod04"
+        },
+        {
+          "value": "5",
+          "label": "Localise variable_mod05"
+        }
+      ],
+      "shortHelp": "Whether the AScorePro site-localisation algorithm is run on each top hit, and for which variable modification. Upstream calls it experimental outside phosphorylation; a confident localisation can replace Comet's top-ranked peptide.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/print_ascorepro_score.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "ascore",
+        "localization",
+        "localisation",
+        "phosphorylation"
+      ],
+      "related": [
+        "variable_mod01"
+      ]
+    },
+    {
+      "name": "num_output_lines",
+      "displayName": "Results reported per spectrum",
+      "category": "output",
+      "kind": "INTEGER",
+      "visibility": "ADVANCED",
+      "default": "5",
+      "min": "1",
+      "max": null,
+      "choices": [],
+      "shortHelp": "How many top-ranked peptides are reported for each spectrum.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/num_output_lines.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "top hits",
+        "results per spectrum"
+      ],
+      "related": [
+        "num_results"
+      ]
+    },
+    {
+      "name": "scan_range",
+      "displayName": "Scan range",
+      "category": "spectrum_filters",
+      "kind": "INTEGER_RANGE",
+      "visibility": "ADVANCED",
+      "default": "0 0",
+      "min": "0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "First and last scan number to search, inclusive. 0 for either end leaves it open; 0 0 searches the whole file.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/scan_range.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TWO_VALUES",
+      "validators": [],
+      "aliases": [
+        "scans",
+        "first scan",
+        "last scan"
+      ],
+      "related": []
+    },
+    {
+      "name": "precursor_charge",
+      "displayName": "Charge range for spectra without a charge",
+      "category": "spectrum_filters",
+      "kind": "INTEGER_RANGE",
+      "visibility": "ADVANCED",
+      "default": "0 0",
+      "min": "0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Charge states to try for spectra whose precursor charge is unknown. A first value of 0 disables it; known charges are kept unless override_charge says otherwise.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/precursor_charge.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TWO_VALUES",
+      "validators": [
+        "ordered_range"
+      ],
+      "aliases": [
+        "charge",
+        "precursor charge"
+      ],
+      "related": [
+        "override_charge",
+        "min_precursor_charge",
+        "max_precursor_charge"
+      ]
+    },
+    {
+      "name": "override_charge",
+      "displayName": "Override precursor charge",
+      "category": "spectrum_filters",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "Keep known charges"
+        },
+        {
+          "value": "1",
+          "label": "Ignore known charges and use precursor_charge"
+        },
+        {
+          "value": "2",
+          "label": "Search only known charges inside precursor_charge"
+        },
+        {
+          "value": "3",
+          "label": "Keep known charges; for unknown ones use 1+ if nothing lies above the precursor m/z, else precursor_charge"
+        }
+      ],
+      "shortHelp": "How charges recorded in the input files interact with precursor_charge.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/override_charge.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "charge"
+      ],
+      "related": [
+        "precursor_charge"
+      ]
+    },
+    {
+      "name": "ms_level",
+      "displayName": "MS level searched",
+      "category": "spectrum_filters",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "2",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "2",
+          "label": "MS2"
+        },
+        {
+          "value": "3",
+          "label": "MS3"
+        }
+      ],
+      "shortHelp": "Whether MS2 or MS3 scans are searched (mzXML, mzML and mz5 inputs).",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/ms_level.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "ms3",
+        "ms2"
+      ],
+      "related": []
+    },
+    {
+      "name": "activation_method",
+      "displayName": "Activation method filter",
+      "category": "spectrum_filters",
+      "kind": "STRING_ENUM",
+      "visibility": "ADVANCED",
+      "default": "ALL",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "ALL",
+          "label": "All methods"
+        },
+        {
+          "value": "CID",
+          "label": "CID"
+        },
+        {
+          "value": "ECD",
+          "label": "ECD"
+        },
+        {
+          "value": "ETD",
+          "label": "ETD"
+        },
+        {
+          "value": "ETD+SA",
+          "label": "ETD with supplemental activation"
+        },
+        {
+          "value": "PQD",
+          "label": "PQD"
+        },
+        {
+          "value": "HCD",
+          "label": "HCD"
+        },
+        {
+          "value": "IRMPD",
+          "label": "IRMPD"
+        },
+        {
+          "value": "SID",
+          "label": "SID"
+        }
+      ],
+      "shortHelp": "Searches only spectra acquired with this activation method (mzXML, mzML and mz5 inputs); ALL applies no filter.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/activation_method.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "fragmentation",
+        "hcd",
+        "cid",
+        "etd"
+      ],
+      "related": []
+    },
+    {
+      "name": "digest_mass_range",
+      "displayName": "Peptide mass range (MH+)",
+      "category": "search_ranges",
+      "kind": "DECIMAL_RANGE",
+      "visibility": "ADVANCED",
+      "default": "600.0 5000.0",
+      "min": "0.0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Lowest and highest singly protonated peptide mass considered; spectra outside it are not searched.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/digest_mass_range.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TWO_VALUES",
+      "validators": [
+        "ordered_range"
+      ],
+      "aliases": [
+        "mass range",
+        "peptide mass"
+      ],
+      "related": [
+        "peptide_length_range"
+      ]
+    },
+    {
+      "name": "peptide_length_range",
+      "displayName": "Peptide length range",
+      "category": "search_ranges",
+      "kind": "INTEGER_RANGE",
+      "visibility": "ADVANCED",
+      "default": "5 50",
+      "min": "1",
+      "max": "50",
+      "choices": [],
+      "shortHelp": "Shortest and longest peptide, in residues, that is analysed. Comet 2026.02.2 analyses at most 50 residues.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_length_range.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TWO_VALUES",
+      "validators": [
+        "ordered_range"
+      ],
+      "aliases": [
+        "peptide length",
+        "length"
+      ],
+      "related": [
+        "digest_mass_range"
+      ]
+    },
+    {
+      "name": "pinfile_protein_delimiter",
+      "displayName": "PIN protein delimiter",
+      "category": "output",
+      "kind": "STRING",
+      "visibility": "EXPERT",
+      "default": "",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Text placed between protein names in the Proteins column of the Percolator .pin file. Empty keeps Comet's default, a tab.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/pinfile_protein_delimiter.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "EMPTY_ALLOWED",
+      "validators": [],
+      "aliases": [
+        "pin",
+        "percolator",
+        "delimiter"
+      ],
+      "related": [
+        "output_percolatorfile"
+      ]
+    },
+    {
+      "name": "num_results",
+      "displayName": "Results stored per spectrum",
+      "category": "output",
+      "kind": "INTEGER",
+      "visibility": "EXPERT",
+      "default": "100",
+      "min": "1",
+      "max": "100",
+      "choices": [],
+      "shortHelp": "How many peptides Comet keeps internally per spectrum, which bounds the range of the Sp rank. Comet raises it to one more than num_output_lines if needed.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/num_results.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "sp rank"
+      ],
+      "related": [
+        "num_output_lines"
+      ]
+    },
+    {
+      "name": "max_duplicate_proteins",
+      "displayName": "Additional proteins reported per peptide",
+      "category": "output",
+      "kind": "INTEGER",
+      "visibility": "ADVANCED",
+      "default": "10",
+      "min": "-1",
+      "max": null,
+      "choices": [],
+      "shortHelp": "How many proteins besides the first are reported for a peptide found in several; -1 reports all of them.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/max_duplicate_proteins.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "protein inference",
+        "duplicate proteins",
+        "shared peptides"
+      ],
+      "related": [
+        "decoy_search"
+      ]
+    },
+    {
+      "name": "max_fragment_charge",
+      "displayName": "Maximum fragment charge",
+      "category": "fragment_scoring",
+      "kind": "INTEGER",
+      "visibility": "ADVANCED",
+      "default": "3",
+      "min": "1",
+      "max": "5",
+      "choices": [],
+      "shortHelp": "Highest fragment-ion charge considered; fragments are still limited to below the precursor charge. Comet enforces at most 5.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/max_fragment_charge.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "fragment charge",
+        "charge"
+      ],
+      "related": [
+        "max_precursor_charge"
+      ]
+    },
+    {
+      "name": "min_precursor_charge",
+      "displayName": "Minimum precursor charge",
+      "category": "spectrum_filters",
+      "kind": "INTEGER",
+      "visibility": "ADVANCED",
+      "default": "1",
+      "min": "1",
+      "max": "9",
+      "choices": [],
+      "shortHelp": "Spectra with a lower precursor charge are not searched.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/min_precursor_charge.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "charge",
+        "precursor charge"
+      ],
+      "related": [
+        "max_precursor_charge",
+        "precursor_charge"
+      ]
+    },
+    {
+      "name": "max_precursor_charge",
+      "displayName": "Maximum precursor charge",
+      "category": "spectrum_filters",
+      "kind": "INTEGER",
+      "visibility": "ADVANCED",
+      "default": "6",
+      "min": "1",
+      "max": "9",
+      "choices": [],
+      "shortHelp": "Spectra with a higher precursor charge are not searched. Comet enforces at most 9.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/max_precursor_charge.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "charge",
+        "precursor charge"
+      ],
+      "related": [
+        "min_precursor_charge",
+        "precursor_charge",
+        "max_fragment_charge"
+      ]
+    },
+    {
+      "name": "clip_nterm_methionine",
+      "displayName": "Also search without initiator methionine",
+      "category": "digestion_enzymes",
+      "kind": "BOOLEAN_FLAG",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "When on, a protein starting with methionine is also digested as if that methionine had been removed, and N-terminal modifications apply to the shortened form.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/clip_nterm_methionine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "methionine",
+        "n-terminus"
+      ],
+      "related": [
+        "add_Nterm_protein"
+      ]
+    },
+    {
+      "name": "spectrum_batch_size",
+      "displayName": "Spectra per batch",
+      "category": "cpu_execution",
+      "kind": "INTEGER",
+      "visibility": "ADVANCED",
+      "default": "15000",
+      "min": "0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Load and search about this many spectra at a time to bound memory; 0 loads every spectrum at once.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/spectrum_batch_size.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "memory",
+        "batch"
+      ],
+      "related": [
+        "fragment_bin_tol",
+        "num_threads"
+      ]
+    },
+    {
+      "name": "decoy_prefix",
+      "displayName": "Decoy protein prefix",
+      "category": "database_peff",
+      "kind": "STRING",
+      "visibility": "ESSENTIALS",
+      "default": "DECOY_",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Text prepended to the protein name of decoy matches. With an internal decoy search Comet adds it; Percolator and downstream tools use it to tell decoys from targets.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/decoy_prefix.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "decoy",
+        "target decoy",
+        "reverse"
+      ],
+      "related": [
+        "decoy_search"
+      ]
+    },
+    {
+      "name": "equal_I_and_L",
+      "displayName": "Treat isoleucine and leucine as equal",
+      "category": "search_ranges",
+      "kind": "BOOLEAN_FLAG",
+      "visibility": "ADVANCED",
+      "default": "1",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "When on, peptides that differ only by I versus L count as one identification, since low-energy fragmentation cannot tell them apart.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/equal_I_and_L.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "isoleucine",
+        "leucine",
+        "I/L"
+      ],
+      "related": []
+    },
+    {
+      "name": "mass_offsets",
+      "displayName": "Precursor mass offsets",
+      "category": "precursor_mass",
+      "kind": "DECIMAL_LIST",
+      "visibility": "EXPERT",
+      "default": "",
+      "min": "0.0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Zero or more non-negative masses subtracted from each precursor mass before matching, for labels that fall off before fragmentation. Include 0.0 to keep the unshifted mass too. Empty means none.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/mass_offsets.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "VALUE_LIST",
+      "validators": [],
+      "aliases": [
+        "mass offset",
+        "tag"
+      ],
+      "related": [
+        "peptide_mass_tolerance_upper",
+        "peptide_mass_tolerance_lower"
+      ]
+    },
+    {
+      "name": "minimum_peaks",
+      "displayName": "Minimum peaks per spectrum",
+      "category": "spectral_processing",
+      "kind": "INTEGER",
+      "visibility": "ADVANCED",
+      "default": "10",
+      "min": "0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Spectra with fewer peaks (after clear_mz_range, before other processing) are not searched.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/minimum_peaks.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "peaks",
+        "sparse spectra"
+      ],
+      "related": [
+        "minimum_intensity",
+        "percentage_base_peak",
+        "clear_mz_range"
+      ]
+    },
+    {
+      "name": "minimum_intensity",
+      "displayName": "Minimum peak intensity",
+      "category": "spectral_processing",
+      "kind": "DECIMAL",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": "0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Peaks below this absolute intensity are dropped when spectra are read; Comet treats a negative value as 0.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/minimum_intensity.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "intensity",
+        "noise"
+      ],
+      "related": [
+        "percentage_base_peak",
+        "minimum_peaks"
+      ]
+    },
+    {
+      "name": "remove_precursor_peak",
+      "displayName": "Remove precursor peaks",
+      "category": "spectral_processing",
+      "kind": "INTEGER_ENUM",
+      "visibility": "ADVANCED",
+      "default": "0",
+      "min": null,
+      "max": null,
+      "choices": [
+        {
+          "value": "0",
+          "label": "None"
+        },
+        {
+          "value": "1",
+          "label": "Peaks around the precursor m/z"
+        },
+        {
+          "value": "2",
+          "label": "Charge-reduced precursor peaks (ETD/ECD)"
+        },
+        {
+          "value": "3",
+          "label": "Phosphate neutral-loss precursor peaks (-80 and -98)"
+        }
+      ],
+      "shortHelp": "Which precursor-derived peaks are removed from each MS/MS spectrum before searching.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/remove_precursor_peak.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [
+        "choice"
+      ],
+      "aliases": [
+        "precursor removal"
+      ],
+      "related": [
+        "remove_precursor_tolerance"
+      ]
+    },
+    {
+      "name": "remove_precursor_tolerance",
+      "displayName": "Precursor removal tolerance (Da)",
+      "category": "spectral_processing",
+      "kind": "DECIMAL",
+      "visibility": "ADVANCED",
+      "default": "1.5",
+      "min": "0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "Half-width in daltons of the window removed around each precursor peak when remove_precursor_peak is on; must be positive.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/remove_precursor_tolerance.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "precursor removal"
+      ],
+      "related": [
+        "remove_precursor_peak"
+      ]
+    },
+    {
+      "name": "clear_mz_range",
+      "displayName": "Cleared m/z range",
+      "category": "spectral_processing",
+      "kind": "DECIMAL_RANGE",
+      "visibility": "ADVANCED",
+      "default": "0.0 0.0",
+      "min": "0.0",
+      "max": null,
+      "choices": [],
+      "shortHelp": "All peaks between these two m/z values are removed before searching, for example TMT or iTRAQ reporter ions; 0.0 0.0 clears nothing.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/clear_mz_range.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "TWO_VALUES",
+      "validators": [
+        "ordered_range"
+      ],
+      "aliases": [
+        "reporter ions",
+        "tmt",
+        "itraq"
+      ],
+      "related": [
+        "minimum_peaks"
+      ]
+    },
+    {
+      "name": "percentage_base_peak",
+      "displayName": "Minimum intensity relative to base peak",
+      "category": "spectral_processing",
+      "kind": "DECIMAL",
+      "visibility": "ADVANCED",
+      "default": "0.0",
+      "min": "0.0",
+      "max": "1.0",
+      "choices": [],
+      "shortHelp": "Peaks weaker than this fraction (0.0 to 1.0) of the base peak are dropped; 0.0 disables it.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/percentage_base_peak.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "intensity",
+        "noise",
+        "base peak"
+      ],
+      "related": [
+        "minimum_intensity",
+        "minimum_peaks"
+      ]
+    },
+    {
+      "name": "add_Cterm_peptide",
+      "displayName": "Static modification: peptide C-terminus",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to the C-terminus of every peptide. 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Cterm_peptide.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "terminus"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_Nterm_peptide",
+      "displayName": "Static modification: peptide N-terminus",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to the N-terminus of every peptide. 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Nterm_peptide.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "terminus"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_Cterm_protein",
+      "displayName": "Static modification: protein C-terminus",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to the C-terminus of each protein's C-terminal peptide. 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Cterm_protein.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "terminus"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_Nterm_protein",
+      "displayName": "Static modification: protein N-terminus",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to the N-terminus of each protein's N-terminal peptide. 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Nterm_protein.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "terminus"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_G_glycine",
+      "displayName": "Static modification: glycine (G)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every glycine (G) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_G_glycine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "glycine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_A_alanine",
+      "displayName": "Static modification: alanine (A)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every alanine (A) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_A_alanine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "alanine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_S_serine",
+      "displayName": "Static modification: serine (S)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every serine (S) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_S_serine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "serine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_P_proline",
+      "displayName": "Static modification: proline (P)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every proline (P) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_P_proline.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "proline"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_V_valine",
+      "displayName": "Static modification: valine (V)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every valine (V) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_V_valine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "valine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_T_threonine",
+      "displayName": "Static modification: threonine (T)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every threonine (T) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_T_threonine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "threonine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_C_cysteine",
+      "displayName": "Static modification: cysteine (C)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "57.021464",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every cysteine (C) residue. -q writes 57.021464, carbamidomethylation by iodoacetamide; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_C_cysteine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "cysteine",
+        "carbamidomethyl",
+        "iodoacetamide",
+        "alkylation"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_L_leucine",
+      "displayName": "Static modification: leucine (L)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every leucine (L) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_L_leucine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "leucine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_I_isoleucine",
+      "displayName": "Static modification: isoleucine (I)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every isoleucine (I) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_I_isoleucine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "isoleucine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_N_asparagine",
+      "displayName": "Static modification: asparagine (N)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every asparagine (N) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_N_asparagine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "asparagine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_D_aspartic_acid",
+      "displayName": "Static modification: aspartic acid (D)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every aspartic acid (D) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_D_aspartic_acid.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "aspartic acid"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_Q_glutamine",
+      "displayName": "Static modification: glutamine (Q)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every glutamine (Q) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Q_glutamine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "glutamine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_K_lysine",
+      "displayName": "Static modification: lysine (K)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every lysine (K) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_K_lysine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "lysine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_E_glutamic_acid",
+      "displayName": "Static modification: glutamic acid (E)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every glutamic acid (E) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_E_glutamic_acid.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "glutamic acid"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_M_methionine",
+      "displayName": "Static modification: methionine (M)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every methionine (M) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_M_methionine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "methionine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_H_histidine",
+      "displayName": "Static modification: histidine (H)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every histidine (H) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_H_histidine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "histidine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_F_phenylalanine",
+      "displayName": "Static modification: phenylalanine (F)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every phenylalanine (F) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_F_phenylalanine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "phenylalanine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_U_selenocysteine",
+      "displayName": "Static modification: selenocysteine (U)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every selenocysteine (U) residue; 0.0 means no modification. Caution: Comet 2026.02.2 reads this name but applies the U static mass from add_U_user_amino_acid, a name -q does not write, so a value here has no effect in that release.",
+      "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L812",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "selenocysteine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_R_arginine",
+      "displayName": "Static modification: arginine (R)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every arginine (R) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_R_arginine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "arginine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_Y_tyrosine",
+      "displayName": "Static modification: tyrosine (Y)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every tyrosine (Y) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Y_tyrosine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "tyrosine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_W_tryptophan",
+      "displayName": "Static modification: tryptophan (W)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every tryptophan (W) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_W_tryptophan.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "tryptophan"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_O_pyrrolysine",
+      "displayName": "Static modification: pyrrolysine (O)",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ESSENTIALS",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Mass added to every pyrrolysine (O) residue; 0.0 means no modification.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_O_pyrrolysine.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "static modification",
+        "fixed modification",
+        "pyrrolysine"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_B_user_amino_acid",
+      "displayName": "User-defined residue B: mass",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ADVANCED",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Residue mass for the letter B, which has no built-in mass: encode a custom residue as B in the FASTA and give its mass here. While it is 0.0, peptides containing B are not analysed.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_B_user_amino_acid.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "user amino acid",
+        "custom residue",
+        "static modification"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_J_user_amino_acid",
+      "displayName": "User-defined residue J: mass",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ADVANCED",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Residue mass for the letter J, which has no built-in mass: encode a custom residue as J in the FASTA and give its mass here. While it is 0.0, peptides containing J are not analysed.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_J_user_amino_acid.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "user amino acid",
+        "custom residue",
+        "static modification"
+      ],
+      "related": [
+        "compoundmods_file"
+      ]
+    },
+    {
+      "name": "add_X_user_amino_acid",
+      "displayName": "User-defined residue X: mass",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ADVANCED",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Residue mass for the letter X, which has no built-in mass: encode a custom residue as X in the FASTA and give its mass here. While it is 0.0, peptides containing X are not analysed.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_X_user_amino_acid.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "user amino acid",
+        "custom residue",
+        "static modification"
+      ],
+      "related": []
+    },
+    {
+      "name": "add_Z_user_amino_acid",
+      "displayName": "User-defined residue Z: mass",
+      "category": "static_mods",
+      "kind": "DECIMAL",
+      "visibility": "ADVANCED",
+      "default": "0.0000",
+      "min": null,
+      "max": null,
+      "choices": [],
+      "shortHelp": "Residue mass for the letter Z, which has no built-in mass: encode a custom residue as Z in the FASTA and give its mass here. While it is 0.0, peptides containing Z are not analysed.",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Z_user_amino_acid.html",
+      "versions": {
+        "from": "2026.02.2",
+        "through": null
+      },
+      "serialization": "SINGLE_VALUE",
+      "validators": [],
+      "aliases": [
+        "user amino acid",
+        "custom residue",
+        "static modification"
+      ],
+      "related": []
+    }
+  ]
+}

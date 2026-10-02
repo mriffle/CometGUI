@@ -14,14 +14,21 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
-/**
- * Reading comet.params files: scalar types, enzyme table, variable-modification tuples, comments,
- * unknown parameters, duplicates and malformed lines. Nothing imported may be silently lost.
- *
- * <p>{@link org.cometgui.params.comet.parser.ParamsLineReader} is the one place that knows how a
- * comet.params line is shaped: it classifies every line (version marker, comment, blank,
- * declaration, enzyme-table header and rows, malformed with its line number) and interprets
- * nothing. Schema discovery reads it today; the typed parser is built on it. Phase 06 (Comet
- * parameter model).
- */
-package org.cometgui.params.comet.parser;
+package org.cometgui.params.comet.schema;
+
+/** How much of the parameter set a dump is known to declare ({@code R-PARAM-01}, {@code -02}). */
+public enum DiscoveryMode {
+
+    /**
+     * From {@code comet -q}: the complete parameter file. A curated parameter it does not declare
+     * is one the binary no longer recognises.
+     */
+    COMPLETE,
+
+    /**
+     * From {@code comet -p}, for a binary without {@code -q}: the default file, which omits
+     * parameters the binary does support (22 of 118 for 2026.02.2). Absence from it proves nothing,
+     * so drift detection never reports a curated parameter as removed on its evidence.
+     */
+    PARTIAL_DISCOVERY
+}
