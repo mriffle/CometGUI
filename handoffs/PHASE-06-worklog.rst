@@ -850,4 +850,8 @@ None yet. Reported upward, not blocking:
 * Comet ``v2026.03.0`` released upstream 2026-10-01; the release matrix does
   not have it (unit 6 sign-off);
 * the exit-gate ``--only tests`` run needs ``scratch/phase06/artefacts/`` as
-  well as ``scratch/phase05/artefacts/`` (unit 6 sign-off).
+  well as ``scratch/phase05/artefacts/`` (unit 6 sign-off);
+* ``scripts/build.sh``'s mutation gate is module-wide and passes a module
+  with one gutted package (88.7 % module, 37.5 % ``validation``); the
+  per-package grade lives only in ``verify-param-gates.sh`` (unit 8
+  sign-off).
