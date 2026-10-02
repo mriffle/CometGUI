@@ -109,12 +109,34 @@ phase = "05"
 # --- AC-PAR -----------------------------------------------------------------
 
 [[ac."AC-PAR-01".evidence]]
-kind = "planned"
-phase = "06"
+kind = "test"
+class = "org.cometgui.params.comet.schema.SchemaDriftFixtureTest"
+method = "theCountsFor202602"
+note = "Phase 06. The real comet -q output of Comet 2026.02.2 declares 118 parameters; 118 are modelled and 0 allow-listed as internal (the allow-list is empty)."
+
+[[ac."AC-PAR-01".evidence]]
+kind = "test"
+class = "org.cometgui.params.comet.schema.BundledMetadataTest"
+method = "itModelsTheCompleteDumpInOrder"
+note = "Phase 06. The bundled metadata loads and models every name the real -q output declares, in -q's order."
 
 [[ac."AC-PAR-02".evidence]]
-kind = "planned"
-phase = "06"
+kind = "test"
+class = "org.cometgui.params.comet.schema.SchemaDriftFixtureTest"
+method = "theDriftTest"
+note = "Phase 06. The drift test proper: the bundled metadata against the real -q output of every Comet version in manifests/tools.json; any finding fails."
+
+[[ac."AC-PAR-02".evidence]]
+kind = "test"
+class = "org.cometgui.params.comet.schema.SchemaDriftFixtureTest"
+method = "theCompleteDumpReportsARemovedEntry"
+note = "Phase 06. With one entry removed from the metadata, the real -q output reports that parameter as UNMODELLED, by name."
+
+[[ac."AC-PAR-02".evidence]]
+kind = "test"
+class = "org.cometgui.params.comet.schema.SchemaDriftTest"
+method = "unmodelled"
+note = "Phase 06. A declared parameter with no metadata is UNMODELLED, named, with its line."
 
 [[ac."AC-PAR-03".evidence]]
 kind = "planned"
@@ -129,8 +151,22 @@ kind = "planned"
 phase = "07"
 
 [[ac."AC-PAR-06".evidence]]
-kind = "planned"
-phase = "06"
+kind = "test"
+class = "org.cometgui.params.comet.parser.CometParamsParserTest"
+method = "keptAndReported"
+note = "Phase 06. An imported unknown parameter is kept with its value, inline comment and comment lines, and reported as a warning naming it and its line."
+
+[[ac."AC-PAR-06".evidence]]
+kind = "test"
+class = "org.cometgui.params.comet.writer.CanonicalWriterTest"
+method = "survive"
+note = "Phase 06. Unknown parameters are written back and survive two parse/write round trips unchanged."
+
+[[ac."AC-PAR-06".evidence]]
+kind = "test"
+class = "org.cometgui.params.comet.writer.CanonicalWriterTest"
+method = "reported"
+note = "Phase 06. Each parse, before and after a write, reports each unknown parameter by name and line."
 
 [[ac."AC-PAR-07".evidence]]
 kind = "planned"
@@ -149,8 +185,16 @@ kind = "planned"
 phase = "07"
 
 [[ac."AC-PAR-11".evidence]]
-kind = "planned"
-phase = "06"
+kind = "test"
+class = "org.cometgui.params.comet.writer.CommaLocaleWriterTest"
+method = "byteIdenticalUnderCommaLocales"
+note = "Phase 06. Under de-DE and fr-FR, shown to format 1.5 as 1,5, the canonical writer's bytes equal Locale.ROOT's for the real -q model and a decimal-heavy variant."
+
+[[ac."AC-PAR-11".evidence]]
+kind = "test"
+class = "org.cometgui.params.comet.value.LocaleIndependenceTest"
+method = "commaDecimalLocalesWriteTheSameText"
+note = "Phase 06. Every structured-value codec writes the same text under comma-decimal default locales as under Locale.ROOT."
 
 # --- AC-WF ------------------------------------------------------------------
 

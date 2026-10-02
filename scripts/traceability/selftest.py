@@ -52,8 +52,22 @@ from .model import SourceError
 # manifests/ is copied because docs/conf.py generates the tool platform matrix
 # from manifests/tools.json (PHASE-05 unit 11) and fails the build without it;
 # a copy that omits it never reaches the defect this harness injects.
+#
+# The Comet parameter metadata directory is copied because docs/conf.py generates
+# reference/comet_parameters_generated.rst from it (PHASE-06 unit 7, R-DOC-04)
+# and fails the build without it -- the same trap as manifests/ above. The rule
+# (PHASE-03 handoff): the sandbox carries what the build reads as input. The
+# generator's other inputs are already here: manifests/tools.json, and the real
+# comet -q fixtures under cometgui-params-comet/src/test, copied with every
+# module's tests below.
 _COPY_FILES = ("specification.rst", "STATUS.rst", "DECISIONS.rst")
-_COPY_TREES = ("phases", "docs", "scripts", "manifests")
+_COPY_TREES = (
+    "phases",
+    "docs",
+    "scripts",
+    "manifests",
+    "cometgui-params-comet/src/main/resources/org/cometgui/params/comet/schema",
+)
 _IGNORE = shutil.ignore_patterns("_build", "__pycache__", "*.pyc")
 
 

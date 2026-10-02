@@ -35,6 +35,9 @@
 # there, shows the build failing on it, removes the injection and shows the same
 # build passing. The working tree is never touched. (Phase 01 unit 8 owns the
 # aggregate falsifiability harness; this is deliberately self-contained.)
+# It then runs scripts/cometparams_selftest.py (PHASE-06 unit 7, R-DOC-04):
+# damaged copies of the Comet parameter metadata must each be refused with
+# their own diagnostic, by the generator and through the builder-inited hook.
 #
 # Exit status:
 #   0  every build passed and produced the HTML it should have
@@ -42,7 +45,8 @@
 #   2  harness misuse or a broken environment (no virtualenv, no documents, ...)
 #   3  sphinx-build exited 0 but produced no or empty HTML
 #   4  --self-test only: the injected broken cross-reference did NOT fail the
-#      build, i.e. the gate is not falsifiable and cannot be trusted
+#      build, or a damaged Comet parameter input was not refused as required,
+#      i.e. the gate is not falsifiable and cannot be trusted
 #
 # Needs no network access once .venv exists.
 
@@ -67,7 +71,7 @@ SELF_TEST=0
 die() { printf 'docs-build.sh: %s\n' "$1" >&2; exit "${2:-2}"; }
 
 usage() {
-    sed -n '3,45p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '3,50p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 while [ "$#" -gt 0 ]; do
@@ -226,6 +230,34 @@ if [ "${SELF_TEST}" -eq 1 ]; then
         exit 3
     fi
     printf '\ndocs-build.sh: self-test OK -- fails on the broken cross-reference, passes without it.\n'
+
+    # PHASE-06 unit 7 (R-DOC-04, PHASE-06 exit gate item 8): the generated Comet
+    # parameter reference. scripts/cometparams_selftest.py damages copies of the
+    # generator's inputs, and of the generator itself, and requires each damage
+    # to be refused with its own diagnostic -- by the generator, and through the
+    # real builder-inited hook in a project copy. The working tree is not
+    # touched. Its exit status is not trusted on its own: the OK line is.
+    printf '\n=== Self-test: the generated Comet parameter reference (scripts/cometparams_selftest.py) ===\n'
+    PARAMS_LOG="${GATE_ROOT}/cometparams-selftest.log"
+    # Same shape as run_sphinx: the script's own status, not tee's, and called
+    # in a condition context so that set -e does not end the script on it.
+    run_params_selftest() {
+        "${VENV}/bin/python" "${PROJECT_ROOT}/scripts/cometparams_selftest.py" \
+            --root "${PROJECT_ROOT}" --work "${GATE_ROOT}/cometparams-selftest" \
+            --sphinx "${SPHINX_BUILD}" 2>&1 | tee -- "${PARAMS_LOG}"
+        return "${PIPESTATUS[0]}"
+    }
+    params_status=0
+    run_params_selftest || params_status=$?
+    if [ "${params_status}" -ne 0 ]; then
+        printf '\ndocs-build.sh: SELF-TEST FAILED -- the Comet parameter reference generator did not\n' >&2
+        printf 'docs-build.sh: reject every damaged input as required (exit %s); see %s\n' "${params_status}" "${PARAMS_LOG}" >&2
+        exit 4
+    fi
+    grep -q '^cometparams-selftest: OK -- ' -- "${PARAMS_LOG}" \
+        || die "self-test: the parameter reference self-test exited 0 without its OK line; see ${PARAMS_LOG}" 3
+    printf '\ndocs-build.sh: parameter reference self-test OK -- %s\n' \
+        "$(sed -n 's/^cometparams-selftest: OK -- //p' -- "${PARAMS_LOG}")"
 fi
 
 # ---------------------------------------------------------------------------

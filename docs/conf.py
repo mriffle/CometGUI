@@ -214,9 +214,102 @@ def _generate_tool_matrix(app):
     )
 
 
+#
+# Phase 06 unit 7: the Comet parameter reference (R-DOC-04), generated the same
+# way. The curated parameter metadata is one JSON file in cometgui-params-comet,
+# read by the Java schema (MetadataLoader) and by scripts/cometparams.py, so the
+# page and the GUI cannot silently diverge. The page
+# reference/comet_parameters_generated.rst keeps a short hand-written
+# introduction and pulls the fragment in with `.. include::`.
+#
+# Two things this handler does that the generator cannot do for itself:
+#   * it deletes the previous build's fragment first, so a generator that
+#     returns without writing cannot pass on yesterday's file; and
+#   * it counts the entries in what was written, against the parameter names it
+#     reads from the metadata with its own json.load -- exactly one entry per
+#     modelled parameter, or the build fails. A generator whose own coverage
+#     check was broken is still caught here.
+
+
+def _generate_comet_parameter_reference(app):
+    """builder-inited handler: write docs/_generated/comet-parameters.rsti or fail the build."""
+    root = _project_root(_CONF_DIR)
+    if root is None:
+        raise ExtensionError(
+            f"cometparams: no project root at or above {_CONF_DIR} (looked for a directory "
+            "holding both specification.rst and phases/). The Comet parameter metadata "
+            "cannot be found, so the parameter reference (R-DOC-04) cannot be generated."
+        )
+    scripts_dir = str(root / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        import cometparams
+    except ImportError as error:  # pragma: no cover - environment failure
+        raise ExtensionError(
+            f"cometparams: cannot import the generator from {scripts_dir}: {error}"
+        ) from None
+
+    out_dir = Path(app.srcdir) / cometparams.OUTPUT_RELATIVE_DIR
+    target = out_dir / cometparams.FRAGMENT_FILE
+    if target.exists():
+        target.unlink()
+    try:
+        summary = cometparams.generate(root, out_dir)
+    except cometparams.CometParamsError as error:
+        raise ExtensionError(
+            "cometparams: the Comet parameter metadata was rejected, so the documentation "
+            "build fails rather than publishing a parameter reference built from it "
+            f"(R-DOC-04).\n\n{error}\n\n"
+            f"Fix {cometparams.METADATA_RELATIVE_PATH.as_posix()} (or the presets beside it), "
+            "or scripts/cometparams.py, and run `python3 scripts/cometparams.py --check`."
+        ) from None
+
+    # Exit code 0 proves nothing, and neither does "no exception": read the file.
+    if not target.is_file() or target.stat().st_size == 0:
+        raise ExtensionError(
+            f"cometparams: the generator returned without writing {target} (or wrote it "
+            "empty). The parameter reference would be missing from the published "
+            "documentation, so the build fails."
+        )
+    import json
+    import re
+
+    names = [
+        parameter["name"]
+        for parameter in json.loads(
+            (root / cometparams.METADATA_RELATIVE_PATH).read_text(encoding="utf-8")
+        )["parameters"]
+    ]
+    rendered = re.findall(
+        r"^\.\. _comet-param-([A-Za-z0-9_]+):$", target.read_text(encoding="utf-8"), re.M
+    )
+    if sorted(rendered) != sorted(names):
+        missing = sorted(set(names) - set(rendered))
+        extra = sorted(set(rendered) - set(names))
+        duplicated = sorted({name for name in rendered if rendered.count(name) > 1})
+        raise ExtensionError(
+            f"cometparams: {target} holds {len(rendered)} parameter entries, but the metadata "
+            f"models {len(names)} parameters: missing {missing}, duplicated {duplicated}, not "
+            f"modelled {extra}. R-DOC-04 requires exactly one entry per modelled parameter."
+        )
+    _LOGGER.info(
+        "[cometparams] wrote %s: %d parameter entries = %d modelled parameters, "
+        "%d internal, for Comet %s; %d preset(s); metadata sha256 %s",
+        target.relative_to(Path(app.srcdir)),
+        len(rendered),
+        len(names),
+        summary["internal"],
+        ", ".join(summary["releases"]),
+        summary["presets"],
+        summary["metadata_sha256"],
+    )
+
+
 def setup(app):
     app.connect("builder-inited", _generate_traceability_report)
     app.connect("builder-inited", _generate_tool_matrix)
+    app.connect("builder-inited", _generate_comet_parameter_reference)
     return {
         "version": "1.0",
         "parallel_read_safe": True,

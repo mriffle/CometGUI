@@ -6,22 +6,19 @@ Comet parameter schema
 
 .. note::
 
-   **Status: in progress, Phase 06.** Landed so far: the real-binary fixtures
-   (unit 1); the schema model, the curated metadata file, the line-level
-   reader, schema discovery, the version marker, drift detection and the
-   schema provider (unit 2); the structured value types and their codecs --
-   the variable-modification tuple with its layout taken from the metadata, the
-   enzyme table, the tolerance pair, the ranges, the mass-offset list and the
-   ion-series family (unit 3); the typed model with value origins, the parser,
-   the canonical writer and write-once hashing (unit 4); validation, with the
-   workflow-enforced outputs and the decoy source on the model (unit 5);
-   presets, diffs, schema migration and a second, real Comet version to migrate
-   from (unit 6). The generator behind
-   :doc:`../reference/comet_parameters_generated` (``R-DOC-04``) is still to
-   come; where this page mentions it it describes intent, not the product.
+   **Status: written as built, Phase 06.** The real-binary fixtures (unit 1);
+   the schema model, the curated metadata file, the line-level reader, schema
+   discovery, the version marker, drift detection and the schema provider
+   (unit 2); the structured value types and their codecs (unit 3); the typed
+   model with value origins, the parser, the canonical writer and write-once
+   hashing (unit 4); validation, with the workflow-enforced outputs and the
+   decoy source on the model (unit 5); presets, diffs, schema migration and a
+   second, real Comet version to migrate from (unit 6); and the generated
+   :doc:`../reference/comet_parameters_generated` (``R-DOC-04``, unit 7,
+   :ref:`dev-comet-parameter-generated-reference`).
 
-What this page will cover
-=========================
+What this page covers
+=====================
 
 How the typed, versioned parameter schema is built from Comet's own ``-q``
 output plus curated metadata, how it is parsed, written, validated and
@@ -241,8 +238,9 @@ The metadata file
 ``cometgui-params-comet/src/main/resources/org/cometgui/params/comet/schema/comet-parameters.json``.
 Java reads it with the project's one JSON reader
 (``org.cometgui.provenance.json.JsonReader``, decision D6-2); the
-documentation generator will read it with Python's standard library. That
-reader accepts whole numbers only, so **every bound and default is a JSON
+documentation generator (:ref:`dev-comet-parameter-generated-reference`)
+reads it with Python's standard library. The
+Java reader accepts whole numbers only, so **every bound and default is a JSON
 string**, written exactly as ``comet.params`` writes it (``"20.0"``,
 ``"0 0"``, ``"15.9949 M 0 3 -1 0 0 0.0"``). Every field is always present;
 JSON ``null`` marks an absent value. A field the loader does not know is an
@@ -1989,6 +1987,136 @@ Citations for presets and migration
    comma accepted only in the count.
 .. [V24D] https://github.com/UWPR/Comet/blob/v2024.01.0/Comet.cpp#L1697-L1700
    -- what 2024.01.0's ``-q`` writes for the fragment-index parameters.
+
+.. _dev-comet-parameter-generated-reference:
+
+Generated reference
+===================
+
+:doc:`../reference/comet_parameters_generated` is ``R-DOC-04``'s page: "The
+Comet parameter schema shall generate ``reference/comet_parameters_generated.rst``
+so that user documentation and GUI metadata cannot silently diverge." It is
+produced the way the traceability report and the tool tables are
+(:ref:`dev-tool-registry-generated-tables`).
+
+How it is produced
+------------------
+
+``scripts/cometparams.py`` (standard library only -- Read the Docs has no JDK,
+decision D6-1) reads:
+
+* **the metadata file** above -- the same bytes ``MetadataLoader`` reads; there
+  is no second copy;
+* **the built-in presets** beside it, for each parameter's preset effects;
+* ``manifests/tools.json``, for the Comet versions CometGUI installs. The page
+  documents those, and only those, as supported: today ``2026.02.2``. The
+  ``2024.01.0`` record is curated for migration only and appears in an entry
+  solely as the start of its version range, labelled as not installed;
+* for each of those versions, **the real ``comet -q`` fixture**
+  (:ref:`dev-comet-parameter-fixtures`), checked against its ``SHA256SUMS`` and
+  its marker against the version record. It is the only complete list of what
+  that Comet declares, and it holds Comet's default ``[COMET_ENZYME_INFO]``
+  rows, which the metadata does not curate and which are the allowed values of
+  the three enzyme-reference parameters.
+
+It renders, per category in the metadata's order, one entry per parameter: the
+Comet name, display name, category, type (the value kind, in words and as the
+constant), the default for each installed version (the version record's
+override where there is one), the allowed values or range (labelled choices,
+bounds, the tuple layout of that version, or a pointer to the enzyme table),
+the short help with its upstream reference, the serialisation rule and the
+**default line exactly as** ``CanonicalParamsWriter`` **writes it** (``name =
+value``, the inline comment's ``#`` at column 40), version availability,
+related parameters as links, preset effects, the editor level, the validator
+ids and the search aliases. Then the enzyme table and the internal allow-list.
+The output is deterministic: no date, and every order comes from the inputs.
+
+``docs/conf.py`` calls ``generate()`` from a ``builder-inited`` handler, after
+deleting the previous build's fragment. The fragment is
+``docs/_generated/comet-parameters.rsti`` (gitignored), pulled in by the page
+with ``.. include::``. The build log carries one count line, for example::
+
+    [cometparams] wrote _generated/comet-parameters.rsti: 118 parameter entries =
+    118 modelled parameters, 0 internal, for Comet 2026.02.2; 3 preset(s);
+    metadata sha256 <the metadata file's SHA-256>
+
+What refuses a build
+--------------------
+
+Each of these fails the documentation build with the generator's own message,
+naming the file, the parameter (or section) and the field:
+
+* a parameter missing any field of the metadata format -- each feeds a field of
+  ``R-DOC-04`` or the default line -- or with a blank name, display name or
+  help; a name given twice;
+* an unknown category, value kind, serialisation rule or editor level, or a
+  tuple field the generator has no words for (a constant the Java enums gain
+  must be added to ``KINDS``, ``SERIALIZATIONS``, ``VISIBILITY`` or
+  ``TUPLE_FIELDS`` too);
+* a choice without a value or a label; an enumerated kind with fewer than two
+  choices; a help reference that is not ``https://``; a version range that does
+  not start (or end) at a curated version;
+* **a parameter an installed Comet's ``comet -q`` declares that the metadata
+  neither models nor allow-lists**, or a modelled parameter that output does
+  not declare -- this is what makes removing a parameter's entry a build
+  failure that names it;
+* a related parameter that is not modelled (or is the parameter itself); a
+  version default override, an enzyme-table reference or a preset delta naming
+  no modelled parameter; a preset for an uncurated version;
+* an installed Comet version with no version record, a missing fixture, or a
+  fixture whose SHA-256 or marker does not match;
+* a rendered fragment without exactly one entry per modelled parameter
+  (``check_coverage``).
+
+``docs/conf.py`` adds two checks of its own that do not trust the generator: a
+generator that returns without writing the fragment fails the build, and the
+handler counts the entries (``.. _comet-param-<name>:`` labels) in what was
+written against the names it reads from the metadata with its own
+``json.load``.
+
+On the Java side, ``GeneratedReferenceTest`` (in this module's tests) runs the
+generator through ``ProcessService`` into a temporary directory and checks the
+fragment against ``MetadataLoader``'s view: every modelled parameter has
+exactly one entry, every default line is byte-for-byte the line the canonical
+writer emits for that parameter in the default model, and every default enzyme
+row is the writer's own.
+
+The self-test
+-------------
+
+``scripts/cometparams_selftest.py``, run by ``scripts/ci/docs-build.sh
+--self-test`` (and so by ``scripts/verify-all-gates.sh --only docs``), damages
+**copies** -- never the real files -- and requires each damage to be refused
+with its own diagnostic: a parameter's entry removed, each required field
+removed in turn, an unknown category and kind, a choice without a label (absent
+and blank), a related name that is not a parameter, a duplicated name, a
+non-``https`` reference, a preset naming no parameter and an installed version
+with no record. Then, through the real hook in a project copy made by
+``scripts/traceability/selftest.py``'s ``copy_project``: the clean copy builds
+with the count line and one HTML section per parameter; a missing field and a
+removed entry each fail the strict build; a generator that writes nothing (with
+the previous fragment on disk) fails it; a generator that drops an entry after
+its own check fails it on the hook's count; and the restored copy builds clean.
+
+Every sandbox that runs the documentation build carries these inputs:
+``scripts/ci/docs-build.sh --self-test`` builds a copy of ``docs/`` whose
+``conf.py`` walks up to the real repository; ``scripts/traceability/selftest.py``
+copies the metadata directory and each module's ``src/test`` (the fixtures);
+``scripts/verify-install-gates.sh`` control G extracts ``git archive HEAD``.
+
+Adding a field
+--------------
+
+#. Add it to the metadata format and to ``MetadataLoader`` (which refuses an
+   unknown field), and document it under
+   :ref:`dev-comet-parameter-metadata-format`.
+#. Add it to ``REQUIRED_PARAMETER_FIELDS`` in ``scripts/cometparams.py`` with
+   the ``R-DOC-04`` field it feeds, render it in ``render_entry``, and give any
+   closed vocabulary its words, so an unknown value is refused rather than
+   printed raw.
+#. Run ``python3 scripts/cometparams.py --check`` and ``bash
+   scripts/ci/docs-build.sh --self-test``; the self-test picks up the new
+   required field automatically.
 
 .. _dev-comet-parameter-comet-reads:
 

@@ -4,34 +4,19 @@
 Comet parameter reference
 =========================
 
-.. warning::
+One entry for every Comet parameter CometGUI models, grouped by the categories
+of the Advanced editor. Each entry gives the Comet name and the name the
+application shows, the category and type, the default for the Comet release
+CometGUI installs, the allowed values or range, a description with a link to
+Comet's own documentation, the exact ``name = value`` line written to
+``comet.params``, which Comet releases declare it, related parameters, and what
+each built-in preset sets it to (``R-DOC-04``).
 
-   **Placeholder -- this page is generated, and this is not the generated
-   version.** ``R-DOC-04`` requires the Comet parameter schema itself to
-   generate this page, so that the user documentation and the GUI metadata
-   cannot silently diverge. The schema is built in **Phase 06 -- Comet
-   Parameter Model** (``phases/PHASE-06-comet-param-model.rst``), which owns
-   ``R-DOC-04``; Phase 01 committed this stub so that the documentation tree
-   builds and so that the page has a stable name to link to.
+Everything below the introduction is **generated during the documentation
+build** by ``scripts/cometparams.py`` from the same metadata file the
+application reads, so this page and the parameter editor cannot say different
+things. A parameter missing from that metadata, or an entry missing a field,
+fails the documentation build rather than producing a shorter page. How it is
+made: :ref:`dev-comet-parameter-generated-reference`.
 
-   When Phase 06 lands, this file is replaced by generated content. Nothing
-   written here by hand will survive.
-
-What the generated page will contain
-====================================
-
-One entry per Comet parameter -- 118 of them for Comet 2026.02.2, several of
-them structured tuples rather than scalars -- each giving, per ``R-DOC-04``:
-
-* the Comet parameter name and the GUI display name;
-* the category and the type;
-* the default for the versioned schema;
-* allowed values or range;
-* a scientific description;
-* the serialisation form written to ``comet.params``;
-* version availability;
-* related parameters;
-* preset effects, where useful.
-
-The generator is the same schema the editor UI reads, which is the point: a
-parameter that changes in the schema changes here in the same build.
+.. include:: /_generated/comet-parameters.rsti
