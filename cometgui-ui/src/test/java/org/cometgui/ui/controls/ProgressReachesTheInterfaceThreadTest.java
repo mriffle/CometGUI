@@ -19,11 +19,13 @@ package org.cometgui.ui.controls;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
 import javafx.scene.Scene;
 import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
@@ -156,7 +158,16 @@ class ProgressReachesTheInterfaceThreadTest {
         ScriptedToolManager manager = new ScriptedToolManager(ToolOffers.percolatorAvailable());
         ToolManagerViewModel viewModel = new ToolManagerViewModel(manager, Platform::runLater);
         showInALiveScene(viewModel);
-        ToolRowViewModel row = viewModel.rows().get(0);
+        /*
+         * The view this test listens on is HELD, here, until the last assertion. rows() builds a
+         * new unmodifiable view per call and that view observes the list behind it only WEAKLY,
+         * as its own javadoc warns. A listener added to a view nobody kept was dropped by any
+         * garbage collection between registering it and the terminal report, and the rebuild then
+         * reached nobody: this test failed with "no row-list rebuild reached the view-model" under
+         * heap pressure, with the view-model having rebuilt the list correctly on the right thread.
+         */
+        ObservableList<ToolRowViewModel> rows = viewModel.rows();
+        ToolRowViewModel row = rows.get(0);
         ArrivedOn arrived = new ArrivedOn();
         FxToolkit.onFxThread(
                 () -> {
@@ -166,17 +177,23 @@ class ProgressReachesTheInterfaceThreadTest {
                      * and replaces the list itself.  What this listener must see is the rebuild the
                      * TERMINAL report causes, on whichever thread that report was delivered to.
                      */
-                    viewModel
-                            .rows()
-                            .addListener(
-                                    (ListChangeListener<ToolRowViewModel>)
-                                            change -> arrived.record());
+                    rows.addListener(
+                            (ListChangeListener<ToolRowViewModel>) change -> arrived.record());
                 });
 
         reportFromAnInstallThread(manager, InstallPhase.DONE, 2_798_963L);
 
         arrived.awaitArrival("row-list rebuild");
         arrived.assertOnInterfaceThread("the pane's row list");
+        /*
+         * Not decoration: a use of the view after the wait is what keeps it strongly reachable
+         * for the whole wait, which a local variable the compiler can see is dead would not.
+         */
+        assertEquals(
+                List.of(row),
+                FxToolkit.callOnFxThread(() -> List.copyOf(rows)),
+                "the terminal report rebuilt the list, and the row it rebuilt it with must be the"
+                        + " same row, kept by key");
     }
 
     /** Puts the view-model on screen, so that a live scene is watching everything it publishes. */

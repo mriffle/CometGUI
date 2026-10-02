@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import javafx.beans.property.Property;
 import javafx.collections.MapChangeListener;
+import javafx.collections.ObservableMap;
 import org.cometgui.ui.testing.Nulls;
 import org.cometgui.workflow.state.RunState;
 import org.cometgui.workflow.state.StepState;
@@ -169,21 +170,27 @@ class StageStepperViewModelTest {
         @DisplayName("is observable on the stage map, with the old and new state")
         void isObservableOnTheMap() {
             List<String> changes = new ArrayList<>();
-            stepper.stageStates()
-                    .addListener(
-                            (MapChangeListener<WorkflowStage, StepState>)
-                                    change ->
-                                            changes.add(
-                                                    change.getKey()
-                                                            + ": "
-                                                            + change.getValueRemoved()
-                                                            + "->"
-                                                            + change.getValueAdded()));
+            /*
+             * Held until the assertion: stageStates() builds a new view per call that observes
+             * the map behind it only weakly, so a listener on a view nobody kept is dropped by
+             * any garbage collection before the first setState.
+             */
+            ObservableMap<WorkflowStage, StepState> states = stepper.stageStates();
+            states.addListener(
+                    (MapChangeListener<WorkflowStage, StepState>)
+                            change ->
+                                    changes.add(
+                                            change.getKey()
+                                                    + ": "
+                                                    + change.getValueRemoved()
+                                                    + "->"
+                                                    + change.getValueAdded()));
             stepper.setState(WorkflowStage.VALIDATE, StepState.VALIDATING);
             stepper.setState(WorkflowStage.VALIDATE, StepState.SUCCEEDED);
             assertEquals(
                     List.of("VALIDATE: NOT_STARTED->VALIDATING", "VALIDATE: VALIDATING->SUCCEEDED"),
                     changes);
+            assertEquals(StepState.SUCCEEDED, states.get(WorkflowStage.VALIDATE));
         }
 
         @Test
