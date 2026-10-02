@@ -371,14 +371,14 @@
       "min": null,
       "max": null,
       "choices": [],
-      "shortHelp": "Path to a spectral library. Not described on Comet's 2026.02 parameter pages; the value -q writes is a placeholder.",
+      "shortHelp": "Path to a spectral library. Not described on Comet's 2026.02 parameter pages; the value -q writes is a placeholder. Empty, or a file Comet cannot read, means no spectral-library search.",
       "inlineComment": null,
       "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L937",
       "versions": {
         "from": "2026.02.2",
         "through": null
       },
-      "serialization": "SINGLE_VALUE",
+      "serialization": "EMPTY_ALLOWED",
       "validators": [
         "path"
       ],
@@ -2297,7 +2297,9 @@
         "through": null
       },
       "serialization": "TWO_VALUES",
-      "validators": [],
+      "validators": [
+        "ordered_range"
+      ],
       "aliases": [
         "scans",
         "first scan",

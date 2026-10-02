@@ -28,6 +28,7 @@ import java.util.Set;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.ParameterDefinition;
+import org.cometgui.params.comet.schema.ValidatorId;
 import org.cometgui.params.comet.schema.ValueKind;
 import org.cometgui.params.comet.value.EnzymeTable;
 import org.cometgui.params.comet.value.IonSeriesSelection;
@@ -401,6 +402,70 @@ public final class CometParameters {
         ParameterDefinition definition = require(name).definition();
         ParameterEntry reset = defaultEntry(codec, definition);
         return withValue(name, reset.value(), reset.origin());
+    }
+
+    /**
+     * The decoy source ({@code R-DEC-01}): {@code decoy_search} as one of the specification's three
+     * sources.
+     *
+     * @return the source, or empty if {@code decoy_search} holds a value Comet does not document
+     * @throws IllegalArgumentException if the version does not model {@code decoy_search}
+     */
+    public Optional<DecoySource> decoySource() {
+        ParameterValue value = value(DecoySource.PARAMETER);
+        return DecoySource.fromDecoySearch(((ParameterValue.Whole) value).value());
+    }
+
+    /**
+     * This model with the decoy source set: {@code decoy_search} written as the source's value.
+     *
+     * @param source the decoy source
+     * @param origin where the choice came from
+     * @return a new model
+     * @throws IllegalArgumentException if the version does not model {@code decoy_search}
+     */
+    public CometParameters withDecoySource(DecoySource source, ValueOrigin origin) {
+        Objects.requireNonNull(source, "source");
+        return withValue(
+                DecoySource.PARAMETER, new ParameterValue.Whole(source.decoySearch()), origin);
+    }
+
+    /**
+     * This model with every output the workflow requires switched on, origin {@link
+     * ValueOrigin#WORKFLOW_ENFORCED} ({@code R-CMT-01}).
+     *
+     * <p>The required outputs are the parameters the metadata marks {@link
+     * ValidatorId#WORKFLOW_ENFORCED} -- for Comet 2026.02.2 {@code output_pepxmlfile} (read by PDV
+     * and the Limelight converter) and {@code output_percolatorfile} (the {@code .pin} file
+     * Percolator reads). Each is set to on and marked as the application's, even where it was
+     * already on, so that the editor shows it as locked by the workflow rather than as the user's.
+     *
+     * @return a new model
+     * @throws IllegalStateException if the metadata marks a parameter that is not an on/off flag
+     */
+    public CometParameters withWorkflowEnforcedOutputs() {
+        CometParameters enforced = this;
+        for (ParameterEntry entry : entries.values()) {
+            ParameterDefinition definition = entry.definition();
+            if (!definition.validators().contains(ValidatorId.WORKFLOW_ENFORCED)) {
+                continue;
+            }
+            if (definition.kind() != ValueKind.BOOLEAN_FLAG) {
+                throw new IllegalStateException(
+                        definition.name()
+                                + " is marked "
+                                + ValidatorId.WORKFLOW_ENFORCED.id()
+                                + " but is of kind "
+                                + definition.kind()
+                                + "; only an on/off flag can be switched on by the workflow");
+            }
+            enforced =
+                    enforced.withValue(
+                            definition.name(),
+                            new ParameterValue.Flag(true),
+                            ValueOrigin.WORKFLOW_ENFORCED);
+        }
+        return enforced;
     }
 
     /**

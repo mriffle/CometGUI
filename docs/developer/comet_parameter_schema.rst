@@ -13,8 +13,9 @@ Comet parameter schema
    the variable-modification tuple with its layout taken from the metadata, the
    enzyme table, the tolerance pair, the ranges, the mass-offset list and the
    ion-series family (unit 3); the typed model with value origins, the parser,
-   the canonical writer and write-once hashing (unit 4). Validation, presets,
-   migration and the generator behind
+   the canonical writer and write-once hashing (unit 4); validation, with the
+   workflow-enforced outputs and the decoy source on the model (unit 5).
+   Presets, migration and the generator behind
    :doc:`../reference/comet_parameters_generated` (``R-DOC-04``) are still to
    come; where this page mentions them it describes intent, not the product.
 
@@ -790,6 +791,8 @@ was. Lookup is by name: ``entry``, ``value``, ``origin``, ``definition`` and
 ``text`` (the value as written). ``tolerancePair()`` and ``ionSeries()`` give
 unit 3's structured views over the two tolerance members and the eight
 ion-series flags, which the model holds as one entry each.
+``withWorkflowEnforcedOutputs()`` and ``withDecoySource(source, origin)`` are
+validation's two model operations (:ref:`dev-comet-parameter-validation`).
 ``CometParameters.defaults(metadata, version, table)`` is every parameter at
 its curated default; the metadata does not curate enzyme rows, so the table is
 given. ``CometParameters.of(...)`` refuses a model with a parameter missing or
@@ -1104,6 +1107,401 @@ target, hashService)``:
 against ``MessageDigest`` over the bytes read back; a recording hash service
 shows it is called once, after the whole file is on disk.
 
+.. _dev-comet-parameter-validation:
+
+Validation
+==========
+
+Package ``org.cometgui.params.comet.validation``. ``CometValidator.standard()
+.validate(model)`` returns a ``ValidationReport``: every ``Finding``, each from
+one ``Rule`` with a **stable identifier** and a **fixed severity**, attached to
+the responsible parameters (the first is the one to show it at) and their
+category -- *Errors shall be attached to the responsible field and category*.
+``hasErrors()`` is what Phase 08 blocks a run on; ``forParameter(name)`` and
+``forCategory(category)`` are what Phase 07 shows at a control and a category
+heading (``AC-PAR-10``). The report is in a stable order: per parameter in the
+model's order, then the cross-field rules, then what the import left.
+
+What validation checks is the **model**. It reads no file: whether the
+database and spectra exist and are readable, output paths are writable, the
+FASTA holds decoys (``R-DEC-02``) or the PIN holds targets and decoys
+(``R-DEC-04``) needs the file system or data and is the workflow's check before
+a run (Phase 08). Paths are checked for **form** only.
+
+Every validator id is implemented
+---------------------------------
+
+Every ``ValidatorId`` has a rule (``FieldRule``), registered in
+``CometValidator.standard()``; a validator built without one is **refused**
+with an ``IllegalStateException`` naming the id, so an id the metadata names
+can never go unchecked. For each parameter the validator applies its curated
+``min``/``max`` (to every number the value holds: both numbers of a range,
+every number of a list), then each rule its metadata ``validators`` names,
+then the cross-field rules. ``ValidatorCoverageTest`` proves the standard
+validator implements every id, that the bundled metadata names ``choice`` 18
+times, ``variable_mod_tuple`` 15, ``path`` 5, ``ordered_range`` 5,
+``enzyme_in_table`` 3, ``signed_tolerance_pair`` 2 and ``workflow_enforced``
+2, and -- the part that matters -- that for **every (parameter, validator)
+pair** the metadata declares, a CONSTRUCTED value that breaks it produces an
+error of that validator's rule at that parameter. ``ChoiceAndBoundsTest`` does
+the same for every enumerated parameter and every parameter with a bound,
+generating its cases from the metadata.
+
+Two metadata corrections came with the rules. ``scan_range`` now names
+``ordered_range`` (it was the one two-value range without it).
+``spectral_library_name`` is now ``EMPTY_ALLOWED``: Comet 2026.02.2 runs no
+spectral-library search when the name is empty or names a file it cannot read
+[M1961]_, so empty is a legitimate value, not a missing one; under the old
+``SINGLE_VALUE`` the path rule would have made the normal "no library" case an
+error. The drift test is unaffected (neither changes a name or a default).
+
+.. _dev-comet-parameter-pair-rule:
+
+The signed precursor tolerance pair (gate item 7)
+-------------------------------------------------
+
+``R-PARAM-04`` gives ``peptide_mass_tolerance_lower`` and ``_upper`` their own
+rule, ``lower <= 0 <= upper``, and the generic ordering rule is **never**
+applied to them (the loader refuses a pair member that names ``ordered_range``,
+and the pair rule is its own class). The two rules disagree on most windows,
+which is what lets a test tell them apart: the generic rule would pass
+``-10 / 20``, ``5 / 20`` and ``-20 / -5`` silently and call ``20 / -20`` its
+own ``ordered_range.reversed``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 36 42
+
+   * - Window
+     - Verdict
+     - Why
+   * - ``-20.0 / 20.0``
+     - clean
+     - Comet's default; contains 0, symmetric.
+   * - ``-10 / 20``, ``0 / 20``
+     - warning ``signed_tolerance_pair.asymmetric``
+     - Contains 0 but not symmetric about it: legal, and possibly deliberate.
+   * - ``5 / 20``, ``-20 / -5``
+     - warning ``signed_tolerance_pair.same_signed``
+     - The window does not contain 0, so the exact theoretical mass is not
+       searched: legal, and possibly deliberate.
+   * - ``20 / -20``
+     - error ``signed_tolerance_pair.reversed``
+     - No mass can match; Comet negates both bounds [M572]_ and stops with
+       "mass_tolerance_lower is greater than mass_tolerance_upper" [M1584]_.
+
+Each finding names both parameters, the lower first, in the
+``precursor_mass`` category, and the pair is reported once although both
+members name the rule. **Units** (``peptide_mass_units``: amu, mmu, ppm) do
+not enter the rule: each is a positive multiple of a mass difference, so the
+signs of the bounds and their order are the same in every unit; a test
+repeats the verdicts under all three. Out-of-range unit codes are the
+``choice`` rule's (Comet would silently use amu [M584]_).
+
+The rule catalogue
+------------------
+
+Severity is the rule's: **E** an error (blocks a run), **W** a warning. Source
+names the Comet fact a rule encodes, at tag ``v2026.02.2``; a rule with none
+encodes this project's choice or the specification's.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 27 4 19 35 15
+
+   * - Rule id
+     - Sev.
+     - Parameters
+     - What it checks
+     - Source
+   * - ``choice.not_listed``
+     - E
+     - each ``choice`` parameter
+     - The value is one of the curated choices. Comet replaces many
+       out-of-range codes with a default without a word.
+     - [M584]_, [M1125]_
+   * - ``bounds.below_minimum``, ``bounds.above_maximum``
+     - E
+     - every parameter with a curated ``min``/``max``
+     - Every number of the value is within the bounds; the message says which
+       number (first, second, value *n*).
+     - the metadata
+   * - ``path.empty``
+     - E
+     - ``path`` parameters not ``EMPTY_ALLOWED`` (``database_name``)
+     - Present.
+     - [M1961]_
+   * - ``path.nul_character``
+     - E
+     - every ``path`` parameter
+     - No NUL, which ends a C string.
+     - --
+   * - ``path.too_long``
+     - E
+     - ``path`` parameters Comet reads whole
+     - At most 4095 bytes: Comet copies the value into ``char
+       szFile[SIZE_FILE]``, ``SIZE_FILE`` 4096.
+     - [C342]_, [D20]_
+   * - ``text.not_one_token``, ``text.too_long``
+     - E
+     - ``decoy_prefix``, ``pinfile_protein_delimiter``,
+       ``protein_modslist_file``
+     - Comet reads these with ``sscanf("%255s")``: only the first word, at
+       most 255 bytes. The ``decoy_prefix`` page: "without spaces".
+     - [C301]_, [C347]_, [DP]_
+   * - ``ordered_range.reversed``
+     - E
+     - ``peptide_length_range``, ``digest_mass_range``, ``clear_mz_range``,
+       ``scan_range``, ``precursor_charge``
+     - First <= second. Comet silently ignores a reversed range and keeps its
+       default. ``scan_range``: a second value of 0 means "to the last scan"
+       and is exempt (``500 0`` is legal); Comet refuses an end below the
+       start only when the end is not 0.
+     - [M606]_, [M1009]_, [M1054]_, [M1093]_, [C768]_, [P383]_, [M304]_
+   * - ``ordered_range.second_ignored``
+     - W
+     - ``precursor_charge``
+     - A first value of 0 switches the range off ("0 as 1st entry ignores
+       parameter"), so ``0 4``'s second value does nothing.
+     - [C1054]_, [M1054]_
+   * - ``signed_tolerance_pair.reversed``
+     - E
+     - ``peptide_mass_tolerance_lower``, ``_upper``
+     - ``lower <= upper``. See above.
+     - [M572]_, [M1584]_
+   * - ``signed_tolerance_pair.same_signed``
+     - W
+     - the pair
+     - The window contains 0 (``R-PARAM-04``).
+     - specification
+   * - ``signed_tolerance_pair.asymmetric``
+     - W
+     - the pair
+     - The window is symmetric about 0 (``R-PARAM-04``).
+     - specification
+   * - ``enzyme_in_table.missing``
+     - E
+     - ``search_enzyme_number``, ``search_enzyme2_number``,
+       ``sample_enzyme_number``
+     - The number is a row of the model's table -- the writer's refusal, as a
+       finding at the field before anything is written. Comet's own
+       "missing definition" checks can never fire.
+     - [C691]_, [D345]_
+   * - ``enzyme_table.row_unreadable``
+     - E
+     - the parameters that select the row
+     - A selected row's name is at most 47 bytes and its residues at most 19:
+       Comet reads selected rows with ``"%lf %47s %d %19s %19s"``.
+     - [C654]_, [C662]_
+   * - ``enzyme_table.unused_row_unreadable``
+     - W
+     - none (``digestion_enzymes``)
+     - The same, for a row nothing selects: Comet reads only selected rows.
+     - [C654]_
+   * - ``enzyme_table.numbering``
+     - W
+     - none (``digestion_enzymes``)
+     - Rows are numbered 0, 1, 2 ... in order, as Comet's page asks; the
+       source does not enforce it.
+     - [EZ]_
+   * - ``variable_mod_tuple.residues_too_long``
+     - E
+     - any slot, active or not
+     - The residue token is at most 31 characters (``%31s`` into
+       ``MAX_VARMOD_AA`` 32); a longer one shifts every later field.
+     - [C589]_, [D25]_
+   * - ``variable_mod_tuple.count_negative``
+     - E
+     - an active slot
+     - Counts are whole numbers 0 and up (the page's generator: ``\d+``).
+     - [VM]_
+   * - ``variable_mod_tuple.count_reversed``
+     - E
+     - an active slot
+     - ``min <= max``: Comet places at most the maximum and rejects fewer than
+       the minimum, so a reversed pair never applies.
+     - [S5729]_, [S5844]_
+   * - ``variable_mod_tuple.count_zero``
+     - W
+     - an active slot
+     - A maximum of 0 places nothing.
+     - [S5729]_
+   * - ``variable_mod_tuple.distance_undocumented``
+     - W
+     - an active slot
+     - Distance is -2, -1 or 0 and up; Comet treats other negatives as -1.
+     - [VM]_, [S5371]_, [S5454]_
+   * - ``variable_mod_tuple.terminus_undocumented``
+     - E
+     - an active slot with a distance of 0 or more
+     - Terminus 0 to 3; with a distance Comet matches no other code, so the
+       modification never applies. (With distance -1 or -2 the terminus is
+       not consulted and is not checked.)
+     - [S5375]_, [S5466]_
+   * - ``variable_mod_tuple.requirement_undocumented``
+     - W
+     - an active slot
+     - Requirement 0, 1 or -1; Comet treats any positive value as 1 and any
+       other negative as 0. The message says which.
+     - [M1401]_, [S5881]_
+   * - ``variable_mod_tuple.binary_group_negative``
+     - W
+     - an active slot
+     - Binary groups are documented as non-zero, used as positive numbers;
+       Comet treats any non-zero value as binary.
+     - [VM]_, [M1398]_
+   * - ``variable_mods.required_without_slot``
+     - E
+     - ``require_variable_mod``
+     - ``require_variable_mod = 1`` needs an active slot: Comet then scores
+       only modified peptides.
+     - [M543]_, [S2933]_
+   * - ``variable_mods.minimum_above_limit``
+     - E
+     - the slot, ``max_variable_mods_in_peptide``
+     - A slot's minimum count is at most ``max_variable_mods_in_peptide``,
+       which caps a peptide's modified residues across all slots.
+     - [S5740]_, [S5844]_
+   * - ``variable_mods.required_but_none_allowed``
+     - E
+     - ``max_variable_mods_in_peptide``, then ``require_variable_mod`` and
+       each required slot
+     - A limit of 0 while a modification is required: nothing can qualify.
+     - [S5740]_, [M543]_, [M1401]_
+   * - ``variable_mods.none_allowed``
+     - W
+     - ``max_variable_mods_in_peptide``, then the active slots
+     - A limit of 0 with active, optional slots: they have no effect.
+     - [S5740]_
+   * - ``workflow_enforced.output_off``
+     - E
+     - ``output_pepxmlfile``, ``output_percolatorfile``
+     - The output is on; the message names the stage that reads it (PDV and
+       the Limelight export; Percolator).
+     - ``R-CMT-01``
+   * - ``decoy.prefix_empty``
+     - E
+     - ``decoy_prefix``
+     - Not empty: Percolator and the Limelight converter tell decoys from
+       targets by it, and Comet prepends it to internal decoys.
+     - ``R-DEC-01``, ``R-DEC-03``
+   * - ``unknown_parameter.imported``
+     - W
+     - the unknown name (no category)
+     - Kept and written back unless removed (``R-PARAM-07``).
+     - [C536]_
+   * - ``version.parameter_unavailable``
+     - E
+     - the name (no category)
+     - A parameter the metadata models for other Comet versions only:
+       blocked, not ignored -- Comet would log "invalid parameter" and drop it.
+     - [C536]_
+   * - ``import.diagnostic``
+     - W
+     - as the parse gave it
+     - Every other warning of the parse that produced the model (version
+       marker mismatched or missing, ``R-PARAM-06``), carried in unchanged.
+     - --
+
+A slot is **active** when its mass difference is not 0 [M1368]_; the meaning
+rules apply to active slots only. A slot's maximum above
+``max_variable_mods_in_peptide`` is ordinary and not reported. A negative
+``max_variable_mods_in_peptide`` is the bounds rule's error and caps nothing
+in the ``variable_mods`` rules, because Comet ignores it and keeps its default
+[M534]_. Each slot holds
+one count form, one requirement code and one terminus, so "two tuple semantics
+in one slot" cannot be expressed and needs no rule. No Comet source or page
+makes any combination of binary group with another field illegal, so none is
+invented.
+
+Unknown and unavailable parameters are decided from the model's **current**
+unknown parameters, with the parser's own test (does the metadata model the
+name for any version), so ``withoutUnknown(name)`` clears the finding; the
+parse's ``UNKNOWN_PARAMETER`` and ``NOT_IN_VERSION`` diagnostics are therefore
+not repeated in the report.
+
+Comet's real defaults
+---------------------
+
+``RealDefaultsTest``: the real ``-q`` file, parsed, has exactly **one**
+finding -- ``workflow_enforced.output_off`` at ``output_percolatorfile``,
+because Comet's default is ``0`` and ``R-CMT-01`` requires ``1``. With the
+workflow's outputs enforced it has **none**, no error and no warning; the same
+holds for the real ``-p`` file and for the schema defaults with the real
+enzyme table.
+
+The model operations
+--------------------
+
+Two operations live on ``CometParameters``, because they change values and
+origins rather than judge them:
+
+``withWorkflowEnforcedOutputs()``
+    ``R-CMT-01``: every parameter the metadata marks ``workflow_enforced``
+    (``output_pepxmlfile``, ``output_percolatorfile``) set on, origin
+    ``WORKFLOW_ENFORCED`` -- even where it was already on, so the editor shows
+    it as locked by the workflow. ``WorkflowOutputs.stageNeeding(name)`` gives
+    the stage in words for the editor's "Required by CometGUI workflow" text.
+    Whether a stage is enabled for a given run (``AC-PAR-09``) is Phase 07's
+    and 08's; at model level every stage is assumed on.
+
+``decoySource()``, ``withDecoySource(source, origin)``
+    ``R-DEC-01``: ``DecoySource`` is ``FASTA_CONTAINS_DECOYS``
+    (``decoy_search = 0``), ``COMET_INTERNAL_CONCATENATED`` (``1``) or
+    ``COMET_INTERNAL_SEPARATE`` (``2``), mapped both ways; an undocumented
+    ``decoy_search`` has no source (Comet would treat it as 0 [M1125]_) and is
+    the ``choice`` rule's error.
+
+The specification's *Comet validation* list
+-------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 46 54
+
+   * - Item
+     - Where
+   * - Database exists and is readable
+     - Phase 08 (file system). Here: ``database_name`` present, no NUL, fits
+       Comet's buffer.
+   * - Spectra exist and use a supported format
+     - Phase 08: spectra are run inputs, not parameters.
+   * - Precursor tolerance values and units are valid
+     - Here: the pair rule, ``choice`` on ``peptide_mass_units`` and
+       ``precursor_tolerance_type``.
+   * - Numeric ranges are ordered (subject to ``R-PARAM-04``)
+     - Here: ``ordered_range`` and the pair rule.
+   * - Peptide-length ranges are valid
+     - Here: ``ordered_range`` and the bounds 1 to 50.
+   * - Selected enzyme numbers exist in the serialised table
+     - Here: ``enzyme_in_table`` (and the writer's refusal).
+   * - Variable-modification tuples are internally valid
+     - Here: ``variable_mod_tuple``.
+   * - Modification counts are consistent with version limits
+     - Here: the tuple count rules, the 31-character residue limit, the
+       ``R-PARAM-10`` rules and the bounds; the fifteen slots are the
+       metadata's.
+   * - ``output_pepxmlfile`` and ``output_percolatorfile`` are enabled
+     - Here, at model level; locking the controls is Phase 07's, blocking a
+       run Phase 08's.
+   * - Selected index and search options are compatible
+     - **Not here.** It depends on whether ``database_name`` names an existing
+       ``.idx`` and which type that file records (Comet reads only the first
+       five variable modifications for a fragment-ion index [K77]_), so it needs the
+       file system: Phase 08. Not yet assigned in any phase document;
+       reported upward.
+   * - Decoy configuration satisfies *Target/decoy strategy*
+     - Here: the decoy source (``R-DEC-01``) and the prefix. Phase 08: the
+       FASTA scan (``R-DEC-02``), the PIN check (``R-DEC-04``) and carrying the
+       prefix to Percolator and Limelight (``R-DEC-03``).
+   * - Output paths are writable
+     - Phase 08 (file system).
+   * - Imported unknown parameters are surfaced
+     - Here (``unknown_parameter.imported``) and in the parse result (unit 4).
+   * - Parameters unavailable in the selected version are blocked
+     - Here (``version.parameter_unavailable``).
+
+
 .. _dev-comet-parameter-comet-reads:
 
 Comet reads what is written
@@ -1145,6 +1543,7 @@ Comet's documentation, 2026.02 page set, fetched 2026-10-02:
 .. [EZ] https://uwpr.github.io/Comet/parameters/parameters_202602/search_enzyme_number.html
 .. [TL] https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_lower.html
 .. [IA] https://uwpr.github.io/Comet/parameters/parameters_202602/use_A_ions.html
+.. [DP] https://uwpr.github.io/Comet/parameters/parameters_202602/decoy_prefix.html
 
 Comet's source at tag ``v2026.02.2``, file and line (``C`` is ``Comet.cpp``,
 ``M`` ``CometSearch/CometSearchManager.cpp``, ``S``
@@ -1228,3 +1627,63 @@ Comet's source at tag ``v2026.02.2``, file and line (``C`` is ``Comet.cpp``,
    -- ``EnzymeInfo``'s constructor: names ``""`` and ``"Cut_everywhere"``.
 .. [K80] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/core/Constants.h#L80
    -- ``VMODS`` is 15.
+
+Added with validation (unit 5), at the same tag; ``P`` is
+``CometSearch/CometPreprocess.cpp``:
+
+.. [C301] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L301-L306
+   -- ``parse_string``: ``sscanf`` with ``%255s``, the first token only.
+.. [C342] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L342-L345
+   -- the four paths copied whole into ``char szFile[SIZE_FILE]``.
+.. [C347] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L347-L352
+   -- the parameters read with ``parse_string``.
+.. [C768] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L768-L787
+   -- ``scan_range`` taken per input file, each end independently.
+.. [C1054] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L1054-L1055
+   -- the ``-q`` comments of ``scan_range`` and ``precursor_charge``.
+.. [M304] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L304-L316
+   -- ``ValidateScanRange``: an end below the start is refused only when the end is not 0.
+.. [M534] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L534-L538
+   -- a negative ``max_variable_mods_in_peptide`` is ignored.
+.. [M543] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L543-L549
+   -- ``require_variable_mod``.
+.. [M572] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L569-L576
+   -- the tolerance pair read and both bounds negated.
+.. [M584] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L584-L588
+   -- ``peptide_mass_units`` outside 0 to 2 becomes 0.
+.. [M606] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L606-L613
+   -- ``clear_mz_range`` applied only when ordered.
+.. [M1009] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1009-L1022
+   -- ``peptide_length_range`` applied only when ordered.
+.. [M1054] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1054-L1061
+   -- ``precursor_charge`` applied only when the start is above 0 and ordered.
+.. [M1093] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1093-L1100
+   -- ``digest_mass_range`` applied only when ordered.
+.. [M1125] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1125-L1127
+   -- ``decoy_search`` outside 0 to 2 becomes 0.
+.. [M1584] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1584-L1588
+   -- "mass_tolerance_lower is greater than mass_tolerance_upper".
+.. [M1961] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1961-L1972
+   -- an empty or unreadable database or spectral library switches that search off.
+.. [S2933] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L2933
+   -- unmodified peptides scored only when no modification is required.
+.. [S5371] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5369-L5372
+   -- a negative distance counts as no constraint.
+.. [S5454] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5452-L5461
+   -- the same for terminal modifications.
+.. [S5466] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5466-L5520
+   -- terminal distances by terminus code 0 to 3.
+.. [S5729] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5729-L5733
+   -- at most the maximum count is placed.
+.. [S5740] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5740-L5743
+   -- the loops break above ``max_variable_mods_in_peptide``.
+.. [S5844] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5844-L5845
+   -- a count below the minimum is rejected (one of fifteen alike).
+.. [D20] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometData.h#L20
+   -- ``SIZE_FILE`` is 4096.
+.. [D25] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometData.h#L25
+   -- ``MAX_VARMOD_AA`` is 32.
+.. [K77] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/core/Constants.h#L77
+   -- ``FRAGINDEX_VMODS`` is 5.
+.. [P383] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometPreprocess.cpp#L383-L387
+   -- each ``scan_range`` end used when not 0.
