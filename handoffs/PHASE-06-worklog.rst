@@ -699,7 +699,65 @@ Reported by the agent and carried upward:
 Unit 7
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-02 at ``4f3f950``, no rework.** One fresh agent:
+``scripts/cometparams.py`` (standard library only) and
+``scripts/cometparams_selftest.py``; a ``builder-inited`` hook in
+``docs/conf.py`` writing ``docs/_generated/comet-parameters.rsti``, which
+``docs/reference/comet_parameters_generated.rst`` includes; the Java agreement
+test ``GeneratedReferenceTest`` (runs the generator through ``ProcessService``
+and checks every default line and enzyme row against
+``CanonicalParamsWriter``); ``scripts/traceability/selftest.py``'s
+``copy_project`` extended with the metadata directory (additive);
+``scripts/ci/docs-build.sh --self-test`` extended to run the generator
+self-test (additive); ``AC-PAR-01``, ``02``, ``06``, ``11`` moved from
+``planned`` to named tests in ``docs/traceability-map.toml``.
+
+Accepted beyond the brief: the generator **also reads the real ``-q`` fixture**
+(SHA-256 checked against ``SHA256SUMS``, marker against the version record).
+It is what lets a removed metadata entry fail the build *naming the
+parameter*, and it supplies Comet's enzyme rows; the fixture is committed, so
+Read the Docs has it. ``GeneratedReferenceTest`` makes Python a test-time
+dependency of the module build; the pull-request workflow runs
+``python-env.sh`` before ``maven-verify.sh``, and no Windows/macOS workflow
+runs the Maven tests.
+
+What I ran and saw:
+
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``;
+  module ``Tests run: 979, Failures: 0, Errors: 0, Skipped: 0``. No Java
+  production class changed, so no PIT re-run beyond unit 6's.
+* **Injection 1, rejected as equivalent and not counted**: the generator's
+  default line always ``name = value`` (losing the ``name =`` empty form). All
+  three agreement tests stayed green, so I rendered both versions:
+  ``cmp`` -> byte-identical fragments -- every empty-valued parameter has an
+  inline comment and the padding absorbs the space. An equivalent edit, not a
+  test gap.
+* **Injection 2** (generator drops the inline comment for ``decoy_*``):
+  ``GeneratedReferenceTest.defaultLinesAreTheCanonicalWritersLines`` -- ``2 of
+  118 canonical default lines are not on the page exactly once; the first:
+  [decoy_search (0x): decoy_search = 0 ... decoy_prefix (0x): ...]``.
+  Restored, ``sha256sum -c`` OK.
+* **Injection 3** (the ``conf.py`` hook returns silently on rejected
+  metadata instead of raising): ``bash scripts/ci/docs-build.sh --self-test``
+  -> **rc 4**, ``cometparams-selftest: HARNESS FAILURE -- hook-field-missing:
+  the build failed (exit 1), but its log ... does not carry 'cometparams: the
+  Comet parameter metadata was rejected, so the documentation build fails' --
+  it failed for some other reason``. The self-test grades the hook on its own
+  diagnostic, not on "the build went red". Restored, ``sha256sum -c`` OK.
+* ``bash scripts/verify-all-gates.sh --only docs --only traceability --only
+  install`` -> ``3 control(s) passed, 0 failed, in 358 seconds``: docs 62 s,
+  traceability 14 s (8 cases), **install 88 controls in 282 s** -- run because
+  ``docs/conf.py`` changed and the install harness's control G builds the
+  documentation from it. ``git status`` clean.
+* The agent showed the Phase 05 trap directly: with HEAD's ``selftest.py``
+  restored, ``traceability.sh --self-test`` exits 1 (``cannot read the Comet
+  parameter metadata at .../_build/traceability/negative/...``).
+
+Noted for unit 8 and the handoff: ``verify-all-gates.sh``'s ``docs`` row still
+describes one injected cross-reference; the 31 generator cases run inside
+``docs-build.sh --self-test`` (exit 4 on failure) but are not counted there.
+Per-version default overrides on the page are untested today (the one
+installed release has none).
 
 .. _p06-u8-signoff:
 
