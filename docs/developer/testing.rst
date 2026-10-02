@@ -55,16 +55,19 @@ Commands
 
    * - ``bash scripts/verify-all-gates.sh``
      - **Prove every gate still fails on the defect it exists to catch.** Runs
-       all ten falsifiability harnesses and exits non-zero if any control
-       stops biting. About twelve minutes. Run it before signing off a phase.
+       all thirteen falsifiability controls and exits non-zero if any control
+       stops biting. About an hour since Phases 05 and 06 (3875 s recorded in
+       ``scripts/dev-verify.sh``). Run it before signing off a phase.
 
    * - ``bash scripts/verify-all-gates.sh --list``
-     - The ten controls, what each injects, and the command that proves it.
+     - The thirteen controls, what each injects, and the command that proves
+       it.
 
    * - ``bash scripts/verify-all-gates.sh --only NAME``
      - One control. Names: ``license``, ``workflows``, ``docs``,
        ``traceability``, ``sbom``, ``depscan``, ``pipeline``, ``quality``,
-       ``shell``, ``tests``. Repeatable, or comma-separated.
+       ``shell``, ``tests``, ``provenance``, ``install``, ``params``.
+       Repeatable, or comma-separated.
 
    * - ``bash scripts/ci/docs-build.sh``
      - The documentation gate on its own: both strict Sphinx builds. About 6 s.
@@ -380,7 +383,7 @@ catch, requires the narrowest command that should catch it to exit non-zero
 once the defect is removed. Every harness damages a copy under ``_build/``;
 the working tree is never touched.
 
-``bash scripts/verify-all-gates.sh`` runs all ten in one command. It injects
+``bash scripts/verify-all-gates.sh`` runs all thirteen in one command. It injects
 nothing itself -- it delegates -- and it fails if a sub-harness is missing or
 not executable rather than skipping it, because a skipped control counted as a
 pass is worse than no aggregator at all.
@@ -491,6 +494,43 @@ pass is worse than no aggregator at all.
        git blob sha, and absent.
      - e.g. ``byte count is 10119, expected 35149 -- the file is TRUNCATED by
        25030 bytes``; ``the text has been ALTERED``.
+
+   * - Hashing and provenance (Phase 04, ``provenance``)
+     - ``scripts/verify-provenance-gates.sh``: a hasher digesting one byte
+       less than it read; a hasher keeping every chunk; a fingerprint treating
+       an absent attribute as a match; a log reader dropping a torn tail;
+       ``ATOMIC_MOVE`` replaced by copy-then-delete; redaction removed from
+       each of three writers.
+     - Each test's own assertion, from the injections recorded in
+       ``handoffs/PHASE-04-worklog.rst``; item 7 is delegated to the ``tests``
+       control's mutation gate.
+
+   * - Tool registry and installer (Phase 05, ``install``)
+     - ``scripts/verify-install-gates.sh``: nineteen injections into
+       production code recorded in ``handoffs/PHASE-05-worklog.rst`` (two of
+       them new at unit 12, one at unit 14), five damaged manifests for the
+       documentation-table generator, each in a ``git archive HEAD`` sandbox
+       and each proved to have changed the compiled class.
+     - Each failing assertion's own words, e.g. ``never FAILED: a user who
+       cancelled has not encountered an error ==> expected: <CANCELLED> but
+       was: <FAILED>``. Item 9 (macOS) is not met and only delegated.
+
+   * - Comet parameter model (Phase 06, ``params``)
+     - ``scripts/verify-param-gates.sh``: fourteen injections into
+       ``cometgui-params-comet`` recorded in ``handoffs/PHASE-06-worklog.rst``
+       -- the writer skipping empty values, an entry removed from the shipped
+       metadata, drift comparing first tokens, a dropped neutral loss, a
+       reversed count, the enzyme table's duplicate check, the writer's
+       enzyme refusal, two locale-sensitive number writers, unknown parameters
+       dropped by the writer and by the parser, and three tolerance-pair rule
+       defects; unit 7's generator self-test, invoked; and PIT scored per
+       package. See :ref:`dev-comet-parameter-falsifiability`.
+     - Each failing assertion's own words, e.g. ``min,max count ==> expected:
+       <79.966331 STY 0 2,4 -1 0 0 0.0> but was: <79.966331 STY 0 4,2 -1 0 0
+       0.0>``; for item 9, ``parser``, ``writer`` and ``validation`` each
+       ``>= 80%`` killed and, with the validation tests removed, ``validation
+       is graded BELOW the 80% threshold`` while the module-wide score, all
+       ``scripts/build.sh`` grades, still passes.
 
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs

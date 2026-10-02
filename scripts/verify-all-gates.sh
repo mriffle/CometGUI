@@ -85,6 +85,7 @@ readonly -a ALL_GATES=(
     tests
     provenance
     install
+    params
 )
 
 PASSED=0
@@ -122,7 +123,8 @@ declare -a COVERED=()
 #                it had grown to 19 and then 23 without the floor following.
 #                install: 83 on 2026-10-01, phase 05 unit 12's first shipping
 #                count; 88 on 2026-10-01, when phase 05 unit 14 added control
-#                19, the macOS quarantine re-check.)
+#                19, the macOS quarantine re-check.  params: 68 on
+#                2026-10-02, phase 06 unit 8's first shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -263,6 +265,21 @@ gate_spec() {
             GATE_FLOOR=88
             GATE_UNIT="controls"
             ;;
+        params)
+            GATE_PHASE="06"
+            GATE_ITEMS="1,2,3,4,5,6,7,8,9"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-06-worklog.rst, each into production code (or, for item 2, the shipped metadata) of cometgui-params-comet in a git-archive sandbox and each proved to have reached the compiled module: the writer skipping every empty-valued parameter; the scan_range entry removed from the metadata; the drift default comparison reduced to its first token; the second neutral loss dropped; a min,max count written max,min; the enzyme table's duplicate-number invariant disabled; the writer's refusal of an absent enzyme number disabled; the one number writer, and separately the writer's decimal path, made locale-sensitive (Locale.ROOT required to stay green); the writer dropping the unknown section; the parser reporting and then dropping unknown parameters; the tolerance pair routed through the generic ordering rule; an asymmetric window made an error; the reversed-pair error unable to fire; unit 7's generator self-test invoked (27 damaged inputs, 4 defects through the real Sphinx hook); PIT scored per package for parser, writer and validation and for the module, each >= 80%, every non-killed mutant listed, and the validation package graded BELOW with its tests removed; and, as controls on the harness itself, an injection that reached the source but not the bytecode and a PIT report with an empty package, each reported as a HARNESS ERROR or FAILURE. Item 9's per-survivor judgement is listed, not automated"
+            GATE_SCRIPT="scripts/verify-param-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-06 exit gate items 1 to 8 were proved here"
+                "Item 9: PIT scored parser, writer and validation each >= 80% and the module"
+                "bytecode as a HARNESS ERROR, not as a pass"
+            )
+            GATE_FLOOR=68
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -297,6 +314,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         install)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        params)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -304,8 +323,8 @@ gate_count() {
 usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
-that every PHASE-01, PHASE-02, PHASE-04 and PHASE-05 gate still fails on the
-defect it exists to catch.
+that every PHASE-01, PHASE-02, PHASE-04, PHASE-05 and PHASE-06 gate still
+fails on the defect it exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -380,7 +399,8 @@ list_gates() {
         printf '  %-13s %-9s injects: %s\n\n' "" "" "${GATE_DEFECT}"
     done
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
-    printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05.  Every phase numbers its items\n'
+    printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06.\n'
+    printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
     printf '  build; 3 ArchUnit layering; 4 coverage; 5 traceability; 6 CI pipelines.\n'
@@ -401,10 +421,17 @@ list_gates() {
     printf '  a tool that cannot load; 6 no THERMO_RAW_WINDOWS without the Thermo DLLs;\n'
     printf '  7 a local Percolator below 3.05 rejected; 8 no offer absent from the\n'
     printf '  manifest; 9 macOS without a Gatekeeper refusal -- NOT MET, delegated only.\n'
+    printf '  PHASE-06 items: 1 a byte-stable double round trip of the real -q output;\n'
+    printf '  2 all 118 parameters modelled and drift failing on a removed entry; 3 every\n'
+    printf '  variable-modification tuple form in all fifteen slots; 4 the enzyme table,\n'
+    printf '  a custom enzyme, and no absent enzyme number written; 5 byte-identical\n'
+    printf '  output under a comma-decimal locale; 6 an unknown parameter kept and\n'
+    printf '  reported; 7 the tolerance pair by its own rule; 8 the generated reference\n'
+    printf '  strict and complete; 9 PIT >= 80%% over parser, writer and validation.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
-    printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst and\n'
-    printf '  phases/PHASE-05-tool-registry.rst.\n\n'
+    printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
+    printf '  phases/PHASE-05-tool-registry.rst and phases/PHASE-06-comet-param-model.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -566,7 +593,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04 and PHASE-05 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05 and PHASE-06 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -604,7 +631,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05; do
+    for phase in 01 02 04 05 06; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"
@@ -627,6 +654,10 @@ main() {
     printf '  refusal -- is NOT MET and is not listed above: a hosted macOS runner does\n'
     printf '  not refuse a quarantined binary, so it cannot show acceptance. The install\n'
     printf '  control only delegates it.\n'
+    printf '  PHASE-06 item 9 is covered in its numeric half only: the params control\n'
+    printf '  requires parser, writer and validation each >= 80%% and lists every\n'
+    printf '  mutant PIT did not kill. Whether one suppresses a validation error or\n'
+    printf '  drops a parameter is a judgement read from that list, not automated.\n'
 
     printf '\n  %d control(s) passed, %d failed, in %d seconds (%dm%02ds).\n' \
         "${PASSED}" "${FAILED}" "${total}" "$((total / 60))" "$((total % 60))"

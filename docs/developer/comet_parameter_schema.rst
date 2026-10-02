@@ -2118,6 +2118,128 @@ Adding a field
    scripts/ci/docs-build.sh --self-test``; the self-test picks up the new
    required field automatically.
 
+.. _dev-comet-parameter-falsifiability:
+
+Falsifiability
+==============
+
+*A gate that has never been seen to fail has not been shown to work*
+(``CONTRIBUTING.rst``, *Gate conventions*). ``bash
+scripts/verify-param-gates.sh`` proves that each of the phase's nine exit gate
+items fails on the defect it exists to catch. It is registered in
+``scripts/verify-all-gates.sh`` as ``params`` and follows Phase 05's
+``scripts/verify-install-gates.sh``:
+
+* it extracts ``git archive HEAD`` into ``_build/param-gate-sandbox`` and
+  damages only that; the working tree is never touched;
+* the module's upstream modules are built once from the sandbox and installed
+  into a private overlay repository (``_build/param-gate-m2``, every other
+  entry a symlink into ``_build/m2repo``), so each control compiles and tests
+  ``cometgui-params-comet`` alone, against the sandbox's own dependencies, and
+  the shared repository's project jars are checked unchanged at the end;
+* each injection's anchor must match exactly once; the damaged file must
+  differ from its pristine copy; after the run its compiled form (the class
+  and its inner classes, or the resource's copy under ``target/classes``) must
+  differ from the clean baseline and everything else must be identical to it;
+* each red is graded on the failing assertion's own words, and a final clean
+  run over every selector must pass with the compiled module byte-identical to
+  the baseline;
+* control ``H`` requires the harness to refuse, as a harness error or failure,
+  an unchanged file, a missing anchor, a metadata removal that removes
+  nothing, an injection that reaches the source but not the bytecode, a green
+  run graded as red, a red without its diagnostic, and a PIT report in which a
+  graded package has no mutation.
+
+.. list-table:: The controls (each from the record in ``handoffs/PHASE-06-worklog.rst``)
+   :header-rows: 1
+   :widths: 6 8 40 46
+
+   * - Control
+     - Gate item
+     - Injected defect
+     - Diagnostic required
+   * - 1
+     - 1
+     - The writer skips every parameter whose value is empty.
+     - ``textUnchanged``: the canonical text's SHA-256 is no longer
+       ``f381afe1...d62b``; the second parse is not the first model.
+   * - 2a
+     - 2
+     - ``scan_range`` removed from the sandbox's shipped metadata JSON.
+     - ``UNMODELLED: Comet 2026.02.2 declares scan_range (line 114, ...)``;
+       counts ``[118, 117, 0]``.
+   * - 2b
+     - 2
+     - The drift test compares only the first token of a default.
+     - ``defaultDiffersInAPartialDump``: ``findings 0 ==> expected: <1>``.
+   * - 3a, 3b
+     - 3
+     - The second neutral loss dropped; a ``min,max`` count written
+       ``max,min``.
+     - The tuple round trip in all fifteen slots, naming the form, e.g.
+       ``min,max count ==> expected: <... 2,4 ...> but was: <... 4,2 ...>``.
+   * - 4a, 4b
+     - 4
+     - The enzyme table's duplicate-number invariant disabled; the writer's
+       refusal of an enzyme number absent from the table disabled.
+     - A custom enzyme reusing number 3 is accepted (the parser's own check
+       stays green); ``refusesAnAbsentNumber``: no ``ParamsWriteException``.
+   * - 5a, 5b
+     - 5
+     - ``Numbers.text``, and separately the model codec's decimal path, made
+       locale-sensitive.
+     - ``model 0 written under de_DE: the bytes differ first at offset 1076``
+       (``20,0``), while the ``Locale.ROOT`` text test stays green.
+   * - 6a, 6b
+     - 6
+     - The writer drops the unknown section; the parser warns about an unknown
+       parameter and then drops it.
+     - ``expected: <[ms1_mass_range, precursor_NL_ions]> but was: <[]>``.
+   * - 7a, 7b, 7c
+     - 7
+     - The pair routed through the generic ordering rule; an asymmetric window
+       made an error; the reversed-pair error unable to fire.
+     - The generic rule's own guard (``... is of kind TOLERANCE_PAIR_MEMBER,
+       not a two-value range``) in 14 of 15 tests; ``expected: <WARNING> but
+       was: <ERROR>``; ``20.0001 / 20`` graded ``PAIR_SAME_SIGNED``.
+   * - 8
+     - 8
+     - None of its own: ``scripts/cometparams_selftest.py`` is invoked in the
+       sandbox (:ref:`dev-comet-parameter-generated-reference`).
+     - Its OK line with at least 27 generator cases and 4 hook defects, the
+       removed entry named, and the hook's count equal to the metadata's 118.
+   * - 9
+     - 9
+     - PIT over the module; then every validation test class removed (source
+       and compiled class) and PIT again.
+     - ``parser``, ``writer`` and ``validation`` each, and the module, at
+       least 80 % killed, scored as ``scripts/build.sh`` scores it; in the
+       negative arm ``validation`` graded below 80 %.
+
+**Item 9 per package.** ``scripts/build.sh`` grades the mutation score per
+*module*. That is not what item 9 says, and the negative arm shows why it
+matters: with every validation test removed, ``validation`` falls to
+68/181 (37.5 %) while the module stays at 978/1102 (88.7 %) and PIT itself
+exits 0 -- the module gate cannot see it; the per-package grade does.
+
+**What the harness does not decide.** Item 9 also says "no surviving mutation
+that suppresses a validation error or drops a parameter". That is a judgement
+about each survivor, so the harness carries **no allow-list**: it prints every
+mutant PIT did not kill in ``parser``, ``writer`` and ``validation`` -- class,
+line, mutator and status, ``TIMED_OUT`` included and, as in
+``scripts/build.sh``, not counted as killed -- and the reviewer reads that list
+against the work log's argument for each one (``ParamsLineReader:137`` twice
+and ``VariableModRules:178``, equivalent; three ``ParamsLineReader``
+timeouts). A new survivor does not fail the harness unless it takes a package
+below 80 %.
+
+Run it as ``bash scripts/verify-param-gates.sh`` (about five and a half
+minutes, two thirds of it PIT), ``--only 2a,7c`` for named controls, or
+``--self-test`` for control ``H`` alone. It needs the gitignored Comet
+mirrors ``scratch/phase05/artefacts`` and ``scratch/phase06/artefacts``,
+because PIT runs the module's real-binary tests, and refuses to start (exit 3)
+without them.
+
 .. _dev-comet-parameter-comet-reads:
 
 Comet reads what is written
