@@ -764,7 +764,60 @@ installed release has none).
 Unit 8
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-02 at ``67ca11f``, no rework.** One fresh agent:
+``scripts/verify-param-gates.sh`` (1678 lines, modelled on
+``verify-install-gates.sh``: ``git archive HEAD`` sandbox, anchors matching
+once, pristine copies, digests of ``target/classes`` proving each injection
+reached the compiled module, grading on each failure's own words, control H on
+the harness, a final clean run byte-identical to the baseline), registered
+additively in ``scripts/verify-all-gates.sh`` as ``params`` (``GATE_PHASE=06``,
+items 1-9, ``GATE_FLOOR=68``); ``docs/developer/testing.rst`` gains the
+``params`` row and the missing ``provenance`` and ``install`` rows;
+``docs/developer/comet_parameter_schema.rst`` gains *Falsifiability*.
+
+Controls: 0 baseline; 8 (unit 7's generator self-test, 27 + 4 cases); 1; 2a,
+2b; 3a, 3b; 4a, 4b; 5a, 5b; 6a, 6b; 7a, 7b, 7c; 9 (PIT per package plus a
+negative arm); H1-H7; C final clean run -- **68 graded controls**. Each is
+marked ``[recorded, unit N]`` from this work log; where the record gave only a
+one-line summary the agent chose the exact form and the script says so.
+
+Design point I checked: the sandbox's upstream modules are built once and
+installed into a **private overlay repository** ``_build/param-gate-m2``
+(every other entry a symlink into ``_build/m2repo``), so PIT scores HEAD's
+module against HEAD's upstream jars, not the 2026-09-18 jars. I hashed every
+``_build/m2repo/org/cometgui/*`` jar before my run and ``sha256sum -c`` after:
+unchanged.
+
+What I ran and saw:
+
+* Read the diff of ``verify-all-gates.sh``: the eight removed lines are prose
+  re-wrapped to add ``PHASE-06``; no existing ``GATE_FLOOR`` or
+  ``GATE_PROOF`` changed; ``params`` is added.
+* ``bash scripts/verify-all-gates.sh --only params`` -> **exit 0**, ``1
+  control(s) passed, 0 failed, in 326 seconds (5m26s)``, ``PHASE-06 exit gate
+  items covered by the controls that passed: 1,2,3,4,5,6,7,8,9``, with the
+  printed caveat that item 9 is covered in its numeric half only.
+  ``_build/m2repo`` project jars unchanged; ``git status`` clean.
+* **My injection into the harness, where control H does not reach**: in a
+  temporary copy (``scripts/zz-p06orch-harness-copy.sh``, deleted after),
+  control 7b's injection replaced by a behaviour-neutral edit that still
+  changes bytecode (``Severity.valueOf("WARNING")``). ``--only 7b`` -> **exit
+  1**, ``FAIL asymmetric is an error: HARNESS FAILURE -- the check PASSED with
+  the defect present. Either the gate is dead or the injection never reached
+  the running code``; ``SUMMARY: 5 control(s) passed, 1 failed``. A dead
+  injection is not graded as a pass.
+* Item 9 as the agent's run reported it, and re-proved in my run: ``parser``
+  96/101 (95.0 %), ``writer`` 30/30, ``validation`` 180/181 (99.4 %), module
+  1095/1102; the non-kill list is exactly units 2 and 5's accepted set. Negative
+  arm: all 11 validation test classes removed -> ``validation is graded BELOW
+  the 80% threshold: 68/181 = 37.5%``.
+
+**Finding, escalated (gate semantics, not this phase's to change):** in that
+negative arm the **module** stayed at 978/1102 = **88.7 %** and PIT exited 0.
+``scripts/build.sh`` scores the 80 % gate module-wide, so it would pass a tree
+whose ``validation`` package is 37.5 % mutation-covered. Gate item 9 says "across
+parser, writer and validators"; only ``verify-param-gates.sh``'s per-package
+grade enforces that. ``build.sh`` is not this phase's to edit.
 
 Rejections and rework
 =====================
