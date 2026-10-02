@@ -555,7 +555,61 @@ keeps them).
 Unit 5
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-02 at ``55aa0b7``, no rework.** One fresh agent; 35 files:
+new ``validation`` package (``ValidationReport``/``Finding``/``Rule`` -- 33
+rules, each with a stable id and fixed severity -- ``CometValidator`` and the
+rule classes), ``model/DecoySource`` and three model operations
+(``decoySource``, ``withDecoySource``, ``withWorkflowEnforcedOutputs``), and two
+metadata edits I read and accept: ``scan_range`` gains ``ordered_range`` (it
+was the one two-value range without it), and ``spectral_library_name`` becomes
+``EMPTY_ALLOWED`` (the source treats an empty name as "no library search";
+cited ``CometSearchManager.cpp`` L1961-1972).
+
+What I ran and saw:
+
+* Read ``TolerancePairRule`` in full: reversed (``lower > upper``) is an
+  error and returns; a window not containing 0 is a ``same_signed`` warning;
+  otherwise a non-symmetric window is an ``asymmetric`` warning. The generic
+  ``OrderedRangeRule`` is not applied to the pair (the agent's own injection
+  (a) routes it there and 14 tests fail).
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``;
+  module ``Tests run: 882, Failures: 0, Errors: 0, Skipped: 0``; **113
+  compiled classes, 113 in ``jacoco.xml``**.
+* PIT, module alone: **910/917** killed (``build.sh`` scoring); ``validation``
+  180/181, ``model`` 97/97, ``writer`` 30/30, ``value`` 200/200, ``schema``
+  307/308, ``parser`` 96/101. The one new non-kill,
+  ``VariableModRules:178`` (boundary on ``requirementCode() > 0``), I read: it
+  is reached only for codes outside {-1, 0, 1}, where ``> 0`` and ``>= 0``
+  agree, and it only chooses a warning's wording -- equivalent, suppresses
+  nothing. The rest are unit 2's accepted six.
+* **Injection 1** (the reversed-pair error can never fire:
+  ``compareTo(...) > 0`` -> ``> 1``): class ``7354fc6d`` -> ``0e913fcb``; 7
+  failures, e.g. ``TolerancePairRuleTest.boundaries`` -- ``expected:
+  <PAIR_REVERSED> but was: <PAIR_SAME_SIGNED>`` for ``20.0001 / 20`` -- and
+  ``ValidatorCoverageTest.everyDeclarationChecked`` [9], [10]. Restored,
+  ``sha256sum -c`` OK.
+* **Injection 2** (``DecoySource.COMET_INTERNAL_CONCATENATED`` mapped to
+  ``decoy_search = 2``, the separate mode): class ``54cbb092`` ->
+  ``e38345b3``; ``DecoyTextAndPathTest.onTheModel`` -- ``expected:
+  <Optional[COMET_INTERNAL_SEPARATE]> but was:
+  <Optional[COMET_INTERNAL_CONCATENATED]>`` -- and ``mapping``. Restored,
+  ``sha256sum -c`` OK.
+* ``--only docs --only traceability`` -> ``2 control(s) passed, 0 failed, in 38
+  seconds``. ``git status`` clean.
+
+Acceptance condition 4 as briefed ("the real ``-q`` defaults validate with no
+errors") conflicts with ``R-CMT-01``: Comet's default
+``output_percolatorfile = 0`` **is** an error for this workflow. The agent
+reports exactly that one error on the raw file and **0 errors, 0 warnings**
+after ``withWorkflowEnforcedOutputs()``. That is the right reading; the brief
+was loose.
+
+**Unassigned specification item, escalated:** *Comet validation* lists
+"selected index and search options are compatible". It depends on whether
+``database_name`` names an existing ``.idx`` and what that index records (a
+fragment index uses only the first five variable modifications,
+``Constants.h`` L77) -- it needs the filesystem. Not implemented here; the
+developer page records it as Phase 08's, but **no phase document assigns it**.
 
 .. _p06-u6-signoff:
 
@@ -602,4 +656,7 @@ None yet. Reported upward, not blocking:
   window; one documentation build in that window failed and then passed
   unchanged (unit 1 sign-off);
 * for tier 1's exit-gate ``--only tests`` run: one sandbox failure seen by the
-  unit 2 agent in ``cometgui-ui`` (unit 2 sign-off).
+  unit 2 agent in ``cometgui-ui`` (unit 2 sign-off);
+* the specification's "selected index and search options are compatible"
+  validation item needs the filesystem and no phase document assigns it
+  (unit 5 sign-off).
