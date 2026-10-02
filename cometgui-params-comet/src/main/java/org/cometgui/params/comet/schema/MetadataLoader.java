@@ -53,6 +53,12 @@ import org.cometgui.provenance.json.JsonValue;
  * consistent with the enzyme-reference parameters. {@code R-PARAM-04} is enforced here too: a
  * tolerance-pair member may not carry the generic ordering rule.
  *
+ * <p>Each version record carries its variable-modification tuple layout ({@code R-PARAM-09}),
+ * checked by {@link VariableModLayout}'s own rules; a parameter named as Comet names a tuple slot
+ * ({@code variable_mod} and two digits) must be of kind {@link ValueKind#VARIABLE_MOD_TUPLE} and
+ * the other way round; and a tuple default must hold as many fields as the layout of every version
+ * it claims.
+ *
  * <p>The format is documented in {@code docs/developer/comet_parameter_schema.rst}; the
  * documentation generator reads the same file with Python's standard library.
  */
@@ -70,6 +76,13 @@ public final class MetadataLoader {
 
     private static final Pattern NON_NEGATIVE_WHOLE = Pattern.compile("[0-9]+");
 
+    /**
+     * How Comet names a tuple slot: {@code LoadParameters} in {@code Comet.cpp} at {@code
+     * v2026.02.2} (line 552) sends any name of fourteen characters starting {@code variable_mod} to
+     * the tuple reader; this project requires the two characters to be digits.
+     */
+    private static final Pattern TUPLE_SLOT = Pattern.compile("variable_mod[0-9]{2}");
+
     private static final String HTTPS = "https://";
 
     private static final List<String> TOP_FIELDS =
@@ -84,6 +97,10 @@ public final class MetadataLoader {
 
     private static final List<String> VERSION_FIELDS =
             List.of("version", "marker", "parameterPages", "source", "variableModTuple");
+
+    private static final List<String> TUPLE_FIELDS = List.of("source", "fields");
+
+    private static final List<String> TUPLE_ENTRY_FIELDS = List.of("field", "kind", "pair");
 
     private static final List<String> CATEGORY_FIELDS = List.of("id", "displayName");
 
@@ -167,6 +184,7 @@ public final class MetadataLoader {
         List<CometVersionRecord> versions = versions(top);
         categories(top);
         List<ParameterDefinition> parameters = parameters(top, versions);
+        tupleDefaults(parameters, versions);
         List<InternalParameter> internal = internal(top, parameters);
         EnzymeTableMetadata enzymeTable = enzymeTable(top, parameters);
         return new CuratedMetadata(SCHEMA_VERSION, versions, parameters, internal, enzymeTable);
@@ -203,17 +221,67 @@ public final class MetadataLoader {
             if (!seen.add(version)) {
                 throw node.failure("version", version.text() + " is listed twice");
             }
-            if (!(node.required("variableModTuple") instanceof JsonValue.JsonNull)) {
-                throw node.failure(
-                        "variableModTuple",
-                        "must be null until the tuple layout is modelled; this loader would"
-                                + " otherwise accept a layout it does not read");
-            }
+            String parameterPages = node.url("parameterPages");
+            String source = node.url("source");
             records.add(
                     new CometVersionRecord(
-                            version, marker, node.url("parameterPages"), node.url("source")));
+                            version, marker, parameterPages, source, tupleLayout(node)));
         }
         return records;
+    }
+
+    private static VariableModLayout tupleLayout(Node version) {
+        Node layout =
+                Node.of(version.required("variableModTuple"), version.where(), "variableModTuple");
+        layout.onlyFields(TUPLE_FIELDS);
+        String source = layout.url("source");
+        List<VariableModLayout.Entry> entries = new ArrayList<>();
+        List<JsonValue> array = layout.array("fields");
+        for (int index = 0; index < array.size(); index++) {
+            Node entry =
+                    Node.of(
+                            array.get(index),
+                            version.where(),
+                            "variableModTuple.fields[" + index + "]");
+            entry.onlyFields(TUPLE_ENTRY_FIELDS);
+            entries.add(
+                    new VariableModLayout.Entry(
+                            entry.constant("field", VariableModField.class),
+                            entry.constant("kind", VariableModField.Kind.class),
+                            entry.bool("pair")));
+        }
+        try {
+            return new VariableModLayout(entries, source);
+        } catch (IllegalArgumentException unusable) {
+            throw version.failure("variableModTuple", unusable.getMessage());
+        }
+    }
+
+    private static void tupleDefaults(
+            List<ParameterDefinition> parameters, List<CometVersionRecord> versions) {
+        for (ParameterDefinition definition : parameters) {
+            if (definition.kind() != ValueKind.VARIABLE_MOD_TUPLE) {
+                continue;
+            }
+            int fields = definition.defaultValue().split("\\s+").length;
+            for (CometVersionRecord record : versions) {
+                int expected = record.variableModTuple().fields().size();
+                if (definition.supportedVersions().contains(record.version())
+                        && fields != expected) {
+                    throw new InvalidMetadataException(
+                            "parameter \"" + definition.name() + "\"",
+                            "default",
+                            "\""
+                                    + definition.defaultValue()
+                                    + "\" holds "
+                                    + fields
+                                    + " fields, and the tuple layout of Comet "
+                                    + record.version().text()
+                                    + " has "
+                                    + expected);
+                }
+            }
+        }
     }
 
     private static void categories(Node top) {
@@ -304,6 +372,15 @@ public final class MetadataLoader {
                                                                 .map(ParameterCategory::id)
                                                                 .toList()));
         ValueKind kind = node.constant("kind", ValueKind.class);
+        boolean slotName = TUPLE_SLOT.matcher(name).matches();
+        if (slotName != (kind == ValueKind.VARIABLE_MOD_TUPLE)) {
+            throw node.failure(
+                    "kind",
+                    slotName
+                            ? "is " + kind + ", and Comet reads every variable_modNN as a tuple"
+                            : "is VARIABLE_MOD_TUPLE, and Comet reads a tuple only under a"
+                                    + " variable_modNN name");
+        }
         VisibilityLevel visibility = node.constant("visibility", VisibilityLevel.class);
         SerializationRule serialization = node.constant("serialization", SerializationRule.class);
         if (!kind.allows(serialization)) {
@@ -660,6 +737,13 @@ public final class MetadataLoader {
                 throw failure(field, "must be a string or null");
             }
             return Optional.of(text.value());
+        }
+
+        boolean bool(String field) {
+            if (!(required(field) instanceof JsonValue.JsonBoolean flag)) {
+                throw failure(field, "must be true or false");
+            }
+            return flag.value();
         }
 
         long number(String field) {

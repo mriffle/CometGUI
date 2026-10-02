@@ -7,7 +7,19 @@
       "marker": "2026.02 rev. 2 (6edec91)",
       "parameterPages": "https://uwpr.github.io/Comet/parameters/parameters_202602/",
       "source": "https://github.com/UWPR/Comet/tree/v2026.02.2",
-      "variableModTuple": null
+      "variableModTuple": {
+        "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L552-L621",
+        "fields": [
+          { "field": "MASS", "kind": "DECIMAL", "pair": false },
+          { "field": "RESIDUES", "kind": "RESIDUES", "pair": false },
+          { "field": "BINARY_GROUP", "kind": "INTEGER", "pair": false },
+          { "field": "COUNT", "kind": "INTEGER", "pair": true },
+          { "field": "TERMINAL_DISTANCE", "kind": "INTEGER", "pair": false },
+          { "field": "TERMINUS", "kind": "INTEGER", "pair": false },
+          { "field": "REQUIRED", "kind": "INTEGER", "pair": false },
+          { "field": "NEUTRAL_LOSS", "kind": "DECIMAL", "pair": true }
+        ]
+      }
     }
   ],
   "categories": [

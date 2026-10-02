@@ -9,8 +9,11 @@ Comet parameter schema
    **Status: in progress, Phase 06.** Landed so far: the real-binary fixtures
    (unit 1); the schema model, the curated metadata file, the line-level
    reader, schema discovery, the version marker, drift detection and the
-   schema provider (unit 2). The typed parser and writer, the structured value
-   codecs, validation, presets, migration and the generator behind
+   schema provider (unit 2); the structured value types and their codecs --
+   the variable-modification tuple with its layout taken from the metadata, the
+   enzyme table, the tolerance pair, the ranges, the mass-offset list and the
+   ion-series family (unit 3). The typed parser and writer, validation,
+   presets, migration and the generator behind
    :doc:`../reference/comet_parameters_generated` (``R-DOC-04``) are still to
    come; where this page mentions them it describes intent, not the product.
 
@@ -191,8 +194,12 @@ Package ``org.cometgui.params.comet.schema``:
        ``BOOLEAN_FLAG``, ``INTEGER_ENUM``, ``STRING_ENUM``, ``FILE_PATH``,
        ``INTEGER_RANGE`` and ``DECIMAL_RANGE`` (two values on one line),
        ``DECIMAL_LIST``, ``TOLERANCE_PAIR_MEMBER``, ``VARIABLE_MOD_TUPLE``,
-       ``ENZYME_REFERENCE`` and ``ION_SERIES_FLAG``. The codecs for the tuple,
-       the enzyme table and the tolerance pair are not here.
+       ``ENZYME_REFERENCE`` and ``ION_SERIES_FLAG``. The codecs for the
+       structured kinds are in ``org.cometgui.params.comet.value``
+       (:ref:`dev-comet-parameter-structured`).
+   * - ``VariableModField``, ``VariableModLayout``
+     - What a tuple field can be, and one Comet version's tuple layout as the
+       metadata records it (:ref:`dev-comet-parameter-tuple`).
    * - ``SerializationRule``
      - ``SINGLE_VALUE``, ``EMPTY_ALLOWED``, ``TWO_VALUES``, ``VALUE_LIST``,
        ``TUPLE``. The specification's *empty-valued parameter* is the rule
@@ -244,7 +251,8 @@ Top level::
       "schemaVersion": 1,
       "description": "...",
       "versions":    [ { "version", "marker", "parameterPages", "source",
-                         "variableModTuple" } ],
+                         "variableModTuple": { "source",
+                                               "fields": [ { "field", "kind", "pair" } ] } } ],
       "categories":  [ { "id", "displayName" } ],         // exactly the fourteen
       "enzymeTable": { "header", "helpUrl", "rowFormat",
                        "senseChoices": [ { "value", "label" } ],
@@ -256,8 +264,12 @@ Top level::
 ``versions`` records each Comet release the metadata was curated against: the
 manifest's spelling (``2026.02.2``), the binary's marker
 (``2026.02 rev. 2 (6edec91)``), and the upstream pages and source tree the
-help was written from. ``variableModTuple`` must be ``null`` until the
-structured value types record the tuple's field layout there.
+help was written from, and ``variableModTuple``: that release's
+variable-modification tuple layout, in Comet's reading order -- see
+:ref:`dev-comet-parameter-tuple`. In each ``fields`` entry ``field`` is a
+``VariableModField`` constant, ``kind`` its ``VariableModField.Kind``
+(``DECIMAL``, ``INTEGER`` or ``RESIDUES``) and ``pair`` a JSON boolean, the
+only booleans in the file.
 
 One parameter::
 
@@ -294,7 +306,15 @@ member carrying the generic ``ordered_range`` rule (``R-PARAM-04``); a related
 parameter that is unknown, the parameter itself, or named twice; a help or
 source reference that is not ``https://``; an allow-list entry without a
 reason, also modelled, or listed twice; and an enzyme-table section that does
-not list exactly the ``ENZYME_REFERENCE`` parameters.
+not list exactly the ``ENZYME_REFERENCE`` parameters. For the tuple layout:
+a ``variableModTuple`` that is not an object (``null`` included); a member,
+field constant or kind it does not know; a ``pair`` that is not a boolean; a
+field listed twice, declared with a kind that is not the field's, or given a
+pair where no Comet release accepts one (only the count and the neutral loss
+are pairable); a layout without the mass difference or the residues; a
+parameter named ``variable_mod`` plus two digits that is not of kind
+``VARIABLE_MOD_TUPLE``, or the other way round; and a tuple default whose
+field count differs from the layout of a version it claims.
 
 Where the words come from
 -------------------------
@@ -446,3 +466,352 @@ To add a Comet version: capture its fixtures (*Fixtures*, above), add its
 to make against that release's documentation and source -- a new parameter
 to describe, a range to close with ``through``, a default to update -- never
 a reason to widen the allow-list for a parameter a user could set.
+
+.. _dev-comet-parameter-structured:
+
+Structured values
+=================
+
+Package ``org.cometgui.params.comet.value`` holds a typed, immutable value for
+every parameter kind that is not a scalar, and a codec that reads it from --
+and writes it to -- the value text of one declaration: the text between ``=``
+and ``#`` that ``ParamsLine.Declaration.value()`` holds. The typed parser and
+writer call these codecs per line, and write what ``format`` returns byte for
+byte; the validators read the typed values' fields.
+
+A codec rejects only text it **cannot read** -- the wrong number of fields, a
+token that is not a number, a comma pair where the version takes one value --
+with a ``ValueSyntaxException`` naming what was being read (a parameter such
+as ``variable_mod03``, or an enzyme row and its line) and the field. Text that
+reads cleanly but means something illegal -- a lower bound above an upper, a
+residue Comet does not know, an enzyme number missing from the table -- is the
+validation package's to report, not a parse error.
+
+Every fact below about Comet is cited to its own documentation for the
+2026.02 release or to its source at tag ``v2026.02.2`` (commit
+``6edec914959a6fe2dfa898f8b395d775bb2d2751``; ``git ls-remote`` shows the tag
+pointing at that commit, and every line cited was read there). Where the two
+disagree, the source wins and the disagreement is written down.
+
+.. _dev-comet-parameter-numbers:
+
+Numbers
+-------
+
+One rule for every codec (``Numbers``):
+
+* A decimal is read into a ``BigDecimal``, which keeps every digit **and the
+  scale written**, and is written back with ``toPlainString()``. So a mass
+  survives exactly as the user gave it: Comet's own default ``15.9949`` is
+  written ``15.9949``, and the precise ``15.994915`` that Phase 00's
+  :doc:`../feasibility/scientific-path` edited it to is written ``15.994915``
+  -- never rounded back, never padded to ``15.994915000``. ``0.0`` stays
+  ``0.0``. Only the notation is canonical: a leading ``+`` is dropped and an
+  exponent is written out (``1.5e2`` becomes ``150``).
+* A whole number is read with ``Integer.parseInt`` and written with
+  ``Integer.toString``; one too large for Comet's ``int`` is refused.
+* What is accepted is what C's ``%lf`` and ``%d`` -- which Comet's reader
+  uses -- read as a plain number, except ``inf`` and ``nan`` (no parameter
+  means them) and exponents of more than three digits.
+* Nothing consults the default locale, so the text is the same under a
+  comma-decimal locale (``R-PARAM-11``). ``LocaleIndependenceTest`` writes
+  every form below under ``Locale.ROOT``, ``Locale.GERMANY`` and
+  ``Locale.FRANCE`` -- after proving that the locale under test really does
+  format ``1.5`` as ``1,5`` -- requires identical text, and restores the
+  default locale after each test. A comma decimal such as ``15,9949`` is
+  never read as a number.
+
+.. _dev-comet-parameter-tuple:
+
+The variable-modification tuple
+-------------------------------
+
+``variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0`` is not a scalar. Its fields, as
+Comet 2026.02.2 reads them:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 4 18 44 34
+
+   * - #
+     - ``VariableModField``
+     - Meaning
+     - Source
+   * - 1
+     - ``MASS``
+     - Mass difference, a decimal. A slot whose mass is zero is ignored --
+       which is how ``comet -q`` writes slots 2 to 15, ``0.0 X 0 3 -1 0 0 0.0``.
+     - Page [VM]_; read ``%lf`` [C589]_; zero means unused [M1368]_.
+   * - 2
+     - ``RESIDUES``
+     - One token of residues; ``n`` for the N-terminus, ``c`` for the
+       C-terminus, combinable (``nK``).
+     - Page [VM]_; read ``%31s`` [C589]_; ``n`` and ``c`` [M1380]_.
+   * - 3
+     - ``BINARY_GROUP``
+     - ``0`` a variable modification; any other integer a binary group, whose
+       residues are all modified or all unmodified together (since 2015.02
+       rev. 1).
+     - Page [VM]_; any non-zero value is binary [M1398]_.
+   * - 4
+     - ``COUNT``
+     - Maximum count per peptide, ``3``; or, since 2020.01 rev. 3, a
+       ``min,max`` pair, ``2,4``.
+     - Page [VM]_; the comma rule [C605]_.
+   * - 5
+     - ``TERMINAL_DISTANCE``
+     - ``-1`` no constraint; ``-2`` anywhere except the peptide's C-terminal
+       residue; ``0`` only the terminal residue; ``N`` the terminal residue
+       through the next ``N``.
+     - Page [VM]_; ``-2`` [S6874]_.
+   * - 6
+     - ``TERMINUS``
+     - Which terminus the distance counts from: ``0`` protein N, ``1``
+       protein C, ``2`` peptide N, ``3`` peptide C.
+     - Page [VM]_; [S5375]_.
+   * - 7
+     - ``REQUIRED``
+     - ``0`` not required; ``1`` required; ``-1`` exclusive -- at most one of
+       the exclusive set in a peptide (since 2024.01.0).
+     - Page [VM]_; ``> 0`` [M1401]_; ``== -1`` [S5881]_.
+   * - 8
+     - ``NEUTRAL_LOSS``
+     - Fragment neutral loss, ``0.0`` for none; since 2025.01.0 a pair of two
+       losses ``a,b`` with no space.
+     - Page [VM]_; the comma rule [C600]_; zero means none [M1404]_,
+       [S1770]_.
+
+Comet requires **exactly eight** white-space separated fields and exits
+otherwise [C576]_, which is why a space inside a pair (``97.976896,
+79.966331``) is a ninth field and refused, not a pair. It reads a tuple under
+any fourteen-character name starting ``variable_mod`` [C552]_, but reads
+**only** ``variable_mod01`` to ``variable_mod15`` into the search
+[M518]_ (``VMODS`` is 15 [K80]_): the ``-q`` comment "Up to 15 variable_mod
+entries are supported for a standard search; manually add additional entries
+as needed" [C971]_ promises more than 2026.02.2 delivers, and a
+``variable_mod16`` would be read and then ignored.
+
+The layout is data
+~~~~~~~~~~~~~~~~~~
+
+``R-PARAM-09`` says field count and order come from the version schema, not
+from a hard-coded format string. So the table above is not in code: it is the
+``versions[].variableModTuple`` object of the metadata file -- for 2026.02.2,
+``MASS``, ``RESIDUES``, ``BINARY_GROUP``, ``COUNT`` (pair), ``TERMINAL_DISTANCE``,
+``TERMINUS``, ``REQUIRED``, ``NEUTRAL_LOSS`` (pair), with its ``source``
+pointing at the reading code [C552]_ -- loaded into a ``VariableModLayout`` on
+the ``CometVersionRecord``. ``VariableModField`` says only what each field
+*is* (its kind, and whether any release pairs it); which fields a release has,
+in which order, and which accept a pair, is the layout's.
+
+``VariableModCodec.forVersion(metadata, version)`` takes that layout and the
+version's ``VARIABLE_MOD_TUPLE`` parameters as its slots. Parsing splits on
+white space, requires as many fields as the layout lists, and reads each by
+what the layout puts at that position; a comma pair is read only where the
+layout accepts one, and then exactly two non-empty values. Formatting walks
+the same layout and joins the fields with one space. The codec holds no field
+count of its own. A field a layout does not hold is given Comet's own default
+when read -- the ``VarMods`` constructor [D269]_: group ``0``, count ``0``,
+distance ``-1``, terminus ``0``, required ``0``, loss ``0.0`` -- and a value
+that differs from that default in such a field is **refused** when written
+under the layout, never silently dropped. ``VariableModCodecTest`` proves
+this with CONSTRUCTED layouts: a seven-field one with no neutral loss reads
+``15.9949 M 0 3 -1 0 1`` and refuses the eight-field form, one without a pair
+on the count refuses ``2,4``, and a reordered three-field one writes
+``STY 79.966331 97.976896,79.966331``.
+
+The typed value
+~~~~~~~~~~~~~~~
+
+``VariableModification`` holds every field: the mass and the losses as
+``BigDecimal`` (one, or two for the pair form), the residue token as written,
+the binary group, an optional minimum and the maximum count, the terminal
+distance, and the terminus and requirement **codes** as integers. The codes
+stay integers because the source accepts values the page does not document:
+any positive requirement acts as required [M1401]_ and only ``-1`` as
+exclusive [S5881]_, and a terminus outside ``0``-``3`` matches none of the
+search's branches [S5375]_. ``terminus()`` and ``requirement()`` map the
+documented codes to enums and return empty otherwise, so the validators can
+warn rather than the parser guess. The residue token must be letters ``A`` to
+``Z`` with ``n`` and ``c`` -- the alphabet the page's own generator enforces
+([VM]_, "Valid: n, c, A-Z"); Comet's reader takes any token up to 31
+characters [C589]_, so the length limit is left to validation.
+``effectiveNeutralLosses()`` drops zeros, as Comet does.
+
+``summary()`` writes the value in words for the editor, as the specification
+asks::
+
+    Oxidation: +15.994915 on M; max 3 per peptide; optional
+    +79.966331 on STY; 2 to 4 per peptide; required; neutral losses 97.976896 and 79.966331
+    +28.0 on C-terminus, within 9 residues of the protein C-terminus; max 3 per peptide; optional
+    unused (mass difference 0.0)
+
+An undocumented code is named, not guessed (``requirement code 2``).
+
+The round trip, gate item 3
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``VariableModRoundTripTest`` runs **17 forms x 15 slots = 255** dynamic tests.
+The forms (``TupleForms``, test sources) are CONSTRUCTED test input: the
+page's own examples [VM]_ -- one loss, two losses, required, ``nK``, ``n`` at
+the protein N-terminus, ``c`` within 8 of the protein C-terminus, the
+pyroglutamate cyclisation at the peptide N-terminus, binary groups 1 and 2 --
+plus forms built from the page's field descriptions where it gives no
+whole-line example (``min,max``, exclusive ``-1``, distance ``-2``, the peptide
+C-terminus, all of them at once), ``comet -q``'s two defaults, and the
+``15.994915`` edit. For each slot the bundled metadata gives 2026.02.2, a line
+``variable_modNN = <form>`` goes through ``ParamsLineReader``; the
+declaration's value is parsed, compared field by field with the form's
+expected value, formatted back to the identical text, and re-parsed to the
+same value. Separately, all fifteen slots of the real ``-q`` fixture, and
+every curated tuple default, read and write back unchanged.
+
+.. _dev-comet-parameter-enzymes:
+
+The enzyme table
+----------------
+
+``[COMET_ENZYME_INFO]`` is the last section of the file: Comet stops reading
+parameters at that line [C541]_ and reads every following line as a row.
+A row is ``number. name sense cut no-cut`` [EZ]_: the number, which the three
+``ENZYME_REFERENCE`` parameters refer to; a name with no spaces; the sense,
+``0`` to cleave N-terminal to (before) the cut residues and ``1`` C-terminal
+to (after) them; the cut residues; and the flanking no-cut residues, ``-``
+meaning none. A row whose cut and no-cut residues are both ``-`` means no
+enzyme -- non-specific cleavage [M1246]_. Comet reads the number with
+``"%d."`` [C657]_ and the row with ``"%lf %47s %d %19s %19s"`` [C662]_, so a
+name of more than 47 characters or residues of more than 19 misparse; those
+limits, the documented "numbers start at 0 and increase by 1" [EZ]_ (not
+enforced by the source), and residue letters are the validation package's.
+
+``EnzymeTableCodec`` reads rows into ``EnzymeDefinition`` values (number,
+name, ``Sense``, cut and no-cut residues with "none" held as the empty string
+and Comet's ``@`` kept as written) in an ``EnzymeTable``, which supports
+lookup by number, adding a custom enzyme and removing one. **A table that
+defines a number twice is refused**, naming the line: Comet's own loop reads
+every row and, for a referenced number, the *last* match silently wins
+[C654]_, so such a file does not mean what it appears to say.
+
+What is written is **exactly the columns ``comet -q`` writes** [C1177]_: the
+number and its full stop left-aligned in 4 characters, the name in 23, the
+sense in 7, the cut residues in 12, then the no-cut residues with no trailing
+space; a field as wide as its column or wider is followed by one space. Comet
+does not need the padding -- ``sscanf`` takes any white space -- but matching
+its own columns means the default table is written back **byte for byte**,
+which is what the double round trip of the real ``-q`` file (gate item 1)
+needs, and a custom row still lines up with Comet's. ``EnzymeTableCodecTest``
+reads the real fixture's twelve rows, checks their typed values, writes them
+back identical to the fixture's lines, adds a CONSTRUCTED ``12. Glu_C 1 DE P``
+that survives a round trip, and refuses a duplicate number. The header line
+and the blank line Comet writes after the rows are the file writer's.
+
+.. _dev-comet-parameter-other-kinds:
+
+The other structured kinds
+--------------------------
+
+Signed tolerance pair (``TolerancePair``)
+    ``peptide_mass_tolerance_lower`` and ``_upper`` as one value, each read as
+    one decimal [C454]_. The lower bound is normally negative -- the mass
+    error is experimental minus theoretical [TL]_ -- and its sign and scale
+    are kept as written. ``R-PARAM-04``'s own rule (``lower <= 0 <= upper``,
+    a warning otherwise) is the validation package's; the pair is never given
+    the generic ordering rule.
+
+Two values on one line (``IntegerRange``, ``DecimalRange``)
+    ``scan_range``, ``precursor_charge``, ``peptide_length_range`` (``%d %d``)
+    and ``digest_mass_range``, ``clear_mz_range`` (``%lf %lf``) [C486]_
+    [C308]_. Exactly two values are required where Comet would ignore a
+    third; they are written separated by one space. They are called first
+    and second, not minimum and maximum, because they are not always that
+    (``precursor_charge = 0 2`` searches every charge).
+
+Mass-offset list (``DecimalList``)
+    ``mass_offsets``, zero or more decimals; empty is a value, and Comet's
+    default. Values keep their order and scale. Comet 2026.02.2 drops
+    negative values and sorts the rest [C494]_, and -- an upstream defect
+    found by reading, not by running -- its loop advances to the next token
+    only when the current one reads as a number, so a non-numeric token never
+    ends it [C494]_. This codec refuses such a token.
+
+Ion-series family (``IonSeries``, ``IonSeriesSelection``)
+    ``use_A_ions`` .. ``use_Z1_ions`` as a set of series, plus ``use_NL_ions``
+    (water and ammonia losses of b and y, a plain boolean in the metadata,
+    not a series) as a separate flag, all read as integers by Comet [C407]_.
+    Each is ``0`` or ``1``, which is all the documentation allows [IA]_; the
+    family is read as a whole and written back in ``-q`` order. A test holds
+    the enum equal to the metadata's ``ION_SERIES_FLAG`` parameters.
+
+Citations
+---------
+
+Comet's documentation, 2026.02 page set, fetched 2026-10-02:
+
+.. [VM] https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html
+.. [EZ] https://uwpr.github.io/Comet/parameters/parameters_202602/search_enzyme_number.html
+.. [TL] https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_lower.html
+.. [IA] https://uwpr.github.io/Comet/parameters/parameters_202602/use_A_ions.html
+
+Comet's source at tag ``v2026.02.2``, file and line (``C`` is ``Comet.cpp``,
+``M`` ``CometSearch/CometSearchManager.cpp``, ``S``
+``CometSearch/CometSearch.cpp``, ``D`` ``CometSearch/CometData.h``, ``K``
+``CometSearch/core/Constants.h``):
+
+.. [C308] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L308-L319
+   -- ``parse_int_range`` and ``parse_double_range``.
+.. [C407] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L407-L414
+   -- the ion-series parameters, read with ``parse_int``.
+.. [C454] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L454-L455
+   -- the tolerance pair, read with ``parse_double``.
+.. [C486] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L486-L492
+   -- which parameters are ranges.
+.. [C494] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L494-L514
+   -- the ``mass_offsets`` handler.
+.. [C541] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L541-L542
+   -- parameters end at ``[COMET_ENZYME_INFO]``.
+.. [C552] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L552-L621
+   -- the tuple reader; line 552 its name rule.
+.. [C576] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L576-L583
+   -- exactly eight fields, or exit.
+.. [C589] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L589-L597
+   -- ``"%lf %31s %d %511s %d %d %d %s"``.
+.. [C600] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L600-L603
+   -- a comma in field 8 means two losses, ``"%lf,%lf"``.
+.. [C605] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L605-L611
+   -- a comma in field 4 means ``min,max``.
+.. [C654] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L654-L688
+   -- the enzyme loop.
+.. [C657] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L657
+   -- the row number, ``"%d."``.
+.. [C662] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L662-L667
+   -- the row, ``"%lf %47s %d %19s %19s"``.
+.. [C971] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L971-L973
+   -- the ``-q`` comment above the slots.
+.. [C1177] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L1177-L1190
+   -- the default table ``-q`` writes.
+.. [M518] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L518-L532
+   -- only ``variable_mod01`` to ``variable_mod15`` are used.
+.. [M1246] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1246-L1264
+   -- cut and no-cut both ``-`` is no enzyme.
+.. [M1368] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1368-L1369
+   -- a zero mass leaves a slot unused.
+.. [M1380] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1380-L1396
+   -- ``n`` and ``c`` in the residue token.
+.. [M1398] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1398-L1399
+   -- any non-zero group is binary.
+.. [M1401] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1401-L1402
+   -- any positive requirement is required.
+.. [M1404] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1404-L1405
+   -- a zero first loss is none.
+.. [S1770] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L1770
+   -- a zero second loss is skipped.
+.. [S5375] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5375-L5390
+   -- the terminus codes 0 to 3.
+.. [S5881] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5881
+   -- only ``-1`` is exclusive.
+.. [S6874] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L6874-L6875
+   -- distance ``-2``.
+.. [D269] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometData.h#L269-L284
+   -- the ``VarMods`` defaults.
+.. [K80] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/core/Constants.h#L80
+   -- ``VMODS`` is 15.

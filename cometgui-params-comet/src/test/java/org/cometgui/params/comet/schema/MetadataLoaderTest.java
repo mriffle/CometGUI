@@ -93,6 +93,228 @@ class MetadataLoaderTest {
         assertEquals("2026.02 rev. 2 (6edec91)", record.marker().text());
         assertEquals("https://example.org/pages/", record.parameterPages());
         assertEquals("https://example.org/source/", record.source());
+        VariableModLayout layout = record.variableModTuple();
+        assertEquals("https://example.org/source/Comet.cpp", layout.source());
+        assertEquals(
+                List.of(
+                        VariableModField.MASS,
+                        VariableModField.RESIDUES,
+                        VariableModField.BINARY_GROUP,
+                        VariableModField.COUNT,
+                        VariableModField.TERMINAL_DISTANCE,
+                        VariableModField.TERMINUS,
+                        VariableModField.REQUIRED,
+                        VariableModField.NEUTRAL_LOSS),
+                layout.fields().stream().map(VariableModLayout.Entry::field).toList());
+        assertEquals(
+                List.of(false, false, false, true, false, false, false, true),
+                layout.fields().stream().map(VariableModLayout.Entry::acceptsPair).toList());
+    }
+
+    @Nested
+    @DisplayName("the variable-modification tuple layout")
+    class TupleLayout {
+
+        @SuppressWarnings("unchecked")
+        private Map<String, Object> layout(ConstructedMetadata doc) {
+            return (Map<String, Object>)
+                    ((Map<String, Object>) doc.list("versions").get(0)).get("variableModTuple");
+        }
+
+        @SuppressWarnings("unchecked")
+        private List<Object> fields(ConstructedMetadata doc) {
+            return (List<Object>) layout(doc).get("fields");
+        }
+
+        @SuppressWarnings("unchecked")
+        private Map<String, Object> field(ConstructedMetadata doc, int index) {
+            return (Map<String, Object>) fields(doc).get(index);
+        }
+
+        private void addTuple(ConstructedMetadata doc, String name, String value) {
+            doc.list("parameters")
+                    .add(
+                            new ConstructedMetadata.Builder(
+                                            name, "VARIABLE_MODS", "VARIABLE_MOD_TUPLE", value)
+                                    .serialization("TUPLE")
+                                    .validators("variable_mod_tuple")
+                                    .map());
+        }
+
+        @Test
+        void aMissingFieldListIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            layout(doc).remove("fields");
+            rejected(doc, "versions[0]", "fields", "is missing");
+        }
+
+        @Test
+        void anUnknownLayoutFieldIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            layout(doc).put("fieldCount", 8L);
+            rejected(doc, "versions[0]", "fieldCount", "is not a field this format has");
+        }
+
+        @Test
+        void aSourceThatIsNotHttpsIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            layout(doc).put("source", "Comet.cpp line 552");
+            rejected(doc, "versions[0]", "source", "is not an https:// reference");
+        }
+
+        @Test
+        void anEntryThatIsNotAnObjectIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            fields(doc).set(2, "BINARY_GROUP");
+            rejected(doc, "versions[0]", "variableModTuple.fields[2]", "must be a JSON object");
+        }
+
+        @Test
+        void anEntryWithAnUnknownMemberIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            field(doc, 0).put("since", "2026.02.2");
+            rejected(doc, "versions[0]", "since", "is not a field this format has");
+        }
+
+        @Test
+        void anUnknownTupleFieldIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            field(doc, 2).put("field", "BINARY");
+            rejected(doc, "versions[0]", "field", "\"BINARY\" is not one of");
+        }
+
+        @Test
+        void anUnknownFieldKindIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            field(doc, 2).put("kind", "WHOLE");
+            rejected(doc, "versions[0]", "kind", "\"WHOLE\" is not one of");
+        }
+
+        @Test
+        void aPairFlagThatIsNotABooleanIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            field(doc, 3).put("pair", "true");
+            rejected(doc, "versions[0]", "pair", "must be true or false");
+        }
+
+        @Test
+        void aKindThatIsNotTheFieldsKindIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            field(doc, 3).put("kind", "DECIMAL");
+            rejected(
+                    doc,
+                    "versions[0]",
+                    "variableModTuple",
+                    "field 4 (COUNT) is declared DECIMAL, and a count per peptide is INTEGER");
+        }
+
+        @Test
+        void aPairOnAFieldNoCometPairsIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            field(doc, 6).put("pair", true);
+            rejected(
+                    doc,
+                    "versions[0]",
+                    "variableModTuple",
+                    "field 7 (REQUIRED) is given a comma pair");
+        }
+
+        @Test
+        void aFieldListedTwiceIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            fields(doc).add(ConstructedMetadata.tupleField("COUNT", "INTEGER", true));
+            rejected(doc, "versions[0]", "variableModTuple", "field 9 (COUNT) is listed twice");
+        }
+
+        @Test
+        void aLayoutWithoutTheMassIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            fields(doc).remove(0);
+            rejected(doc, "versions[0]", "variableModTuple", "the layout has no MASS field");
+        }
+
+        @Test
+        void anEmptyLayoutIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            fields(doc).clear();
+            rejected(doc, "versions[0]", "variableModTuple", "the layout has no MASS field");
+        }
+
+        @Test
+        void aLayoutWithoutTheResiduesIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            fields(doc).remove(1);
+            rejected(doc, "versions[0]", "variableModTuple", "the layout has no RESIDUES field");
+        }
+
+        @Test
+        void aTupleSlotWithTheLayoutsFieldCountLoads() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            addTuple(doc, "variable_mod01", "15.9949 M 0 3 -1 0 0 0.0");
+            assertEquals(
+                    ValueKind.VARIABLE_MOD_TUPLE,
+                    doc.load().parameter("variable_mod01").orElseThrow().kind());
+        }
+
+        @Test
+        void aTupleDefaultWithTheWrongFieldCountIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            addTuple(doc, "variable_mod01", "15.9949 M 0 3 -1 0 0");
+            rejected(
+                    doc,
+                    "parameter \"variable_mod01\"",
+                    "default",
+                    "holds 7 fields, and the tuple layout of Comet 2026.02.2 has 8");
+        }
+
+        @Test
+        void aTupleDefaultForAVersionItDoesNotClaimIsNotCounted() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            Map<String, Object> older = new java.util.LinkedHashMap<>();
+            older.put("version", "2025.03.1");
+            older.put("marker", "2025.03 rev. 1");
+            older.put("parameterPages", "https://example.org/older/");
+            older.put("source", "https://example.org/older-source/");
+            Map<String, Object> sevenFields = ConstructedMetadata.tupleLayout();
+            ((List<?>) sevenFields.get("fields")).remove(7);
+            older.put("variableModTuple", sevenFields);
+            doc.list("versions").add(older);
+            addTuple(doc, "variable_mod01", "15.9949 M 0 3 -1 0 0 0.0");
+            CuratedMetadata metadata = doc.load();
+            assertEquals(
+                    7,
+                    metadata.version(ToolVersion.parse("2025.03.1"))
+                            .orElseThrow()
+                            .variableModTuple()
+                            .fields()
+                            .size());
+        }
+
+        @Test
+        void aTupleUnderAnotherNameIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            addTuple(doc, "variable_mod1", "15.9949 M 0 3 -1 0 0 0.0");
+            rejected(
+                    doc,
+                    "parameter \"variable_mod1\"",
+                    "kind",
+                    "Comet reads a tuple only under a variable_modNN name");
+        }
+
+        @Test
+        void aSlotNameOfAnotherKindIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.list("parameters")
+                    .add(
+                            new ConstructedMetadata.Builder(
+                                            "variable_mod16", "VARIABLE_MODS", "STRING", "x")
+                                    .map());
+            rejected(
+                    doc,
+                    "parameter \"variable_mod16\"",
+                    "kind",
+                    "is STRING, and Comet reads every variable_modNN as a tuple");
+        }
     }
 
     @Nested
@@ -202,10 +424,17 @@ class MetadataLoaderTest {
         }
 
         @Test
-        void aTupleLayoutThisLoaderCannotReadIsRejected() {
+        void aTupleLayoutThatIsNotAnObjectIsRejected() {
             ConstructedMetadata doc = ConstructedMetadata.valid();
             version(doc).put("variableModTuple", "mass residues ...");
-            rejected(doc, "versions[0]", "variableModTuple", "must be null");
+            rejected(doc, "versions[0]", "variableModTuple", "must be a JSON object");
+        }
+
+        @Test
+        void aNullTupleLayoutIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            version(doc).put("variableModTuple", null);
+            rejected(doc, "versions[0]", "variableModTuple", "must be a JSON object");
         }
 
         @Test

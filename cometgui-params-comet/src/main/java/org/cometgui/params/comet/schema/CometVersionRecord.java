@@ -22,17 +22,21 @@ import org.cometgui.domain.tools.ToolVersion;
 /**
  * The metadata's record of one Comet version it was curated against.
  *
- * <p>The variable-modification tuple layout is version-dependent and will be recorded here by the
- * structured value types; until then the metadata file carries {@code "variableModTuple": null} and
- * nothing else is accepted in that place.
+ * <p>The variable-modification tuple's field layout is version-dependent ({@code R-PARAM-09}), so
+ * it is recorded here, per version, as data the codec reads.
  *
  * @param version the version as the manifest spells it, such as {@code 2026.02.2}
  * @param marker how that release's binary spells itself on its {@code # comet_version} line
  * @param parameterPages the upstream parameter documentation for the release
  * @param source the upstream source tree at the release's tag
+ * @param variableModTuple the field layout of the release's variable-modification tuple
  */
 public record CometVersionRecord(
-        ToolVersion version, CometVersionMarker marker, String parameterPages, String source) {
+        ToolVersion version,
+        CometVersionMarker marker,
+        String parameterPages,
+        String source,
+        VariableModLayout variableModTuple) {
 
     /** Validates the components. */
     public CometVersionRecord {
@@ -40,5 +44,6 @@ public record CometVersionRecord(
         Objects.requireNonNull(marker, "marker");
         Objects.requireNonNull(parameterPages, "parameterPages");
         Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(variableModTuple, "variableModTuple");
     }
 }

@@ -43,7 +43,7 @@ final class ConstructedMetadata {
         version.put("marker", "2026.02 rev. 2 (6edec91)");
         version.put("parameterPages", "https://example.org/pages/");
         version.put("source", "https://example.org/source/");
-        version.put("variableModTuple", null);
+        version.put("variableModTuple", tupleLayout());
         List<Object> categories = new ArrayList<>();
         for (ParameterCategory category : ParameterCategory.values()) {
             Map<String, Object> entry = new LinkedHashMap<>();
@@ -113,6 +113,34 @@ final class ConstructedMetadata {
         doc.root.put("internal", new ArrayList<>(List.of(internal)));
         doc.root.put("parameters", parameters);
         return doc;
+    }
+
+    /**
+     * A tuple layout of the 2026.02.2 shape, CONSTRUCTED here as test input: eight fields, pairs on
+     * the count and the neutral loss.
+     */
+    static Map<String, Object> tupleLayout() {
+        Map<String, Object> layout = new LinkedHashMap<>();
+        layout.put("source", "https://example.org/source/Comet.cpp");
+        List<Object> fields = new ArrayList<>();
+        fields.add(tupleField("MASS", "DECIMAL", false));
+        fields.add(tupleField("RESIDUES", "RESIDUES", false));
+        fields.add(tupleField("BINARY_GROUP", "INTEGER", false));
+        fields.add(tupleField("COUNT", "INTEGER", true));
+        fields.add(tupleField("TERMINAL_DISTANCE", "INTEGER", false));
+        fields.add(tupleField("TERMINUS", "INTEGER", false));
+        fields.add(tupleField("REQUIRED", "INTEGER", false));
+        fields.add(tupleField("NEUTRAL_LOSS", "DECIMAL", true));
+        layout.put("fields", fields);
+        return layout;
+    }
+
+    static Map<String, Object> tupleField(String field, String kind, Object pair) {
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("field", field);
+        entry.put("kind", kind);
+        entry.put("pair", pair);
+        return entry;
     }
 
     /** The document's top level, to be changed in place. */
