@@ -21,7 +21,9 @@
  * <p>{@link org.cometgui.params.comet.parser.ParamsLineReader} is the one place that knows how a
  * comet.params line is shaped: it classifies every line (version marker, comment, blank,
  * declaration, enzyme-table header and rows, malformed with its line number) and interprets
- * nothing. Schema discovery reads it today; the typed parser is built on it. Phase 06 (Comet
- * parameter model).
+ * nothing. Schema discovery reads it, and so does {@link
+ * org.cometgui.params.comet.parser.CometParamsParser}, which turns a whole file into the typed
+ * model all or nothing: errors yield no model, warnings travel on it. Phase 06 (Comet parameter
+ * model).
  */
 package org.cometgui.params.comet.parser;

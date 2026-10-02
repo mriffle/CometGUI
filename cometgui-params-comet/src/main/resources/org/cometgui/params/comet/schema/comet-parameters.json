@@ -113,6 +113,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Path to the protein or nucleotide FASTA file to search, or to a Comet .idx index built from one. Comet has no default; the value -q writes is a placeholder.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/database_name.html",
       "versions": {
         "from": "2026.02.2",
@@ -157,6 +158,7 @@
         }
       ],
       "shortHelp": "Whether Comet generates reversed decoy peptides itself, and whether targets and decoys compete for one result per spectrum or are reported separately.",
+      "inlineComment": "0=no (default), 1=internal decoy concatenated, 2=internal decoy separate",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/decoy_search.html",
       "versions": {
         "from": "2026.02.2",
@@ -196,6 +198,7 @@
         }
       ],
       "shortHelp": "Used only when database_name names an .idx file that does not exist yet and is built from its FASTA: chooses whether that index is a peptide index or a fragment-ion index. An existing .idx records its own type and this value is then ignored. New in 2026.02.2.",
+      "inlineComment": "0=peptide index (PI_DB), 1=fragment ion index (FI_DB, default)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/index_search_type.html",
       "versions": {
         "from": "2026.02.2",
@@ -225,6 +228,7 @@
       "max": "128",
       "choices": [],
       "shortHelp": "Number of search threads. 0 uses one thread per CPU core; a negative value uses that many fewer than the core count. The NSLOTS environment variable, when set, overrides it.",
+      "inlineComment": "0=poll CPU to set num threads; else specify num threads directly (max 128)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/num_threads.html",
       "versions": {
         "from": "2026.02.2",
@@ -278,6 +282,7 @@
         }
       ],
       "shortHelp": "Whether database_name is plain FASTA or PEFF, and which PEFF annotations (modifications, amino-acid variants, or both) are searched.",
+      "inlineComment": "0=no (normal fasta, default), 1=PEFF PSI-MOD, 2=PEFF Unimod",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peff_format.html",
       "versions": {
         "from": "2026.02.2",
@@ -309,6 +314,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Path to the PSI-MOD or Unimod OBO file that defines the modifications named in a PEFF database. Ignored when peff_format is 0; empty means no file.",
+      "inlineComment": "path to PSI Mod or Unimod OBO file",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peff_obo.html",
       "versions": {
         "from": "2026.02.2",
@@ -337,6 +343,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Path to a text file of masses, one per line, used for a multi-modification search on 'J' residues. Empty means no file. Comet's parameter pages for 2026.02 do not describe it; this text follows the comment -q writes and the source.",
+      "inlineComment": "path to compound mods mass file, one mass per line, for multi-mod search on 'J' residues",
       "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L936",
       "versions": {
         "from": "2026.02.2",
@@ -365,6 +372,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Path to a spectral library. Not described on Comet's 2026.02 parameter pages; the value -q writes is a placeholder.",
+      "inlineComment": null,
       "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L937",
       "versions": {
         "from": "2026.02.2",
@@ -406,6 +414,7 @@
         }
       ],
       "shortHelp": "MS level of the spectral-library spectra. Caution: Comet 2026.02.2 writes this name with -q, but its own parameter reader looks for speclib_ms_level and its search code for spectraL_library_ms_level, so a value given under this name is ignored by that release.",
+      "inlineComment": "ignored by Comet 2026.02.2, which reads speclib_ms_level instead",
       "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L938",
       "versions": {
         "from": "2026.02.2",
@@ -433,6 +442,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Upper edge of the precursor mass window, in peptide_mass_units. Mass error is experimental minus theoretical, so this is normally positive.",
+      "inlineComment": "upper bound of the precursor mass tolerance",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_upper.html",
       "versions": {
         "from": "2026.02.2",
@@ -466,6 +476,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Lower edge of the precursor mass window, in peptide_mass_units. It is normally negative; a same-signed window is legal but deliberate (for example an open-modification search).",
+      "inlineComment": "lower bound of the precursor mass tolerance; USUALLY NEGATIVE TO BE LOWER THAN 0",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_lower.html",
       "versions": {
         "from": "2026.02.2",
@@ -512,6 +523,7 @@
         }
       ],
       "shortHelp": "Units of the two precursor tolerance bounds.",
+      "inlineComment": "0=amu, 1=mmu, 2=ppm",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_units.html",
       "versions": {
         "from": "2026.02.2",
@@ -552,6 +564,7 @@
         }
       ],
       "shortHelp": "Whether an amu or mmu tolerance is applied to the singly protonated peptide mass or to the precursor m/z. Ignored for ppm tolerances.",
+      "inlineComment": "0=MH+ (default), 1=precursor m/z; only valid for amu/mmu tolerances",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/precursor_tolerance_type.html",
       "versions": {
         "from": "2026.02.2",
@@ -614,6 +627,7 @@
         }
       ],
       "shortHelp": "Lets a narrow precursor tolerance still match when the instrument picked a 13C isotope peak rather than the monoisotopic one, by also searching the listed isotope offsets. The source accepts 0 to 7; the comment -q writes lists only 0 to 5.",
+      "inlineComment": "0=off, 1=0/1 (C13 error), 2=0/1/2, 3=0/1/2/3, 4=-1/0/1/2/3, 5=-1/0/1, 6=-3 to +3, 7=-8/-4/0/+4/+8",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/isotope_error.html",
       "versions": {
         "from": "2026.02.2",
@@ -653,6 +667,7 @@
         }
       ],
       "shortHelp": "Whether peptide (precursor) masses are calculated from average or monoisotopic element masses.",
+      "inlineComment": "0=average masses, 1=monoisotopic masses",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/mass_type_parent.html",
       "versions": {
         "from": "2026.02.2",
@@ -690,6 +705,7 @@
         }
       ],
       "shortHelp": "Whether fragment-ion masses are calculated from average or monoisotopic element masses.",
+      "inlineComment": "0=average masses, 1=monoisotopic masses",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/mass_type_fragment.html",
       "versions": {
         "from": "2026.02.2",
@@ -718,6 +734,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Number of the enzyme, in the [COMET_ENZYME_INFO] table at the end of the file, whose cleavage rule generates candidate peptides.",
+      "inlineComment": "choose from list at end of this params file",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/search_enzyme_number.html",
       "versions": {
         "from": "2026.02.2",
@@ -751,6 +768,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Optional second enzyme from the [COMET_ENZYME_INFO] table, applied together with the first. 0 means no second enzyme.",
+      "inlineComment": "second enzyme; set to 0 if no second enzyme",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/search_enzyme2_number.html",
       "versions": {
         "from": "2026.02.2",
@@ -782,6 +800,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Enzyme recorded in pepXML as the one applied to the sample; it does not change the search. Useful when the search enzyme differs, for example a non-specific search of a tryptic digest.",
+      "inlineComment": "specifies the sample enzyme which is possibly different than the one applied to the search;",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/sample_enzyme_number.html",
       "versions": {
         "from": "2026.02.2",
@@ -828,6 +847,7 @@
         }
       ],
       "shortHelp": "How many peptide termini must follow the search enzyme's rule: both (fully specific), at least one (semi-specific), or one named terminus.",
+      "inlineComment": "1 (semi-digested), 2 (fully digested, default), 8 C-term unspecific , 9 N-term unspecific",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/num_enzyme_termini.html",
       "versions": {
         "from": "2026.02.2",
@@ -859,6 +879,7 @@
       "max": "5",
       "choices": [],
       "shortHelp": "Maximum number of internal cleavage sites the enzyme skipped within one peptide. Not applied to a non-specific search. The comment -q writes gives 5 as the maximum.",
+      "inlineComment": "maximum value is 5; for enzyme search",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/allowed_missed_cleavage.html",
       "versions": {
         "from": "2026.02.2",
@@ -886,6 +907,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -918,6 +940,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -950,6 +973,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -982,6 +1006,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1014,6 +1039,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1046,6 +1072,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1078,6 +1105,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1110,6 +1138,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1142,6 +1171,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1174,6 +1204,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1206,6 +1237,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1238,6 +1270,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1270,6 +1303,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1302,6 +1336,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1334,6 +1369,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "One variable modification as eight fields: mass difference, residues (n and c for termini), binary group, maximum or min,max count per peptide, distance from a terminus, which terminus, required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
       "versions": {
         "from": "2026.02.2",
@@ -1366,6 +1402,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Upper limit on the total number of variably modified residues in one peptide, across all variable-modification slots. 0 allows none.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/max_variable_mods_in_peptide.html",
       "versions": {
         "from": "2026.02.2",
@@ -1393,6 +1430,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "When on, only peptides carrying at least one variable modification are analysed.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/require_variable_mod.html",
       "versions": {
         "from": "2026.02.2",
@@ -1421,6 +1459,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Path to a text file pairing variable-modification slot numbers with protein accession substrings, so that a slot is applied only to matching proteins. Empty means no restriction.",
+      "inlineComment": "limit variable mods to subset of specified proteins if this file is specified & present",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/protein_modslist_file.html",
       "versions": {
         "from": "2026.02.2",
@@ -1448,6 +1487,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Width of the m/z bins MS/MS peaks are stored in, which acts as the fragment tolerance. About 0.02 suits high-resolution MS/MS and about 1.0005 ion-trap MS/MS; narrower bins use more memory. Comet's minimum is 0.01.",
+      "inlineComment": "binning to use on fragment ions",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_tol.html",
       "versions": {
         "from": "2026.02.2",
@@ -1477,6 +1517,7 @@
       "max": "1.0",
       "choices": [],
       "shortHelp": "Where each fragment bin starts, as a fraction (0.0 to 1.0) of the bin width. 0.0 goes with high-resolution 0.02 bins and 0.4 with ion-trap 1.0005 bins.",
+      "inlineComment": "offset position to start the binning (0.0 to 1.0)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragment_bin_offset.html",
       "versions": {
         "from": "2026.02.2",
@@ -1512,6 +1553,7 @@
         }
       ],
       "shortHelp": "Whether the fast correlation score also counts half of each neighbouring bin's intensity. Flanking bins suit narrow bins; the central bin alone suits very coarse (about 1 Da) bins.",
+      "inlineComment": "0=use flanking peaks, 1=M peak only",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/theoretical_fragment_ions.html",
       "versions": {
         "from": "2026.02.2",
@@ -1540,6 +1582,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether a-type fragment ions are considered when scoring.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_A_ions.html",
       "versions": {
         "from": "2026.02.2",
@@ -1573,6 +1616,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether b-type fragment ions are considered when scoring.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_B_ions.html",
       "versions": {
         "from": "2026.02.2",
@@ -1606,6 +1650,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether c-type fragment ions are considered when scoring.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_C_ions.html",
       "versions": {
         "from": "2026.02.2",
@@ -1639,6 +1684,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether x-type fragment ions are considered when scoring.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_X_ions.html",
       "versions": {
         "from": "2026.02.2",
@@ -1672,6 +1718,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether y-type fragment ions are considered when scoring.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_Y_ions.html",
       "versions": {
         "from": "2026.02.2",
@@ -1705,6 +1752,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether z-type fragment ions are considered when scoring.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_Z_ions.html",
       "versions": {
         "from": "2026.02.2",
@@ -1738,6 +1786,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether z-dot + 1 fragment ions, typical of ETD and ECD spectra, are considered when scoring.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_Z1_ions.html",
       "versions": {
         "from": "2026.02.2",
@@ -1771,6 +1820,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether b and y ions that lost NH3 or H2O are also scored; Comet applies this to singly charged fragments only.",
+      "inlineComment": "0=no, 1=yes to consider NH3/H2O neutral loss peaks",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/use_NL_ions.html",
       "versions": {
         "from": "2026.02.2",
@@ -1798,6 +1848,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "A candidate must match at least this many fragment-index peaks to be scored by xcorr. Scoring more candidates fills out the score histogram used for E-values.",
+      "inlineComment": "minimum number of matched fragment ion index peaks for scoring",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_min_ions_score.html",
       "versions": {
         "from": "2026.02.2",
@@ -1823,6 +1874,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "A candidate must match at least this many fragment-index peaks to be reported; normally equal to or larger than fragindex_min_ions_score.",
+      "inlineComment": "minimum number of matched fragment ion index peaks for reporting(>= fragindex_min_ions_score)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_min_ions_report.html",
       "versions": {
         "from": "2026.02.2",
@@ -1848,6 +1900,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Number of most intense binned peaks from each spectrum queried against the fragment index. More peaks are slower; too few can lose correct peptides. Configurable from 2026.02.0.",
+      "inlineComment": "number of peaks from spectrum to use for fragment ion index matching",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_num_spectrumpeaks.html",
       "versions": {
         "from": "2026.02.2",
@@ -1873,6 +1926,7 @@
       "max": "2000.0",
       "choices": [],
       "shortHelp": "Smallest singly charged fragment mass put into the fragment index. Comet ignores a value outside 200 to 2000.",
+      "inlineComment": "low mass cutoff for fragment ions",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_min_fragmentmass.html",
       "versions": {
         "from": "2026.02.2",
@@ -1898,6 +1952,7 @@
       "max": "2000.0",
       "choices": [],
       "shortHelp": "Largest singly charged fragment mass put into the fragment index. Comet ignores a value outside 200 to 2000.",
+      "inlineComment": "high mass cutoff for fragment ions",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_max_fragmentmass.html",
       "versions": {
         "from": "2026.02.2",
@@ -1923,6 +1978,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "When off, Comet first reads every precursor mass in the inputs and indexes only peptides that could match one; when on (the default), it indexes every peptide in digest_mass_range.",
+      "inlineComment": "0=read precursors to limit fragment ion index, 1=skip reading precursors (default)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/fragindex_skipreadprecursors.html",
       "versions": {
         "from": "2026.02.2",
@@ -1948,6 +2004,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether results are also written as an .sqt file.",
+      "inlineComment": "0=no, 1=yes  write sqt file",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_sqtfile.html",
       "versions": {
         "from": "2026.02.2",
@@ -1987,6 +2044,7 @@
         }
       ],
       "shortHelp": "Whether results are also written as a tab-delimited .txt file. The comment -q writes offers 2 for a Crux-formatted file; the 2026.02.2 parameter code treats any non-zero value as 'write'.",
+      "inlineComment": "0=no, 1=yes  write tab-delimited txt file (2026.02.2 treats 2 as 1)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_txtfile.html",
       "versions": {
         "from": "2026.02.2",
@@ -2014,6 +2072,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether results are written as pepXML. The CometGUI workflow requires it.",
+      "inlineComment": "0=no, 1=yes  write pepXML file",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_pepxmlfile.html",
       "versions": {
         "from": "2026.02.2",
@@ -2056,6 +2115,7 @@
         }
       ],
       "shortHelp": "Whether results are also written as mzIdentML, optionally with protein sequences.",
+      "inlineComment": "0=no, 1=yes  write mzIdentML file",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_mzidentmlfile.html",
       "versions": {
         "from": "2026.02.2",
@@ -2083,6 +2143,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Whether a Percolator .pin file is written. The CometGUI workflow requires it, because Percolator rescoring reads it.",
+      "inlineComment": "0=no, 1=yes  write Percolator pin file",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/output_percolatorfile.html",
       "versions": {
         "from": "2026.02.2",
@@ -2114,6 +2175,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "In SQT output only, whether the E-value replaces the preliminary Sp score column.",
+      "inlineComment": "0=no, 1=yes to replace Sp with expect in out & sqt",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/print_expect_score.html",
       "versions": {
         "from": "2026.02.2",
@@ -2170,6 +2232,7 @@
         }
       ],
       "shortHelp": "Whether the AScorePro site-localisation algorithm is run on each top hit, and for which variable modification. Upstream calls it experimental outside phosphorylation; a confident localisation can replace Comet's top-ranked peptide.",
+      "inlineComment": "0=no, 0 to 5 to localize variable_mod01 to _mod05; -1 to localize all variable mods",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/print_ascorepro_score.html",
       "versions": {
         "from": "2026.02.2",
@@ -2200,6 +2263,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "How many top-ranked peptides are reported for each spectrum.",
+      "inlineComment": "num peptide results to show",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/num_output_lines.html",
       "versions": {
         "from": "2026.02.2",
@@ -2226,6 +2290,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "First and last scan number to search, inclusive. 0 for either end leaves it open; 0 0 searches the whole file.",
+      "inlineComment": "start and end scan range to search; either entry can be set independently",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/scan_range.html",
       "versions": {
         "from": "2026.02.2",
@@ -2251,6 +2316,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Charge states to try for spectra whose precursor charge is unknown. A first value of 0 disables it; known charges are kept unless override_charge says otherwise.",
+      "inlineComment": "precursor charge range to analyze; does not override any existing charge; 0 as 1st entry ignores parameter",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/precursor_charge.html",
       "versions": {
         "from": "2026.02.2",
@@ -2298,6 +2364,7 @@
         }
       ],
       "shortHelp": "How charges recorded in the input files interact with precursor_charge.",
+      "inlineComment": "0=no, 1=override precursor charge states, 2=ignore precursor charges outside precursor_charge range, 3=see online",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/override_charge.html",
       "versions": {
         "from": "2026.02.2",
@@ -2334,6 +2401,7 @@
         }
       ],
       "shortHelp": "Whether MS2 or MS3 scans are searched (mzXML, mzML and mz5 inputs).",
+      "inlineComment": "MS level to analyze, valid are levels 2 (default) or 3",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/ms_level.html",
       "versions": {
         "from": "2026.02.2",
@@ -2397,6 +2465,7 @@
         }
       ],
       "shortHelp": "Searches only spectra acquired with this activation method (mzXML, mzML and mz5 inputs); ALL applies no filter.",
+      "inlineComment": "activation method; used if activation method set; allowed ALL, CID, ECD, ETD, ETD+SA, PQD, HCD, IRMPD, SID",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/activation_method.html",
       "versions": {
         "from": "2026.02.2",
@@ -2425,6 +2494,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Lowest and highest singly protonated peptide mass considered; spectra outside it are not searched.",
+      "inlineComment": "MH+ peptide mass range to analyze",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/digest_mass_range.html",
       "versions": {
         "from": "2026.02.2",
@@ -2453,6 +2523,7 @@
       "max": "50",
       "choices": [],
       "shortHelp": "Shortest and longest peptide, in residues, that is analysed. Comet 2026.02.2 analyses at most 50 residues.",
+      "inlineComment": "minimum and maximum peptide length to analyze (default min 1 to allowed max 51)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_length_range.html",
       "versions": {
         "from": "2026.02.2",
@@ -2481,6 +2552,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Text placed between protein names in the Proteins column of the Percolator .pin file. Empty keeps Comet's default, a tab.",
+      "inlineComment": "blank = default 'tab' delimiter between proteins; enter a char/string to use in place of the tab; Percolator pin output only",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/pinfile_protein_delimiter.html",
       "versions": {
         "from": "2026.02.2",
@@ -2508,6 +2580,7 @@
       "max": "100",
       "choices": [],
       "shortHelp": "How many peptides Comet keeps internally per spectrum, which bounds the range of the Sp rank. Comet raises it to one more than num_output_lines if needed.",
+      "inlineComment": "number of results to store internally for Sp rank only; if Sp rank is not used, set this to num_output_lines",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/num_results.html",
       "versions": {
         "from": "2026.02.2",
@@ -2533,6 +2606,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "How many proteins besides the first are reported for a peptide found in several; -1 reports all of them.",
+      "inlineComment": "maximum number of additional duplicate protein names to report for each peptide ID; -1 reports all duplicates",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/max_duplicate_proteins.html",
       "versions": {
         "from": "2026.02.2",
@@ -2560,6 +2634,7 @@
       "max": "5",
       "choices": [],
       "shortHelp": "Highest fragment-ion charge considered; fragments are still limited to below the precursor charge. Comet enforces at most 5.",
+      "inlineComment": "set maximum fragment charge state to analyze (allowed max 5)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/max_fragment_charge.html",
       "versions": {
         "from": "2026.02.2",
@@ -2586,6 +2661,7 @@
       "max": "9",
       "choices": [],
       "shortHelp": "Spectra with a lower precursor charge are not searched.",
+      "inlineComment": "set minimum precursor charge state to analyze (1 if missing)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/min_precursor_charge.html",
       "versions": {
         "from": "2026.02.2",
@@ -2613,6 +2689,7 @@
       "max": "9",
       "choices": [],
       "shortHelp": "Spectra with a higher precursor charge are not searched. Comet enforces at most 9.",
+      "inlineComment": "set maximum precursor charge state to analyze (allowed max 9)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/max_precursor_charge.html",
       "versions": {
         "from": "2026.02.2",
@@ -2641,6 +2718,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "When on, a protein starting with methionine is also digested as if that methionine had been removed, and N-terminal modifications apply to the shortened form.",
+      "inlineComment": "0=leave protein sequences as-is; 1=also consider sequence w/o N-term methionine",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/clip_nterm_methionine.html",
       "versions": {
         "from": "2026.02.2",
@@ -2667,6 +2745,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Load and search about this many spectra at a time to bound memory; 0 loads every spectrum at once.",
+      "inlineComment": "max. # of spectra to search at a time; 0 to search the entire scan range in one loop",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/spectrum_batch_size.html",
       "versions": {
         "from": "2026.02.2",
@@ -2694,6 +2773,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Text prepended to the protein name of decoy matches. With an internal decoy search Comet adds it; Percolator and downstream tools use it to tell decoys from targets.",
+      "inlineComment": "decoy entries are denoted by this string which is pre-pended to each protein accession",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/decoy_prefix.html",
       "versions": {
         "from": "2026.02.2",
@@ -2721,6 +2801,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "When on, peptides that differ only by I versus L count as one identification, since low-energy fragmentation cannot tell them apart.",
+      "inlineComment": "0=treat I and L as different; 1=treat I and L as same",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/equal_I_and_L.html",
       "versions": {
         "from": "2026.02.2",
@@ -2746,6 +2827,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Zero or more non-negative masses subtracted from each precursor mass before matching, for labels that fall off before fragmentation. Include 0.0 to keep the unshifted mass too. Empty means none.",
+      "inlineComment": "one or more mass offsets to search (values substracted from deconvoluted precursor mass)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/mass_offsets.html",
       "versions": {
         "from": "2026.02.2",
@@ -2773,6 +2855,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Spectra with fewer peaks (after clear_mz_range, before other processing) are not searched.",
+      "inlineComment": "required minimum number of peaks in spectrum to search (default 10)",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/minimum_peaks.html",
       "versions": {
         "from": "2026.02.2",
@@ -2801,6 +2884,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Peaks below this absolute intensity are dropped when spectra are read; Comet treats a negative value as 0.",
+      "inlineComment": "minimum intensity value to read in",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/minimum_intensity.html",
       "versions": {
         "from": "2026.02.2",
@@ -2845,6 +2929,7 @@
         }
       ],
       "shortHelp": "Which precursor-derived peaks are removed from each MS/MS spectrum before searching.",
+      "inlineComment": "0=no, 1=yes, 2=all charge reduced precursor peaks (for ETD), 3=phosphate neutral loss peaks",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/remove_precursor_peak.html",
       "versions": {
         "from": "2026.02.2",
@@ -2872,6 +2957,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Half-width in daltons of the window removed around each precursor peak when remove_precursor_peak is on; must be positive.",
+      "inlineComment": "+- Da tolerance for precursor removal",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/remove_precursor_tolerance.html",
       "versions": {
         "from": "2026.02.2",
@@ -2897,6 +2983,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "All peaks between these two m/z values are removed before searching, for example TMT or iTRAQ reporter ions; 0.0 0.0 clears nothing.",
+      "inlineComment": "clear out all peaks in the specified m/z range e.g. remove reporter ion region of TMT spectra",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/clear_mz_range.html",
       "versions": {
         "from": "2026.02.2",
@@ -2926,6 +3013,7 @@
       "max": "1.0",
       "choices": [],
       "shortHelp": "Peaks weaker than this fraction (0.0 to 1.0) of the base peak are dropped; 0.0 disables it.",
+      "inlineComment": "specify a percentage (e.g. \"0.05\" for 5%) of the base peak intensity as a minimum intensity threshold",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/percentage_base_peak.html",
       "versions": {
         "from": "2026.02.2",
@@ -2954,6 +3042,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to the C-terminus of every peptide. 0.0 means no modification.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Cterm_peptide.html",
       "versions": {
         "from": "2026.02.2",
@@ -2979,6 +3068,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to the N-terminus of every peptide. 0.0 means no modification.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Nterm_peptide.html",
       "versions": {
         "from": "2026.02.2",
@@ -3004,6 +3094,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to the C-terminus of each protein's C-terminal peptide. 0.0 means no modification.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Cterm_protein.html",
       "versions": {
         "from": "2026.02.2",
@@ -3029,6 +3120,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to the N-terminus of each protein's N-terminal peptide. 0.0 means no modification.",
+      "inlineComment": null,
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Nterm_protein.html",
       "versions": {
         "from": "2026.02.2",
@@ -3054,6 +3146,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every glycine (G) residue; 0.0 means no modification.",
+      "inlineComment": "added to G - avg.  57.0513, mono.  57.02146",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_G_glycine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3079,6 +3172,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every alanine (A) residue; 0.0 means no modification.",
+      "inlineComment": "added to A - avg.  71.0779, mono.  71.03711",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_A_alanine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3104,6 +3198,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every serine (S) residue; 0.0 means no modification.",
+      "inlineComment": "added to S - avg.  87.0773, mono.  87.03203",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_S_serine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3129,6 +3224,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every proline (P) residue; 0.0 means no modification.",
+      "inlineComment": "added to P - avg.  97.1152, mono.  97.05276",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_P_proline.html",
       "versions": {
         "from": "2026.02.2",
@@ -3154,6 +3250,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every valine (V) residue; 0.0 means no modification.",
+      "inlineComment": "added to V - avg.  99.1311, mono.  99.06841",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_V_valine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3179,6 +3276,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every threonine (T) residue; 0.0 means no modification.",
+      "inlineComment": "added to T - avg. 101.1038, mono. 101.04768",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_T_threonine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3204,6 +3302,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every cysteine (C) residue. -q writes 57.021464, carbamidomethylation by iodoacetamide; 0.0 means no modification.",
+      "inlineComment": "added to C - avg. 103.1429, mono. 103.00918",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_C_cysteine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3232,6 +3331,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every leucine (L) residue; 0.0 means no modification.",
+      "inlineComment": "added to L - avg. 113.1576, mono. 113.08406",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_L_leucine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3257,6 +3357,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every isoleucine (I) residue; 0.0 means no modification.",
+      "inlineComment": "added to I - avg. 113.1576, mono. 113.08406",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_I_isoleucine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3282,6 +3383,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every asparagine (N) residue; 0.0 means no modification.",
+      "inlineComment": "added to N - avg. 114.1026, mono. 114.04293",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_N_asparagine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3307,6 +3409,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every aspartic acid (D) residue; 0.0 means no modification.",
+      "inlineComment": "added to D - avg. 115.0874, mono. 115.02694",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_D_aspartic_acid.html",
       "versions": {
         "from": "2026.02.2",
@@ -3332,6 +3435,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every glutamine (Q) residue; 0.0 means no modification.",
+      "inlineComment": "added to Q - avg. 128.1292, mono. 128.05858",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Q_glutamine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3357,6 +3461,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every lysine (K) residue; 0.0 means no modification.",
+      "inlineComment": "added to K - avg. 128.1723, mono. 128.09496",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_K_lysine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3382,6 +3487,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every glutamic acid (E) residue; 0.0 means no modification.",
+      "inlineComment": "added to E - avg. 129.1140, mono. 129.04259",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_E_glutamic_acid.html",
       "versions": {
         "from": "2026.02.2",
@@ -3407,6 +3513,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every methionine (M) residue; 0.0 means no modification.",
+      "inlineComment": "added to M - avg. 131.1961, mono. 131.04048",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_M_methionine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3432,6 +3539,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every histidine (H) residue; 0.0 means no modification.",
+      "inlineComment": "added to H - avg. 137.1393, mono. 137.05891",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_H_histidine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3457,6 +3565,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every phenylalanine (F) residue; 0.0 means no modification.",
+      "inlineComment": "added to F - avg. 147.1739, mono. 147.06841",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_F_phenylalanine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3482,6 +3591,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every selenocysteine (U) residue; 0.0 means no modification. Caution: Comet 2026.02.2 reads this name but applies the U static mass from add_U_user_amino_acid, a name -q does not write, so a value here has no effect in that release.",
+      "inlineComment": "added to U - avg. 150.0379, mono. 150.95363; ignored by Comet 2026.02.2",
       "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L812",
       "versions": {
         "from": "2026.02.2",
@@ -3507,6 +3617,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every arginine (R) residue; 0.0 means no modification.",
+      "inlineComment": "added to R - avg. 156.1857, mono. 156.10111",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_R_arginine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3532,6 +3643,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every tyrosine (Y) residue; 0.0 means no modification.",
+      "inlineComment": "added to Y - avg. 163.0633, mono. 163.06333",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Y_tyrosine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3557,6 +3669,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every tryptophan (W) residue; 0.0 means no modification.",
+      "inlineComment": "added to W - avg. 186.0793, mono. 186.07931",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_W_tryptophan.html",
       "versions": {
         "from": "2026.02.2",
@@ -3582,6 +3695,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Mass added to every pyrrolysine (O) residue; 0.0 means no modification.",
+      "inlineComment": "added to O - avg. 237.2982, mono  237.14773",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_O_pyrrolysine.html",
       "versions": {
         "from": "2026.02.2",
@@ -3607,6 +3721,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Residue mass for the letter B, which has no built-in mass: encode a custom residue as B in the FASTA and give its mass here. While it is 0.0, peptides containing B are not analysed.",
+      "inlineComment": "added to B - avg.   0.0000, mono.   0.00000",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_B_user_amino_acid.html",
       "versions": {
         "from": "2026.02.2",
@@ -3632,6 +3747,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Residue mass for the letter J, which has no built-in mass: encode a custom residue as J in the FASTA and give its mass here. While it is 0.0, peptides containing J are not analysed.",
+      "inlineComment": "added to J - avg.   0.0000, mono.   0.00000",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_J_user_amino_acid.html",
       "versions": {
         "from": "2026.02.2",
@@ -3659,6 +3775,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Residue mass for the letter X, which has no built-in mass: encode a custom residue as X in the FASTA and give its mass here. While it is 0.0, peptides containing X are not analysed.",
+      "inlineComment": "added to X - avg.   0.0000, mono.   0.00000",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_X_user_amino_acid.html",
       "versions": {
         "from": "2026.02.2",
@@ -3684,6 +3801,7 @@
       "max": null,
       "choices": [],
       "shortHelp": "Residue mass for the letter Z, which has no built-in mass: encode a custom residue as Z in the FASTA and give its mass here. While it is 0.0, peptides containing Z are not analysed.",
+      "inlineComment": "added to Z - avg.   0.0000, mono.   0.00000",
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/add_Z_user_amino_acid.html",
       "versions": {
         "from": "2026.02.2",

@@ -12,8 +12,9 @@ Comet parameter schema
    schema provider (unit 2); the structured value types and their codecs --
    the variable-modification tuple with its layout taken from the metadata, the
    enzyme table, the tolerance pair, the ranges, the mass-offset list and the
-   ion-series family (unit 3). The typed parser and writer, validation,
-   presets, migration and the generator behind
+   ion-series family (unit 3); the typed model with value origins, the parser,
+   the canonical writer and write-once hashing (unit 4). Validation, presets,
+   migration and the generator behind
    :doc:`../reference/comet_parameters_generated` (``R-DOC-04``) are still to
    come; where this page mentions them it describes intent, not the product.
 
@@ -283,6 +284,7 @@ One parameter::
       "min": null, "max": null,              // strings, numeric kinds only
       "choices": [ { "value": "0", "label": "Off: monoisotopic mass only" }, ... ],
       "shortHelp": "...",                    // our words, not upstream's
+      "inlineComment": "0=off, 1=0/1 (C13 error), ...",  // or null; see below
       "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202602/isotope_error.html",
       "versions": { "from": "2026.02.2", "through": null },
       "serialization": "SINGLE_VALUE",       // a SerializationRule constant
@@ -301,7 +303,9 @@ integer enum; a default that is not one of its choices, not ``0``/``1`` for a
 flag, not a number of the right shape for a numeric kind, outside its own
 ``min``/``max``, empty where empty is not a value, or padded with white space;
 bounds on a non-numeric kind, or ``min`` above ``max``; a version range that
-does not start at a curated version or ends before it starts; a tolerance-pair
+does not start at a curated version or ends before it starts; an
+``inlineComment`` that is not a string or ``null``, is blank, holds a line
+break, or has white space at either end; a tolerance-pair
 member carrying the generic ``ordered_range`` rule (``R-PARAM-04``); a related
 parameter that is unknown, the parameter itself, or named twice; a help or
 source reference that is not ``https://``; an allow-list entry without a
@@ -315,6 +319,17 @@ are pairable); a layout without the mass difference or the residues; a
 parameter named ``variable_mod`` plus two digits that is not of kind
 ``VARIABLE_MOD_TUPLE``, or the other way round; and a tuple default whose
 field count differs from the layout of a version it claims.
+
+``inlineComment`` is the comment the canonical writer puts after the value on
+the parameter's own line (:ref:`dev-comet-parameter-canonical`), or ``null``
+for none. The starting text is Comet's own ``-q`` comment for the parameter,
+verbatim, for the 87 parameters that have one. Four are curated away from it
+because the ``-q`` text is wrong for 2026.02.2: ``isotope_error`` adds the
+values 6 and 7, ``output_txtfile`` drops the "2=Crux-formatted" that the
+parameter code treats as 1, and ``spectral_library_ms_level`` (which ``-q``
+writes without a comment) and ``add_U_selenocysteine`` say that Comet ignores
+them (both facts are below). It must be one line because it is written on one
+line, and unpadded because the reader trims it.
 
 Where the words come from
 -------------------------
@@ -742,6 +757,355 @@ Ion-series family (``IonSeries``, ``IonSeriesSelection``)
     family is read as a whole and written back in ``-q`` order. A test holds
     the enum equal to the metadata's ``ION_SERIES_FLAG`` parameters.
 
+.. _dev-comet-parameter-model:
+
+The typed model
+===============
+
+Package ``org.cometgui.params.comet.model``. ``CometParameters`` is the
+parameter set of one Comet version: what the parser builds, the canonical
+writer writes, and validation, presets and the editor read (``R-PARAM-03``).
+It holds:
+
+* exactly **one entry per parameter** the metadata models for the version, in
+  the metadata's order -- which is the order ``comet -q`` writes. An entry
+  (``ParameterEntry``) is the curated ``ParameterDefinition``, a typed
+  ``ParameterValue`` and a ``ValueOrigin``;
+* the enzyme table (unit 3's ``EnzymeTable``);
+* the **unknown parameters** an imported file carried (``UnknownParameter``:
+  name, value text as imported, inline comment, the comment lines above it,
+  and its line), in file order;
+* the **diagnostics** of the parse that produced it -- warnings only, since a
+  parse with an error produces no model.
+
+It is immutable. ``withValue(name, value, origin)``, ``withText(name, text,
+origin)`` (text read as the parameter's kind), ``withOrigin(name, origin)``,
+``resetToDefault(name)``, ``withEnzymeTable(table)`` and
+``withoutUnknown(name)`` each return a new model and leave the old one as it
+was. Lookup is by name: ``entry``, ``value``, ``origin``, ``definition`` and
+``text`` (the value as written). ``tolerancePair()`` and ``ionSeries()`` give
+unit 3's structured views over the two tolerance members and the eight
+ion-series flags, which the model holds as one entry each.
+``CometParameters.defaults(metadata, version, table)`` is every parameter at
+its curated default; the metadata does not curate enzyme rows, so the table is
+given. ``CometParameters.of(...)`` refuses a model with a parameter missing or
+given twice, an entry the version does not model, a definition that is not the
+metadata's, an unknown parameter that is modelled or named twice, or an error
+diagnostic.
+
+Values
+------
+
+One ``ParameterValue`` variant per family of kinds, fixed by the kind:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Variant
+     - Kinds
+   * - ``Whole``
+     - ``INTEGER``, ``INTEGER_ENUM``, ``ENZYME_REFERENCE``
+   * - ``Decimal`` (``BigDecimal``, scale kept)
+     - ``DECIMAL``, ``TOLERANCE_PAIR_MEMBER``
+   * - ``Flag``
+     - ``BOOLEAN_FLAG``, ``ION_SERIES_FLAG`` -- ``0`` or ``1``, nothing else
+   * - ``Text`` (possibly empty)
+     - ``STRING``, ``STRING_ENUM``, ``FILE_PATH``
+   * - ``WholeRange``, ``DecimalPair``, ``Decimals``, ``Tuple``
+     - ``INTEGER_RANGE``, ``DECIMAL_RANGE``, ``DECIMAL_LIST``,
+       ``VARIABLE_MOD_TUPLE`` -- unit 3's types
+       (:ref:`dev-comet-parameter-structured`)
+
+``ParameterValueCodec`` is the one reader and writer of a value's text for a
+version; the parser and the writer both call it. Its numbers go through unit
+3's ``Numbers`` (made public for this, unchanged otherwise), so the whole file
+has one number reader and one number writer. A ``Text`` may not hold ``#``
+(Comet ends a value there), a line break, or white space at either end (the
+reader trims), because it would not read back as written.
+
+Origins
+-------
+
+``ValueOrigin`` is the specification's five: ``COMET_DEFAULT`` (the curated
+default, what ``-q`` writes), ``PRESET``, ``USER``, ``IMPORTED`` and
+``WORKFLOW_ENFORCED`` (``R-CMT-01``: the outputs the workflow forces on). The
+origin is carried, compared by model equality, and never written: two models
+that differ only in origins write the same bytes.
+
+.. _dev-comet-parameter-parser:
+
+The parser
+==========
+
+``org.cometgui.params.comet.parser.CometParamsParser`` is built for one
+selected Comet version and turns a whole text into a ``ParseResult``: a model
+and its warnings, or **no model** and every finding. It reads lines through
+``ParamsLineReader`` and values through ``ParameterValueCodec``; nothing else
+knows how a line or a value is shaped.
+
+Parsing is **all or nothing**, which is what makes ``R-PARAM-08``'s "a failed
+parse leaves the typed model untouched" true by construction: a caller that
+applies a result only when it holds a model cannot half-apply one.
+``ParseResult`` itself refuses a model alongside an error. Every finding is a
+``Diagnostic`` with a severity fixed by its code, the lines it concerns, the
+parameter where there is one, and a message naming both. Every finding is
+reported, not only the first, ordered by line.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 12 58
+
+   * - Code
+     - Severity
+     - When
+   * - ``MALFORMED_LINE``
+     - error
+     - A line ``ParamsLineReader`` classifies as malformed; the message quotes
+       it and gives the reader's reason.
+   * - ``DUPLICATE_PARAMETER``
+     - error
+     - A name declared twice, known or unknown; both lines are named.
+   * - ``DUPLICATE_VERSION_MARKER``
+     - error
+     - A second ``# comet_version`` line; both lines are named.
+   * - ``UNREADABLE_VALUE``
+     - error
+     - A modelled parameter's value cannot be read as its kind (``num_threads
+       = many``, a flag of ``2``, a seven-field tuple), or an unknown
+       parameter could not be written back as it was read.
+   * - ``ENZYME_TABLE_MISSING``
+     - error
+     - No ``[COMET_ENZYME_INFO]`` line.
+   * - ``UNREADABLE_ENZYME_ROW``, ``DUPLICATE_ENZYME_NUMBER``
+     - error
+     - A row unit 3's codec cannot read; a number defined twice, both lines
+       named (Comet would silently use the later row [C654]_).
+   * - ``VERSION_MISMATCH``
+     - warning
+     - The marker names another Comet version than the selected one, or text
+       that is not a version; the message names both. The same version from
+       another build (another hash) is not a mismatch.
+   * - ``VERSION_MARKER_MISSING``
+     - warning
+     - No marker; the message says the file's version is unknown and names the
+       selected one.
+   * - ``UNKNOWN_PARAMETER``, ``NOT_IN_VERSION``
+     - warning
+     - A name the metadata does not model at all, or models only for other
+       versions. Kept as an ``UnknownParameter`` and written back
+       (``R-PARAM-07``).
+
+A version mismatch is a warning, not an error, because the file can be
+represented: its parameters are read as the selected version's, and it will
+be written for the selected version. ``R-PARAM-06`` asks that the user see it,
+not that the import be refused.
+
+Values, defaults and comments
+-----------------------------
+
+A modelled parameter the file declares takes its value from the file, origin
+``IMPORTED``; one it does not declare takes the curated default, origin
+``COMET_DEFAULT``. An **empty value is a value**: ``peff_obo =`` imports the
+empty text, and ``decoy_prefix =`` imports the empty text rather than the
+default ``DECOY_`` -- whether that is sensible is validation's question.
+Parsing the real ``-p`` fixture gives 96 ``IMPORTED`` entries and exactly the
+22 ``-q``-only parameters at ``COMET_DEFAULT``, every value equal to the
+``-q`` model's.
+
+The file's comment structure (``R-PARAM-05``) is preserved where it cannot be
+re-derived: an unknown parameter keeps its inline comment and the whole-line
+comments directly above it -- up to the nearest blank line, declaration or
+version marker -- and both are written back with it. Comments on modelled
+parameters are not imported; the writer emits the curated ones. A CRLF file
+parses to the same model as its LF twin.
+
+The duplicate policy
+--------------------
+
+**A parameter declared twice is an error, naming both lines.** Comet
+2026.02.2 does not refuse it: its main loop reads every declaration in file
+order and hands each to ``SetParam`` [C536]_, which erases an existing entry
+of that name and inserts the new one [M1651]_; the enzyme numbers are copied
+into locals on each declaration [C400]_. So **the last declaration silently
+wins**, and a file with a duplicate does not mean what its first declaration
+says. Taking the last would match Comet but drop the first value; taking the
+first would misrepresent what Comet does. Refusing the file, with both line
+numbers, drops nothing and lets the user say which one they meant. This is
+the same choice unit 3 made for an enzyme number defined twice.
+
+.. _dev-comet-parameter-canonical:
+
+The canonical form
+==================
+
+``org.cometgui.params.comet.writer.CanonicalParamsWriter`` writes a model as
+canonical text (*Canonical serialisation*, ``R-PARAM-11``): the same bytes for
+the same model and build, under any default locale. Its constructor takes the
+running build's ``BuildIdentity``. An annotated excerpt of the real ``-q``
+fixture's model written by a build whose version is ``0.1.0-SNAPSHOT``::
+
+    # comet_version 2026.02 rev. 2 (6edec91)                     (1)
+    # Written by CometGUI 0.1.0-SNAPSHOT for Comet 2026.02.2. Canonical form, generated from the typed model.
+    # Everything following the '#' symbol is treated as a comment.
+    #
+    database_name = /some/path/db.fasta                          (2)
+    decoy_search = 0                       # 0=no (default), ...  (3)
+    ...
+    peff_obo =                             # path to PSI Mod or Unimod OBO file
+    ...
+    variable_mod02 = 0.0 X 0 3 -1 0 0 0.0
+    ...
+    add_Z_user_amino_acid = 0.0000         # added to Z - ...
+                                                                 (4)
+    #
+    # COMET_ENZYME_INFO _must_ be at the end of this parameters file
+    #
+    [COMET_ENZYME_INFO]                                          (5)
+    0.  Cut_everywhere         0      -           -
+    1.  Trypsin                1      KR          P
+    ...
+    11. No_cut                 1      @           @
+
+(The numbers in brackets are this page's annotations, not part of the file.)
+
+1. **The version marker, regenerated** for the model's version from the
+   metadata's record of it (``R-PARAM-05``), **always on line 1**. Comet
+   2026.02.2 looks for a line starting ``# comet_version`` only in the first
+   seven lines and exits without one ("The comet.params file is from version
+   unknown") [C244]_, accepting any version text containing ``2026.0``,
+   ``2025.0`` or ``2024.0`` [M1892]_. The **generated header** -- the CometGUI
+   version from ``BuildIdentity`` and the target Comet version -- therefore
+   comes *after* the marker. Header lines are comments; Comet's main loop cuts
+   every line at ``#`` and ignores what has no ``=`` before it [C536]_. Seven
+   comment lines before the marker were observed to make the real binary
+   refuse the file; six were not.
+2. **Every modelled parameter, in the metadata's (``-q``'s) order**, as ``name
+   = value``. Each value is written by ``ParameterValueCodec``: decimals with
+   ``BigDecimal.toPlainString()`` and the scale they were read with, whole
+   numbers with ``Integer.toString``, flags as ``0``/``1`` -- no
+   locale-sensitive formatter anywhere. An empty value is ``name =``.
+3. **The curated inline comment** from the metadata, its ``#`` at column 40
+   as in Comet's own output, or one space after a longer declaration. A
+   parameter without one gets none; no line has trailing white space.
+4. **Unknown parameters**, only if there are any, in a section after the
+   modelled ones -- they must come before the table, where Comet stops reading
+   parameters [C541]_. The section opens with a blank line, the line ``#
+   Parameters CometGUI does not model for this Comet version, kept as imported
+   (Comet 2026.02.2)`` and another blank line; then each unknown parameter's
+   imported comment lines, verbatim, and ``name = value`` as imported with its
+   inline comment. The blank line keeps the section's own comment from being
+   read back as the first unknown parameter's.
+5. **The enzyme table, last**, after a blank line and three comment lines,
+   with unit 3's column layout. Every line ends ``\n``; the file ends with the
+   last row's ``\n``.
+
+A parameter that Comet ignores (``spectral_library_ms_level``) is still
+written, because the model holds it and the metadata models it.
+
+Byte stability
+--------------
+
+Gate item 1 is ``CanonicalWriterTest``: parse the real ``-q`` fixture and write
+it -- text A, 10 656 bytes -- then parse A and write again, and again; all
+three are byte-identical, and the test reports the first differing offset if
+not. Parsing A gives a model equal to the fixture's with no finding. Every
+declaration's value text in A equals the fixture's, character for character,
+and the enzyme rows are the fixture's own lines. Of the 118 declaration
+lines, the only ones that differ from Comet's are the four with curated
+comments and ``minimum_intensity``, whose comment Comet itself writes one
+column early; Comet's section comments are not reproduced, the header is
+added.
+
+Gate item 5 is ``CommaLocaleWriterTest``: under ``de-DE`` and ``fr-FR`` --
+after showing that each really formats ``1.5`` as ``1,5`` with both
+``String.format`` and ``NumberFormat`` -- the real fixture's model and a
+CONSTRUCTED variant full of decimals parse and write to the same bytes as
+under ``Locale.ROOT``. The default locale is restored after every test.
+
+Refusal: enzyme numbers absent from the table
+---------------------------------------------
+
+The writer **never emits an enzyme number absent from the table it writes**
+(*Enzyme definitions*). For every parameter the metadata's
+``enzymeTable.referencedBy`` names -- ``search_enzyme_number``,
+``search_enzyme2_number``, ``sample_enzyme_number`` -- whose number is not a
+row of the model's table, ``write`` throws ``ParamsWriteException`` naming the
+parameter and the number, and nothing is written::
+
+    search_enzyme_number = 42 names enzyme 42, which is not in the
+    [COMET_ENZYME_INFO] table being written (its numbers are [0, 1, ..., 11]);
+    the file is not written
+
+Comet 2026.02.2 does **not** catch this, although it appears to. It keeps
+each referenced number in a local [C400]_ and, after the table, exits with
+"is missing definition" when the enzyme's name is ``"-"`` [C691]_. But the
+names are those of an ``EnzymeInfo``, whose constructor sets the search and
+sample names to ``""`` and the second enzyme's to ``"Cut_everywhere"``
+[D345]_ -- never ``"-"`` -- so those checks cannot fire. Run against the real
+binary, a ``-q`` file edited to ``search_enzyme_number = 42`` goes straight
+past the parameter reader. The refusal is this project's only guard.
+
+A custom enzyme survives a full file round trip: the real model with a
+CONSTRUCTED row ``12. Glu_C 1 DE P`` added and ``search_enzyme_number = 12``
+writes the row last in Comet's columns, parses back to the same row and
+number, and writes the same bytes again.
+
+.. _dev-comet-parameter-write-once:
+
+Write once, hash what was written
+=================================
+
+``R-PARAM-12``: the exact file written to disk is the file recorded in
+provenance and passed to Comet. ``CanonicalParamsWriter.writeOnce(model,
+target, hashService)``:
+
+#. produces the bytes first, so a refused model touches nothing;
+#. writes them to ``target`` with ``CREATE_NEW`` -- a file that already exists
+   is never overwritten (``FileAlreadyExistsException``, the file untouched);
+#. hands ``target`` to the domain ``HashService`` port, which reads the
+   **file on disk**;
+#. returns ``WrittenParams``: the path, its ``FileHashes`` (MD5 and SHA-256)
+   and its size on disk -- and no text, so nothing downstream can write the
+   file again; it passes the path.
+
+``WriteOnceTest`` writes the real fixture's model with the real
+``StreamingHashService`` from ``cometgui-provenance`` and checks both digests
+against ``MessageDigest`` over the bytes read back; a recording hash service
+shows it is called once, after the whole file is on disk.
+
+.. _dev-comet-parameter-comet-reads:
+
+Comet reads what is written
+===========================
+
+``CometReadsCanonicalRealBinaryTest`` (Linux only, like the other real-binary
+tests) runs the pinned 2026.02.2 binary, staged from the mirror and checked
+against the manifest's SHA-256, through ``ProcessService``, as ``comet
+-P<file> missing.mzML`` in an empty directory. Comet loads the ``-P`` file
+**before** it looks at any input file [C820]_, and its parameter reader exits
+with its own message for a missing or unrecognised marker [C244]_, for a file
+without ``output_percolatorfile`` ("outdated params file") [C691]_, and for a
+variable-modification tuple without eight fields [C576]_; it logs ``Warning -
+invalid parameter found`` for every name it does not know [C536]_. Only after
+all of that does it stop at ``Error - input file "missing.mzML" not found.``
+[C820]_ (exit 1).
+
+The test runs Comet's own ``-q`` file first, as the control: one warning,
+for ``spectral_library_ms_level`` (``-q`` writes it, the reader knows
+``speclib_ms_level``), then the input-file error. The canonical file of the
+same model, and a canonical file with a custom enzyme and a paired-field tuple,
+must give exactly the same standard output, standard error and exit code. A
+canonical file carrying one unknown parameter must add exactly one warning
+naming it, which shows the comparison can see a difference.
+
+What this proves: the real 2026.02.2 parameter reader accepts the canonical
+file -- marker, header, every parameter name, every tuple's shape, the table
+-- exactly as it accepts its own ``-q`` output. What it does **not** prove:
+that Comet reads each value as the model means it. Comet prints no parsed
+values, so a value Comet's ``sscanf`` would read differently goes unseen
+here; that is what the codecs' citations of Comet's reading code are for.
+
 Citations
 ---------
 
@@ -757,8 +1121,13 @@ Comet's source at tag ``v2026.02.2``, file and line (``C`` is ``Comet.cpp``,
 ``CometSearch/CometSearch.cpp``, ``D`` ``CometSearch/CometData.h``, ``K``
 ``CometSearch/core/Constants.h``):
 
+.. [C244] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L242-L278
+   -- the version check: ``# comet_version`` in the first seven lines, or
+   exit.
 .. [C308] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L308-L319
    -- ``parse_int_range`` and ``parse_double_range``.
+.. [C400] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L400-L403
+   -- the enzyme numbers copied into locals, per declaration.
 .. [C407] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L407-L414
    -- the ion-series parameters, read with ``parse_int``.
 .. [C454] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L454-L455
@@ -767,6 +1136,9 @@ Comet's source at tag ``v2026.02.2``, file and line (``C`` is ``Comet.cpp``,
    -- which parameters are ranges.
 .. [C494] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L494-L514
    -- the ``mass_offsets`` handler.
+.. [C536] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L536-L634
+   -- the main loop: cut at ``#``, one ``SetParam`` per declaration, a
+   warning for an unknown name.
 .. [C541] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L541-L542
    -- parameters end at ``[COMET_ENZYME_INFO]``.
 .. [C552] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L552-L621
@@ -785,6 +1157,11 @@ Comet's source at tag ``v2026.02.2``, file and line (``C`` is ``Comet.cpp``,
    -- the row number, ``"%d."``.
 .. [C662] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L662-L667
    -- the row, ``"%lf %47s %d %19s %19s"``.
+.. [C691] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L691-L721
+   -- "outdated params file" and the three "is missing definition" checks.
+.. [C820] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L820-L890
+   -- ``ProcessCmdLine``: ``LoadParameters`` (line 862) before the input
+   files (line 880).
 .. [C971] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L971-L973
    -- the ``-q`` comment above the slots.
 .. [C1177] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L1177-L1190
@@ -803,6 +1180,10 @@ Comet's source at tag ``v2026.02.2``, file and line (``C`` is ``Comet.cpp``,
    -- any positive requirement is required.
 .. [M1404] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1404-L1405
    -- a zero first loss is none.
+.. [M1651] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1651-L1660
+   -- ``SetParam`` replaces an existing entry (every overload alike).
+.. [M1892] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1892-L1904
+   -- ``IsValidCometVersion``.
 .. [S1770] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L1770
    -- a zero second loss is skipped.
 .. [S5375] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5375-L5390
@@ -813,5 +1194,7 @@ Comet's source at tag ``v2026.02.2``, file and line (``C`` is ``Comet.cpp``,
    -- distance ``-2``.
 .. [D269] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometData.h#L269-L284
    -- the ``VarMods`` defaults.
+.. [D345] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometData.h#L345-L365
+   -- ``EnzymeInfo``'s constructor: names ``""`` and ``"Cut_everywhere"``.
 .. [K80] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/core/Constants.h#L80
    -- ``VMODS`` is 15.

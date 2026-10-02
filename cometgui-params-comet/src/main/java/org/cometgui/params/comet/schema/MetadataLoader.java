@@ -125,6 +125,7 @@ public final class MetadataLoader {
                     "max",
                     "choices",
                     "shortHelp",
+                    "inlineComment",
                     "helpUrl",
                     "versions",
                     "serialization",
@@ -397,6 +398,7 @@ public final class MetadataLoader {
         String defaultValue = node.string("default");
         checkDefault(node, kind, serialization, defaultValue, minimum, maximum, choices);
         String shortHelp = node.text("shortHelp");
+        Optional<String> inlineComment = inlineComment(node);
         String helpUrl = node.url("helpUrl");
         VersionRange range = versionRange(node, curated);
         List<ValidatorId> validators = validators(node, kind);
@@ -413,12 +415,38 @@ public final class MetadataLoader {
                 maximum,
                 choices,
                 shortHelp,
+                inlineComment,
                 helpUrl,
                 range,
                 serialization,
                 validators,
                 aliases,
                 related);
+    }
+
+    /**
+     * The curated comment the canonical writer puts after a value. It is written on the value's own
+     * line after {@code #}, so it must be one line, and since the writer and the reader both trim
+     * it, it may not be blank or carry white space at either end -- such a comment would not read
+     * back as written.
+     */
+    private static Optional<String> inlineComment(Node node) {
+        Optional<String> comment = node.optionalString("inlineComment");
+        if (comment.isPresent()) {
+            String text = comment.get();
+            if (text.isBlank()) {
+                throw node.failure("inlineComment", "is blank; write null for no comment");
+            }
+            if (text.contains("\n") || text.contains("\r")) {
+                throw node.failure(
+                        "inlineComment", "holds a line break; it is written on the value's line");
+            }
+            if (!text.equals(text.strip())) {
+                throw node.failure(
+                        "inlineComment", "has surrounding white space, which would not read back");
+            }
+        }
+        return comment;
     }
 
     private static List<Choice> choices(Node node, ValueKind kind) {

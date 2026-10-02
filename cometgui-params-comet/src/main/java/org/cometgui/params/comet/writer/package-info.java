@@ -16,8 +16,11 @@
 
 /**
  * Writing comet.params files: deterministic, byte-stable canonical output, locale-independent
- * (including under a comma-decimal locale), with workflow-enforced outputs forced on.
+ * (including under a comma-decimal locale), with a generated header naming the CometGUI and Comet
+ * versions, curated inline comments, unknown parameters written back, and the enzyme table last.
  *
- * <p>Filled by phase 06 (Comet parameter model).
+ * <p>{@link org.cometgui.params.comet.writer.CanonicalParamsWriter} refuses a model whose enzyme
+ * numbers are absent from the table it writes, and writes a file once and hashes what it wrote
+ * (R-PARAM-11, R-PARAM-12). Phase 06 (Comet parameter model).
  */
 package org.cometgui.params.comet.writer;

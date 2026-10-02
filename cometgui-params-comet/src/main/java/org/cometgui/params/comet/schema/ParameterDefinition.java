@@ -41,6 +41,8 @@ import java.util.Optional;
  * @param maximum the largest legal number, as text, where one exists
  * @param choices the labelled values of an enumerated kind; empty for every other kind
  * @param shortHelp one or two sentences, in this project's words
+ * @param inlineComment the curated comment the canonical writer puts after the value, on the same
+ *     line; Comet's own {@code -q} comment where it has one is the starting text. Empty for none
  * @param detailedHelpRef the upstream page or source line the help was written from
  * @param supportedVersions the Comet versions this definition claims
  * @param serialization how the value is written
@@ -59,6 +61,7 @@ public record ParameterDefinition(
         Optional<String> maximum,
         List<Choice> choices,
         String shortHelp,
+        Optional<String> inlineComment,
         String detailedHelpRef,
         VersionRange supportedVersions,
         SerializationRule serialization,
@@ -78,6 +81,7 @@ public record ParameterDefinition(
         Objects.requireNonNull(maximum, "maximum");
         choices = List.copyOf(choices);
         Objects.requireNonNull(shortHelp, "shortHelp");
+        Objects.requireNonNull(inlineComment, "inlineComment");
         Objects.requireNonNull(detailedHelpRef, "detailedHelpRef");
         Objects.requireNonNull(supportedVersions, "supportedVersions");
         Objects.requireNonNull(serialization, "serialization");

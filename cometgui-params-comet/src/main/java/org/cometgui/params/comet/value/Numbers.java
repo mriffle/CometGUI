@@ -33,8 +33,12 @@ import java.util.regex.Pattern;
  *
  * <p>What is accepted is what C's {@code %lf} and {@code %d}, which Comet's reader uses, accept as
  * a plain number -- minus {@code inf} and {@code nan}, which no Comet parameter means.
+ *
+ * <p>Public since Phase 06 unit 4, unchanged otherwise: the typed model reads and writes its scalar
+ * values (a single decimal, a single whole number) through this class, so that the whole parameter
+ * file has one number reader and one number writer.
  */
-final class Numbers {
+public final class Numbers {
 
     private static final Pattern DECIMAL =
             Pattern.compile("[+-]?([0-9]+[.]?[0-9]*|[.][0-9]+)([eE][+-]?[0-9]{1,3})?");
@@ -52,7 +56,7 @@ final class Numbers {
      * @return its value, with the scale written
      * @throws ValueSyntaxException if the token is not a number
      */
-    static BigDecimal decimal(String subject, String field, String text) {
+    public static BigDecimal decimal(String subject, String field, String text) {
         if (!DECIMAL.matcher(text).matches()) {
             throw new ValueSyntaxException(subject, field, "\"" + text + "\" is not a number");
         }
@@ -68,7 +72,7 @@ final class Numbers {
      * @return its value
      * @throws ValueSyntaxException if the token is not a whole number an {@code int} can hold
      */
-    static int whole(String subject, String field, String text) {
+    public static int whole(String subject, String field, String text) {
         if (!WHOLE.matcher(text).matches()) {
             throw new ValueSyntaxException(
                     subject, field, "\"" + text + "\" is not a whole number");
@@ -87,7 +91,7 @@ final class Numbers {
      * @param value the value
      * @return its canonical text
      */
-    static String text(BigDecimal value) {
+    public static String text(BigDecimal value) {
         return value.toPlainString();
     }
 
@@ -97,7 +101,7 @@ final class Numbers {
      * @param text the value text
      * @return the tokens; none for blank text
      */
-    static String[] tokens(String text) {
+    public static String[] tokens(String text) {
         String stripped = text.strip();
         return stripped.isEmpty() ? new String[0] : stripped.split("\\s+");
     }

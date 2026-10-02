@@ -537,6 +537,85 @@ class MetadataLoaderTest {
         }
 
         @Test
+        @DisplayName("a curated inline comment loads exactly as written, and null means none")
+        void anInlineCommentLoads() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").put("inlineComment", "0=off, 1=0/1 (C13 error)");
+            CuratedMetadata metadata = doc.load();
+            assertEquals(
+                    Optional.of("0=off, 1=0/1 (C13 error)"),
+                    metadata.parameter("isotope_error").orElseThrow().inlineComment());
+            assertEquals(
+                    Optional.empty(),
+                    metadata.parameter("allowed_missed_cleavage").orElseThrow().inlineComment());
+        }
+
+        @Test
+        void aMissingInlineCommentIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").remove("inlineComment");
+            rejected(doc, ISOTOPE, "inlineComment", "is missing");
+        }
+
+        @Test
+        void anInlineCommentThatIsNotAStringIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").put("inlineComment", 2L);
+            rejected(doc, ISOTOPE, "inlineComment", "must be a string or null");
+        }
+
+        @Test
+        void aBlankInlineCommentIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").put("inlineComment", "   ");
+            rejected(doc, ISOTOPE, "inlineComment", "is blank; write null for no comment");
+        }
+
+        @Test
+        void anEmptyInlineCommentIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").put("inlineComment", "");
+            rejected(doc, ISOTOPE, "inlineComment", "is blank; write null for no comment");
+        }
+
+        @Test
+        void anInlineCommentWithANewlineIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").put("inlineComment", "first\nsecond");
+            rejected(doc, ISOTOPE, "inlineComment", "holds a line break");
+        }
+
+        @Test
+        void anInlineCommentWithACarriageReturnIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").put("inlineComment", "first\rsecond");
+            rejected(doc, ISOTOPE, "inlineComment", "holds a line break");
+        }
+
+        @Test
+        void anInlineCommentStartingWithALineBreakIsRejectedAsOne() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").put("inlineComment", "\n0=off");
+            rejected(doc, ISOTOPE, "inlineComment", "holds a line break");
+            doc.parameter("isotope_error").put("inlineComment", "\r0=off");
+            rejected(doc, ISOTOPE, "inlineComment", "holds a line break");
+        }
+
+        @Test
+        void aPaddedInlineCommentIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").put("inlineComment", " 0=off");
+            rejected(doc, ISOTOPE, "inlineComment", "has surrounding white space");
+        }
+
+        @Test
+        void anInlineCommentWithTrailingSpaceIsRejected() {
+            ConstructedMetadata doc = ConstructedMetadata.valid();
+            doc.parameter("isotope_error").put("inlineComment", "0=off ");
+            rejected(doc, ISOTOPE, "inlineComment", "has surrounding white space");
+        }
+
+        @Test
         void aHelpReferenceThatIsNotHttpsIsRejected() {
             ConstructedMetadata doc = ConstructedMetadata.valid();
             doc.parameter("isotope_error").put("helpUrl", "isotope_error.html");

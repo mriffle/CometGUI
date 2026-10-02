@@ -213,6 +213,7 @@ final class ConstructedMetadata {
             map.put("max", null);
             map.put("choices", new ArrayList<>());
             map.put("shortHelp", "Constructed help for " + name + ".");
+            map.put("inlineComment", null);
             map.put("helpUrl", "https://example.org/" + name);
             Map<String, Object> versions = new LinkedHashMap<>();
             versions.put("from", VERSION);
@@ -267,6 +268,14 @@ final class ConstructedMetadata {
         } else if (value instanceof String text) {
             out.append('"');
             for (char c : text.toCharArray()) {
+                if (c == '\n') {
+                    out.append("\\n");
+                    continue;
+                }
+                if (c == '\r') {
+                    out.append("\\r");
+                    continue;
+                }
                 if (c == '"' || c == '\\') {
                     out.append('\\');
                 }
