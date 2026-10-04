@@ -215,6 +215,37 @@ def _alphabet_removed(document):
     _record(document, OVERRIDING_RELEASE)["variableModTuple"].pop("residueAlphabet")
 
 
+#: The version-scoped rule whose severity the rule-severity cases damage.
+SCOPED_RULE = "variable_mod_tuple.distance_undocumented"
+
+
+def _severity(document: dict, version: str = OVERRIDING_RELEASE) -> dict:
+    for entry in _record(document, version)["ruleSeverities"]:
+        if entry["rule"] == SCOPED_RULE:
+            return entry
+    raise HarnessError(f"the {version} record states no severity for {SCOPED_RULE} to damage")
+
+
+def _severity_set(field, value):
+    def damage(document):
+        _severity(document)[field] = value
+    return damage
+
+
+def _severity_duplicate(document):
+    _record(document, OVERRIDING_RELEASE)["ruleSeverities"].append(
+        copy.deepcopy(_severity(document)))
+
+
+def _severity_unstated(document):
+    record = _record(document, "2026.02.2")
+    record["ruleSeverities"].remove(_severity(document, "2026.02.2"))
+
+
+def _severities_removed(document):
+    _record(document, OVERRIDING_RELEASE).pop("ruleSeverities")
+
+
 def generator_cases():
     """(id, input, damage, expected inner diagnostic) for part 1."""
     where = f'("{VICTIM}")'
@@ -307,6 +338,26 @@ def generator_cases():
          _alphabet_set("source", "CometSearchManager.cpp line 1540"),
          f"{alphabet} has \"source\" = 'CometSearchManager.cpp line 1540'; it must be an "
          "https:// reference"),
+    ]
+    severities = f"versions[0] ({OVERRIDING_RELEASE}) ruleSeverities"
+    cases += [
+        ("severities-missing", "metadata", _severities_removed,
+         f"{severities} is null; it must be the list of the release's severity"),
+        ("severity-unknown-field", "metadata", _severity_set("since", "2026.03.0"),
+         f"{severities}[1] has the field 'since', which it does not have"),
+        ("severity-unknown-level", "metadata", _severity_set("severity", "FATAL"),
+         f"{severities}[1] ({SCOPED_RULE}) has \"severity\" = 'FATAL'; it must be one of ERROR, "
+         "WARNING, OFF"),
+        ("severity-bad-rule-id", "metadata", _severity_set("rule", "Distance"),
+         f"{severities}[1] has \"rule\" = 'Distance', which is not a rule identifier"),
+        ("severity-source-not-https", "metadata", _severity_set("source", "Comet.cpp line 1436"),
+         f"{severities}[1] ({SCOPED_RULE}) has \"source\" = 'Comet.cpp line 1436'; it must be "
+         "an https:// reference"),
+        ("severity-stated-twice", "metadata", _severity_duplicate,
+         f"{severities}[2] states {SCOPED_RULE} a second time"),
+        ("severity-unstated-for-a-release", "metadata", _severity_unstated,
+         "Comet 2026.02.2's version record states the version-scoped rules "
+         "['index_search_type.ignored_without_idx'], and Comet 2026.03.0's states"),
     ]
     return cases
 
