@@ -23,6 +23,14 @@ Comet parameter schema
    for every captured and every installed release, and what each release does
    with the parameters that differ (:ref:`dev-comet-parameter-202603`).
 
+   **Comet 2026.03.0 intake, unit 3**: the residue alphabet of the
+   variable-modification tuple as per-release data
+   (:ref:`dev-comet-parameter-residue-alphabet`), so ``^`` and ``$`` are legal
+   for 2026.03.0 only (:ref:`dev-comet-parameter-202603-termini`); Phase 06
+   gate items 1, 3, 4, 5 and 6 for 2026.03.0 as for 2026.02.2; and the real
+   2026.03.0 binary reading the canonical file
+   (:ref:`dev-comet-parameter-comet-reads`).
+
 What this page covers
 =====================
 
@@ -225,7 +233,15 @@ Adding a new Comet version
 #. The drift test (:ref:`dev-comet-parameter-drift`) runs for the new fixture
    directory at once and fails until the metadata has a version record for
    it: a captured release can never sit unchecked, whether or not the
-   manifest names it yet.
+   manifest names it yet. The record's ``variableModTuple`` carries the
+   release's field layout **and its residue alphabet**
+   (:ref:`dev-comet-parameter-residue-alphabet`), each read from the
+   release's own source and established by running it.
+#. Give the release a row in ``ReleaseWriterGateTest`` (which fails for a
+   fixture release without one), a round-trip entry point in
+   ``VariableModRoundTripTest`` (which fails for an installed release without
+   one) and a row in ``CometReadsCanonicalRealBinaryTest``, each with facts
+   observed from the release, not copied from another.
 
 Do not add fixtures for a platform whose binary was not executed. Its row
 stays reported as never captured.
@@ -324,7 +340,8 @@ Top level::
       "description": "...",
       "versions":    [ { "version", "marker", "parameterPages", "source",
                          "variableModTuple": { "source",
-                                               "fields": [ { "field", "kind", "pair" } ] },
+                                               "fields": [ { "field", "kind", "pair" } ],
+                                               "residueAlphabet": { "characters", "source" } },
                          "overrides": [ { "name", "source", ...any of "default",
                                           "choices", "inlineComment",
                                           "shortHelp", "helpUrl" } ] } ],
@@ -344,7 +361,10 @@ variable-modification tuple layout, in Comet's reading order -- see
 :ref:`dev-comet-parameter-tuple`. In each ``fields`` entry ``field`` is a
 ``VariableModField`` constant, ``kind`` its ``VariableModField.Kind``
 (``DECIMAL``, ``INTEGER`` or ``RESIDUES``) and ``pair`` a JSON boolean, the
-only booleans in the file.
+only booleans in the file. ``residueAlphabet`` is the characters that release
+accepts in the tuple's residue token, each once, with the ``https://``
+reference to where the release shows them -- see
+:ref:`dev-comet-parameter-residue-alphabet`.
 
 ``overrides`` lists what **that release** says differently about a parameter
 (:ref:`dev-comet-parameter-overrides`); it is empty for a release that agrees
@@ -362,7 +382,9 @@ with every curated definition. Three records exist
      - ``2026.03 rev. 0 (fa08489)``
      - The default verified release from specification revision 12
        (``D-010``). The same tuple layout as 2026.02.2, read by
-       ``Comet.cpp`` lines 556-625 at ``v2026.03.0`` [V26T]_. Four overrides:
+       ``Comet.cpp`` lines 556-625 at ``v2026.03.0`` [V26T]_; its residue
+       alphabet adds ``^`` and ``$`` to ``A``-``Z``, ``n`` and ``c``
+       [V26A]_ (:ref:`dev-comet-parameter-202603-termini`). Four overrides:
        ``index_search_type`` (default ``-1``, choices ``-1``/``0``/``1``,
        Comet's own 2026.03.0 inline comment, help and help page),
        ``decoy_search`` (Comet's own 2026.03.0 inline comment),
@@ -370,13 +392,15 @@ with every curated definition. Three records exist
        comment, help and help reference: what 2026.03.0 really does with each).
    * - ``2026.02.2``
      - ``2026.02 rev. 2 (6edec91)``
-     - Neutral loss and count both take a comma pair. ``overrides`` empty:
-       every curated definition is 2026.02.2's own.
+     - Neutral loss and count both take a comma pair; residue alphabet
+       ``A``-``Z``, ``n``, ``c`` [M1380]_. ``overrides`` empty: every curated
+       definition is 2026.02.2's own.
    * - ``2024.01.0``
      - ``2024.01 rev. 0 (f00df0c)``
      - The migration fixture's release, not offered to users. The neutral loss
        takes **one** value -- Comet 2024.01.0 reads it with ``%lf`` [V24T]_
-       -- and the count takes ``min,max``. Two default overrides:
+       -- and the count takes ``min,max``; residue alphabet ``A``-``Z``,
+       ``n``, ``c`` [V24A]_. Two default overrides:
        ``fragindex_num_spectrumpeaks = 100`` and
        ``fragindex_skipreadprecursors = 0`` [V24D]_, where 2026.02.2 writes
        ``150`` and ``1``.
@@ -443,8 +467,15 @@ field listed twice, declared with a kind that is not the field's, or given a
 pair where no Comet release accepts one (only the count and the neutral loss
 are pairable); a layout without the mass difference or the residues; a
 parameter named ``variable_mod`` plus two digits that is not of kind
-``VARIABLE_MOD_TUPLE``, or the other way round; and a tuple default whose
-field count differs from the layout of a version it claims.
+``VARIABLE_MOD_TUPLE``, or the other way round; a tuple default whose
+field count differs from the layout of a version it claims, or whose residues
+hold a character outside that version's alphabet. For the alphabet
+(``variableModTuple.residueAlphabet``): missing, or not an object; a member
+other than ``characters`` and ``source``; ``characters`` missing, not a
+string, or empty; a character that is neither a letter ``A``-``Z`` nor one of
+the four terminal codes; a character listed twice; and a ``source`` that is not
+``https://``. ``ResidueAlphabetLoaderTest`` proves each on constructed
+metadata.
 
 ``inlineComment`` is the comment the canonical writer puts after the value on
 the parameter's own line (:ref:`dev-comet-parameter-canonical`), or ``null``
@@ -529,10 +560,10 @@ user preset although no parameter changed; a reader that predates
 ``overrides`` refuses the document anyway, on the unknown field.
 
 **Where later facts attach.** The version record is the place for anything
-else a release changes: the residue alphabet of the variable-modification
-tuple (2026.03.0's ``^`` and ``$``) belongs in that release's
-``variableModTuple``, beside the field layout it qualifies, and
-version-keyed validation facts (a rule's severity or bound for that release)
+else a release changes. The residue alphabet of the variable-modification
+tuple (2026.03.0's ``^`` and ``$``) is in that release's ``variableModTuple``,
+beside the field layout it qualifies (:ref:`dev-comet-parameter-residue-alphabet`).
+Version-keyed validation facts (a rule's severity or bound for that release)
 belong in a member of the record keyed by the rule's stable id -- each a new
 field the loader validates, so that a rule reads the fact from the version the
 model carries.
@@ -828,10 +859,106 @@ so this documents
 existing behaviour rather than a change; the override carries the new comment
 because the canonical file for a release takes that release's comments.
 
+.. _dev-comet-parameter-202603-termini:
+
+``^`` and ``$`` in the residue token
+------------------------------------
+
+Comet 2026.03.0 adds two terminal codes to the residue field of
+``variable_modNN``: ``^``, the protein N-terminus only, and ``$``, the protein
+C-terminus only, "combined with residues in the same string" as ``n`` and
+``c`` are [VM26]_. Its own ``-q`` output now says so above the slots (``^ =
+protein N-terminus only, $ = protein C-terminus only (e.g. 42.010565 ^ 0 1 -1 0
+0 0.0)``), and the 2026.03 page's generator validates ``n``, ``c``, ``^``,
+``$`` and ``A``-``Z``, where the 2026.02 page's validated ``n``, ``c`` and
+``A``-``Z`` [VM]_.
+
+Both binaries were run on 2026-10-04 as in the probes above (each release's
+own ``-q`` file, ``database_name`` the one-protein BSA FASTA, the spectral
+library emptied, ``num_threads = 4``, one line changed, ``comet -Pp.params
+-Nout BSA3.mzML``), and the pepXML header's modification elements and the
+``<spectrum_query>`` part of the output compared:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 38 38
+
+   * - ``variable_mod02 =``
+     - Comet 2026.02.2
+     - Comet 2026.03.0
+   * - ``42.010565 ^ 0 1 -1 0 0 0.0``
+     - exit 0, no message. Header: ``<aminoacid_modification aminoacid="^"
+       massdiff="42.010565" mass="1000041.010565" ...>`` -- an *amino acid*
+       named ``^``. The ``<spectrum_query>`` text is **byte-identical** (by
+       SHA-256) to the run with slot 2 unused: the modification never applied.
+     - exit 0, no message. Header: ``<terminal_modification terminus="N"
+       massdiff="42.010565" ... protein_terminus="Y"/>``.
+   * - ``-0.984016 $ 0 1 -1 0 0 0.0``
+     - exit 0, no message; ``aminoacid="$"``; results again byte-identical to
+       the unused slot.
+     - exit 0; ``<terminal_modification terminus="C" ...
+       protein_terminus="Y"/>``; one search hit in the pepXML carries the
+       C-terminal modification (the protein's C-terminal peptide).
+   * - ``42.010565 n 0 1 -1 0 0 0.0``
+     - ``protein_terminus="N"``; 12 search hits with the N-terminal
+       modification.
+     - the same: ``protein_terminus="N"``, 12 search hits.
+   * - ``n^``, ``$c``
+     - --
+     - ``n^``: the results are byte-identical to ``n``'s; ``$c``: identical to
+       ``c``'s. ``n`` with ``^`` is just ``n`` [V26A]_.
+   * - ``^M``, ``^$``, ``^^``, ``K^c$``
+     - --
+     - all exit 0. ``^M``: an ``M`` modification and a protein N-terminal
+       one; ``^$``: both protein termini; ``^^``: the same results as ``^``
+       (characters are sorted and de-duplicated [V26E]_); ``K^c$``: ``K``,
+       the protein N-terminus and *any* C-terminus.
+
+So Comet 2026.02.2 **accepts** ``^`` and ``$`` and silently does nothing with
+them. Its search manager knows ``n`` and ``c`` only [M1380]_; every other
+character of the token is a residue to be found in the protein sequence by
+``strchr`` [S6735]_, and the FASTA loader keeps only ``A``-``Z`` in a sequence
+[S902]_, so ``^`` and ``$`` can never match. A file with ``^`` written for
+2026.02.2 would run, report no error, and search without the modification the
+user asked for. **Decision:** this project refuses ``^`` and ``$`` for
+2026.02.2 (and 2024.01.0, whose source has no code for them either [V24A]_),
+as it did before, and accepts them for 2026.03.0. That is data, not code: each
+release's ``variableModTuple.residueAlphabet`` lists what it accepts
+(:ref:`dev-comet-parameter-residue-alphabet`).
+
+**Combinations.** Comet reads the token with ``%31s`` [V26T]_ and does not
+check its characters; it sorts and de-duplicates them [V26E]_, takes ``n`` over
+``^`` and ``c`` over ``$`` [V26A]_, and rewrites ``n`` (or ``c``) at distance 0
+from the protein N- (or C-) terminus to ``^`` (``$``) [V26N]_. Every
+combination above ran. So the codec admits any combination of a release's
+characters, repeats included, exactly as it always admitted ``nn`` or
+``nKc``; whether a redundant combination deserves a warning is validation's
+question (unit 4), not the reader's.
+
 Citations, at tag ``v2026.03.0`` (commit
 ``fa08489b5d5311c69df0e1d6d188bea22b80c184``, ``git ls-remote``) and
 ``v2026.02.2``:
 
+.. [VM26] https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html
+   -- the 2026.03 page: ``^`` and ``$`` "added with release 2026.03.0"; its
+   generator's "Valid: n, c, ^, $, A-Z" (fetched 2026-10-04).
+.. [V26A] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1538-L1563
+   -- the terminal codes: ``n``/``c`` any peptide terminus, ``^``/``$`` the
+   protein's only; "'n' together with '^' is just 'n'". The 2026.03.0 record's
+   alphabet ``source``.
+.. [V26E] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1514-L1521
+   -- the token's characters sorted and de-duplicated.
+.. [V26N] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1417-L1471
+   -- ``n``/``c`` at distance 0 from the protein terminus rewritten to
+   ``^``/``$``.
+.. [V24A] https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometSearchManager.cpp#L1460-L1477
+   -- 2024.01.0's terminal codes: ``n`` and ``c`` only. The 2024.01.0
+   record's alphabet ``source``.
+.. [S6735] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L6735
+   -- 2026.02.2: a residue character matched against the sequence with
+   ``strchr``.
+.. [S902] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L902-L915
+   -- 2026.02.2's FASTA loader keeps ``A``-``Z`` (upper-casing ``a``-``z``).
 .. [V26Q] https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L934-L946
    -- ``index_search_type = -1``, written only for ``-q`` (``iPrintParams ==
    2``).
@@ -942,8 +1069,10 @@ Comet 2026.02.2 reads them:
    * - 2
      - ``RESIDUES``
      - One token of residues; ``n`` for the N-terminus, ``c`` for the
-       C-terminus, combinable (``nK``).
-     - Page [VM]_; read ``%31s`` [C589]_; ``n`` and ``c`` [M1380]_.
+       C-terminus, combinable (``nK``). From 2026.03.0 also ``^`` and ``$``,
+       the protein N- and C-terminus only (:ref:`dev-comet-parameter-202603-termini`).
+     - Page [VM]_; read ``%31s`` [C589]_; ``n`` and ``c`` [M1380]_; ``^``
+       and ``$`` [VM26]_, [V26A]_.
    * - 3
      - ``BINARY_GROUP``
      - ``0`` a variable modification; any other integer a binary group, whose
@@ -1007,7 +1136,8 @@ white space, requires as many fields as the layout lists, and reads each by
 what the layout puts at that position; a comma pair is read only where the
 layout accepts one, and then exactly two non-empty values. Formatting walks
 the same layout and joins the fields with one space. The codec holds no field
-count of its own. A field a layout does not hold is given Comet's own default
+count of its own, and no residue alphabet either
+(:ref:`dev-comet-parameter-residue-alphabet`). A field a layout does not hold is given Comet's own default
 when read -- the ``VarMods`` constructor [D269]_: group ``0``, count ``0``,
 distance ``-1``, terminus ``0``, required ``0``, loss ``0.0`` -- and a value
 that differs from that default in such a field is **refused** when written
@@ -1029,10 +1159,16 @@ any positive requirement acts as required [M1401]_ and only ``-1`` as
 exclusive [S5881]_, and a terminus outside ``0``-``3`` matches none of the
 search's branches [S5375]_. ``terminus()`` and ``requirement()`` map the
 documented codes to enums and return empty otherwise, so the validators can
-warn rather than the parser guess. The residue token must be letters ``A`` to
-``Z`` with ``n`` and ``c`` -- the alphabet the page's own generator enforces
-([VM]_, "Valid: n, c, A-Z"); Comet's reader takes any token up to 31
-characters [C589]_, so the length limit is left to validation.
+warn rather than the parser guess. The type holds a residue token whose every
+character it can describe -- a letter ``A`` to ``Z`` or one of the four
+``TerminalCode``\ s, ``n``, ``c``, ``^`` and ``$`` -- and refuses anything else
+(``"K#" holds '#'; a residue token is letters A-Z and the terminal codes n, c,
+^ and $``). Which of those a *release* accepts is its alphabet, which the
+codec applies (:ref:`dev-comet-parameter-residue-alphabet`). Comet's reader
+takes any token up to 31 characters [C589]_, so the length limit is left to
+validation. ``nTerminus()`` and ``cTerminus()`` say which terminus a token
+targets -- ``n`` over ``^`` and ``c`` over ``$``, as Comet resolves them
+[V26A]_ -- and ``residueLetters()`` drops all four codes.
 ``effectiveNeutralLosses()`` drops zeros, as Comet does.
 
 ``summary()`` writes the value in words for the editor, as the specification
@@ -1041,14 +1177,91 @@ asks::
     Oxidation: +15.994915 on M; max 3 per peptide; optional
     +79.966331 on STY; 2 to 4 per peptide; required; neutral losses 97.976896 and 79.966331
     +28.0 on C-terminus, within 9 residues of the protein C-terminus; max 3 per peptide; optional
+    Acetyl: +42.010565 on protein N-terminus; max 1 per peptide; optional
+    +42.010565 on M and protein N-terminus; max 1 per peptide; optional
     unused (mass difference 0.0)
 
-An undocumented code is named, not guessed (``requirement code 2``).
+An undocumented code is named, not guessed (``requirement code 2``). ``n^``
+reads "on N-terminus" and ``$c`` "on C-terminus", because Comet treats each as
+the peptide code alone.
+
+.. _dev-comet-parameter-residue-alphabet:
+
+The residue alphabet is data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Which characters a residue token may hold differs by release -- ``^`` and
+``$`` are 2026.03.0's -- so, by decision C-2 of the 2026.03.0 intake, it is in
+the version record, not in the code: ``versions[].variableModTuple
+.residueAlphabet``, loaded into the ``VariableModLayout`` as a
+``ResidueAlphabet``::
+
+    "residueAlphabet": {
+      "characters": "ABCDEFGHIJKLMNOPQRSTUVWXYZnc^$",
+      "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1538-L1563"
+    }
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 40 46
+
+   * - Release
+     - ``characters``
+     - ``source``
+   * - 2026.03.0
+     - ``A``-``Z``, ``n``, ``c``, ``^``, ``$``
+     - [V26A]_
+   * - 2026.02.2
+     - ``A``-``Z``, ``n``, ``c``
+     - [M1380]_
+   * - 2024.01.0
+     - ``A``-``Z``, ``n``, ``c``
+     - [V24A]_
+
+``TerminalCode`` (``schema``) is the vocabulary: what ``n``, ``c``, ``^`` and
+``$`` *mean* (``N-terminus``, ``C-terminus``, ``protein N-terminus``,
+``protein C-terminus``), which is the same in every release that has them; the
+alphabet is the law, which is not. The loader refuses an alphabet character
+that is in neither ``A``-``Z`` nor the vocabulary, so every accepted character
+can be put into words.
+
+``VariableModCodec`` holds a token to the alphabet **both ways**. Reading a
+character the release does not accept is a ``ValueSyntaxException`` naming the
+slot, the field and the release::
+
+    variable_mod07, field 2 (residues): "^" holds '^', which Comet 2026.02.2 does
+    not accept in a residue token; its residue alphabet is A-Z, n (N-terminus), c
+    (C-terminus)
+
+and writing one -- a value made for 2026.03.0 put into a 2026.02.2 model -- is
+refused with the same words and ``, so it cannot be written``; the canonical
+writer then writes nothing. ``forVersion`` names the release as ``Comet
+<version>``; a codec built directly from a layout says ``this Comet version``.
+The parser reports the read refusal as ``UNREADABLE_VALUE`` with the line
+number, and fails the parse (``R-PARAM-08``). The loader also holds each
+curated tuple default to the alphabet of every release it claims.
+
+``ResidueAlphabetTest`` and ``ResidueAlphabetLoaderTest`` cover the type and the
+loader; ``VariableModCodecAlphabetTest`` shows the codec follows the data, with
+CONSTRUCTED alphabets (``KM^`` accepts ``^K`` and refuses ``X``) as well as the
+bundled ones; ``VariableModificationTest`` the meanings and the words.
 
 The round trip, gate item 3
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``VariableModRoundTripTest`` runs **17 forms x 15 slots = 255** dynamic tests.
+``VariableModRoundTripTest`` runs **17 forms x 15 slots = 255** dynamic tests
+for 2026.02.2 (``everyFormInEverySlot``) and **26 forms x 15 slots = 390** for
+2026.03.0 (``everyFormInEverySlotOfComet202603``): the same 17 plus the nine
+``TupleForms.PROTEIN_TERMINI`` forms with ``^`` or ``$``. Those nine are then
+**refused** in every slot of 2026.02.2 and of 2024.01.0, reading and writing,
+with the diagnostic above: **2 x 9 x 15 = 270** more. Which releases accept
+``^`` and ``$`` is typed in the test, not read from the metadata, so a record
+that gave them to the wrong release fails it; and the releases with a round
+trip are held to the manifest's. The run prints ``round trips completed
+{2026.02.2=255, 2026.03.0=390} ... ^/$ refusals completed {2024.01.0=135,
+2026.02.2=135}``. The 2026.02.2 entry point keeps its name and count because
+``scripts/verify-param-gates.sh`` grades it by them.
+
 The forms (``TupleForms``, test sources) are CONSTRUCTED test input: the
 page's own examples [VM]_ -- one loss, two losses, required, ``nK``, ``n`` at
 the protein N-terminus, ``c`` within 8 of the protein C-terminus, the
@@ -1056,7 +1269,12 @@ pyroglutamate cyclisation at the peptide N-terminus, binary groups 1 and 2 --
 plus forms built from the page's field descriptions where it gives no
 whole-line example (``min,max``, exclusive ``-1``, distance ``-2``, the peptide
 C-terminus, all of them at once), ``comet -q``'s two defaults, and the
-``15.994915`` edit. For each slot the bundled metadata gives 2026.02.2, a line
+``15.994915`` edit. The protein-terminus forms are the 2026.03 page's own
+examples [VM26]_ (``42.010565 ^ 0 1 -1 0 0 0.0``, ``15.994915 ^ 0 3 -1 0 0
+0.0``) and forms built from its description and from the combinations the
+real binary was seen to accept (:ref:`dev-comet-parameter-202603-termini`):
+``$``, ``^M``, ``n^``, ``$c``, ``^$``, ``^^`` and ``^STY$`` with every other
+field set. For each slot the bundled metadata gives the release, a line
 ``variable_modNN = <form>`` goes through ``ParamsLineReader``; the
 declaration's value is parsed, compared field by field with the form's
 expected value, formatted back to the identical text, and re-parsed to the
@@ -1431,11 +1649,51 @@ comments and ``minimum_intensity``, whose comment Comet itself writes one
 column early; Comet's section comments are not reproduced, the header is
 added.
 
+**Every installed release.** ``ReleaseWriterGateTest`` runs gate items 1, 4
+(the writer half) and 6 for each release with fixtures -- 2026.02.2 and
+2026.03.0 -- from one table of per-release facts rather than a copy of the
+test per release; a fixture release without a row fails it. For each: parse
+the release's real ``-q`` fixture and write, then twice more, all three
+byte-identical; the length and SHA-256 are the release's own, typed in --
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 12 74
+
+   * - Release
+     - Bytes
+     - SHA-256 of the canonical ``-q`` text
+   * - 2026.02.2
+     - 10 656
+     - ``f381afe1d48749d49a0bb5e97a0375be7e691f3c6bfa2f740e96589b4502d62b``
+   * - 2026.03.0
+     - 10 725
+     - ``3aecc834201d0e0cfb5a010b8e60391a3c599da70e42aa1b16abe720bd7b7444``
+
+-- the re-parse has no finding and equals the first model, line 1 is the
+release's marker, and all 118 declaration values equal the fixture's. (Of
+2026.03.0's 118 declaration lines, the only ones that differ from Comet's own
+``-q`` file are the three with curated comments -- ``spectral_library_ms_level``,
+``isotope_error``, ``output_txtfile`` -- and ``minimum_intensity``, whose
+comment Comet writes one column early; Comet's section comments are not
+reproduced and the header is added, as for 2026.02.2.) Then the
+release's twelve enzyme rows are written as Comet's own lines, each of the
+three enzyme references set to ``42`` is refused with the message above, and
+the CONSTRUCTED custom ``12. Glu_C`` survives a file round trip; then two
+CONSTRUCTED unknown parameters survive two round trips, in a section naming
+the release, and are reported as ``UNKNOWN_PARAMETER`` by both parses.
+Finally the ``^``/``$`` slots: for 2026.03.0, a model with ``^``, ``$`` and
+``^M`` in three slots writes them, reads them back and writes the same bytes
+again; for 2026.02.2, the same text is refused by ``withText`` and by the
+parser, and a ``^`` value made by the 2026.03.0 codec and put into a
+2026.02.2 model is refused by the writer, each naming 2026.02.2.
+
 Gate item 5 is ``CommaLocaleWriterTest``: under ``de-DE`` and ``fr-FR`` --
 after showing that each really formats ``1.5`` as ``1,5`` with both
 ``String.format`` and ``NumberFormat`` -- the real fixture's model and a
 CONSTRUCTED variant full of decimals parse and write to the same bytes as
-under ``Locale.ROOT``. The default locale is restored after every test.
+under ``Locale.ROOT``, for 2026.02.2 and for 2026.03.0 (whose variant also
+carries a ``$`` slot). The default locale is restored after every test.
 
 Refusal: enzyme numbers absent from the table
 ---------------------------------------------
@@ -2354,7 +2612,8 @@ It renders, per category in the metadata's order, one entry per parameter: the
 Comet name, display name, category, type (the value kind, in words and as the
 constant), the default for each installed version (the version record's
 override where there is one), the allowed values or range (labelled choices,
-bounds, the tuple layout of that version, or a pointer to the enzyme table),
+bounds, the tuple layout and residue alphabet of that version, or a pointer
+to the enzyme table),
 the short help with its upstream reference, the serialisation rule and, for
 each installed version, the **default line exactly as**
 ``CanonicalParamsWriter`` **writes it** for that version (``name = value``,
@@ -2382,6 +2641,11 @@ What refuses a build
 Each of these fails the documentation build with the generator's own message,
 naming the file, the parameter (or section) and the field:
 
+* a release's residue alphabet missing, not an object, with a member other
+  than ``characters`` and ``source``, with empty or missing characters, a
+  character that is neither ``A``-``Z`` nor a terminal code (``TERMINAL_CODES``,
+  which mirrors ``TerminalCode``), a character listed twice, or a source that
+  is not ``https://`` -- checked for every version record, installed or not;
 * a parameter missing any field of the metadata format -- each feeds a field of
   ``R-DOC-04`` or the default line -- or with a blank name, display name or
   help; a name given twice;
@@ -2440,12 +2704,18 @@ unmodelled parameter, an override for a release its parameter's range does not
 claim (``index_search_type`` for 2024.01.0), a second override, a non-``https``
 source, an override that replaces nothing, a repeated curated inline comment
 and choices, a default outside the release's choices and choices that drop its
-default, choices on a decimal, a non-``https`` help reference and blank help:
-40 generator cases in all. Before the damages, a **per-release control**
+default, choices on a decimal, a non-``https`` help reference and blank help;
+and eight damaged residue alphabets of the 2026.03.0 record -- the alphabet
+missing, an unknown member, empty characters, no characters, a character no
+release can mean (``#``), a lower-case letter, a character listed twice and a
+non-``https`` source: 48 generator cases in all. Before the damages, a
+**per-release control**
 renders the clean copy for a manifest that also names 2026.03.0 and requires
 ``index_search_type``'s entry to carry ``1`` and ``0``/``1`` for 2026.02.2 and
-``-1`` and ``-1``/``0``/``1`` for 2026.03.0, each with its own default line:
-a generator that ignored the overrides would fail it. Then, through the real hook in a project copy made by
+``-1`` and ``-1``/``0``/``1`` for 2026.03.0, each with its own default line,
+and ``variable_mod01``'s entry to state ``A``-``Z``, ``n``, ``c`` as
+2026.02.2's residue alphabet and to add ``^`` and ``$`` for 2026.03.0 only:
+a generator that ignored the overrides or the alphabets would fail it. Then, through the real hook in a project copy made by
 ``scripts/traceability/selftest.py``'s ``copy_project``: the clean copy builds
 with the count line and one HTML section per parameter; a missing field and a
 removed entry each fail the strict build; a generator that writes nothing (with
@@ -2602,9 +2872,10 @@ Comet reads what is written
 ===========================
 
 ``CometReadsCanonicalRealBinaryTest`` (Linux only, like the other real-binary
-tests) runs the pinned 2026.02.2 binary, staged from the mirror and checked
-against the manifest's SHA-256, through ``ProcessService``, as ``comet
--P<file> missing.mzML`` in an empty directory. Comet loads the ``-P`` file
+tests) runs each installed release's pinned binary -- 2026.02.2 and 2026.03.0
+-- staged from the mirror and checked against the manifest's SHA-256, through
+``ProcessService``, as ``comet -P<file> missing.mzML`` in an empty directory,
+each with the canonical file written for it. Comet loads the ``-P`` file
 **before** it looks at any input file [C820]_, and its parameter reader exits
 with its own message for a missing or unrecognised marker [C244]_, for a file
 without ``output_percolatorfile`` ("outdated params file") [C691]_, and for a
@@ -2613,17 +2884,41 @@ invalid parameter found`` for every name it does not know [C536]_. Only after
 all of that does it stop at ``Error - input file "missing.mzML" not found.``
 [C820]_ (exit 1).
 
-The test runs Comet's own ``-q`` file first, as the control: one warning,
-for ``spectral_library_ms_level`` (``-q`` writes it, the reader knows
-``speclib_ms_level``), then the input-file error. The canonical file of the
-same model, and a canonical file with a custom enzyme and a paired-field tuple,
-must give exactly the same standard output, standard error and exit code. A
-canonical file carrying one unknown parameter must add exactly one warning
-naming it, which shows the comparison can see a difference.
+The test runs the release's own ``-q`` file first, as the control. The
+control transcripts differ, and each is typed in the test as observed:
 
-What this proves: the real 2026.02.2 parameter reader accepts the canonical
-file -- marker, header, every parameter name, every tuple's shape, the table
--- exactly as it accepts its own ``-q`` output. What it does **not** prove:
+.. list-table::
+   :header-rows: 1
+   :widths: 14 86
+
+   * - Release
+     - Control transcript (exit 1 in both)
+   * - 2026.02.2
+     - standard output ``Warning - invalid parameter found:
+       spectral_library_ms_level.  Parameter will be ignored.`` (``-q``
+       writes it, the reader knows ``speclib_ms_level``); standard error
+       ``Comet version 2026.02 rev. 2 (6edec91)`` and ``Error - input file
+       "missing.mzML" not found.``
+   * - 2026.03.0
+     - standard output **empty** -- 2026.03.0 reads
+       ``spectral_library_ms_level`` [V26L]_; standard error ``Comet version
+       2026.03 rev. 0 (fa08489)`` and ``Error - input file "missing.mzML" not
+       found.``
+
+The canonical file of the same model, and a canonical file with a custom
+enzyme and a paired-field tuple, must give exactly the same standard output,
+standard error and exit code. For 2026.03.0, so must a canonical file with
+``^``, ``$`` and ``^M$`` in three slots. A canonical file carrying one unknown
+parameter must add exactly one warning naming it -- ``bogus_parameter``,
+after 2026.02.2's own warning and as 2026.03.0's only one -- which shows the
+comparison can see a difference.
+
+What this proves: the real 2026.02.2 and 2026.03.0 parameter readers accept
+the canonical file written for each -- marker, header, every parameter name,
+every tuple's shape, the table, and for 2026.03.0 the protein-terminus codes
+-- exactly as each accepts its own ``-q`` output. (That 2026.03.0 then
+*searches* with ``^`` and ``$`` as meant was established by real searches,
+:ref:`dev-comet-parameter-202603-termini`, not by this test.) What it does **not** prove:
 that Comet reads each value as the model means it. Comet prints no parsed
 values, so a value Comet's ``sscanf`` would read differently goes unseen
 here; that is what the codecs' citations of Comet's reading code are for.
