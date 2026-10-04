@@ -451,6 +451,18 @@ build_sandbox() {
     # damages is exactly what it means to damage.
     cp "${ROOT}/specification.rst" "${SANDBOX}/specification.rst"
 
+    # By the same rule, one developer page: cometgui-params-comet's
+    # ValidationCorpusTest.everyCaseIsDocumented (COMET-2026-03 unit 4) asserts
+    # that docs/developer/comet_parameter_schema.rst has a corpus-table row for
+    # every case of the validation corpus.  Without the page every sandbox
+    # build died in that test, and controls 5, 7, 8 and H went red for that
+    # reason rather than their own (found on the package's final --only tests
+    # run, 2026-10-04).  The page alone, not docs/: nothing else there is read
+    # by a test.
+    mkdir -p "${SANDBOX}/docs/developer"
+    cp "${ROOT}/docs/developer/comet_parameter_schema.rst" \
+        "${SANDBOX}/docs/developer/comet_parameter_schema.rst"
+
     # manifests/ is here for the same reason and by the same rule: the build
     # reads it as INPUT.  Phase 05's cometgui-install ships manifests/tools.json
     # as a resource resolved through ${maven.multiModuleProjectDirectory}, so
