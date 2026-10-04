@@ -31,6 +31,15 @@ Comet parameter schema
    2026.03.0 binary reading the canonical file
    (:ref:`dev-comet-parameter-comet-reads`).
 
+   **Comet 2026.03.0 intake, unit 4**: validation agreed with both real
+   binaries -- version-scoped rule severities as data in each release's
+   version record (:ref:`dev-comet-parameter-rule-severities`,
+   :ref:`dev-comet-parameter-version-scoped-rules`), three new rules, and a
+   corpus of 42 cases each release's binary was run on, replayed by a
+   real-binary test (:ref:`dev-comet-parameter-validation-corpus`); the
+   2026.03.0 help of ``variable_modNN`` and ``output_txtfile``
+   (:ref:`dev-comet-parameter-202603-help`).
+
 What this page covers
 =====================
 
@@ -344,7 +353,8 @@ Top level::
                                                "residueAlphabet": { "characters", "source" } },
                          "overrides": [ { "name", "source", ...any of "default",
                                           "choices", "inlineComment",
-                                          "shortHelp", "helpUrl" } ] } ],
+                                          "shortHelp", "helpUrl" } ],
+                         "ruleSeverities": [ { "rule", "severity", "source" } ] } ],
       "categories":  [ { "id", "displayName" } ],         // exactly the fourteen
       "enzymeTable": { "header", "helpUrl", "rowFormat",
                        "senseChoices": [ { "value", "label" } ],
@@ -368,7 +378,9 @@ reference to where the release shows them -- see
 
 ``overrides`` lists what **that release** says differently about a parameter
 (:ref:`dev-comet-parameter-overrides`); it is empty for a release that agrees
-with every curated definition. Three records exist
+with every curated definition. ``ruleSeverities`` states, for each
+version-scoped validation rule, what that release's binary does with what the
+rule checks (:ref:`dev-comet-parameter-rule-severities`). Three records exist
 (:ref:`dev-comet-parameter-202603`, :ref:`dev-comet-parameter-older-release`):
 
 .. list-table::
@@ -384,17 +396,23 @@ with every curated definition. Three records exist
        (``D-010``). The same tuple layout as 2026.02.2, read by
        ``Comet.cpp`` lines 556-625 at ``v2026.03.0`` [V26T]_; its residue
        alphabet adds ``^`` and ``$`` to ``A``-``Z``, ``n`` and ``c``
-       [V26A]_ (:ref:`dev-comet-parameter-202603-termini`). Four overrides:
+       [V26A]_ (:ref:`dev-comet-parameter-202603-termini`). Twenty overrides:
        ``index_search_type`` (default ``-1``, choices ``-1``/``0``/``1``,
        Comet's own 2026.03.0 inline comment, help and help page),
        ``decoy_search`` (Comet's own 2026.03.0 inline comment),
        ``spectral_library_ms_level`` and ``add_U_selenocysteine`` (inline
-       comment, help and help reference: what 2026.03.0 really does with each).
+       comment, help and help reference: what 2026.03.0 really does with each),
+       ``output_txtfile`` (inline comment and help naming 2026.03.0) and
+       ``variable_mod01`` to ``variable_mod15`` (help naming ``^`` and ``$``,
+       and the 2026.03 page) -- :ref:`dev-comet-parameter-202603-help`. Rule
+       severities: a distance below -2 an **error**, ``index_search_type``
+       without an ``.idx`` a **warning**.
    * - ``2026.02.2``
      - ``2026.02 rev. 2 (6edec91)``
      - Neutral loss and count both take a comma pair; residue alphabet
        ``A``-``Z``, ``n``, ``c`` [M1380]_. ``overrides`` empty: every curated
-       definition is 2026.02.2's own.
+       definition is 2026.02.2's own. Rule severities: a distance below -2 a
+       **warning**, ``index_search_type`` without an ``.idx`` **off**.
    * - ``2024.01.0``
      - ``2024.01 rev. 0 (f00df0c)``
      - The migration fixture's release, not offered to users. The neutral loss
@@ -403,7 +421,8 @@ with every curated definition. Three records exist
        ``n``, ``c`` [V24A]_. Two default overrides:
        ``fragindex_num_spectrumpeaks = 100`` and
        ``fragindex_skipreadprecursors = 0`` [V24D]_, where 2026.02.2 writes
-       ``150`` and ``1``.
+       ``150`` and ``1``. Rule severities as 2026.02.2's (it has no
+       ``index_search_type``).
 
 ``CuratedMetadata.parametersFor(version)`` and ``parameter(name, version)``
 give each definition **as that version has it** -- the version's override
@@ -563,10 +582,52 @@ user preset although no parameter changed; a reader that predates
 else a release changes. The residue alphabet of the variable-modification
 tuple (2026.03.0's ``^`` and ``$``) is in that release's ``variableModTuple``,
 beside the field layout it qualifies (:ref:`dev-comet-parameter-residue-alphabet`).
-Version-keyed validation facts (a rule's severity or bound for that release)
-belong in a member of the record keyed by the rule's stable id -- each a new
-field the loader validates, so that a rule reads the fact from the version the
-model carries.
+Version-keyed validation facts -- a rule's severity for that release -- are
+the record's ``ruleSeverities``, keyed by the rule's stable identifier
+(:ref:`dev-comet-parameter-rule-severities`), so that a rule reads the fact
+from the version the model carries.
+
+.. _dev-comet-parameter-rule-severities:
+
+Rule severities
+---------------
+
+Decision C-2 again, for validation: where Comet releases judge a
+configuration differently -- one refuses it, another warns, a third says
+nothing -- the rule that checks it is **version-scoped**, and each release's
+version record states its severity::
+
+    "ruleSeverities": [
+      { "rule": "index_search_type.ignored_without_idx", "severity": "WARNING",
+        "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1764-L1775" },
+      { "rule": "variable_mod_tuple.distance_undocumented", "severity": "ERROR",
+        "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1436-L1450" }
+    ]
+
+``rule`` is the rule's stable identifier (``Rule.id()``), ``severity`` one of
+``ERROR``, ``WARNING`` and ``OFF`` (the release has nothing to report, so the
+rule finds nothing for it), and ``source`` the ``https://`` reference to the
+release behaviour the level encodes. Java holds an entry as ``RuleSeverity``;
+``CometVersionRecord.ruleSeverities()`` maps rule identifiers to them.
+
+There is **no default and no inheritance**: every release states every
+version-scoped rule, so a release added later cannot be judged by a severity
+nobody chose for it. The member is required like every other (empty is
+legal JSON, and then the validator refuses the record). What
+``MetadataLoader`` refuses, naming ``versions[i] severity of rule "<id>"`` and
+the field: a missing member or one that is not an array of objects; an entry
+field other than the three; a ``rule`` that is blank or not an identifier
+(lower-case words, a dot, lower-case words); a rule stated twice; a
+``severity`` that is not one of the three constants; a ``source`` that is not
+``https://``. The schema does not know the rules, so the validator, which
+does, refuses the rest when it judges a model of that release
+(``VersionSeverities``, an ``IllegalStateException`` naming the release): a
+rule that does not exist, a rule whose severity is fixed, and a
+version-scoped rule the record does not state. ``RuleSeveritiesLoaderTest``
+and ``VersionScopedRulesTest`` prove each. The documentation generator
+refuses the same malformed entries, and a release whose set of rules differs
+from another's, and renders the table of severities on the generated
+reference (:ref:`comet-rule-severities`).
 
 Where the words come from
 -------------------------
@@ -859,6 +920,34 @@ so this documents
 existing behaviour rather than a change; the override carries the new comment
 because the canonical file for a release takes that release's comments.
 
+.. _dev-comet-parameter-202603-help:
+
+``output_txtfile`` and ``variable_modNN``: help that names the release
+------------------------------------------------------------------------
+
+Two curated texts named the wrong release when 2026.03.0 inherited them; its
+record now overrides both.
+
+* ``output_txtfile``. The curated inline comment and help say that
+  **2026.02.2** treats ``2`` (the "Crux-formatted" value ``-q`` offers) as
+  ``1``. 2026.03.0 does the same: its parameter code tests ``== 0`` and writes
+  the text file for any other value [V26O]_. Run on 2026-10-04 with 2026.03.0's
+  own ``-q`` file (the base edits of :ref:`dev-comet-parameter-validation-corpus`)
+  and ``output_txtfile`` ``1`` and then ``2``: both exit 0, silent, and write
+  the same ``.txt`` body (26 lines, the same SHA-256). The 2026.03.0 override
+  says ``0=no, 1=yes  write tab-delimited txt file (2026.03.0 treats 2 as 1)``,
+  help naming 2026.03.0, and the 2026.03 page; the choices are unchanged, so
+  ``2`` stays legal and the file reads back unchanged. ``ReleaseWriterGateTest``
+  re-pinned the 2026.03.0 canonical SHA-256 for this one comment, and only for
+  it: reversing that substitution in the new text gives the old pinned value.
+* ``variable_mod01`` to ``variable_mod15``. The curated help says "n and c for
+  termini". 2026.03.0's ``-q`` comment documents ``^`` and ``$`` and the
+  position fields [V26M]_; its override (fifteen, one per slot) says ``n`` and
+  ``c`` for any peptide terminus and ``^`` and ``$`` for the protein's, that
+  2026.03.0 refuses a distance other than -1, -2 or 0 and up, and the terminus
+  codes, and points at the 2026.03 page. ``Comet202603CurationTest`` holds
+  both releases' texts.
+
 .. _dev-comet-parameter-202603-termini:
 
 ``^`` and ``$`` in the residue token
@@ -990,6 +1079,42 @@ Citations, at tag ``v2026.03.0`` (commit
    -- an index's ``DecoySearch:`` header line read back (written at line 887).
 .. [V26D] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometPeptideIndex.cpp#L1949-L1951
    -- the same in 2026.03.0 (written at line 1357).
+.. [V26X] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1436-L1450
+   -- an active slot with a distance below -2, or a distance of 0 or more and a
+   terminus outside 0-3, refused: ``invalid term_distance/which_term``.
+.. [V26C] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1402-L1414
+   -- each active slot's maximum count capped at the per-peptide limit, and
+   at 5 when a fragment-ion index is being built.
+.. [V26G] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1475-L1512
+   -- a slot identical to a lower one merged into it and switched off.
+.. [V26P] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1577-L1603
+   -- AScorePro with an active ``variable_mod10``-``15`` refused, and why.
+.. [V26S] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1706-L1708
+   -- "an index" decided by the database name's last four characters, ``.idx``.
+.. [V26F] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1764-L1775
+   -- ``index_search_type`` 0 or 1 with a database that is not an ``.idx``: a
+   warning.
+.. [V26Z] https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L707-L729
+   -- an enzyme number with no row: ``is missing definition in params file``,
+   exit 1.
+.. [V26O] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L748-L754
+   -- ``output_txtfile``: ``== 0`` or not.
+.. [V26M] https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003
+   -- the ``-q`` comment above the slots: ``^``, ``$``, the distance and the
+   terminus codes.
+.. [V22G] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1315-L1352
+   -- 2026.02.2's merge of identical slots: the same comparison, no
+   protein-terminus rewrite before it.
+.. [V22F] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L720-L724
+   -- 2026.02.2 reads ``index_search_type`` with no check and no warning.
+.. [V24G] https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometSearch.cpp#L4754-L4758
+   -- 2024.01.0, as 2026.02.2: any negative distance is "no constraint".
+.. [P920] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometPostAnalysis.cpp#L913-L921
+   -- the peptide handed to AScorePro: each modified residue followed by its
+   slot number in decimal digits.
+.. [M3336] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L3330-L3360
+   -- AScorePro's modification symbols: slot *n* is the one character
+   ``'0' + n``.
 
 .. _dev-comet-parameter-structured:
 
@@ -1753,7 +1878,9 @@ Validation
 
 Package ``org.cometgui.params.comet.validation``. ``CometValidator.standard()
 .validate(model)`` returns a ``ValidationReport``: every ``Finding``, each from
-one ``Rule`` with a **stable identifier** and a **fixed severity**, attached to
+one ``Rule`` with a **stable identifier** and a **severity** -- fixed, or, for
+a version-scoped rule, the one the model's release states
+(:ref:`dev-comet-parameter-version-scoped-rules`) -- attached to
 the responsible parameters (the first is the one to show it at) and their
 category -- *Errors shall be attached to the responsible field and category*.
 ``hasErrors()`` is what Phase 08 blocks a run on; ``forParameter(name)`` and
@@ -1837,12 +1964,53 @@ signs of the bounds and their order are the same in every unit; a test
 repeats the verdicts under all three. Out-of-range unit codes are the
 ``choice`` rule's (Comet would silently use amu [M584]_).
 
+.. _dev-comet-parameter-version-scoped-rules:
+
+Version-scoped rules
+--------------------
+
+Comet 2026.03.0 refuses or warns about configurations 2026.02.2 accepted in
+silence, so some verdicts differ by release. By decision C-2 no rule asks which
+version it judges. Two kinds of fact are data instead:
+
+* **A severity.** A version-scoped ``Rule`` has no severity of its own
+  (``Rule.fixedSeverity()`` is empty, ``isVersionScoped()`` true); each
+  release's version record states it (:ref:`dev-comet-parameter-rule-severities`),
+  and the finding carries it (``Finding.severity()``). ``Findings`` reads the
+  record of the model's version once per validation (``VersionSeverities``)
+  and records nothing for a rule the release states ``OFF``.
+* **A release fact a rule reads.** The residue alphabet
+  (:ref:`dev-comet-parameter-residue-alphabet`) is the law of
+  ``variable_mod_tuple.residue_not_in_release``, and the merge model of
+  ``variable_mods.ascorepro_slot_unsupported`` applies Comet 2026.03.0's
+  protein-terminus rewrite only in a release whose alphabet has the
+  protein-terminus code. Neither rule's severity differs, so neither is
+  version-scoped.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 22 22 22
+
+   * - Version-scoped rule
+     - Comet 2026.03.0
+     - Comet 2026.02.2
+     - Comet 2024.01.0
+   * - ``variable_mod_tuple.distance_undocumented``
+     - **error**: the binary refuses it [V26X]_
+     - warning: read as -1, silently [S5371]_
+     - warning, as 2026.02.2 [V24G]_
+   * - ``index_search_type.ignored_without_idx``
+     - warning: the binary warns [V26F]_
+     - off: the binary is silent [V22F]_
+     - off: no such parameter
+
 The rule catalogue
 ------------------
 
-Severity is the rule's: **E** an error (blocks a run), **W** a warning. Source
-names the Comet fact a rule encodes, at tag ``v2026.02.2``; a rule with none
-encodes this project's choice or the specification's.
+Severity is the rule's: **E** an error (blocks a run), **W** a warning, **V**
+version-scoped (the release states it; the table above). Source names the
+Comet fact a rule encodes, at tag ``v2026.02.2`` unless it names another; a
+rule with none encodes this project's choice or the specification's.
 
 .. list-table::
    :header-rows: 1
@@ -1923,9 +2091,10 @@ encodes this project's choice or the specification's.
      - ``search_enzyme_number``, ``search_enzyme2_number``,
        ``sample_enzyme_number``
      - The number is a row of the model's table -- the writer's refusal, as a
-       finding at the field before anything is written. Comet's own
-       "missing definition" checks can never fire.
-     - [C691]_, [D345]_
+       finding at the field before anything is written. Comet 2026.02.2's own
+       "missing definition" checks can never fire, so it searches on with a
+       default identity; 2026.03.0 refuses the file at parameter load.
+     - [C691]_, [D345]_, [V26Z]_
    * - ``enzyme_table.row_unreadable``
      - E
      - the parameters that select the row
@@ -1949,6 +2118,15 @@ encodes this project's choice or the specification's.
      - The residue token is at most 31 characters (``%31s`` into
        ``MAX_VARMOD_AA`` 32); a longer one shifts every later field.
      - [C589]_, [D25]_
+   * - ``variable_mod_tuple.residue_not_in_release``
+     - E
+     - any slot, active or not
+     - Every character of the residue token is in the release's residue
+       alphabet: ``^`` and ``$`` are 2026.03.0's. Comet 2026.02.2 runs them
+       without a word and never applies them; the codec refuses them on read
+       and write, and this reports a model built in code at the field. The
+       message offers ``n`` (``c``) at distance 0 from terminus 0 (1) instead.
+     - [V26A]_, [M1380]_
    * - ``variable_mod_tuple.count_negative``
      - E
      - an active slot
@@ -1966,17 +2144,19 @@ encodes this project's choice or the specification's.
      - A maximum of 0 places nothing.
      - [S5729]_
    * - ``variable_mod_tuple.distance_undocumented``
-     - W
+     - V
      - an active slot
-     - Distance is -2, -1 or 0 and up; Comet treats other negatives as -1.
-     - [VM]_, [S5371]_, [S5454]_
+     - Distance is -2, -1 or 0 and up. Comet 2026.02.2 treats other
+       negatives as -1 (a warning); 2026.03.0 refuses them (an error).
+     - [VM]_, [S5371]_, [S5454]_, [V26X]_
    * - ``variable_mod_tuple.terminus_undocumented``
      - E
      - an active slot with a distance of 0 or more
-     - Terminus 0 to 3; with a distance Comet matches no other code, so the
-       modification never applies. (With distance -1 or -2 the terminus is
-       not consulted and is not checked.)
-     - [S5375]_, [S5466]_
+     - Terminus 0 to 3; with a distance Comet 2026.02.2 matches no other code,
+       so the modification never applies, and 2026.03.0 refuses it. (With
+       distance -1 or -2 neither release consults the terminus, and it is not
+       checked.)
+     - [S5375]_, [S5466]_, [V26X]_
    * - ``variable_mod_tuple.requirement_undocumented``
      - W
      - an active slot
@@ -2012,6 +2192,19 @@ encodes this project's choice or the specification's.
      - ``max_variable_mods_in_peptide``, then the active slots
      - A limit of 0 with active, optional slots: they have no effect.
      - [S5740]_
+   * - ``variable_mods.ascorepro_slot_unsupported``
+     - E
+     - the slot, ``print_ascorepro_score``
+     - AScorePro on (``print_ascorepro_score`` not 0) while a slot above
+       ``variable_mod09`` is active after Comet merges each slot identical to
+       a lower one into it. One finding per such slot.
+     - [V26P]_, [V26G]_, [P920]_, [M3336]_
+   * - ``index_search_type.ignored_without_idx``
+     - V
+     - ``index_search_type``, ``database_name``
+     - ``index_search_type`` 0 or 1 while ``database_name`` does not end in
+       ``.idx`` (Comet's own test, case-sensitive): the value has no effect.
+     - [V26S]_, [V26F]_
    * - ``workflow_enforced.output_off``
      - E
      - ``output_pepxmlfile``, ``output_percolatorfile``
@@ -2043,7 +2236,27 @@ encodes this project's choice or the specification's.
      - --
 
 A slot is **active** when its mass difference is not 0 [M1368]_; the meaning
-rules apply to active slots only. A slot's maximum above
+rules apply to active slots only.
+
+**AScorePro and the slot merge.** Comet hands AScorePro each modified residue
+followed by its slot number as decimal digits [P920]_ and registers slot *n* as
+the one character ``'0' + n`` [M3336]_, so a two-digit slot reads as two
+one-digit ones. Before any check, Comet merges every active slot identical to
+a lower active one into it and switches it off [V26G]_ (the same loop in
+2026.02.2 [V22G]_); "identical" compares, as ``double``\ s and integers, the
+mass difference, both neutral losses (a missing second one is 0), the binary
+group, the maximum count **after** Comet caps it at
+``max_variable_mods_in_peptide`` (or at the release's default when that is
+negative and ignored) [V26C]_, the minimum count (0 when there is none), the
+requirement (never ``-1``: exclusive slots are never merged), the distance and
+the terminus -- not the residues. Comet 2026.03.0 first rewrites ``n`` (``c``)
+at distance 0 from terminus 0 (1), in a token of nothing else and its
+protein-terminus code, to ``^`` (``$``) with distance -1 and terminus 0
+[V26N]_; ``AScoreProRule.activeAfterMerge`` applies that rewrite only where the
+release's alphabet has the code. The rule then reports each surviving slot 10
+to 15. It is an **error in both releases**: 2026.03.0 refuses the file
+[V26P]_, and 2026.02.2 -- whose catalogue said nothing -- was seen to crash in
+post-analysis (case ``ascore-crash``, :ref:`dev-comet-parameter-validation-corpus`). A slot's maximum above
 ``max_variable_mods_in_peptide`` is ordinary and not reported. A negative
 ``max_variable_mods_in_peptide`` is the bounds rule's error and caps nothing
 in the ``variable_mods`` rules, because Comet ignores it and keeps its default
@@ -2124,7 +2337,9 @@ The specification's *Comet validation* list
      - Here, at model level; locking the controls is Phase 07's, blocking a
        run Phase 08's.
    * - Selected index and search options are compatible
-     - **Not here.** It depends on whether ``database_name`` names an existing
+     - **Partly here**: ``index_search_type`` against the text of
+       ``database_name`` (``index_search_type.ignored_without_idx``, 2026.03.0).
+       The rest depends on whether ``database_name`` names an existing
        ``.idx`` and which type that file records (Comet reads only the first
        five variable modifications for a fragment-ion index [K77]_), so it needs the
        file system: Phase 08. Not yet assigned in any phase document;
@@ -2140,6 +2355,368 @@ The specification's *Comet validation* list
    * - Parameters unavailable in the selected version are blocked
      - Here (``version.parameter_unavailable``).
 
+
+.. _dev-comet-parameter-validation-corpus:
+
+Validation agreed with the real binaries
+========================================
+
+Comet 2026.03.0 intake, unit 4. For every rule the release changed, a corpus
+of parameter files was run through **both** real binaries, 2026.03.0 and
+2026.02.2, and the validator, given each release, was made to agree with that
+release's binary on every case. The corpus is
+``cometgui-params-comet/src/test/resources/fixtures/comet-validation/corpus.json``;
+``ValidationCorpusTest`` holds the validator to it on every platform and
+``ValidationCorpusRealBinaryTest`` re-runs both binaries on it (Linux).
+
+The agreement criterion
+-----------------------
+
+Each run is classed **error** (the binary exits non-zero), **warning** (it
+exits 0 and prints a ``Warning`` line beyond its release's control run) or
+**clean**; the validator's report is classed **error** (``hasErrors()``),
+**warning** (findings, none an error) or **clean**. Then:
+
+* binary error: validator error;
+* binary warning: validator warning -- or error, only with a recorded reason;
+* binary clean: validator clean -- or a recorded deliberate stricter judgement
+  (the setting is a silent no-op, never applies, or cannot be written).
+
+The validator is **never** less severe than the binary. A case recorded
+``same`` must have equal classes; one recorded ``stricter`` must be strictly
+more severe and carry its reason (``S1``-``S8`` below). Both tests assert it
+for every case and release, and the exact findings and the binary's exact
+lines.
+
+How each case was run
+---------------------
+
+Every case is the release's own ``comet -q`` fixture
+(``fixtures/comet/<version>/linux-x86-64/comet-q.params``) with five **base
+edits** and then the case's edits, each replacing the one line that declares
+the parameter -- CONSTRUCTED input. The base edits: ``database_name`` the
+first 1000 records of the UniProt human proteome ``UP000005640_9606.fasta``
+(SHA-256 ``5005d961...558f`` for the subset); ``spectral_library_name``
+empty (``-q``'s placeholder ``/some/path/speclib.file`` stops every search
+with ``Error (5) - cannot read spectral library file``); ``scan_range = 11188
+11192``; ``num_threads = 4``; ``output_percolatorfile = 1`` (so the base model
+is clean: ``R-CMT-01``). Each run, in its own directory::
+
+    comet -P<dir>/case.params -N<dir>/out <K562_3.mzML, LF copy>
+
+with the pinned mirror binaries ``v2026.03.0__comet.linux.exe`` (SHA-256
+``ad93b4cf...91e7ed``) and ``v2026.02.2__comet.linux.exe``. The spectra are
+the Crux K562 run ``20100614_Velos1_TaGe_SA_K562_3.mzML`` (``D-006``; SHA-256
+``cbd0c1b3...0bc7``), whose CRLF line endings break its index, so the run uses
+an LF copy (SHA-256 ``a562f6e6...54da``). Neither file is committed; the test
+reads both from ``scratch/fixture/`` and fails, naming the file, when one is
+missing or changed. Refill with ``python3
+scripts/feasibility/fetch_ephemeral_input.py``, which fetches by checksum.
+``scripts/verify-test-gates.sh`` stops at once when ``scratch/fixture`` is
+missing. Each search takes about 0.2 s; the whole corpus, both releases, runs
+in about 5 s on eight threads.
+
+Recorded per run: the exit code and every line holding ``Warning`` or
+``Error``, from standard output and standard error, less the release's
+**control** lines -- what its own base file prints anyway. Comet 2026.03.0's
+control prints nothing; 2026.02.2's prints ``Warning - invalid parameter
+found: spectral_library_ms_level.  Parameter will be ignored.`` on every run,
+because its reader does not know the name its own ``-q`` writes
+(:ref:`dev-comet-parameter-202603`). That warning is about the release's
+template, not about any value a user chooses (Comet's own file draws it), so
+the validator reports nothing for it, and the corpus judges each case by what
+it adds to the control.
+
+Which checks fire where: only the enzyme-definition errors fire at parameter
+load (``comet -P<file> missing.mzML`` reaches them); the distance and terminus
+errors, the AScorePro error and both ``index_search_type`` warnings fire only
+once a search starts (with a missing input the run stops first at ``Error -
+input file "missing.mzML" not found.``).
+
+The corpus
+----------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 26 29 29
+
+   * - Case
+     - Edit (CONSTRUCTED)
+     - Comet 2026.03.0
+     - Comet 2026.02.2
+   * - ``control``
+     - none (the base file)
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``res-protein-n``
+     - ``variable_mod02 = 42.010565 ^ 0 1 -1 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: error ``variable_mod_tuple.residue_not_in_release``. **stricter [S1]**
+   * - ``res-protein-c``
+     - ``variable_mod02 = -0.984016 $ 0 1 -1 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: error ``variable_mod_tuple.residue_not_in_release``. **stricter [S1]**
+   * - ``res-n-and-protein-n``
+     - ``variable_mod02 = 42.010565 n^ 0 1 -1 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: error ``variable_mod_tuple.residue_not_in_release``. **stricter [S1]**
+   * - ``res-mixed``
+     - ``variable_mod02 = 42.010565 K^c$ 0 1 -1 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: error ``variable_mod_tuple.residue_not_in_release``. **stricter [S1]**
+   * - ``res-protein-n-unused``
+     - ``variable_mod02 = 0.0 ^ 0 3 -1 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: error ``variable_mod_tuple.residue_not_in_release``. **stricter [S2]**
+   * - ``dist-minus3``
+     - ``variable_mod01 = 15.9949 M 0 3 -3 0 0 0.0``
+     - exit 1, error [M1]. Validator: error ``variable_mod_tuple.distance_undocumented``. **same**
+     - exit 0, silent. Validator: warning ``variable_mod_tuple.distance_undocumented``. **stricter [S3]**
+   * - ``dist-minus2``
+     - ``variable_mod01 = 15.9949 M 0 3 -2 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``dist-minus3-unused``
+     - ``variable_mod02 = 0.0 X 0 3 -3 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``term4-dist2``
+     - ``variable_mod01 = 15.9949 M 0 3 2 4 0 0.0``
+     - exit 1, error [M2]. Validator: error ``variable_mod_tuple.terminus_undocumented``. **same**
+     - exit 0, silent. Validator: error ``variable_mod_tuple.terminus_undocumented``. **stricter [S4]**
+   * - ``termminus1-dist0``
+     - ``variable_mod01 = 15.9949 M 0 3 0 -1 0 0.0``
+     - exit 1, error [M3]. Validator: error ``variable_mod_tuple.terminus_undocumented``. **same**
+     - exit 0, silent. Validator: error ``variable_mod_tuple.terminus_undocumented``. **stricter [S4]**
+   * - ``term4-dist-minus1``
+     - ``variable_mod01 = 15.9949 M 0 3 -1 4 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``term7-dist-minus2``
+     - ``variable_mod01 = 15.9949 M 0 3 -2 7 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ascore-slot10``
+     - ``variable_mod10 = 79.966331 STY 0 3 -1 0 0 0.0``
+     - exit 1, error [M4]. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **stricter [S5]**
+   * - ``ascore-slot10-off``
+     - ``variable_mod10 = 79.966331 STY 0 3 -1 0 0 0.0``; ``print_ascorepro_score = 0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ascore-slot10-all``
+     - ``variable_mod10 = 79.966331 STY 0 3 -1 0 0 0.0``; ``print_ascorepro_score = -1``
+     - exit 1, error [M4]. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **stricter [S5]**
+   * - ``ascore-slot15``
+     - ``variable_mod15 = 79.966331 STY 0 3 -1 0 0 0.0``
+     - exit 1, error [M5]. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **stricter [S5]**
+   * - ``ascore-slot09``
+     - ``variable_mod09 = 79.966331 STY 0 3 -1 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ascore-merged``
+     - ``variable_mod10 = 15.9949 M 0 3 -1 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ascore-merged-residues``
+     - ``variable_mod10 = 15.9949 STY 0 3 -1 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ascore-merged-digits``
+     - ``variable_mod10 = 15.99490 M 0 3 -1 0 0 0.00``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ascore-count-differs``
+     - ``variable_mod10 = 15.9949 M 0 2 -1 0 0 0.0``
+     - exit 1, error [M4]. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **stricter [S5]**
+   * - ``ascore-merged-by-cap``
+     - ``variable_mod10 = 15.9949 M 0 7 -1 0 0 0.0``; ``max_variable_mods_in_peptide = 3``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ascore-cap-not-reached``
+     - ``variable_mod10 = 15.9949 M 0 7 -1 0 0 0.0``
+     - exit 1, error [M4]. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **stricter [S5]**
+   * - ``ascore-exclusive``
+     - ``variable_mod01 = 15.9949 M 0 3 -1 0 -1 0.0``; ``variable_mod10 = 15.9949 M 0 3 -1 0 -1 0.0``
+     - exit 1, error [M4]. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **stricter [S5]**
+   * - ``ascore-merged-unused-lower``
+     - ``variable_mod01 = 0.0 M 0 3 -1 0 0 0.0``; ``variable_mod10 = 15.9949 M 0 3 -1 0 0 0.0``
+     - exit 1, error [M4]. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **stricter [S5]**
+   * - ``ascore-merged-rewrite``
+     - ``variable_mod01 = 42.010565 n 0 1 0 0 0 0.0``; ``variable_mod10 = 42.010565 n 0 1 -1 0 0 0.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **stricter [S5]**
+   * - ``ascore-crash``
+     - ``scan_range = 11000 12500``; ``print_ascorepro_score = -1``; ``variable_mod01 = 0.0 M 0 3 -1 0 0 0.0``; ``variable_mod10 = 15.9949 M 0 3 -1 0 0 0.0``
+     - exit 1, error [M4]. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 139 (signal 11, segmentation fault), no message. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+   * - ``ascore-neutral-loss-differs``
+     - ``variable_mod10 = 15.9949 M 0 3 -1 0 0 63.998285``
+     - exit 1, error [M4]. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``. **stricter [S5]**
+   * - ``ascore-slot10-dist-invalid``
+     - ``variable_mod10 = 79.966331 STY 0 3 -3 0 0 0.0``
+     - exit 1, error [M6]. Validator: error ``variable_mod_tuple.distance_undocumented``; error ``variable_mods.ascorepro_slot_unsupported``. **same**
+     - exit 0, silent. Validator: error ``variable_mods.ascorepro_slot_unsupported``; warning ``variable_mod_tuple.distance_undocumented``. **stricter [S5]**
+   * - ``ist-1``
+     - ``index_search_type = 1``
+     - exit 0, warning [M7]. Validator: warning ``index_search_type.ignored_without_idx``. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ist-0``
+     - ``index_search_type = 0``
+     - exit 0, warning [M8]. Validator: warning ``index_search_type.ignored_without_idx``. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ist-minus1``
+     - ``index_search_type = -1``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: error ``choice.not_listed``. **stricter [S6]**
+   * - ``ist-99``
+     - ``index_search_type = 99``
+     - exit 0, warning [M9]. Validator: error ``choice.not_listed``. **stricter [S7]**
+     - exit 0, silent. Validator: error ``choice.not_listed``. **stricter [S7]**
+   * - ``ist-minus5``
+     - ``index_search_type = -5``
+     - exit 0, warning [M10]. Validator: error ``choice.not_listed``. **stricter [S7]**
+     - exit 0, silent. Validator: error ``choice.not_listed``. **stricter [S7]**
+   * - ``ist-1-idx-name``
+     - ``index_search_type = 1``; ``database_name = ${DATABASE}.idx``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``ist-0-idx-name``
+     - ``index_search_type = 0``; ``database_name = ${DATABASE}.idx``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``enz-search-99``
+     - ``search_enzyme_number = 99``
+     - exit 1, error [M11]. Validator: error ``enzyme_in_table.missing``. **same**
+     - exit 0, silent. Validator: error ``enzyme_in_table.missing``. **stricter [S8]**
+   * - ``enz-search2-99``
+     - ``search_enzyme2_number = 99``
+     - exit 1, error [M12]. Validator: error ``enzyme_in_table.missing``. **same**
+     - exit 0, silent. Validator: error ``enzyme_in_table.missing``. **stricter [S8]**
+   * - ``enz-sample-99``
+     - ``sample_enzyme_number = 99``
+     - exit 1, error [M13]. Validator: error ``enzyme_in_table.missing``. **same**
+     - exit 0, silent. Validator: error ``enzyme_in_table.missing``. **stricter [S8]**
+   * - ``selenocysteine``
+     - ``add_U_selenocysteine = 10.0``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+   * - ``speclib-level-2``
+     - ``spectral_library_ms_level = 2``
+     - exit 0, silent. Validator: clean. **same**
+     - exit 0, silent. Validator: clean. **same**
+
+The binaries' lines, verbatim (``${DATABASE}`` standing for the database path):
+
+M1
+    ``Error - variable_mod01 (M): invalid term_distance/which_term "-3 0"; term_distance must be -2, -1 or >= 0, and which_term 0-3 (0 = protein N, 1 = protein C, 2 = peptide N, 3 = peptide C).``
+M2
+    ``Error - variable_mod01 (M): invalid term_distance/which_term "2 4"; term_distance must be -2, -1 or >= 0, and which_term 0-3 (0 = protein N, 1 = protein C, 2 = peptide N, 3 = peptide C).``
+M3
+    ``Error - variable_mod01 (M): invalid term_distance/which_term "0 -1"; term_distance must be -2, -1 or >= 0, and which_term 0-3 (0 = protein N, 1 = protein C, 2 = peptide N, 3 = peptide C).``
+M4
+    ``Error - print_ascorepro_score is enabled but variable_mod10 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s).``
+M5
+    ``Error - print_ascorepro_score is enabled but variable_mod15 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s).``
+M6
+    ``Error - variable_mod10 (STY): invalid term_distance/which_term "-3 0"; term_distance must be -2, -1 or >= 0, and which_term 0-3 (0 = protein N, 1 = protein C, 2 = peptide N, 3 = peptide C).``
+M7
+    ``Warning - index_search_type = 1 is ignored: "${DATABASE}" is not an .idx file (plain FASTA search). It only selects the index type to auto-build when database_name names an .idx file that does not exist yet.``
+M8
+    ``Warning - index_search_type = 0 is ignored: "${DATABASE}" is not an .idx file (plain FASTA search). It only selects the index type to auto-build when database_name names an .idx file that does not exist yet.``
+M9
+    ``Warning - index_search_type = 99 is not -1, 0 or 1; using the default (-1, not set).``
+M10
+    ``Warning - index_search_type = -5 is not -1, 0 or 1; using the default (-1, not set).``
+M11
+    ``Error - search_enzyme_number 99 is missing definition in params file.``
+M12
+    ``Error - search_enzyme2_number 99 is missing definition in params file.``
+M13
+    ``Error - sample_enzyme_number 99 is missing definition in params file.``
+
+Why the validator is stricter than the binary:
+
+S1
+    Comet 2026.02.2 runs ^ and $ without a word and never applies them: searches with and without such a slot gave byte-identical results (unit 3), and the codec refuses to write the token for this release, so the slot is reported where it is.
+S2
+    The slot is unused and Comet ignores it, but the token holds a character this release's residue alphabet does not have, so the file cannot be written; the slot is reported where it is.
+S3
+    Comet 2026.02.2 treats a distance below -2 as -1 without a word (scans 11000-12500: results byte-identical to -1); a value it silently reinterprets is a warning, as the catalogue had it.
+S4
+    With a distance of 0 or more Comet 2026.02.2 matches no terminus outside 0-3, so the modification never applies (scans 11000-12500: results byte-identical to the slot unused).
+S5
+    Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise.
+S6
+    -1 is not a 2026.02.2 choice (unit 1): that release reads it as 1, as it reads every value but 0, and documents 0 and 1 only.
+S7
+    Comet replaces an out-of-range code by substitution (2026.03.0 with -1 and a warning, 2026.02.2 reads it as 1 silently); the choice rule refuses a value whose meaning Comet decides for the user.
+S8
+    Comet 2026.02.2 searches on with a default enzyme identity when the number names no row; the writer cannot write a reference to a missing row.
+
+Cases the binaries cannot settle here
+-------------------------------------
+
+* **A database name ending in .idx.** ``ist-1-idx-name`` and
+  ``ist-0-idx-name`` name an ``.idx`` that does not exist yet: both releases
+  build the index and exit 0 silently, and the validator is clean. With an
+  existing ``.idx``, 2026.03.0 warns when the value disagrees with the file's
+  own type (``is a peptide index and its own IndexSearchType: header line
+  decides``); that needs the file and is Phase 08's. The text-only rule fires
+  only for a name that does not end in ``.idx``, which is exactly Comet's own
+  test [V26S]_.
+* **The merge when an index is built.** When Comet builds a fragment-ion
+  index it also caps each slot's count at 5 before merging [V26C]_; whether it
+  builds one depends on the file system, so the merge model applies the
+  ``max_variable_mods_in_peptide`` cap only. Two slots that differ only in
+  counts above 5 could then merge in Comet and not in the model.
+* **The -i and -j index-building flags.** 2026.03.0 warns when an explicit
+  ``index_search_type`` disagrees with ``-i``/``-j``; the workflow never
+  passes them.
+* **Windows and macOS binaries, and real-time search.** Not run; the corpus is
+  the linux/x86-64 binaries'.
+* **AScorePro corruption without a crash.** 2026.02.2 crashed (case
+  ``ascore-crash``) when AScorePro localised the slot-10 modification; with a
+  target of slot 1 and a phosphorylation in slot 10, scans 11000-12500 of the
+  full proteome gave the same results as with the modification in slot 2 but
+  for 18 E-values that differ slightly. The release notes' "corrupted
+  modification sites" were not reproduced beyond the crash; the source shows
+  the mechanism [P920]_ [M3336]_.
+
+Catalogue changes for 2026.02.2, with their evidence
+-----------------------------------------------------
+
+The rule catalogue's behaviour for 2026.02.2 is unchanged except for one new
+error: the new rule ``variable_mods.ascorepro_slot_unsupported`` **is an error
+for 2026.02.2 as well**. The binary is silent on five scans, but over scans
+11000-12500 with ``print_ascorepro_score = -1`` and only ``variable_mod10 =
+15.9949 M 0 3 -1 0 0 0.0`` active it died with signal 11 in post-analysis on
+every run -- three on the full proteome and each replay on the 1000-record
+subset (``ascore-crash``, exit 139) -- where the same modification in
+``variable_mod02`` completed. A warning would let a run start that the
+binary cannot finish. The other new rule, ``residue_not_in_release``,
+reports at the field what the codec already refused for 2026.02.2 on read and
+write. ``index_search_type.ignored_without_idx`` is off for 2026.02.2, whose
+binary says nothing, and ``distance_undocumented`` keeps its warning there.
+``terminus_undocumented`` and ``enzyme_in_table.missing`` were already errors
+for both releases: 2026.03.0's binary now agrees with each.
+
+Nothing to validate: ``add_U_selenocysteine`` and the library MS level
+-----------------------------------------------------------------------
+
+Cases ``selenocysteine`` and ``speclib-level-2`` run clean in both releases,
+and the validator is clean: neither binary refuses or warns about a value.
+What each release does with them (2026.02.2 ignores both; 2026.03.0 applies the
+U mass, and reads the level but uses it only for a ``.raw`` library it refuses)
+is in their release-specific help (:ref:`dev-comet-parameter-202603`). A value
+2026.02.2 ignores is a silent no-op the help states; no finding was added.
 
 .. _dev-comet-parameter-presets:
 
