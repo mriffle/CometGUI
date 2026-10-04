@@ -3664,7 +3664,11 @@ default, choices on a decimal, a non-``https`` help reference and blank help;
 and eight damaged residue alphabets of the 2026.03.0 record -- the alphabet
 missing, an unknown member, empty characters, no characters, a character no
 release can mean (``#``), a lower-case letter, a character listed twice and a
-non-``https`` source: 48 generator cases in all. Before the damages, a
+non-``https`` source; and seven damaged rule severities -- the list missing, an
+unknown field, an unknown level (``FATAL``), a rule identifier that is not one,
+a non-``https`` source, a rule stated twice, and a version-scoped rule one
+release states and another does not: 55 generator cases in all. Before the
+damages, a
 **per-release control**
 renders the clean copy for a manifest that also names 2026.03.0 and requires
 ``index_search_type``'s entry to carry ``1`` and ``0``/``1`` for 2026.02.2 and
@@ -3786,10 +3790,12 @@ items fails on the defect it exists to catch. It is registered in
      - 8
      - None of its own: ``scripts/cometparams_selftest.py`` is invoked in the
        sandbox (:ref:`dev-comet-parameter-generated-reference`).
-     - Its OK line with at least 27 generator cases (40 since the Comet
-       2026.03.0 intake's unit 1; the floor is the falsifiability unit's to
-       raise) and 4 hook defects, the
-       removed entry named, and the hook's count equal to the metadata's 118.
+     - Its OK line with at least 55 generator cases (27 when it shipped;
+       raised to the measured count by the Comet 2026.03.0 intake's unit 6)
+       and 4 hook defects, the removed entry named, the hook's count equal to
+       the metadata's 118, and its two per-release controls
+       (``index_search_type``'s and ``variable_mod01``'s entries state each
+       release's own facts).
    * - 9
      - 9
      - PIT over the module; then every validation test class removed (source
@@ -3811,16 +3817,169 @@ mutant PIT did not kill in ``parser``, ``writer`` and ``validation`` -- class,
 line, mutator and status, ``TIMED_OUT`` included and, as in
 ``scripts/build.sh``, not counted as killed -- and the reviewer reads that list
 against the work log's argument for each one (``ParamsLineReader:137`` twice
-and ``VariableModRules:178``, equivalent; three ``ParamsLineReader``
-timeouts). A new survivor does not fail the harness unless it takes a package
-below 80 %.
+and ``VariableModRules:178`` -- line 204 since the Comet 2026.03.0 intake --
+equivalent; three ``ParamsLineReader`` timeouts). A new survivor does not fail
+the harness unless it takes a package below 80 %.
 
-Run it as ``bash scripts/verify-param-gates.sh`` (about five and a half
-minutes, two thirds of it PIT), ``--only 2a,7c`` for named controls, or
+.. _dev-comet-parameter-falsifiability-versions:
+
+Version-blind controls (the Comet 2026.03.0 intake)
+---------------------------------------------------
+
+The intake made a set of facts **version-scoped**, each held as data in its
+release's version record (decision C-2 in
+``handoffs/COMET-2026-03-worklog.rst``): overrides of the curated metadata,
+the residue alphabet, rule severities and value migrations. The defect such a
+fact invites is not a wrong value but a value applied to the **wrong
+release**, so each control below makes one of them version-blind -- in
+production code, or in the shipped metadata where the metadata is what is
+tested -- and, where it can, requires the release the defect does not touch to
+**stay green**, so that the red is the version and nothing else. Each is graded
+on its own diagnostic and proved in the bytecode like every other control.
+"Recorded" means the injection is a unit sign-off's in the package's work log;
+the others are new. Each runs one module compile and a narrow test selection,
+7 to 12 seconds.
+
+.. list-table:: The version-blind controls
+   :header-rows: 1
+   :widths: 6 8 40 46
+
+   * - Control
+     - Intake item
+     - Injected defect
+     - Diagnostic required
+   * - v3a
+     - 3 (recorded, unit 1)
+     - ``CuratedMetadata`` applies the *first* version record's overrides
+       (2026.03.0's) to every release.
+     - ``minusOneIsNotA202602Choice: [] ==> expected: <1> but was: <0>``
+       (``-1`` became a 2026.02.2 choice); 2026.02.2's
+       ``index_search_type`` default ``expected: <1> but was: <-1>``.
+   * - v3b
+     - 3
+     - No release's override is applied.
+     - ``indexSearchTypeIsVersionScoped ... expected: <-1> but was: <1>``;
+       2026.03.0's drift counts fail while 2026.02.2's stay green.
+   * - v3c
+     - 3
+     - ``scan_range``'s version range in the shipped metadata ends at
+       2026.02.2.
+     - ``UNMODELLED: Comet 2026.03.0 declares scan_range (line 120, default
+       "0 0"), which has no metadata ...`` and ``Comet 2026.03.0 COMPLETE:
+       declared 118, modelled 117``; 2026.02.2's counts stay green.
+   * - v4a
+     - 4
+     - The tuple codec gives every release 2026.03.0's residue alphabet.
+     - ``VariableModCodecAlphabetTest.versionScoped: Expected
+       ...ValueSyntaxException to be thrown, but nothing was thrown`` (2026.02.2
+       reads ``^``); the release writer gate no longer refuses ``^``.
+   * - v4b
+     - 4
+     - The reverse: every release gets 2024.01.0's alphabet.
+     - ``"^" holds '^', which Comet 2026.03.0 does not accept in a residue
+       token``, in the 2026.03.0 fifteen-slot round trip.
+   * - v4c
+     - 4 (gate item 1 for 2026.03.0)
+     - The writer writes the *curated* inline comment, not the release's own.
+     - ``Comet 2026.03.0 ==> expected: <c600c64f...fcf2e> but was: <...>`` --
+       the pinned canonical text; one of the two releases fails (2026.02.2,
+       which has no comment override, stays green).
+   * - v5a
+     - 5 (recorded, unit 4)
+     - Every model is judged with the second version record's (2026.02.2's)
+       severities.
+     - ``ist-1, Comet 2026.03.0: ValidationReport[findings=[]] ==> expected:
+       <[WARNING index_search_type.ignored_without_idx]> but was: <[]>``; a
+       distance below -2 is no longer an error for 2026.03.0.
+   * - v5b
+     - 5
+     - Validation reads the newest release's residue alphabet.
+     - ``proteinNTerminus: expected exactly one finding:
+       ValidationReport[findings=[]] ==> expected: <1> but was: <0>`` -- ``^``
+       in a 2026.02.2 model built in code is no longer reported.
+   * - v5c
+     - 5 (recorded, unit 4)
+     - AScorePro's ``-1`` ("localise all") suppresses the slot error
+       (``ascore == 0`` became ``<= 0``).
+     - ``slotsAboveNine ... print_ascorepro_score, -1]: [] ==> expected: <1>
+       but was: <0>``.
+   * - v5d
+     - 5
+     - AScorePro's merge of identical slots disabled.
+     - ``mergedSlots ... [variable_mod10, 15.9949 M 0 3 -1 0 0 0.0] ==>
+       expected: <[]> but was: <[Finding[rule=VARMODS_ASCOREPRO_SLOT, ...``.
+   * - v5e
+     - 5
+     - AScorePro's protein-terminus rewrite applied whatever the release's
+       alphabet, so 2026.02.2 merges as 2026.03.0 does.
+     - ``proteinTerminusRewrite ... [variable_mod01, 42.010565 n 0 1 0 0 0
+       0.0, variable_mod10, 42.010565 n 0 1 -1 0 0 0.0]: [] ==> expected: <1>
+       but was: <0>``.
+   * - v5f
+     - 5
+     - ``index_search_type.ignored_without_idx`` warns in every release.
+     - ``silentForTheOlderRelease expected: <[]> but was:
+       <[Finding[rule=INDEX_SEARCH_TYPE_IGNORED, severity=WARNING, ...``;
+       2026.03.0's own warning stays green.
+   * - v5g
+     - 5 (data, not code)
+     - One recorded **binary** verdict of the validation corpus made wrong:
+       ``ist-1``'s 2026.03.0 warning line removed from ``corpus.json``.
+     - ``ist-1, Comet 2026.03.0: Warning and Error lines ==> expected: <[]>
+       but was: <[Warning - index_search_type = 1 is ignored: ...`` from the
+       real binary; that case alone fails (``Tests run: 42, Failures: 1``).
+       A test resource is not compiled, so the proof is its copy on the test
+       class path: damaged in the run, pristine after the final clean run.
+   * - v6a
+     - 6 (recorded, unit 5)
+     - Value migrations are applied whatever release they are *from*.
+     - ``MigrationTo202603Test.sameRelease expected: <118> but was: <116>``.
+   * - v6b
+     - 6 (recorded, unit 5)
+     - Migration hands conversion no source findings, so rule-keyed value
+       migrations never apply.
+     - ``distanceBelowMinusTwo 2026.02.2 ==> expected: <CONVERTED> but was:
+       <CARRIED>``; ``terminusOutsideZeroToThree expected: <NEEDS_ATTENTION>
+       but was: <CARRIED>``.
+
+Control ``H`` also covers the new controls' plumbing: a metadata range edit
+naming no parameter (``H8``), a corpus edit that would change nothing
+(``H9``), and a test resource damaged in the source but not on the test class
+path (``H10``) are each a harness error. A new control whose anchor has moved,
+or whose injection does not compile, stops the run with exit 4 like any other
+(both were shown on 2026-10-04 with a temporary copy of the script). Every
+version-blind injection is laid out as ``google-java-format`` (AOSP) leaves
+it, although the sandbox switches Spotless off.
+
+**Mutation over the intake's changes** (gate item 8 of the intake, Phase 06
+item 9 over the changed classes). PIT, no test excluded, over every production
+class changed since ``d19b232`` -- 22 sources and their inner classes: **700 of
+701 mutations killed**. The one survivor is ``VariableModRules:204``, the
+boundary of ``requirementCode() > 0`` in the *wording* of the undocumented
+requirement message: that line is reached only for a code that is neither 0 nor
+1, so ``> 0`` and ``>= 0`` choose the same words (Phase 06's documented
+equivalent, formerly line 178). It suppresses no error, drops no parameter and
+touches no version-scoped fact. Every compiled class of the changed sources is
+in the report except nine that carry no mutable code: three ``$1`` switch-map
+classes, the enums ``RuleSeverity$Level`` and ``ValueMigration$Action``, and
+the records ``MetadataLoader$Said``, ``VariableModLayout$Entry``,
+``AScoreProRule$MergeKey`` and ``AScoreProRule$Slot``; every compiled class
+of the module is in ``jacoco.xml`` but its nine ``package-info`` classes.
+Module-wide, control
+9 graded ``parser`` 96/101, ``writer`` 30/30, ``validation`` 251/252 and the
+module 1360/1367 (``migration`` 84/84), and its negative arm put
+``validation`` at 115/252 with the module still at 89.1 %.
+
+Running it
+----------
+
+Run it as ``bash scripts/verify-param-gates.sh`` (about seven and a half
+minutes, a third of it PIT), ``--only 2a,7c,v5g`` for named controls, or
 ``--self-test`` for control ``H`` alone. It needs the gitignored Comet
-mirrors ``scratch/phase05/artefacts`` and ``scratch/phase06/artefacts``,
-because PIT runs the module's real-binary tests, and refuses to start (exit 3)
-without them.
+mirrors ``scratch/phase05/artefacts`` (2026.03.0 and 2026.02.2) and
+``scratch/phase06/artefacts`` (2024.01.0) and the ``D-006`` inputs under
+``scratch/fixture``, because the module's real-binary tests run them, and
+refuses to start (exit 3) without them.
 
 .. _dev-comet-parameter-comet-reads:
 

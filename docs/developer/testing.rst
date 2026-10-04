@@ -524,7 +524,12 @@ pass is worse than no aggregator at all.
        enzyme refusal, two locale-sensitive number writers, unknown parameters
        dropped by the writer and by the parser, and three tolerance-pair rule
        defects; unit 7's generator self-test, invoked; and PIT scored per
-       package. See :ref:`dev-comet-parameter-falsifiability`.
+       package. Since the Comet 2026.03.0 intake (``COMET-2026-03``) also
+       fifteen controls that each make one version-scoped fact version-blind
+       -- overrides, drift, residue alphabets, the 2026.03.0 round trip, rule
+       severities, the AScorePro and ``index_search_type`` rules, value
+       migrations, and one recorded binary verdict of the validation corpus
+       (data, not code). See :ref:`dev-comet-parameter-falsifiability`.
      - Each failing assertion's own words, e.g. ``min,max count ==> expected:
        <79.966331 STY 0 2,4 -1 0 0 0.0> but was: <79.966331 STY 0 4,2 -1 0 0
        0.0>``; for item 9, ``parser``, ``writer`` and ``validation`` each
