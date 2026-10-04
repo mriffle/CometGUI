@@ -40,6 +40,12 @@ Comet parameter schema
    2026.03.0 help of ``variable_modNN`` and ``output_txtfile``
    (:ref:`dev-comet-parameter-202603-help`).
 
+   **Comet 2026.03.0 intake, unit 5**: what a release does with values written
+   for another, as data in its version record
+   (:ref:`dev-comet-parameter-value-migrations`), and migration of the real
+   2026.02.2 and 2024.01.0 files to 2026.03.0, accepted by the real 2026.03.0
+   binary (:ref:`dev-comet-parameter-migration-202603`).
+
 What this page covers
 =====================
 
@@ -585,7 +591,10 @@ beside the field layout it qualifies (:ref:`dev-comet-parameter-residue-alphabet
 Version-keyed validation facts -- a rule's severity for that release -- are
 the record's ``ruleSeverities``, keyed by the rule's stable identifier
 (:ref:`dev-comet-parameter-rule-severities`), so that a rule reads the fact
-from the version the model carries.
+from the version the model carries. What a release does with a value written
+for another -- Comet 2026.02.2's ``index_search_type = 1``, which 2026.03.0
+spells ``-1`` -- is the record's ``valueMigrations``
+(:ref:`dev-comet-parameter-value-migrations`).
 
 .. _dev-comet-parameter-rule-severities:
 
@@ -869,6 +878,8 @@ value that never warns [V26W]_. The 2026.03.0 override therefore carries
 comment, new help and the 2026.03 parameter page; 2026.02.2 keeps choices
 ``0``/``1`` and the choice rule refuses ``-1`` there
 (``Comet202603CurationTest``).
+What migration does with a 2026.02.2 file's ``1`` (and ``0``), with the
+runs against existing indexes, is in :ref:`dev-comet-parameter-migration-202603`.
 
 ``spectral_library_ms_level``
 -----------------------------
@@ -2976,6 +2987,16 @@ migrated. The rules, per parameter:
      - Modelled in both; the value written in the target's syntax with the
        same meaning -- a variable-modification tuple re-laid-out for the
        target's field layout -- with its origin.
+   * - ``CONVERTED``
+     - Modelled in both; the value written as another that the target
+       release gives the same meaning, as the target's version record states
+       (:ref:`dev-comet-parameter-value-migrations`), with its origin. The
+       explanation carries the record's reason and source.
+   * - ``NOTED``
+     - Modelled in both; carried with the same text and meaning, but the
+       target's version record notes how that release treats it differently
+       -- a warning the source release never gave. The explanation carries
+       the notice and its source.
    * - ``ADDED``
      - New in the target: the target version's default, origin
        ``COMET_DEFAULT``.
@@ -2995,9 +3016,16 @@ migrated. The rules, per parameter:
    * - ``NEEDS_ATTENTION``
      - The target has the parameter but cannot hold the value with its
        meaning (two neutral losses into 2024.01.0's one-loss tuple; an
-       adopted unknown whose text is not of the target's kind). The new model
+       adopted unknown whose text is not of the target's kind; a value the
+       target's version record says has no equivalent there). The new model
        holds the target's default; the source value is in the report. Nothing
        is guessed.
+
+Every outcome but ``CARRIED`` and ``UNKNOWN_CARRIED`` is a change
+(``MigrationReport.changes()``), and ``MigrationReport.describe()`` writes a
+headline and one line per change -- outcome, parameter, explanation -- which
+is the reviewable diff the specification asks for (*Comet*: 2026.02.2 files
+"import, and migrate to the default with a reviewable diff").
 
 The enzyme table is the file's content, not the schema's, and is carried
 unchanged (Comet 2024.01.0's own default table differs from 2026.02.2's in
@@ -3019,6 +3047,105 @@ data every shared parameter is ``CARRIED``. ``RESHAPED`` and the
 missing-field case are proved on a CONSTRUCTED third version (``2099.01.0``,
 test input built on the bundled metadata in ``ConstructedVersions``) with a
 reordered and a seven-field layout.
+
+.. _dev-comet-parameter-value-migrations:
+
+Value migrations: what a release does with another's values
+-----------------------------------------------------------
+
+Comet 2026.03.0 intake, unit 5. ``VersionConversion`` carries a value by its
+typed meaning, which is right whenever the two releases read the same text
+the same way. Where they do not -- the same text treated differently, or
+different text with the same effect -- the **target** release's version
+record says so, keyed by the release the value was written for (decision C-2:
+data in the version record, never an ``if (version ...)``)::
+
+    "valueMigrations": [
+      { "from": "2026.02.2", "parameter": "index_search_type", "value": "1",
+        "action": "CONVERT", "becomes": "-1",
+        "reason": "Comet 2026.02.2 reads index_search_type only to ...",
+        "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1524" },
+      { "from": "2026.02.2", "rule": "variable_mod_tuple.distance_undocumented",
+        "action": "CONVERT", "field": "TERMINAL_DISTANCE", "becomes": "-1",
+        "reason": "...", "source": "https://..." },
+      { "from": "2026.02.2", "rule": "variable_mod_tuple.terminus_undocumented",
+        "action": "NEEDS_ATTENTION", "reason": "...", "source": "https://..." }
+    ]
+
+An entry is matched one of two ways:
+
+* by ``parameter`` and ``value``: one choice of an enumerated parameter, as
+  the source release writes it;
+* by ``rule``: a validation rule's stable identifier whose finding the
+  **source** model's own validation has on the parameter. The tuple conditions
+  Comet 2026.03.0 refuses are exactly what two existing rules recognise --
+  rules unit 4 agreed with both real binaries -- so the entry names the rule
+  rather than restating its condition, and the condition stays in one place.
+
+``action`` is one of:
+
+``CONVERT``
+    Write the value as ``becomes``, which means the same in the target:
+    the whole value for an entry matched by value, or the text of one
+    ``field`` of a variable-modification tuple for an entry matched by rule
+    (that field replaced at its position in the source release's layout,
+    then the tuple written for the target). Status ``CONVERTED``; migration
+    outcome ``CONVERTED``.
+``NEEDS_ATTENTION``
+    The target has no equivalent. Status ``NOT_CONVERTIBLE``; migration
+    outcome ``NEEDS_ATTENTION``, the target's default in the new model, the
+    source value in the report.
+``NOTICE``
+    Carry the value unchanged -- it means the same -- and report how the
+    target treats it. Status ``SAME`` with the notice in the explanation;
+    migration outcome ``NOTED``.
+
+Every entry carries ``reason`` (the words the user reads) and ``source`` (an
+``https://`` reference to the release behaviour); each result names the
+entries that decided it (``VersionConversion.Result.applied()``) and appends
+each reason with its source to its explanation, so nothing an entry does is
+silent. All matching entries apply: if any has no equivalent the value needs
+attention; otherwise each conversion applies in the metadata's order, and
+each notice is reported. Java holds an entry as ``ValueMigration``;
+``CometVersionRecord.valueMigrations()`` lists them and
+``valueMigrationsFrom(release)`` selects one source release's.
+
+**Where they apply.** ``VersionConversion.convert(name, text)`` -- the preset
+compatibility check -- applies the entries matched by value: a user's
+2026.02.2 preset setting ``index_search_type = 1`` is ``CONVERTED`` to ``-1``
+on a 2026.03.0 set. Entries matched by rule need the source model's findings,
+so only ``SchemaMigration`` applies them: it validates the source model
+(``CometValidator.standard()``), passes each parameter's rule identifiers to
+``convert(name, text, rules)``, and refuses, with an
+``IllegalStateException`` naming the record and the identifier, a target
+record whose entries name a rule that does not exist.
+
+**What ``MetadataLoader`` refuses**, naming ``versions[i] value migration k``
+and the field: a missing ``valueMigrations`` member (it is required, as
+``ruleSeverities`` is, so a release added later states its migrations, if
+only as ``[]``) or one that is not an array of objects; a field other than
+``from``, ``action``, ``reason``, ``source``, ``parameter``, ``value``,
+``rule``, ``field`` and ``becomes``; a ``from`` that is not a curated release
+or is the record's own; an ``action`` that is not one of the three; a blank
+``reason``; a ``source`` that is not ``https://``; an entry matched both ways
+or neither; ``becomes`` missing for ``CONVERT`` or given for anything else.
+Matched by value: a ``field``; a parameter that is not modelled, not modelled
+for both releases, or not enumerated; a ``value`` that is not one of the
+source release's own choices (its override applied); a ``becomes`` that is
+not one of the target's, or that repeats the value; a ``NOTICE`` value the
+target does not offer. Matched by rule: a ``value``; an identifier that is
+not one; for ``CONVERT``, a ``field`` that is not a ``VariableModField`` or
+that either release's tuple layout lacks, and a ``becomes`` that is not one
+value of the field's kind; a ``field`` on any other action. And any value or
+rule matched twice for one source release. ``ValueMigrationsLoaderTest``
+proves each on CONSTRUCTED metadata; ``ValueMigrationConversionTest`` proves
+the conversions value by value, including a CONSTRUCTED target that combines
+a conversion, a notice and a re-laid-out tuple.
+
+The documentation generator does not render ``valueMigrations``: the
+generated reference describes parameters, and what migration did to a
+particular file is in that migration's report. The generator ignores the
+member, and refuses nothing about it.
 
 What the real migration proves
 ------------------------------
@@ -3044,6 +3171,251 @@ from the two real dumps **and** typed by hand (each checking the other):
   with their text, blocked by validation, written in the unknown-parameter
   section and read back by the 2024.01.0 parser; a two-loss tuple is
   ``NEEDS_ATTENTION``.
+
+.. _dev-comet-parameter-migration-202603:
+
+Migration to Comet 2026.03.0
+----------------------------
+
+Comet 2026.03.0 intake, unit 5. 2026.03.0 declares the same 118 parameters as
+2026.02.2, so a 2026.02.2 file loses and gains nothing; what changes is how
+2026.03.0 treats three values 2026.02.2 accepted. Each was established from
+the source at both tags and by running the real binaries on 2026-10-04 --
+2026.03.0, 2026.02.2 and 2024.01.0 (the pinned mirror binaries, SHA-256
+``ad93b4cf...91e7ed``, ``af515b6e...6d9e`` and ``2834f928...2379``) -- in a
+private scratch directory. Each run is that release's own ``-q`` fixture with
+``database_name`` the 1000-record proteome subset, ``spectral_library_name``
+empty, ``num_threads = 8``, ``output_txtfile = 1``, ``scan_range`` as stated,
+and the case's edits (CONSTRUCTED input), searched as ``comet -P<case>
+-N<out> <K562_3.mzML, LF copy>`` (the corpus inputs,
+:ref:`dev-comet-parameter-validation-corpus`). Results are compared by the
+SHA-256 of the ``.txt`` output without its first line (which names the run).
+
+``index_search_type``
+~~~~~~~~~~~~~~~~~~~~~
+
+Every 2026.02.2 file Comet wrote holds ``index_search_type = 1``. Five scans
+(11188-11192), each value in each situation; for an ``.idx`` the index is
+built by the same release, and "built" is its ``IndexSearchType:`` header
+line:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 39 39
+
+   * - Situation
+     - Comet 2026.02.2: ``-1``, ``0``, ``1``
+     - Comet 2026.03.0: ``-1``, ``0``, ``1``
+   * - FASTA database
+     - all three silent, identical results (26 lines)
+     - all three identical results (26 lines); ``-1`` silent; ``0`` and ``1``
+       each warn ``Warning - index_search_type = N is ignored: "<db>" is not
+       an .idx file (plain FASTA search). ...``
+   * - ``database_name`` an ``.idx`` that does not exist
+     - ``-1`` and ``1`` build a **fragment ion index**, ``0`` a **peptide
+       index**; all silent
+     - the same, all silent
+   * - an existing fragment-ion index
+     - the header decides; all three silent, identical results
+     - the header decides, identical results; ``0`` warns ``... is a
+       fragment ion index and its own IndexSearchType: header line decides
+       ...``; ``-1`` and ``1`` silent
+   * - an existing peptide index
+     - the header decides; all three silent, identical results
+     - the header decides, identical results; ``1`` warns ``... is a peptide
+       index ...``; ``-1`` and ``0`` silent
+
+The source says why: 2026.02.2 reads the value only where a named ``.idx``
+does not exist yet, and tests ``== 0`` there (``CometSearchManager.cpp``
+L1524 at ``v2026.02.2``: ``(iIndexSearchType == 0) ? PI_DB : FI_DB``), so
+every value but 0 is a fragment-ion index; 2026.03.0 builds the same way, and
+adds warnings for a value other than ``-1`` that it ignores (L1742-L1775 at
+``v2026.03.0``) or coerces (L811-L822). So:
+
+* **2026.02.2's** ``1`` **is written** ``-1`` **(** ``CONVERTED`` **).** In every
+  situation above, 2026.02.2's ``1`` and 2026.03.0's ``-1`` do the same, and
+  ``-1`` never warns; carried as ``1`` it would draw the "is ignored" warning
+  on every FASTA search, about a value the user never chose (Comet's own
+  ``-q`` wrote it). The conversion is in the report with its reason, never
+  silent. Flagging it instead was rejected: the value has an exact
+  equivalent, and a flag that holds the default would ask every user the
+  same question with one right answer.
+* **2026.02.2's** ``0`` **is carried with a notice (** ``NOTED`` **).** It means
+  the same in both releases -- a peptide index for a named ``.idx`` that does
+  not exist, nothing for a FASTA search -- and no other 2026.03.0 value means
+  that. 2026.03.0 warns about it on a FASTA search and on an existing
+  fragment-ion index; the report says so, and validation of the migrated set
+  reports ``index_search_type.ignored_without_idx`` as a warning where the
+  database is not an ``.idx``.
+* **2024.01.0** has no ``index_search_type``: it is ``ADDED`` at 2026.03.0's
+  default ``-1``.
+* **Back to 2026.02.2**, 2026.03.0's ``-1`` is written ``1`` (2026.02.2's
+  record): 2026.02.2 does not document ``-1`` (its validator refuses the
+  choice), and ``1`` does exactly the same there. A 2026.02.2 file migrated to
+  2026.03.0 and back is the same model.
+
+Position fields 2026.03.0 refuses
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+2026.03.0 stops a search (``Error - variable_modNN (...): invalid
+term_distance/which_term ...``) for an **active** slot with a terminal
+distance below -2, or a distance of 0 or more with a terminus outside 0-3
+(``CometSearchManager.cpp`` L1436-L1450); an unused slot (mass 0) is reset
+before the check. Scans 11000-12500, ``variable_mod01`` changed:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 23 23 24
+
+   * - ``variable_mod01``
+     - Comet 2026.02.2
+     - Comet 2024.01.0
+     - Comet 2026.03.0
+   * - ``15.9949 M 0 3 -1 0 0 0.0``
+     - exit 0, 6985 lines (``878261f3aa3a70b5``)
+     - exit 0, 6985 lines (``343bcf31720b5e6e``)
+     - exit 0, 6985 lines
+   * - the same with distance ``-3``, and ``-7``
+     - exit 0, identical to ``-1``
+     - exit 0, identical to ``-1``
+     - exit 1, the error
+   * - ``15.9949 M 0 3 2 4 0 0.0`` (terminus 4, distance 2)
+     - exit 0, 6811 lines, identical to the slot unused; no modified peptide
+     - exit 0, 6811 lines, no modified peptide (with every slot unused,
+       2024.01.0 itself stops: ``Error in StorePeptides. stored twice``,
+       exit 1, so the comparison is by the absence of modified peptides)
+     - exit 1, the error
+   * - ``15.9949 M 0 3 0 -1 0 0.0`` (terminus -1, distance 0)
+     - exit 0, identical to the slot unused
+     - exit 0, identical to terminus 4
+     - exit 1, the error
+   * - ``15.9949 M 0 3 -1 4 0 0.0`` (terminus 4, no distance)
+     - exit 0, identical to ``-1 0``
+     - exit 0, identical to ``-1 0``
+     - exit 0, identical to ``-1 0``
+
+Both older releases test ``iVarModTermDistance < 0`` for "no constraint"
+(``CometSearch.cpp`` L5371-L5372 at ``v2026.02.2``, L4757-L4758 at
+``v2024.01.0``) and compare the terminus with 0 to 3 and nothing else
+(L5373-L5390, L4759-L4776). So:
+
+* **A distance below -2 on an active slot is written -1 (** ``CONVERTED`` **)**,
+  from either older release, matched by the rule
+  ``variable_mod_tuple.distance_undocumented``. **One difference no 2026.03.0
+  value can keep**, found in the source and confirmed by running: both older
+  releases switch on their "one exclusive modification per peptide" check
+  only when an active slot has a distance of exactly ``-1``
+  (``bRareVarModPresent``, ``CometSearchManager.cpp`` L1318-L1322 at
+  ``v2026.02.2``, L1399-L1403 at ``v2024.01.0``; its own comment says it means
+  ``iRequireThisMod == -1``). With two exclusive slots (required ``-1``) at
+  distance ``-3`` and no slot at ``-1``, 2026.02.2 gave 7265 result lines
+  where the same slots at ``-1`` gave 7263 (2024.01.0 likewise); adding a
+  third active slot at ``-1`` made ``-3`` and ``-1`` identical again.
+  2026.03.0 switches the check on for any active slot, whatever the value
+  (L1476-L1481 at ``v2026.03.0``). The reason in the record says so, so the
+  report does.
+* **A terminus outside 0-3 with a distance of 0 or more needs attention (**
+  ``NEEDS_ATTENTION`` **)**, from either older release, matched by
+  ``variable_mod_tuple.terminus_undocumented``: the modification was never
+  applied, there is nothing in 2026.03.0 that means what the user wrote, and
+  switching the slot off silently would hide that the file asked for
+  something. The migrated set holds the slot's default, as for every
+  ``NEEDS_ATTENTION``; the source value and the reason are in the report.
+* An **unused** slot with such fields, and a terminus outside 0-3 with a
+  negative distance, are ``CARRIED``: 2026.03.0 accepts both.
+
+**AScorePro with an active slot 10-15** is an error for both releases in this
+project (:ref:`dev-comet-parameter-validation-corpus`), so it is not a
+migration question: there is nothing to convert to. It is carried, and the
+migrated set's validation reports ``variable_mods.ascorepro_slot_unsupported``
+as an error (``MigrationTo202603Test.Edits.ascoreProIsNotHidden``).
+
+The real migrations
+~~~~~~~~~~~~~~~~~~~
+
+``MigrationTo202603Test`` migrates the four real fixtures with
+``migrateFile``; the expected outcomes are derived from the real ``-q`` dumps
+-- the names one release declares and the other does not, and the parameters
+both declare whose own ``-q`` values differ -- **and** typed by hand, each
+checking the other:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Source
+     - Report (118 entries each)
+   * - 2026.02.2 ``-q``, 2026.02.2 ``-p``
+     - ``CONVERTED`` 1 (``index_search_type``), ``CARRIED`` 117; nothing
+       added, removed, reshaped, noted or needing attention
+   * - 2024.01.0 ``-q``, 2024.01.0 ``-p``
+     - ``ADDED`` 9 (the nine parameters 2024.01.0 lacks, each at 2026.03.0's
+       default, ``index_search_type`` at ``-1``), ``CARRIED`` 109
+
+The one change of a 2026.02.2 file, as ``MigrationReport.describe()`` writes
+it::
+
+    Comet 2026.02.2 -> 2026.03.0: 118 parameters, 1 changes, 0 needing attention
+    CONVERTED index_search_type: index_search_type = 1 (Comet 2026.02.2) is written -1 for
+    Comet 2026.03.0, which means the same there: Comet 2026.02.2 reads index_search_type only
+    to choose the index it builds for a named .idx file that does not exist yet, and builds a
+    fragment-ion index for every value but 0, so 1 (what its comet -q writes) is its ordinary
+    setting. Comet 2026.03.0's -1 (not set, what its comet -q writes) does exactly the same and
+    never warns; 1 there draws a warning on every FASTA search that the value is ignored.
+    (https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1524)
+
+(one line in the report; wrapped here). The migrated 2026.02.2 ``-q`` set holds
+**exactly** 2026.03.0's own ``-q`` values, and its canonical file is byte for
+byte the canonical file of 2026.03.0's own ``-q``. Each migrated set writes,
+re-parses as 2026.03.0 with no diagnostic to the same values, and validates
+with exactly one finding, ``workflow_enforced.output_off`` on
+``output_percolatorfile`` (Comet's own files switch the PIN off) -- and with
+none once the workflow's outputs are enforced: in particular no
+``index_search_type`` warning, which the unmigrated value would draw. The
+CONSTRUCTED edits -- ``index_search_type = 0``, a distance of ``-3`` and a
+terminus of 4 in an active slot from either older release, the same in an
+unused slot, AScorePro with slot 10 -- each give the outcome above, with
+the record's reason in the explanation; migrating 2026.03.0 to itself changes
+nothing, and 2024.01.0 to 2026.02.2 carries ``-3`` (2026.02.2's record states
+no such entry): the entries are keyed by the source release.
+
+Accepted by the real 2026.03.0 binary
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The four migrated canonical files are checked in, CometGUI's own output, at
+``cometgui-params-comet/src/test/resources/fixtures/comet-migrated/2026.03.0/``
+(``from-2026.02.2-q.params`` and so on, with ``SHA256SUMS``, ``-text`` in
+``.gitattributes``). ``MigrationTo202603Test.Written`` requires migration and
+the writer to produce exactly those bytes -- and writes what they produce to
+``target/`` when they differ, for review -- and that each release's ``-p``
+file migrates to the same bytes as its ``-q`` file (``-p`` omits only
+parameters at their defaults). ``MigratedFileRealBinaryTest`` (Linux) runs
+the pinned 2026.03.0 binary on those bytes through ``ProcessService`` and
+**runs no production class of this module**, so PIT never maps a mutant to
+its searches (the reason is in :ref:`dev-comet-parameter-validation-corpus`);
+the byte-equality test is what ties the bytes it runs to production code.
+
+* **Parameter load**, each file exactly as written: ``comet
+  -P<file> missing.mzML`` exits 1 with one line, ``Error - input file
+  "missing.mzML" not found.`` -- the same transcript as 2026.03.0's own
+  ``-q`` file. Comet reads the whole file before it looks at the input.
+* **A five-scan search**, each file with five explicit text edits, made in
+  the test and stated there: ``database_name`` the proteome subset,
+  ``spectral_library_name`` empty, ``scan_range = 11188 11192``,
+  ``num_threads = 4``, ``output_txtfile = 1``. The migrated files hold the
+  placeholders ``/some/path/db.fasta`` and ``/some/path/speclib.file``,
+  because Comet's own ``-q`` writes them and migration carries what the file
+  says (2024.01.0 has no library parameter, and migration adds 2026.03.0's
+  default, the same placeholder); a search with either stops before it
+  starts, and choosing the database and the library is the workflow's job,
+  not migration's. Every file: exit 0, **no Warning or Error line**, and the
+  same 26 result lines as 2026.03.0's own ``-q`` file with the same edits.
+* **The negative control**: the migrated 2026.02.2 file with the one
+  migrated line put back, ``index_search_type = 1``, exits 0 with the same
+  results and exactly one line, ``Warning - index_search_type = 1 is ignored:
+  "<db>" is not an .idx file (plain FASTA search). It only selects the index
+  type to auto-build when database_name names an .idx file that does not
+  exist yet.`` -- the warning migration spares every search.
 
 .. _dev-comet-parameter-older-release:
 
