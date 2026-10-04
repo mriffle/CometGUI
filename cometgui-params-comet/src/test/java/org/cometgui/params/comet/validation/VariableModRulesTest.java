@@ -63,6 +63,11 @@ class VariableModRulesTest {
     @DisplayName("per slot")
     class PerSlot {
 
+        /**
+         * AScorePro is switched off here: with it on (the {@code -q} default), an active slot above
+         * {@code variable_mod09} draws {@link Rule#VARMODS_ASCOREPRO_SLOT} too, which {@link
+         * AScoreProRuleTest} proves on its own.
+         */
         @TestFactory
         @DisplayName("each of the fifteen slots is checked, attached to itself")
         Stream<DynamicTest> everySlot() {
@@ -81,7 +86,10 @@ class VariableModRulesTest {
                                                                                 "79.966331 STY 0"
                                                                                         + " 4,2 -1"
                                                                                         + " 0 0"
-                                                                                        + " 0.0")));
+                                                                                        + " 0.0",
+                                                                                "print_ascorepro"
+                                                                                        + "_score",
+                                                                                "0")));
                                                 assertAttached(
                                                         finding,
                                                         Rule.VARMOD_COUNT_REVERSED,

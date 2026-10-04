@@ -21,7 +21,15 @@ import java.util.Optional;
 import org.cometgui.params.comet.schema.ValidatorId;
 
 /**
- * Every rule the validators apply, each with a stable identifier and a fixed severity.
+ * Every rule the validators apply, each with a stable identifier and a severity.
+ *
+ * <p>Most rules have a fixed severity. A <em>version-scoped</em> rule does not: whether what it
+ * checks is an error, a warning or nothing at all differs between Comet releases, so each release's
+ * version record states it ({@link org.cometgui.params.comet.schema.CometVersionRecord
+ * #ruleSeverities()}, decision C-2 of the Comet 2026.03.0 intake), and a finding takes the severity
+ * of the version its model carries. Every curated release must state every version-scoped rule; the
+ * validator refuses a record that does not, or that states one for a rule it does not have or whose
+ * severity is fixed.
  *
  * <p>The identifier is what a test, the editor and the documentation's rule catalogue refer to; it
  * never changes once published. A rule that belongs to a metadata {@link ValidatorId} names it as
@@ -106,11 +114,21 @@ public enum Rule {
     VARMOD_COUNT_ZERO(
             "variable_mod_tuple.count_zero", Severity.WARNING, ValidatorId.VARIABLE_MOD_TUPLE),
 
-    /** An active slot's terminal distance is a value Comet does not document. */
-    VARMOD_DISTANCE_UNDOCUMENTED(
-            "variable_mod_tuple.distance_undocumented",
-            Severity.WARNING,
+    /**
+     * A residue token holds a character the model's Comet release does not accept, such as the
+     * protein-terminus codes {@code ^} and {@code $} in a release older than 2026.03.0.
+     */
+    VARMOD_RESIDUE_NOT_IN_RELEASE(
+            "variable_mod_tuple.residue_not_in_release",
+            Severity.ERROR,
             ValidatorId.VARIABLE_MOD_TUPLE),
+
+    /**
+     * An active slot's terminal distance is below -2, which Comet does not document.
+     * Version-scoped: Comet 2026.03.0 refuses it, earlier releases treat it as -1.
+     */
+    VARMOD_DISTANCE_UNDOCUMENTED(
+            "variable_mod_tuple.distance_undocumented", ValidatorId.VARIABLE_MOD_TUPLE),
 
     /** An active slot constrains a distance from a terminus Comet does not know. */
     VARMOD_TERMINUS_UNDOCUMENTED(
@@ -143,6 +161,20 @@ public enum Rule {
     /** {@code R-PARAM-10}: slots are active while the per-peptide limit is zero. */
     VARMODS_NONE_ALLOWED("variable_mods.none_allowed", Severity.WARNING, null),
 
+    /**
+     * AScorePro is on while a slot above {@code variable_mod09} is active after Comet merges slots
+     * identical to a lower one: AScorePro cannot tell a two-digit slot number from two one-digit
+     * ones.
+     */
+    VARMODS_ASCOREPRO_SLOT("variable_mods.ascorepro_slot_unsupported", Severity.ERROR, null),
+
+    /**
+     * {@code index_search_type} asks for an index type while {@code database_name} does not name an
+     * {@code .idx} file, so nothing uses the value. Version-scoped: Comet 2026.03.0 warns,
+     * 2026.02.2 is silent.
+     */
+    INDEX_SEARCH_TYPE_IGNORED("index_search_type.ignored_without_idx", null),
+
     /** {@code R-CMT-01}: an output a downstream stage needs is switched off. */
     WORKFLOW_OUTPUT_OFF(
             "workflow_enforced.output_off", Severity.ERROR, ValidatorId.WORKFLOW_ENFORCED),
@@ -170,9 +202,17 @@ public enum Rule {
 
     private final ValidatorId family;
 
+    /** A rule with a fixed severity. */
     Rule(String id, Severity severity, ValidatorId family) {
         this.id = id;
         this.severity = Objects.requireNonNull(severity, "severity");
+        this.family = family;
+    }
+
+    /** A version-scoped rule: each Comet release's version record states its severity. */
+    Rule(String id, ValidatorId family) {
+        this.id = id;
+        this.severity = null;
         this.family = family;
     }
 
@@ -186,12 +226,36 @@ public enum Rule {
     }
 
     /**
-     * The severity every finding of this rule has.
+     * The severity every finding of this rule has, whatever the Comet version.
      *
-     * @return the severity
+     * @return the severity, or empty for a version-scoped rule
      */
-    public Severity severity() {
-        return severity;
+    public Optional<Severity> fixedSeverity() {
+        return Optional.ofNullable(severity);
+    }
+
+    /**
+     * Whether each Comet release's version record states this rule's severity.
+     *
+     * @return {@code true} for a version-scoped rule
+     */
+    public boolean isVersionScoped() {
+        return severity == null;
+    }
+
+    /**
+     * The rule with a stable identifier.
+     *
+     * @param id the identifier
+     * @return the rule, or empty if no rule has it
+     */
+    public static Optional<Rule> byId(String id) {
+        for (Rule rule : values()) {
+            if (rule.id.equals(id)) {
+                return Optional.of(rule);
+            }
+        }
+        return Optional.empty();
     }
 
     /**

@@ -45,6 +45,7 @@ final class ConstructedMetadata {
         version.put("source", "https://example.org/source/");
         version.put("variableModTuple", tupleLayout());
         version.put("overrides", new ArrayList<>());
+        version.put("ruleSeverities", ruleSeverities());
         List<Object> categories = new ArrayList<>();
         for (ParameterCategory category : ParameterCategory.values()) {
             Map<String, Object> entry = new LinkedHashMap<>();
@@ -114,6 +115,34 @@ final class ConstructedMetadata {
         doc.root.put("internal", new ArrayList<>(List.of(internal)));
         doc.root.put("parameters", parameters);
         return doc;
+    }
+
+    /**
+     * A CONSTRUCTED {@code ruleSeverities} array stating both version-scoped rules, for a version
+     * record a test adds.
+     *
+     * @return the array, mutable
+     */
+    static List<Object> ruleSeverities() {
+        return new ArrayList<>(
+                List.of(
+                        ruleSeverity("variable_mod_tuple.distance_undocumented", "WARNING"),
+                        ruleSeverity("index_search_type.ignored_without_idx", "OFF")));
+    }
+
+    /**
+     * One CONSTRUCTED entry of a version record's {@code ruleSeverities}.
+     *
+     * @param rule the rule identifier
+     * @param severity the level's name
+     * @return the entry, mutable
+     */
+    static Map<String, Object> ruleSeverity(String rule, String severity) {
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("rule", rule);
+        entry.put("severity", severity);
+        entry.put("source", "https://example.org/source/" + rule);
+        return entry;
     }
 
     /**

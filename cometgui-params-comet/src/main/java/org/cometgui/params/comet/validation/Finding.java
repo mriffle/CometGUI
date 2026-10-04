@@ -26,7 +26,9 @@ import org.cometgui.params.comet.schema.ParameterCategory;
  * the editor can show it at the control ("Errors shall be attached to the responsible field and
  * category").
  *
- * @param rule the rule that found it; fixes the severity and the identifier
+ * @param rule the rule that found it; fixes the identifier
+ * @param severity the severity: the rule's own, or for a version-scoped rule the one the model's
+ *     Comet version states
  * @param parameters the responsible parameters, the first being the one to show it at; empty only
  *     for a finding about the file as a whole, such as its version marker, or about an enzyme row
  *     no parameter references
@@ -35,15 +37,25 @@ import org.cometgui.params.comet.schema.ParameterCategory;
  * @param message what is wrong, with the value, and what would be valid
  */
 public record Finding(
-        Rule rule, List<String> parameters, Optional<ParameterCategory> category, String message) {
+        Rule rule,
+        Severity severity,
+        List<String> parameters,
+        Optional<ParameterCategory> category,
+        String message) {
 
     /**
      * Validates the components.
      *
-     * @throws IllegalArgumentException if the message is blank
+     * @throws IllegalArgumentException if the message is blank, or the severity is not the one a
+     *     rule with a fixed severity has
      */
     public Finding {
         Objects.requireNonNull(rule, "rule");
+        Objects.requireNonNull(severity, "severity");
+        if (rule.fixedSeverity().filter(fixed -> fixed != severity).isPresent()) {
+            throw new IllegalArgumentException(
+                    rule.id() + " is always " + rule.fixedSeverity().get() + ", not " + severity);
+        }
         parameters = List.copyOf(parameters);
         Objects.requireNonNull(category, "category");
         Objects.requireNonNull(message, "message");
@@ -60,15 +72,6 @@ public record Finding(
     @Override
     public List<String> parameters() {
         return List.copyOf(parameters);
-    }
-
-    /**
-     * The severity, which is the rule's.
-     *
-     * @return the severity
-     */
-    public Severity severity() {
-        return rule.severity();
     }
 
     /**

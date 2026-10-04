@@ -47,6 +47,7 @@ class VersionDefaultsLoaderTest {
         older.put("source", "https://example.org/older-source/");
         older.put("variableModTuple", ConstructedMetadata.tupleLayout());
         older.put("overrides", new ArrayList<>(List.of(overrides)));
+        older.put("ruleSeverities", ConstructedMetadata.ruleSeverities());
         doc.list("versions").add(older);
         ((Map<String, Object>) doc.parameter("allowed_missed_cleavage").get("versions"))
                 .put("from", "2024.01.0");

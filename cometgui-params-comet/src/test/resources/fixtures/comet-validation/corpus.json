@@ -1,0 +1,1481 @@
+{
+  "description": "The Comet 2026.03.0 intake's validation corpus (unit 4). Each case is the release's own comet -q fixture with the base edits and the case's edits -- CONSTRUCTED input -- run as comet -P<case>.params -N<out> <spectra> by each real binary. exit and lines are what the binary did (lines: its Warning and Error lines beyond the release's control run, ${DATABASE} standing for the database path); findings are the validator's verdict for that release. agreement is 'same' when the validator's class (error, warning, clean) equals the binary's, and 'stricter', with a reason, when the validator judges more severely. Replayed by ValidationCorpusTest and ValidationCorpusRealBinaryTest; documented in docs/developer/comet_parameter_schema.rst.",
+  "spectra": {
+    "file": "scratch/fixture/20100614_Velos1_TaGe_SA_K562_3.mzML",
+    "sha256": "cbd0c1b37fb990e6f44528278956306754145ff7318ec7f89fed3b4d3c9b0bc7",
+    "lineFeedSha256": "a562f6e642b2880bece3134c43aa9581124788926bd1b9305c2db0bb506954da"
+  },
+  "database": {
+    "file": "scratch/fixture/UP000005640_9606.fasta",
+    "sha256": "2329a517bec9bd7269f9ce3b9252d8b959ae98bc41405a945c2d6134b284d5a0",
+    "records": 1000,
+    "subsetSha256": "5005d9614b20f944915616201389cc7529d209a0f039278cae29cb356192558f"
+  },
+  "base": [
+    {
+      "name": "database_name",
+      "value": "${DATABASE}"
+    },
+    {
+      "name": "spectral_library_name",
+      "value": ""
+    },
+    {
+      "name": "scan_range",
+      "value": "11188 11192"
+    },
+    {
+      "name": "num_threads",
+      "value": "4"
+    },
+    {
+      "name": "output_percolatorfile",
+      "value": "1"
+    }
+  ],
+  "controls": [
+    {
+      "version": "2026.03.0",
+      "lines": []
+    },
+    {
+      "version": "2026.02.2",
+      "lines": [
+        "Warning - invalid parameter found: spectral_library_ms_level.  Parameter will be ignored."
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "control",
+      "topic": "control",
+      "edits": [],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "res-protein-n",
+      "topic": "residue codes ^ and $",
+      "edits": [
+        {
+          "name": "variable_mod02",
+          "value": "42.010565 ^ 0 1 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mod_tuple.residue_not_in_release"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 runs ^ and $ without a word and never applies them: searches with and without such a slot gave byte-identical results (unit 3), and the codec refuses to write the token for this release, so the slot is reported where it is",
+          "builtInCode": true
+        }
+      ]
+    },
+    {
+      "id": "res-protein-c",
+      "topic": "residue codes ^ and $",
+      "edits": [
+        {
+          "name": "variable_mod02",
+          "value": "-0.984016 $ 0 1 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mod_tuple.residue_not_in_release"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 runs ^ and $ without a word and never applies them: searches with and without such a slot gave byte-identical results (unit 3), and the codec refuses to write the token for this release, so the slot is reported where it is",
+          "builtInCode": true
+        }
+      ]
+    },
+    {
+      "id": "res-n-and-protein-n",
+      "topic": "residue codes ^ and $",
+      "edits": [
+        {
+          "name": "variable_mod02",
+          "value": "42.010565 n^ 0 1 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mod_tuple.residue_not_in_release"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 runs ^ and $ without a word and never applies them: searches with and without such a slot gave byte-identical results (unit 3), and the codec refuses to write the token for this release, so the slot is reported where it is",
+          "builtInCode": true
+        }
+      ]
+    },
+    {
+      "id": "res-mixed",
+      "topic": "residue codes ^ and $",
+      "edits": [
+        {
+          "name": "variable_mod02",
+          "value": "42.010565 K^c$ 0 1 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mod_tuple.residue_not_in_release"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 runs ^ and $ without a word and never applies them: searches with and without such a slot gave byte-identical results (unit 3), and the codec refuses to write the token for this release, so the slot is reported where it is",
+          "builtInCode": true
+        }
+      ]
+    },
+    {
+      "id": "res-protein-n-unused",
+      "topic": "residue codes ^ and $",
+      "edits": [
+        {
+          "name": "variable_mod02",
+          "value": "0.0 ^ 0 3 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mod_tuple.residue_not_in_release"
+          ],
+          "agreement": "stricter",
+          "reason": "the slot is unused and Comet ignores it, but the token holds a character this release's residue alphabet does not have, so the file cannot be written; the slot is reported where it is",
+          "builtInCode": true
+        }
+      ]
+    },
+    {
+      "id": "dist-minus3",
+      "topic": "fifth field: distance",
+      "edits": [
+        {
+          "name": "variable_mod01",
+          "value": "15.9949 M 0 3 -3 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - variable_mod01 (M): invalid term_distance/which_term \"-3 0\"; term_distance must be -2, -1 or >= 0, and which_term 0-3 (0 = protein N, 1 = protein C, 2 = peptide N, 3 = peptide C)."
+          ],
+          "findings": [
+            "ERROR variable_mod_tuple.distance_undocumented"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "WARNING variable_mod_tuple.distance_undocumented"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 treats a distance below -2 as -1 without a word (scans 11000-12500: results byte-identical to -1); a value it silently reinterprets is a warning, as the catalogue had it",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "dist-minus2",
+      "topic": "fifth field: distance",
+      "edits": [
+        {
+          "name": "variable_mod01",
+          "value": "15.9949 M 0 3 -2 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "dist-minus3-unused",
+      "topic": "fifth field: distance",
+      "edits": [
+        {
+          "name": "variable_mod02",
+          "value": "0.0 X 0 3 -3 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "term4-dist2",
+      "topic": "sixth field: terminus",
+      "edits": [
+        {
+          "name": "variable_mod01",
+          "value": "15.9949 M 0 3 2 4 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - variable_mod01 (M): invalid term_distance/which_term \"2 4\"; term_distance must be -2, -1 or >= 0, and which_term 0-3 (0 = protein N, 1 = protein C, 2 = peptide N, 3 = peptide C)."
+          ],
+          "findings": [
+            "ERROR variable_mod_tuple.terminus_undocumented"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mod_tuple.terminus_undocumented"
+          ],
+          "agreement": "stricter",
+          "reason": "with a distance of 0 or more Comet 2026.02.2 matches no terminus outside 0-3, so the modification never applies (scans 11000-12500: results byte-identical to the slot unused)",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "termminus1-dist0",
+      "topic": "sixth field: terminus",
+      "edits": [
+        {
+          "name": "variable_mod01",
+          "value": "15.9949 M 0 3 0 -1 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - variable_mod01 (M): invalid term_distance/which_term \"0 -1\"; term_distance must be -2, -1 or >= 0, and which_term 0-3 (0 = protein N, 1 = protein C, 2 = peptide N, 3 = peptide C)."
+          ],
+          "findings": [
+            "ERROR variable_mod_tuple.terminus_undocumented"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mod_tuple.terminus_undocumented"
+          ],
+          "agreement": "stricter",
+          "reason": "with a distance of 0 or more Comet 2026.02.2 matches no terminus outside 0-3, so the modification never applies (scans 11000-12500: results byte-identical to the slot unused)",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "term4-dist-minus1",
+      "topic": "sixth field: terminus",
+      "edits": [
+        {
+          "name": "variable_mod01",
+          "value": "15.9949 M 0 3 -1 4 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "term7-dist-minus2",
+      "topic": "sixth field: terminus",
+      "edits": [
+        {
+          "name": "variable_mod01",
+          "value": "15.9949 M 0 3 -2 7 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-slot10",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "79.966331 STY 0 3 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - print_ascorepro_score is enabled but variable_mod10 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s)."
+          ],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-slot10-off",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "79.966331 STY 0 3 -1 0 0 0.0"
+        },
+        {
+          "name": "print_ascorepro_score",
+          "value": "0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-slot10-all",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "79.966331 STY 0 3 -1 0 0 0.0"
+        },
+        {
+          "name": "print_ascorepro_score",
+          "value": "-1"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - print_ascorepro_score is enabled but variable_mod10 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s)."
+          ],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-slot15",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod15",
+          "value": "79.966331 STY 0 3 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - print_ascorepro_score is enabled but variable_mod15 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s)."
+          ],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-slot09",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod09",
+          "value": "79.966331 STY 0 3 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-merged",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "15.9949 M 0 3 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-merged-residues",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "15.9949 STY 0 3 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-merged-digits",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "15.99490 M 0 3 -1 0 0 0.00"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-count-differs",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "15.9949 M 0 2 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - print_ascorepro_score is enabled but variable_mod10 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s)."
+          ],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-merged-by-cap",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "15.9949 M 0 7 -1 0 0 0.0"
+        },
+        {
+          "name": "max_variable_mods_in_peptide",
+          "value": "3"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-cap-not-reached",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "15.9949 M 0 7 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - print_ascorepro_score is enabled but variable_mod10 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s)."
+          ],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-exclusive",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod01",
+          "value": "15.9949 M 0 3 -1 0 -1 0.0"
+        },
+        {
+          "name": "variable_mod10",
+          "value": "15.9949 M 0 3 -1 0 -1 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - print_ascorepro_score is enabled but variable_mod10 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s)."
+          ],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-merged-unused-lower",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod01",
+          "value": "0.0 M 0 3 -1 0 0 0.0"
+        },
+        {
+          "name": "variable_mod10",
+          "value": "15.9949 M 0 3 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - print_ascorepro_score is enabled but variable_mod10 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s)."
+          ],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-merged-rewrite",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod01",
+          "value": "42.010565 n 0 1 0 0 0 0.0"
+        },
+        {
+          "name": "variable_mod10",
+          "value": "42.010565 n 0 1 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-crash",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "scan_range",
+          "value": "11000 12500"
+        },
+        {
+          "name": "print_ascorepro_score",
+          "value": "-1"
+        },
+        {
+          "name": "variable_mod01",
+          "value": "0.0 M 0 3 -1 0 0 0.0"
+        },
+        {
+          "name": "variable_mod10",
+          "value": "15.9949 M 0 3 -1 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - print_ascorepro_score is enabled but variable_mod10 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s)."
+          ],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 139,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-neutral-loss-differs",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "15.9949 M 0 3 -1 0 0 63.998285"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - print_ascorepro_score is enabled but variable_mod10 is active; AScorePro localization is only supported for variable_mod01 through variable_mod09. Disable print_ascorepro_score or remove/renumber the higher-numbered variable mod(s)."
+          ],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ascore-slot10-dist-invalid",
+      "topic": "AScorePro and slots 10-15",
+      "edits": [
+        {
+          "name": "variable_mod10",
+          "value": "79.966331 STY 0 3 -3 0 0 0.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - variable_mod10 (STY): invalid term_distance/which_term \"-3 0\"; term_distance must be -2, -1 or >= 0, and which_term 0-3 (0 = protein N, 1 = protein C, 2 = peptide N, 3 = peptide C)."
+          ],
+          "findings": [
+            "ERROR variable_mod_tuple.distance_undocumented",
+            "ERROR variable_mods.ascorepro_slot_unsupported"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR variable_mods.ascorepro_slot_unsupported",
+            "WARNING variable_mod_tuple.distance_undocumented"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 hands AScorePro two-digit slot numbers it cannot read: the same kind of configuration crashed with signal 11 in post-analysis over scans 11000-12500 (case ascore-crash), and the 2026.03.0 release notes call it site corruption; five scans here gave AScorePro nothing to localise",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ist-1",
+      "topic": "index_search_type",
+      "edits": [
+        {
+          "name": "index_search_type",
+          "value": "1"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [
+            "Warning - index_search_type = 1 is ignored: \"${DATABASE}\" is not an .idx file (plain FASTA search). It only selects the index type to auto-build when database_name names an .idx file that does not exist yet."
+          ],
+          "findings": [
+            "WARNING index_search_type.ignored_without_idx"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ist-0",
+      "topic": "index_search_type",
+      "edits": [
+        {
+          "name": "index_search_type",
+          "value": "0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [
+            "Warning - index_search_type = 0 is ignored: \"${DATABASE}\" is not an .idx file (plain FASTA search). It only selects the index type to auto-build when database_name names an .idx file that does not exist yet."
+          ],
+          "findings": [
+            "WARNING index_search_type.ignored_without_idx"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ist-minus1",
+      "topic": "index_search_type",
+      "edits": [
+        {
+          "name": "index_search_type",
+          "value": "-1"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR choice.not_listed"
+          ],
+          "agreement": "stricter",
+          "reason": "-1 is not a 2026.02.2 choice (unit 1): that release reads it as 1, as it reads every value but 0, and documents 0 and 1 only",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ist-99",
+      "topic": "index_search_type",
+      "edits": [
+        {
+          "name": "index_search_type",
+          "value": "99"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [
+            "Warning - index_search_type = 99 is not -1, 0 or 1; using the default (-1, not set)."
+          ],
+          "findings": [
+            "ERROR choice.not_listed"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet replaces an out-of-range code by substitution (2026.03.0 with -1 and a warning, 2026.02.2 reads it as 1 silently); the choice rule refuses a value whose meaning Comet decides for the user",
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR choice.not_listed"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet replaces an out-of-range code by substitution (2026.03.0 with -1 and a warning, 2026.02.2 reads it as 1 silently); the choice rule refuses a value whose meaning Comet decides for the user",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ist-minus5",
+      "topic": "index_search_type",
+      "edits": [
+        {
+          "name": "index_search_type",
+          "value": "-5"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [
+            "Warning - index_search_type = -5 is not -1, 0 or 1; using the default (-1, not set)."
+          ],
+          "findings": [
+            "ERROR choice.not_listed"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet replaces an out-of-range code by substitution (2026.03.0 with -1 and a warning, 2026.02.2 reads it as 1 silently); the choice rule refuses a value whose meaning Comet decides for the user",
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR choice.not_listed"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet replaces an out-of-range code by substitution (2026.03.0 with -1 and a warning, 2026.02.2 reads it as 1 silently); the choice rule refuses a value whose meaning Comet decides for the user",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ist-1-idx-name",
+      "topic": "index_search_type",
+      "edits": [
+        {
+          "name": "index_search_type",
+          "value": "1"
+        },
+        {
+          "name": "database_name",
+          "value": "${DATABASE}.idx"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "ist-0-idx-name",
+      "topic": "index_search_type",
+      "edits": [
+        {
+          "name": "index_search_type",
+          "value": "0"
+        },
+        {
+          "name": "database_name",
+          "value": "${DATABASE}.idx"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "enz-search-99",
+      "topic": "undefined enzyme numbers",
+      "edits": [
+        {
+          "name": "search_enzyme_number",
+          "value": "99"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - search_enzyme_number 99 is missing definition in params file."
+          ],
+          "findings": [
+            "ERROR enzyme_in_table.missing"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR enzyme_in_table.missing"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 searches on with a default enzyme identity when the number names no row; the writer cannot write a reference to a missing row",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "enz-search2-99",
+      "topic": "undefined enzyme numbers",
+      "edits": [
+        {
+          "name": "search_enzyme2_number",
+          "value": "99"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - search_enzyme2_number 99 is missing definition in params file."
+          ],
+          "findings": [
+            "ERROR enzyme_in_table.missing"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR enzyme_in_table.missing"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 searches on with a default enzyme identity when the number names no row; the writer cannot write a reference to a missing row",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "enz-sample-99",
+      "topic": "undefined enzyme numbers",
+      "edits": [
+        {
+          "name": "sample_enzyme_number",
+          "value": "99"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 1,
+          "lines": [
+            "Error - sample_enzyme_number 99 is missing definition in params file."
+          ],
+          "findings": [
+            "ERROR enzyme_in_table.missing"
+          ],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [
+            "ERROR enzyme_in_table.missing"
+          ],
+          "agreement": "stricter",
+          "reason": "Comet 2026.02.2 searches on with a default enzyme identity when the number names no row; the writer cannot write a reference to a missing row",
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "selenocysteine",
+      "topic": "add_U_selenocysteine",
+      "edits": [
+        {
+          "name": "add_U_selenocysteine",
+          "value": "10.0"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    },
+    {
+      "id": "speclib-level-2",
+      "topic": "spectral_library_ms_level",
+      "edits": [
+        {
+          "name": "spectral_library_ms_level",
+          "value": "2"
+        }
+      ],
+      "verdicts": [
+        {
+          "version": "2026.03.0",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        },
+        {
+          "version": "2026.02.2",
+          "exit": 0,
+          "lines": [],
+          "findings": [],
+          "agreement": "same",
+          "reason": null,
+          "builtInCode": false
+        }
+      ]
+    }
+  ]
+}

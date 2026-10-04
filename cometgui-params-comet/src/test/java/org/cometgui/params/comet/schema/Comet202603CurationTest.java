@@ -107,19 +107,64 @@ class Comet202603CurationTest {
                 BUNDLED.version(V2026_02_2).orElseThrow().variableModTuple().fields(),
                 record.variableModTuple().fields(),
                 "the 2026.03.0 reader takes the same eight fields with the same two pairs");
-        assertEquals(
-                Set.of(
-                        "add_U_selenocysteine",
-                        "decoy_search",
-                        "index_search_type",
-                        "spectral_library_ms_level"),
-                record.overrides().keySet());
+        Set<String> overridden =
+                new TreeSet<>(
+                        Set.of(
+                                "add_U_selenocysteine",
+                                "decoy_search",
+                                "index_search_type",
+                                "output_txtfile",
+                                "spectral_library_ms_level"));
+        for (int slot = 1; slot <= 15; slot++) {
+            overridden.add(String.format(java.util.Locale.ROOT, "variable_mod%02d", slot));
+        }
+        assertEquals(overridden, record.overrides().keySet());
         assertEquals(Map.of("index_search_type", "-1"), record.defaults());
         for (ParameterOverride override : record.overrides().values()) {
             assertTrue(
                     override.source().startsWith("https://github.com/UWPR/Comet/blob/v2026.03.0/"),
                     override::toString);
         }
+    }
+
+    @Test
+    @DisplayName("variable_modNN's help names ^ and $ for 2026.03.0 only")
+    void variableModHelpIsVersionScoped() {
+        for (int slot = 1; slot <= 15; slot++) {
+            String name = String.format(java.util.Locale.ROOT, "variable_mod%02d", slot);
+            ParameterDefinition newer = at(name, V2026_03_0);
+            ParameterDefinition older = at(name, V2026_02_2);
+            assertTrue(
+                    newer.shortHelp()
+                            .contains("^ and $, new in Comet 2026.03.0, for the protein N-"),
+                    newer.shortHelp());
+            assertTrue(newer.shortHelp().contains("Comet 2026.03.0 refuses any other value"));
+            assertTrue(older.shortHelp().contains("(n and c for termini)"), older.shortHelp());
+            assertTrue(!older.shortHelp().contains("^"), older.shortHelp());
+            assertEquals(
+                    "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html",
+                    newer.detailedHelpRef());
+            assertEquals(
+                    "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html",
+                    older.detailedHelpRef());
+            assertEquals(older.defaultValue(), newer.defaultValue());
+        }
+    }
+
+    @Test
+    @DisplayName("output_txtfile: each release's comment names that release, which treats 2 as 1")
+    void outputTxtfileCommentNamesItsOwnRelease() {
+        ParameterDefinition newer = at("output_txtfile", V2026_03_0);
+        ParameterDefinition older = at("output_txtfile", V2026_02_2);
+        assertEquals(
+                Optional.of("0=no, 1=yes  write tab-delimited txt file (2026.03.0 treats 2 as 1)"),
+                newer.inlineComment());
+        assertEquals(
+                Optional.of("0=no, 1=yes  write tab-delimited txt file (2026.02.2 treats 2 as 1)"),
+                older.inlineComment());
+        assertTrue(newer.shortHelp().contains("the 2026.03.0 parameter code"), newer.shortHelp());
+        assertTrue(!newer.shortHelp().contains("2026.02.2"), newer.shortHelp());
+        assertEquals(values(older), values(newer));
     }
 
     @Test

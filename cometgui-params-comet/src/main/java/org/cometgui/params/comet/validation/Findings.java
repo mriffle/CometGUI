@@ -33,10 +33,23 @@ final class Findings {
 
     private final CometParameters model;
 
+    private final VersionSeverities severities;
+
     private final Set<Finding> found = new LinkedHashSet<>();
 
+    /**
+     * Collects the findings about one model, with the severities of its Comet version.
+     *
+     * @param model the model
+     * @throws IllegalStateException if the record of the model's version does not state the
+     *     version-scoped rules ({@link VersionSeverities})
+     */
     Findings(CometParameters model) {
         this.model = model;
+        // A model always has a record: CometParameters cannot be built for a version the metadata
+        // has none of (its tuple codec refuses it).
+        this.severities =
+                VersionSeverities.of(model.metadata().version(model.version()).orElseThrow());
     }
 
     /**
@@ -49,7 +62,7 @@ final class Findings {
     void add(Rule rule, List<String> parameters, String message) {
         Optional<ParameterCategory> category =
                 model.entry(parameters.get(0)).map(entry -> entry.definition().category());
-        found.add(new Finding(rule, parameters, category, message));
+        record(rule, parameters, category, message);
     }
 
     /**
@@ -72,7 +85,7 @@ final class Findings {
      * @param message the message
      */
     void addUncategorised(Rule rule, List<String> parameters, String message) {
-        found.add(new Finding(rule, parameters, Optional.empty(), message));
+        record(rule, parameters, Optional.empty(), message);
     }
 
     /**
@@ -84,7 +97,25 @@ final class Findings {
      * @param message the message
      */
     void addToCategory(Rule rule, ParameterCategory category, String message) {
-        found.add(new Finding(rule, List.of(), Optional.of(category), message));
+        record(rule, List.of(), Optional.of(category), message);
+    }
+
+    /**
+     * Records a finding with the severity its rule has for the model's Comet version; a
+     * version-scoped rule that version states as off records nothing.
+     */
+    private void record(
+            Rule rule,
+            List<String> parameters,
+            Optional<ParameterCategory> category,
+            String message) {
+        severities
+                .of(rule)
+                .ifPresent(
+                        severity ->
+                                found.add(
+                                        new Finding(
+                                                rule, severity, parameters, category, message)));
     }
 
     ValidationReport report() {

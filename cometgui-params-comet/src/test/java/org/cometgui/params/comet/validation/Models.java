@@ -95,6 +95,38 @@ final class Models {
         return model;
     }
 
+    /** Comet 2026.03.0, whose real {@code -q} output is the second fixture. */
+    static final ToolVersion COMET_2026_03_0 = ToolVersion.parse("2026.03.0");
+
+    /**
+     * A release's real {@code -q} file, parsed for that release, with the workflow's outputs
+     * enforced.
+     *
+     * @param version the release
+     * @return the model
+     */
+    static CometParameters enforced(ToolVersion version) {
+        ParseResult result =
+                new CometParamsParser(METADATA, version).parse(ParamsFiles.complete(version));
+        assertTrue(result.succeeded(), () -> "the test input must parse: " + result.errors());
+        return result.model().orElseThrow().withWorkflowEnforcedOutputs();
+    }
+
+    /**
+     * A release's enforced real model with CONSTRUCTED value texts.
+     *
+     * @param version the release
+     * @param nameThenText parameter names and value texts, alternating
+     * @return the model
+     */
+    static CometParameters with(ToolVersion version, String... nameThenText) {
+        CometParameters model = enforced(version);
+        for (int index = 0; index < nameThenText.length; index += 2) {
+            model = model.withText(nameThenText[index], nameThenText[index + 1], ValueOrigin.USER);
+        }
+        return model;
+    }
+
     static ValidationReport validate(CometParameters model) {
         return CometValidator.standard().validate(model);
     }
@@ -121,7 +153,8 @@ final class Models {
     static void assertAttached(
             Finding finding, Rule rule, ParameterCategory category, String... parameters) {
         assertEquals(rule, finding.rule(), finding::toString);
-        assertEquals(rule.severity(), finding.severity());
+        rule.fixedSeverity()
+                .ifPresent(fixed -> assertEquals(fixed, finding.severity(), finding::toString));
         assertEquals(List.of(parameters), finding.parameters(), finding::toString);
         assertEquals(Optional.of(category), finding.category(), finding::toString);
     }

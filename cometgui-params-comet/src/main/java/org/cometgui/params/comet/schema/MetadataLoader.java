@@ -110,9 +110,12 @@ public final class MetadataLoader {
                     "parameterPages",
                     "source",
                     "variableModTuple",
-                    "overrides");
+                    "overrides",
+                    "ruleSeverities");
 
     private static final List<String> OVERRIDE_REQUIRED = List.of("name", "source");
+
+    private static final List<String> RULE_SEVERITY_FIELDS = List.of("rule", "severity", "source");
 
     private static final List<String> TUPLE_FIELDS = List.of("source", "fields", "residueAlphabet");
 
@@ -229,7 +232,8 @@ public final class MetadataLoader {
                     record.parameterPages(),
                     record.source(),
                     record.variableModTuple(),
-                    overrides);
+                    overrides,
+                    record.ruleSeverities());
         }
     }
 
@@ -377,13 +381,41 @@ public final class MetadataLoader {
             }
             String parameterPages = node.url("parameterPages");
             String source = node.url("source");
+            VariableModLayout layout = tupleLayout(node);
             records.add(
                     new PendingVersion(
-                            new CometVersionRecord(
-                                    version, marker, parameterPages, source, tupleLayout(node)),
+                            new CometVersionRecord(version, marker, parameterPages, source, layout)
+                                    .withRuleSeverities(ruleSeverities(node)),
                             node));
         }
         return records;
+    }
+
+    /**
+     * A version record's {@code ruleSeverities}: for each version-scoped validation rule, what the
+     * release's binary does with what the rule checks. Which rules exist, and which of them are
+     * version-scoped, is the validator's to know; here each entry is held to its form.
+     */
+    private static Map<String, RuleSeverity> ruleSeverities(Node version) {
+        List<JsonValue> array = version.array("ruleSeverities");
+        Map<String, RuleSeverity> severities = new LinkedHashMap<>();
+        for (int index = 0; index < array.size(); index++) {
+            Node entry =
+                    Node.of(array.get(index), version.where(), "ruleSeverities[" + index + "]");
+            entry.onlyFields(RULE_SEVERITY_FIELDS);
+            String rule = entry.text("rule");
+            Node named = entry.renamed(version.where() + " severity of rule \"" + rule + "\"");
+            if (!RuleSeverity.RULE_ID.matcher(rule).matches()) {
+                throw named.failure(
+                        "rule", "is not a rule identifier such as family.what_it_checks");
+            }
+            if (severities.containsKey(rule)) {
+                throw named.failure("rule", "is stated twice");
+            }
+            RuleSeverity.Level level = named.constant("severity", RuleSeverity.Level.class);
+            severities.put(rule, new RuleSeverity(rule, level, named.url("source")));
+        }
+        return severities;
     }
 
     private static VariableModLayout tupleLayout(Node version) {

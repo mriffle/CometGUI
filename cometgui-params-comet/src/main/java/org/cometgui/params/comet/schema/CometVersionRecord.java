@@ -38,6 +38,11 @@ import org.cometgui.domain.tools.ToolVersion;
  * CuratedMetadata#parameter(String, ToolVersion)} apply the overrides, so a model of a version is
  * built from, written with and validated against that version's own definitions.
  *
+ * <p>Validation facts that differ by release are here too: {@link #ruleSeverities()} states, for
+ * each version-scoped validation rule, whether this release's binary refuses, warns about or
+ * accepts what the rule checks ({@link RuleSeverity}), so a rule reads its severity from the
+ * version the model carries rather than asking which version it is.
+ *
  * @param version the version as the manifest spells it, such as {@code 2026.02.2}
  * @param marker how that release's binary spells itself on its {@code # comet_version} line
  * @param parameterPages the upstream parameter documentation for the release
@@ -45,6 +50,7 @@ import org.cometgui.domain.tools.ToolVersion;
  * @param variableModTuple the field layout of the release's variable-modification tuple
  * @param overrides parameter name to what this version says differently about it; empty for a
  *     version that agrees with every curated definition
+ * @param ruleSeverities rule identifier to this release's severity for that version-scoped rule
  */
 public record CometVersionRecord(
         ToolVersion version,
@@ -52,12 +58,15 @@ public record CometVersionRecord(
         String parameterPages,
         String source,
         VariableModLayout variableModTuple,
-        Map<String, ParameterOverride> overrides) {
+        Map<String, ParameterOverride> overrides,
+        Map<String, RuleSeverity> ruleSeverities) {
 
     /**
-     * Validates the components and takes an immutable, name-ordered copy of the overrides.
+     * Validates the components and takes immutable, name-ordered copies of the overrides and the
+     * rule severities.
      *
-     * @throws IllegalArgumentException if an override is filed under another parameter's name
+     * @throws IllegalArgumentException if an override is filed under another parameter's name, or a
+     *     rule severity under another rule's identifier
      */
     public CometVersionRecord {
         Objects.requireNonNull(version, "version");
@@ -73,10 +82,18 @@ public record CometVersionRecord(
                                 "the override filed under " + name + " is for " + override.name());
                     }
                 });
+        ruleSeverities = Collections.unmodifiableSortedMap(new TreeMap<>(ruleSeverities));
+        ruleSeverities.forEach(
+                (rule, severity) -> {
+                    if (!severity.rule().equals(rule)) {
+                        throw new IllegalArgumentException(
+                                "the severity filed under " + rule + " is for " + severity.rule());
+                    }
+                });
     }
 
     /**
-     * A record with no overrides.
+     * A record with no overrides and no rule severities.
      *
      * @param version the version as the manifest spells it
      * @param marker how that release's binary spells itself
@@ -91,6 +108,48 @@ public record CometVersionRecord(
             String source,
             VariableModLayout variableModTuple) {
         this(version, marker, parameterPages, source, variableModTuple, Map.of());
+    }
+
+    /**
+     * A record with overrides and no rule severities.
+     *
+     * @param version the version as the manifest spells it
+     * @param marker how that release's binary spells itself
+     * @param parameterPages the upstream parameter documentation for the release
+     * @param source the upstream source tree at the release's tag
+     * @param variableModTuple the field layout of the release's variable-modification tuple
+     * @param overrides parameter name to what this version says differently about it
+     */
+    public CometVersionRecord(
+            ToolVersion version,
+            CometVersionMarker marker,
+            String parameterPages,
+            String source,
+            VariableModLayout variableModTuple,
+            Map<String, ParameterOverride> overrides) {
+        this(version, marker, parameterPages, source, variableModTuple, overrides, Map.of());
+    }
+
+    /**
+     * This record with other rule severities, everything else kept.
+     *
+     * @param severities the rule severities
+     * @return the record
+     */
+    public CometVersionRecord withRuleSeverities(Map<String, RuleSeverity> severities) {
+        return new CometVersionRecord(
+                version, marker, parameterPages, source, variableModTuple, overrides, severities);
+    }
+
+    /**
+     * This release's severity for one version-scoped validation rule.
+     *
+     * @param rule the rule's stable identifier
+     * @return the severity, or empty if this record does not state one
+     */
+    public Optional<RuleSeverity> ruleSeverity(String rule) {
+        Objects.requireNonNull(rule, "rule");
+        return Optional.ofNullable(ruleSeverities.get(rule));
     }
 
     /**

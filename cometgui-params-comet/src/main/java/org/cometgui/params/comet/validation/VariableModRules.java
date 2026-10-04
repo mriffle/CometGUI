@@ -23,6 +23,8 @@ import java.util.OptionalInt;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ParameterEntry;
 import org.cometgui.params.comet.model.ParameterValue;
+import org.cometgui.params.comet.schema.ResidueAlphabet;
+import org.cometgui.params.comet.schema.TerminalCode;
 import org.cometgui.params.comet.schema.ValueKind;
 import org.cometgui.params.comet.value.VariableModification;
 
@@ -41,14 +43,18 @@ import org.cometgui.params.comet.value.VariableModification;
  * <ul>
  *   <li>Residues: Comet reads the token with {@code %31s} into a 32-byte buffer ({@code Comet.cpp}
  *       line 589; {@code MAX_VARMOD_AA}, {@code CometData.h} line 25), so a token of more than
- *       {@value #RESIDUE_LIMIT} characters is an error. The alphabet itself is the typed value's.
+ *       {@value #RESIDUE_LIMIT} characters is an error. Which characters a token may hold is the
+ *       release's residue alphabet, data in its version record: a character outside it -- {@code ^}
+ *       or {@code $} before Comet 2026.03.0 -- is an error at the slot, active or not, because the
+ *       release runs it without a word and never applies it, and the writer refuses it.
  *   <li>Count: whole numbers only ({@code \d+(,\d+)?} in the documentation's own tuple generator);
  *       a minimum above the maximum can never be met, because Comet places at most the maximum
  *       ({@code CometSearch.cpp} lines 5729-5733) and rejects a count below the minimum (line 5844
  *       and the fourteen like it). A maximum of 0 places nothing: a warning.
  *   <li>Terminal distance: {@code -2}, {@code -1} and {@code 0} upwards are documented. Comet
- *       treats any other negative value as "no constraint" ({@code CometSearch.cpp} lines 5371 and
- *       5454), so it is a warning.
+ *       2026.02.2 treats any other negative value as "no constraint" ({@code CometSearch.cpp} lines
+ *       5371 and 5454) and 2026.03.0 refuses it, so the rule is version-scoped: each release's
+ *       version record states its severity.
  *   <li>Terminus: with a distance of 0 or more Comet compares the terminus with 0 to 3 and matches
  *       nothing else ({@code CometSearch.cpp} lines 5375-5390 and 5466-5520): an undocumented code
  *       means the modification is never applied, an error.
@@ -100,7 +106,27 @@ final class VariableModRules {
     static void checkSlot(CometParameters model, ParameterEntry entry, Findings findings) {
         String name = entry.name();
         VariableModification mod = ((ParameterValue.Tuple) entry.value()).modification();
-        String shown = name + " = " + model.text(name);
+        String shown = shown(model, name, mod);
+        ResidueAlphabet alphabet = alphabet(model);
+        alphabet.firstRefused(mod.residues())
+                .ifPresent(
+                        refused ->
+                                findings.add(
+                                        Rule.VARMOD_RESIDUE_NOT_IN_RELEASE,
+                                        name,
+                                        shown
+                                                + ": the residue token \""
+                                                + mod.residues()
+                                                + "\" holds '"
+                                                + refused
+                                                + "', which Comet "
+                                                + model.version().text()
+                                                + " does not accept (its residue alphabet is "
+                                                + alphabet.describe()
+                                                + "); that release would run the token without a"
+                                                + " word and never apply the modification, and"
+                                                + " the file cannot be written"
+                                                + instead(refused)));
         if (mod.residues().length() > RESIDUE_LIMIT) {
             findings.add(
                     Rule.VARMOD_RESIDUES_TOO_LONG,
@@ -190,6 +216,41 @@ final class VariableModRules {
         }
     }
 
+    /**
+     * The slot and its value as {@code comet.params} would hold it, or in words when the model's
+     * release cannot write the value (a residue character outside its alphabet, which {@link
+     * Rule#VARMOD_RESIDUE_NOT_IN_RELEASE} reports).
+     */
+    static String shown(CometParameters model, String name, VariableModification mod) {
+        try {
+            return name + " = " + model.text(name);
+        } catch (IllegalArgumentException unwritable) {
+            return name + " (" + mod.summary() + ")";
+        }
+    }
+
+    /** The residue alphabet of the model's release, from its version record. */
+    static ResidueAlphabet alphabet(CometParameters model) {
+        return model.metadata()
+                .version(model.version())
+                .orElseThrow()
+                .variableModTuple()
+                .residueAlphabet();
+    }
+
+    /** What a release without the protein-terminus codes offers in their place. */
+    private static String instead(char refused) {
+        if (refused == TerminalCode.PROTEIN_N.code()) {
+            return "; for the protein N-terminus use n with terminal distance 0 from terminus 0"
+                    + " (fields 5 and 6: 0 0)";
+        }
+        if (refused == TerminalCode.PROTEIN_C.code()) {
+            return "; for the protein C-terminus use c with terminal distance 0 from terminus 1"
+                    + " (fields 5 and 6: 0 1)";
+        }
+        return "";
+    }
+
     static void checkLimits(CometParameters model, Findings findings) {
         List<ParameterEntry> active = new ArrayList<>();
         for (ParameterEntry entry : model.entries()) {
@@ -230,9 +291,7 @@ final class VariableModRules {
                 findings.add(
                         Rule.VARMODS_MINIMUM_ABOVE_LIMIT,
                         List.of(slot.name(), LIMIT),
-                        slot.name()
-                                + " = "
-                                + model.text(slot.name())
+                        shown(model, slot.name(), modification(slot))
                                 + " needs at least "
                                 + minimum.getAsInt()
                                 + " modified residues, but "

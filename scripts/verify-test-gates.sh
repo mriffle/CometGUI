@@ -1174,6 +1174,12 @@ main() {
     # rather than skip without it -- so the sandbox build would die there too.
     [ -d "${ROOT}/scratch/phase06/artefacts" ] \
         || die "scratch/phase06/artefacts does not exist. cometgui-params-comet's migration tests run the real Comet 2024.01.0 binary from there and fail rather than skip without it, so the sandbox build would die before any control ran. The mirror is gitignored; refill it as docs/developer/comet_parameter_schema.rst (The migration fixture: Comet 2024.01.0) describes, checking the SHA-256 pinned in MigrationFixtures.ROW."
+    # And for the local spectra and FASTA (D-006: never committed): the
+    # validation corpus's real-binary test (ValidationCorpusRealBinaryTest,
+    # Comet 2026.03.0 intake unit 4) searches them with both Comet releases and
+    # fails rather than skips without them.
+    [ -d "${ROOT}/scratch/fixture" ] \
+        || die "scratch/fixture does not exist. cometgui-params-comet's validation-corpus test searches the Crux K562 mzML and the UniProt human proteome from there with the real Comet binaries and fails rather than skip without them, so the sandbox build would die before any control ran. The inputs are gitignored (D-006); refill them with python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches by checksum, as docs/developer/comet_parameter_schema.rst (Validation agreed with the real binaries) describes."
     bash "${ROOT}/scripts/fetch-fontstack.sh" --verify >/dev/null \
         || die "the font stack is missing; run bash scripts/fetch-fontstack.sh first."
 

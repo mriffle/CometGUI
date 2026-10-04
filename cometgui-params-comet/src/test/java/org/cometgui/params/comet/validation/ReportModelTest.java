@@ -37,6 +37,7 @@ class ReportModelTest {
     private static final Finding ERROR =
             new Finding(
                     Rule.PAIR_REVERSED,
+                    Severity.ERROR,
                     List.of("peptide_mass_tolerance_lower", "peptide_mass_tolerance_upper"),
                     Optional.of(ParameterCategory.PRECURSOR_MASS),
                     "reversed");
@@ -44,15 +45,21 @@ class ReportModelTest {
     private static final Finding WARNING =
             new Finding(
                     Rule.VARMOD_COUNT_ZERO,
+                    Severity.WARNING,
                     List.of("variable_mod01"),
                     Optional.of(ParameterCategory.VARIABLE_MODS),
                     "zero");
 
     private static final Finding FILE =
-            new Finding(Rule.IMPORT_DIAGNOSTIC, List.of(), Optional.empty(), "marker");
+            new Finding(
+                    Rule.IMPORT_DIAGNOSTIC,
+                    Severity.WARNING,
+                    List.of(),
+                    Optional.empty(),
+                    "marker");
 
     @Test
-    @DisplayName("a finding takes its severity from its rule and needs a message")
+    @DisplayName("a finding has its rule's fixed severity and needs a message")
     void finding() {
         assertEquals(Severity.ERROR, ERROR.severity());
         assertTrue(ERROR.isError());
@@ -62,12 +69,55 @@ class ReportModelTest {
         assertFalse(ERROR.concerns("variable_mod01"));
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new Finding(Rule.PAIR_REVERSED, List.of(), Optional.empty(), " "));
+                () ->
+                        new Finding(
+                                Rule.PAIR_REVERSED,
+                                Severity.ERROR,
+                                List.of(),
+                                Optional.empty(),
+                                " "));
+        IllegalArgumentException fixed =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                new Finding(
+                                        Rule.PAIR_REVERSED,
+                                        Severity.WARNING,
+                                        List.of(),
+                                        Optional.empty(),
+                                        "m"));
+        assertEquals(
+                "signed_tolerance_pair.reversed is always ERROR, not WARNING", fixed.getMessage());
         List<String> names = new ArrayList<>(List.of("a"));
-        Finding copied = new Finding(Rule.PATH_EMPTY, names, Optional.empty(), "m");
+        Finding copied = new Finding(Rule.PATH_EMPTY, Severity.ERROR, names, Optional.empty(), "m");
         names.add("b");
         assertEquals(List.of("a"), copied.parameters());
         assertThrows(UnsupportedOperationException.class, () -> copied.parameters().add("c"));
+    }
+
+    @Test
+    @DisplayName("a finding of a version-scoped rule carries the severity it was given")
+    void versionScopedFinding() {
+        for (Severity severity : Severity.values()) {
+            Finding finding =
+                    new Finding(
+                            Rule.VARMOD_DISTANCE_UNDOCUMENTED,
+                            severity,
+                            List.of("variable_mod01"),
+                            Optional.of(ParameterCategory.VARIABLE_MODS),
+                            "distance");
+            assertEquals(severity, finding.severity());
+            assertEquals(severity == Severity.ERROR, finding.isError());
+        }
+        assertThrows(
+                NullPointerException.class,
+                () ->
+                        new Finding(
+                                Rule.VARMOD_DISTANCE_UNDOCUMENTED,
+                                null,
+                                List.of(),
+                                Optional.empty(),
+                                "m"));
     }
 
     @Test
@@ -100,10 +150,43 @@ class ReportModelTest {
             assertTrue(shape.matcher(rule.id()).matches(), rule.id());
         }
         assertEquals("signed_tolerance_pair.asymmetric", Rule.PAIR_ASYMMETRIC.id());
-        assertEquals(Severity.WARNING, Rule.PAIR_ASYMMETRIC.severity());
-        assertEquals(Severity.WARNING, Rule.PAIR_SAME_SIGNED.severity());
-        assertEquals(Severity.ERROR, Rule.PAIR_REVERSED.severity());
-        assertEquals(Severity.ERROR, Rule.UNAVAILABLE_IN_VERSION.severity());
-        assertEquals(Severity.WARNING, Rule.UNKNOWN_PARAMETER.severity());
+        assertEquals(Optional.of(Severity.WARNING), Rule.PAIR_ASYMMETRIC.fixedSeverity());
+        assertEquals(Optional.of(Severity.WARNING), Rule.PAIR_SAME_SIGNED.fixedSeverity());
+        assertEquals(Optional.of(Severity.ERROR), Rule.PAIR_REVERSED.fixedSeverity());
+        assertEquals(Optional.of(Severity.ERROR), Rule.UNAVAILABLE_IN_VERSION.fixedSeverity());
+        assertEquals(Optional.of(Severity.WARNING), Rule.UNKNOWN_PARAMETER.fixedSeverity());
+        assertEquals(
+                Optional.of(Severity.ERROR), Rule.VARMOD_RESIDUE_NOT_IN_RELEASE.fixedSeverity());
+        assertEquals(Optional.of(Severity.ERROR), Rule.VARMODS_ASCOREPRO_SLOT.fixedSeverity());
+        for (Rule rule : Rule.values()) {
+            assertTrue(
+                    org.cometgui.params.comet.schema.RuleSeverity.RULE_ID
+                            .matcher(rule.id())
+                            .matches(),
+                    rule.id());
+            assertEquals(Optional.of(rule), Rule.byId(rule.id()));
+            assertEquals(rule.isVersionScoped(), rule.fixedSeverity().isEmpty(), rule.id());
+        }
+        assertEquals(Optional.empty(), Rule.byId("variable_mod_tuple.no_such_rule"));
+    }
+
+    @Test
+    @DisplayName("exactly the rules Comet releases judge differently are version-scoped")
+    void versionScopedRules() {
+        List<Rule> scoped = new ArrayList<>();
+        for (Rule rule : Rule.values()) {
+            if (rule.isVersionScoped()) {
+                scoped.add(rule);
+            }
+        }
+        assertEquals(
+                List.of(Rule.VARMOD_DISTANCE_UNDOCUMENTED, Rule.INDEX_SEARCH_TYPE_IGNORED), scoped);
+        assertEquals(
+                "variable_mod_tuple.distance_undocumented", Rule.VARMOD_DISTANCE_UNDOCUMENTED.id());
+        assertEquals("index_search_type.ignored_without_idx", Rule.INDEX_SEARCH_TYPE_IGNORED.id());
+        assertEquals(
+                "variable_mod_tuple.residue_not_in_release",
+                Rule.VARMOD_RESIDUE_NOT_IN_RELEASE.id());
+        assertEquals("variable_mods.ascorepro_slot_unsupported", Rule.VARMODS_ASCOREPRO_SLOT.id());
     }
 }

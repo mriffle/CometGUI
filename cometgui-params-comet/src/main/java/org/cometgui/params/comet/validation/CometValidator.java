@@ -31,7 +31,13 @@ import org.cometgui.params.comet.schema.ValidatorId;
  * parameter's curated bounds, and the cross-field rules -- the signed precursor tolerance pair
  * ({@code R-PARAM-04}), enzyme references, variable-modification tuples and their limits ({@code
  * R-PARAM-09}, {@code R-PARAM-10}), the workflow's required outputs ({@code R-CMT-01}), the decoy
- * prefix ({@code R-DEC-01}), and the parameters an import could not model ({@code R-PARAM-07}).
+ * prefix ({@code R-DEC-01}), AScorePro against the slots it can localise, {@code index_search_type}
+ * against the database, and the parameters an import could not model ({@code R-PARAM-07}).
+ *
+ * <p>Where Comet releases judge a configuration differently, the rule is version-scoped and takes
+ * its severity from the model's version record ({@link Rule#isVersionScoped()}); a rule that
+ * depends on a release fact, such as which characters a residue token may hold, reads that fact
+ * from the record too. No rule asks which version it is judging.
  *
  * <p>Every {@link ValidatorId} must have an implementation: a validator built without one is
  * refused, so a validator id the metadata names can never silently go unchecked.
@@ -108,6 +114,8 @@ public final class CometValidator {
         TextTokenRule.check(model, findings);
         EnzymeRules.checkTable(model, findings);
         VariableModRules.checkLimits(model, findings);
+        AScoreProRule.check(model, findings);
+        IndexSearchTypeRule.check(model, findings);
         DecoyRule.check(model, findings);
         ImportedRules.check(model, findings);
         return findings.report();

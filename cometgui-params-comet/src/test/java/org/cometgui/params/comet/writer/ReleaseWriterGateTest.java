@@ -57,8 +57,10 @@ import org.junit.jupiter.params.provider.MethodSource;
  * CONSTRUCTED and labelled so. The expected bytes and SHA-256 of each release's canonical text are
  * typed here: 2026.02.2's is the value signed off in Phase 06 ({@link CanonicalWriterTest} pins the
  * same), 2026.03.0's the value this test was first seen to produce, after the round trips below
- * showed it stable. A release added to the fixtures without a row here fails {@link
- * #everyFixtureReleaseHasARow()}.
+ * showed it stable -- re-pinned once, when the 2026.03.0 inline comment of {@code output_txtfile}
+ * stopped naming 2026.02.2 ({@code (2026.03.0 treats 2 as 1)}): that one substitution reversed
+ * gives the earlier value, {@code 3aecc834...7444}, byte for byte. A release added to the fixtures
+ * without a row here fails {@link #everyFixtureReleaseHasARow()}.
  */
 class ReleaseWriterGateTest {
 
@@ -99,7 +101,7 @@ class ReleaseWriterGateTest {
                     new Release(
                             "2026.03.0",
                             10_725,
-                            "3aecc834201d0e0cfb5a010b8e60391a3c599da70e42aa1b16abe720bd7b7444",
+                            "c600c64f473ec46baaa760c7b1f55c78faa196dd96c36748da06c8ea9d5fcf2e",
                             "# comet_version 2026.03 rev. 0 (fa08489)",
                             true));
 

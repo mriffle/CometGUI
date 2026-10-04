@@ -60,11 +60,120 @@
           "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/index_search_type.html"
         },
         {
+          "name": "output_txtfile",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L748-L754",
+          "inlineComment": "0=no, 1=yes  write tab-delimited txt file (2026.03.0 treats 2 as 1)",
+          "shortHelp": "Whether results are also written as a tab-delimited .txt file. The comment -q writes offers 2 for a Crux-formatted file; the 2026.03.0 parameter code treats any non-zero value as 'write', and a value of 2 writes the same file as 1.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/output_txtfile.html"
+        },
+        {
           "name": "spectral_library_ms_level",
           "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L512-L516",
           "inlineComment": "read by Comet 2026.03.0 but used only for a .raw spectral library, which it refuses",
           "shortHelp": "MS level of the spectral-library spectra. Comet 2026.03.0 reads this name (2026.02.2 did not), but its only use of the value is in the reader for a Thermo .raw spectral library, which this release refuses before it reads the level (\"raw files as spectral libraries are not supported yet\"), so a value given here has no effect on a search.",
           "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSpecLib.cpp#L195-L215"
+        },
+        {
+          "name": "variable_mod01",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod02",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod03",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod04",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod05",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod06",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod07",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod08",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod09",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod10",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod11",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod12",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod13",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod14",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        },
+        {
+          "name": "variable_mod15",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
+          "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html"
+        }
+      ],
+      "ruleSeverities": [
+        {
+          "rule": "index_search_type.ignored_without_idx",
+          "severity": "WARNING",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1764-L1775"
+        },
+        {
+          "rule": "variable_mod_tuple.distance_undocumented",
+          "severity": "ERROR",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1436-L1450"
         }
       ]
     },
@@ -90,7 +199,19 @@
           "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1380-L1396"
         }
       },
-      "overrides": []
+      "overrides": [],
+      "ruleSeverities": [
+        {
+          "rule": "index_search_type.ignored_without_idx",
+          "severity": "OFF",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L720-L724"
+        },
+        {
+          "rule": "variable_mod_tuple.distance_undocumented",
+          "severity": "WARNING",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5369-L5372"
+        }
+      ]
     },
     {
       "version": "2024.01.0",
@@ -124,6 +245,18 @@
           "name": "fragindex_skipreadprecursors",
           "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/Comet.cpp#L1700",
           "default": "0"
+        }
+      ],
+      "ruleSeverities": [
+        {
+          "rule": "index_search_type.ignored_without_idx",
+          "severity": "OFF",
+          "source": "https://github.com/UWPR/Comet/tree/v2024.01.0"
+        },
+        {
+          "rule": "variable_mod_tuple.distance_undocumented",
+          "severity": "WARNING",
+          "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometSearch.cpp#L4754-L4758"
         }
       ]
     }
