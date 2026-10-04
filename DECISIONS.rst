@@ -2,7 +2,8 @@
 Decisions
 =========
 
-:Updated: 2026-08-30 (D-003 answered; no decision now open)
+:Updated: 2026-10-04 (D-010 decided by the owner: Comet 2026.03.0 becomes
+   the default; no decision now open)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -855,3 +856,44 @@ institutional name on the strength of this entry. The wording stays exactly
 ``CONTRIBUTORS`` file listing who they are would make the line true rather than
 merely conventional. Not done here because the owner asked only for the wording;
 Phase 16 owns it alongside the licence audit.
+
+----
+
+D-010 -- Which Comet version is the default
+===========================================
+
+:Status: **DECIDED 2026-10-04**
+:Raised: 2026-10-02, by tier 1 at Phase 06 sign-off (Comet 2026.03.0 was
+   released upstream on 2026-10-01 and was not in the release matrix)
+:Blocks: Phase 07, which builds the editor on the default version's schema;
+   the intake work package runs first
+:Owner: Project owner
+
+**Question.** Comet 2026.03.0 appeared one day before Phase 06 closed on
+2026.02.2. Does the project adopt it, and as what?
+
+**Why it is the owner's.** The specification named 2026.02.2 as *the* default
+verified version, and 2026.03.0 is not a drop-in: it adds the ``^`` and ``$``
+residue codes to ``variable_modNN``, rejects position fields 2026.02.2
+accepted, changes what ``index_search_type`` means, makes AScorePro with
+``variable_mod10``..``15`` an error, and moves ``.idx`` to format v5, which
+earlier indexes cannot be searched with. Changing the default is a requirements
+change, not an implementation detail.
+
+**DECISION (2026-10-04).** The owner directed: *"Yes, let's support the latest
+version of comet."*
+
+**How tier 1 reads it, and what it is acting on.** 2026.03.0 becomes the
+default verified version. 2026.02.2 **stays in the release matrix** as a
+supported older version, whose parameter files import and migrate to the
+default with a reviewable diff, so nothing Phase 06 built is thrown away and no
+user's existing file stops loading. That second half is tier 1's reading, not
+the owner's words; the owner can overrule it, and dropping 2026.02.2 later is a
+deletion from the matrix, not a redesign. Specification revision 12 records the
+change. The rule that a release enters the registry only after automated
+compatibility and regression tests pass still applies in full: the intake work
+package (``handoffs/COMET-2026-03-BRIEF.rst``) is what earns that entry.
+
+**What this does not authorise.** No fact about 2026.03.0 is taken from its
+release notes alone. Parameter counts, defaults and acceptance rules are
+established by running the real binary, as they were for 2026.02.2.

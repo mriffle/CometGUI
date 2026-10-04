@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 11
-:Revision date: 2026-08-30
-:Supersedes: Revision 9, 2026-08-30
+:Revision: 12
+:Revision date: 2026-10-04
+:Supersedes: Revision 11, 2026-09-03
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,23 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 12
+     - 2026-10-04
+     - **Comet 2026.03.0 becomes the default verified Comet version**, on the
+       owner's instruction of 2026-10-04 (``D-010``). It was released upstream
+       on 2026-10-01. 2026.02.2 stays in the release matrix as a supported
+       older version. The *Comet* section's policy, the upstream-facts table,
+       ``AC-PAR-01`` and step 6 of the end-to-end scenario are amended. The
+       version-specific facts (the ``-q``/``-p`` parameter counts, the new
+       ``^``/``$`` variable-modification residue codes, the stricter position
+       fields, ``index_search_type``'s new meaning, ``.idx`` format v5) are
+       established by executing the real binary and land in later revisions
+       or in the generated reference, never from the release notes alone.
+   * - 11
+     - 2026-09-03
+     - The Percolator ``XML_OUTPUT`` probe's fixture-size rule was corrected
+       from measurement (see *Amended in revision 11* under Percolator
+       capability). *This row was missing until revision 12 added it.*
    * - 10
      - 2026-08-30
      - **``R-SEC-01`` amended to match ``D-001``, which decided it on
@@ -233,8 +250,13 @@ each release.
      - Verified finding
      - Source / method
    * - Comet current release
-     - ``v2026.02.2``, published 2026-08-11.
-     - GitHub releases API, ``UWPR/Comet``
+     - ``v2026.02.2``, published 2026-08-11. *Superseded (revision 12):*
+       ``v2026.03.0``, published 2026-10-01, with the same five executables
+       plus ``CometWrapperCore.dll`` and ``Ijwhost.dll`` (a .NET 8 real-time
+       search wrapper, not used by CometGUI). It changes ``.idx`` to format
+       v5, so indexes built by earlier versions are rejected.
+     - GitHub releases API, ``UWPR/Comet`` (2026.03.0 re-checked
+       2026-10-04)
    * - Comet artefacts
      - Standalone executables, no archive: ``comet.linux.exe``,
        ``comet.aarch64.linux.exe``, ``comet.macos.exe``,
@@ -687,10 +709,13 @@ JavaFX versions shall be pinned in the build and recorded in provenance.
 Comet
 -----
 
-The default verified Comet version for the initial implementation shall be
-``2026.02.2``. Tool metadata shall not assume this remains latest forever. New
-Comet releases shall enter the managed registry only after automated
-compatibility and regression tests pass.
+The default verified Comet version shall be ``2026.03.0`` (revision 12,
+``D-010``). ``2026.02.2``, the default through revision 11, remains in the
+release matrix as a supported older version: its parameter files import, and
+migrate to the default with a reviewable diff. Tool metadata shall not assume
+the default remains latest forever. New Comet releases shall enter the
+managed registry only after automated compatibility and regression tests
+pass.
 
 Comet ships **standalone executables**, not archives, one per platform, plus
 Windows-only companion DLLs for Thermo RAW reading. The installer must
@@ -2771,7 +2796,7 @@ The principal end-to-end test shall:
 #. Create or open a test project through the UI.
 #. Choose **two** real spectrum fixtures through the same control users use.
 #. Choose the real FASTA fixture.
-#. Select Comet 2026.02.2.
+#. Select the default Comet version (2026.03.0 as of revision 12).
 #. Select the platform's default XML-capable Percolator, and assert that the
    selection was resolved from the manifest rather than hard-coded.
 #. Change at least one precursor or fragment parameter from its preset value.
@@ -3151,8 +3176,10 @@ Comet parameters
    * - ID
      - Criterion
    * - ``AC-PAR-01``
-     - Comet 2026.02.2 is fully represented by the supported parameter schema
-       as discovered by ``-q``, subject only to documented internal exclusions.
+     - Every Comet version in the release matrix -- 2026.03.0 (the default)
+       and 2026.02.2 as of revision 12 -- is fully represented by the
+       supported parameter schema as discovered by ``-q``, subject only to
+       documented internal exclusions.
    * - ``AC-PAR-02``
      - Schema drift CI detects unmodelled supported parameters.
    * - ``AC-PAR-03``

@@ -128,6 +128,10 @@ Independence, for ordering purposes only:
   piece of work in the project. Start it as early as a Comet binary exists.
 * 07 (parameter UI) cannot start before 06 has a stable model, and it is the
   second-longest piece.
+  *2026-10-04:* ``D-010`` made Comet 2026.03.0 the default, so a Comet
+  2026.03.0 intake work package (``handoffs/COMET-2026-03-BRIEF.rst``)
+  extends 05's manifest and 06's model first; 07 starts after tier 1 signs it
+  off.
 * 11 (PDV) is independent of 12 (Limelight) once 10 is done -- independent in
   the dependency sense, still run one after the other. It grew
   materially on 2026-08-30: ``D-005`` added an **mzTab exporter** with its own

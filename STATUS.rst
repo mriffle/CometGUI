@@ -3,26 +3,24 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-01
-:Updated by: Main orchestrator, session 09 (**Phase 06 signed off PASSED**
-   on 2026-10-02 -- :ref:`status-p06-signed`; earlier, Phase 05 signed off
-   PARTIAL and the nightly fixed -- :ref:`status-p05-signed`)
-:Current phase: **none -- PAUSED by the owner's instruction** ("pause when
-   phase 6 is green"). Phase 06 is **PASSED**, signed off 2026-10-02 on tier
-   1's full exit-gate run, two red controls fixed at the root, a re-run of the
-   ``tests`` control and three of tier 1's own injections. Phase 07 (Comet
-   Parameter Editor UI) is next and is **not dispatched**; it waits for the
-   owner.
+:Updated: 2026-10-04
+:Updated by: Main orchestrator, session 10 (**``D-010`` decided: Comet
+   2026.03.0 becomes the default**; specification revision 12; the intake work
+   package dispatched -- :ref:`status-comet-2603`)
+:Current phase: **Comet 2026.03.0 intake** (a work package amending Phases
+   05 and 06), dispatched 2026-10-04 with ``handoffs/COMET-2026-03-BRIEF.rst``.
+   The owner said yes to Phase 07 and to supporting the latest Comet; the
+   editor is built on the default version's schema, so the intake runs first
+   and Phase 07 follows it, one at a time.
 :Overall: Seven phases are signed off -- 02 and 06 PASSED; 00, 01, 03, 04 and
    05 PARTIAL. The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
    ``scripts/verify-all-gates.sh`` (~105 minutes now) runs once per phase, at
-   the exit gate, by tier 1. Open owner decisions: how ``build.sh`` scores the
+   the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
-   :ref:`status-p06-signed`); Comet 2026.03.0 is out and not in the matrix.
-   The nightly is red **by the owner's decision** until Phase 15 replaces its
-   stubs (:ref:`status-nightly-masking`).
+   :ref:`status-p06-signed`). The nightly is red **by the owner's decision**
+   until Phase 15 replaces its stubs (:ref:`status-nightly-masking`).
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -71,8 +69,9 @@ What exists
      - State
      - Notes
    * - ``specification.rst``
-     - Revision 11
-     - Revision 11 is the file's own header as of 2026-09-17; this row said
+     - Revision 12
+     - Revision 12 (2026-10-04) makes Comet 2026.03.0 the default
+       (``D-010``). Revision 11 is the file's own header as of 2026-09-17; this row said
        revision 9 until then. Revision 9 records ``D-003`` (three managed
        Percolator versions,
        ``R-PERC-12``); revision 8 recorded ``D-005`` (drive PDV through a
@@ -87,9 +86,10 @@ What exists
      - Scope, deliverables and exit gate per phase. 00 and 01 signed off
        PARTIAL, 05 re-scoped by ``D-002`` option C.
    * - ``DECISIONS.rst``
-     - 0 open, 7 decided, 2 partial/provisional
+     - 0 open, 8 decided, 2 partial/provisional
      - ``D-001``, ``D-002`` (including option C), ``D-004`` and ``D-008``
-       (all three parts), ``D-003``, ``D-005`` and ``D-007`` decided;
+       (all three parts), ``D-003``, ``D-005``, ``D-007`` and ``D-010``
+       (Comet 2026.03.0 is the default, 2026-10-04) decided;
        ``D-009`` provisional and ``D-006`` partly decided. **No ``D-`` item is
        open.**
    * - ``handoffs/``
@@ -196,8 +196,13 @@ Phase board
        (:ref:`status-platform-divergence`).
    * - 05
      - Tool registry and installer
-     - INCOMPLETE -- **stopped mid-unit-12, UNSIGNED**
-     - **Stopped 2026-09-18 by owner instruction, mid-unit-12**
+     - PARTIAL
+     - **Signed off PARTIAL 2026-10-01** (:ref:`status-p05-signed`): items 1-8
+       met, item 9 (macOS Gatekeeper acceptance) not met. *This row read
+       "stopped, unsigned" until 2026-10-04; the history below predates the
+       sign-off.* Comet 2026.03.0 is added to its manifest by the intake
+       work package (:ref:`status-comet-2603`).
+       **Stopped 2026-09-18 by owner instruction, mid-unit-12**
        (:ref:`status-p05-stopped-again`). Units 8, 9, 10, 13 and 11 accepted by
        the phase orchestrator -- three after rework -- and the inherited
        cancel-mid-download defect reproduced and fixed. **Unit 12 unfinished**;
@@ -216,8 +221,16 @@ Phase board
        off and no decision blocks it.
    * - 06
      - Comet parameter model
-     - NOT STARTED
-     - --
+     - PASSED
+     - **Signed off 2026-10-02** on tier 1's full exit-gate run
+       (:ref:`status-p06-signed`), for Comet 2026.02.2. Extended to 2026.03.0
+       by the intake work package (:ref:`status-comet-2603`), which tier 1
+       signs off separately; the grade above stands for what was gated.
+   * - 06+
+     - Comet 2026.03.0 intake (amends 05 and 06)
+     - IN PROGRESS
+     - Dispatched 2026-10-04 (``D-010``). Eight-item gate in
+       ``handoffs/COMET-2026-03-BRIEF.rst``.
    * - 07
      - Comet parameter editor UI
      - NOT STARTED
@@ -3209,6 +3222,38 @@ Handoffs written at tier 1 because the phase could not write its own:
 ``handoffs/PHASE-05-handoff.rst`` (rewritten for a successor) and
 ``handoffs/SESSION-08-main-orchestrator.rst``.
 
+.. _status-comet-2603:
+
+Comet 2026.03.0 becomes the default (2026-10-04)
+================================================
+
+Asked whether to start Phase 07, the owner replied: *"Yes, let's support the
+latest version of comet."* Recorded as ``D-010``; specification revision 12
+makes 2026.03.0 the default verified version and keeps 2026.02.2 in the
+release matrix (tier 1's reading -- the owner can overrule the second half).
+
+**Why it is not a version bump.** Tier 1 read the upstream release
+(2026-10-01) before planning. It adds ``^``/``$`` protein-terminus residue
+codes to ``variable_modNN``; rejects position fields 2026.02.2 accepted; makes
+AScorePro with ``variable_mod10``..``15`` an error; changes
+``index_search_type`` (``-p`` stops writing it, ``-q`` writes ``-1``);
+fixes the reading of ``add_U_selenocysteine``; errors on undefined enzyme
+numbers; and moves ``.idx`` to format v5. Each lands in Phase 06's model,
+which Phase 07's editor is built on -- the modification editor must offer
+``^``/``$`` only where the selected version accepts them.
+
+**Ordering.** One orchestrator at a time: the intake work package first, then
+Phase 07. Its gate (eight items, ``handoffs/COMET-2026-03-BRIEF.rst``) asks for
+the registry entry from bytes downloaded and hashed, real ``-q``/``-p``
+fixtures, a per-version drift test, round trip, **version-scoped validation
+agreed with the real binary case by case**, migration from 2026.02.2 and
+2024.01.0 accepted by the binary, the reference, and mutation evidence. Tier 1
+runs the full build and gates once, at its exit.
+
+Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
+since their sign-offs, now carry their grades; the specification's missing
+revision-11 history row was added.
+
 .. _status-p06-signed:
 
 Phase 06 signed off (2026-10-02)
@@ -3578,6 +3623,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-04
+     - 06+
+     - **``D-010`` decided by the owner: Comet 2026.03.0 becomes the default
+       verified version**; specification revision 12; the Comet 2026.03.0
+       intake work package dispatched ahead of Phase 07. See
+       :ref:`status-comet-2603`.
    * - 2026-09-18
      - 05
      - **Phase 05 stopped a second time by owner instruction, mid-unit-12, and
