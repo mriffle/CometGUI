@@ -20,8 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.fixtures.ParamsFiles;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ValueOrigin;
@@ -32,13 +34,23 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Gate item 5 / {@code AC-PAR-11} / {@code R-PARAM-11}: the canonical text of the REAL {@code -q}
- * file's model -- and of a CONSTRUCTED variant with more decimals in it -- is byte-identical under
- * comma-decimal default locales and under {@link Locale#ROOT}. Each locale is first shown really to
- * write {@code 1.5} as {@code 1,5}, so the test cannot pass by testing nothing. The default locale
- * is restored after every test.
+ * Gate item 5 / {@code AC-PAR-11} / {@code R-PARAM-11}: for every release the project installs
+ * (Comet 2026.02.2 and 2026.03.0), the canonical text of the REAL {@code -q} file's model -- and of
+ * a CONSTRUCTED variant with more decimals in it, and for 2026.03.0 its {@code ^}/{@code $} slots
+ * -- is byte-identical under comma-decimal default locales and under {@link Locale#ROOT}. Each
+ * locale is first shown really to write {@code 1.5} as {@code 1,5}, so the test cannot pass by
+ * testing nothing. The default locale is restored after every test.
  */
 class CommaLocaleWriterTest {
+
+    /**
+     * Each installed release, and the CONSTRUCTED tuple its variant puts in {@code variable_mod03}:
+     * a {@code $} form where the release accepts it.
+     */
+    private static final List<List<String>> RELEASES =
+            List.of(
+                    List.of("2026.02.2", "15.994915 M 0 3 -1 0 0 0.0"),
+                    List.of("2026.03.0", "-0.984016 $ 0 1 -1 0 0 0.0"));
 
     private static final List<Locale> COMMA_LOCALES =
             List.of(Locale.forLanguageTag("de-DE"), Locale.forLanguageTag("fr-FR"));
@@ -55,14 +67,23 @@ class CommaLocaleWriterTest {
         Locale.setDefault(saved);
     }
 
-    /** Parses and writes under whatever the default locale is now. */
+    /** Parses and writes, for every release, under whatever the default locale is now. */
     private static List<byte[]> writeEverything() {
-        CometParamsParser parser = new CometParamsParser(ParamsFiles.metadata(), ParamsFiles.COMET);
+        List<byte[]> written = new ArrayList<>();
+        for (List<String> release : RELEASES) {
+            written.addAll(writeEverything(ToolVersion.parse(release.get(0)), release.get(1)));
+        }
+        return written;
+    }
+
+    private static List<byte[]> writeEverything(ToolVersion version, String slot3) {
+        CometParamsParser parser = new CometParamsParser(ParamsFiles.metadata(), version);
         CanonicalParamsWriter writer = new CanonicalParamsWriter(ParamsFiles.build());
-        CometParameters real = parser.parse(ParamsFiles.complete()).model().orElseThrow();
+        CometParameters real = parser.parse(ParamsFiles.complete(version)).model().orElseThrow();
         CometParameters edited =
                 parser.parse(
                                 ParamsFiles.completeWith(
+                                        version,
                                         "num_results",
                                         "ms1_mass_range = 400.25 1600.5 # constructed\n"))
                         .model()
@@ -75,7 +96,8 @@ class CommaLocaleWriterTest {
                         .withText(
                                 "variable_mod02",
                                 "79.966331 STY 0 2,4 -1 0 0 97.976896,79.966331",
-                                ValueOrigin.USER);
+                                ValueOrigin.USER)
+                        .withText("variable_mod03", slot3, ValueOrigin.USER);
         return List.of(writer.bytes(real), writer.bytes(edited));
     }
 
@@ -85,9 +107,21 @@ class CommaLocaleWriterTest {
         Locale.setDefault(Locale.ROOT);
         assertEquals("1.5", String.format("%.1f", 1.5));
         List<byte[]> root = writeEverything();
-        assertTrue(
-                new String(root.get(1), java.nio.charset.StandardCharsets.UTF_8)
-                        .contains("\nfragment_bin_tol = 1.0005 "));
+        assertEquals(2 * RELEASES.size(), root.size());
+        for (int index = 0; index < RELEASES.size(); index++) {
+            String edited =
+                    new String(root.get(2 * index + 1), java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(edited.contains("\nfragment_bin_tol = 1.0005 "), RELEASES.get(index).get(0));
+            assertTrue(
+                    edited.contains("\nvariable_mod03 = " + RELEASES.get(index).get(1) + "\n"),
+                    RELEASES.get(index).get(0));
+            assertTrue(
+                    edited.startsWith(
+                            "# comet_version "
+                                    + RELEASES.get(index).get(0).substring(0, 7)
+                                    + " rev. "),
+                    RELEASES.get(index).get(0));
+        }
         for (Locale locale : COMMA_LOCALES) {
             Locale.setDefault(locale);
             assertEquals(

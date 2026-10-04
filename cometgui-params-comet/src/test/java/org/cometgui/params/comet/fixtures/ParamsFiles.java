@@ -50,6 +50,16 @@ public final class ParamsFiles {
     }
 
     /**
+     * The real {@code comet -q} output of one release, linux/x86-64.
+     *
+     * @param version the release, which must have fixtures
+     * @return its text
+     */
+    public static String complete(ToolVersion version) {
+        return text(version.text(), CometFixtures.Mode.COMPLETE);
+    }
+
+    /**
      * The real {@code comet -p} output for 2026.02.2, linux/x86-64.
      *
      * @return its text
@@ -59,10 +69,13 @@ public final class ParamsFiles {
     }
 
     private static String text(CometFixtures.Mode mode) {
+        return text(CometFixtures.COMET_2026_02_2, mode);
+    }
+
+    private static String text(String version, CometFixtures.Mode mode) {
         try {
             return new String(
-                    CometFixtures.bytes(
-                            CometFixtures.COMET_2026_02_2, CometFixtures.LINUX_X86_64, mode),
+                    CometFixtures.bytes(version, CometFixtures.LINUX_X86_64, mode),
                     StandardCharsets.UTF_8);
         } catch (IOException unreadable) {
             throw new UncheckedIOException(unreadable);
@@ -97,7 +110,21 @@ public final class ParamsFiles {
      * @return the edited text
      */
     public static String completeWith(String beforeLineStarting, String block) {
-        String text = complete();
+        return completeWith(COMET, beforeLineStarting, block);
+    }
+
+    /**
+     * One release's real {@code -q} text with a CONSTRUCTED block inserted before the line that
+     * starts with a prefix. The result is test input, not Comet's output.
+     *
+     * @param version the release, which must have fixtures
+     * @param beforeLineStarting the start of the line to insert before; must occur exactly once
+     * @param block the lines to insert, each ending in {@code \n}
+     * @return the edited text
+     */
+    public static String completeWith(
+            ToolVersion version, String beforeLineStarting, String block) {
+        String text = complete(version);
         int at = text.indexOf("\n" + beforeLineStarting);
         if (at < 0 || text.indexOf("\n" + beforeLineStarting, at + 1) >= 0) {
             throw new AssertionError(

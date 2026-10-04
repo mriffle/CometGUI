@@ -24,10 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
 
 /** The layout's own rules, over CONSTRUCTED layouts. */
 class VariableModLayoutTest {
+
+    private static final ResidueAlphabet ALPHABET =
+            new ResidueAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZnc", "https://example.org/alphabet");
 
     private static VariableModLayout.Entry entry(VariableModField field, boolean pair) {
         return new VariableModLayout.Entry(field, field.kind(), pair);
@@ -36,7 +40,9 @@ class VariableModLayoutTest {
     private static String refused(VariableModLayout.Entry... entries) {
         return assertThrows(
                         IllegalArgumentException.class,
-                        () -> new VariableModLayout(List.of(entries), "https://example.org"))
+                        () ->
+                                new VariableModLayout(
+                                        List.of(entries), "https://example.org", ALPHABET))
                 .getMessage();
     }
 
@@ -47,13 +53,34 @@ class VariableModLayoutTest {
                         List.of(
                                 entry(VariableModField.RESIDUES, false),
                                 entry(VariableModField.MASS, false)),
-                        "https://example.org");
+                        "https://example.org",
+                        ALPHABET);
         assertEquals("residues, mass difference", layout.describe());
         assertEquals(
                 Optional.of(entry(VariableModField.MASS, false)),
                 layout.entry(VariableModField.MASS));
         assertEquals(Optional.empty(), layout.entry(VariableModField.COUNT));
         assertEquals("https://example.org", layout.source());
+        assertEquals(OptionalInt.of(0), layout.position(VariableModField.RESIDUES));
+        assertEquals(OptionalInt.of(1), layout.position(VariableModField.MASS));
+        assertEquals(OptionalInt.empty(), layout.position(VariableModField.COUNT));
+        assertEquals(ALPHABET, layout.residueAlphabet());
+    }
+
+    @Test
+    void aLayoutWithoutAResidueAlphabetIsRefused() {
+        assertEquals(
+                "residueAlphabet",
+                assertThrows(
+                                NullPointerException.class,
+                                () ->
+                                        new VariableModLayout(
+                                                List.of(
+                                                        entry(VariableModField.MASS, false),
+                                                        entry(VariableModField.RESIDUES, false)),
+                                                "https://example.org",
+                                                null))
+                        .getMessage());
     }
 
     @Test
@@ -62,7 +89,7 @@ class VariableModLayoutTest {
         for (VariableModField field : VariableModField.values()) {
             entries.add(entry(field, field.pairable()));
         }
-        VariableModLayout layout = new VariableModLayout(entries, "https://example.org");
+        VariableModLayout layout = new VariableModLayout(entries, "https://example.org", ALPHABET);
         assertEquals(
                 "mass difference, residues, binary group, count per peptide[,pair], terminal"
                         + " distance, terminus, required, neutral loss[,pair]",
@@ -118,7 +145,8 @@ class VariableModLayoutTest {
                                         entry(VariableModField.MASS, false),
                                         entry(VariableModField.RESIDUES, false),
                                         entry(VariableModField.COUNT, false)),
-                                "https://example.org")
+                                "https://example.org",
+                                ALPHABET)
                         .fields()
                         .get(2)
                         .acceptsPair());

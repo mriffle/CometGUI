@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.schema.MetadataLoader;
+import org.cometgui.params.comet.schema.TerminalCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,8 +40,17 @@ class VariableModificationTest {
             VariableModCodec.forVersion(
                     MetadataLoader.loadBundled(), ToolVersion.parse("2026.02.2"));
 
+    /** Comet 2026.03.0's codec: its alphabet holds the protein-terminus codes ^ and $. */
+    private static final VariableModCodec CODEC_2026_03 =
+            VariableModCodec.forVersion(
+                    MetadataLoader.loadBundled(), ToolVersion.parse("2026.03.0"));
+
     private static VariableModification read(String text) {
         return CODEC.parse("variable_mod01", text);
+    }
+
+    private static VariableModification read202603(String text) {
+        return CODEC_2026_03.parse("variable_mod01", text);
     }
 
     private static VariableModification withResidues(String residues) {
@@ -75,12 +85,39 @@ class VariableModificationTest {
 
         @Test
         void aResidueTokenOutsideTheAlphabet() {
-            for (String bad : List.of("K-", "N@", "k", "1", "*", "Ka")) {
+            for (String bad : List.of("K-", "N@", "k", "1", "*", "Ka", "#", "^a")) {
                 IllegalArgumentException failure =
                         assertThrows(IllegalArgumentException.class, () -> withResidues(bad), bad);
-                assertTrue(failure.getMessage().contains("letters A-Z, with n and c"), bad);
+                assertEquals(
+                        "\""
+                                + bad
+                                + "\" holds '"
+                                + bad.chars()
+                                        .mapToObj(c -> String.valueOf((char) c))
+                                        .filter(c -> !c.matches("[A-Z^]"))
+                                        .findFirst()
+                                        .orElseThrow()
+                                + "'; a residue token is letters A-Z and the terminal codes n, c,"
+                                + " ^ and $",
+                        failure.getMessage());
             }
-            for (String good : List.of("A", "Z", "n", "c", "nKc", "ACDEFGHIKLMNPQRSTVWY")) {
+            // The type holds every character some release can mean; which release accepts which is
+            // the version's alphabet, applied by the codec (VariableModCodecAlphabetTest).
+            for (String good :
+                    List.of(
+                            "A",
+                            "Z",
+                            "n",
+                            "c",
+                            "nKc",
+                            "ACDEFGHIKLMNPQRSTVWY",
+                            "^",
+                            "$",
+                            "^M",
+                            "n^",
+                            "^$",
+                            "$c",
+                            "^^")) {
                 assertEquals(good, withResidues(good).residues());
             }
         }
@@ -133,6 +170,46 @@ class VariableModificationTest {
             assertEquals("STY", sty.residueLetters());
             assertFalse(sty.nTerminal());
             assertFalse(sty.cTerminal());
+        }
+
+        @Test
+        @DisplayName("^ and $ are terminal codes, not residues; n and c take precedence")
+        void proteinTerminusCodes() {
+            VariableModification protein = read202603("42.010565 ^ 0 1 -1 0 0 0.0");
+            assertEquals("", protein.residueLetters());
+            assertTrue(protein.nTerminal());
+            assertFalse(protein.cTerminal());
+            assertEquals(Optional.of(TerminalCode.PROTEIN_N), protein.nTerminus());
+            assertEquals(Optional.empty(), protein.cTerminus());
+            assertTrue(protein.has(TerminalCode.PROTEIN_N));
+            assertFalse(protein.has(TerminalCode.PEPTIDE_N));
+            VariableModification amide = read202603("-0.984016 $ 0 1 -1 0 0 0.0");
+            assertFalse(amide.nTerminal());
+            assertTrue(amide.cTerminal());
+            assertEquals(Optional.empty(), amide.nTerminus());
+            assertEquals(Optional.of(TerminalCode.PROTEIN_C), amide.cTerminus());
+            VariableModification both = read202603("42.010565 ^M$ 0 1 -1 0 0 0.0");
+            assertEquals("M", both.residueLetters());
+            assertEquals(Optional.of(TerminalCode.PROTEIN_N), both.nTerminus());
+            assertEquals(Optional.of(TerminalCode.PROTEIN_C), both.cTerminus());
+            // Comet: "'n' together with '^' is just 'n'" (CometSearchManager.cpp at v2026.03.0).
+            assertEquals(
+                    Optional.of(TerminalCode.PEPTIDE_N),
+                    read202603("42.010565 n^ 0 1 -1 0 0 0.0").nTerminus());
+            assertEquals(
+                    Optional.of(TerminalCode.PEPTIDE_N),
+                    read202603("42.010565 ^n 0 1 -1 0 0 0.0").nTerminus());
+            assertEquals(
+                    Optional.of(TerminalCode.PEPTIDE_C),
+                    read202603("-0.984016 $c 0 1 -1 0 0 0.0").cTerminus());
+            assertEquals(
+                    Optional.of(TerminalCode.PEPTIDE_C),
+                    read202603("-0.984016 c$ 0 1 -1 0 0 0.0").cTerminus());
+            assertEquals("KR", read202603("1.0 ^K$Rnc 0 3 -1 0 0 0.0").residueLetters());
+            assertEquals(
+                    Optional.of(TerminalCode.PEPTIDE_N), read("1.0 nK 0 3 -1 0 0 0.0").nTerminus());
+            assertEquals(Optional.empty(), read("1.0 K 0 3 -1 0 0 0.0").nTerminus());
+            assertEquals(Optional.empty(), read("1.0 K 0 3 -1 0 0 0.0").cTerminus());
         }
 
         @Test
@@ -266,6 +343,34 @@ class VariableModificationTest {
                     "+1.0 on K and N-terminus and C-terminus, within 2 residues of the"
                             + " peptide C-terminus; max 3 per peptide; optional",
                     read("1.0 nKc 0 3 1 3 0 0.0").summary());
+        }
+
+        @Test
+        @DisplayName("^ and $ in words: the protein's terminus, not any peptide's")
+        void proteinTermini() {
+            assertEquals(
+                    "Acetyl: +42.010565 on protein N-terminus; max 1 per peptide; optional",
+                    read202603("42.010565 ^ 0 1 -1 0 0 0.0").summary("Acetyl"));
+            assertEquals(
+                    "-0.984016 on protein C-terminus; max 1 per peptide; optional",
+                    read202603("-0.984016 $ 0 1 -1 0 0 0.0").summary());
+            assertEquals(
+                    "+42.010565 on M and protein N-terminus; max 1 per peptide; optional",
+                    read202603("42.010565 ^M 0 1 -1 0 0 0.0").summary());
+            assertEquals(
+                    "+42.010565 on protein N-terminus and protein C-terminus; max 1 per peptide;"
+                            + " optional",
+                    read202603("42.010565 ^$ 0 1 -1 0 0 0.0").summary());
+            assertEquals(
+                    "+42.010565 on N-terminus; max 1 per peptide; optional",
+                    read202603("42.010565 n^ 0 1 -1 0 0 0.0").summary());
+            assertEquals(
+                    "-0.984016 on C-terminus; max 1 per peptide; optional",
+                    read202603("-0.984016 $c 0 1 -1 0 0 0.0").summary());
+            assertEquals(
+                    "+42.010565 on K and protein N-terminus and C-terminus; max 1 per peptide;"
+                            + " optional",
+                    read202603("42.010565 K^c$ 0 1 -1 0 0 0.0").summary());
         }
 
         @Test

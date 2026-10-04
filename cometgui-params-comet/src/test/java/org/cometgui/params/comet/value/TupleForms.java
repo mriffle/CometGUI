@@ -32,12 +32,22 @@ import java.util.OptionalInt;
  * {@code -2} distance, the peptide C-terminus); {@code Q_DEFAULT} and {@code SCIENTIFIC_PATH} are
  * the two values a real file in this project holds -- {@code comet -q}'s own default for slot 1,
  * and Phase 00's edited oxidation mass.
+ *
+ * <p>{@link #PROTEIN_TERMINI} are the forms with the protein-terminus codes {@code ^} and {@code $}
+ * that Comet 2026.03.0 added. {@code UPSTREAM_2026_03} texts are copied from the 2026.03 page,
+ * https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html (fetched
+ * 2026-10-04); the {@code DESCRIBED} ones are built from its description of the codes ("can be
+ * combined with residues in the same string") and from the combinations its source resolves ({@code
+ * n} with {@code ^} is {@code n}; {@code CometSearch/CometSearchManager.cpp} lines 1538-1563 at
+ * {@code v2026.03.0}). Each was accepted by the real 2026.03.0 binary in a search
+ * (docs/developer/comet_parameter_schema.rst, *The residue alphabet is data*).
  */
 final class TupleForms {
 
     /** Where a form's text comes from. */
     enum Origin {
         UPSTREAM,
+        UPSTREAM_2026_03,
         DESCRIBED,
         Q_DEFAULT,
         SCIENTIFIC_PATH
@@ -194,6 +204,69 @@ final class TupleForms {
                                     2,
                                     5,
                                     2,
+                                    1,
+                                    "97.976896",
+                                    "79.966331")));
+
+    /**
+     * The forms with {@code ^} or {@code $}: legal in Comet 2026.03.0, refused for every earlier
+     * curated release.
+     */
+    static final List<Form> PROTEIN_TERMINI =
+            List.of(
+                    new Form(
+                            "acetylation of the protein N-terminus, ^",
+                            Origin.UPSTREAM_2026_03,
+                            "42.010565 ^ 0 1 -1 0 0 0.0",
+                            mod("42.010565", "^", 0, NO_MIN, 1, -1, 0, 0, "0.0")),
+                    new Form(
+                            "oxidation of the protein N-terminus, ^ (the page's 'n 0 3 0 0')",
+                            Origin.UPSTREAM_2026_03,
+                            "15.994915 ^ 0 3 -1 0 0 0.0",
+                            mod("15.994915", "^", 0, NO_MIN, 3, -1, 0, 0, "0.0")),
+                    new Form(
+                            "amidation of the protein C-terminus, $",
+                            Origin.DESCRIBED,
+                            "-0.984016 $ 0 1 -1 0 0 0.0",
+                            mod("-0.984016", "$", 0, NO_MIN, 1, -1, 0, 0, "0.0")),
+                    new Form(
+                            "a residue and the protein N-terminus, ^M",
+                            Origin.DESCRIBED,
+                            "42.010565 ^M 0 1 -1 0 0 0.0",
+                            mod("42.010565", "^M", 0, NO_MIN, 1, -1, 0, 0, "0.0")),
+                    new Form(
+                            "n with ^, which Comet reads as n",
+                            Origin.DESCRIBED,
+                            "42.010565 n^ 0 1 -1 0 0 0.0",
+                            mod("42.010565", "n^", 0, NO_MIN, 1, -1, 0, 0, "0.0")),
+                    new Form(
+                            "$ with c, which Comet reads as c",
+                            Origin.DESCRIBED,
+                            "-0.984016 $c 0 1 -1 0 0 0.0",
+                            mod("-0.984016", "$c", 0, NO_MIN, 1, -1, 0, 0, "0.0")),
+                    new Form(
+                            "both protein termini, ^$",
+                            Origin.DESCRIBED,
+                            "42.010565 ^$ 0 1 -1 0 0 0.0",
+                            mod("42.010565", "^$", 0, NO_MIN, 1, -1, 0, 0, "0.0")),
+                    new Form(
+                            "^ repeated, which Comet de-duplicates",
+                            Origin.DESCRIBED,
+                            "42.010565 ^^ 0 1 -1 0 0 0.0",
+                            mod("42.010565", "^^", 0, NO_MIN, 1, -1, 0, 0, "0.0")),
+                    new Form(
+                            "everything at once with both codes: group, min,max, distance,"
+                                    + " required, two losses",
+                            Origin.DESCRIBED,
+                            "79.966331 ^STY$ 3 1,2 5 3 1 97.976896,79.966331",
+                            mod(
+                                    "79.966331",
+                                    "^STY$",
+                                    3,
+                                    OptionalInt.of(1),
+                                    2,
+                                    5,
+                                    3,
                                     1,
                                     "97.976896",
                                     "79.966331")));

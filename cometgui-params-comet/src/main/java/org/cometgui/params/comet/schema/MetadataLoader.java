@@ -62,7 +62,10 @@ import org.cometgui.provenance.json.JsonValue;
  * field; and the version's resulting default must be one of the version's resulting choices. A
  * parameter named as Comet names a tuple slot ({@code variable_mod} and two digits) must be of kind
  * {@link ValueKind#VARIABLE_MOD_TUPLE} and the other way round; and a tuple default must hold as
- * many fields as the layout of every version it claims.
+ * many fields as the layout of every version it claims, and residues that version's {@link
+ * ResidueAlphabet} accepts. The alphabet ({@code variableModTuple.residueAlphabet}: {@code
+ * characters} and an {@code https://} {@code source}) is checked by {@link ResidueAlphabet}'s own
+ * rules.
  *
  * <p>The format is documented in {@code docs/developer/comet_parameter_schema.rst}; the
  * documentation generator reads the same file with Python's standard library.
@@ -111,7 +114,9 @@ public final class MetadataLoader {
 
     private static final List<String> OVERRIDE_REQUIRED = List.of("name", "source");
 
-    private static final List<String> TUPLE_FIELDS = List.of("source", "fields");
+    private static final List<String> TUPLE_FIELDS = List.of("source", "fields", "residueAlphabet");
+
+    private static final List<String> ALPHABET_FIELDS = List.of("characters", "source");
 
     private static final List<String> TUPLE_ENTRY_FIELDS = List.of("field", "kind", "pair");
 
@@ -401,10 +406,24 @@ public final class MetadataLoader {
                             entry.constant("kind", VariableModField.Kind.class),
                             entry.bool("pair")));
         }
+        ResidueAlphabet alphabet = residueAlphabet(version, layout);
         try {
-            return new VariableModLayout(entries, source);
+            return new VariableModLayout(entries, source, alphabet);
         } catch (IllegalArgumentException unusable) {
             throw version.failure("variableModTuple", unusable.getMessage());
+        }
+    }
+
+    private static ResidueAlphabet residueAlphabet(Node version, Node layout) {
+        String where = "variableModTuple.residueAlphabet";
+        Node alphabet = Node.of(layout.required("residueAlphabet"), version.where(), where);
+        alphabet.onlyFields(ALPHABET_FIELDS);
+        String characters = alphabet.string("characters");
+        String source = alphabet.url("source");
+        try {
+            return new ResidueAlphabet(characters, source);
+        } catch (IllegalArgumentException unusable) {
+            throw version.failure(where, unusable.getMessage());
         }
     }
 
@@ -417,10 +436,14 @@ public final class MetadataLoader {
             for (CometVersionRecord record : versions) {
                 String value =
                         record.defaultOverride(definition.name()).orElse(definition.defaultValue());
-                int fields = value.split("\\s+").length;
-                int expected = record.variableModTuple().fields().size();
-                if (definition.supportedVersions().contains(record.version())
-                        && fields != expected) {
+                String[] tokens = value.split("\\s+");
+                int fields = tokens.length;
+                VariableModLayout layout = record.variableModTuple();
+                int expected = layout.fields().size();
+                if (!definition.supportedVersions().contains(record.version())) {
+                    continue;
+                }
+                if (fields != expected) {
                     throw new InvalidMetadataException(
                             "parameter \"" + definition.name() + "\"",
                             "default",
@@ -432,6 +455,23 @@ public final class MetadataLoader {
                                     + record.version().text()
                                     + " has "
                                     + expected);
+                }
+                String residues = tokens[layout.position(VariableModField.RESIDUES).orElseThrow()];
+                Optional<Character> refused = layout.residueAlphabet().firstRefused(residues);
+                if (refused.isPresent()) {
+                    throw new InvalidMetadataException(
+                            "parameter \"" + definition.name() + "\"",
+                            "default",
+                            "\""
+                                    + value
+                                    + "\" has the residues \""
+                                    + residues
+                                    + "\", and '"
+                                    + refused.get()
+                                    + "' is not in the residue alphabet of Comet "
+                                    + record.version().text()
+                                    + ": "
+                                    + layout.residueAlphabet().describe());
                 }
             }
         }

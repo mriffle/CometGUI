@@ -31,9 +31,11 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.cometgui.domain.ports.ProcessListener;
 import org.cometgui.domain.ports.RunningProcess;
 import org.cometgui.domain.ports.ToolCommand;
+import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.fixtures.CometFixtures;
 import org.cometgui.params.comet.fixtures.CometManifest;
 import org.cometgui.params.comet.fixtures.ParamsFiles;
@@ -46,13 +48,15 @@ import org.cometgui.params.comet.value.EnzymeDefinition;
 import org.cometgui.tools.process.ProcessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * The REAL pinned Comet 2026.02.2 binary reads the canonical file without complaint.
+ * The REAL pinned Comet binaries -- 2026.02.2 and 2026.03.0, each with the canonical file written
+ * for it -- read the canonical file without complaint.
  *
  * <p>The check is {@code comet -P<file> missing.mzML}, run through {@link ProcessService}. Comet's
  * {@code ProcessCmdLine} ({@code Comet.cpp} at {@code v2026.02.2}) calls {@code LoadParameters} on
@@ -65,11 +69,13 @@ import org.junit.jupiter.api.io.TempDir;
  * those Comet's own {@code -q} file gives, proves the canonical file passed the parameter reader.
  * It does not prove Comet read each value as the model means it: Comet prints no parsed values.
  *
- * <p>Comet's own {@code -q} file is run first as the control, and must give the same transcript;
- * that transcript carries one warning, for {@code spectral_library_ms_level}, which {@code -q}
- * writes and the reader does not know (it reads {@code speclib_ms_level}). A model with one unknown
- * parameter is run last and must add exactly one warning, which shows this check can see a
- * difference.
+ * <p>Comet's own {@code -q} file is run first as the control, and must give the same transcript.
+ * The control transcript is each release's own, typed in {@link #RELEASES} as observed: 2026.02.2's
+ * carries one warning, for {@code spectral_library_ms_level}, which {@code -q} writes and the
+ * reader does not know (it reads {@code speclib_ms_level}); 2026.03.0 reads that name and warns
+ * about nothing. For 2026.03.0 a model with the protein-terminus codes {@code ^} and {@code $} in
+ * three slots must give the control transcript too. A model with one unknown parameter is run last
+ * and must add exactly one warning, which shows this check can see a difference.
  */
 @EnabledOnOs(
         value = OS.LINUX,
@@ -86,20 +92,61 @@ class CometReadsCanonicalRealBinaryTest {
             " Warning - invalid parameter found: spectral_library_ms_level.  Parameter will be"
                     + " ignored.";
 
+    private static final String UNKNOWN_WARNING =
+            " Warning - invalid parameter found: bogus_parameter.  Parameter will be ignored.";
+
+    /**
+     * One release under test.
+     *
+     * @param version the release, as the manifest spells it
+     * @param controlWarnings the warnings its own {@code -q} file draws, observed by running it
+     * @param proteinSlots CONSTRUCTED {@code ^}/{@code $} slots to run where the release accepts
+     *     them; empty where it does not
+     */
+    record Release(String version, List<String> controlWarnings, List<List<String>> proteinSlots) {
+
+        ToolVersion tool() {
+            return ToolVersion.parse(version);
+        }
+
+        @Override
+        public String toString() {
+            return "Comet " + version;
+        }
+    }
+
+    static Stream<Release> releases() {
+        return RELEASES.stream();
+    }
+
+    static final List<Release> RELEASES =
+            List.of(
+                    new Release(CometFixtures.COMET_2026_02_2, List.of(KNOWN_WARNING), List.of()),
+                    new Release(
+                            CometFixtures.COMET_2026_03_0,
+                            List.of(),
+                            List.of(
+                                    List.of("variable_mod02", "42.010565 ^ 0 1 -1 0 0 0.0"),
+                                    List.of("variable_mod03", "-0.984016 $ 0 1 -1 0 0 0.0"),
+                                    List.of("variable_mod14", "42.010565 ^M$ 0 1 -1 0 0 0.0"))));
+
     private Path scratch;
 
     private Path binary;
 
     @BeforeEach
-    void stage(@TempDir Path directory) throws IOException {
+    void scratch(@TempDir Path directory) {
         scratch = directory;
+    }
+
+    private void stage(Release release) throws IOException {
         CometManifest.Row row =
                 CometManifest.cometRows(CometManifest.repositoryManifest()).stream()
-                        .filter(r -> r.version().equals(CometFixtures.COMET_2026_02_2))
+                        .filter(r -> r.version().equals(release.version()))
                         .filter(CometManifest.Row::isLinuxX8664)
                         .findFirst()
                         .orElseThrow(
-                                () -> new AssertionError("no linux/x86-64 Comet 2026.02.2 row"));
+                                () -> new AssertionError("no linux/x86-64 " + release + " row"));
         binary =
                 UpstreamMirror.stage(
                                 UpstreamMirror.repositoryRoot(),
@@ -177,36 +224,53 @@ class CometReadsCanonicalRealBinaryTest {
         }
     }
 
-    private static CometParameters realModel() {
-        return new CometParamsParser(ParamsFiles.metadata(), ParamsFiles.COMET)
-                .parse(ParamsFiles.complete())
+    private static CometParameters realModel(Release release) {
+        return new CometParamsParser(ParamsFiles.metadata(), release.tool())
+                .parse(ParamsFiles.complete(release.tool()))
                 .model()
                 .orElseThrow();
     }
 
-    @Test
+    private static List<String> plus(List<String> warnings, String last) {
+        List<String> all = new ArrayList<>(warnings);
+        all.add(last);
+        return all;
+    }
+
+    @ParameterizedTest
+    @MethodSource("releases")
     @DisplayName("Comet reads its own -q file and the canonical file identically, to the inputs")
-    void cometReadsTheCanonicalFile() throws IOException, InterruptedException {
+    void cometReadsTheCanonicalFile(Release release) throws IOException, InterruptedException {
+        stage(release);
         CanonicalParamsWriter writer = new CanonicalParamsWriter(ParamsFiles.build());
         Transcript control =
                 run(
                         "control",
                         CometFixtures.bytes(
-                                CometFixtures.COMET_2026_02_2,
+                                release.version(),
                                 CometFixtures.LINUX_X86_64,
                                 CometFixtures.Mode.COMPLETE));
-        assertEquals(List.of(KNOWN_WARNING, REACHED_INPUTS), control.warningsAndErrors());
+        assertEquals(plus(release.controlWarnings(), REACHED_INPUTS), control.warningsAndErrors());
         assertEquals(1, control.exitCode());
+        assertTrue(
+                control.standardError().stream()
+                        .anyMatch(
+                                line ->
+                                        line.startsWith(
+                                                " Comet version "
+                                                        + release.version().substring(0, 7)
+                                                        + " rev. ")),
+                control.standardError().toString());
 
-        Transcript canonical = run("canonical", writer.bytes(realModel()));
+        Transcript canonical = run("canonical", writer.bytes(realModel(release)));
         assertEquals(control.warningsAndErrors(), canonical.warningsAndErrors());
         assertEquals(control, canonical);
         assertEquals(1, canonical.exitCode());
 
         CometParameters custom =
-                realModel()
+                realModel(release)
                         .withEnzymeTable(
-                                realModel()
+                                realModel(release)
                                         .enzymeTable()
                                         .with(
                                                 new EnzymeDefinition(
@@ -226,23 +290,37 @@ class CometReadsCanonicalRealBinaryTest {
         Transcript edited = run("custom", writer.bytes(custom));
         assertEquals(control, edited);
 
-        String withUnknown = ParamsFiles.completeWith("num_results", "bogus_parameter = 3\n");
+        if (!release.proteinSlots().isEmpty()) {
+            CometParameters protein = realModel(release);
+            for (List<String> slot : release.proteinSlots()) {
+                protein = protein.withText(slot.get(0), slot.get(1), ValueOrigin.USER);
+            }
+            byte[] proteinFile = writer.bytes(protein);
+            for (List<String> slot : release.proteinSlots()) {
+                assertTrue(
+                        new String(proteinFile, java.nio.charset.StandardCharsets.UTF_8)
+                                .contains("\n" + slot.get(0) + " = " + slot.get(1) + "\n"),
+                        slot.toString());
+            }
+            assertEquals(control, run("protein-termini", proteinFile));
+        }
+
+        String withUnknown =
+                ParamsFiles.completeWith(release.tool(), "num_results", "bogus_parameter = 3\n");
         Transcript unknown =
                 run(
                         "unknown",
                         writer.bytes(
-                                new CometParamsParser(ParamsFiles.metadata(), ParamsFiles.COMET)
+                                new CometParamsParser(ParamsFiles.metadata(), release.tool())
                                         .parse(withUnknown)
                                         .model()
                                         .orElseThrow()));
         assertNotEquals(control, unknown);
-        assertEquals(
-                List.of(
-                        KNOWN_WARNING,
-                        " Warning - invalid parameter found: bogus_parameter.  Parameter will be"
-                                + " ignored.",
-                        REACHED_INPUTS),
-                unknown.warningsAndErrors());
+        List<String> expected = new ArrayList<>(release.controlWarnings());
+        expected.add(UNKNOWN_WARNING);
+        expected.add(REACHED_INPUTS);
+        assertEquals(expected, unknown.warningsAndErrors());
+        assertEquals(control.warningsAndErrors().size() + 1, unknown.warningsAndErrors().size());
         assertTrue(unknown.standardError().contains(REACHED_INPUTS));
         assertEquals(control.standardError(), unknown.standardError());
     }

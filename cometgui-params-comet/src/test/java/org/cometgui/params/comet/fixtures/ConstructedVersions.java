@@ -60,7 +60,9 @@ public final class ConstructedVersions {
                         + " \"variableModTuple\": {\"source\": \"https://example.org/c\","
                         + " \"fields\": ["
                         + fields
-                        + "]}, \"overrides\": ["
+                        + "], \"residueAlphabet\": {\"characters\":"
+                        + " \"ABCDEFGHIJKLMNOPQRSTUVWXYZnc\","
+                        + " \"source\": \"https://example.org/a\"}}, \"overrides\": ["
                         + defaults
                         + "]},\n";
         String anchor = "\"versions\": [\n";

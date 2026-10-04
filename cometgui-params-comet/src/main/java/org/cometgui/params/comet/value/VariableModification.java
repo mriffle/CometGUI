@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import org.cometgui.params.comet.schema.TerminalCode;
 
 /**
  * One variable modification, as one {@code variable_modNN} slot holds it: every field of Comet's
@@ -39,8 +40,12 @@ import java.util.OptionalInt;
  * <p>Instances are made by {@link VariableModCodec#parse(String, String)} or directly.
  *
  * @param mass the mass difference
- * @param residues the residue token: letters {@code A}-{@code Z}, with {@code n} and {@code c} for
- *     the N- and C-terminus, as written (for example {@code STY} or {@code nK})
+ * @param residues the residue token: letters {@code A}-{@code Z} and the {@link TerminalCode}s --
+ *     {@code n} and {@code c} for any peptide N- and C-terminus, {@code ^} and {@code $} for the
+ *     protein N- and C-terminus only -- as written (for example {@code STY}, {@code nK} or {@code
+ *     ^}). Which of these a Comet release accepts is its {@link
+ *     org.cometgui.params.comet.schema.ResidueAlphabet}, applied by {@link VariableModCodec}; this
+ *     type holds any token whose every character it can describe
  * @param binaryGroup {@code 0} for a variable modification; any other value names the binary group
  *     whose residues are all modified or all unmodified together
  * @param minimumCount the minimum count per peptide, present only when the count was written as a
@@ -181,9 +186,9 @@ public record VariableModification(
     /**
      * Validates presence and the two shape rules, and takes an immutable copy.
      *
-     * @throws IllegalArgumentException if the residue token is empty or holds a character other
-     *     than {@code A}-{@code Z}, {@code n} and {@code c}, or if there is not one or two neutral
-     *     losses
+     * @throws IllegalArgumentException if the residue token is empty or holds a character that is
+     *     neither a letter {@code A}-{@code Z} nor a {@link TerminalCode}, or if there is not one
+     *     or two neutral losses
      */
     public VariableModification {
         Objects.requireNonNull(mass, "mass");
@@ -211,7 +216,8 @@ public record VariableModification(
     }
 
     /**
-     * Why a residue token cannot be one, or {@code null} if it can.
+     * Why a residue token cannot be one in any release, or {@code null} if it can. A release's own
+     * alphabet, which may be narrower, is the codec's to apply.
      *
      * @param residues the token
      * @return the problem in words, or {@code null}
@@ -222,42 +228,91 @@ public record VariableModification(
         }
         for (int index = 0; index < residues.length(); index++) {
             char c = residues.charAt(index);
-            if (!((c >= 'A' && c <= 'Z') || c == 'n' || c == 'c')) {
+            if (!TerminalCode.describable(c)) {
                 return "\""
                         + residues
                         + "\" holds '"
                         + c
-                        + "'; a residue token is letters A-Z, with n and c for the termini";
+                        + "'; a residue token is letters A-Z and the terminal codes n, c, ^ and $";
             }
         }
         return null;
     }
 
     /**
-     * The residue letters, without the terminus markers.
+     * The residue letters, without the terminal codes.
      *
-     * @return for example {@code K} for {@code nK}; empty for a terminal-only modification
+     * @return for example {@code K} for {@code nK} or {@code ^K}; empty for a terminal-only
+     *     modification
      */
     public String residueLetters() {
-        return residues.replace("n", "").replace("c", "");
+        StringBuilder letters = new StringBuilder();
+        for (int index = 0; index < residues.length(); index++) {
+            char c = residues.charAt(index);
+            if (TerminalCode.of(c).isEmpty()) {
+                letters.append(c);
+            }
+        }
+        return letters.toString();
     }
 
     /**
-     * Whether the modification applies to the N-terminus ({@code n} in the residue token).
+     * Whether the residue token holds a terminal code.
+     *
+     * @param terminal the code
+     * @return {@code true} if the code's character is in the token
+     */
+    public boolean has(TerminalCode terminal) {
+        return residues.indexOf(terminal.code()) >= 0;
+    }
+
+    /**
+     * Whether the modification applies to an N-terminus: {@code n} (any peptide's) or {@code ^}
+     * (the protein's) in the residue token.
      *
      * @return {@code true} if it does
      */
     public boolean nTerminal() {
-        return residues.indexOf('n') >= 0;
+        return has(TerminalCode.PEPTIDE_N) || has(TerminalCode.PROTEIN_N);
     }
 
     /**
-     * Whether the modification applies to the C-terminus ({@code c} in the residue token).
+     * Whether the modification applies to a C-terminus: {@code c} (any peptide's) or {@code $} (the
+     * protein's) in the residue token.
      *
      * @return {@code true} if it does
      */
     public boolean cTerminal() {
-        return residues.indexOf('c') >= 0;
+        return has(TerminalCode.PEPTIDE_C) || has(TerminalCode.PROTEIN_C);
+    }
+
+    /**
+     * Which N-terminus the modification applies to. Comet treats {@code n} with {@code ^} as just
+     * {@code n} ({@code CometSearch/CometSearchManager.cpp} lines 1538-1563 at {@code v2026.03.0}),
+     * so {@code n} wins.
+     *
+     * @return {@link TerminalCode#PEPTIDE_N} for {@code n}, else {@link TerminalCode#PROTEIN_N} for
+     *     {@code ^}, else empty
+     */
+    public Optional<TerminalCode> nTerminus() {
+        return terminus(TerminalCode.PEPTIDE_N, TerminalCode.PROTEIN_N);
+    }
+
+    /**
+     * Which C-terminus the modification applies to; {@code c} with {@code $} is just {@code c}.
+     *
+     * @return {@link TerminalCode#PEPTIDE_C} for {@code c}, else {@link TerminalCode#PROTEIN_C} for
+     *     {@code $}, else empty
+     */
+    public Optional<TerminalCode> cTerminus() {
+        return terminus(TerminalCode.PEPTIDE_C, TerminalCode.PROTEIN_C);
+    }
+
+    private Optional<TerminalCode> terminus(TerminalCode anyPeptide, TerminalCode proteinOnly) {
+        if (has(anyPeptide)) {
+            return Optional.of(anyPeptide);
+        }
+        return has(proteinOnly) ? Optional.of(proteinOnly) : Optional.empty();
     }
 
     /**
@@ -358,12 +413,8 @@ public record VariableModification(
         if (!residueLetters().isEmpty()) {
             targets.add(residueLetters());
         }
-        if (nTerminal()) {
-            targets.add("N-terminus");
-        }
-        if (cTerminal()) {
-            targets.add("C-terminus");
-        }
+        nTerminus().ifPresent(terminal -> targets.add(terminal.words()));
+        cTerminus().ifPresent(terminal -> targets.add(terminal.words()));
         return String.join(" and ", targets);
     }
 

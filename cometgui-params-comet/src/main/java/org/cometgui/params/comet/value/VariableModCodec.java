@@ -25,6 +25,7 @@ import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.schema.CometVersionRecord;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.ParameterDefinition;
+import org.cometgui.params.comet.schema.ResidueAlphabet;
 import org.cometgui.params.comet.schema.ValueKind;
 import org.cometgui.params.comet.schema.VariableModField;
 import org.cometgui.params.comet.schema.VariableModLayout;
@@ -41,6 +42,12 @@ import org.cometgui.params.comet.schema.VariableModLayout;
  * in {@code CometSearch/CometData.h} at {@code v2026.02.2}), and a value that differs from that
  * default in such a field cannot be written under the layout and is refused rather than dropped.
  *
+ * <p>The residue token is held to the layout's {@link ResidueAlphabet} both ways: a character the
+ * version does not accept is refused when read and when written, with a diagnostic naming the
+ * version, so a token such as {@code ^} -- the protein N-terminus in Comet 2026.03.0, a character
+ * that silently matches nothing in 2026.02.2 -- is legal exactly where the version record says it
+ * is.
+ *
  * <p>The slots are the version's {@link ValueKind#VARIABLE_MOD_TUPLE} parameters in the metadata;
  * reading a value for any other name is refused, so a {@code variable_mod16} cannot slip through
  * for a version with fifteen slots.
@@ -49,18 +56,36 @@ public final class VariableModCodec {
 
     private static final String WHOLE_TUPLE = "the tuple";
 
+    private static final String UNNAMED = "this Comet version";
+
+    private final String release;
+
     private final VariableModLayout layout;
 
     private final List<String> slots;
 
     /**
-     * Creates a codec for a layout and its slots.
+     * Creates a codec for a layout and its slots, for a release its diagnostics call "this Comet
+     * version".
      *
      * @param layout the version's tuple layout
      * @param slots the names of the version's tuple slots, such as {@code variable_mod01}
      * @throws IllegalArgumentException if there are no slots
      */
     public VariableModCodec(VariableModLayout layout, List<String> slots) {
+        this(UNNAMED, layout, slots);
+    }
+
+    /**
+     * Creates a codec for a named release's layout and slots.
+     *
+     * @param release the release as diagnostics name it, such as {@code Comet 2026.02.2}
+     * @param layout the release's tuple layout
+     * @param slots the names of the release's tuple slots, such as {@code variable_mod01}
+     * @throws IllegalArgumentException if there are no slots
+     */
+    public VariableModCodec(String release, VariableModLayout layout, List<String> slots) {
+        this.release = Objects.requireNonNull(release, "release");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.slots = List.copyOf(slots);
         if (this.slots.isEmpty()) {
@@ -90,7 +115,7 @@ public final class VariableModCodec {
                         .filter(p -> p.kind() == ValueKind.VARIABLE_MOD_TUPLE)
                         .map(ParameterDefinition::name)
                         .toList();
-        return new VariableModCodec(record.variableModTuple(), slots);
+        return new VariableModCodec("Comet " + version.text(), record.variableModTuple(), slots);
     }
 
     /**
@@ -149,7 +174,7 @@ public final class VariableModCodec {
                             + ": "
                             + layout.describe());
         }
-        Reading reading = new Reading(slot);
+        Reading reading = new Reading(slot, this);
         for (int index = 0; index < tokens.length; index++) {
             reading.read(index, fields.get(index), tokens[index]);
         }
@@ -162,10 +187,15 @@ public final class VariableModCodec {
      * @param value the value
      * @return the fields in layout order, joined by one space
      * @throws IllegalArgumentException if the value holds something the layout cannot write: a
-     *     non-default value in a field the layout lacks, or a pair where the layout takes one value
+     *     non-default value in a field the layout lacks, a pair where the layout takes one value,
+     *     or a residue character outside the version's alphabet
      */
     public String format(VariableModification value) {
         Objects.requireNonNull(value, "value");
+        String refused = refusedResidues(value.residues());
+        if (refused != null) {
+            throw new IllegalArgumentException(refused + ", so it cannot be written");
+        }
         for (VariableModField field : VariableModField.values()) {
             if (layout.entry(field).isEmpty() && !Defaults.holds(field, value)) {
                 throw new IllegalArgumentException(
@@ -181,6 +211,27 @@ public final class VariableModCodec {
             tokens.add(token(entry, value));
         }
         return String.join(" ", tokens);
+    }
+
+    /**
+     * Why a residue token holds a character the version does not accept, or {@code null} if it
+     * holds none.
+     */
+    private String refusedResidues(String residues) {
+        return layout.residueAlphabet()
+                .firstRefused(residues)
+                .map(
+                        refused ->
+                                "\""
+                                        + residues
+                                        + "\" holds '"
+                                        + refused
+                                        + "', which "
+                                        + release
+                                        + " does not accept in a residue token; its residue"
+                                        + " alphabet is "
+                                        + layout.residueAlphabet().describe())
+                .orElse(null);
     }
 
     private static String token(VariableModLayout.Entry entry, VariableModification value) {
@@ -261,6 +312,8 @@ public final class VariableModCodec {
 
         private final String slot;
 
+        private final VariableModCodec codec;
+
         private BigDecimal mass;
 
         private String residues;
@@ -279,8 +332,9 @@ public final class VariableModCodec {
 
         private List<BigDecimal> neutralLosses = Defaults.NEUTRAL_LOSSES;
 
-        Reading(String slot) {
+        Reading(String slot, VariableModCodec codec) {
             this.slot = slot;
+            this.codec = codec;
         }
 
         void read(int index, VariableModLayout.Entry entry, String token) {
@@ -289,6 +343,9 @@ public final class VariableModCodec {
                 case MASS -> mass = Numbers.decimal(slot, field, single(entry, field, token));
                 case RESIDUES -> {
                     String problem = VariableModification.residueProblem(token);
+                    if (problem == null) {
+                        problem = codec.refusedResidues(token);
+                    }
                     if (problem != null) {
                         throw new ValueSyntaxException(slot, field, problem);
                     }

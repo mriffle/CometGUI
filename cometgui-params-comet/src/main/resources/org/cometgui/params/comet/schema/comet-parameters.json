@@ -18,7 +18,11 @@
           { "field": "TERMINUS", "kind": "INTEGER", "pair": false },
           { "field": "REQUIRED", "kind": "INTEGER", "pair": false },
           { "field": "NEUTRAL_LOSS", "kind": "DECIMAL", "pair": true }
-        ]
+        ],
+        "residueAlphabet": {
+          "characters": "ABCDEFGHIJKLMNOPQRSTUVWXYZnc^$",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1538-L1563"
+        }
       },
       "overrides": [
         {
@@ -80,7 +84,11 @@
           { "field": "TERMINUS", "kind": "INTEGER", "pair": false },
           { "field": "REQUIRED", "kind": "INTEGER", "pair": false },
           { "field": "NEUTRAL_LOSS", "kind": "DECIMAL", "pair": true }
-        ]
+        ],
+        "residueAlphabet": {
+          "characters": "ABCDEFGHIJKLMNOPQRSTUVWXYZnc",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1380-L1396"
+        }
       },
       "overrides": []
     },
@@ -100,7 +108,11 @@
           { "field": "TERMINUS", "kind": "INTEGER", "pair": false },
           { "field": "REQUIRED", "kind": "INTEGER", "pair": false },
           { "field": "NEUTRAL_LOSS", "kind": "DECIMAL", "pair": false }
-        ]
+        ],
+        "residueAlphabet": {
+          "characters": "ABCDEFGHIJKLMNOPQRSTUVWXYZnc",
+          "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometSearchManager.cpp#L1460-L1477"
+        }
       },
       "overrides": [
         {

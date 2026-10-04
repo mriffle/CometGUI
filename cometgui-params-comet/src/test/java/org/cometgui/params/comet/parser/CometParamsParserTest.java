@@ -605,7 +605,9 @@ class CometParamsParserTest {
                         + "{\"field\": \"TERMINUS\", \"kind\": \"INTEGER\", \"pair\": false},"
                         + "{\"field\": \"REQUIRED\", \"kind\": \"INTEGER\", \"pair\": false},"
                         + "{\"field\": \"NEUTRAL_LOSS\", \"kind\": \"DECIMAL\", \"pair\": true}"
-                        + "]}, \"overrides\": []}";
+                        + "], \"residueAlphabet\": {\"characters\":"
+                        + " \"ABCDEFGHIJKLMNOPQRSTUVWXYZnc\","
+                        + " \"source\": \"https://example.org/a\"}}, \"overrides\": []}";
         int parametersEnd = json.lastIndexOf("\n  ]\n}");
         String knob =
                 ",\n    {\"name\": \"future_knob\", \"displayName\": \"Future knob\","

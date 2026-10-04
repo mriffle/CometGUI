@@ -133,6 +133,10 @@ final class ConstructedMetadata {
         fields.add(tupleField("REQUIRED", "INTEGER", false));
         fields.add(tupleField("NEUTRAL_LOSS", "DECIMAL", true));
         layout.put("fields", fields);
+        Map<String, Object> alphabet = new LinkedHashMap<>();
+        alphabet.put("characters", "ABCDEFGHIJKLMNOPQRSTUVWXYZnc");
+        alphabet.put("source", "https://example.org/source/CometSearchManager.cpp");
+        layout.put("residueAlphabet", alphabet);
         return layout;
     }
 

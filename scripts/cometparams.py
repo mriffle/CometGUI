@@ -156,7 +156,7 @@ VISIBILITY = {
 #: ``org.cometgui.params.comet.schema.VariableModField``, in Comet's words.
 TUPLE_FIELDS = {
     "MASS": "mass difference",
-    "RESIDUES": "residues, with ``n`` and ``c`` for the termini",
+    "RESIDUES": "residues and terminal codes",
     "BINARY_GROUP": "binary group",
     "COUNT": "count per peptide",
     "TERMINAL_DISTANCE": "distance from a terminus",
@@ -166,6 +166,19 @@ TUPLE_FIELDS = {
 }
 
 TUPLE_KINDS = {"DECIMAL": "decimal", "INTEGER": "whole number", "RESIDUES": "residue letters"}
+
+#: ``org.cometgui.params.comet.schema.TerminalCode``: what each terminal code of a
+#: residue token means. The vocabulary only -- which codes a release accepts is its
+#: ``variableModTuple.residueAlphabet``, and an alphabet character that is neither
+#: a letter A-Z nor one of these is refused.
+TERMINAL_CODES = {
+    "n": "N-terminus",
+    "c": "C-terminus",
+    "^": "protein N-terminus",
+    "$": "protein C-terminus",
+}
+
+_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 _NUMERIC_KINDS = ("INTEGER", "DECIMAL", "INTEGER_RANGE", "DECIMAL_RANGE", "DECIMAL_LIST")
 
@@ -402,6 +415,7 @@ def validate(metadata: dict, presets: dict, metadata_path: Path, presets_path: P
                     f"[{position}] = {field!r} is not a tuple field this generator knows "
                     f"({', '.join(TUPLE_FIELDS)}) with a known kind and a boolean pair"
                 )
+        _validate_alphabet(path, index, record)
         records[record["version"]] = record
     for version in releases:
         if version not in records:
@@ -627,6 +641,52 @@ def validate(metadata: dict, presets: dict, metadata_path: Path, presets_path: P
                 )
 
 
+def _validate_alphabet(path: Path, index: int, record: dict) -> None:
+    """Refuse a release's residue alphabet the page could not state truthfully -- the
+    rules ``MetadataLoader`` and ``ResidueAlphabet`` apply."""
+    where = f"{path}: versions[{index}] ({record['version']}) variableModTuple.residueAlphabet"
+    alphabet = record["variableModTuple"].get("residueAlphabet")
+    if not isinstance(alphabet, dict):
+        raise CometParamsError(
+            f"{where} is {_kind(alphabet)}; it must be an object naming the characters the "
+            "release accepts in a residue token"
+        )
+    unknown = sorted(set(alphabet) - {"characters", "source"})
+    if unknown:
+        raise CometParamsError(f"{where} has the field {unknown[0]!r}, which it does not have")
+    characters = alphabet.get("characters")
+    if not isinstance(characters, str) or not characters:
+        raise CometParamsError(f"{where} has \"characters\" = {characters!r}; it must be a "
+                               "non-empty string")
+    for position, character in enumerate(characters):
+        if character not in _LETTERS and character not in TERMINAL_CODES:
+            raise CometParamsError(
+                f"{where} holds {character!r}, which is neither a residue letter A-Z nor a "
+                f"terminal code ({', '.join(TERMINAL_CODES)})"
+            )
+        if characters.index(character) != position:
+            raise CometParamsError(f"{where} lists {character!r} twice")
+    source = alphabet.get("source")
+    if not isinstance(source, str) or not source.startswith("https://"):
+        raise CometParamsError(f"{where} has \"source\" = {source!r}; it must be an https:// "
+                               "reference")
+
+
+def describe_alphabet(characters: str) -> str:
+    """A release's residue alphabet in words, as ``ResidueAlphabet.describe`` puts it,
+    with each character as a literal."""
+    letters = "".join(letter for letter in _LETTERS if letter in characters)
+    words = []
+    if letters == _LETTERS:
+        words.append("``A``-``Z``")
+    elif letters:
+        words.append(_literal(letters))
+    for code, meaning in TERMINAL_CODES.items():
+        if code in characters:
+            words.append(f"{_literal(code)} ({meaning})")
+    return ", ".join(words)
+
+
 def _choice_pairs(choices):
     return [(choice["value"], choice["label"]) for choice in choices]
 
@@ -847,9 +907,12 @@ def _allowed(metadata: dict, parameter: dict, releases) -> str:
                 words = f"{TUPLE_FIELDS[field['field']]} ({TUPLE_KINDS[field['kind']]}"
                 words += ", or two as ``a,b``)" if field["pair"] else ")"
                 items.append(words)
+            alphabet = record["variableModTuple"]["residueAlphabet"]
             parts.append(
                 f"Comet {version}: {len(fields)} space-separated fields, in this order: "
-                + "; ".join(items) + "."
+                + "; ".join(items) + ". Residues: any combination of "
+                + describe_alphabet(alphabet["characters"])
+                + f" (`source <{alphabet['source']}>`__)."
             )
         text = " ".join(parts) + " A mass difference of ``0.0`` leaves the slot unused."
     elif kind == "TOLERANCE_PAIR_MEMBER":

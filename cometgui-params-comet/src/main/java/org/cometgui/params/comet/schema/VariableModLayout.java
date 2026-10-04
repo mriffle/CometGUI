@@ -21,6 +21,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 
 /**
@@ -38,10 +39,16 @@ import java.util.Set;
  * pairs, or a layout without the mass difference and the residues, without which a tuple means
  * nothing.
  *
+ * <p>The layout also carries the release's {@link ResidueAlphabet}: which characters its residue
+ * token accepts. That too differs by release ({@code ^} and {@code $} arrived with Comet 2026.03.0)
+ * and is data beside the fields it qualifies, never a version test in the codec.
+ *
  * @param fields the fields in the order Comet reads them
  * @param source where the layout was taken from: the upstream source line that reads the tuple
+ * @param residueAlphabet the characters the release accepts in the residue token
  */
-public record VariableModLayout(List<Entry> fields, String source) {
+public record VariableModLayout(
+        List<Entry> fields, String source, ResidueAlphabet residueAlphabet) {
 
     /**
      * One position in the layout.
@@ -68,6 +75,7 @@ public record VariableModLayout(List<Entry> fields, String source) {
     public VariableModLayout {
         fields = List.copyOf(fields);
         Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(residueAlphabet, "residueAlphabet");
         Set<VariableModField> seen = EnumSet.noneOf(VariableModField.class);
         for (int index = 0; index < fields.size(); index++) {
             Entry entry = fields.get(index);
@@ -122,6 +130,22 @@ public record VariableModLayout(List<Entry> fields, String source) {
     public Optional<Entry> entry(VariableModField field) {
         Objects.requireNonNull(field, "field");
         return fields.stream().filter(entry -> entry.field() == field).findFirst();
+    }
+
+    /**
+     * Where a field sits in the layout.
+     *
+     * @param field the field
+     * @return its zero-based position, or empty if the version's tuple does not hold it
+     */
+    public OptionalInt position(VariableModField field) {
+        Objects.requireNonNull(field, "field");
+        for (int index = 0; index < fields.size(); index++) {
+            if (fields.get(index).field() == field) {
+                return OptionalInt.of(index);
+            }
+        }
+        return OptionalInt.empty();
     }
 
     /**

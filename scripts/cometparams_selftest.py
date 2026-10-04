@@ -199,6 +199,22 @@ def _override_unmodelled(document):
     _override(document)["name"] = "ms1_mass_range"
 
 
+def _alphabet_set(field, value, version=OVERRIDING_RELEASE):
+    """Damage one release's residue alphabet (``variableModTuple.residueAlphabet``);
+    a value of ``None`` removes the field."""
+    def damage(document):
+        alphabet = _record(document, version)["variableModTuple"]["residueAlphabet"]
+        if value is None:
+            alphabet.pop(field)
+        else:
+            alphabet[field] = value
+    return damage
+
+
+def _alphabet_removed(document):
+    _record(document, OVERRIDING_RELEASE)["variableModTuple"].pop("residueAlphabet")
+
+
 def generator_cases():
     """(id, input, damage, expected inner diagnostic) for part 1."""
     where = f'("{VICTIM}")'
@@ -269,6 +285,29 @@ def generator_cases():
         ("override-blank-help", "metadata", _override_set("shortHelp", "  "),
          f'{over}[2] ("{OVERRIDDEN}") has "shortHelp" = '),
     ]
+    alphabet = f"versions[0] ({OVERRIDING_RELEASE}) variableModTuple.residueAlphabet"
+    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    cases += [
+        ("alphabet-missing", "metadata", _alphabet_removed,
+         f"{alphabet} is null; it must be an object"),
+        ("alphabet-unknown-field", "metadata", _alphabet_set("since", "2026.03.0"),
+         f"{alphabet} has the field 'since', which it does not have"),
+        ("alphabet-empty", "metadata", _alphabet_set("characters", ""),
+         f"{alphabet} has \"characters\" = ''; it must be a non-empty string"),
+        ("alphabet-no-characters", "metadata", _alphabet_set("characters", None),
+         f"{alphabet} has \"characters\" = None; it must be a non-empty string"),
+        ("alphabet-unknown-character", "metadata", _alphabet_set("characters", letters + "nc#"),
+         f"{alphabet} holds '#', which is neither a residue letter A-Z nor a terminal code"),
+        ("alphabet-lower-case-letter", "metadata",
+         _alphabet_set("characters", letters + "ncm"),
+         f"{alphabet} holds 'm', which is neither a residue letter A-Z nor a terminal code"),
+        ("alphabet-character-twice", "metadata", _alphabet_set("characters", letters + "nc^$^"),
+         f"{alphabet} lists '^' twice"),
+        ("alphabet-source-not-https", "metadata",
+         _alphabet_set("source", "CometSearchManager.cpp line 1540"),
+         f"{alphabet} has \"source\" = 'CometSearchManager.cpp line 1540'; it must be an "
+         "https:// reference"),
+    ]
     return cases
 
 
@@ -336,6 +375,23 @@ def per_release_control(root: Path, clean: Path, files: dict) -> None:
         )
     print(f"    control   rendered for {', '.join(summary['releases'])}: {OVERRIDDEN} carries "
           f"each release's own default, choices and comment")
+
+    # The residue alphabet is per release too: ^ and $ for 2026.03.0, never for 2026.02.2.
+    start = text.index(f"{cometparams.ENTRY_LABEL_PREFIX}variable_mod01:")
+    tuple_entry = text[start:text.index(cometparams.ENTRY_LABEL_PREFIX, start + 1)]
+    older = "Residues: any combination of ``A``-``Z``, ``n`` (N-terminus), ``c`` (C-terminus) ("
+    newer = ("Residues: any combination of ``A``-``Z``, ``n`` (N-terminus), ``c`` (C-terminus), "
+             "``^`` (protein N-terminus), ``$`` (protein C-terminus) (")
+    at_older = tuple_entry.find("Comet 2026.02.2: 8 space-separated fields")
+    at_newer = tuple_entry.find(f"Comet {OVERRIDING_RELEASE}: 8 space-separated fields")
+    if at_older < 0 or at_newer < 0 or older not in tuple_entry[at_older:at_newer] \
+            or newer not in tuple_entry[at_newer:] or "``^``" in tuple_entry[at_older:at_newer]:
+        raise HarnessError(
+            "per-release control: variable_mod01 does not state each release's own residue "
+            f"alphabet (^ and $ for {OVERRIDING_RELEASE} only):\n{tuple_entry}"
+        )
+    print(f"    control   variable_mod01 states each release's residue alphabet: ^ and $ for "
+          f"{OVERRIDING_RELEASE} only")
 
 
 def part_one(root: Path, work: Path) -> int:

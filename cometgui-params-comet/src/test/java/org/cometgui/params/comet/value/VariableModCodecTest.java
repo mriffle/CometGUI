@@ -33,6 +33,7 @@ import org.cometgui.params.comet.parser.ParamsLineReader;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.MetadataLoader;
 import org.cometgui.params.comet.schema.ParameterDefinition;
+import org.cometgui.params.comet.schema.ResidueAlphabet;
 import org.cometgui.params.comet.schema.ValueKind;
 import org.cometgui.params.comet.schema.VariableModField;
 import org.cometgui.params.comet.schema.VariableModLayout;
@@ -66,7 +67,11 @@ class VariableModCodecTest {
     }
 
     private static VariableModLayout layout(VariableModLayout.Entry... entries) {
-        return new VariableModLayout(List.of(entries), "https://example.org/constructed");
+        return new VariableModLayout(
+                List.of(entries),
+                "https://example.org/constructed",
+                new ResidueAlphabet(
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZnc", "https://example.org/constructed"));
     }
 
     @Nested
