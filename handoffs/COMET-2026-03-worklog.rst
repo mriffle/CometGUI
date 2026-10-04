@@ -70,10 +70,21 @@ checked; they are not a substitute for the unit's own capture.
     index_search_type = 1 is ignored: "<fasta>" is not an .idx file ...``;
     ``-1`` is silent on both.
   - ``variable_mod10`` active with ``print_ascorepro_score`` ``1`` or ``-1``:
-    **both versions complete, rc 0, no message.** The release notes' "AScorePro
-    alongside variable_mod10-15 ... now an error" is **not confirmed** by this
-    probe; whatever condition triggers it must be found in the source at
-    ``v2026.03.0`` and then shown by execution.
+    **both versions complete, rc 0, no message** -- *but see the correction
+    below: this probe was wrong.*
+
+  **Correction, same day, by me.** My slot-10 probe used ``15.9949 M 0 3 -1 0
+  0 0.0``, identical to slot 1, and Comet **merges** a slot identical to a
+  lower one before any check (``CometSearchManager.cpp`` L1483-1512 at
+  ``v2026.03.0``, commit ``fa08489``), so slot 10 was no longer active. The
+  check itself is L1577-1603. Re-probed with ``variable_mod10 = 79.966331 STY 0
+  3 -1 0 0 0.0``: with ``print_ascorepro_score = 1`` 2026.03.0 stops, rc 1,
+  ``Error - print_ascorepro_score is enabled but variable_mod10 is active;
+  AScorePro localization is only supported for variable_mod01 through
+  variable_mod09. ...``; with ``0`` it completes; 2026.02.2 completes in both.
+  The same STY slot in ``variable_mod09`` with ``-1`` completes. The release
+  note is **confirmed**, with the merge rule as a condition the validator must
+  model.
   - 2026.03.0 no longer warns ``invalid parameter found:
     spectral_library_ms_level`` (2026.02.2 does).
 
@@ -214,7 +225,80 @@ Sign-off entries
 Unit 1
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-04 at ``f375c87``, no rework.** One fresh agent; commits
+``72f0ed5`` (fixtures, test-gate precondition), ``65e97ce`` (overrides, the
+2026.03.0 record, tests, generator), ``88ed18b`` (developer page), ``f375c87``
+(self-test control exit code). 27 paths, all inside its brief; no edit to
+``manifests/tools.json``.
+
+What I ran and saw:
+
+* **Read the whole production diff**: ``ParameterOverride`` (new record: name,
+  source, optional default / choices / shortHelp / helpUrl, and an inline
+  comment with its own "replaced" flag so a release can have *no* comment);
+  ``CometVersionRecord.defaults`` -> ``overrides`` with ``defaults()`` kept as
+  a view; ``CuratedMetadata.forVersion`` applies the version's override;
+  ``MetadataLoader`` reads ``overrides`` with every replaced field held to the
+  curated field's rule, required to differ from it, and the version's
+  resulting default required to be one of its resulting choices. No
+  ``if (version ...)`` anywhere (C-2). The 2026.03.0 record overrides
+  ``index_search_type`` (default ``-1``, choices ``-1``/``0``/``1``),
+  ``decoy_search`` (comment), ``spectral_library_ms_level`` and
+  ``add_U_selenocysteine`` (comment, help, reference), each with an
+  ``https://`` source at the tag. ``scripts/verify-test-gates.sh``'s new
+  precondition is additive.
+* **Fixtures against my own independent capture** (*Starting state*): ``git
+  show HEAD:<fixture> | cmp -`` identical for both ``comet-q.params`` and
+  ``comet-p.params``; ``sha256sum -c SHA256SUMS`` OK for 2026.03.0 and
+  2026.02.2; ``git diff --stat`` empty over the 2026.02.2 and 2024.01.0
+  fixtures; ``git check-attr``: ``text: unset``. Mirror
+  ``scratch/phase05/artefacts/v2026.03.0__comet.linux.exe`` sha256
+  ``ad93b4cf...91e7ed``.
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``,
+  2m53s; ``Tests run: 1032, Failures: 0, Errors: 0, Skipped: 0`` (979 before).
+* **PIT**, ``test-compile org.pitest:pitest-maven:mutationCoverage
+  -DfailWhenNoMutations=false -DtargetClasses=`` the four changed classes:
+  **192/192 killed** -- ``ParameterOverride`` 17, ``CometVersionRecord`` 7,
+  ``CuratedMetadata`` 24, ``MetadataLoader`` 144; none surviving.
+  (``-DfailWhenNoMutations=false`` is needed because ``-am`` runs PIT in the
+  upstream modules, which have none of the target classes.)
+* **Injection 1, version-blind** (``CuratedMetadata.forVersion`` reads the
+  *first* version record -- 2026.03.0 -- whatever version is asked). My first
+  form was stopped by **Spotless** before compiling and the class hash did not
+  change, so it gave no verdict; re-injected in formatter-clean layout: class
+  ``2b848f36`` -> ``0bdfc99e``; **28 failures** in 10 classes, among them
+  ``Comet202603CurationTest.minusOneIsNotA202602Choice:246 expected: <1> but
+  was: <0>`` (``-1`` became legal for 2026.02.2) and
+  ``indexSearchTypeIsVersionScoped:142 expected: <1> but was: <-1>``.
+  Restored, ``sha256sum -c`` OK.
+* **Injection 2** (``MetadataLoader`` no longer detects a parameter overridden
+  twice): class ``a64ee876`` -> ``ccbd2368``; 2 failures --
+  ``VersionDefaultsLoaderTest.aNameOverriddenTwiceIsRejected ... Expected
+  ...InvalidMetadataException to be thrown, but nothing was thrown.`` and the
+  same in ``VersionOverridesLoaderTest``. Restored, ``sha256sum -c`` OK;
+  ``git status`` clean.
+* ``scripts/ci/docs-build.sh`` PASSED (count line ``118 parameter entries =
+  118 modelled parameters ... for Comet 2026.02.2`` -- the manifest still
+  names only 2026.02.2, as briefed); ``--self-test`` PASSED.
+* ``bash scripts/verify-all-gates.sh --only docs --only traceability --only
+  params`` -> ``3 control(s) passed, 0 failed, in 308 seconds``; params ``68
+  controls`` (floor 68, unchanged).
+* **Precondition**: with ``scratch/phase06/artefacts`` renamed away,
+  ``verify-test-gates.sh`` stops at once with ``FATAL: scratch/phase06/artefacts
+  does not exist. ...``; renamed back, binary present.
+* **Spot-check of an execution claim**: 2026.03.0 with ``index_search_type =
+  99`` prints ``Warning - index_search_type = 99 is not -1, 0 or 1; using the
+  default (-1, not set).`` -- as the agent reported.
+* **Not run, deliberately: ``--only tests``**, although
+  ``verify-test-gates.sh`` changed. It is ~50 minutes and builds every module
+  in a sandbox, and units 2-5 change what it builds; it is run **once**, on a
+  quiet tree, after the last unit (see the handoff). The changed line is a
+  precondition and was exercised directly above.
+
+Residue carried forward: the real-binary fixture test is manifest-driven, so
+it does not yet re-prove the 2026.03.0 fixture bytes -- unit 2 makes it.
+The generator self-test now has 40 cases while ``verify-param-gates.sh``'s
+recorded count is 27 -- unit 6 raises it.
 
 .. _c2603-u2-signoff:
 
