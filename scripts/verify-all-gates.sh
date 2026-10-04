@@ -125,7 +125,10 @@ declare -a COVERED=()
 #                count; 88 on 2026-10-01, when phase 05 unit 14 added control
 #                19, the macOS quarantine re-check; 95 on 2026-10-04, when
 #                COMET-2026-03 unit 2 added controls 20-22.  params: 68 on
-#                2026-10-02, phase 06 unit 8's first shipping count.)
+#                2026-10-02, phase 06 unit 8's first shipping count; 109 on
+#                2026-10-04, when COMET-2026-03 unit 6 added the fifteen
+#                version-blind controls v3a-v6b, control 8's two per-release
+#                checks and control H's H8-H10.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -269,7 +272,7 @@ gate_spec() {
         params)
             GATE_PHASE="06"
             GATE_ITEMS="1,2,3,4,5,6,7,8,9"
-            GATE_DEFECT="from the injections recorded in handoffs/PHASE-06-worklog.rst, each into production code (or, for item 2, the shipped metadata) of cometgui-params-comet in a git-archive sandbox and each proved to have reached the compiled module: the writer skipping every empty-valued parameter; the scan_range entry removed from the metadata; the drift default comparison reduced to its first token; the second neutral loss dropped; a min,max count written max,min; the enzyme table's duplicate-number invariant disabled; the writer's refusal of an absent enzyme number disabled; the one number writer, and separately the writer's decimal path, made locale-sensitive (Locale.ROOT required to stay green); the writer dropping the unknown section; the parser reporting and then dropping unknown parameters; the tolerance pair routed through the generic ordering rule; an asymmetric window made an error; the reversed-pair error unable to fire; unit 7's generator self-test invoked (27 damaged inputs, 4 defects through the real Sphinx hook); PIT scored per package for parser, writer and validation and for the module, each >= 80%, every non-killed mutant listed, and the validation package graded BELOW with its tests removed; and, as controls on the harness itself, an injection that reached the source but not the bytecode and a PIT report with an empty package, each reported as a HARNESS ERROR or FAILURE. Item 9's per-survivor judgement is listed, not automated"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-06-worklog.rst, each into production code (or, for item 2, the shipped metadata) of cometgui-params-comet in a git-archive sandbox and each proved to have reached the compiled module: the writer skipping every empty-valued parameter; the scan_range entry removed from the metadata; the drift default comparison reduced to its first token; the second neutral loss dropped; a min,max count written max,min; the enzyme table's duplicate-number invariant disabled; the writer's refusal of an absent enzyme number disabled; the one number writer, and separately the writer's decimal path, made locale-sensitive (Locale.ROOT required to stay green); the writer dropping the unknown section; the parser reporting and then dropping unknown parameters; the tolerance pair routed through the generic ordering rule; an asymmetric window made an error; the reversed-pair error unable to fire; unit 7's generator self-test invoked (27 damaged inputs, 4 defects through the real Sphinx hook); PIT scored per package for parser, writer and validation and for the module, each >= 80%, every non-killed mutant listed, and the validation package graded BELOW with its tests removed; and, as controls on the harness itself, an injection that reached the source but not the bytecode and a PIT report with an empty package, each reported as a HARNESS ERROR or FAILURE. Item 9's per-survivor judgement is listed, not automated. NEW at COMET-2026-03 unit 6, each making one version-scoped fact of the Comet 2026.03.0 intake version-blind (its exit gate items 3-6), with the untouched release required to stay green where it can: the first version record's overrides applied to every release, and no override applied; scan_range's range ending at 2026.02.2 in the shipped metadata, named UNMODELLED for 2026.03.0 only; every release's tuple codec given 2026.03.0's residue alphabet, and 2024.01.0's; the writer writing the curated inline comment, so the pinned 2026.03.0 canonical round trip goes red; every model judged with 2026.02.2's rule severities; validation reading the newest release's alphabet; AScorePro's -1 suppressing the slot error, its merge of identical slots disabled, and its protein-terminus rewrite applied in a release without ^; index_search_type.ignored_without_idx warning in every release; one recorded binary verdict of the validation corpus made wrong (data, not code); value migrations applied whatever release they are from, and rule-keyed migrations never applied; control 8's generator floor raised to 55 with its per-release checks graded; and H8-H10 on the new controls' own plumbing"
             GATE_SCRIPT="scripts/verify-param-gates.sh"
             GATE_ARGS=()
             GATE_PROOF=(
@@ -277,8 +280,9 @@ gate_spec() {
                 "PHASE-06 exit gate items 1 to 8 were proved here"
                 "Item 9: PIT scored parser, writer and validation each >= 80% and the module"
                 "bytecode as a HARNESS ERROR, not as a pass"
+                "COMET-2026-03 exit gate items 3 to 6 were made version-blind here"
             )
-            GATE_FLOOR=68
+            GATE_FLOOR=109
             GATE_UNIT="controls"
             ;;
         *)

@@ -30,8 +30,10 @@
 # the record gives the exact failure text, the control requires it; where the
 # record names the injection but not its form (the unit AGENTS' injections,
 # whose reports reached the work log only as a summary), the form here is this
-# script's and is said to be.  Nothing here is [NEW]: every gate item had at
-# least one recorded injection.
+# script's and is said to be.  At Phase 06 nothing here was [NEW]: every gate
+# item had at least one recorded injection.  The COMET-2026-03 controls (v3a
+# to v6b) are partly recorded from that package's work log and partly NEW,
+# each marked so.
 #
 # WHAT IT COVERS (PHASE-06 exit gate items; see phases/PHASE-06-comet-param-model.rst)
 #
@@ -68,10 +70,60 @@
 #   7c  item 7 [recorded, unit 5, orchestrator]: the reversed-pair error can
 #       never fire (compareTo > 0 became > 1)
 #   8   item 8 [recorded, unit 7]: scripts/cometparams_selftest.py, INVOKED in
-#       the sandbox, not duplicated -- 27 damaged generator inputs and 4 defects
-#       through the real Sphinx builder-inited hook, each graded there on its
-#       own diagnostic; graded here on its OK line, its floors, the removed
-#       entry it names, and the hook's count equal to the metadata's
+#       the sandbox, not duplicated -- 55 damaged generator inputs (27 when
+#       unit 7 shipped it; COMET-2026-03 units 1, 3 and 4 added the overrides,
+#       the residue alphabets and the rule severities) and 4 defects through
+#       the real Sphinx builder-inited hook, each graded there on its own
+#       diagnostic; graded here on its OK line, its floors, the removed entry
+#       it names, the hook's count equal to the metadata's, and (COMET-2026-03
+#       unit 6) its two per-release controls: index_search_type's and
+#       variable_mod01's entries state each release's own facts
+#
+#   COMET-2026-03 (the Comet 2026.03.0 intake, handoffs/COMET-2026-03-worklog.rst):
+#   its exit gate items 3 to 6 are VERSION-SCOPED facts, kept as data in each
+#   release's version record (decision C-2).  The defect each family exists to
+#   catch is a fact applied to the WRONG RELEASE, so every control below makes
+#   one thing VERSION-BLIND, and where it can, requires the release the defect
+#   does not touch to STAY GREEN -- the red is the version, nothing else.
+#   [recorded, uN orch.] is that unit's sign-off injection in the package's
+#   work log, with its failure text where the log gives it; [NEW, u6] is this
+#   script's own.
+#
+#   v3a item 3 [recorded, u1 orch.]: CuratedMetadata applies the FIRST version
+#       record's overrides (2026.03.0's) to every release: -1 becomes a
+#       2026.02.2 choice
+#   v3b item 3 [NEW, u6]: no release's override is applied: 2026.03.0's drift
+#       sees index_search_type's -1 as drift; 2026.02.2's counts stay green
+#   v3c item 3 [NEW, u6]: scan_range's range in the shipped metadata ends at
+#       2026.02.2, so the drift test of 2026.03.0 alone must name it
+#       UNMODELLED; 2026.02.2's counts stay green
+#   v4a item 4 [NEW, u6, after u3 orch. 1]: the tuple codec gives every
+#       release 2026.03.0's residue alphabet: 2026.02.2 accepts ^
+#   v4b item 4 [NEW, u6]: the reverse -- every release gets 2024.01.0's
+#       alphabet: 2026.03.0 refuses ^ and its fifteen-slot round trip goes red
+#   v4c item 4 [NEW, u6]: the writer writes the CURATED inline comment, not
+#       the release's own: the 2026.03.0 byte-stable canonical round trip (gate
+#       item 1 for 2026.03.0) goes red; 2026.02.2's stays green
+#   v5a item 5 [recorded, u4 orch. 1]: severities bound to the second version
+#       record (2026.02.2's) for every model
+#   v5b item 5 [NEW, u6]: validation reads the newest release's residue
+#       alphabet: ^ in a 2026.02.2 model is no longer an error
+#   v5c item 5 [recorded, u4 orch. 2]: AScorePro's "localise all" (-1)
+#       suppresses the slot-10 error (ascore == 0 became <= 0)
+#   v5d item 5 [NEW, u6]: AScorePro's merge of identical slots disabled: a
+#       slot Comet merges away is reported
+#   v5e item 5 [NEW, u6]: AScorePro's protein-terminus rewrite applied in a
+#       release whose alphabet has no ^ (2026.02.2 merges as 2026.03.0 does)
+#   v5f item 5 [NEW, u6]: index_search_type.ignored_without_idx warns in every
+#       release; 2026.03.0's warning stays green
+#   v5g item 5 [NEW, u6, DATA -- not production code]: one recorded BINARY
+#       verdict of the validation corpus made wrong (ist-1's 2026.03.0 warning
+#       line removed): the real-binary corpus test must disagree with it
+#   v6a item 6 [recorded, u5 orch. A]: value migrations applied whatever
+#       release they are FROM
+#   v6b item 6 [recorded, u5 orch. B]: migration hands conversion no source
+#       findings, so rule-keyed value migrations never apply
+#
 #   9   item 9 [recorded, units 2 and 6]: PIT over cometgui-params-comet in the
 #       sandbox, scored as scripts/build.sh scores it (status='KILLED' over all
 #       mutations in mutations.xml; TIMED_OUT is not killed), PER PACKAGE for
@@ -86,7 +138,10 @@
 #       that reaches the source but not the bytecode, a green run graded as a
 #       red, a red without the expected diagnostic, and a PIT report in which a
 #       graded package has no mutation at all must each be reported as a
-#       HARNESS ERROR or FAILURE -- never as a pass
+#       HARNESS ERROR or FAILURE -- never as a pass; and, for the COMET-2026-03
+#       controls' own plumbing (unit 6), a metadata range edit that edits
+#       nothing, a corpus verdict edit that edits nothing, and a test resource
+#       damaged in the source but not on the test class path
 #
 # WHAT IT DOES NOT COVER, said plainly rather than left to be discovered:
 #
@@ -97,7 +152,8 @@
 #     cannot be missed, and carries NO allow-list of accepted survivors: a new
 #     survivor does not fail this script unless it takes a package below 80 %.
 #     handoffs/PHASE-06-worklog.rst records the argument for each survivor
-#     (ParamsLineReader:137 x2 and VariableModRules:178, equivalent), and
+#     (ParamsLineReader:137 x2 and VariableModRules:178 -- :204 since the
+#     COMET-2026-03 intake -- equivalent), and
 #     whoever signs the gate off re-reads the list printed here against it.
 #   * Control 9 runs PIT once per arm (clean, then validation tests removed).
 #     It is NOT scripts/verify-test-gates.sh's pinned-survivor control, which
@@ -117,9 +173,10 @@
 # tree's.  tools/, .venv/ and scratch/ are gitignored and absent from the
 # archive, so they are symlinked: tools/ for the JDK and Maven, .venv/ for the
 # generator self-test's Sphinx and the module's generator agreement test,
-# scratch/ for the real Comet binaries (2026.02.2 and 2024.01.0) the module's
-# real-binary tests run -- and FAIL, rather than skip, without.  Nothing here
-# writes to them.
+# scratch/ for the real Comet binaries (2026.03.0, 2026.02.2 and 2024.01.0)
+# and the validation corpus's D-006 spectra and proteome (scratch/fixture) the
+# module's real-binary tests run -- and FAIL, rather than skip, without.
+# Nothing here writes to them.
 #
 # ONE MODULE, BUILT AGAINST ITS OWN UPSTREAM.  Every injection is in
 # cometgui-params-comet.  Its upstream modules (read from its POM: domain,
@@ -172,9 +229,9 @@
 # threshold); only its thread count is scaled as scripts/build.sh scales it.
 #
 # WHAT IT NEEDS.  A built tree: tools/, .venv/, a populated _build/m2repo, and
-# the gitignored mirrors scratch/phase05/artefacts (Comet 2026.02.2) and
-# scratch/phase06/artefacts (Comet 2024.01.0).  Offline; writes only under
-# _build/.
+# the gitignored mirrors scratch/phase05/artefacts (Comet 2026.03.0 and
+# 2026.02.2), scratch/phase06/artefacts (Comet 2024.01.0) and the D-006 inputs
+# under scratch/fixture.  Offline; writes only under _build/.
 #
 # WHAT IT COSTS.  Measured and printed per control; the total is on the
 # SUMMARY line.  The two PIT runs dominate.
@@ -205,6 +262,10 @@ readonly M2REPO="${ROOT}/_build/m2repo"
 readonly LOGS="${ROOT}/_build/param-gate-logs"
 readonly MIRROR_2026="scratch/phase05/artefacts/v2026.02.2__comet.linux.exe"
 readonly MIRROR_2024="scratch/phase06/artefacts/v2024.01.0__comet.linux.exe"
+readonly MIRROR_2026_03="scratch/phase05/artefacts/v2026.03.0__comet.linux.exe"
+# The validation corpus's real-binary test searches these (D-006, gitignored).
+readonly CORPUS_SPECTRA="scratch/fixture/20100614_Velos1_TaGe_SA_K562_3.mzML"
+readonly CORPUS_PROTEOME="scratch/fixture/UP000005640_9606.fasta"
 
 # The one module every control damages and runs.
 readonly MODULE="cometgui-params-comet"
@@ -222,11 +283,23 @@ readonly VALIDATOR="${J}/validation/CometValidator.java"
 readonly RULE="${J}/validation/Rule.java"
 readonly PAIR_RULE="${J}/validation/TolerancePairRule.java"
 readonly METADATA="${MODULE}/src/main/resources/org/cometgui/params/comet/schema/comet-parameters.json"
+# COMET-2026-03 unit 6: the version-scoped classes, and one test resource.
+readonly CURATED="${J}/schema/CuratedMetadata.java"
+readonly VERSION_RECORD="${J}/schema/CometVersionRecord.java"
+readonly FINDINGS="${J}/validation/Findings.java"
+readonly SEVERITIES="${J}/validation/VersionSeverities.java"
+readonly VARMOD_RULES="${J}/validation/VariableModRules.java"
+readonly ASCORE_RULE="${J}/validation/AScoreProRule.java"
+readonly MIGRATION="${J}/migration/SchemaMigration.java"
+readonly CORPUS="${MODULE}/src/test/resources/fixtures/comet-validation/corpus.json"
 
 # Control 8's harness, unit 7's: invoked, never duplicated.  Its floors are the
-# counts it printed when unit 7 shipped it; fewer means cases were lost.
+# counts it printed when last recorded; fewer means cases were lost.  27 when
+# unit 7 shipped it; 55 on 2026-10-04 (COMET-2026-03 unit 6), measured after
+# COMET-2026-03 units 1, 3 and 4 added 13 override, 8 alphabet and 7
+# severity cases.
 readonly PARAMS_SELFTEST="scripts/cometparams_selftest.py"
-readonly SELFTEST_GENERATOR_FLOOR=27
+readonly SELFTEST_GENERATOR_FLOOR=55
 readonly SELFTEST_HOOK_FLOOR=4
 
 # Control 9: the packages item 9 names, and the threshold, R-TEST-02's.
@@ -244,7 +317,8 @@ readonly -a QUIET=(
 )
 
 # Every control id, in the order they run.  Maven-free first, PIT last.
-readonly -a ALL_CONTROLS=(8 1 2a 2b 3a 3b 4a 4b 5a 5b 6a 6b 7a 7b 7c 9 H)
+readonly -a ALL_CONTROLS=(8 1 2a 2b 3a 3b 4a 4b 5a 5b 6a 6b 7a 7b 7c
+    v3a v3b v3c v4a v4b v4c v5a v5b v5c v5d v5e v5f v5g v6a v6b 9 H)
 
 PASSED=0
 FAILED=0
@@ -272,10 +346,12 @@ Usage:
                                             baseline and the final clean run
   bash scripts/${SCRIPT_NAME} -h|--help
 
-It needs a built tree: tools/, .venv/, a populated _build/m2repo and the
-gitignored Comet mirrors ${MIRROR_2026} and
-${MIRROR_2024}.  It runs Maven offline, damages only a
-git-archive sandbox under _build/, and writes only under _build/.
+It needs a built tree: tools/, .venv/, a populated _build/m2repo, the
+gitignored Comet mirrors ${MIRROR_2026},
+${MIRROR_2026_03} and
+${MIRROR_2024}, and the D-006 inputs under scratch/fixture.
+It runs Maven offline, damages only a git-archive sandbox under _build/, and
+writes only under _build/.
 
 Exit status: 0 every control bit; 1 a control failed; 2 misuse; 3 the
 environment is not ready; 4 a harness error (an injection that reached
@@ -710,9 +786,39 @@ dirty_run() {
     if grep -qE 'NoClassDefFoundError|ClassNotFoundException: org\.cometgui' "${log}"; then
         harness_error "(${label}) $(rel "${log}") carries NoClassDefFoundError/ClassNotFoundException for project code: the red is the harness's, not the gate's."
     fi
-    compare_tree "${log}" "${source}"
+    case "${source}" in
+        */src/test/resources/*)
+            # A damaged TEST resource (control v5g's data): no production class
+            # may change, and the test class path must hold the damaged bytes.
+            compare_tree "${log}"
+            assert_test_resource_reached "${label}" "${source}"
+            ;;
+        *) compare_tree "${log}" "${source}" ;;
+    esac
     verify_classes_ran "${log}" "${selectors}"
     USED_SELECTORS+=("${selectors}")
+}
+
+# assert_test_resource_reached LABEL SOURCE -- a test resource is not compiled,
+# so the bytecode proof cannot see it.  Its copy on the test class path
+# (target/test-classes) is what the tests read: it must DIFFER from the
+# pristine copy and EQUAL the damaged source.  Anything else is a harness
+# error -- the run read something other than the defect.
+assert_test_resource_reached() {
+    local label="$1" source="$2"
+    local within="${source#*/src/test/resources/}"
+    local copy="${SANDBOX}/${MODULE}/target/test-classes/${within}"
+    [ -f "${copy}" ] \
+        || harness_error "(${label}) the test class path holds no copy of ${source} at $(rel "${copy}"), so nothing shows the tests read it."
+    [ -e "${PRISTINE}/${source}" ] \
+        || harness_error "(${label}) no pristine copy of ${source} was taken, so nothing can be compared."
+    if cmp -s "${copy}" "${PRISTINE}/${source}"; then
+        harness_error "(${label}) the test class path's copy of ${source} is BYTE-IDENTICAL to the pristine copy. The damage reached the source and not what the tests read, so the run tested the clean data and its result is not evidence of anything."
+    fi
+    cmp -s "${copy}" "${SANDBOX}/${source}" \
+        || harness_error "(${label}) the test class path's copy of ${source} is neither the pristine nor the damaged file; the run's input cannot be attributed."
+    printf '   test class path: %s holds the damaged bytes (sha256 %s); every compiled class identical to the baseline\n' \
+        "${within}" "$(sha256_of "${copy}" | cut -c1-12)"
 }
 
 # ------------------------------------------------- injection and its guards --
@@ -792,6 +898,90 @@ PYTHON
     fi
 }
 
+# set_parameter_through LABEL NAME RELEASE -- ends one parameter's version range
+# at RELEASE in the sandbox's metadata JSON, as text, so that the diff is that
+# one field.  The parameter must open exactly once, its span must hold
+# "through": null exactly once, and the result must still be JSON in which
+# that field, and nothing else, changed -- or it is a harness error.
+set_parameter_through() {
+    local label="$1" name="$2" release="$3" rc=0
+    python3 - "${SANDBOX}/${METADATA}" "${name}" "${release}" <<'PYTHON' || rc=$?
+import json
+import sys
+
+path, name, release = sys.argv[1:4]
+with open(path, encoding="utf-8") as handle:
+    text = handle.read()
+before = json.loads(text)
+opening = '    {\n      "name": "%s",\n' % name
+if text.count(opening) != 1:
+    sys.stderr.write("the parameter %r opens %d time(s), expected once\n" % (name, text.count(opening)))
+    raise SystemExit(1)
+start = text.index(opening)
+end = text.index("\n    }", start) + len("\n    }")
+span = text[start:end]
+old = '"through": null'
+if span.count(old) != 1:
+    sys.stderr.write("%r's object holds %r %d time(s), expected once\n" % (name, old, span.count(old)))
+    raise SystemExit(1)
+edited = text[:start] + span.replace(old, '"through": "%s"' % release) + text[end:]
+after = json.loads(edited)
+names = [p["name"] for p in before["parameters"]]
+index = names.index(name)
+if after["parameters"][index]["versions"]["through"] != release:
+    sys.stderr.write("the edit did not set %r's range to end at %s\n" % (name, release))
+    raise SystemExit(1)
+after["parameters"][index]["versions"]["through"] = None
+if after != before:
+    sys.stderr.write("the edit changed more than %r's range\n" % name)
+    raise SystemExit(1)
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(edited)
+PYTHON
+    if [ "${rc}" -ne 0 ]; then
+        harness_error "(${label}) ending ${name}'s range at ${release} in the sandbox metadata did not land. A control whose defect was not injected tests nothing."
+    fi
+}
+
+# clear_corpus_lines LABEL CASE RELEASE -- in the sandbox's validation corpus,
+# empties the Warning and Error lines recorded for one release's run of one
+# case: a recorded BINARY verdict made wrong, and nothing else.  The file is
+# rewritten in the one form it is kept in (2-space JSON); the original must
+# already be in that form, the case and verdict must exist once, and the lines
+# must not already be empty -- or it is a harness error.
+clear_corpus_lines() {
+    local label="$1" kase="$2" release="$3" rc=0
+    python3 - "${SANDBOX}/${CORPUS}" "${kase}" "${release}" <<'PYTHON' || rc=$?
+import json
+import sys
+
+path, kase, release = sys.argv[1:4]
+with open(path, encoding="utf-8") as handle:
+    text = handle.read()
+data = json.loads(text)
+if json.dumps(data, indent=2, ensure_ascii=False) + "\n" != text:
+    sys.stderr.write("the corpus is not in the form this edit rewrites; the diff would not be one field\n")
+    raise SystemExit(1)
+cases = [c for c in data["cases"] if c["id"] == kase]
+if len(cases) != 1:
+    sys.stderr.write("the case %r occurs %d time(s), expected once\n" % (kase, len(cases)))
+    raise SystemExit(1)
+verdicts = [v for v in cases[0]["verdicts"] if v["version"] == release]
+if len(verdicts) != 1:
+    sys.stderr.write("%r has %d verdict(s) for %s, expected one\n" % (kase, len(verdicts), release))
+    raise SystemExit(1)
+if not verdicts[0]["lines"]:
+    sys.stderr.write("%r's %s verdict records no line; emptying it would change nothing\n" % (kase, release))
+    raise SystemExit(1)
+verdicts[0]["lines"] = []
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+PYTHON
+    if [ "${rc}" -ne 0 ]; then
+        harness_error "(${label}) emptying ${kase}'s recorded ${release} lines in the sandbox corpus did not land. A control whose defect was not injected tests nothing."
+    fi
+}
+
 # assert_modified LABEL FILE -- and it really differs from the pristine copy.
 assert_modified() {
     local label="$1" file="$2"
@@ -843,7 +1033,8 @@ build_sandbox() {
     ln -s -- "${ROOT}/.venv" "${SANDBOX}/.venv"
     ln -s -- "${ROOT}/scratch" "${SANDBOX}/scratch"
     [ -f "${SANDBOX}/${MIRROR_2026}" ] && [ -f "${SANDBOX}/${MIRROR_2024}" ] \
-        || harness_error "the sandbox's scratch/ symlink does not resolve to both Comet mirrors."
+        && [ -f "${SANDBOX}/${MIRROR_2026_03}" ] && [ -f "${SANDBOX}/${CORPUS_SPECTRA}" ] \
+        || harness_error "the sandbox's scratch/ symlink does not resolve to the three Comet mirrors and the corpus inputs."
     local head dirty
     head="$(cd -- "${ROOT}" && git rev-parse --short HEAD)"
     echo "Sandbox: $(rel "${SANDBOX}") (git archive ${head}, $(find "${SANDBOX}/${MODULE}/src" -name '*.java' -type f | wc -l) java files in ${MODULE})"
@@ -873,6 +1064,23 @@ readonly SEL_7A="TolerancePairRuleTest"
 readonly SEL_7B="TolerancePairRuleTest#asymmetric"
 readonly SEL_7C="TolerancePairRuleTest#boundaries+reversed"
 readonly SEL_H="${SEL_1}"
+# COMET-2026-03.  A test that must STAY GREEN (the release the defect does not
+# touch) is selected beside the one that must go red.
+readonly SEL_V3A="Comet202603CurationTest#minusOneIsNotA202602Choice+indexSearchTypeIsVersionScoped"
+readonly SEL_V3B="Comet202603CurationTest#indexSearchTypeIsVersionScoped,SchemaDriftFixtureTest#theCountsFor202603+theCountsFor202602"
+readonly SEL_V3C="SchemaDriftFixtureTest#theDriftTest+theCountsFor202603+theCountsFor202602"
+readonly SEL_V4A="VariableModCodecAlphabetTest#versionScoped,ReleaseWriterGateTest#proteinTerminusSlots"
+readonly SEL_V4B="VariableModCodecAlphabetTest#versionScoped,VariableModRoundTripTest#everyFormInEverySlotOfComet202603"
+readonly SEL_V4C="ReleaseWriterGateTest#gateItem1"
+readonly SEL_V5A="VersionScopedRulesTest\$Distance#severityByRelease,VersionScopedRulesTest\$IndexSearchType#warnsForTheNewerRelease,ValidationCorpusTest#theValidatorAgrees"
+readonly SEL_V5B="ResidueAlphabetRuleTest#proteinNTerminus"
+readonly SEL_V5C="AScoreProRuleTest#slotsAboveNine"
+readonly SEL_V5D="AScoreProRuleTest#mergedSlots"
+readonly SEL_V5E="AScoreProRuleTest#proteinTerminusRewrite"
+readonly SEL_V5F="VersionScopedRulesTest\$IndexSearchType#silentForTheOlderRelease+warnsForTheNewerRelease"
+readonly SEL_V5G="ValidationCorpusRealBinaryTest#replay"
+readonly SEL_V6A="MigrationTo202603Test\$Keyed#sameRelease+otherTarget+backToOlder"
+readonly SEL_V6B="MigrationTo202603Test\$Edits#distanceBelowMinusTwo+terminusOutsideZeroToThree"
 
 control_selectors() {
     case "$1" in
@@ -890,6 +1098,21 @@ control_selectors() {
         7b) printf '%s' "${SEL_7B}" ;;
         7c) printf '%s' "${SEL_7C}" ;;
         H) printf '%s' "${SEL_H}" ;;
+        v3a) printf '%s' "${SEL_V3A}" ;;
+        v3b) printf '%s' "${SEL_V3B}" ;;
+        v3c) printf '%s' "${SEL_V3C}" ;;
+        v4a) printf '%s' "${SEL_V4A}" ;;
+        v4b) printf '%s' "${SEL_V4B}" ;;
+        v4c) printf '%s' "${SEL_V4C}" ;;
+        v5a) printf '%s' "${SEL_V5A}" ;;
+        v5b) printf '%s' "${SEL_V5B}" ;;
+        v5c) printf '%s' "${SEL_V5C}" ;;
+        v5d) printf '%s' "${SEL_V5D}" ;;
+        v5e) printf '%s' "${SEL_V5E}" ;;
+        v5f) printf '%s' "${SEL_V5F}" ;;
+        v5g) printf '%s' "${SEL_V5G}" ;;
+        v6a) printf '%s' "${SEL_V6A}" ;;
+        v6b) printf '%s' "${SEL_V6B}" ;;
         8|9) ;;
         *) die "no control '$1'. Controls: ${ALL_CONTROLS[*]}" 2 ;;
     esac
@@ -1152,6 +1375,265 @@ control_7c() {
     end_control
 }
 
+# ------------------------------------------- COMET-2026-03: version-blind --
+#
+# Each control below makes one version-scoped fact VERSION-BLIND.  The record
+# is handoffs/COMET-2026-03-worklog.rst; see the header for which are recorded
+# and which are this script's own.
+
+control_v3a() {
+    begin_control "v3a" "COMET-2026-03 item 3 [recorded, u1 orch.]: every release given the first record's overrides"
+    # Unit 1's sign-off, injection 1: "CuratedMetadata.forVersion reads the
+    # first version record -- 2026.03.0 -- whatever version is asked",
+    # "-1 became legal for 2026.02.2".
+    java_control_inject "the first record's overrides for every release" "${CURATED}" "${SEL_V3A}" regex \
+        'Comet202603CurationTest\.minusOneIsNotA202602Choice:[0-9]+ \[\] ==> expected: <1> but was: <0>' \
+        '        return version(version)
+                .flatMap(record -> record.override(definition.name()))' \
+        '        return versions.stream()
+                .findFirst()
+                .flatMap(record -> record.override(definition.name()))'
+    assert_log_matches "and 2026.02.2's index_search_type default became 2026.03.0's" \
+        "${DIRTY_LOG}" 'Comet202603CurationTest\.indexSearchTypeIsVersionScoped:[0-9]+ .*expected: <1> but was: <-1>'
+    restore_pristine "${CURATED}"
+    end_control
+}
+
+control_v3b() {
+    begin_control "v3b" "COMET-2026-03 item 3 [NEW, u6]: no release's override is applied"
+    # The release's own default (-1) is what makes 2026.03.0's -q drift-clean:
+    # without its override the curated 1 is drift there.  2026.02.2 has no
+    # override, so its counts must stay green.
+    java_control_inject "overrides never applied" "${CURATED}" "${SEL_V3B}" regex \
+        'Comet202603CurationTest\.indexSearchTypeIsVersionScoped:[0-9]+ .*expected: <-1> but was: <1>' \
+        '                .map(override -> override.applyTo(definition))' \
+        '                .map(override -> definition)'
+    assert_testcase "and 2026.03.0's drift test is no longer clean" failed \
+        SchemaDriftFixtureTest theCountsFor202603
+    assert_testcase "while 2026.02.2, which has no override, stays drift-clean: the red is the version" passed \
+        SchemaDriftFixtureTest theCountsFor202602
+    restore_pristine "${CURATED}"
+    end_control
+}
+
+control_v3c() {
+    begin_control "v3c" "COMET-2026-03 item 3 [NEW, u6]: scan_range no longer claimed for 2026.03.0 in the shipped metadata"
+    # The drift test runs per release.  An entry missing for one release only
+    # must be named for that release, and the other must stay clean: a drift
+    # test that ran for 2026.02.2 alone would pass this.
+    save_pristine "${METADATA}"
+    set_parameter_through "scan_range ends at 2026.02.2" "scan_range" "2026.02.2"
+    assert_modified "scan_range ends at 2026.02.2" "${METADATA}"
+    DIRTY_LOG="${LOGS}/${CONTROL_ID}-dirty.log"
+    printf '   %s\n' "$(gate_command "${SEL_V3C}")"
+    dirty_run "scan_range ends at 2026.02.2" "${METADATA}" "${SEL_V3C}" "${DIRTY_LOG}"
+    grade_red regex "scan_range ends at 2026.02.2" "${DIRTY_RC}" "${DIRTY_LOG}" \
+        'UNMODELLED: Comet 2026\.03\.0 declares scan_range \(line [0-9]+, default "0 0"\), which has no metadata'
+    assert_log_matches "and the 2026.03.0 counts say 117 modelled of 118 declared" \
+        "${DIRTY_LOG}" 'SchemaDriftFixtureTest\.theCountsFor202603:[0-9]+ Comet 2026\.03\.0 COMPLETE: declared 118, modelled 117, allow-listed 0, findings 1$'
+    assert_testcase "while 2026.02.2's counts stay green: the red is the version" passed \
+        SchemaDriftFixtureTest theCountsFor202602
+    restore_pristine "${METADATA}"
+    end_control
+}
+
+control_v4a() {
+    begin_control "v4a" "COMET-2026-03 item 4 [NEW, u6]: every release's codec given 2026.03.0's residue alphabet"
+    # Unit 3's sign-off injection 1 gave every release the newest LAYOUT; this
+    # is that defect narrowed to the alphabet, the one fact it was about.
+    java_control_inject "the newest alphabet for every release" "${TUPLE_CODEC}" "${SEL_V4A}" regex \
+        'VariableModCodecAlphabetTest\.versionScoped:[0-9]+ Expected org\.cometgui\.params\.comet\.value\.ValueSyntaxException to be thrown, but nothing was thrown' \
+        '        return new VariableModCodec("Comet " + version.text(), record.variableModTuple(), slots);' \
+        '        VariableModLayout tuple = record.variableModTuple();
+        return new VariableModCodec(
+                "Comet " + version.text(),
+                new VariableModLayout(
+                        tuple.fields(),
+                        tuple.source(),
+                        metadata.versions().get(0).variableModTuple().residueAlphabet()),
+                slots);'
+    assert_testcase "and the writer gate no longer refuses ^ and \$ for 2026.02.2" failed \
+        ReleaseWriterGateTest proteinTerminusSlots
+    restore_pristine "${TUPLE_CODEC}"
+    end_control
+}
+
+control_v4b() {
+    begin_control "v4b" "COMET-2026-03 item 4 [NEW, u6]: every release's codec given 2024.01.0's residue alphabet"
+    java_control_inject "the oldest alphabet for every release" "${TUPLE_CODEC}" "${SEL_V4B}" regex \
+        'holds .\^., which Comet 2026\.03\.0 does not accept in a residue token' \
+        '        return new VariableModCodec("Comet " + version.text(), record.variableModTuple(), slots);' \
+        '        VariableModLayout tuple = record.variableModTuple();
+        return new VariableModCodec(
+                "Comet " + version.text(),
+                new VariableModLayout(
+                        tuple.fields(),
+                        tuple.source(),
+                        metadata.versions()
+                                .get(metadata.versions().size() - 1)
+                                .variableModTuple()
+                                .residueAlphabet()),
+                slots);'
+    assert_testcase "and the 2026.03.0 alphabet test fails too" failed \
+        VariableModCodecAlphabetTest versionScoped
+    restore_pristine "${TUPLE_CODEC}"
+    end_control
+}
+
+control_v4c() {
+    begin_control "v4c" "COMET-2026-03 item 4 [NEW, u6]: the writer writes the curated inline comment, not the release's"
+    # Gate item 1 for 2026.03.0: its canonical text's SHA-256 is pinned.  The
+    # release's inline comments (decoy_search, index_search_type) are its
+    # override; the curated ones are 2026.02.2's, so 2026.02.2 stays green.
+    java_control_inject "inline comment read from the curated definition" "${WRITER}" "${SEL_V4C}" regex \
+        'Comet 2026\.03\.0 ==> expected: <c600c64f473ec46baaa760c7b1f55c78faa196dd96c36748da06c8ea9d5fcf2e> but was: <[0-9a-f]{64}>' \
+        '            line(out, declaration(entry.name(), value, entry.definition().inlineComment()));' \
+        '            line(
+                    out,
+                    declaration(
+                            entry.name(),
+                            value,
+                            model.metadata()
+                                    .parameter(entry.name())
+                                    .orElseThrow()
+                                    .inlineComment()));'
+    assert_log_contains "and only one of the two releases fails" \
+        "${DIRTY_LOG}" 'Tests run: 2, Failures: 1, Errors: 0, Skipped: 0'
+    restore_pristine "${WRITER}"
+    end_control
+}
+
+control_v5a() {
+    begin_control "v5a" "COMET-2026-03 item 5 [recorded, u4 orch. 1]: every model judged with 2026.02.2's severities"
+    # Unit 4's sign-off, injection 1: "Findings binds every model to the
+    # second version record, 2026.02.2", with the corpus text below.
+    java_control_inject "severities of the second record for every model" "${FINDINGS}" "${SEL_V5A}" fixed \
+        'ist-1, Comet 2026.03.0: ValidationReport[findings=[]] ==> expected: <[WARNING index_search_type.ignored_without_idx]> but was: <[]>' \
+        '        this.severities =
+                VersionSeverities.of(model.metadata().version(model.version()).orElseThrow());' \
+        '        this.severities = VersionSeverities.of(model.metadata().versions().get(1));'
+    assert_testcase "and below -2 is no longer an error for 2026.03.0" failed \
+        VersionScopedRulesTest severityByRelease
+    assert_testcase "and 2026.03.0's index_search_type warning is gone" failed \
+        VersionScopedRulesTest warnsForTheNewerRelease
+    restore_pristine "${FINDINGS}"
+    end_control
+}
+
+control_v5b() {
+    begin_control "v5b" "COMET-2026-03 item 5 [NEW, u6]: validation reads the newest release's residue alphabet"
+    # The codec refuses ^ for 2026.02.2 when a file is read or written; a model
+    # built in code (Phase 07's editor) holds it until then, and validation must
+    # say so at the field (unit 3's condition on unit 4).
+    java_control_inject "the newest alphabet in validation" "${VARMOD_RULES}" "${SEL_V5B}" regex \
+        'ResidueAlphabetRuleTest\.proteinNTerminus:[0-9]+ .*expected: <1> but was: <0>' \
+        '        return model.metadata()
+                .version(model.version())
+                .orElseThrow()
+                .variableModTuple()
+                .residueAlphabet();' \
+        '        return model.metadata().versions().get(0).variableModTuple().residueAlphabet();'
+    restore_pristine "${VARMOD_RULES}"
+    end_control
+}
+
+control_v5c() {
+    begin_control "v5c" "COMET-2026-03 item 5 [recorded, u4 orch. 2]: AScorePro's 'localise all' suppresses the slot error"
+    java_control_inject "ascore == 0 became ascore <= 0" "${ASCORE_RULE}" "${SEL_V5C}" regex \
+        'AScoreProRuleTest\.slotsAboveNine.*print_ascorepro_score, -1\]: \[\] ==> expected: <1> but was: <0>' \
+        '        if (ascore == 0) {' \
+        '        if (ascore <= 0) {'
+    restore_pristine "${ASCORE_RULE}"
+    end_control
+}
+
+control_v5d() {
+    begin_control "v5d" "COMET-2026-03 item 5 [NEW, u6]: AScorePro applied to slots Comet merges away"
+    java_control_inject "no slot is ever merged" "${ASCORE_RULE}" "${SEL_V5D}" regex \
+        'AScoreProRuleTest\.mergedSlots.* expected: <\[\]> but was: <\[' \
+        '            boolean merged = key.requirement() != -1 && !seen.add(key);' \
+        '            boolean merged = false;'
+    restore_pristine "${ASCORE_RULE}"
+    end_control
+}
+
+control_v5e() {
+    begin_control "v5e" "COMET-2026-03 item 5 [NEW, u6]: AScorePro's protein-terminus rewrite in a release without ^"
+    # Comet 2026.03.0 rewrites n at distance 0 from the protein N-terminus to ^
+    # before it merges; 2026.02.2 has no ^ and does not.  The rule reads that
+    # from the release's alphabet: without the check, 2026.02.2 merges too.
+    java_control_inject "the rewrite whatever the alphabet" "${ASCORE_RULE}" "${SEL_V5E}" regex \
+        'AScoreProRuleTest\.proteinTerminusRewrite:[0-9]+->flagged:[0-9]+ 2026\.2\.2 \[variable_mod01, 42\.010565 n 0 1 0 0 0 0\.0, variable_mod10, 42\.010565 n 0 1 -1 0 0 0\.0\]: \[\] ==> expected: <1> but was: <0>' \
+        '        if (!alphabet.accepts(to)) {
+            return false;
+        }' \
+        '        if (false) {
+            return false;
+        }'
+    restore_pristine "${ASCORE_RULE}"
+    end_control
+}
+
+control_v5f() {
+    begin_control "v5f" "COMET-2026-03 item 5 [NEW, u6]: index_search_type.ignored_without_idx in every release"
+    java_control_inject "the index rule warns whatever the release" "${SEVERITIES}" "${SEL_V5F}" regex \
+        'VersionScopedRulesTest\.silentForTheOlderRelease expected: <\[\]> but was: <\[Finding\[rule=INDEX_SEARCH_TYPE_IGNORED, severity=WARNING, parameters=\[index_search_type, database_name\]' \
+        '        return rule.fixedSeverity().or(() -> scoped.get(rule));' \
+        '        if (rule == Rule.INDEX_SEARCH_TYPE_IGNORED) {
+            return Optional.of(Severity.WARNING);
+        }
+        return rule.fixedSeverity().or(() -> scoped.get(rule));'
+    assert_testcase "while 2026.03.0's own warning stays green: the red is the version" passed \
+        VersionScopedRulesTest warnsForTheNewerRelease
+    restore_pristine "${SEVERITIES}"
+    end_control
+}
+
+control_v5g() {
+    begin_control "v5g" "COMET-2026-03 item 5 [NEW, u6, DATA]: one recorded binary verdict of the corpus made wrong"
+    # NOT PRODUCTION CODE.  The validation corpus records what each real binary
+    # did with each case; ValidationCorpusRealBinaryTest replays every case on
+    # both binaries and runs no production class of this module (unit 4's
+    # rework).  Here the recorded 2026.03.0 warning of ist-1 is removed, as if
+    # whoever recorded it had misread the binary: the real binary must
+    # contradict the record.  Proved on the test class path, not in bytecode.
+    save_pristine "${CORPUS}"
+    clear_corpus_lines "ist-1's 2026.03.0 warning unrecorded" "ist-1" "2026.03.0"
+    assert_modified "ist-1's 2026.03.0 warning unrecorded" "${CORPUS}"
+    DIRTY_LOG="${LOGS}/${CONTROL_ID}-dirty.log"
+    printf '   %s\n' "$(gate_command "${SEL_V5G}")"
+    dirty_run "ist-1's 2026.03.0 warning unrecorded" "${CORPUS}" "${SEL_V5G}" "${DIRTY_LOG}"
+    grade_red regex "ist-1's 2026.03.0 warning unrecorded" "${DIRTY_RC}" "${DIRTY_LOG}" \
+        'ist-1, Comet 2026\.03\.0: Warning and Error lines ==> expected: <\[\]> but was: <\[Warning - index_search_type = 1 is ignored: "[^"]*" is not an \.idx file'
+    assert_log_contains "and that case alone: one of the corpus's 42 cases fails" \
+        "${DIRTY_LOG}" 'Tests run: 42, Failures: 1, Errors: 0, Skipped: 0'
+    restore_pristine "${CORPUS}"
+    end_control
+}
+
+control_v6a() {
+    begin_control "v6a" "COMET-2026-03 item 6 [recorded, u5 orch. A]: value migrations applied whatever release they are from"
+    java_control_inject "valueMigrationsFrom ignores from" "${VERSION_RECORD}" "${SEL_V6A}" fixed \
+        'MigrationTo202603Test.sameRelease expected: <118> but was: <116>' \
+        '        return valueMigrations.stream().filter(m -> m.from().equals(from)).toList();' \
+        '        return valueMigrations.stream().toList();'
+    restore_pristine "${VERSION_RECORD}"
+    end_control
+}
+
+control_v6b() {
+    begin_control "v6b" "COMET-2026-03 item 6 [recorded, u5 orch. B]: rule-keyed value migrations never applied"
+    java_control_inject "conversion handed no source findings" "${MIGRATION}" "${SEL_V6B}" fixed \
+        'MigrationTo202603Test.distanceBelowMinusTwo 2026.02.2 ==> expected: <CONVERTED> but was: <CARRIED>' \
+        '                        conversion.convert(
+                                name, source.text(name), sourceRules.getOrDefault(name, Set.of()));' \
+        '                        conversion.convert(name, source.text(name), Set.of());'
+    assert_log_matches "and a terminus outside 0-3 is carried instead of needing attention" \
+        "${DIRTY_LOG}" 'terminusOutsideZeroToThree.*expected: <NEEDS_ATTENTION> but was: <CARRIED>'
+    restore_pristine "${MIGRATION}"
+    end_control
+}
+
 # ---------------------------------------------------------------- control 8 --
 
 control_8() {
@@ -1199,6 +1681,12 @@ control_8() {
         "${log}" 'hook-entry-removed +build failed \(exit [1-9][0-9]*\): .*comet-parameters\.json: comet -q of Comet 2026\.02\.2'
     assert_log_matches "8 and a generator that drops an entry after its own check fails on the hook's independent count" \
         "${log}" "hook-entry-dropped-after-check +build failed .*holds $((modelled - 1)) parameter entries, but the metadata models ${modelled} parameters"
+    # COMET-2026-03 unit 6: the self-test's per-release controls, which a
+    # generator that ignored the version records' overrides or alphabets fails.
+    assert_log_matches "8 per release: index_search_type's entry carries each release's own default, choices and comment" \
+        "${log}" '^ +control +rendered for 2026\.02\.2, 2026\.03\.0: index_search_type carries each release.s own default, choices and comment$'
+    assert_log_matches "8 per release: variable_mod01's entry states ^ and \$ for 2026.03.0 only" \
+        "${log}" '^ +control +variable_mod01 states each release.s residue alphabet: \^ and \$ for 2026\.03\.0 only$'
     end_control
 }
 
@@ -1489,6 +1977,15 @@ XML
     grade_pit "H7 (deliberately graded: a report with no writer mutation)" "${xml}" OK
 }
 
+# The sandbox's corpus damaged, and NOT copied to the test class path: what a
+# run that skipped process-test-resources would leave.  Runs in a subshell
+# (expect_harness_error), so the edit is undone by H's restoration.
+h_test_resource_not_copied() {
+    clear_corpus_lines "H10" "ist-1" "2026.03.0"
+    assert_modified "H10" "${CORPUS}"
+    assert_test_resource_reached "H10" "${CORPUS}"
+}
+
 control_H() {
     begin_control "H" "the harness itself: an injection that did not land must never be a pass"
     save_pristine "${WRITER}"
@@ -1531,8 +2028,25 @@ control_H() {
     expect_recorded_failure "H7 a PIT report in which a graded package has no mutation is a failure, not a score" \
         h_vacuous_pit_report
 
+    # COMET-2026-03 unit 6: the new controls' own plumbing.  Neither edit may
+    # write anything, and a damaged test resource that never reached the test
+    # class path must stop the run -- no Maven run is needed to show it: the
+    # baseline left the clean copy there.
+    expect_harness_error "H8 a metadata range edit naming a parameter that does not exist is refused" \
+        "did not land" set_parameter_through "H8" "no_such_parameter" "2026.02.2"
+    cmp -s "${SANDBOX}/${METADATA}" "${PRISTINE}/${METADATA}" \
+        || harness_error "control H8's refused metadata edit changed ${METADATA} after all."
+    save_pristine "${CORPUS}"
+    expect_harness_error "H9 a corpus verdict edit that would change nothing is refused" \
+        "did not land" clear_corpus_lines "H9" "ist-1" "2026.02.2"
+    cmp -s "${SANDBOX}/${CORPUS}" "${PRISTINE}/${CORPUS}" \
+        || harness_error "control H9's refused corpus edit changed ${CORPUS} after all."
+    expect_harness_error "H10 a test resource damaged in the source but not on the test class path is refused" \
+        "BYTE-IDENTICAL to the pristine copy" h_test_resource_not_copied
+
     restore_pristine "${WRITER}"
     restore_pristine "${METADATA}"
+    restore_pristine "${CORPUS}"
     USED_SELECTORS+=("${SEL_H}")
     end_control
 }
@@ -1546,6 +2060,11 @@ run_control() {
         5a) control_5a ;; 5b) control_5b ;; 6a) control_6a ;; 6b) control_6b ;;
         7a) control_7a ;; 7b) control_7b ;; 7c) control_7c ;;
         8) control_8 ;; 9) control_9 ;; H) control_H ;;
+        v3a) control_v3a ;; v3b) control_v3b ;; v3c) control_v3c ;;
+        v4a) control_v4a ;; v4b) control_v4b ;; v4c) control_v4c ;;
+        v5a) control_v5a ;; v5b) control_v5b ;; v5c) control_v5c ;; v5d) control_v5d ;;
+        v5e) control_v5e ;; v5f) control_v5f ;; v5g) control_v5g ;;
+        v6a) control_v6a ;; v6b) control_v6b ;;
         *) die "no control '$1'. Controls: ${ALL_CONTROLS[*]}" 2 ;;
     esac
 }
@@ -1567,6 +2086,16 @@ final_clean_run() {
     local file
     for file in $(printf '%s\n' "${RESTORED[@]}" | grep '/src/main/' | sort -u); do
         record_pass "restored compiled form of ${file##*/} is byte-identical to the clean baseline"
+    done
+    # A restored TEST resource is not in the bytecode proof: its copy on the
+    # test class path must be the pristine file again, or the clean run above
+    # read the damage.
+    local copy
+    for file in $(printf '%s\n' "${RESTORED[@]}" | grep '/src/test/resources/' | sort -u); do
+        copy="${SANDBOX}/${MODULE}/target/test-classes/${file#*/src/test/resources/}"
+        cmp -s "${copy}" "${PRISTINE}/${file}" \
+            || harness_error "the test class path's copy of ${file} is not the pristine file after the final clean run; the restoration did not reach what the tests read."
+        record_pass "restored test-class-path copy of ${file##*/} is byte-identical to the pristine file"
     done
     end_control
 }
@@ -1596,9 +2125,14 @@ main() {
     [ -d "${M2REPO}/org/cometgui" ] || die "$(rel "${M2REPO}") is not populated; run bash scripts/build.sh first." 3
     [ -x "${ROOT}/.venv/bin/sphinx-build" ] || die ".venv/bin/sphinx-build is missing; control 8 needs the project's Sphinx." 3
     local mirror
-    for mirror in "${MIRROR_2026}" "${MIRROR_2024}"; do
+    for mirror in "${MIRROR_2026}" "${MIRROR_2024}" "${MIRROR_2026_03}"; do
         [ -f "${ROOT}/${mirror}" ] \
-            || die "${mirror} does not exist. ${MODULE}'s real-binary tests run it and FAIL rather than skip without it, so PIT (control 9) would score a failing suite. The mirror is gitignored; refill it from the release URL and verify its SHA-256 (manifests/tools.json for 2026.02.2; handoffs/PHASE-06-worklog.rst, unit 6, for 2024.01.0)." 3
+            || die "${mirror} does not exist. ${MODULE}'s real-binary tests run it and FAIL rather than skip without it, so PIT (control 9) would score a failing suite. The mirror is gitignored; refill it from the release URL and verify its SHA-256 (manifests/tools.json for 2026.03.0 and 2026.02.2; handoffs/PHASE-06-worklog.rst, unit 6, for 2024.01.0)." 3
+    done
+    local input
+    for input in "${CORPUS_SPECTRA}" "${CORPUS_PROTEOME}"; do
+        [ -f "${ROOT}/${input}" ] \
+            || die "${input} does not exist. ${MODULE}'s validation-corpus test searches it with the real Comet binaries and FAILS rather than skips without it, so control v5g and PIT (control 9) could not run. The inputs are gitignored (D-006); refill them with python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches by checksum." 3
     done
 
     local -a selected=()
@@ -1654,8 +2188,10 @@ main() {
     if [ "${self_test_only}" -eq 1 ]; then
         printf '\n  self-test OK -- the harness reports an injection that reached the source but\n'
         printf '  not the bytecode, an unchanged file, a missing anchor, a metadata edit that\n'
-        printf '  removed nothing, a run with no defect, a red for the wrong reason and a PIT\n'
-        printf '  report with an empty package as a HARNESS ERROR or FAILURE, not as a pass.\n\n'
+        printf '  removed nothing, a run with no defect, a red for the wrong reason, a PIT\n'
+        printf '  report with an empty package, a metadata range edit and a corpus verdict\n'
+        printf '  edit that edit nothing, and a test resource damaged in the source but not on\n'
+        printf '  the test class path as a HARNESS ERROR or FAILURE, not as a pass.\n\n'
         return 0
     fi
     if [ -n "${only}" ]; then
@@ -1670,6 +2206,11 @@ main() {
     printf '  removed. Every non-killed mutant in those packages is listed above. Whether any\n'
     printf '  of them suppresses a validation error or drops a parameter is a JUDGEMENT this\n'
     printf '  script does not make: read the list against handoffs/PHASE-06-worklog.rst.\n'
+    printf '  COMET-2026-03 exit gate items 3 to 6 were made version-blind here, one\n'
+    printf '  family at a time -- overrides and drift, the residue alphabet and the\n'
+    printf '  2026.03.0 round trip, rule severities and the AScorePro and index rules,\n'
+    printf '  value migrations -- each in production code or the shipped metadata, plus\n'
+    printf '  one recorded binary verdict of the validation corpus (data, not code).\n'
     printf '  The harness reports an injection that reached the source but not the\n'
     printf '  bytecode as a HARNESS ERROR, not as a pass.\n'
     printf '\n  Every gate rejected its defect and accepted the clean tree.\n\n'
