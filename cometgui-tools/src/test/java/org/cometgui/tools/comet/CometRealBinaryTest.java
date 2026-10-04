@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
@@ -42,10 +43,11 @@ import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.process.ProcessService;
 import org.cometgui.tools.testing.UpstreamArtefacts;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Comet's capability set, established by running the real {@code comet.linux.exe}.
@@ -62,17 +64,52 @@ import org.junit.jupiter.api.io.TempDir;
                         + " never been executed anywhere in this project")
 class CometRealBinaryTest {
 
-    private static final String COMET_FILE = "v2026.02.2__comet.linux.exe";
+    /**
+     * One linux-x86-64 Comet release the manifest ships, typed out: this module cannot read the
+     * manifest, so the digest and the two counts are a second statement of what the manifest and
+     * the parameter fixtures say, measured from the bytes.
+     *
+     * @param file the mirror's name for the binary
+     * @param sha256 the manifest's SHA-256 for it
+     * @param version the release
+     * @param defaultCount how many parameters {@code -p} declares
+     * @param completeCount how many parameters {@code -q} declares
+     */
+    record Release(
+            String file, String sha256, String version, int defaultCount, int completeCount) {
 
-    /** The manifest's SHA-256 for {@code comet.linux.exe}, hand-typed. */
-    private static final String COMET_SHA256 =
-            "af515b6ed5a17efafff7277a6a9c73cee97e26d38f3c9b2a8da16adaa44e6d9e";
+        @Override
+        public String toString() {
+            return "Comet " + version;
+        }
+    }
+
+    /**
+     * Both releases the manifest installs on linux-x86-64. 2026.03.0's {@code -p} no longer writes
+     * {@code index_search_type}, which is why its count is one lower; {@code -q} is 118 in both.
+     *
+     * @return the releases
+     */
+    static Stream<Release> releases() {
+        return Stream.of(
+                new Release(
+                        "v2026.02.2__comet.linux.exe",
+                        "af515b6ed5a17efafff7277a6a9c73cee97e26d38f3c9b2a8da16adaa44e6d9e",
+                        "2026.02.2",
+                        96,
+                        118),
+                new Release(
+                        "v2026.03.0__comet.linux.exe",
+                        "ad93b4cf60c2ed7afc2f41b8a3a05567c3938d999f17deb7b3676bc1fa91e7ed",
+                        "2026.03.0",
+                        95,
+                        118));
+    }
 
     private static final HostPlatform LINUX =
             new HostPlatform(HostOperatingSystem.LINUX, HostArchitecture.X86_64);
     private static final HostPlatform WINDOWS =
             new HostPlatform(HostOperatingSystem.WINDOWS, HostArchitecture.X86_64);
-    private static final ToolVersion VERSION = ToolVersion.parse("2026.02.2");
 
     private static ToolRunner runner() {
         return new ToolRunner(new ProcessService(Clock.systemUTC()), Duration.ofSeconds(60));
@@ -83,25 +120,26 @@ class CometRealBinaryTest {
                 file.getParent(), "the staged binary is written into a directory");
     }
 
-    private static Path stage(Path directory) throws IOException {
+    private static Path stage(Release release, Path directory) throws IOException {
         Path binary =
                 UpstreamArtefacts.executableCopy(
-                        COMET_FILE, directory.resolve("bin").resolve("comet"));
+                        release.file(), directory.resolve("bin").resolve("comet"));
         assertEquals(
-                COMET_SHA256,
+                release.sha256(),
                 UpstreamArtefacts.sha256(binary),
                 "the staged Comet is not the bytes the manifest pins");
         return binary;
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("releases")
     @DisplayName("the real binary is observed to write pepXML, write PIN and answer -q")
-    void theRealCapabilitySet(@TempDir Path directory) throws IOException {
-        Path binary = stage(directory);
+    void theRealCapabilitySet(Release release, @TempDir Path directory) throws IOException {
+        Path binary = stage(release, directory);
 
         Set<ToolCapability> observed =
                 new CometCapabilityProbe(runner(), List.of())
-                        .probe(ToolName.COMET, VERSION, LINUX, binary);
+                        .probe(ToolName.COMET, ToolVersion.parse(release.version()), LINUX, binary);
 
         assertEquals(
                 Set.of(
@@ -113,17 +151,19 @@ class CometRealBinaryTest {
                         + " R-TOOL-08 makes an unprobed capability an absent one");
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("releases")
     @DisplayName("a real Linux Comet never advertises THERMO_RAW_WINDOWS, gate or no gate")
-    void theRealBinaryHasNoThermoCapability(@TempDir Path directory) throws IOException {
-        Path binary = stage(directory);
+    void theRealBinaryHasNoThermoCapability(Release release, @TempDir Path directory)
+            throws IOException {
+        Path binary = stage(release, directory);
         for (String companion : CometCompanionGates.thermoRawWindows().fileNames()) {
             Files.writeString(directoryOf(binary).resolve(companion), "MZ");
         }
 
         Set<ToolCapability> observed =
                 new CometCapabilityProbe(runner(), List.of(CometCompanionGates.thermoRawWindows()))
-                        .probe(ToolName.COMET, VERSION, LINUX, binary);
+                        .probe(ToolName.COMET, ToolVersion.parse(release.version()), LINUX, binary);
 
         assertFalse(
                 observed.contains(ToolCapability.THERMO_RAW_WINDOWS),
@@ -132,41 +172,52 @@ class CometRealBinaryTest {
                         + observed);
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("releases")
     @DisplayName(
             "the same real binary, told it is on Windows with the libraries, does advertise it")
-    void theCompanionRuleGrantsIt(@TempDir Path directory) throws IOException {
-        Path binary = stage(directory);
+    void theCompanionRuleGrantsIt(Release release, @TempDir Path directory) throws IOException {
+        Path binary = stage(release, directory);
         for (String companion : CometCompanionGates.thermoRawWindows().fileNames()) {
             Files.writeString(directoryOf(binary).resolve(companion), "MZ");
         }
 
         Set<ToolCapability> observed =
                 new CometCapabilityProbe(runner(), List.of(CometCompanionGates.thermoRawWindows()))
-                        .probe(ToolName.COMET, VERSION, WINDOWS, binary);
+                        .probe(
+                                ToolName.COMET,
+                                ToolVersion.parse(release.version()),
+                                WINDOWS,
+                                binary);
 
         assertAll(
                 () -> assertTrue(observed.contains(ToolCapability.THERMO_RAW_WINDOWS)),
                 () -> assertTrue(observed.contains(ToolCapability.PEPXML_OUTPUT)));
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("releases")
     @DisplayName(
             "and with the libraries taken away it stops, which is the half that makes it a rule")
-    void theCompanionRuleWithholdsIt(@TempDir Path directory) throws IOException {
-        Path binary = stage(directory);
+    void theCompanionRuleWithholdsIt(Release release, @TempDir Path directory) throws IOException {
+        Path binary = stage(release, directory);
 
         Set<ToolCapability> observed =
                 new CometCapabilityProbe(runner(), List.of(CometCompanionGates.thermoRawWindows()))
-                        .probe(ToolName.COMET, VERSION, WINDOWS, binary);
+                        .probe(
+                                ToolName.COMET,
+                                ToolVersion.parse(release.version()),
+                                WINDOWS,
+                                binary);
 
         assertFalse(observed.contains(ToolCapability.THERMO_RAW_WINDOWS), observed.toString());
     }
 
-    @Test
-    @DisplayName("-p declares 96 parameters and -q declares 118, which is why -q is a capability")
-    void theTwoParameterCounts(@TempDir Path directory) throws IOException {
-        Path binary = stage(directory);
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("releases")
+    @DisplayName("-p declares fewer parameters than -q's 118, which is why -q is a capability")
+    void theTwoParameterCounts(Release release, @TempDir Path directory) throws IOException {
+        Path binary = stage(release, directory);
         Path defaults = Files.createDirectories(directory.resolve("defaults"));
         Path complete = Files.createDirectories(directory.resolve("complete"));
 
@@ -184,8 +235,8 @@ class CometRealBinaryTest {
         assertAll(
                 () -> assertTrue(defaultRun.exitedZero()),
                 () -> assertTrue(completeRun.exitedZero()),
-                () -> assertEquals(96, declaredByDefault.size()),
-                () -> assertEquals(118, declaredByComplete.size()),
+                () -> assertEquals(release.defaultCount(), declaredByDefault.size()),
+                () -> assertEquals(release.completeCount(), declaredByComplete.size()),
                 () ->
                         assertTrue(
                                 declaredByComplete.containsAll(declaredByDefault),
@@ -197,10 +248,11 @@ class CometRealBinaryTest {
                 () -> assertTrue(declaredByComplete.contains(CometCapabilityProbe.PIN_PARAMETER)));
     }
 
-    @Test
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("releases")
     @DisplayName("the banner arrives on standard output for -q, so both streams have to be read")
-    void theBannerStream(@TempDir Path directory) throws IOException {
-        Path binary = stage(directory);
+    void theBannerStream(Release release, @TempDir Path directory) throws IOException {
+        Path binary = stage(release, directory);
         Path workspace = Files.createDirectories(directory.resolve("run"));
 
         ToolRunOutcome outcome =

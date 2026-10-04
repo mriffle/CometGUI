@@ -293,6 +293,262 @@
       "minimumCometGuiVersion": "0.1.0"
     },
     {
+      "tool": "comet",
+      "version": "2026.03.0",
+      "releaseTag": "v2026.03.0",
+      "os": "linux",
+      "arch": "x86-64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/UWPR/Comet/releases/download/v2026.03.0/comet.linux.exe",
+      "sizeBytes": 7077008,
+      "sha256": "ad93b4cf60c2ed7afc2f41b8a3a05567c3938d999f17deb7b3676bc1fa91e7ed",
+      "md5": "6bbfe4bb8f7eebac7c6be02dcac125ce",
+      "expectedExecutablePath": "bin/comet",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.03.0/LICENSE",
+        "note": "upstream LICENSE at tag v2026.03.0 (commit fa08489, 366 lines, sha256 a7bb1f78b5882641776f794373c0b52bebfa465974c6eee74f6f88f3d5d39744, byte-identical to the v2026.02.2 file) opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022) and the Thermo Fisher RawFileReader notice; recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
+      },
+      "companions": [],
+      "capabilities": [
+        {
+          "capability": "PEPXML_OUTPUT",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by the Comet 2026.03.0 intake on 2026-10-04 (binary sha256 ad93b4cf...91e7ed, banner \"2026.03 rev. 0 (fa08489)\"): a decoy search of each of the two D-006 K562 mzML files against the UniProt human FASTA, scan ranges 11000-11400 and 10000-10400, exited 0 and wrote a .pep.xml beside each input, holding 194 and 363 spectrum_query elements"
+        },
+        {
+          "capability": "PIN_OUTPUT",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by the Comet 2026.03.0 intake on 2026-10-04: the same two searches wrote a .pin beside each input, with 549 target and 421 decoy rows, and 1059 target and 756 decoy rows"
+        },
+        {
+          "capability": "COMPLETE_PARAMS_QUERY",
+          "evidence": "observed-by-execution",
+          "note": "run on linux-x86-64 by the Comet 2026.03.0 intake on 2026-10-04: comet -q wrote 118 parameters against comet -p's 95, the same 118 names as 2026.02.2's -q; captured as the cometgui-params-comet fixture for 2026.03.0"
+        }
+      ],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "glibcxx": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "comet",
+      "version": "2026.03.0",
+      "releaseTag": "v2026.03.0",
+      "os": "linux",
+      "arch": "aarch64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/UWPR/Comet/releases/download/v2026.03.0/comet.aarch64.linux.exe",
+      "sizeBytes": 6537888,
+      "sha256": "671f23fb49d9efec8e5a246f21f273aae1a404d020219f5965ab80b724ff95b6",
+      "md5": "4b56a297c09d6ce87a51758b6cb11d3f",
+      "expectedExecutablePath": "bin/comet",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.03.0/LICENSE",
+        "note": "upstream LICENSE at tag v2026.03.0 (commit fa08489, 366 lines, sha256 a7bb1f78b5882641776f794373c0b52bebfa465974c6eee74f6f88f3d5d39744, byte-identical to the v2026.02.2 file) opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022) and the Thermo Fisher RawFileReader notice; recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
+      },
+      "companions": [],
+      "capabilities": [
+        {
+          "capability": "PEPXML_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for linux-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.03.0, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "PIN_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for linux-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.03.0, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "COMPLETE_PARAMS_QUERY",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for linux-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.03.0, and the host probe decides (R-TOOL-07)."
+        }
+      ],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "glibcxx": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "comet",
+      "version": "2026.03.0",
+      "releaseTag": "v2026.03.0",
+      "os": "macos",
+      "arch": "aarch64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/UWPR/Comet/releases/download/v2026.03.0/comet.aarch64.macos.exe",
+      "sizeBytes": 4125080,
+      "sha256": "41363c9d45cb17e0690c2de4c545793b7249e3f763cfa012b1582e2de0f00f00",
+      "md5": "56f4675c9be8548360a6b40d0ce2202c",
+      "expectedExecutablePath": "bin/comet",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.03.0/LICENSE",
+        "note": "upstream LICENSE at tag v2026.03.0 (commit fa08489, 366 lines, sha256 a7bb1f78b5882641776f794373c0b52bebfa465974c6eee74f6f88f3d5d39744, byte-identical to the v2026.02.2 file) opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022) and the Thermo Fisher RawFileReader notice; recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
+      },
+      "companions": [],
+      "capabilities": [
+        {
+          "capability": "PEPXML_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for macos-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.03.0, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "PIN_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for macos-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.03.0, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "COMPLETE_PARAMS_QUERY",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for macos-aarch64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.03.0, and the host probe decides (R-TOOL-07)."
+        }
+      ],
+      "advisories": [],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "glibcxx": null,
+        "macos": null,
+        "requiredHostLibraries": []
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
+      "tool": "comet",
+      "version": "2026.03.0",
+      "releaseTag": "v2026.03.0",
+      "os": "windows",
+      "arch": "x86-64",
+      "kind": "BARE_EXECUTABLE",
+      "url": "https://github.com/UWPR/Comet/releases/download/v2026.03.0/comet.win64.exe",
+      "sizeBytes": 3525120,
+      "sha256": "b9f243fe46234d72e87a3f650a79b22fa102faa5043a898bfbeff3d0e474a32f",
+      "md5": "185500a6fe07e627da6acdd80cbcf122",
+      "expectedExecutablePath": "bin/comet.exe",
+      "executable": true,
+      "licence": {
+        "spdx": "Apache-2.0",
+        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.03.0/LICENSE",
+        "note": "upstream LICENSE at tag v2026.03.0 (commit fa08489, 366 lines, sha256 a7bb1f78b5882641776f794373c0b52bebfa465974c6eee74f6f88f3d5d39744, byte-identical to the v2026.02.2 file) opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022) and the Thermo Fisher RawFileReader notice; recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
+      },
+      "companions": [
+        {
+          "id": "comet-2026-03-0-thermo-cometwrapper",
+          "kind": "BARE_EXECUTABLE",
+          "url": "https://github.com/UWPR/Comet/releases/download/v2026.03.0/CometWrapper.dll",
+          "sizeBytes": 4494336,
+          "sha256": "e507772ee5245fd91b314c0c4d2fa7322342d659d21a221aa56f8f0867697aa1",
+          "md5": "c77103f91d210fbaef2e48b66a1d92fe",
+          "runtimePrerequisite": true,
+          "gatesCapability": "THERMO_RAW_WINDOWS",
+          "note": "R-TOOL-02 names this library among the three Thermo companions, so it gates THERMO_RAW_WINDOWS here as on 2026.02.2. The 2026.03.0 intake read the bytes on 2026-10-04 and records what it found rather than dropping the requirement on its own authority: comet.win64.exe's PE import table and its .NET assembly references name ThermoFisher.CommonCore.Data and ThermoFisher.CommonCore.RawFileReader and not this library, and upstream's release README says neither wrapper is needed to run comet.win64.exe. Requiring it can only withhold the capability, never claim it falsely. CometWrapperCore.dll and Ijwhost.dll, also published in v2026.03.0, are a .NET 8 build of this wrapper and its loader shim for real-time search callers; comet.win64.exe references neither, so neither is a companion.",
+          "members": [
+            {
+              "path": "CometWrapper.dll",
+              "sizeBytes": 4494336,
+              "sha256": "e507772ee5245fd91b314c0c4d2fa7322342d659d21a221aa56f8f0867697aa1",
+              "md5": "c77103f91d210fbaef2e48b66a1d92fe",
+              "installedPath": "bin/CometWrapper.dll"
+            }
+          ]
+        },
+        {
+          "id": "comet-2026-03-0-thermo-commoncore-data",
+          "kind": "BARE_EXECUTABLE",
+          "url": "https://github.com/UWPR/Comet/releases/download/v2026.03.0/ThermoFisher.CommonCore.Data.dll",
+          "sizeBytes": 406016,
+          "sha256": "8b10b14f885c00619a90d0a8434d08098f3bdffcc260d59feb00ea8b7efbc139",
+          "md5": "a2280fe49a7a7e0a8d5dd3224da2fd05",
+          "runtimePrerequisite": true,
+          "gatesCapability": "THERMO_RAW_WINDOWS",
+          "note": "Comet reads Thermo RAW files on Windows only with this library installed beside comet.exe. R-TOOL-02 requires an install missing it not to advertise THERMO_RAW_WINDOWS; gatesCapability above makes that a fact in the manifest rather than a conditional in code. comet.win64.exe's .NET assembly references name it; the bytes are identical to v2026.02.2's.",
+          "members": [
+            {
+              "path": "ThermoFisher.CommonCore.Data.dll",
+              "sizeBytes": 406016,
+              "sha256": "8b10b14f885c00619a90d0a8434d08098f3bdffcc260d59feb00ea8b7efbc139",
+              "md5": "a2280fe49a7a7e0a8d5dd3224da2fd05",
+              "installedPath": "bin/ThermoFisher.CommonCore.Data.dll"
+            }
+          ]
+        },
+        {
+          "id": "comet-2026-03-0-thermo-commoncore-rawfilereader",
+          "kind": "BARE_EXECUTABLE",
+          "url": "https://github.com/UWPR/Comet/releases/download/v2026.03.0/ThermoFisher.CommonCore.RawFileReader.dll",
+          "sizeBytes": 650752,
+          "sha256": "a9b2fc190367881c6541291caf57e114f7d305a10ba933ccbb0040d3a8a33888",
+          "md5": "dd9e2c51610f96b908d5e7f7de4cbfb5",
+          "runtimePrerequisite": true,
+          "gatesCapability": "THERMO_RAW_WINDOWS",
+          "note": "Comet reads Thermo RAW files on Windows only with this library installed beside comet.exe. R-TOOL-02 requires an install missing it not to advertise THERMO_RAW_WINDOWS; gatesCapability above makes that a fact in the manifest rather than a conditional in code. comet.win64.exe's .NET assembly references name it; the bytes are identical to v2026.02.2's.",
+          "members": [
+            {
+              "path": "ThermoFisher.CommonCore.RawFileReader.dll",
+              "sizeBytes": 650752,
+              "sha256": "a9b2fc190367881c6541291caf57e114f7d305a10ba933ccbb0040d3a8a33888",
+              "md5": "dd9e2c51610f96b908d5e7f7de4cbfb5",
+              "installedPath": "bin/ThermoFisher.CommonCore.RawFileReader.dll"
+            }
+          ]
+        }
+      ],
+      "capabilities": [
+        {
+          "capability": "PEPXML_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for windows-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.03.0, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "PIN_OUTPUT",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for windows-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.03.0, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "COMPLETE_PARAMS_QUERY",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for windows-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.03.0, and the host probe decides (R-TOOL-07)."
+        },
+        {
+          "capability": "THERMO_RAW_WINDOWS",
+          "evidence": "unverified",
+          "note": "no Comet 2026.03.0 binary for windows-x86-64 has ever been run anywhere in this project. This capability is additionally gated on the three Thermo companion downloads below: an install missing any of them must not advertise it (R-TOOL-02)."
+        }
+      ],
+      "advisories": [
+        {
+          "id": "comet.windows-needs-visual-cpp-runtime",
+          "text": "comet.win64.exe is the bare executable and ships no Visual C++ runtime: its import table names MSVCP140.dll, MSVCP140_ATOMIC_WAIT.dll, VCRUNTIME140.dll and VCRUNTIME140_1.dll, which the host must already provide; their absence is a loader failure naming the DLL. It also loads the .NET Framework (mscoree.dll) to read Thermo RAW files."
+        }
+      ],
+      "minimumHostRequirements": {
+        "glibc": null,
+        "glibcxx": null,
+        "macos": null,
+        "requiredHostLibraries": [
+          "MSVCP140.dll",
+          "MSVCP140_ATOMIC_WAIT.dll",
+          "VCRUNTIME140.dll",
+          "VCRUNTIME140_1.dll"
+        ]
+      },
+      "minimumCometGuiVersion": "0.1.0"
+    },
+    {
       "tool": "percolator",
       "version": "3.07.1",
       "releaseTag": "rel-3-07-01",

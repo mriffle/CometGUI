@@ -56,8 +56,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.testfx.api.FxToolkit;
 
 /**
- * Gate item 1 against the real world: the same four installs, pressed in the same interface, with
- * the bytes fetched from GitHub over TLS.
+ * Gate item 1 against the real world: the same four tools, pressed in the same interface, with the
+ * bytes fetched from GitHub over TLS -- and Comet twice, the default 2026.03.0 and the 2026.02.2 it
+ * superseded and still offers (D-010).
  *
  * <h2>How to run it</h2>
  *
@@ -68,10 +69,10 @@ import org.testfx.api.FxToolkit;
  *     -Dtest=UpstreamInstallUiTest -Dsurefire.failIfNoSpecifiedTests=false test
  * }</pre>
  *
- * <p>It moves <strong>115 982 855 bytes</strong> from five URLs on three GitHub repositories'
- * release assets. Measured on this project's build host, the whole class ran in <strong>11.4
- * s</strong>; the cost is the connection rather than the work, so a slower one takes proportionally
- * longer and nothing here assumes otherwise.
+ * <p>It moves <strong>123 059 863 bytes</strong> from six URLs on three GitHub repositories'
+ * release assets. Measured on this project's build host with five URLs, the whole class ran in
+ * <strong>11.4 s</strong>; the cost is the connection rather than the work, so a slower one takes
+ * proportionally longer and nothing here assumes otherwise.
  *
  * <h2>The network test does not run in the ordinary build</h2>
  *
@@ -79,8 +80,8 @@ import org.testfx.api.FxToolkit;
  * goes red because a release host is having a bad afternoon teaches people to ignore it. The opt-in
  * half is therefore skipped <em>with a stated reason</em>, which surefire records, rather than
  * passing while doing nothing -- and the other half of this class <strong>always runs</strong>, so
- * the gate is not vacuous when the flag is absent: it pins the five URLs, their sizes and the
- * scheme against the shipped manifest, and goes red if the manifest moves under a stale copy.
+ * the gate is not vacuous when the flag is absent: it pins the six URLs, their sizes and the scheme
+ * against the shipped manifest, and goes red if the manifest moves under a stale copy.
  *
  * <h2>What it adds to {@code ToolManagerInstallUiTest}</h2>
  *
@@ -109,24 +110,26 @@ class UpstreamInstallUiTest {
                     Optional.of(GlibcVersion.parse("2.36")),
                     Optional.of(GlibcVersion.parse("3.4.30")));
 
-    private static final String COMET_ROW = "comet-2026_02_2-1";
+    private static final String COMET_ROW = "comet-2026_03_0-1";
+    private static final String OLDER_COMET_ROW = "comet-2026_02_2-1";
     private static final String PERCOLATOR_ROW = "percolator-3_07_1-1";
     private static final String PDV_ROW = "pdv-2_7_0-1";
     private static final String CONVERTER_ROW = "limelight-converter-2_8_1-1";
 
+    /** The four tools, with both Comet releases the manifest offers on this host. */
     private static final List<String> THE_FOUR =
-            List.of(COMET_ROW, PERCOLATOR_ROW, PDV_ROW, CONVERTER_ROW);
+            List.of(COMET_ROW, OLDER_COMET_ROW, PERCOLATOR_ROW, PDV_ROW, CONVERTER_ROW);
 
     /**
      * Every URL this test fetches and how large upstream says it is, typed out here.
      *
-     * <p>Five entries for four tools: Percolator's row fetches its portable zip <em>and</em> the
+     * <p>Six entries for five rows: Percolator's row fetches its portable zip <em>and</em> the
      * Debian package the two XSD companions are taken out of.
      */
     private static final Map<String, Long> UPSTREAM_TRANSFER = upstreamTransfer();
 
-    /** The sum of the five, typed out rather than added up by the code under test. */
-    private static final long UPSTREAM_TOTAL_BYTES = 115_982_855L;
+    /** The sum of the six, typed out rather than added up by the code under test. */
+    private static final long UPSTREAM_TOTAL_BYTES = 123_059_863L;
 
     @TempDir private Path temporary;
 
@@ -139,6 +142,9 @@ class UpstreamInstallUiTest {
 
     private static Map<String, Long> upstreamTransfer() {
         Map<String, Long> transfer = new LinkedHashMap<>();
+        transfer.put(
+                "https://github.com/UWPR/Comet/releases/download/v2026.03.0/comet.linux.exe",
+                7_077_008L);
         transfer.put(
                 "https://github.com/UWPR/Comet/releases/download/v2026.02.2/comet.linux.exe",
                 7_014_400L);
@@ -161,9 +167,11 @@ class UpstreamInstallUiTest {
     }
 
     @Test
-    @DisplayName("the opt-in install targets the five transfers the shipped manifest really pins")
+    @DisplayName("the opt-in install targets the six transfers the shipped manifest really pins")
     void theOptInInstallTargetsTheShippedManifest() throws IOException {
         Map<String, Long> shipped = new LinkedHashMap<>();
+        ArtefactRecord older = ArtefactMirror.record(ToolName.COMET, "2026.02.2", LINUX);
+        shipped.put(older.url().toString(), older.sizeBytes());
         for (ToolName tool :
                 List.of(
                         ToolName.COMET,
@@ -213,7 +221,7 @@ class UpstreamInstallUiTest {
             named = OPT_IN,
             matches = "true",
             disabledReason =
-                    "reaches github.com and moves 115 982 855 bytes; run with"
+                    "reaches github.com and moves 123 059 863 bytes; run with"
                             + " -Dcometgui.install.upstream=true. The ordinary build must not"
                             + " depend on upstream being reachable.")
     @DisplayName(
@@ -261,6 +269,24 @@ class UpstreamInstallUiTest {
                                     ui.textOf(UiIds.toolRowCapabilities(COMET_ROW))),
                     () ->
                             assertEquals(
+                                    "Capabilities: PEPXML_OUTPUT (observed-by-execution),"
+                                            + " PIN_OUTPUT (observed-by-execution),"
+                                            + " COMPLETE_PARAMS_QUERY (observed-by-execution)",
+                                    ui.textOf(UiIds.toolRowCapabilities(OLDER_COMET_ROW))),
+                    () ->
+                            assertTrue(
+                                    Files.isExecutable(
+                                            cacheRoot.resolve(
+                                                    "tools/comet/2026.3/linux-x86-64/bin/comet")),
+                                    "the default Comet is installed and executable"),
+                    () ->
+                            assertTrue(
+                                    Files.isExecutable(
+                                            cacheRoot.resolve(
+                                                    "tools/comet/2026.2.2/linux-x86-64/bin/comet")),
+                                    "and so is the release it superseded"),
+                    () ->
+                            assertEquals(
                                     "Capabilities: XML_OUTPUT (observed-by-execution),"
                                             + " XML_DECOY_OUTPUT (observed-by-execution)",
                                     ui.textOf(UiIds.toolRowCapabilities(PERCOLATOR_ROW)),
@@ -293,8 +319,8 @@ class UpstreamInstallUiTest {
                                     elapsedSeconds >= 0,
                                     "fetched "
                                             + UPSTREAM_TOTAL_BYTES
-                                            + " bytes from five real URLs, installed and probed"
-                                            + " four tools, in "
+                                            + " bytes from six real URLs, installed and probed"
+                                            + " five builds, in "
                                             + elapsedSeconds
                                             + " s"));
         }
@@ -302,7 +328,7 @@ class UpstreamInstallUiTest {
 
     private static ArtefactRecord recordFor(ToolName tool) throws IOException {
         return switch (tool) {
-            case COMET -> ArtefactMirror.record(tool, "2026.02.2", LINUX);
+            case COMET -> ArtefactMirror.record(tool, "2026.03.0", LINUX);
             case PERCOLATOR -> ArtefactMirror.record(tool, "3.07.1", LINUX);
             case PDV -> ArtefactMirror.record(tool, "2.7.0", LINUX);
             case LIMELIGHT_CONVERTER -> ArtefactMirror.record(tool, "2.8.1", LINUX);

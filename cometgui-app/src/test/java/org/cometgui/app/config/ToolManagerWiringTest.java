@@ -208,6 +208,7 @@ class ToolManagerWiringTest {
 
         assertEquals(
                 List.of(
+                        "comet 2026.03.0 NOT_INSTALLED",
                         "comet 2026.02.2 NOT_INSTALLED",
                         "percolator 3.09 UNAVAILABLE_ON_THIS_PLATFORM",
                         "percolator 3.07.1 NOT_INSTALLED",
@@ -287,6 +288,7 @@ class ToolManagerWiringTest {
                 () ->
                         assertEquals(
                                 List.of(
+                                        "comet 2026.03.0 NOT_INSTALLED",
                                         "comet 2026.02.2 NOT_INSTALLED",
                                         "percolator 3.09 UNAVAILABLE_ON_THIS_PLATFORM",
                                         "percolator 3.07.1 NOT_INSTALLED",

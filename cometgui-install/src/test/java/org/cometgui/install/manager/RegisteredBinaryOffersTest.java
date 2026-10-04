@@ -89,6 +89,7 @@ class RegisteredBinaryOffersTest {
      */
     private static List<String> theManifestsSixRows() {
         return List.of(
+                "comet 2026.03.0 MANAGED NOT_INSTALLED",
                 "comet 2026.02.2 MANAGED NOT_INSTALLED",
                 "percolator 3.09 MANAGED UNAVAILABLE_ON_THIS_PLATFORM",
                 "percolator 3.07.1 MANAGED NOT_INSTALLED",
@@ -123,6 +124,7 @@ class RegisteredBinaryOffersTest {
 
         assertEquals(
                 List.of(
+                        "comet 2026.03.0 MANAGED NOT_INSTALLED",
                         "comet 2026.02.2 MANAGED NOT_INSTALLED",
                         "percolator 3.09 MANAGED UNAVAILABLE_ON_THIS_PLATFORM",
                         "percolator 3.07.1 MANAGED NOT_INSTALLED",
@@ -159,6 +161,7 @@ class RegisteredBinaryOffersTest {
                 () ->
                         assertEquals(
                                 List.of(
+                                        "comet 2026.03.0 MANAGED NOT_INSTALLED",
                                         "comet 2026.02.2 MANAGED NOT_INSTALLED",
                                         "percolator 3.09 MANAGED UNAVAILABLE_ON_THIS_PLATFORM",
                                         "percolator 3.07.1 MANAGED NOT_INSTALLED",
@@ -197,11 +200,11 @@ class RegisteredBinaryOffersTest {
         harness.manager().registerLocalBinary(ToolName.PERCOLATOR, binary);
 
         assertAll(
-                () -> assertEquals("percolator 3.05 LOCAL INSTALLED", before.get(4)),
+                () -> assertEquals("percolator 3.05 LOCAL INSTALLED", theOneLocalRow(before)),
                 () ->
                         assertEquals(
                                 "percolator 3.07.1 LOCAL INSTALLED",
-                                rows(harness.manager().offers()).get(4),
+                                theOneLocalRow(rows(harness.manager().offers())),
                                 "the file at that path changed under the user and asking again is"
                                         + " how they say so"));
     }
@@ -226,6 +229,7 @@ class RegisteredBinaryOffersTest {
 
         assertEquals(
                 List.of(
+                        "comet 2026.03.0 MANAGED NOT_INSTALLED",
                         "comet 2026.02.2 MANAGED NOT_INSTALLED",
                         "comet 2026.01.1 LOCAL INSTALLED",
                         "percolator 3.09 MANAGED UNAVAILABLE_ON_THIS_PLATFORM",
@@ -314,5 +318,16 @@ class RegisteredBinaryOffersTest {
                 Optional.empty(),
                 Optional.of(executable),
                 OptionalLong.empty());
+    }
+
+    /*
+     * The single row a registration produced, found by its origin rather than by its position: a
+     * release added to the manifest moves every row after it, and an index would then read some
+     * other row and fail for a reason unrelated to the registration under test.
+     */
+    private static String theOneLocalRow(List<String> rows) {
+        List<String> local = rows.stream().filter(row -> row.contains(" LOCAL ")).toList();
+        assertEquals(1, local.size(), () -> "one LOCAL row expected: " + rows);
+        return local.get(0);
     }
 }

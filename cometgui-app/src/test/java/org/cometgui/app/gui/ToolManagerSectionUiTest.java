@@ -126,10 +126,10 @@ class ToolManagerSectionUiTest {
                                 "every release in manifests/tools.json has a row, and the section"
                                         + " shows no build the manifest does not name (gate item"
                                         + " 8)"),
-                () -> assertEquals(6, renderedBuilds().size()),
+                () -> assertEquals(7, renderedBuilds().size()),
                 () ->
                         assertEquals(
-                                "6 tool builds on this host.", textOf(UiIds.TOOL_MANAGER_SUMMARY)));
+                                "7 tool builds on this host.", textOf(UiIds.TOOL_MANAGER_SUMMARY)));
     }
 
     @Test

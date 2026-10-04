@@ -18,7 +18,9 @@ package org.cometgui.install.probe;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,6 +30,7 @@ import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.ToolName;
+import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.install.registry.ArtefactManifest;
 import org.cometgui.install.registry.ArtefactRecord;
 import org.cometgui.install.testing.Nulls;
@@ -40,6 +43,13 @@ import org.junit.jupiter.api.Test;
  * row for one of its three managed versions, which is exactly the case this class is for.
  */
 class ManifestAlternativesTest {
+
+    /**
+     * The Comet release that publishes both a native and an x86-64 macOS build. 2026.03.0 does not:
+     * the file upstream names {@code comet.macos.exe} is an arm64 build, so its manifest has no
+     * macos-x86-64 row.
+     */
+    private static final ToolVersion TWO_MACOS_BUILDS = ToolVersion.parse("2026.02.2");
 
     private static final HostRuntimeVersions DEBIAN_12 =
             new HostRuntimeVersions(
@@ -78,9 +88,20 @@ class ManifestAlternativesTest {
                 new ManifestAlternatives(ProbeRecords.shipped(), appleSilicon, DEBIAN_12)
                         .forArtefact(nativeComet);
 
+        assertAll(
+                () ->
+                        assertFalse(
+                                alternatives.contains(nativeComet.describe()),
+                                "the failing row itself is never its own alternative: "
+                                        + alternatives),
+                () ->
+                        assertTrue(
+                                alternatives.size() > sameRelease(alternatives, nativeComet).size(),
+                                "and the other Comet releases that run here are named too: "
+                                        + alternatives));
         assertEquals(
                 List.of("comet 2026.02.2 macos-x86-64"),
-                alternatives,
+                sameRelease(alternatives, nativeComet),
                 "Comet publishes TWO macOS builds of one version and D-004 says the x86-64 one runs"
                         + " on Apple silicon under Rosetta 2, so "
                         + "a native build that will not load has"
@@ -98,8 +119,10 @@ class ManifestAlternativesTest {
 
         assertEquals(
                 List.of("comet 2026.02.2 macos-aarch64"),
-                new ManifestAlternatives(ProbeRecords.shipped(), appleSilicon, DEBIAN_12)
-                        .forArtefact(translatedComet),
+                sameRelease(
+                        new ManifestAlternatives(ProbeRecords.shipped(), appleSilicon, DEBIAN_12)
+                                .forArtefact(translatedComet),
+                        translatedComet),
                 "the rule is about which ROW failed, not which of the two is preferred");
     }
 
@@ -205,6 +228,7 @@ class ManifestAlternativesTest {
             throws IOException {
         return ProbeRecords.shipped().select(host, ToolName.COMET).stream()
                 .map(selection -> selection.artefact())
+                .filter(record -> record.version().equals(TWO_MACOS_BUILDS))
                 .filter(record -> record.platform().architecture() == builtFor)
                 .findFirst()
                 .orElseThrow(
@@ -215,6 +239,18 @@ class ManifestAlternativesTest {
                                                 + " Comet build on "
                                                 + host.id()
                                                 + "; this case exists because it offers two"));
+    }
+
+    /*
+     * The alternatives that are the failing build's own release.  The defect these sibling cases
+     * exist for is the exclusion keyed on the VERSION, which removes the same-release sibling and
+     * leaves the other releases standing; since the manifest names 2026.03.0 as well, "nothing is
+     * left" is no longer what that defect looks like in the whole list, but it still is in this
+     * slice of it, which is where the sibling relation lives.
+     */
+    private static List<String> sameRelease(List<String> alternatives, ArtefactRecord failing) {
+        String release = failing.tool().id() + " " + failing.version().text() + " ";
+        return alternatives.stream().filter(described -> described.startsWith(release)).toList();
     }
 
     private static ManifestAlternatives alternatives(HostRuntimeVersions versions)

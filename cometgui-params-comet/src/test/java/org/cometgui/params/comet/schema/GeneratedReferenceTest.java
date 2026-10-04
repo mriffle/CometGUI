@@ -39,6 +39,9 @@ import java.util.regex.Pattern;
 import org.cometgui.domain.ports.ProcessListener;
 import org.cometgui.domain.ports.RunningProcess;
 import org.cometgui.domain.ports.ToolCommand;
+import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.params.comet.fixtures.CometFixtures;
+import org.cometgui.params.comet.fixtures.CometManifest;
 import org.cometgui.params.comet.fixtures.ParamsFiles;
 import org.cometgui.params.comet.fixtures.UpstreamMirror;
 import org.cometgui.params.comet.model.CometParameters;
@@ -91,6 +94,19 @@ class GeneratedReferenceTest {
 
     /** An enzyme row sits in a top-level literal block: 3 spaces. */
     private static final String ENZYME_ROW_INDENT = "   ";
+
+    /** One release's serialisation block: its heading, a blank line, then the literal lines. */
+    private static final Pattern DEFAULT_BLOCK =
+            Pattern.compile(
+                    "\\n   Comet (\\S+), the default as the canonical writer emits it"
+                            + "[^\\n]*::\\n\\n((?:      [^\\n]*\\n)+)");
+
+    /** One release's enzyme table, as written: the header line, then one row per line. */
+    private static final Pattern ENZYME_BLOCK =
+            Pattern.compile(
+                    "rows Comet (\\S+) writes by default.*?As written::\\n\\n"
+                            + "   \\[COMET_ENZYME_INFO\\]\\n((?:   [^\\n]*\\n)+)",
+                    Pattern.DOTALL);
 
     private static final CuratedMetadata METADATA = MetadataLoader.loadBundled();
 
@@ -193,71 +209,135 @@ class GeneratedReferenceTest {
     }
 
     @Test
-    @DisplayName("every default line on the page is the canonical writer's line for the default")
-    void defaultLinesAreTheCanonicalWritersLines() {
-        CometParameters defaults =
-                CometParameters.defaults(METADATA, ParamsFiles.COMET, defaultEnzymeTable());
-        String canonical = new CanonicalParamsWriter(ParamsFiles.build()).write(defaults);
-        Map<String, String> lines = new LinkedHashMap<>();
-        for (String line : canonical.split("\n", -1)) {
-            Matcher declaration = DECLARATION.matcher(line);
-            if (declaration.find()) {
-                lines.put(declaration.group(1), line);
-            }
-        }
+    @DisplayName(
+            "under each installed release, every default line on the page is the canonical"
+                    + " writer's line for that release's default")
+    void defaultLinesAreTheCanonicalWritersLines() throws IOException {
+        /*
+         * The page renders one serialisation block per release the manifest installs, headed
+         * "Comet <version>, the default as the canonical writer emits it".  Since the intake's
+         * unit 2 that is two releases, and their lines differ where a version record overrides a
+         * default or a comment (index_search_type, decoy_search, ...).  So each release's lines
+         * are compared with the canonical writer's output FOR THAT RELEASE, inside that release's
+         * blocks only -- a page that printed 2026.02.2's line under 2026.03.0 goes red.
+         */
+        Map<String, List<String>> blocks = defaultBlocksByVersion();
         assertEquals(
-                METADATA.parametersFor(ParamsFiles.COMET).stream()
-                        .map(ParameterDefinition::name)
-                        .toList(),
-                List.copyOf(lines.keySet()),
-                "the canonical writer declares every modelled parameter once, in order");
+                installedVersions(),
+                List.copyOf(blocks.keySet()),
+                "the page carries a default block for exactly the releases the manifest installs");
         List<String> wrong = new ArrayList<>();
-        for (Map.Entry<String, String> entry : lines.entrySet()) {
-            int found = occurrences(fragment, "\n" + DEFAULT_LINE_INDENT + entry.getValue() + "\n");
-            if (found != 1) {
-                wrong.add(entry.getKey() + " (" + found + "x): " + entry.getValue());
+        for (String version : installedVersions()) {
+            ToolVersion release = ToolVersion.parse(version);
+            CometParameters defaults =
+                    CometParameters.defaults(METADATA, release, defaultEnzymeTable(version));
+            String canonical = new CanonicalParamsWriter(ParamsFiles.build()).write(defaults);
+            Map<String, String> lines = new LinkedHashMap<>();
+            for (String line : canonical.split("\n", -1)) {
+                Matcher declaration = DECLARATION.matcher(line);
+                if (declaration.find()) {
+                    lines.put(declaration.group(1), line);
+                }
+            }
+            assertEquals(
+                    METADATA.parametersFor(release).stream()
+                            .map(ParameterDefinition::name)
+                            .toList(),
+                    List.copyOf(lines.keySet()),
+                    "the canonical writer declares every modelled parameter of Comet "
+                            + version
+                            + " once, in order");
+            List<String> rendered = blocks.get(version);
+            for (Map.Entry<String, String> entry : lines.entrySet()) {
+                long found = rendered.stream().filter(entry.getValue()::equals).count();
+                if (found != 1) {
+                    wrong.add(
+                            "Comet "
+                                    + version
+                                    + " "
+                                    + entry.getKey()
+                                    + " ("
+                                    + found
+                                    + "x): "
+                                    + entry.getValue());
+                }
             }
         }
         assertTrue(
                 wrong.isEmpty(),
                 () ->
                         wrong.size()
-                                + " of "
-                                + lines.size()
-                                + " canonical default lines are not on the page exactly once;"
-                                + " the first: "
+                                + " canonical default line(s) are not on the page exactly once"
+                                + " under their release; the first: "
                                 + wrong.subList(0, Math.min(3, wrong.size())));
     }
 
     @Test
-    @DisplayName("every default enzyme row on the page is the canonical writer's row")
-    void enzymeRowsAreTheCanonicalWritersRows() {
-        List<String> rows = EnzymeTableCodec.format(defaultEnzymeTable());
-        assertEquals(12, rows.size(), "Comet 2026.02.2 writes twelve default rows");
-        for (String row : rows) {
+    @DisplayName(
+            "under each installed release, every default enzyme row on the page is the canonical"
+                    + " writer's row")
+    void enzymeRowsAreTheCanonicalWritersRows() throws IOException {
+        Map<String, List<String>> tables = enzymeBlocksByVersion();
+        assertEquals(
+                installedVersions(),
+                List.copyOf(tables.keySet()),
+                "the page carries an enzyme table for exactly the releases the manifest installs");
+        for (String version : installedVersions()) {
+            List<String> rows = EnzymeTableCodec.format(defaultEnzymeTable(version));
+            assertEquals(12, rows.size(), "Comet " + version + " writes twelve default rows");
             assertEquals(
-                    1,
-                    occurrences(fragment, "\n" + ENZYME_ROW_INDENT + row + "\n"),
-                    () -> "the enzyme row " + row);
+                    rows,
+                    tables.get(version),
+                    "the rows written under Comet " + version + "'s table are its own, in order");
         }
     }
 
-    private static EnzymeTable defaultEnzymeTable() {
-        return new CometParamsParser(METADATA, ParamsFiles.COMET)
-                .parse(ParamsFiles.complete())
+    /** The releases the shipped manifest installs, oldest first, as the generator orders them. */
+    private static List<String> installedVersions() throws IOException {
+        List<String> versions =
+                new ArrayList<>(CometManifest.cometVersions(CometManifest.repositoryManifest()));
+        versions.sort((a, b) -> ToolVersion.parse(a).compareTo(ToolVersion.parse(b)));
+        return versions;
+    }
+
+    /** Each release's default lines, gathered from every block headed with that release. */
+    private static Map<String, List<String>> defaultBlocksByVersion() {
+        Map<String, List<String>> blocks = new LinkedHashMap<>();
+        Matcher heading = DEFAULT_BLOCK.matcher(fragment);
+        while (heading.find()) {
+            List<String> lines = blocks.computeIfAbsent(heading.group(1), v -> new ArrayList<>());
+            for (String line : heading.group(2).split("\n")) {
+                lines.add(line.substring(DEFAULT_LINE_INDENT.length()));
+            }
+        }
+        return blocks;
+    }
+
+    /** Each release's enzyme rows, from the literal block under that release's table. */
+    private static Map<String, List<String>> enzymeBlocksByVersion() {
+        Map<String, List<String>> tables = new LinkedHashMap<>();
+        Matcher table = ENZYME_BLOCK.matcher(fragment);
+        while (table.find()) {
+            List<String> rows = new ArrayList<>();
+            for (String line : table.group(2).split("\n")) {
+                rows.add(line.substring(ENZYME_ROW_INDENT.length()));
+            }
+            tables.put(table.group(1), rows);
+        }
+        return tables;
+    }
+
+    private static EnzymeTable defaultEnzymeTable(String version) throws IOException {
+        String complete =
+                new String(
+                        CometFixtures.bytes(
+                                version, CometFixtures.LINUX_X86_64, CometFixtures.Mode.COMPLETE),
+                        StandardCharsets.UTF_8);
+        return new CometParamsParser(METADATA, ToolVersion.parse(version))
+                .parse(complete)
                 .model()
                 .orElseThrow()
                 .enzymeTable();
-    }
-
-    private static int occurrences(String text, String wanted) {
-        int count = 0;
-        int from = text.indexOf(wanted);
-        while (from >= 0) {
-            count++;
-            from = text.indexOf(wanted, from + 1);
-        }
-        return count;
     }
 
     /** Collects both streams and the exit code, on the process service's threads. */

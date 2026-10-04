@@ -143,13 +143,14 @@ class ManagedToolManagerOffersTest {
     }
 
     @Test
-    @DisplayName("and on linux-x86-64 those rows are, written out by hand, exactly these six")
+    @DisplayName("and on linux-x86-64 those rows are, written out by hand, exactly these seven")
     void theRowsAScientistSeesOnLinux() throws IOException {
         /*
          * Hand-typed from manifests/tools.json, not derived: the test above walks the manifest the
-         * same way the production code does, so it would agree with a shared misreading.  Six rows
-         * -- Comet's one Linux build, Percolator's three releases of which 3.09 publishes nothing
-         * for Linux at all, PDV and the converter.
+         * same way the production code does, so it would agree with a shared misreading.  Seven
+         * rows -- Comet's two releases, one Linux build each and the newer first (D-010 makes
+         * 2026.03.0 the default and keeps 2026.02.2 offered), Percolator's three releases of which
+         * 3.09 publishes nothing for Linux at all, PDV and the converter.
          *
          * THE TWO PERCOLATOR FIGURES ARE SUMS AND THE OTHERS ARE NOT, which is why they are written
          * out.  3.07.1 is 946 303 + 1 852 660 = 2 798 963 and 3.06.5 is 917 285 + 1 882 696 =
@@ -159,6 +160,7 @@ class ManagedToolManagerOffersTest {
          */
         List<String> expected =
                 List.of(
+                        "comet 2026.03.0 NOT_INSTALLED 7077008",
                         "comet 2026.02.2 NOT_INSTALLED 7014400",
                         "percolator 3.09 UNAVAILABLE_ON_THIS_PLATFORM no-download",
                         "percolator 3.07.1 NOT_INSTALLED 2798963",
@@ -169,6 +171,58 @@ class ManagedToolManagerOffersTest {
         List<ToolOffer> offers = harness().manager().offers();
 
         assertEquals(expected, offers.stream().map(ManagedToolManagerOffersTest::row).toList());
+    }
+
+    @Test
+    @DisplayName(
+            "the first Comet the Tool Manager offers is the newest release the manifest names,"
+                    + " and every older release is still offered after it")
+    void theDefaultCometIsTheNewestReleaseTheManifestNames() throws IOException {
+        /*
+         * D-010 (2026-10-04): 2026.03.0 is the default verified Comet and 2026.02.2 stays offered.
+         * There is no "default" field anywhere: the default is the first row the port offers for
+         * the tool, and that order is the manifest's releases newest first.  So the expectation is
+         * derived from the manifest -- the newest Comet version among its rows, by ToolVersion's
+         * numeric order -- and then held to the decision's own words, so that a manifest that
+         * stopped naming 2026.03.0, or an order that stopped being newest-first, both go red.
+         */
+        ArtefactManifest manifest = ToolManagerFixtures.shippedManifest();
+        List<ToolVersion> cometReleases =
+                manifest.artefacts().stream()
+                        .filter(record -> record.tool() == ToolName.COMET)
+                        .map(ArtefactRecord::version)
+                        .distinct()
+                        .sorted(Comparator.reverseOrder())
+                        .toList();
+
+        List<ToolVersion> offered =
+                harness().manager().offers().stream()
+                        .filter(offer -> offer.tool() == ToolName.COMET)
+                        .map(ToolOffer::version)
+                        .toList();
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                cometReleases,
+                                offered,
+                                "every Comet release the manifest names is offered on"
+                                        + " linux-x86-64, newest first"),
+                () ->
+                        assertEquals(
+                                "2026.03.0",
+                                offered.get(0).text(),
+                                "D-010: the default -- the first Comet offered -- is 2026.03.0"),
+                () ->
+                        assertEquals(
+                                cometReleases.get(0),
+                                offered.get(0),
+                                "and it is the default because it is the newest, not because"
+                                        + " anything names it"),
+                () ->
+                        assertTrue(
+                                offered.contains(ToolVersion.parse("2026.02.2")),
+                                "D-010: 2026.02.2 stays in the release matrix: " + offered));
     }
 
     @Test
@@ -304,7 +358,7 @@ class ManagedToolManagerOffersTest {
         List<ToolOffer> offers = harness.manager().offers();
 
         assertAll(
-                () -> assertEquals(6, offers.size()),
+                () -> assertEquals(7, offers.size()),
                 () -> assertEquals(List.of(), refusingEverything.asked()));
     }
 

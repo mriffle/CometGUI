@@ -250,7 +250,7 @@ class ShippedManifestTest {
                                         + " root: "
                                         + resource),
                 () -> assertEquals(1, shipped().schemaVersion()),
-                () -> assertEquals(23, shipped().artefacts().size()));
+                () -> assertEquals(27, shipped().artefacts().size()));
     }
 
     // ------------------------------------------------------------------- round trip --
@@ -411,6 +411,9 @@ class ShippedManifestTest {
                     "comet 2026.02.2 linux-x86-64 COMPLETE_PARAMS_QUERY",
                     "comet 2026.02.2 linux-x86-64 PEPXML_OUTPUT",
                     "comet 2026.02.2 linux-x86-64 PIN_OUTPUT",
+                    "comet 2026.03.0 linux-x86-64 COMPLETE_PARAMS_QUERY",
+                    "comet 2026.03.0 linux-x86-64 PEPXML_OUTPUT",
+                    "comet 2026.03.0 linux-x86-64 PIN_OUTPUT",
                     "percolator 3.06.5 linux-x86-64 XML_DECOY_OUTPUT",
                     "percolator 3.06.5 linux-x86-64 XML_OUTPUT",
                     "percolator 3.07.1 linux-x86-64 XML_DECOY_OUTPUT",
@@ -603,7 +606,9 @@ class ShippedManifestTest {
     }
 
     @Test
-    @DisplayName("on Apple silicon Comet is offered natively first, and its x86-64 build second")
+    @DisplayName(
+            "on Apple silicon each Comet release is offered natively first, and the one release"
+                    + " with an x86-64 build offers it second")
     void cometIsOfferedNativelyOnAppleSilicon() throws IOException {
         List<ArtefactSelection> offered = shipped().select(MACOS_AARCH64, ToolName.COMET);
         List<String> described = new ArrayList<>();
@@ -612,28 +617,137 @@ class ShippedManifestTest {
                     selection.artefact().describe()
                             + (selection.isTranslated() ? " (translated)" : " (native)"));
         }
+        /*
+         * The release that publishes BOTH builds, found in the data rather than assumed to be the
+         * first: since 2026.03.0, which publishes no x86-64 macOS row (see its absence below), the
+         * head of the whole list is a native build whatever the second ordering key says, so
+         * "native first" has to be read inside the one release where the key decides something.
+         */
+        List<ArtefactSelection> twoBuildRelease =
+                offered.stream()
+                        .filter(
+                                selection ->
+                                        selection
+                                                .artefact()
+                                                .version()
+                                                .equals(ToolVersion.parse("2026.02.2")))
+                        .toList();
 
         assertAll(
                 () ->
                         assertEquals(
                                 List.of(
+                                        "comet 2026.03.0 macos-aarch64 (native)",
                                         "comet 2026.02.2 macos-aarch64 (native)",
                                         "comet 2026.02.2 macos-x86-64 (translated)"),
                                 described,
                                 COMET_RUNS_NATIVELY),
                 () ->
                         assertEquals(
+                                2,
+                                twoBuildRelease.size(),
+                                "2026.02.2 is the release with both macOS builds: " + described),
+                () ->
+                        assertEquals(
                                 ArtefactExecutability.NATIVE,
-                                offered.get(0).executability(),
+                                twoBuildRelease.get(0).executability(),
                                 "the native build must be first, not merely present"),
                 () ->
                         assertTrue(
-                                !offered.get(0)
+                                !twoBuildRelease
+                                        .get(0)
                                         .artefact()
                                         .url()
-                                        .equals(offered.get(1).artefact().url()),
+                                        .equals(twoBuildRelease.get(1).artefact().url()),
                                 "two different downloads with two different digests, which"
                                         + " is why both are offered rather than collapsed"));
+    }
+
+    @Test
+    @DisplayName(
+            "on every host, the first Comet offered is the newest release with a build there,"
+                    + " and 2026.02.2 is still offered")
+    void theDefaultCometIsTheNewestReleaseOnEveryHost() throws IOException {
+        /*
+         * D-010: 2026.03.0 is the default.  Nothing in the product names a default; select()
+         * orders newest version first, so the default is offered.get(0).  The expectation is
+         * written out per host because one host differs: an Intel Mac has no 2026.03.0 row (see
+         * comet202603HasNoIntelMacRow), so its default is the newest release it CAN run.  And each
+         * one is also derived from the rows themselves, so the order is graded against the data
+         * and not only against this table.
+         */
+        HostPlatform linuxAarch64 =
+                new HostPlatform(HostOperatingSystem.LINUX, HostArchitecture.AARCH64);
+        List<HostPlatform> hosts =
+                List.of(LINUX_X86_64, linuxAarch64, MACOS_AARCH64, MACOS_X86_64, WINDOWS_X86_64);
+        List<String> expected =
+                List.of(
+                        "linux-x86-64 2026.03.0",
+                        "linux-aarch64 2026.03.0",
+                        "macos-aarch64 2026.03.0",
+                        "macos-x86-64 2026.02.2",
+                        "windows-x86-64 2026.03.0");
+        ArtefactManifest manifest = shipped();
+        List<String> defaults = new ArrayList<>();
+        List<Executable> assertions = new ArrayList<>();
+        for (HostPlatform host : hosts) {
+            List<ArtefactSelection> offered = manifest.select(host, ToolName.COMET);
+            ToolVersion newest =
+                    offered.stream()
+                            .map(selection -> selection.artefact().version())
+                            .max(ToolVersion::compareTo)
+                            .orElseThrow(() -> new AssertionError("no Comet on " + host.id()));
+            ToolVersion first = offered.get(0).artefact().version();
+            defaults.add(host.id() + " " + first.text());
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    newest,
+                                    first,
+                                    host.id()
+                                            + ": the first Comet offered must be the newest one"
+                                            + " runnable there: "
+                                            + describedBy(offered)));
+            assertions.add(
+                    () ->
+                            assertTrue(
+                                    offered.stream()
+                                            .anyMatch(
+                                                    selection ->
+                                                            selection
+                                                                    .artefact()
+                                                                    .version()
+                                                                    .equals(
+                                                                            ToolVersion.parse(
+                                                                                    "2026.02.2"))),
+                                    host.id()
+                                            + ": D-010 keeps 2026.02.2 offered: "
+                                            + describedBy(offered)));
+        }
+        assertions.add(() -> assertEquals(expected, defaults, "D-010's default, host by host"));
+        assertAll(assertions);
+    }
+
+    @Test
+    @DisplayName(
+            "Comet 2026.03.0 has no macos-x86-64 row, because the file upstream names for it is"
+                    + " an arm64 build")
+    void comet202603HasNoIntelMacRow() throws IOException {
+        /*
+         * Read from the bytes on 2026-10-04: v2026.03.0's comet.macos.exe is a thin Mach-O whose
+         * cputype is 0x0100000c (ARM64), as is comet.aarch64.macos.exe, and upstream's
+         * macos-build.yml builds it with a plain make on a macos-14 (arm64) runner.  A row
+         * claiming x86-64 for it would be a false statement about the artefact, so the row is
+         * absent rather than invented -- and an Intel Mac is offered 2026.02.2 alone.
+         */
+        assertEquals(
+                List.of(),
+                shipped().artefacts().stream()
+                        .filter(record -> record.tool() == ToolName.COMET)
+                        .filter(record -> record.version().equals(ToolVersion.parse("2026.03.0")))
+                        .filter(record -> record.platform().equals(MACOS_X86_64))
+                        .map(ArtefactRecord::describe)
+                        .toList());
     }
 
     @Test
@@ -804,43 +918,101 @@ class ShippedManifestTest {
     }
 
     @Test
-    @DisplayName("Comet on Windows gates THERMO_RAW_WINDOWS on its three companion libraries")
+    @DisplayName(
+            "every Windows Comet release gates THERMO_RAW_WINDOWS on its three companion"
+                    + " libraries, and on nothing else")
     void cometOnWindowsGatesThermoOnItsCompanions() throws IOException {
-        ArtefactRecord comet = recordFor(shipped(), ToolName.COMET, "2026.02.2", WINDOWS_X86_64);
-        List<String> gating = new ArrayList<>();
-        for (ArtefactCompanion companion : comet.companions()) {
-            if (companion
-                    .gatesCapability()
-                    .equals(Optional.of(ToolCapability.THERMO_RAW_WINDOWS))) {
-                gating.add(companion.installedPaths().get(0));
+        List<Executable> assertions = new ArrayList<>();
+        List<String> releases = new ArrayList<>();
+        for (ArtefactRecord comet : shipped().artefacts()) {
+            if (comet.tool() != ToolName.COMET || !comet.platform().equals(WINDOWS_X86_64)) {
+                continue;
             }
+            releases.add(comet.version().text());
+            List<String> gating = new ArrayList<>();
+            List<String> companions = new ArrayList<>();
+            for (ArtefactCompanion companion : comet.companions()) {
+                companions.add(companion.installedPaths().get(0));
+                if (companion
+                        .gatesCapability()
+                        .equals(Optional.of(ToolCapability.THERMO_RAW_WINDOWS))) {
+                    gating.add(companion.installedPaths().get(0));
+                }
+            }
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    List.of(
+                                            "bin/CometWrapper.dll",
+                                            "bin/ThermoFisher.CommonCore.Data.dll",
+                                            "bin/ThermoFisher.CommonCore.RawFileReader.dll"),
+                                    gating,
+                                    comet.describe()
+                                            + " -- R-TOOL-02: a Comet install missing these shall"
+                                            + " not advertise THERMO_RAW_WINDOWS, and"
+                                            + " gatesCapability is what makes that data rather"
+                                            + " than a conditional in code"));
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    gating,
+                                    companions,
+                                    comet.describe()
+                                            + " fetches nothing else: 2026.03.0 also publishes"
+                                            + " CometWrapperCore.dll and Ijwhost.dll, a .NET 8"
+                                            + " real-time-search wrapper and its loader shim that"
+                                            + " comet.win64.exe neither imports nor references"));
+            assertions.add(
+                    () ->
+                            assertTrue(
+                                    comet.capabilities().stream()
+                                            .anyMatch(
+                                                    declared ->
+                                                            declared.capability()
+                                                                    == ToolCapability
+                                                                            .THERMO_RAW_WINDOWS),
+                                    comet.describe()
+                                            + ": the capability the companions gate must be one"
+                                            + " the row declares"));
         }
-
-        assertAll(
+        assertions.add(
                 () ->
                         assertEquals(
-                                List.of(
-                                        "bin/CometWrapper.dll",
-                                        "bin/ThermoFisher.CommonCore.Data.dll",
-                                        "bin/ThermoFisher.CommonCore.RawFileReader.dll"),
-                                gating,
-                                "R-TOOL-02: a Comet install missing these shall not advertise"
-                                        + " THERMO_RAW_WINDOWS, and gatesCapability is what makes"
-                                        + " that data rather than a conditional in code"),
-                () ->
-                        assertTrue(
-                                comet.capabilities().stream()
-                                        .anyMatch(
-                                                declared ->
-                                                        declared.capability()
-                                                                == ToolCapability
-                                                                        .THERMO_RAW_WINDOWS),
-                                "the capability the companions gate must be one the row declares"),
+                                List.of("2026.02.2", "2026.03.0"),
+                                releases,
+                                "both Comet releases publish a Windows build"));
+        assertions.add(
                 () ->
                         assertEquals(
                                 List.of(),
                                 otherPlatformsGating(),
                                 "no platform but Windows may gate THERMO_RAW_WINDOWS"));
+        assertAll(assertions);
+    }
+
+    @Test
+    @DisplayName(
+            "Comet 2026.03.0 on Windows declares the Visual C++ runtime its import table names")
+    void comet202603OnWindowsDeclaresTheVisualCppRuntime() throws IOException {
+        ArtefactRecord comet = recordFor(shipped(), ToolName.COMET, "2026.03.0", WINDOWS_X86_64);
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "MSVCP140.dll",
+                                        "MSVCP140_ATOMIC_WAIT.dll",
+                                        "VCRUNTIME140.dll",
+                                        "VCRUNTIME140_1.dll"),
+                                comet.minimumHostRequirements().requiredHostLibraries(),
+                                "read from comet.win64.exe's PE import table on 2026-10-04; the"
+                                        + " api-ms-win-crt-* and mscoree.dll imports are the"
+                                        + " operating system's own and are not listed, as"
+                                        + " bcrypt.dll is not for Percolator"),
+                () ->
+                        assertEquals(
+                                List.of("comet.windows-needs-visual-cpp-runtime"),
+                                comet.advisories().stream().map(ToolAdvisory::id).toList(),
+                                "and the scientist is told so at selection time"));
     }
 
     private static List<String> otherPlatformsGating() throws IOException {

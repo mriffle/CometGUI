@@ -101,12 +101,13 @@ import org.testfx.api.FxToolkit;
  *
  * <h2>What it costs, measured on this build</h2>
  *
- * <p>The four installs took <strong>275 ms</strong> (Comet, 7 014 400 bytes), <strong>1 412
- * ms</strong> (Percolator 3.07.1: two transfers totalling 2 798 963 bytes, plus a real binary run
- * over a 64-plus-64-row synthetic PIN, twice), <strong>2 200 ms</strong> (PDV: 103 407 417 bytes
- * transferred and a 222-entry archive expanded) and <strong>653 ms</strong> (the converter, whose
- * identity is a second virtual machine). The whole class runs in about nine seconds. Reading the
- * offered list once, with all four installed, took <strong>353 ms on the JavaFX application
+ * <p>Measured at Phase 05, when gate item 1's Comet was 2026.02.2: the four installs took
+ * <strong>275 ms</strong> (Comet, 7 014 400 bytes; the default 2026.03.0 is 7 077 008), <strong>1
+ * 412 ms</strong> (Percolator 3.07.1: two transfers totalling 2 798 963 bytes, plus a real binary
+ * run over a 64-plus-64-row synthetic PIN, twice), <strong>2 200 ms</strong> (PDV: 103 407 417
+ * bytes transferred and a 222-entry archive expanded) and <strong>653 ms</strong> (the converter,
+ * whose identity is a second virtual machine). The whole class runs in about nine seconds. Reading
+ * the offered list once, with all four installed, took <strong>353 ms on the JavaFX application
  * thread</strong> and launched three processes; the assertion at the end of the first test pins
  * that count, because it is the number that would grow silently.
  *
@@ -136,7 +137,12 @@ class ToolManagerInstallUiTest {
                     Optional.of(GlibcVersion.parse("2.36")),
                     Optional.of(GlibcVersion.parse("3.4.30")));
 
-    private static final String COMET_ZIP = "v2026.02.2__comet.linux.exe";
+    /** The default Comet (D-010), which gate item 1 installs. */
+    private static final String COMET_ZIP = "v2026.03.0__comet.linux.exe";
+
+    /** The release the default superseded, still offered, which the mouse test installs. */
+    private static final String OLDER_COMET_FILE = "v2026.02.2__comet.linux.exe";
+
     private static final String PERCOLATOR_ZIP =
             "rel-3-07-01__percolator-noxml-ubuntu-portable.zip";
     private static final String PERCOLATOR_DEB =
@@ -144,7 +150,8 @@ class ToolManagerInstallUiTest {
     private static final String PDV_ZIP = "v2.7.0__PDV-2.7.0.zip";
     private static final String CONVERTER_JAR = "v2.8.1__cometPercolator2LimelightXML.jar";
 
-    private static final String COMET_ROW = "comet-2026_02_2-1";
+    private static final String COMET_ROW = "comet-2026_03_0-1";
+    private static final String OLDER_COMET_ROW = "comet-2026_02_2-1";
     private static final String PERCOLATOR_ROW = "percolator-3_07_1-1";
     private static final String OLDER_PERCOLATOR_ROW = "percolator-3_06_5-1";
     private static final String PDV_ROW = "pdv-2_7_0-1";
@@ -161,14 +168,14 @@ class ToolManagerInstallUiTest {
      * <strong>normalised</strong> version, which {@code ToolVersion} documents as "the numeric
      * components, most significant first, with trailing zero components dropped": {@code 3.07.1}
      * installs under {@code 3.7.1}, {@code 2026.02.2} under {@code 2026.2.2}, and <strong>{@code
-     * 2.7.0} under {@code 2.7}</strong>. The rule exists because {@code ToolVersion.equals} is
-     * numeric and two spellings of one version must not become two directories. Every row still
-     * reads upstream's own spelling, and {@link #theFourManagedToolsInstallFromAnEmptyCache}
-     * asserts both.
+     * 2.7.0} under {@code 2.7}</strong> -- as the default Comet, {@code 2026.03.0}, installs under
+     * {@code 2026.3}. The rule exists because {@code ToolVersion.equals} is numeric and two
+     * spellings of one version must not become two directories. Every row still reads upstream's
+     * own spelling, and {@link #theFourManagedToolsInstallFromAnEmptyCache} asserts both.
      */
     private static final Map<String, String> INSTALLED_AT =
             Map.of(
-                    COMET_ROW, "tools/comet/2026.2.2/linux-x86-64/bin/comet",
+                    COMET_ROW, "tools/comet/2026.3/linux-x86-64/bin/comet",
                     PERCOLATOR_ROW, "tools/percolator/3.7.1/linux-x86-64/bin/percolator",
                     PDV_ROW, "tools/pdv/2.7/linux-x86-64/PDV-2.7.0/PDV-2.7.0.jar",
                     CONVERTER_ROW,
@@ -257,6 +264,25 @@ class ToolManagerInstallUiTest {
                                         "CometGUI-managed: not installed",
                                         ui.textOf(UiIds.toolRowState(OLDER_PERCOLATOR_ROW)),
                                         "installing four builds touches no fifth one"));
+                claims.add(
+                        () ->
+                                assertEquals(
+                                        "CometGUI-managed: not installed",
+                                        ui.textOf(UiIds.toolRowState(OLDER_COMET_ROW)),
+                                        "and installing the default Comet touches no other"
+                                                + " release of it"));
+                claims.add(
+                        () ->
+                                assertEquals(
+                                        COMET_ROW,
+                                        shownRows.stream()
+                                                .filter(key -> key.startsWith("comet-"))
+                                                .findFirst()
+                                                .orElseThrow(),
+                                        "D-010: the default Comet, 2026.03.0, is the first Comet"
+                                                + " row the window shows, and 2026.02.2 follows"
+                                                + " it: "
+                                                + shownRows));
                 claims.add(
                         () ->
                                 assertEquals(
@@ -438,7 +464,7 @@ class ToolManagerInstallUiTest {
         ArtefactRecord comet = ArtefactMirror.record(ToolName.COMET, "2026.02.2", LINUX);
         try (LoopbackArtefactServer served =
                 new LoopbackArtefactServer()
-                        .serve(comet.url(), ArtefactMirror.artefact(COMET_ZIP))) {
+                        .serve(comet.url(), ArtefactMirror.artefact(OLDER_COMET_FILE))) {
             ToolManager manager =
                     ToolManagerWiring.toolManager(
                             LINUX,
@@ -450,28 +476,31 @@ class ToolManagerInstallUiTest {
                             served);
             try (ShownToolManager ui = ShownToolManager.showing(manager, window)) {
                 FxUiDriver driver = ui.syntheticInput();
-                ui.watch(COMET_ROW);
+                ui.watch(OLDER_COMET_ROW);
 
-                driver.clickOn(UiIds.toolRowInstall(COMET_ROW));
-                InstallProgress terminal = ui.awaitTerminal(COMET_ROW);
+                driver.clickOn(UiIds.toolRowInstall(OLDER_COMET_ROW));
+                InstallProgress terminal = ui.awaitTerminal(OLDER_COMET_ROW);
 
                 assertAll(
                         () ->
                                 assertEquals(
                                         InstallPhase.DONE,
                                         terminal.phase(),
-                                        () -> "the phases shown were " + ui.phases(COMET_ROW)),
+                                        () ->
+                                                "the phases shown were "
+                                                        + ui.phases(OLDER_COMET_ROW)),
                         () ->
                                 assertEquals(
                                         "CometGUI-managed: installed",
-                                        ui.textOf(UiIds.toolRowState(COMET_ROW)),
+                                        ui.textOf(UiIds.toolRowState(OLDER_COMET_ROW)),
                                         "a synthetic mouse click on the control a user would press,"
                                                 + " through "
                                                 + driver),
                         () ->
                                 assertEquals(
                                         "Install comet 2026.02.2",
-                                        driver.accessibleTextOf(UiIds.toolRowInstall(COMET_ROW)),
+                                        driver.accessibleTextOf(
+                                                UiIds.toolRowInstall(OLDER_COMET_ROW)),
                                         "and a screen reader user reaches the same control"));
             }
         }
@@ -482,7 +511,7 @@ class ToolManagerInstallUiTest {
         ArtefactRecord percolator = ArtefactMirror.record(ToolName.PERCOLATOR, "3.07.1", LINUX);
         return new LoopbackArtefactServer()
                 .serve(
-                        ArtefactMirror.record(ToolName.COMET, "2026.02.2", LINUX).url(),
+                        ArtefactMirror.record(ToolName.COMET, "2026.03.0", LINUX).url(),
                         ArtefactMirror.artefact(COMET_ZIP))
                 .serve(percolator.url(), ArtefactMirror.artefact(PERCOLATOR_ZIP))
                 .serve(
@@ -499,7 +528,7 @@ class ToolManagerInstallUiTest {
     private static List<URI> urlsOfTheFour() throws IOException {
         ArtefactRecord percolator = ArtefactMirror.record(ToolName.PERCOLATOR, "3.07.1", LINUX);
         return List.of(
-                ArtefactMirror.record(ToolName.COMET, "2026.02.2", LINUX).url(),
+                ArtefactMirror.record(ToolName.COMET, "2026.03.0", LINUX).url(),
                 percolator.url(),
                 percolator.companions().get(0).url(),
                 ArtefactMirror.record(ToolName.PDV, "2.7.0", LINUX).url(),

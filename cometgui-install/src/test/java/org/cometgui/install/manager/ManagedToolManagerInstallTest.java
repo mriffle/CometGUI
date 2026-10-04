@@ -349,7 +349,7 @@ class ManagedToolManagerInstallTest {
                                     "R-TOOL-06: a tool that fails loadability is never offered"),
                     () ->
                             assertEquals(
-                                    5,
+                                    6,
                                     after.size(),
                                     "and only that row leaves; one unreachable build does not"
                                             + " blank the Tool Manager"));
@@ -485,7 +485,7 @@ class ManagedToolManagerInstallTest {
                                             + " under test"),
                     () ->
                             assertEquals(
-                                    6,
+                                    7,
                                     offers.size(),
                                     "and the Tool Manager still draws every row: one unreadable"
                                             + " directory does not blank the list"),
