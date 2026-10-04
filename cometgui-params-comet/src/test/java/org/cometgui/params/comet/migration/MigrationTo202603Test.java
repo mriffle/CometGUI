@@ -262,19 +262,26 @@ class MigrationTo202603Test {
                 assertEquals("-1", entry.targetText());
                 assertEquals("-1", result.model().text("index_search_type"));
                 assertEquals(ValueOrigin.IMPORTED, result.model().origin("index_search_type"));
-                assertTrue(
-                        entry.explanation()
-                                .startsWith(
-                                        "index_search_type = 1 (Comet 2026.02.2) is written -1 for"
-                                                + " Comet 2026.03.0, which means the same there:"
-                                                + " Comet 2026.02.2 reads index_search_type only"),
+                org.cometgui.params.comet.schema.ValueMigration stated =
+                        METADATA.version(V2026_03)
+                                .orElseThrow()
+                                .valueMigrationsFrom(V2026_02)
+                                .get(0);
+                assertEquals(
+                        "index_search_type = 1 (Comet 2026.02.2) is written -1 for Comet"
+                                + " 2026.03.0, which means the same there: "
+                                + stated.reason()
+                                + " ("
+                                + stated.source()
+                                + ")",
                         entry.explanation());
                 assertTrue(
-                        entry.explanation()
-                                .endsWith(
-                                        "(https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/"
-                                                + "CometSearchManager.cpp#L1524)"),
-                        entry.explanation());
+                        stated.reason().startsWith("Comet 2026.02.2 reads index_search_type only"),
+                        stated.reason());
+                assertEquals(
+                        "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/"
+                                + "CometSearchManager.cpp#L1524",
+                        stated.source());
                 assertTrue(
                         result.report()
                                 .describe()

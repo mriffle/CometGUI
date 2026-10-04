@@ -211,15 +211,6 @@ public final class VersionConversion {
     }
 
     /**
-     * The target release's value-migration entries for values written for the source release.
-     *
-     * @return the entries, in the metadata's order; empty when the target states none
-     */
-    public List<ValueMigration> migrations() {
-        return List.copyOf(migrations);
-    }
-
-    /**
      * Carries one value, applying the target's value-migration entries matched by value.
      *
      * @param parameter a parameter the source version models

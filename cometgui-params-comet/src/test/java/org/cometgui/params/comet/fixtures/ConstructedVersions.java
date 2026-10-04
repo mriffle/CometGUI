@@ -47,6 +47,16 @@ public final class ConstructedVersions {
      * needs its tuples' defaults written in it.
      */
     public static CuratedMetadata withConstructedVersion(String fields, String defaults) {
+        return withConstructedVersion(fields, defaults, "");
+    }
+
+    /**
+     * As {@link #withConstructedVersion(String, String)}, with the version record's {@code
+     * valueMigrations} array holding {@code migrations} (JSON objects, comma separated):
+     * CONSTRUCTED entries for values migrated into the constructed version.
+     */
+    public static CuratedMetadata withConstructedVersion(
+            String fields, String defaults, String migrations) {
         String json;
         try (var in = MetadataLoader.class.getResourceAsStream(MetadataLoader.RESOURCE)) {
             json = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
@@ -69,7 +79,9 @@ public final class ConstructedVersions {
                         + " \"severity\": \"WARNING\", \"source\": \"https://example.org/d\"},"
                         + " {\"rule\": \"index_search_type.ignored_without_idx\","
                         + " \"severity\": \"OFF\", \"source\": \"https://example.org/i\"}],"
-                        + " \"valueMigrations\": []},\n";
+                        + " \"valueMigrations\": ["
+                        + migrations
+                        + "]},\n";
         String anchor = "\"versions\": [\n";
         int at = json.indexOf(anchor);
         return MetadataLoader.load(

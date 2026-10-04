@@ -106,7 +106,7 @@ public final class SchemaMigration {
         CuratedMetadata metadata = source.metadata();
         ToolVersion from = source.version();
         VersionConversion conversion = VersionConversion.between(metadata, from, target);
-        Map<String, Set<String>> sourceRules = sourceRules(source, target, conversion);
+        Map<String, Set<String>> sourceRules = sourceRules(source, target);
         ParameterValueCodec codec = ParameterValueCodec.forVersion(metadata, target);
         Map<String, UnknownParameter> sourceUnknowns = new LinkedHashMap<>();
         source.unknownParameters().forEach(u -> sourceUnknowns.put(u.name(), u));
@@ -233,15 +233,14 @@ public final class SchemaMigration {
     }
 
     /**
-     * The rules the target's value migrations from the source release are matched by, found on each
-     * parameter of the source model by its own validation; empty, and no validation run, when no
-     * entry is matched by a rule.
+     * The rules the source model's own validation finds on each parameter: what the target's value
+     * migrations matched by a rule are matched against.
      *
      * @throws IllegalStateException if any of the target's value migrations names a rule that does
      *     not exist
      */
     private static Map<String, Set<String>> sourceRules(
-            CometParameters source, ToolVersion target, VersionConversion conversion) {
+            CometParameters source, ToolVersion target) {
         for (ValueMigration migration :
                 source.metadata().version(target).orElseThrow().valueMigrations()) {
             migration
@@ -258,17 +257,10 @@ public final class SchemaMigration {
                                                 + "\", which is not a rule");
                             });
         }
-        Set<String> consulted = new HashSet<>();
-        conversion.migrations().forEach(m -> m.rule().ifPresent(consulted::add));
         Map<String, Set<String>> found = new HashMap<>();
-        if (consulted.isEmpty()) {
-            return found;
-        }
         for (Finding finding : CometValidator.standard().validate(source).findings()) {
-            if (consulted.contains(finding.rule().id())) {
-                for (String parameter : finding.parameters()) {
-                    found.computeIfAbsent(parameter, p -> new HashSet<>()).add(finding.rule().id());
-                }
+            for (String parameter : finding.parameters()) {
+                found.computeIfAbsent(parameter, p -> new HashSet<>()).add(finding.rule().id());
             }
         }
         return found;
