@@ -658,7 +658,15 @@ Rejections and rework
 Deferred
 ========
 
-None yet.
+* ``--only tests`` was deferred from every unit sign-off to one run on the
+  final tree (unit 1's sign-off says why). That run, at ``fbe67e7``, **failed**
+  (6 controls, 1057 s): the harness sandbox did not carry
+  ``docs/developer/comet_parameter_schema.rst``, which unit 4's
+  ``ValidationCorpusTest.everyCaseIsDocumented`` reads, so every sandbox build
+  died there. Repaired by me in ``scripts/verify-test-gates.sh`` -- the page is
+  copied into the sandbox by name, under the harness's own rule for documents
+  tests assert against; nothing else changed. Re-run: ``PASS tests: 37
+  assertions in 3052s`` (floor 37).
 
 Blockers escalated
 ==================
