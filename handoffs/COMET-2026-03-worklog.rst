@@ -306,7 +306,89 @@ recorded count is 27 -- unit 6 raises it.
 Unit 2
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-04 at ``667c080``, no rework, two departures from its
+brief accepted on evidence (below).** One fresh agent; commits ``bc10bb9``
+(rows and tests), ``149bc5c`` (registry docs, harness controls 20-22),
+``667c080`` (install floor 88 -> 95). The agent stopped once mid-unit with its
+work uncommitted ("waiting for the verify run"; nothing was running); tier 1
+flagged it and I resumed the same agent with an instruction to run every check
+in the foreground. 17 paths, all in scope. **No production class changed**;
+data, tests, docs and harness only.
+
+What I ran and saw:
+
+* **Read the diff.** ``manifests/tools.json``: insertions only (0 removed
+  lines), four 2026.03.0 rows at indices 5-8 so every ``artefacts[0..4]``
+  reference in tests and harnesses still names the same record. Existing
+  tests: every removed assertion is re-expressed, none dropped -- counts that
+  grew are re-typed (``6`` -> ``7`` offers, ``23`` -> ``27`` artefacts), and
+  ``CometRealBinaryTest`` became per-release with hand-typed counts (``-p`` 96
+  for 2026.02.2, 95 for 2026.03.0; ``-q`` 118 for both). Harness: control 5's
+  expected text names ``comet-2026_03_0-1`` (the gate-1 UI test now presses the
+  default Comet, the same assertion); controls 13 and 16 unchanged in text;
+  controls 20-22 new.
+* **Rows against my own download** (*Starting state*): size, SHA-256 and MD5
+  of all four rows and the three Windows companions equal my independently
+  downloaded bytes.
+* **Departure 1 -- no macos-x86-64 row.** Verified myself: the first eight
+  bytes of ``comet.macos.exe`` **and** ``comet.aarch64.macos.exe`` are ``cf fa
+  ed fe 0c 00 00 01`` -- Mach-O 64, CPU type ``0x0100000C``, **ARM64** -- in
+  both 2026.03.0 and 2026.02.2; the two 2026.03.0 files differ in 115 bytes.
+  Upstream publishes no x86-64 macOS Comet, so writing that row would record a
+  false fact. Gate item 1's "every platform the manifest already covers" is
+  therefore met for four of five and **cannot** be met for the fifth;
+  escalated, with the related finding that the existing **2026.02.2
+  macos-x86-64 row describes an arm64 binary**.
+* **Departure 2** -- the Windows 2026.03.0 row declares the four Visual C++
+  runtime DLLs its import table names, as the Windows Percolator rows do. The
+  2026.02.2 Windows row does not, although its binary imports the same:
+  escalated, not changed.
+* **Companions** -- ``CometWrapper.dll`` and the two ThermoFisher DLLs kept as
+  required (R-TOOL-02 names them); ``CometWrapperCore.dll`` and
+  ``Ijwhost.dll`` not companions (import table, .NET references,
+  ``Comet.vcxproj``; recorded in ``tool_registry.rst``). The agent's finding
+  that ``comet.win64.exe`` does not reference ``CometWrapper.dll`` either is
+  escalated as a specification question.
+* ``mvn -B -o -pl cometgui-install,cometgui-tools,cometgui-params-comet,cometgui-app
+  -am verify`` -> ``BUILD SUCCESS``, 6m18s. Surefire: install 1024 (0 failed,
+  2 skipped), tools 232 (0, 0), params-comet 1031 (0, 0), app 120 (0, 1). The
+  three skips are the opt-in ``-Dcometgui.install.upstream=true`` tests.
+* **The real upstream install, run myself**: ``mvn -B -o -pl cometgui-install
+  -am test -Dcometgui.install.upstream=true
+  -Dtest=CometReleaseInstallTest,UpstreamArtefactTest`` -> rc 0, nothing
+  skipped; ``theDefaultCometInstallsFromItsRealUpstreamUrl`` (1.05 s) uses the
+  real ``HttpDownloader``, ``ArtefactVerifier``, ``ToolCache`` and a probe over
+  the real ``ProcessService``, and asserts SHA-256 ``ad93b4cf...``, 7 077 008
+  bytes, identity ``2026.03.0`` and a verifying cache entry.
+  ``aCorruptedPinIsRefusedBeforeAnythingRuns`` passed in the same run.
+* **Injection 1, version-blind** (``ManagedToolManager.rowsOf`` keeps every
+  row whatever its version): class ``3acb52f0`` -> ``b7abb3e0``; ``Tests run:
+  1024, Failures: 13`` -- e.g. ``ManagedToolManagerOffersTest
+  .aReleaseWithNoArtefactHereIsShownAsUnavailable ... one row expected for
+  percolator 3.09: [] ==> expected: <1> but was: <0>``. Restored,
+  ``sha256sum -c`` OK.
+* **Injection 2** (``VersionBanner``'s Comet pattern reads one digit of the
+  release number): class ``6e079c12`` -> ``67da14ff``; 4 failures, 1 error --
+  ``VersionBannerTest.cometQuotedBanner:80 expected: <2026.02.2> but was:
+  <2026.0.2>`` and ``CometReleaseInstallTest
+  .aBinaryThatIsNotThePinnedReleaseIsRefusedByItsBanner``. Restored,
+  ``sha256sum -c`` OK; ``git status`` clean.
+* **PIT**: no production class changed, so there is nothing to mutate; the
+  agent ran ``StagedToolProbe`` 16/16 and ``ArtefactManifest`` 21/21 as extra
+  evidence of the new tests' reach. Not re-run.
+* ``scripts/ci/docs-build.sh`` PASSED; count line ``118 parameter entries =
+  118 modelled parameters, 0 internal, for Comet 2026.02.2, 2026.03.0``.
+* ``verify-all-gates.sh --only docs --only traceability`` -> docs 1,
+  traceability 8, PASS; ``--only install`` -> ``95 controls in 260s`` (floor
+  95); ``--only params`` -> ``68 controls in 255s``.
+
+Findings for later units and for tier 1: ``.idx`` format v5 -- 2026.03.0
+rejects an index whose first line does not begin ``Comet index database v5``
+(``CometPeptideIndex.cpp`` at ``fa08489``), so a future "selected index is
+compatible" check can compare line 1 with the selected version's format. Only
+``.github/workflows/macos-gatekeeper.yml`` names a Comet version (a comment,
+line 38); its driver selects through ``ArtefactManifest.select`` and will now
+pick 2026.03.0 aarch64.
 
 .. _c2603-u3-signoff:
 
