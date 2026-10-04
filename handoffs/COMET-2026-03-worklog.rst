@@ -594,7 +594,49 @@ Residue, for tier 1 (judgement calls, not defects in the gate):
 Unit 6
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-04 at ``f3b3973``, no rework.** One fresh agent; commits
+``5a2dffb`` (controls, floor), ``0ba27b4`` (developer page, ``testing.rst``),
+``f3b3973`` (``GATE_DEFECT`` text). Four paths, all in scope; no product or
+test code changed.
+
+What I ran and saw:
+
+* **Read the diff.** ``scripts/verify-param-gates.sh`` gains fifteen controls
+  (``v3a``-``v3c``, ``v4a``-``v4c``, ``v5a``-``v5g``, ``v6a``, ``v6b``; five
+  re-encode injections from this log's sign-offs, ten are new) and three
+  harness-error checks (H8-H10). The only removed code line,
+  ``compare_tree "${log}" "${source}"``, is now one branch of a ``case``
+  that keeps it for production sources and adds a test-resource branch for
+  ``v5g``'s data damage -- additive. Generator floor 27 -> 55 (measured);
+  ``params`` ``GATE_FLOOR`` 68 -> **109**. No existing control's diagnostic
+  loosened.
+* ``bash scripts/verify-all-gates.sh --only params`` -> ``PASS params: 109
+  controls in 446s``. Every new control's lines read: each ``rejected, exit 1``
+  on its own diagnostic, and where it applies the other release stays green
+  ("the red is the version"). Control 9: parser 96/101, writer 30/30,
+  validation 251/252, module 1360/1367.
+* **My injection into the harness** (a copy, ``--only v5f``): ``v5f``'s
+  expected diagnostic changed to name a rule that does not exist. My first
+  attempt matched no anchor (the text is a regular expression with escapes)
+  and so ran the pristine control -- discarded as no verdict. With the escaped
+  anchor (matched once, marker grepped back): rc 1, ``FAIL the index rule warns
+  whatever the release: failed, but without the expected diagnostic ...``,
+  ``SUMMARY: 6 control(s) passed, 1 failed``. Copy deleted; tree clean.
+* **Gate item 8, run myself**: PIT over all **22** production classes changed
+  since ``d19b232`` (all in ``cometgui-params-comet``; unit 2 changed none)
+  and their inner classes, **no test excluded**: **700/701 killed**. The
+  survivor is ``VariableModRules:204``, Phase 06's documented equivalent
+  (line 178 then): the ``> 0`` boundary differs only at code 0, which never
+  reaches that branch, and it changes message wording only. **No survivor
+  makes a version-scoped rule version-blind or suppresses a validation
+  error.**
+* ``scripts/ci/docs-build.sh`` PASSED; ``--only docs --only traceability`` ->
+  2 passed in 58 s.
+
+The agent's population audit (accepted, not re-derived): the classes absent
+from PIT's report have no mutable code (records, enums, switch maps,
+``package-info``); ``jacoco.xml`` holds every compiled class but the nine
+``package-info``.
 
 Rejections and rework
 =====================
