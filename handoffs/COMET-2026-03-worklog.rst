@@ -448,7 +448,74 @@ scope; harness controls for the 2026.03.0 round trip are unit 6's.
 Unit 4
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-04 at ``5a25dc1``, after one rework round** (see
+*Rejections and rework*). One fresh agent; commits ``c1b89f7`` (rules,
+corpus, tests), ``f08ff50`` (generator), ``543fb08`` (developer page),
+``5a25dc1`` (rework). 35 paths, all in scope; no spectra or FASTA committed.
+
+What I ran and saw:
+
+* **Read the production diff.** Each version record carries a required
+  ``ruleSeverities`` list (rule id, ``ERROR``/``WARNING``/``OFF``, https
+  source); ``VersionSeverities`` binds them to the model's release and refuses
+  an unknown rule, a rule whose severity is fixed, and a version-scoped rule a
+  release does not state -- no default, no ``if (version ...)`` (C-2). Two
+  rules are version-scoped: ``variable_mod_tuple.distance_undocumented``
+  (2026.03.0 error; 2026.02.2 and 2024.01.0 warning) and the new
+  ``index_search_type.ignored_without_idx`` (2026.03.0 warning; older off).
+  New fixed-severity rules read release facts: ``variable_mod_tuple
+  .residue_not_in_release`` (the alphabet -- meets the condition unit 3's
+  sign-off set) and ``variable_mods.ascorepro_slot_unsupported`` (Comet's
+  merge of identical slots modelled from ``CometSearchManager.cpp``
+  L1475-1512).
+* **The one 2026.02.2 catalogue change, reproduced myself**: AScorePro with an
+  active slot 10-15 is an **error for 2026.02.2 too**. My own run --
+  2026.02.2, full human proteome, scans 11000-12500, ``print_ascorepro_score =
+  -1``, only ``variable_mod10 = 15.9949 M 0 3 -1 0 0 0.0`` active -- ended
+  ``Segmentation fault (core dumped)``, rc **139**, after ``Post analysis:``;
+  the same modification in ``variable_mod02`` completed, rc 0.
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``,
+  ``Tests run: 1862, Failures: 0, Errors: 0, Skipped: 0``;
+  ``ValidationCorpusRealBinaryTest`` 43 and ``ValidationCorpusTest`` 45, none
+  skipped.
+* **PIT** (my targeted run, real-binary test excluded) over the eleven changed
+  classes: **351/352**; the survivor is ``VariableModRules:204`` (Phase 06's
+  documented equivalent at what was line 178: the ``> 0`` boundary differs only
+  at code 0, which never reaches that branch; message wording only).
+* **Injection 1, version-blind** (``Findings`` binds every model to the
+  second version record, 2026.02.2): my first form was stopped by Spotless --
+  no verdict; re-injected formatter-clean: class ``ab02407c`` -> ``a7f24efb``;
+  ``Tests run: 1862, Failures: 12`` -- among them ``ValidationCorpus...
+  ist-1, Comet 2026.03.0: ValidationReport[findings=[]] ==> expected: <[WARNING
+  index_search_type.ignored_without_idx]> but was: <[]>`` and
+  ``dist-minus3, Comet 2026.03.0 ... severity=WARNING``. Restored,
+  ``sha256sum -c`` OK.
+* **Injection 2** (``AScoreProRule``: ``ascore == 0`` -> ``ascore <= 0``, so
+  "localise all" suppresses the error): class ``9b4a2bd2`` -> ``14046953``; 6
+  failures -- ``AScoreProRuleTest.slotsAboveNine ... print_ascorepro_score, -1]:
+  [] ==> expected: <1> but was: <0>`` for both releases, and the corpus case
+  ``ascore-slot10-all, Comet 2026.03.0``. Restored, ``sha256sum -c`` OK.
+* **First ``--only params`` run, at ``543fb08``: FAIL** -- ``67 control(s)
+  passed, 1 failed``; control 9 ``validation 191/252 mutations killed = 75.7%,
+  BELOW the R-TEST-02 threshold of 80%``, about sixty validation mutants
+  ``TIMED_OUT``. The agent had reported this harness green. Sent back.
+* **After rework, ``--only params`` at ``5a25dc1``: PASS**, ``68 controls in
+  294s``; control 9: parser 96/101, writer 30/30, **validation 251/252 =
+  99.6 %**, module 1263/1270; only ``VariableModRules:204`` not killed in
+  validation; the negative arm still grades validation BELOW (93/252). Module
+  verify re-run: 1862, 0 failed, 0 skipped.
+* ``scripts/ci/docs-build.sh`` PASSED; ``--only docs --only traceability`` ->
+  2 passed in 57 s. The ``verify-test-gates.sh`` precondition now also requires
+  ``scratch/fixture`` (additive).
+
+What the corpus establishes (42 cases, both binaries, recorded in
+``fixtures/comet-validation/corpus.json`` and the developer page): only the
+undefined-enzyme errors fire at parameter load in 2026.03.0; every other
+2026.03.0 check fires when a search starts. Cases the binaries cannot settle
+here: an existing ``.idx`` whose type disagrees (Phase 08); Comet's count cap
+of 5 when building an index, before merging (not modelled -- in that edge case
+the validator could report an AScorePro error the binary would not); the
+``-i``/``-j`` flags; Windows, macOS and real-time search.
 
 .. _c2603-u5-signoff:
 
@@ -467,7 +534,19 @@ Not yet dispatched.
 Rejections and rework
 =====================
 
-None yet.
+* **Unit 4, round 1 rejected (2026-10-04).** ``--only params`` failed control
+  9 at ``543fb08``: validation 191/252 = 75.7 %. Cause:
+  ``ValidationCorpusRealBinaryTest``'s ``@BeforeAll`` ran all 86 real Comet
+  searches and its cases then parsed and validated, so PIT mapped every
+  validator mutant to it and re-ran the searches per mutant; those mutants
+  ended ``TIMED_OUT``, which the gate (rightly) does not count as killed. The
+  agent's own PIT excluded the test, and its single harness pass was
+  load-dependent -- it had reported the harness green. Fixed at the root, with
+  no change to the PIT configuration, the harness or the threshold: the
+  real-binary test now checks only binary == recorded verdict, building each
+  file by text edits and running no production class of the module; the fast
+  ``ValidationCorpusTest`` checks validator == the same recorded verdict.
+  Re-signed above.
 
 Deferred
 ========
