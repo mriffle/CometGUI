@@ -123,7 +123,8 @@ declare -a COVERED=()
 #                it had grown to 19 and then 23 without the floor following.
 #                install: 83 on 2026-10-01, phase 05 unit 12's first shipping
 #                count; 88 on 2026-10-01, when phase 05 unit 14 added control
-#                19, the macOS quarantine re-check.  params: 68 on
+#                19, the macOS quarantine re-check; 95 on 2026-10-04, when
+#                COMET-2026-03 unit 2 added controls 20-22.  params: 68 on
 #                2026-10-02, phase 06 unit 8's first shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
@@ -253,7 +254,7 @@ gate_spec() {
         install)
             GATE_PHASE="05"
             GATE_ITEMS="1,2,3,4,5,6,7,8"
-            GATE_DEFECT="from the injections recorded in handoffs/PHASE-05-worklog.rst, each into production code in a git-archive sandbox and each proved to have reached the bytecode: a mid-transfer cancel reported as FAILED, resumed progress counted from the resume point, a progress report delivered off the JavaFX thread, the real Tool Manager's Install control disabled, the step-2 re-hash disabled, a corrupted artefact let out of the transfer step so only the [DOWNLOADING, FAILED] phase sequence sees it, a drive letter never seen, the xar DOCTYPE guard deleted, a lost file counted from the marker, a build that no longer starts offered, an unreachable binary's refusal naming no alternatives, alternatives keyed on the version, the offer order inverted, the download size quoting the artefact alone, Locale.ROOT removed from the probe's PIN, a blank note accepted for UNVERIFIED evidence; NEW at unit 12, a Thermo companion gate that ignores a missing DLL (item 6) and a local Percolator floor of 3.04 (item 7); NEW at unit 14, R-PLAT-04's macOS quarantine step believing an xattr -d that exited 0 and removed nothing, graded on Linux against a scripted xattr (not evidence about macOS); five damaged manifests the documentation-table generator must reject with each one's own diagnostic, one through the Sphinx hook, and a generator that writes nothing; and, as a control on the harness itself, an injection that reached the source but not the bytecode, which must be reported as a HARNESS ERROR. Item 9 (macOS) is NOT MET and is only delegated"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-05-worklog.rst, each into production code in a git-archive sandbox and each proved to have reached the bytecode: a mid-transfer cancel reported as FAILED, resumed progress counted from the resume point, a progress report delivered off the JavaFX thread, the real Tool Manager's Install control disabled, the step-2 re-hash disabled, a corrupted artefact let out of the transfer step so only the [DOWNLOADING, FAILED] phase sequence sees it, a drive letter never seen, the xar DOCTYPE guard deleted, a lost file counted from the marker, a build that no longer starts offered, an unreachable binary's refusal naming no alternatives, alternatives keyed on the version, the offer order inverted, the download size quoting the artefact alone, Locale.ROOT removed from the probe's PIN, a blank note accepted for UNVERIFIED evidence; NEW at unit 12, a Thermo companion gate that ignores a missing DLL (item 6) and a local Percolator floor of 3.04 (item 7); NEW at unit 14, R-PLAT-04's macOS quarantine step believing an xattr -d that exited 0 and removed nothing, graded on Linux against a scripted xattr (not evidence about macOS); five damaged manifests the documentation-table generator must reject with each one's own diagnostic, one through the Sphinx hook, and a generator that writes nothing; NEW at COMET-2026-03 unit 2, the identity stage made version-blind (the 2026.03.0 binary installed under a 2026.02.2 pin) and the default Comet no longer the newest release, in select() and in the Tool Manager's own release order; and, as a control on the harness itself, an injection that reached the source but not the bytecode, which must be reported as a HARNESS ERROR. Item 9 (macOS) is NOT MET and is only delegated"
             GATE_SCRIPT="scripts/verify-install-gates.sh"
             GATE_ARGS=()
             GATE_PROOF=(
@@ -262,7 +263,7 @@ gate_spec() {
                 "Item 9 is NOT MET"
                 "bytecode as a HARNESS ERROR, not as a pass"
             )
-            GATE_FLOOR=88
+            GATE_FLOOR=95
             GATE_UNIT="controls"
             ;;
         params)
