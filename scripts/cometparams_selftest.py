@@ -325,8 +325,9 @@ def per_release_control(root: Path, clean: Path, files: dict) -> None:
         "parameters_202603/index_search_type.html",
     ]
     missing = [needle for needle in expected if needle not in entry]
-    allowed_2602 = entry[entry.index(":Allowed values, Comet 2026.02.2:"):
-                         entry.index(f":Allowed values, Comet {OVERRIDING_RELEASE}:")]
+    allowed_2602 = "" if missing else entry[
+        entry.index(":Allowed values, Comet 2026.02.2:"):
+        entry.index(f":Allowed values, Comet {OVERRIDING_RELEASE}:")]
     if missing or "``-1``" in allowed_2602:
         raise HarnessError(
             f"per-release control: the {OVERRIDDEN} entry rendered for "
