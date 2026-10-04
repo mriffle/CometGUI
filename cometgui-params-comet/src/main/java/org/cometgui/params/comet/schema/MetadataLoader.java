@@ -54,13 +54,15 @@ import org.cometgui.provenance.json.JsonValue;
  * tolerance-pair member may not carry the generic ordering rule.
  *
  * <p>Each version record carries its variable-modification tuple layout ({@code R-PARAM-09}),
- * checked by {@link VariableModLayout}'s own rules, and the defaults that release writes where they
- * differ from a parameter's curated one: each override must name a parameter whose range claims the
- * version, once, with an {@code https://} source, and a value that passes every rule the curated
- * default must pass and is not the curated default itself; a parameter named as Comet names a tuple
- * slot ({@code variable_mod} and two digits) must be of kind {@link ValueKind#VARIABLE_MOD_TUPLE}
- * and the other way round; and a tuple default must hold as many fields as the layout of every
- * version it claims.
+ * checked by {@link VariableModLayout}'s own rules, and its {@link ParameterOverride}s: what that
+ * release says differently about a parameter -- its default, choices, inline comment, short help or
+ * help reference. Each override must name a parameter whose range claims the version, once, with an
+ * {@code https://} source; it must replace at least one field, and nothing but those five; every
+ * field it replaces must pass the rule the curated field passes and must differ from the curated
+ * field; and the version's resulting default must be one of the version's resulting choices. A
+ * parameter named as Comet names a tuple slot ({@code variable_mod} and two digits) must be of kind
+ * {@link ValueKind#VARIABLE_MOD_TUPLE} and the other way round; and a tuple default must hold as
+ * many fields as the layout of every version it claims.
  *
  * <p>The format is documented in {@code docs/developer/comet_parameter_schema.rst}; the
  * documentation generator reads the same file with Python's standard library.
@@ -105,9 +107,9 @@ public final class MetadataLoader {
                     "parameterPages",
                     "source",
                     "variableModTuple",
-                    "defaults");
+                    "overrides");
 
-    private static final List<String> OVERRIDE_FIELDS = List.of("name", "default", "source");
+    private static final List<String> OVERRIDE_REQUIRED = List.of("name", "source");
 
     private static final List<String> TUPLE_FIELDS = List.of("source", "fields");
 
@@ -199,7 +201,7 @@ public final class MetadataLoader {
                 parameters(top, pending.stream().map(PendingVersion::record).toList());
         List<CometVersionRecord> versions = new ArrayList<>();
         for (PendingVersion version : pending) {
-            versions.add(version.withDefaults(overrides(version, parameters)));
+            versions.add(version.withOverrides(overrides(version, parameters)));
         }
         tupleDefaults(parameters, versions);
         List<InternalParameter> internal = internal(top, parameters);
@@ -208,35 +210,35 @@ public final class MetadataLoader {
     }
 
     /**
-     * A version record read before the parameters it overrides defaults for.
+     * A version record read before the parameters it overrides.
      *
      * @param record the record, without its overrides
      * @param node where it is, for reporting an override
      */
     private record PendingVersion(CometVersionRecord record, Node node) {
 
-        CometVersionRecord withDefaults(Map<String, String> defaults) {
+        CometVersionRecord withOverrides(Map<String, ParameterOverride> overrides) {
             return new CometVersionRecord(
                     record.version(),
                     record.marker(),
                     record.parameterPages(),
                     record.source(),
                     record.variableModTuple(),
-                    defaults);
+                    overrides);
         }
     }
 
-    private static Map<String, String> overrides(
+    private static Map<String, ParameterOverride> overrides(
             PendingVersion pending, List<ParameterDefinition> parameters) {
         Node version = pending.node();
         ToolVersion curated = pending.record().version();
-        List<JsonValue> array = version.array("defaults");
-        Map<String, String> defaults = new LinkedHashMap<>();
+        List<JsonValue> array = version.array("overrides");
+        Map<String, ParameterOverride> overrides = new LinkedHashMap<>();
         for (int index = 0; index < array.size(); index++) {
-            Node entry = Node.of(array.get(index), version.where(), "defaults[" + index + "]");
-            entry.onlyFields(OVERRIDE_FIELDS);
+            Node entry = Node.of(array.get(index), version.where(), "overrides[" + index + "]");
+            entry.onlyFields(OVERRIDE_REQUIRED, ParameterOverride.FIELDS);
             String name = entry.text("name");
-            Node named = entry.renamed(version.where() + " default override for \"" + name + "\"");
+            Node named = entry.renamed(version.where() + " override for \"" + name + "\"");
             ParameterDefinition definition =
                     parameters.stream()
                             .filter(p -> p.name().equals(name))
@@ -248,32 +250,93 @@ public final class MetadataLoader {
                         "name",
                         "is not modelled for Comet "
                                 + curated.text()
-                                + ", so that version has no default for it");
+                                + ", so that version has nothing to override");
             }
-            if (defaults.containsKey(name)) {
+            if (overrides.containsKey(name)) {
                 throw named.failure("name", "is overridden twice");
             }
-            String value = named.string("default");
-            checkDefault(
-                    named,
-                    definition.kind(),
-                    definition.serialization(),
-                    value,
-                    definition.minimum(),
-                    definition.maximum(),
-                    definition.choices());
-            if (value.equals(definition.defaultValue())) {
+            String source = named.url("source");
+            if (ParameterOverride.FIELDS.stream().noneMatch(named::has)) {
                 throw named.failure(
-                        "default",
-                        "\""
-                                + value
-                                + "\" repeats the parameter's own curated default; an override"
-                                + " records only a difference");
+                        "name",
+                        "replaces no field; an override names at least one of "
+                                + ParameterOverride.FIELDS);
             }
-            named.url("source");
-            defaults.put(name, value);
+            overrides.put(name, override(named, definition, source));
         }
-        return defaults;
+        return overrides;
+    }
+
+    /**
+     * One override's fields, each held to the rule its curated field keeps, each required to differ
+     * from it, and the version's resulting default required to be one of its resulting choices.
+     */
+    private static ParameterOverride override(
+            Node named, ParameterDefinition definition, String source) {
+        Optional<List<Choice>> choices = Optional.empty();
+        if (named.has("choices")) {
+            List<Choice> listed = choices(named, definition.kind());
+            if (listed.equals(definition.choices())) {
+                throw unchanged(named, "choices", "choices");
+            }
+            choices = Optional.of(listed);
+        }
+        List<Choice> versionChoices = choices.orElse(definition.choices());
+        Optional<String> defaultValue = Optional.empty();
+        if (named.has("default")) {
+            String value = named.string("default");
+            if (value.equals(definition.defaultValue())) {
+                throw unchanged(named, "default", "default \"" + value + "\"");
+            }
+            defaultValue = Optional.of(value);
+        }
+        checkDefault(
+                named,
+                definition.kind(),
+                definition.serialization(),
+                defaultValue.orElse(definition.defaultValue()),
+                definition.minimum(),
+                definition.maximum(),
+                versionChoices);
+        boolean replacesComment = named.has("inlineComment");
+        Optional<String> inlineComment = Optional.empty();
+        if (replacesComment) {
+            inlineComment = inlineComment(named);
+            if (inlineComment.equals(definition.inlineComment())) {
+                throw unchanged(named, "inlineComment", "inline comment");
+            }
+        }
+        Optional<String> shortHelp = Optional.empty();
+        if (named.has("shortHelp")) {
+            shortHelp = Optional.of(named.text("shortHelp"));
+            if (shortHelp.get().equals(definition.shortHelp())) {
+                throw unchanged(named, "shortHelp", "short help");
+            }
+        }
+        Optional<String> helpUrl = Optional.empty();
+        if (named.has("helpUrl")) {
+            helpUrl = Optional.of(named.url("helpUrl"));
+            if (helpUrl.get().equals(definition.detailedHelpRef())) {
+                throw unchanged(named, "helpUrl", "help reference");
+            }
+        }
+        return new ParameterOverride(
+                definition.name(),
+                source,
+                defaultValue,
+                choices,
+                shortHelp,
+                helpUrl,
+                replacesComment,
+                inlineComment);
+    }
+
+    private static InvalidMetadataException unchanged(Node named, String field, String what) {
+        return named.failure(
+                field,
+                "repeats the parameter's own curated "
+                        + what
+                        + "; an override records only a difference");
     }
 
     private static List<PendingVersion> versions(Node top) {
@@ -801,15 +864,25 @@ public final class MetadataLoader {
         }
 
         void onlyFields(List<String> allowed) {
-            for (String field : allowed) {
+            onlyFields(allowed, List.of());
+        }
+
+        void onlyFields(List<String> required, List<String> optional) {
+            for (String field : required) {
                 required(field);
             }
+            List<String> allowed = new ArrayList<>(required);
+            allowed.addAll(optional);
             for (String present : object.members().keySet()) {
                 if (!allowed.contains(present)) {
                     throw failure(
                             present, "is not a field this format has; expected only " + allowed);
                 }
             }
+        }
+
+        boolean has(String field) {
+            return object.member(field).isPresent();
         }
 
         JsonValue required(String field) {

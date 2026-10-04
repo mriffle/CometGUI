@@ -44,7 +44,7 @@ final class ConstructedMetadata {
         version.put("parameterPages", "https://example.org/pages/");
         version.put("source", "https://example.org/source/");
         version.put("variableModTuple", tupleLayout());
-        version.put("defaults", new ArrayList<>());
+        version.put("overrides", new ArrayList<>());
         List<Object> categories = new ArrayList<>();
         for (ParameterCategory category : ParameterCategory.values()) {
             Map<String, Object> entry = new LinkedHashMap<>();

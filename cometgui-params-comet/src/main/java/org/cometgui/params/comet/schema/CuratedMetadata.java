@@ -79,9 +79,9 @@ public record CuratedMetadata(
     }
 
     /**
-     * The definition of one parameter, whatever versions it claims, with the parameter's own
-     * curated default -- not any version's override of it ({@link CometVersionRecord#defaults()}).
-     * For the definition as one version has it, use {@link #parameter(String, ToolVersion)}.
+     * The definition of one parameter, whatever versions it claims, as curated -- not as any
+     * version's override of it ({@link CometVersionRecord#overrides()}) has it. For the definition
+     * as one version has it, use {@link #parameter(String, ToolVersion)}.
      *
      * @param name the parameter name
      * @return the definition, or empty if the parameter is not modelled
@@ -93,7 +93,8 @@ public record CuratedMetadata(
 
     /**
      * The definition of one parameter as one version has it: present only if its range claims the
-     * version, and carrying that version's default.
+     * version, and with that version's override applied where its record has one -- its own
+     * default, choices, inline comment, help and help reference.
      *
      * @param name the parameter name
      * @param version the Comet version
@@ -107,9 +108,9 @@ public record CuratedMetadata(
     }
 
     /**
-     * The definitions that claim a version, in metadata order, each carrying that version's
-     * default: the curated default, or the version record's override of it where the version's own
-     * {@code -q} output writes another value.
+     * The definitions that claim a version, in metadata order, each as that version has it: the
+     * curated definition, with the version record's override applied where the version says
+     * something else about the parameter ({@link ParameterOverride}).
      *
      * @param version the Comet version
      * @return the definitions whose version range contains it
@@ -123,29 +124,10 @@ public record CuratedMetadata(
     }
 
     private ParameterDefinition forVersion(ParameterDefinition definition, ToolVersion version) {
-        Optional<String> override =
-                version(version).flatMap(record -> record.defaultOverride(definition.name()));
-        if (override.isEmpty()) {
-            return definition;
-        }
-        return new ParameterDefinition(
-                definition.name(),
-                definition.displayName(),
-                definition.category(),
-                definition.kind(),
-                definition.visibility(),
-                override.get(),
-                definition.minimum(),
-                definition.maximum(),
-                definition.choices(),
-                definition.shortHelp(),
-                definition.inlineComment(),
-                definition.detailedHelpRef(),
-                definition.supportedVersions(),
-                definition.serialization(),
-                definition.validators(),
-                definition.aliases(),
-                definition.related());
+        return version(version)
+                .flatMap(record -> record.override(definition.name()))
+                .map(override -> override.applyTo(definition))
+                .orElse(definition);
     }
 
     /**

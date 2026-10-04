@@ -3,6 +3,68 @@
   "description": "Curated metadata for the parameters of Comet's comet.params file: what Comet's own -q output cannot say (display names, categories, help, enum labels, relationships, visibility, version ranges). Read by org.cometgui.params.comet.schema.MetadataLoader and by the documentation generator; format described in docs/developer/comet_parameter_schema.rst.",
   "versions": [
     {
+      "version": "2026.03.0",
+      "marker": "2026.03 rev. 0 (fa08489)",
+      "parameterPages": "https://uwpr.github.io/Comet/parameters/parameters_202603/",
+      "source": "https://github.com/UWPR/Comet/tree/v2026.03.0",
+      "variableModTuple": {
+        "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L556-L625",
+        "fields": [
+          { "field": "MASS", "kind": "DECIMAL", "pair": false },
+          { "field": "RESIDUES", "kind": "RESIDUES", "pair": false },
+          { "field": "BINARY_GROUP", "kind": "INTEGER", "pair": false },
+          { "field": "COUNT", "kind": "INTEGER", "pair": true },
+          { "field": "TERMINAL_DISTANCE", "kind": "INTEGER", "pair": false },
+          { "field": "TERMINUS", "kind": "INTEGER", "pair": false },
+          { "field": "REQUIRED", "kind": "INTEGER", "pair": false },
+          { "field": "NEUTRAL_LOSS", "kind": "DECIMAL", "pair": true }
+        ]
+      },
+      "overrides": [
+        {
+          "name": "add_U_selenocysteine",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L914-L915",
+          "inlineComment": "added to U - avg. 150.0379, mono. 150.95363",
+          "shortHelp": "Mass added to every selenocysteine (U) residue; 0.0 means no modification.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/add_U_selenocysteine.html"
+        },
+        {
+          "name": "decoy_search",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L931",
+          "inlineComment": "0=no (default), 1=internal decoy concatenated, 2=internal decoy separate; .idx searches use the value the index was built with"
+        },
+        {
+          "name": "index_search_type",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L939-L945",
+          "default": "-1",
+          "choices": [
+            {
+              "value": "-1",
+              "label": "Not set: an index built on demand is a fragment-ion index (FI_DB), and Comet never warns"
+            },
+            {
+              "value": "0",
+              "label": "Peptide index (PI_DB)"
+            },
+            {
+              "value": "1",
+              "label": "Fragment-ion index (FI_DB)"
+            }
+          ],
+          "inlineComment": "0=create peptide index, 1=create fragment ion index; if .idx specified but not present",
+          "shortHelp": "Used only when database_name names an .idx file that does not exist yet and is built from its FASTA: chooses whether that index is a peptide index or a fragment-ion index. -1, the default, means not set and builds a fragment-ion index. An existing .idx records its own type and a plain FASTA search has no index, so Comet 2026.03.0 ignores a 0 or 1 there and warns; any value other than -1, 0 or 1 is warned about and treated as -1.",
+          "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/index_search_type.html"
+        },
+        {
+          "name": "spectral_library_ms_level",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L512-L516",
+          "inlineComment": "read by Comet 2026.03.0 but used only for a .raw spectral library, which it refuses",
+          "shortHelp": "MS level of the spectral-library spectra. Comet 2026.03.0 reads this name (2026.02.2 did not), but its only use of the value is in the reader for a Thermo .raw spectral library, which this release refuses before it reads the level (\"raw files as spectral libraries are not supported yet\"), so a value given here has no effect on a search.",
+          "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSpecLib.cpp#L195-L215"
+        }
+      ]
+    },
+    {
       "version": "2026.02.2",
       "marker": "2026.02 rev. 2 (6edec91)",
       "parameterPages": "https://uwpr.github.io/Comet/parameters/parameters_202602/",
@@ -20,7 +82,7 @@
           { "field": "NEUTRAL_LOSS", "kind": "DECIMAL", "pair": true }
         ]
       },
-      "defaults": []
+      "overrides": []
     },
     {
       "version": "2024.01.0",
@@ -40,16 +102,16 @@
           { "field": "NEUTRAL_LOSS", "kind": "DECIMAL", "pair": false }
         ]
       },
-      "defaults": [
+      "overrides": [
         {
           "name": "fragindex_num_spectrumpeaks",
-          "default": "100",
-          "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/Comet.cpp#L1697"
+          "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/Comet.cpp#L1697",
+          "default": "100"
         },
         {
           "name": "fragindex_skipreadprecursors",
-          "default": "0",
-          "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/Comet.cpp#L1700"
+          "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/Comet.cpp#L1700",
+          "default": "0"
         }
       ]
     }

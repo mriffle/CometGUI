@@ -50,6 +50,26 @@ class CometVersionMarkerTest {
     }
 
     @Test
+    @DisplayName("the real 2026.03.0 fixtures' first line is Comet 2026.03.0, build fa08489")
+    void theReal202603MarkerMaps() throws IOException {
+        for (CometFixtures.Mode mode : CometFixtures.Mode.values()) {
+            String first =
+                    CometFixtures.lines(
+                                    CometFixtures.COMET_2026_03_0, CometFixtures.LINUX_X86_64, mode)
+                            .get(0);
+            CometVersionMarker marker = CometVersionMarker.parseLine(first);
+            assertEquals("2026.03", marker.release());
+            assertEquals(0, marker.revision());
+            assertEquals(Optional.of("fa08489"), marker.build());
+            assertEquals(ToolVersion.parse("2026.03.0"), marker.toolVersion());
+            assertEquals("2026.03 rev. 0 (fa08489)", marker.text());
+        }
+        assertEquals(
+                "2026.03 rev. 0",
+                CometVersionMarker.releaseTextFor(ToolVersion.parse("2026.03.0")));
+    }
+
+    @Test
     @DisplayName("the manifest's version maps back to Comet's spelling")
     void theManifestVersionMapsBack() {
         assertEquals(

@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
  */
 class VersionDefaultsLoaderTest {
 
-    private static final String WHERE = "versions[1] default override for ";
+    private static final String WHERE = "versions[1] override for ";
 
     @SuppressWarnings("unchecked")
     private static ConstructedMetadata withOlderVersion(Map<String, Object>... overrides) {
@@ -46,7 +46,7 @@ class VersionDefaultsLoaderTest {
         older.put("parameterPages", "https://example.org/older/");
         older.put("source", "https://example.org/older-source/");
         older.put("variableModTuple", ConstructedMetadata.tupleLayout());
-        older.put("defaults", new ArrayList<>(List.of(overrides)));
+        older.put("overrides", new ArrayList<>(List.of(overrides)));
         doc.list("versions").add(older);
         ((Map<String, Object>) doc.parameter("allowed_missed_cleavage").get("versions"))
                 .put("from", "2024.01.0");
@@ -186,15 +186,15 @@ class VersionDefaultsLoaderTest {
     @Test
     void defaultsThatAreNotAnArrayAreRejected() {
         ConstructedMetadata doc = withOlderVersion();
-        ((Map<String, Object>) doc.list("versions").get(1)).put("defaults", "none");
-        rejected(doc, "versions[1]", "defaults", "must be an array");
+        ((Map<String, Object>) doc.list("versions").get(1)).put("overrides", "none");
+        rejected(doc, "versions[1]", "overrides", "must be an array");
     }
 
     @Test
     void aMissingDefaultsFieldIsRejected() {
         ConstructedMetadata doc = ConstructedMetadata.valid();
-        ((Map<String, Object>) doc.list("versions").get(0)).remove("defaults");
-        rejected(doc, "versions[0]", "defaults", "is missing");
+        ((Map<String, Object>) doc.list("versions").get(0)).remove("overrides");
+        rejected(doc, "versions[0]", "overrides", "is missing");
     }
 
     @Test

@@ -124,6 +124,53 @@ class FixtureMatrixTest {
     }
 
     @Test
+    @DisplayName("every fixture directory verifies, including 2026.03.0 before the manifest has it")
+    void everyFixtureDirectoryVerifies() throws IOException {
+        assertEquals(List.of(), FixtureMatrix.verifyEveryDirectory(CometFixtures.root()));
+        assertTrue(
+                CometFixtures.versions(CometFixtures.root())
+                        .containsAll(
+                                List.of(
+                                        CometFixtures.COMET_2026_02_2,
+                                        CometFixtures.COMET_2026_03_0)),
+                "both captured releases are fixture directories");
+    }
+
+    @Test
+    @DisplayName("a changed byte in a fixture directory the manifest does not name is caught")
+    void aChangedByteOutsideTheManifestFails(@TempDir Path directory) throws IOException {
+        Path root = copiedFixtures(directory);
+        Path unlisted =
+                Files.createDirectories(
+                        CometFixtures.directory(root, "2099.01.0", CometFixtures.LINUX_X86_64));
+        Path source =
+                CometFixtures.directory(
+                        root, CometFixtures.COMET_2026_02_2, CometFixtures.LINUX_X86_64);
+        try (var files = Files.list(source)) {
+            for (Path file : files.toList()) {
+                Files.copy(file, unlisted.resolve(file.getFileName()));
+            }
+        }
+        Files.createDirectories(root.resolve("2099.02.0"));
+        assertEquals(
+                List.of(root.resolve("2099.02.0") + " holds no platform directory"),
+                FixtureMatrix.verifyEveryDirectory(root));
+        Path fixture = unlisted.resolve(CometFixtures.Mode.DEFAULTS.fileName());
+        byte[] bytes = Files.readAllBytes(fixture);
+        bytes[10] = (byte) (bytes[10] ^ 0x01);
+        Files.write(fixture, bytes);
+        List<String> problems = FixtureMatrix.verifyEveryDirectory(root);
+        assertEquals(2, problems.size(), problems.toString());
+        assertTrue(
+                problems.stream()
+                        .anyMatch(
+                                problem ->
+                                        problem.contains("2099.01.0")
+                                                && problem.contains("comet-p.params has SHA-256")),
+                problems.toString());
+    }
+
+    @Test
     @DisplayName("a Comet version in the manifest with no fixtures fails the check, naming it")
     void aVersionWithoutFixturesFails(@TempDir Path directory) throws IOException {
         Path manifest =

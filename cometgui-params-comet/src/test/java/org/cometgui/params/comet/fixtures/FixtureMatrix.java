@@ -140,6 +140,31 @@ public final class FixtureMatrix {
     }
 
     /**
+     * Verifies every fixture directory under a root against its {@code SHA256SUMS} -- including a
+     * version the manifest does not (yet) name, whose bytes would otherwise be checked by nothing
+     * until its manifest rows land.
+     *
+     * @param fixtureRoot the fixture root
+     * @return one line per problem, empty if every directory verifies
+     * @throws IOException if the root cannot be listed or a file cannot be read
+     */
+    public static List<String> verifyEveryDirectory(Path fixtureRoot) throws IOException {
+        List<String> problems = new ArrayList<>();
+        for (String version : CometFixtures.versions(fixtureRoot)) {
+            try (var platforms = Files.list(fixtureRoot.resolve(version))) {
+                List<Path> directories = platforms.filter(Files::isDirectory).sorted().toList();
+                if (directories.isEmpty()) {
+                    problems.add(fixtureRoot.resolve(version) + " holds no platform directory");
+                }
+                for (Path directory : directories) {
+                    problems.addAll(verifyDirectory(directory));
+                }
+            }
+        }
+        return problems;
+    }
+
+    /**
      * Verifies one fixture directory: both dumps present, a {@code SHA256SUMS} listing both, and
      * every listed digest equal to its file's.
      *

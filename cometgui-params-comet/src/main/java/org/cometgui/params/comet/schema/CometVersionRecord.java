@@ -29,19 +29,22 @@ import org.cometgui.domain.tools.ToolVersion;
  * <p>The variable-modification tuple's field layout is version-dependent ({@code R-PARAM-09}), so
  * it is recorded here, per version, as data the codec reads.
  *
- * <p>A parameter's curated {@code default} holds for every curated version its range claims, except
- * where a version's own {@code -q} output writes another value: that version's record then
- * overrides it in {@link #defaults()} (Comet 2024.01.0 writes {@code fragindex_num_spectrumpeaks =
- * 100} where 2026.02.2 writes {@code 150}). {@link CuratedMetadata#parametersFor(ToolVersion)}
- * applies the overrides, so a model of a version is built from that version's defaults.
+ * <p>A parameter's curated definition holds for every curated version its range claims, except
+ * where a version says something else about it: that version's record then carries a {@link
+ * ParameterOverride} for the parameter in {@link #overrides()} -- another default (Comet 2024.01.0
+ * writes {@code fragindex_num_spectrumpeaks = 100} where 2026.02.2 writes {@code 150}), other
+ * choices (Comet 2026.03.0 adds {@code index_search_type = -1}), another inline comment, help or
+ * help reference. {@link CuratedMetadata#parametersFor(ToolVersion)} and {@link
+ * CuratedMetadata#parameter(String, ToolVersion)} apply the overrides, so a model of a version is
+ * built from, written with and validated against that version's own definitions.
  *
  * @param version the version as the manifest spells it, such as {@code 2026.02.2}
  * @param marker how that release's binary spells itself on its {@code # comet_version} line
  * @param parameterPages the upstream parameter documentation for the release
  * @param source the upstream source tree at the release's tag
  * @param variableModTuple the field layout of the release's variable-modification tuple
- * @param defaults parameter name to the default this version writes where it differs from the
- *     parameter's curated default; empty for most versions
+ * @param overrides parameter name to what this version says differently about it; empty for a
+ *     version that agrees with every curated definition
  */
 public record CometVersionRecord(
         ToolVersion version,
@@ -49,20 +52,31 @@ public record CometVersionRecord(
         String parameterPages,
         String source,
         VariableModLayout variableModTuple,
-        Map<String, String> defaults) {
+        Map<String, ParameterOverride> overrides) {
 
-    /** Validates the components and takes an immutable, name-ordered copy of the overrides. */
+    /**
+     * Validates the components and takes an immutable, name-ordered copy of the overrides.
+     *
+     * @throws IllegalArgumentException if an override is filed under another parameter's name
+     */
     public CometVersionRecord {
         Objects.requireNonNull(version, "version");
         Objects.requireNonNull(marker, "marker");
         Objects.requireNonNull(parameterPages, "parameterPages");
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(variableModTuple, "variableModTuple");
-        defaults = Map.copyOf(defaults);
+        overrides = Collections.unmodifiableSortedMap(new TreeMap<>(overrides));
+        overrides.forEach(
+                (name, override) -> {
+                    if (!override.name().equals(name)) {
+                        throw new IllegalArgumentException(
+                                "the override filed under " + name + " is for " + override.name());
+                    }
+                });
     }
 
     /**
-     * A record with no default overrides.
+     * A record with no overrides.
      *
      * @param version the version as the manifest spells it
      * @param marker how that release's binary spells itself
@@ -80,13 +94,27 @@ public record CometVersionRecord(
     }
 
     /**
-     * The default overrides, immutable and ordered by name.
+     * This version's override for one parameter.
      *
-     * @return parameter name to this version's default
+     * @param name the parameter name
+     * @return the override, or empty if the curated definition holds for this version
      */
-    @Override
+    public Optional<ParameterOverride> override(String name) {
+        Objects.requireNonNull(name, "name");
+        return Optional.ofNullable(overrides.get(name));
+    }
+
+    /**
+     * The default overrides alone, immutable and ordered by name.
+     *
+     * @return parameter name to this version's default, for the overrides that replace one
+     */
     public Map<String, String> defaults() {
-        return Collections.unmodifiableSortedMap(new TreeMap<>(defaults));
+        TreeMap<String, String> defaults = new TreeMap<>();
+        overrides.forEach(
+                (name, override) ->
+                        override.defaultValue().ifPresent(value -> defaults.put(name, value)));
+        return Collections.unmodifiableSortedMap(defaults);
     }
 
     /**
@@ -96,7 +124,6 @@ public record CometVersionRecord(
      * @return the overriding default, or empty if the parameter's curated default holds
      */
     public Optional<String> defaultOverride(String name) {
-        Objects.requireNonNull(name, "name");
-        return Optional.ofNullable(defaults.get(name));
+        return override(name).flatMap(ParameterOverride::defaultValue);
     }
 }

@@ -42,7 +42,7 @@ public final class ConstructedVersions {
     }
 
     /**
-     * As {@link #withConstructedVersion(String)}, with the version record's {@code defaults} array
+     * As {@link #withConstructedVersion(String)}, with the version record's {@code overrides} array
      * holding {@code defaults} (JSON objects, comma separated) -- a layout of another field count
      * needs its tuples' defaults written in it.
      */
@@ -60,7 +60,7 @@ public final class ConstructedVersions {
                         + " \"variableModTuple\": {\"source\": \"https://example.org/c\","
                         + " \"fields\": ["
                         + fields
-                        + "]}, \"defaults\": ["
+                        + "]}, \"overrides\": ["
                         + defaults
                         + "]},\n";
         String anchor = "\"versions\": [\n";

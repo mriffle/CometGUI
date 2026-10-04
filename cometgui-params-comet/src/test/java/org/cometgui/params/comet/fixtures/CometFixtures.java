@@ -23,6 +23,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.TreeSet;
+import java.util.stream.Stream;
 
 /**
  * Where the real {@code comet -q} and {@code comet -p} fixtures are, by version, platform and mode.
@@ -42,8 +44,11 @@ public final class CometFixtures {
     /** The checksum file in each fixture directory, in {@code sha256sum} format. */
     public static final String SHA256SUMS = "SHA256SUMS";
 
-    /** The version whose fixtures exist today, as the manifest spells it. */
+    /** Comet 2026.02.2, the release Phase 06 was built on, as the manifest spells it. */
     public static final String COMET_2026_02_2 = "2026.02.2";
+
+    /** Comet 2026.03.0, the default from specification revision 12 ({@code D-010}). */
+    public static final String COMET_2026_03_0 = "2026.03.0";
 
     /** The one platform this project's host can execute, as a fixture directory name. */
     public static final String LINUX_X86_64 = "linux-x86-64";
@@ -107,6 +112,23 @@ public final class CometFixtures {
         } catch (URISyntaxException impossible) {
             throw new AssertionError(url + " is not a URI", impossible);
         }
+    }
+
+    /**
+     * Every Comet version that has a fixture directory under a root, whether or not the manifest
+     * names it: the drift test runs for each, so a captured release cannot sit unchecked.
+     *
+     * @param root the fixture root, {@link #root()} or a test's copy of it
+     * @return the version directory names, sorted
+     * @throws IOException if the root cannot be listed
+     */
+    public static List<String> versions(Path root) throws IOException {
+        TreeSet<String> versions = new TreeSet<>();
+        try (Stream<Path> children = Files.list(root)) {
+            children.filter(Files::isDirectory)
+                    .forEach(child -> versions.add(root.relativize(child).toString()));
+        }
+        return List.copyOf(versions);
     }
 
     /**

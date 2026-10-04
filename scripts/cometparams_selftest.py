@@ -126,7 +126,77 @@ def _preset_unknown(document):
 def _unknown_release(document):
     for artefact in document["artefacts"]:
         if artefact.get("tool") == "comet":
-            artefact["version"] = "2026.03.0"
+            artefact["version"] = UNRECORDED_RELEASE
+
+
+#: A Comet release no version record describes. (2026.03.0 played this part
+#: until COMET-2026-03 unit 1 gave it a record.)
+UNRECORDED_RELEASE = "2099.01.0"
+
+#: The release whose record carries the overrides the override cases damage.
+OVERRIDING_RELEASE = "2026.03.0"
+
+#: The overridden parameter most override damages are applied to: its record
+#: replaces its default, choices, inline comment, help and help reference.
+OVERRIDDEN = "index_search_type"
+
+
+def _record(document: dict, version: str) -> dict:
+    for record in document["versions"]:
+        if record["version"] == version:
+            return record
+    raise HarnessError(f"the metadata has no version record {version!r} to damage")
+
+
+def _override(document: dict, name: str = OVERRIDDEN) -> dict:
+    for override in _record(document, OVERRIDING_RELEASE)["overrides"]:
+        if override["name"] == name:
+            return override
+    raise HarnessError(f"the {OVERRIDING_RELEASE} record has no override for {name!r} to damage")
+
+
+def _override_set(field, value, name=OVERRIDDEN):
+    def damage(document):
+        _override(document, name)[field] = value
+    return damage
+
+
+def _override_same_as_curated(field, name):
+    def damage(document):
+        _override(document, name)[field] = copy.deepcopy(_parameter(document, name)[field])
+    return damage
+
+
+def _override_revalue_choice(value, replacement):
+    # Re-valued rather than dropped: without -1 the choices would equal the
+    # curated ones and be refused for repeating them, a different diagnostic.
+    def damage(document):
+        hits = [c for c in _override(document)["choices"] if c["value"] == value]
+        if len(hits) != 1:
+            raise HarnessError(f"the override has no single choice {value!r} to re-value")
+        hits[0]["value"] = replacement
+    return damage
+
+
+def _override_strip(document):
+    override = _override(document)
+    for field in cometparams.OVERRIDE_FIELDS:
+        override.pop(field, None)
+
+
+def _override_duplicate(document):
+    record = _record(document, OVERRIDING_RELEASE)
+    record["overrides"].append(copy.deepcopy(_override(document)))
+
+
+def _override_for_unclaimed_release(document):
+    # index_search_type is curated from 2026.02.2: Comet 2024.01.0 does not declare it.
+    _record(document, "2024.01.0")["overrides"].append(
+        {"name": OVERRIDDEN, "source": "https://example.org/", "default": "0"})
+
+
+def _override_unmodelled(document):
+    _override(document)["name"] = "ms1_mass_range"
 
 
 def generator_cases():
@@ -161,7 +231,43 @@ def generator_cases():
         ("preset-names-no-parameter", "presets", _preset_unknown,
          "deltas[0] sets 'ms1_mass_range', which is not a modelled parameter"),
         ("release-without-version-record", "manifest", _unknown_release,
-         "installs Comet 2026.03.0, but the metadata has no version record"),
+         f"installs Comet {UNRECORDED_RELEASE}, but the metadata has no version record"),
+    ]
+    over = f'versions[0] ({OVERRIDING_RELEASE}) overrides'
+    cases += [
+        ("override-unknown-field", "metadata", _override_set("since", "2026.03.0"),
+         f'("{OVERRIDDEN}") has the field "since", which an override does not have'),
+        ("override-unmodelled", "metadata", _override_unmodelled,
+         "names 'ms1_mass_range', which is not a modelled parameter"),
+        ("override-unclaimed-release", "metadata", _override_for_unclaimed_release,
+         f"overrides {OVERRIDDEN} for Comet 2024.01.0, whose range (2026.02.2 to open) does not "
+         "claim that release"),
+        ("override-twice", "metadata", _override_duplicate,
+         f'("{OVERRIDDEN}") overrides {OVERRIDDEN} a second time'),
+        ("override-source-not-https", "metadata", _override_set("source", "Comet.cpp line 939"),
+         "has \"source\" = 'Comet.cpp line 939'"),
+        ("override-replaces-nothing", "metadata", _override_strip,
+         f'("{OVERRIDDEN}") replaces no field'),
+        ("override-repeats-curated-comment", "metadata",
+         _override_same_as_curated("inlineComment", "decoy_search"),
+         'repeats the curated "inlineComment" of decoy_search'),
+        ("override-repeats-curated-choices", "metadata",
+         _override_same_as_curated("choices", OVERRIDDEN),
+         f'repeats the curated "choices" of {OVERRIDDEN}'),
+        ("override-default-not-a-choice", "metadata", _override_set("default", "7"),
+         f"leaves Comet {OVERRIDING_RELEASE} with the default '7', which is not one of that "
+         "release's choices"),
+        ("override-choices-drop-default", "metadata", _override_revalue_choice("-1", "2"),
+         f"leaves Comet {OVERRIDING_RELEASE} with the default '-1', which is not one of that "
+         "release's choices (2, 0, 1)"),
+        ("override-choices-on-non-enum", "metadata",
+         _override_set("choices", [{"value": "1", "label": "a"}, {"value": "2", "label": "b"}],
+                       "add_U_selenocysteine"),
+         "gives choices to DECIMAL, which is not an enumerated kind"),
+        ("override-help-not-https", "metadata", _override_set("helpUrl", "http://example.org/"),
+         "has \"helpUrl\" = 'http://example.org/'"),
+        ("override-blank-help", "metadata", _override_set("shortHelp", "  "),
+         f'{over}[2] ("{OVERRIDDEN}") has "shortHelp" = '),
     ]
     return cases
 
@@ -181,6 +287,54 @@ def _write_json(path: Path, document) -> None:
 def _generate(root, out_dir, files):
     return cometparams.generate(root, out_dir, metadata_file=files["metadata"],
                                 presets_file=files["presets"], manifest_file=files["manifest"])
+
+
+def per_release_control(root: Path, clean: Path, files: dict) -> None:
+    """A release's override reaches the page: rendered for both releases, the
+    overridden entry carries each release's own default, choices and comment.
+
+    Not a damage but a positive control: a generator that ignored the version
+    records' overrides would render 2026.03.0 with 2026.02.2's facts and fail it.
+    """
+    manifest = json.loads(files["manifest"].read_text(encoding="utf-8"))
+    linux = [a for a in manifest["artefacts"] if a.get("tool") == "comet"
+             and a.get("os") == "linux" and a.get("arch") == "x86-64"]
+    if not linux:
+        raise HarnessError("per-release control: the manifest has no linux/x86-64 Comet row")
+    if OVERRIDING_RELEASE not in {a["version"] for a in linux}:
+        added = dict(linux[0], version=OVERRIDING_RELEASE, releaseTag=f"v{OVERRIDING_RELEASE}")
+        manifest["artefacts"].append(added)
+    control = clean.parent / "per-release"
+    control.mkdir(parents=True)
+    control_files = dict(files, manifest=control / files["manifest"].name)
+    _write_json(control_files["manifest"], manifest)
+    try:
+        summary = _generate(root, control / "out", control_files)
+    except cometparams.CometParamsError as error:
+        raise HarnessError(f"per-release control: rejected: {error}") from None
+    text = (control / "out" / cometparams.FRAGMENT_FILE).read_text(encoding="utf-8")
+    start = text.index(f"{cometparams.ENTRY_LABEL_PREFIX}{OVERRIDDEN}:")
+    entry = text[start:text.index(cometparams.ENTRY_LABEL_PREFIX, start + 1)]
+    expected = [
+        ":Default, Comet 2026.02.2: ``1``",
+        f":Default, Comet {OVERRIDING_RELEASE}: ``-1``",
+        ":Allowed values, Comet 2026.02.2:",
+        f":Allowed values, Comet {OVERRIDING_RELEASE}:",
+        f"{OVERRIDDEN} = -1                 # 0=create peptide index, 1=create fragment ion index",
+        f"{OVERRIDDEN} = 1                  # 0=peptide index (PI_DB), 1=fragment ion index",
+        "parameters_202603/index_search_type.html",
+    ]
+    missing = [needle for needle in expected if needle not in entry]
+    allowed_2602 = entry[entry.index(":Allowed values, Comet 2026.02.2:"):
+                         entry.index(f":Allowed values, Comet {OVERRIDING_RELEASE}:")]
+    if missing or "``-1``" in allowed_2602:
+        raise HarnessError(
+            f"per-release control: the {OVERRIDDEN} entry rendered for "
+            f"{', '.join(summary['releases'])} does not carry each release's own facts; "
+            f"missing {missing}, or -1 offered for 2026.02.2:\n{entry}"
+        )
+    print(f"    control   rendered for {', '.join(summary['releases'])}: {OVERRIDDEN} carries "
+          f"each release's own default, choices and comment")
 
 
 def part_one(root: Path, work: Path) -> int:
@@ -205,6 +359,7 @@ def part_one(root: Path, work: Path) -> int:
     if summary["entries"] != expected or summary["parameters"] != expected:
         raise HarnessError(f"control: {summary['entries']} entries for {expected} parameters")
     print(f"    control   the clean (re-serialised) copy renders: {cometparams.describe(summary)}")
+    per_release_control(root, clean, files)
 
     caught = 0
     for case_id, target, damage, diagnostic in generator_cases():
