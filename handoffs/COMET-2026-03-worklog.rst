@@ -73,22 +73,23 @@ checked; they are not a substitute for the unit's own capture.
     **both versions complete, rc 0, no message** -- *but see the correction
     below: this probe was wrong.*
 
-  **Correction, same day, by me.** My slot-10 probe used ``15.9949 M 0 3 -1 0
-  0 0.0``, identical to slot 1, and Comet **merges** a slot identical to a
-  lower one before any check (``CometSearchManager.cpp`` L1483-1512 at
-  ``v2026.03.0``, commit ``fa08489``), so slot 10 was no longer active. The
-  check itself is L1577-1603. Re-probed with ``variable_mod10 = 79.966331 STY 0
-  3 -1 0 0 0.0``: with ``print_ascorepro_score = 1`` 2026.03.0 stops, rc 1,
-  ``Error - print_ascorepro_score is enabled but variable_mod10 is active;
-  AScorePro localization is only supported for variable_mod01 through
-  variable_mod09. ...``; with ``0`` it completes; 2026.02.2 completes in both.
-  The same STY slot in ``variable_mod09`` with ``-1`` completes. The release
-  note is **confirmed**, with the merge rule as a condition the validator must
-  model.
   - 2026.03.0 no longer warns ``invalid parameter found:
     spectral_library_ms_level`` (2026.02.2 does).
 
 * ``-q``'s default ``print_ascorepro_score`` is ``1`` in both versions.
+
+**Correction, same day, by me.** My slot-10 probe used
+``15.9949 M 0 3 -1 0 0 0.0``, identical to slot 1, and Comet **merges** a slot
+identical to a lower one before any check (``CometSearchManager.cpp``
+L1483-1512 at ``v2026.03.0``, commit ``fa08489``), so slot 10 was no longer
+active. The check itself is L1577-1603. Re-probed with
+``variable_mod10 = 79.966331 STY 0 3 -1 0 0 0.0``: with
+``print_ascorepro_score = 1`` 2026.03.0 stops, rc 1, ``Error -
+print_ascorepro_score is enabled but variable_mod10 is active; AScorePro
+localization is only supported for variable_mod01 through variable_mod09.
+...``; with ``0`` it completes; 2026.02.2 completes in both. The same STY slot
+in ``variable_mod09`` with ``-1`` completes. The release note is
+**confirmed**, with the merge rule as a condition the validator must model.
 
 Coupling that fixes the order of units
 ---------------------------------------
