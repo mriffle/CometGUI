@@ -1168,6 +1168,12 @@ main() {
     # build, which is how it presented the first time and cost a diagnosis.
     [ -d "${ROOT}/scratch/phase05/artefacts" ] \
         || die "scratch/phase05/artefacts does not exist. Phase 05's extraction and install suites read the real upstream bytes from there and fail rather than skip without them, so controls 7 and 8 would die in the build stage instead of proving the census. The mirror is gitignored; refill it by fetching each artefact from the URL in manifests/tools.json and verifying its SHA-256 before use."
+    # The same for Phase 06's mirror: cometgui-params-comet's migration tests
+    # (MigrationFixtureRealBinaryTest) run the real Comet 2024.01.0 binary from
+    # scratch/phase06/artefacts, which is NOT in manifests/tools.json, and fail
+    # rather than skip without it -- so the sandbox build would die there too.
+    [ -d "${ROOT}/scratch/phase06/artefacts" ] \
+        || die "scratch/phase06/artefacts does not exist. cometgui-params-comet's migration tests run the real Comet 2024.01.0 binary from there and fail rather than skip without it, so the sandbox build would die before any control ran. The mirror is gitignored; refill it as docs/developer/comet_parameter_schema.rst (The migration fixture: Comet 2024.01.0) describes, checking the SHA-256 pinned in MigrationFixtures.ROW."
     bash "${ROOT}/scripts/fetch-fontstack.sh" --verify >/dev/null \
         || die "the font stack is missing; run bash scripts/fetch-fontstack.sh first."
 
