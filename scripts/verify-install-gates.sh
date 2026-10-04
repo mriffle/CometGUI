@@ -88,6 +88,19 @@
 #       shape a process can take it.  Graded on Linux through the scripted
 #       ProcessRunner production calls; NOT evidence of what xattr does on a
 #       Mac, which only the macos-gatekeeper workflow can show
+#   20  R-TOOL-06 [NEW at COMET-2026-03 unit 2, not from the record]: the
+#       identity stage made VERSION-BLIND -- StagedToolProbe's comparison of
+#       the banner's version with the record's replaced by `false` -- so the
+#       real Comet 2026.03.0 binary installs under a record pinning 2026.02.2.
+#       The SHA-256 matches (they are the pinned bytes), so the banner is the
+#       only thing that can tell the releases apart
+#   21  D-010 [NEW at COMET-2026-03 unit 2, not from the record]: the offer
+#       order's FIRST key inverted, so select() offers the oldest release
+#       first and the default Comet stops being the newest the manifest names
+#       -- graded host by host against the shipped manifest
+#   22  D-010 [NEW at COMET-2026-03 unit 2, not from the record]: the Tool
+#       Manager's own release order (ManagedToolManager.releasesOf) inverted,
+#       so the port offers 2026.02.2 as the first -- the default -- Comet
 #   G   R-DOC-06 / R-PERC-12 [recorded, unit 11]: scripts/toolmatrix.py, the
 #       documentation-table generator.  The clean manifest renders and the
 #       output names the manifest's own digest; the five recorded manifest
@@ -270,6 +283,7 @@ readonly ALTERNATIVES="${MOD_INSTALL}/${J}/install/probe/ManifestAlternatives.ja
 readonly COMPANION_GATE="${MOD_TOOLS}/${J}/tools/api/CompanionGate.java"
 readonly LOCAL_PERCOLATOR="${MOD_TOOLS}/${J}/tools/percolator/LocalPercolatorRegistration.java"
 readonly MANIFEST_CLASS="${MOD_INSTALL}/${J}/install/registry/ArtefactManifest.java"
+readonly STAGED_PROBE="${MOD_INSTALL}/${J}/install/probe/StagedToolProbe.java"
 readonly PLATFORM_FIXUPS="${MOD_INSTALL}/${J}/install/cache/PlatformFixups.java"
 readonly SYNTHETIC_PIN="${MOD_TOOLS}/${J}/tools/percolator/SyntheticPin.java"
 
@@ -293,7 +307,7 @@ readonly -a QUIET=(
 )
 
 # Every control id, in the order they run.  Cheap and Maven-free first.
-readonly -a ALL_CONTROLS=(G M 1 2 3 6 8 9 10 19 11 12 13 16 17 14 15 18 4 5 7 H)
+readonly -a ALL_CONTROLS=(G M 1 2 3 6 8 9 10 19 11 12 13 16 17 20 21 22 14 15 18 4 5 7 H)
 
 PASSED=0
 FAILED=0
@@ -906,6 +920,9 @@ readonly SEL_16="ShippedManifestTest#aPlatformIndependentDownloadIsOfferedOnce+c
 readonly SEL_17="ManagedToolManagerInstallTest#anInstallRunsEndToEndThroughThePort,ManagedToolManagerOffersTest#theRowsAScientistSeesOnLinux"
 readonly SEL_18="SyntheticPinTest\$LocaleIndependence#theFixturesDoNotFollowTheDefaultLocale+bothFormatCallSitesHold"
 readonly SEL_19="PlatformFixupsTest#aDeletionThatChangesNothingIsReportedAsNotCleared+onMacOsEveryQuarantinedFileIsClearedThroughXattr+onOtherHostsTheAttributeIsNotTouched"
+readonly SEL_20="CometReleaseInstallTest#aBinaryThatIsNotThePinnedReleaseIsRefusedByItsBanner+everyLinuxCometReleaseInstallsAndIdentifiesItself"
+readonly SEL_21="ShippedManifestTest#theDefaultCometIsTheNewestReleaseOnEveryHost"
+readonly SEL_22="ManagedToolManagerOffersTest#theDefaultCometIsTheNewestReleaseTheManifestNames+theRowsAScientistSeesOnLinux"
 
 # control_target ID -- "RUN_MODULE SELECTORS" for a Java control, empty for
 # the others.  The baseline covers exactly the selected controls' targets, so
@@ -931,6 +948,9 @@ control_target() {
         17) printf '%s %s' "${MOD_INSTALL}" "${SEL_17}" ;;
         18) printf '%s %s' "${MOD_TOOLS}" "${SEL_18}" ;;
         19) printf '%s %s' "${MOD_INSTALL}" "${SEL_19}" ;;
+        20) printf '%s %s' "${MOD_INSTALL}" "${SEL_20}" ;;
+        21) printf '%s %s' "${MOD_INSTALL}" "${SEL_21}" ;;
+        22) printf '%s %s' "${MOD_INSTALL}" "${SEL_22}" ;;
         G|M) ;;
         *) die "no control '$1'. Controls: ${ALL_CONTROLS[*]}" 2 ;;
     esac
@@ -1082,10 +1102,13 @@ control_5() {
     # opt-in upstream run.  install.setDisable(true) is the same defect --
     # pressing Install does nothing -- and the gate-1 test catches it before
     # the first press, by reading each row's Install control in the real
-    # window assembled in cometgui-app.
+    # window assembled in cometgui-app.  The row named is the first one the
+    # test presses: the default Comet, 2026.03.0 since COMET-2026-03 unit 2
+    # (D-010), where it was 2026.02.2 -- the same assertion on the same
+    # control, reached one row earlier in a list that grew.
     java_control_inject "Install control disabled" "${PANE}" \
         "${MOD_APP}" "${SEL_5}" fixed \
-        "comet-2026_02_2-1's Install control is disabled before anything is installed ==> expected: <true> but was: <false>" \
+        "comet-2026_03_0-1's Install control is disabled before anything is installed ==> expected: <true> but was: <false>" \
         '            install.setDisable(!row.canInstall());' \
         '            install.setDisable(true);'
     assert_log_lacks "and it was caught at once, by the window's own state, not by the 600 s terminal timeout" \
@@ -1250,7 +1273,11 @@ control_13() {
     begin_control "13" "item 5 [recorded, unit 6]: the R-PLAT-03 alternatives keyed on the version, not the row"
     # Found by reading at unit 6 (p05-u6-alternatives-defect) and re-injected
     # by the orchestrator at acceptance: Comet 2026.02.2 is TWO macOS rows, and
-    # excluding the failing build by version takes its sibling with it.
+    # excluding the failing build by version takes its sibling with it.  Since
+    # COMET-2026-03 unit 2 the manifest also names 2026.03.0, which the
+    # defect leaves standing, so the two tests compare the alternatives of
+    # the failing build's OWN release -- where the defect still reads
+    # "but was: <[]>" -- and both graded texts are unchanged.
     java_control_inject "alternatives keyed on the version" "${ALTERNATIVES}" \
         "${MOD_INSTALL}" "${SEL_13}" fixed \
         'R-PLAT-03 requires it to be named. Excluding the failing build by VERSION rather than by row takes the sibling with it and tells the scientist there is nothing else ==> expected: <[comet 2026.02.2 macos-x86-64]> but was: <[]>' \
@@ -1348,6 +1375,60 @@ control_17() {
         '        return record.sizeBytes();'
     assert_log_contains "and the hand-typed rows a scientist sees on Linux" \
         "${DIRTY_LOG}" 'percolator 3.07.1 NOT_INSTALLED 946303'
+    restore_pristine "${MANAGER}"
+    end_control
+}
+
+control_20() {
+    begin_control "20" "R-TOOL-06 [NEW at COMET-2026-03 unit 2]: the identity stage made version-blind"
+    # Not from the record: the intake's own injection.  The real 2026.03.0
+    # binary is installed under a record identical to its own row except that
+    # it pins 2026.02.2.  The SHA-256 matches -- these are the pinned bytes --
+    # so the comparison of the banner's version with the record's is the only
+    # thing standing between them, and with it gone the wrong release is
+    # installed and recorded under 2026.02.2.
+    java_control_inject "identity comparison ignored" "${STAGED_PROBE}" \
+        "${MOD_INSTALL}" "${SEL_20}" fixed \
+        'the 2026.03.0 binary must be refused under a record pinning 2026.02.2: its SHA-256 matches, so the identity stage reading the banner is the only thing that can tell the two releases apart ==> Expected org.cometgui.install.cache.InstallRejectedException to be thrown, but nothing was thrown.' \
+        '        if (!identified.equals(record.version())) {' \
+        '        if (false) {'
+    assert_testcase "and every genuine release still installs and identifies itself: only the mislabelled one is affected" \
+        passed "${MOD_INSTALL}" CometReleaseInstallTest everyLinuxCometReleaseInstallsAndIdentifiesItself
+    restore_pristine "${STAGED_PROBE}"
+    end_control
+}
+
+control_21() {
+    begin_control "21" "D-010 [NEW at COMET-2026-03 unit 2]: select() no longer offers the newest release first"
+    # Not from the record.  The default Comet is nothing but the first row
+    # select() offers; there is no field naming it.  Reversing the first key
+    # of OFFER_ORDER makes the oldest release the default on every host.
+    java_control_inject "offer order oldest first" "${MANIFEST_CLASS}" \
+        "${MOD_INSTALL}" "${SEL_21}" fixed \
+        "D-010's default, host by host ==> expected: <[linux-x86-64 2026.03.0, linux-aarch64 2026.03.0, macos-aarch64 2026.03.0, macos-x86-64 2026.02.2, windows-x86-64 2026.03.0]> but was: <[linux-x86-64 2026.02.2, linux-aarch64 2026.02.2, macos-aarch64 2026.02.2, macos-x86-64 2026.02.2, windows-x86-64 2026.02.2]>" \
+        '                            Comparator.reverseOrder())
+                    .thenComparing(ArtefactSelection::isTranslated);' \
+        '                            Comparator.naturalOrder())
+                    .thenComparing(ArtefactSelection::isTranslated);'
+    assert_log_contains "and the derivation from the rows says the same, on its own" \
+        "${DIRTY_LOG}" 'linux-x86-64: the first Comet offered must be the newest one runnable there'
+    restore_pristine "${MANIFEST_CLASS}"
+    end_control
+}
+
+control_22() {
+    begin_control "22" "D-010 [NEW at COMET-2026-03 unit 2]: the Tool Manager lists a tool's releases oldest first"
+    # Not from the record.  The port orders releases itself, over the whole
+    # manifest, so that a release with no build on this host is still shown
+    # as unavailable; select()'s order does not reach it.  Inverting that sort
+    # makes 2026.02.2 the first -- the default -- Comet a scientist is offered.
+    java_control_inject "release order oldest first" "${MANAGER}" \
+        "${MOD_INSTALL}" "${SEL_22}" fixed \
+        'D-010: the default -- the first Comet offered -- is 2026.03.0 ==> expected: <2026.03.0> but was: <2026.02.2>' \
+        '        newestFirst.sort(Comparator.reverseOrder());' \
+        '        newestFirst.sort(Comparator.naturalOrder());'
+    assert_log_contains "and the hand-typed rows a scientist sees on Linux go red with it" \
+        "${DIRTY_LOG}" 'expected: <[comet 2026.03.0 NOT_INSTALLED 7077008, comet 2026.02.2 NOT_INSTALLED 7014400,'
     restore_pristine "${MANAGER}"
     end_control
 }
@@ -1750,6 +1831,7 @@ run_control() {
         9) control_9 ;; 10) control_10 ;; 11) control_11 ;; 12) control_12 ;;
         13) control_13 ;; 14) control_14 ;; 15) control_15 ;; 16) control_16 ;;
         17) control_17 ;; 18) control_18 ;; 19) control_19 ;;
+        20) control_20 ;; 21) control_21 ;; 22) control_22 ;;
         G) control_G ;; M) control_M ;; H) control_H ;;
         *) die "no control '$1'. Controls: ${ALL_CONTROLS[*]}" 2 ;;
     esac

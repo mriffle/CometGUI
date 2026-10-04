@@ -91,13 +91,13 @@ There are two sets, both **linux/x86-64**: Comet 2026.02.2 and Comet
      - 10 256
      - ``0b6abd4c7415a9289d858d3c8fc84031c31d62acf10f174a8123070ebd8fb8fc``
 
-The 2026.03.0 set was captured before ``manifests/tools.json`` names that
-release (its rows are the next unit's), because the registry cannot gain a
-version whose schema does not exist yet; until then its bytes are proved by
-``SHA256SUMS`` and the drift test, not yet by the real-binary test, which reads
-its checksum from the manifest.
+The 2026.03.0 set was captured before ``manifests/tools.json`` named that
+release, because the registry cannot gain a version whose schema does not exist
+yet. The intake's unit 2 added its rows, so the real-binary test now re-proves
+these bytes from the binary too, reading its checksum from the manifest.
 
 The manifest also names Comet 2026.02.2 for linux/aarch64, macos/x86-64,
+macos/aarch64 and windows/x86-64, and Comet 2026.03.0 for linux/aarch64,
 macos/aarch64 and windows/x86-64. **Their output has never been captured,
 because those binaries have never been executed here**; only linux/x86-64
 runs on this project's host. The fixture tests print each such row as ``NOT

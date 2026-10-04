@@ -175,6 +175,24 @@ banner answers as a version; the two macOS Comet rows genuinely are both
 2026.02.2, and the SHA-256 checked four steps earlier is what tells those two
 files apart.
 
+.. _dev-tool-registry-default:
+
+The default version is the newest, and nothing names it
+-------------------------------------------------------
+
+There is no "default" field in the manifest and no version constant in the
+code. ``select`` orders a tool's rows **newest version first** -- by
+``ToolVersion``'s numeric order, not by manifest order -- and the Tool Manager
+lists a tool's releases in that order, so the default is simply the first row
+offered. ``D-010`` made Comet 2026.03.0 the default and kept 2026.02.2 offered;
+adding 2026.03.0's rows to the manifest is the whole of the change, and two
+tests hold it to the decision: ``ShippedManifestTest`` host by host (an Intel
+Mac, which has no 2026.03.0 row, defaults to 2026.02.2) and
+``ManagedToolManagerOffersTest`` through the port. The 2026.03.0 rows sit
+*after* 2026.02.2's in ``manifests/tools.json``, because manifest order decides
+nothing a user sees and every check that names a record by its index keeps
+naming the same one.
+
 .. _dev-tool-registry-kinds:
 
 Artefact kinds
@@ -555,9 +573,60 @@ Comet's Thermo RAW support
 --------------------------
 
 ``CometWrapper.dll``, ``ThermoFisher.CommonCore.Data.dll`` and
-``ThermoFisher.CommonCore.RawFileReader.dll`` are companions of the Windows
+``ThermoFisher.CommonCore.RawFileReader.dll`` are companions of each Windows
 Comet record, and an install missing them **does not advertise**
 ``THERMO_RAW_WINDOWS`` (``R-TOOL-02``).
+
+**Comet 2026.03.0 publishes two more Windows files, and neither is a
+companion.** ``CometWrapperCore.dll`` (4 501 504 B) is upstream's .NET 8 build
+of the real-time-search wrapper, and ``Ijwhost.dll`` (129 800 B) is the .NET
+shim that loads it. Decided from the bytes on 2026-10-04, not from the release
+notes:
+
+* ``comet.win64.exe``'s PE import table names the Visual C++ runtime, the
+  Universal C runtime, ``WS2_32.dll``, ``KERNEL32.dll`` and ``mscoree.dll`` --
+  no wrapper and no ``Ijwhost.dll``;
+* its .NET metadata references exactly five assemblies: ``mscorlib``,
+  ``netstandard``, ``System``, ``ThermoFisher.CommonCore.Data`` and
+  ``ThermoFisher.CommonCore.RawFileReader``; and neither wrapper's name occurs
+  anywhere in the file, in ASCII or UTF-16;
+* the source agrees: at ``v2026.03.0`` (``fa08489``) ``Comet.vcxproj`` links
+  ``MSToolkit.lib``, whose ``RAWReader.cpp`` alone is compiled ``/clr``
+  against the two ThermoFisher assemblies; ``CometWrapperCore.dll`` itself
+  imports ``ijwhost.dll``, which is why the shim exists; and upstream's release
+  README says neither wrapper is needed to run ``comet.win64.exe``.
+
+The same evidence says ``comet.win64.exe`` does not reference
+``CometWrapper.dll`` either. It stays a gating companion for 2026.03.0 as for
+2026.02.2 because ``R-TOOL-02`` names it, and requiring a file the binary does
+not need can only withhold the capability, never claim it falsely; the finding
+is recorded in the companion's own note and raised with the work package
+rather than acted on by dropping a requirement the specification states.
+
+Both releases' ThermoFisher libraries are byte-identical (the same SHA-256 on
+both rows); ``CometWrapper.dll`` changed (4 411 392 to 4 494 336 B).
+
+**Comet 2026.03.0 declares its Visual C++ runtime.** ``comet.win64.exe``
+imports ``MSVCP140.dll``, ``MSVCP140_ATOMIC_WAIT.dll``, ``VCRUNTIME140.dll``
+and ``VCRUNTIME140_1.dll``, so its record lists them as required host libraries
+with an advisory, exactly as the Windows Percolator rows do. The 2026.02.2
+binary imports the same four and its record lists none; that row is left as it
+was and the gap is reported, not silently repaired.
+
+Comet 2026.03.0 has no macOS x86-64 row
+----------------------------------------
+
+Upstream publishes ``comet.macos.exe`` beside ``comet.aarch64.macos.exe``, and
+the 2026.02.2 manifest files the former as ``macos``/``x86-64``. **The bytes
+say otherwise**, in both releases: each is a thin Mach-O whose ``cputype`` is
+``0x0100000c`` -- ARM64 -- and the two 2026.03.0 files differ in only 115
+bytes. Upstream's ``macos-build.yml`` builds ``comet.macos.exe`` with a plain
+``make`` on a ``macos-14`` runner, which is an Apple-silicon machine. So the
+2026.03.0 manifest has **no** ``macos``/``x86-64`` row: writing one would state
+an architecture the artefact does not have. An Intel Mac is offered 2026.02.2,
+whose row is unchanged and whose architecture claim is the same false one; that
+and ``D-004``'s premise that Comet publishes a native x86-64 macOS build are
+reported upward rather than decided here.
 
 The Windows Visual C++ runtime
 ------------------------------
@@ -677,12 +746,25 @@ serves the real artefact bytes over real HTTP from a loopback mirror, through
 the real downloader, the real checksum check, the real extractor, the real
 atomic move and the real probe, and it runs the real binaries. What it does not
 prove is that upstream is still reachable. A separate opt-in run fetches every
-manifest artefact from its real URL -- 115 982 855 bytes from five URLs across
-three repositories, about 11 seconds -- and a nightly manifest check belongs to
-Phase 15.
+Linux artefact the Tool Manager offers from its real URL -- 123 059 863 bytes
+from six URLs across three repositories, both Comet releases among them -- and
+a nightly manifest check belongs to Phase 15.
+
+**Every Comet release is installed and identified by data.**
+``CometReleaseInstallTest`` installs each Comet row the manifest names for
+``linux-x86-64`` through the real installer and the real probe, which executes
+the binary and reads the release from its own banner (``Comet version
+2026.03 rev. 0 (fa08489)`` is 2026.03.0). The same class refuses the 2026.03.0
+binary installed under a record pinned as 2026.02.2 -- the SHA-256 matches, so
+only the banner can tell -- and refuses a 2026.03.0 record whose pinned SHA-256
+is one character wrong before any process is started. Its opt-in half installs
+the default Comet from its real GitHub URL.
 
 **Linux x86-64 is where this project has watched binaries run.** Comet's and
-Percolator's capability sets are ``observed-by-execution`` there. The four
+Percolator's capability sets are ``observed-by-execution`` there -- for Comet
+2026.03.0 from a search of each ``D-006`` K562 file on 2026-10-04 that wrote a
+``.pep.xml`` and a ``.pin`` beside it, and from its ``-q`` and ``-p``
+listings. The four
 managed tools install from an empty cache and probe, driven through the Tool
 Manager interface. Install times measured on the development machine: Comet 275
 ms, Percolator 1412 ms, PDV 2200 ms, the converter 653 ms.
