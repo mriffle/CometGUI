@@ -17,6 +17,12 @@ Comet parameter schema
    :doc:`../reference/comet_parameters_generated` (``R-DOC-04``, unit 7,
    :ref:`dev-comet-parameter-generated-reference`).
 
+   **Comet 2026.03.0 intake, unit 1** (``handoffs/COMET-2026-03-worklog.rst``):
+   the real 2026.03.0 fixtures, its version record, per-version
+   :ref:`overrides <dev-comet-parameter-overrides>` beyond the default, drift
+   for every captured and every installed release, and what each release does
+   with the parameters that differ (:ref:`dev-comet-parameter-202603`).
+
 What this page covers
 =====================
 
@@ -46,8 +52,9 @@ What the files are
 ``<version>``, ``<os>`` and ``<arch>`` are spelled exactly as
 ``manifests/tools.json`` spells them. ``comet-q.params`` is the unmodified
 ``comet.params.new`` written by ``comet -q`` (the complete file, 118
-parameters for 2026.02.2); ``comet-p.params`` is the one written by ``comet
--p`` (the default file, 96). ``SHA256SUMS`` is ``sha256sum`` output for both.
+parameters for 2026.02.2 and for 2026.03.0); ``comet-p.params`` is the one
+written by ``comet -p`` (the default file, 96 for 2026.02.2, 95 for
+2026.03.0). ``SHA256SUMS`` is ``sha256sum`` output for both.
 A ``.gitattributes`` in ``fixtures/comet/`` sets ``-text`` so that Git never
 converts their line endings on checkout -- ``core.autocrlf=true`` is the
 default on a Windows runner and would otherwise change the bytes.
@@ -56,21 +63,39 @@ Tests locate fixtures through
 ``org.cometgui.params.comet.fixtures.CometFixtures`` (test sources) by
 version, platform and mode rather than by path.
 
-Today there is one set: **Comet 2026.02.2, linux/x86-64**.
+There are two sets, both **linux/x86-64**: Comet 2026.02.2 and Comet
+2026.03.0.
 
 .. list-table::
    :header-rows: 1
-   :widths: 22 12 66
+   :widths: 12 22 12 54
 
-   * - File
+   * - Version
+     - File
      - Bytes
      - SHA-256
-   * - ``comet-q.params``
+   * - 2026.02.2
+     - ``comet-q.params``
      - 11 844
      - ``d15048709f485c09a840dcb2a384dc301b4ba4da4566c2ea053e9c17eae58f51``
-   * - ``comet-p.params``
+   * - 2026.02.2
+     - ``comet-p.params``
      - 10 214
      - ``b56c967959ae04e2e782411858b2f5be06863e572cf1bfdfeccc7a4b28fbb19c``
+   * - 2026.03.0
+     - ``comet-q.params``
+     - 12 551
+     - ``4bbf39f943f011f16ea6f2380f396f05a06b85579496ece7d5265d3d7bac7aeb``
+   * - 2026.03.0
+     - ``comet-p.params``
+     - 10 256
+     - ``0b6abd4c7415a9289d858d3c8fc84031c31d62acf10f174a8123070ebd8fb8fc``
+
+The 2026.03.0 set was captured before ``manifests/tools.json`` names that
+release (its rows are the next unit's), because the registry cannot gain a
+version whose schema does not exist yet; until then its bytes are proved by
+``SHA256SUMS`` and the drift test, not yet by the real-binary test, which reads
+its checksum from the manifest.
 
 The manifest also names Comet 2026.02.2 for linux/aarch64, macos/x86-64,
 macos/aarch64 and windows/x86-64. **Their output has never been captured,
@@ -106,6 +131,42 @@ comet-p.params comet-q.params``. The ``-q`` output is byte-identical to Phase
 The first line of either file is ``# comet_version 2026.02 rev. 2
 (6edec91)`` -- Comet's own spelling, not the manifest's ``2026.02.2``.
 
+Comet 2026.03.0 was captured on 2026-10-04 the same way, from
+``https://github.com/UWPR/Comet/releases/download/v2026.03.0/comet.linux.exe``
+(7 077 008 bytes; its SHA-256, below, equals the one the work package's brief
+gives, which the orchestrator had checked against the digest the GitHub
+releases API publishes for the asset), mirrored as
+``scratch/phase05/artefacts/v2026.03.0__comet.linux.exe``::
+
+    $ curl -sSfL -o <scratch>/comet.linux.exe \
+        https://github.com/UWPR/Comet/releases/download/v2026.03.0/comet.linux.exe
+    $ cp <scratch>/comet.linux.exe scratch/phase05/artefacts/v2026.03.0__comet.linux.exe
+    $ mkdir -p _build/c2603-u1/bin _build/c2603-u1/q _build/c2603-u1/p
+    $ cp scratch/phase05/artefacts/v2026.03.0__comet.linux.exe _build/c2603-u1/bin/comet
+    $ chmod 700 _build/c2603-u1/bin/comet
+    $ sha256sum _build/c2603-u1/bin/comet
+    ad93b4cf60c2ed7afc2f41b8a3a05567c3938d999f17deb7b3676bc1fa91e7ed  _build/c2603-u1/bin/comet
+    $ B=$(realpath _build/c2603-u1/bin/comet)
+    $ (cd _build/c2603-u1/q && "$B" -q)     # exit 0, banner Comet version
+    $ (cd _build/c2603-u1/p && "$B" -p)     # "2026.03 rev. 0 (fa08489)", then
+                                            # "Created:  comet.params.new"
+    $ F=cometgui-params-comet/src/test/resources/fixtures/comet/2026.03.0/linux-x86-64
+    $ mkdir -p "$F"
+    $ cp _build/c2603-u1/q/comet.params.new "$F/comet-q.params"
+    $ cp _build/c2603-u1/p/comet.params.new "$F/comet-p.params"
+    $ (cd "$F" && sha256sum comet-p.params comet-q.params > SHA256SUMS && cat SHA256SUMS)
+    0b6abd4c7415a9289d858d3c8fc84031c31d62acf10f174a8123070ebd8fb8fc  comet-p.params
+    4bbf39f943f011f16ea6f2380f396f05a06b85579496ece7d5265d3d7bac7aeb  comet-q.params
+
+Both ``-q`` and ``-p`` start ``# comet_version 2026.03 rev. 0 (fa08489)``. The
+``-q`` file declares the same 118 names as 2026.02.2's; ``-p`` leaves out 23 --
+2026.02.2's 22 plus ``index_search_type``, which 2026.03.0 writes only for
+``-q`` [V26Q]_. Against 2026.02.2's ``-q`` the whole-file difference is the
+marker, ``decoy_search``'s inline comment, ``index_search_type``'s block
+comment, inline comment and default (``1`` becomes ``-1``), and five new
+comment lines above the variable modifications documenting ``^``, ``$``,
+``-2`` and the terminus codes. Nothing else.
+
 What the build re-proves on every run
 -------------------------------------
 
@@ -125,13 +186,19 @@ All in ``cometgui-params-comet``'s test sources, package
   ``manifests/tools.json`` has a ``linux-x86-64`` directory with both files
   and a ``SHA256SUMS`` that lists both and verifies. A manifest version with no
   fixtures fails the build.
+* ``FixtureMatrixTest`` also verifies **every** fixture directory against its
+  ``SHA256SUMS``, the manifest's or not, so a captured release whose rows have
+  not landed yet is still checked byte for byte.
 * ``ParameterDumpFactsTest`` (every platform): the ``R-PARAM-01`` facts --
-  ``-q`` declares 118 parameters, ``-p`` 96, ``-p`` declares nothing ``-q``
-  does not, and the difference is exactly the 22 names the specification
-  lists, typed into the test from the specification rather than derived from
-  the fixtures; the ``-q`` file starts with the ``# comet_version`` marker and
-  ends with the ``[COMET_ENZYME_INFO]`` table. Declarations are counted with a
-  line rule (a name at column one, optional blanks, ``=``), not a parser.
+  for 2026.02.2, ``-q`` declares 118 parameters, ``-p`` 96, ``-p`` declares
+  nothing ``-q`` does not, and the difference is exactly the 22 names the
+  specification lists, typed into the test from the specification rather than
+  derived from the fixtures; for 2026.03.0, 118 and 95 and exactly 23 names,
+  typed by hand from this project's own run of the binary, and ``-q``'s name
+  set equal to 2026.02.2's. Each ``-q`` file starts with its version's
+  ``# comet_version`` marker and ends with the ``[COMET_ENZYME_INFO]`` table.
+  Declarations are counted with a line rule (a name at column one, optional
+  blanks, ``=``), not a parser.
 
 Adding a new Comet version
 --------------------------
@@ -151,10 +218,14 @@ Adding a new Comet version
    ``git check-attr -a`` that Git sees them as ``text: unset`` and stores them
    unchanged.
 #. Run ``mvn -B -o -pl cometgui-params-comet -am verify``. The real-binary
-   test must pass for the new version. ``ParameterDumpFactsTest`` asserts the
-   2026.02.2 facts only; a new version's counts are a new fact, established by
-   running it and checked against the specification, not copied from the
+   test must pass for the new version. ``ParameterDumpFactsTest`` asserts each
+   captured version's facts; a new version's counts are a new fact,
+   established by running it and typed into the test, not copied from the
    file.
+#. The drift test (:ref:`dev-comet-parameter-drift`) runs for the new fixture
+   directory at once and fails until the metadata has a version record for
+   it: a captured release can never sit unchecked, whether or not the
+   manifest names it yet.
 
 Do not add fixtures for a platform whose binary was not executed. Its row
 stays reported as never captured.
@@ -254,7 +325,9 @@ Top level::
       "versions":    [ { "version", "marker", "parameterPages", "source",
                          "variableModTuple": { "source",
                                                "fields": [ { "field", "kind", "pair" } ] },
-                         "defaults": [ { "name", "default", "source" } ] } ],
+                         "overrides": [ { "name", "source", ...any of "default",
+                                          "choices", "inlineComment",
+                                          "shortHelp", "helpUrl" } ] } ],
       "categories":  [ { "id", "displayName" } ],         // exactly the fourteen
       "enzymeTable": { "header", "helpUrl", "rowFormat",
                        "senseChoices": [ { "value", "label" } ],
@@ -273,10 +346,10 @@ variable-modification tuple layout, in Comet's reading order -- see
 (``DECIMAL``, ``INTEGER`` or ``RESIDUES``) and ``pair`` a JSON boolean, the
 only booleans in the file.
 
-``defaults`` lists the parameters whose default **that release** writes
-differently from the parameter's curated ``default``, each with the
-``https://`` source line that writes it; it is empty for most releases. Two
-records exist (:ref:`dev-comet-parameter-older-release`):
+``overrides`` lists what **that release** says differently about a parameter
+(:ref:`dev-comet-parameter-overrides`); it is empty for a release that agrees
+with every curated definition. Three records exist
+(:ref:`dev-comet-parameter-202603`, :ref:`dev-comet-parameter-older-release`):
 
 .. list-table::
    :header-rows: 1
@@ -285,24 +358,36 @@ records exist (:ref:`dev-comet-parameter-older-release`):
    * - ``version``
      - ``marker``
      - What else it records
+   * - ``2026.03.0``
+     - ``2026.03 rev. 0 (fa08489)``
+     - The default verified release from specification revision 12
+       (``D-010``). The same tuple layout as 2026.02.2, read by
+       ``Comet.cpp`` lines 556-625 at ``v2026.03.0`` [V26T]_. Four overrides:
+       ``index_search_type`` (default ``-1``, choices ``-1``/``0``/``1``,
+       Comet's own 2026.03.0 inline comment, help and help page),
+       ``decoy_search`` (Comet's own 2026.03.0 inline comment),
+       ``spectral_library_ms_level`` and ``add_U_selenocysteine`` (inline
+       comment, help and help reference: what 2026.03.0 really does with each).
    * - ``2026.02.2``
      - ``2026.02 rev. 2 (6edec91)``
-     - The release matrix's version. Neutral loss and count both take a
-       comma pair. ``defaults`` empty: every curated default is its own.
+     - Neutral loss and count both take a comma pair. ``overrides`` empty:
+       every curated definition is 2026.02.2's own.
    * - ``2024.01.0``
      - ``2024.01 rev. 0 (f00df0c)``
      - The migration fixture's release, not offered to users. The neutral loss
        takes **one** value -- Comet 2024.01.0 reads it with ``%lf`` [V24T]_
-       -- and the count takes ``min,max``. ``defaults``:
+       -- and the count takes ``min,max``. Two default overrides:
        ``fragindex_num_spectrumpeaks = 100`` and
        ``fragindex_skipreadprecursors = 0`` [V24D]_, where 2026.02.2 writes
        ``150`` and ``1``.
 
 ``CuratedMetadata.parametersFor(version)`` and ``parameter(name, version)``
-give each definition **with that version's default** -- the override where
-there is one -- so the parser's defaults, ``CometParameters.defaults``,
-``resetToDefault`` and the drift test all use the version's own value.
-``parameter(name)`` alone gives the curated definition, whatever the version.
+give each definition **as that version has it** -- the version's override
+applied where there is one -- so the parser's defaults,
+``CometParameters.defaults``, ``resetToDefault``, the choice rule, the
+canonical writer's inline comment and the drift test all use the version's
+own facts. ``parameter(name)`` alone gives the curated definition, whatever
+the version.
 
 A parameter's ``versions`` range is a claim about the **curated** releases:
 ``from`` must be one of them, and the claim is checked against each curated
@@ -345,10 +430,8 @@ flag, not a number of the right shape for a numeric kind, outside its own
 bounds on a non-numeric kind, or ``min`` above ``max``; a version range that
 does not start at a curated version or ends before it starts; an
 ``inlineComment`` that is not a string or ``null``, is blank, holds a line
-break, or has white space at either end; a version's default override that
-names a parameter which is not modelled, or not modelled for that version, or
-that is overridden twice, has no ``https://`` source, repeats the curated
-default, or breaks any rule a curated default must keep; a tolerance-pair
+break, or has white space at either end; an override that breaks any of the
+rules under :ref:`dev-comet-parameter-overrides`; a tolerance-pair
 member carrying the generic ``ordered_range`` rule (``R-PARAM-04``); a related
 parameter that is unknown, the parameter itself, or named twice; a help or
 source reference that is not ``https://``; an allow-list entry without a
@@ -366,13 +449,93 @@ field count differs from the layout of a version it claims.
 ``inlineComment`` is the comment the canonical writer puts after the value on
 the parameter's own line (:ref:`dev-comet-parameter-canonical`), or ``null``
 for none. The starting text is Comet's own ``-q`` comment for the parameter,
-verbatim, for the 87 parameters that have one. Four are curated away from it
-because the ``-q`` text is wrong for 2026.02.2: ``isotope_error`` adds the
-values 6 and 7, ``output_txtfile`` drops the "2=Crux-formatted" that the
-parameter code treats as 1, and ``spectral_library_ms_level`` (which ``-q``
-writes without a comment) and ``add_U_selenocysteine`` say that Comet ignores
-them (both facts are below). It must be one line because it is written on one
-line, and unpadded because the reader trims it.
+verbatim, for the 87 parameters that have one -- **each release's own**: where
+a release's ``-q`` comment differs (2026.03.0's ``decoy_search``,
+``index_search_type`` and ``add_U_selenocysteine``), that release's override
+carries it. Curated away from it, because the ``-q`` text is wrong for the
+release: for both 2026.02.2 and 2026.03.0, ``isotope_error`` adds the values 6
+and 7, ``output_txtfile`` drops the "2=Crux-formatted" that the parameter code
+treats as 1, and ``spectral_library_ms_level`` (which ``-q`` writes without a
+comment) says what the release does with it; for 2026.02.2 only,
+``add_U_selenocysteine`` says that Comet ignores it (these facts are below and
+in :ref:`dev-comet-parameter-202603`). ``Comet202603CurationTest`` holds each
+release's comments to its own ``-q`` file with exactly those deviations,
+typed in: four for 2026.02.2, three for 2026.03.0. It must be one line because
+it is written on one line, and unpadded because the reader trims it.
+
+.. _dev-comet-parameter-overrides:
+
+Per-version overrides
+---------------------
+
+Decision C-2 of the Comet 2026.03.0 intake: a fact that differs between Comet
+releases is **data in that release's version record**, never an ``if
+(version ...)`` in a codec or a rule. A parameter's object holds the curated
+definition -- the facts of the release it was curated from, which every later
+release inherits -- and a version record's ``overrides`` replaces, for that
+release only, the fields that release says differently::
+
+    {
+      "name": "index_search_type",
+      "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L939-L945",
+      "default": "-1",
+      "choices": [ { "value": "-1", "label": "Not set: ..." },
+                   { "value": "0",  "label": "Peptide index (PI_DB)" },
+                   { "value": "1",  "label": "Fragment-ion index (FI_DB)" } ],
+      "inlineComment": "0=create peptide index, 1=create fragment ion index; ...",
+      "shortHelp": "Used only when database_name names an .idx file ...",
+      "helpUrl": "https://uwpr.github.io/Comet/parameters/parameters_202603/index_search_type.html"
+    }
+
+``name`` and ``source`` (the ``https://`` reference to where the release
+shows the difference) are required; then **any** of the five fields that can
+differ by release: ``default``, ``choices``, ``inlineComment``, ``shortHelp``
+and ``helpUrl``. A field left out is inherited from the curated definition --
+this is the one object in the file where an absent field means something --
+and ``"inlineComment": null`` replaces the curated comment by none. Nothing
+else can be overridden: a parameter's name, kind, category, bounds,
+serialisation and validators are the same in every release it is modelled
+for, and a release that changes one of them is a new parameter or a closed
+version range.
+
+Java holds an override as ``ParameterOverride`` and applies it with
+``applyTo``; ``CometVersionRecord.overrides()`` maps parameter names to them,
+and ``defaults()`` is the view of the overrides that replace a default. The
+documentation generator applies the same fields the same way
+(``definition_for`` in ``scripts/cometparams.py``).
+
+What ``MetadataLoader`` refuses in an override, naming ``versions[i] override
+for "<name>"`` and the field: a field that is not ``name``, ``source`` or one
+of the five (``displayName`` and ``kind`` included, and ``version`` -- an
+override has no version of its own; it belongs to the record it is in); an
+override that replaces no field; a ``name`` that is not modelled, or whose
+version range does not claim the record's version; a parameter overridden
+twice; a ``source`` or ``helpUrl`` that is not ``https://``; **any replaced
+field equal to the curated one** (an override records only a difference);
+choices for a kind that is not enumerated, or choices that break the curated
+choice rules (fewer than two, unlabelled or blank label, a value listed twice,
+an integer-enum value that is not whole); a default that breaks its kind or
+its curated bounds; **a release whose resulting default is not one of its
+resulting choices** -- whether the default changed, the choices changed, or
+both; an inline comment that is blank, holds a line break or is padded; blank
+short help; and an ``overrides`` member that is not an array of objects.
+``VersionOverridesLoaderTest`` proves each on constructed metadata, and
+``VersionDefaultsLoaderTest`` the default-only cases that predate the other
+four fields.
+
+The format kept ``schemaVersion`` 1. A saved preset records the metadata
+schema version it was made against, and bumping it would have orphaned every
+user preset although no parameter changed; a reader that predates
+``overrides`` refuses the document anyway, on the unknown field.
+
+**Where later facts attach.** The version record is the place for anything
+else a release changes: the residue alphabet of the variable-modification
+tuple (2026.03.0's ``^`` and ``$``) belongs in that release's
+``variableModTuple``, beside the field layout it qualifies, and
+version-keyed validation facts (a rule's severity or bound for that release)
+belong in a member of the record keyed by the rule's stable id -- each a new
+field the loader validates, so that a rule reads the fact from the version the
+model carries.
 
 Where the words come from
 -------------------------
@@ -391,7 +554,9 @@ source wins and the help says so: ``isotope_error`` accepts 0 to 7 although
 the ``-q`` comment lists 0 to 5, and ``output_txtfile`` value 2 is treated as
 1 by the 2026.02.2 parameter code.
 
-Two upstream defects are recorded in the help rather than hidden:
+Two upstream defects of 2026.02.2 are recorded in its help rather than hidden
+(2026.03.0 fixed the names; what it does instead is in
+:ref:`dev-comet-parameter-202603`, and its override says so):
 
 * ``spectral_library_ms_level`` is written by ``-q``, but Comet 2026.02.2's
   reader looks for ``speclib_ms_level`` and its search code for
@@ -404,9 +569,9 @@ The allow-list
 --------------
 
 ``internal`` exists for parameters Comet declares that are hidden or internal
-and deliberately not modelled, each with a reason. For Comet 2026.02.2 it is
-**empty**: every one of the 118 parameters ``-q`` declares is modelled,
-including the two above, because a user can set them.
+and deliberately not modelled, each with a reason. For Comet 2026.02.2 and
+2026.03.0 it is **empty**: every one of the 118 parameters ``-q`` declares is
+modelled, including the two above, because a user can set them.
 
 Visibility
 ----------
@@ -512,12 +677,34 @@ The drift test
 
 ``SchemaDriftFixtureTest`` (test sources, package
 ``org.cometgui.params.comet.schema``) runs the bundled metadata against the
-real ``-q`` fixture of every Comet version ``manifests/tools.json`` names --
-the enumeration unit 1's ``FixtureMatrixTest`` already requires fixtures for
--- and fails on any finding with the whole report. For 2026.02.2 it asserts
-118 declared, 118 modelled, 0 allow-listed. It also proves the partial rule
-against the real ``-p`` fixture: none of the 22 ``-q``-only parameters is
-reported, and a parameter removed from the metadata still is.
+real ``-q`` fixture of every Comet version that has a fixture directory under
+``fixtures/comet/`` **and** every version ``manifests/tools.json`` names, and
+fails on any finding with the whole report. So a manifest version without
+fixtures fails (as ``FixtureMatrixTest`` also requires), and a captured
+release the metadata has no record of fails on its ``VERSION_RECORD``
+finding -- a release cannot be captured and then sit unchecked until its
+manifest rows land. For 2026.02.2 and for 2026.03.0 it asserts 118 declared,
+118 modelled, 0 allow-listed, no finding. It also proves the partial rule
+against the real ``-p`` fixtures: for 2026.02.2 none of the 22 ``-q``-only
+parameters is reported, and a parameter removed from the metadata still is;
+for 2026.03.0, ``PARTIAL_DISCOVERY`` with 95 declared and modelled and none of
+its 23 ``-q``-only parameters reported.
+
+For 2026.03.0 specifically, the test shows the drift test going red on each
+defect it exists to catch:
+
+* an entry removed from the metadata (``index_search_type``):
+  ``UNMODELLED: Comet 2026.03.0 declares index_search_type (line 14, ...)``,
+  117 modelled;
+* a parameter claimed for 2026.03.0 by its version range that 2026.03.0's
+  ``-q`` does not write (a constructed ``ms1_mass_range`` from 2026.03.0):
+  ``NOT_DECLARED``, while 2026.02.2's drift stays clean;
+* an override claiming a parameter for 2026.03.0 whose range does not: the
+  loader refuses the document (``is not modelled for Comet 2026.03.0``);
+* the 2026.03.0 ``index_search_type`` override stripped: ``DEFAULT_DIFFERS``
+  -- the metadata's default is "1" and Comet 2026.03.0 writes "-1";
+* the real 2026.03.0 ``-q`` under a marker no record names (``2099.01 rev.
+  0``), or under another build hash: ``VERSION_RECORD``.
 
 It also runs against the **migration fixture's** real Comet 2024.01.0 output
 (:ref:`dev-comet-parameter-older-release`): ``-q`` 109 declared, 109 modelled,
@@ -529,10 +716,153 @@ drift test report exactly those two ``DEFAULT_DIFFERS``; claiming a
 2024.01.0 from a parameter it declares is reported ``UNMODELLED``.
 
 To add a Comet version: capture its fixtures (*Fixtures*, above), add its
-``versions`` record, and run the module's tests. Each finding is a decision
+``versions`` record, and run the module's tests -- the drift test runs for it
+from the moment its fixture directory exists. Each finding is a decision
 to make against that release's documentation and source -- a new parameter
 to describe, a range to close with ``through``, a default to update -- never
 a reason to widen the allow-list for a parameter a user could set.
+
+.. _dev-comet-parameter-202603:
+
+Comet 2026.03.0
+===============
+
+Comet 2026.03.0 becomes the default verified release (``D-010``,
+specification revision 12); 2026.02.2 stays supported. Its version record and
+the reason for each override follow. Every fact was established by running
+**both** real binaries on 2026-10-04, in a private scratch directory, each
+probe a copy of that release's own ``-q`` file with ``database_name`` pointed
+at a one-protein FASTA (UniProt P02769, bovine serum albumin), the
+``spectral_library_name`` placeholder emptied, and one or two lines changed,
+searched as ``comet -P<file> BSA3.mzML`` (a local bovine serum albumin run,
+not a project fixture); the source lines cited are at the two tags.
+
+``index_search_type``
+---------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 10 45 45
+
+   * - Value
+     - Comet 2026.02.2
+     - Comet 2026.03.0
+   * - ``-1``
+     - FASTA search: silent. ``database_name = bsa.fasta.idx`` (missing, so
+       built on demand): a **fragment ion index** (the ``.idx`` header's
+       ``IndexSearchType:`` line), silent.
+     - FASTA: silent. Built on demand: fragment ion index, silent.
+   * - ``0``
+     - FASTA: silent. Built: **peptide index**.
+     - FASTA: ``Warning - index_search_type = 0 is ignored: "bsa.fasta" is not
+       an .idx file (plain FASTA search) ...``. Built: peptide index.
+   * - ``1``
+     - FASTA: silent. Built: fragment ion index.
+     - FASTA: the same warning for ``1``. Built: fragment ion index, silent.
+   * - ``99``
+     - FASTA: silent. Built: fragment ion index, silent.
+     - ``Warning - index_search_type = 99 is not -1, 0 or 1; using the default
+       (-1, not set).`` in both cases; built: fragment ion index.
+
+Every run exited 0. **Decision: ``-1`` is a legal choice for 2026.03.0 only.**
+In 2026.02.2 it is accepted silently, but so is every integer: both places
+that read the value test ``== 0`` and nothing else [V22I]_ [V22J]_, so ``-1``
+builds exactly what ``1`` builds -- and what ``99`` builds -- and the release's
+``-q`` comment and parameter page document ``0`` and ``1`` only. There it has
+no meaning of its own, and offering it would invite a value that reads as
+"not set" in a release where it is not. In 2026.03.0, ``-1`` is what ``-q``
+writes [V26Q]_, the value any other one is coerced to [V26I]_, and the only
+value that never warns [V26W]_. The 2026.03.0 override therefore carries
+``default`` ``-1``, choices ``-1``/``0``/``1``, Comet's own 2026.03.0 inline
+comment, new help and the 2026.03 parameter page; 2026.02.2 keeps choices
+``0``/``1`` and the choice rule refuses ``-1`` there
+(``Comet202603CurationTest``).
+
+``spectral_library_ms_level``
+-----------------------------
+
+* **2026.02.2:** every run of Comet's own ``-q`` file logs ``Warning - invalid
+  parameter found: spectral_library_ms_level.  Parameter will be ignored.``:
+  the reader registers ``speclib_ms_level`` [V22L]_, and the search manager
+  then asks for ``spectraL_library_ms_level`` [V22M]_, so the value is ignored
+  under every spelling. (``speclib_ms_level = 2`` draws no warning in 2026.02.2
+  and no effect either.)
+* **2026.03.0:** no warning; the reader registers the written name and the
+  search manager reads it into the options [V26L]_ (``speclib_ms_level`` now
+  draws the "invalid parameter" warning). But the value's **only** reader is
+  the loader for a Thermo ``.raw`` spectral library [V26R]_, which prints
+  ``Error - raw files as spectral libraries are not supported yet.`` and exits
+  before it gets there. Run with ``spectral_library_name = lib.raw`` (an empty
+  file) at level ``1`` and at level ``7``: both exit 1 with exactly that
+  message -- in both releases. Level ``7`` with no library: silent, exit 0.
+
+So 2026.03.0 reads the name, and nothing a command-line search does depends on
+it. The 2026.03.0 override says so in its help and inline comment, cites the
+loader as its help reference (Comet publishes no page for the parameter: the
+2026.03 page set returns 404 for it), and keeps the choices ``1``/``2``/``3``.
+
+``add_U_selenocysteine``
+------------------------
+
+* **2026.02.2:** with ``add_U_selenocysteine = 10.0`` the pepXML header has
+  no ``aminoacid_modification`` for ``U``: the search manager takes the U
+  static mass from ``add_U_user_amino_acid`` [V22U]_, and that name is not one
+  the reader knows (``add_U_user_amino_acid = 10.0`` logs ``Warning - invalid
+  parameter found: add_U_user_amino_acid``), so no ``comet.params`` can set it.
+* **2026.03.0:** with ``add_U_selenocysteine = 10.0`` the header carries
+  ``<aminoacid_modification aminoacid="U" massdiff="10.000000"
+  mass="160.953633" variable="N"/>`` -- 150.953633 plus 10, so the mass table
+  carries the modification [V26U]_.
+
+The 2026.03.0 override restores Comet's own inline comment and plain help, and
+points at the 2026.03 page, which documents the parameter; 2026.02.2's
+definition still says that release ignores it.
+
+``decoy_search``
+----------------
+
+Only Comet's own inline comment changed: 2026.03.0's ``-q`` adds ``; .idx
+searches use the value the index was built with``. Both releases store the
+decoy mode in an index's header and read it back from there [V22D]_ [V26D]_,
+so this documents
+existing behaviour rather than a change; the override carries the new comment
+because the canonical file for a release takes that release's comments.
+
+Citations, at tag ``v2026.03.0`` (commit
+``fa08489b5d5311c69df0e1d6d188bea22b80c184``, ``git ls-remote``) and
+``v2026.02.2``:
+
+.. [V26Q] https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L934-L946
+   -- ``index_search_type = -1``, written only for ``-q`` (``iPrintParams ==
+   2``).
+.. [V26T] https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L556-L625
+   -- the tuple reader: eight fields, a comma pair in the count and in the
+   neutral loss, as at ``v2026.02.2``.
+.. [V26I] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L811-L823
+   -- a value other than -1, 0 or 1 is warned about and becomes -1.
+.. [V26W] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1742-L1786
+   -- the three warnings for a 0 or 1 that has no effect.
+.. [V26L] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L512-L516
+   -- ``spectral_library_ms_level`` read under its written name.
+.. [V26R] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSpecLib.cpp#L195-L215
+   -- the ``.raw`` library loader: exits before it reads the level.
+.. [V26U] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L914-L915
+   -- ``add_U_selenocysteine`` applied to U.
+.. [V22I] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L219-L228
+   -- building an index on demand: ``== 0`` a peptide index, anything else a
+   fragment ion index.
+.. [V22J] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1524
+   -- the search type of an index about to be built: ``== 0`` or not.
+.. [V22L] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L404
+   -- the reader registers ``speclib_ms_level``.
+.. [V22M] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L421-L425
+   -- the search manager asks for ``spectraL_library_ms_level``.
+.. [V22U] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L812-L813
+   -- the U static mass taken from ``add_U_user_amino_acid``.
+.. [V22D] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometPeptideIndex.cpp#L1362-L1364
+   -- an index's ``DecoySearch:`` header line read back (written at line 887).
+.. [V26D] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometPeptideIndex.cpp#L1949-L1951
+   -- the same in 2026.03.0 (written at line 1357).
 
 .. _dev-comet-parameter-structured:
 
@@ -2009,9 +2339,10 @@ decision D6-1) reads:
   is no second copy;
 * **the built-in presets** beside it, for each parameter's preset effects;
 * ``manifests/tools.json``, for the Comet versions CometGUI installs. The page
-  documents those, and only those, as supported: today ``2026.02.2``. The
-  ``2024.01.0`` record is curated for migration only and appears in an entry
-  solely as the start of its version range, labelled as not installed;
+  documents those, and only those, as supported: today ``2026.02.2``, and
+  ``2026.03.0`` from the commit that adds its manifest rows. The ``2024.01.0``
+  record is curated for migration only and appears in an entry solely as the
+  start of its version range, labelled as not installed;
 * for each of those versions, **the real ``comet -q`` fixture**
   (:ref:`dev-comet-parameter-fixtures`), checked against its ``SHA256SUMS`` and
   its marker against the version record. It is the only complete list of what
@@ -2024,11 +2355,16 @@ Comet name, display name, category, type (the value kind, in words and as the
 constant), the default for each installed version (the version record's
 override where there is one), the allowed values or range (labelled choices,
 bounds, the tuple layout of that version, or a pointer to the enzyme table),
-the short help with its upstream reference, the serialisation rule and the
-**default line exactly as** ``CanonicalParamsWriter`` **writes it** (``name =
-value``, the inline comment's ``#`` at column 40), version availability,
+the short help with its upstream reference, the serialisation rule and, for
+each installed version, the **default line exactly as**
+``CanonicalParamsWriter`` **writes it** for that version (``name = value``,
+that version's inline comment with its ``#`` at column 40), version
+availability,
 related parameters as links, preset effects, the editor level, the validator
-ids and the search aliases. Then the enzyme table and the internal allow-list.
+ids and the search aliases. Where the installed releases say different things
+-- an override's choices or help -- *Allowed values* and *Description* are
+rendered once per release, named for it (``Allowed values, Comet 2026.03.0``);
+where they agree, once. Then the enzyme table and the internal allow-list.
 The output is deterministic: no date, and every order comes from the inputs.
 
 ``docs/conf.py`` calls ``generate()`` from a ``builder-inited`` handler, after
@@ -2060,9 +2396,16 @@ naming the file, the parameter (or section) and the field:
   neither models nor allow-lists**, or a modelled parameter that output does
   not declare -- this is what makes removing a parameter's entry a build
   failure that names it;
-* a related parameter that is not modelled (or is the parameter itself); a
-  version default override, an enzyme-table reference or a preset delta naming
-  no modelled parameter; a preset for an uncurated version;
+* a related parameter that is not modelled (or is the parameter itself); an
+  enzyme-table reference or a preset delta naming no modelled parameter; a
+  preset for an uncurated version;
+* any override the loader refuses (:ref:`dev-comet-parameter-overrides`): an
+  unknown field, an unmodelled parameter or one the release's range does not
+  claim, a second override of one parameter, a non-``https`` source or help
+  reference, no replaced field, a replaced field equal to the curated one,
+  choices on a kind that is not enumerated or without labels, a release left
+  with a default outside its choices, a malformed inline comment, blank help
+  -- checked for every version record, installed or not;
 * an installed Comet version with no version record, a missing fixture, or a
   fixture whose SHA-256 or marker does not match;
 * a rendered fragment without exactly one entry per modelled parameter
@@ -2090,8 +2433,19 @@ The self-test
 with its own diagnostic: a parameter's entry removed, each required field
 removed in turn, an unknown category and kind, a choice without a label (absent
 and blank), a related name that is not a parameter, a duplicated name, a
-non-``https`` reference, a preset naming no parameter and an installed version
-with no record. Then, through the real hook in a project copy made by
+non-``https`` reference, a preset naming no parameter, an installed version
+with no record (a constructed ``2099.01.0``: 2026.03.0 has one now), and
+thirteen damaged overrides of the 2026.03.0 record -- an unknown field, an
+unmodelled parameter, an override for a release its parameter's range does not
+claim (``index_search_type`` for 2024.01.0), a second override, a non-``https``
+source, an override that replaces nothing, a repeated curated inline comment
+and choices, a default outside the release's choices and choices that drop its
+default, choices on a decimal, a non-``https`` help reference and blank help:
+40 generator cases in all. Before the damages, a **per-release control**
+renders the clean copy for a manifest that also names 2026.03.0 and requires
+``index_search_type``'s entry to carry ``1`` and ``0``/``1`` for 2026.02.2 and
+``-1`` and ``-1``/``0``/``1`` for 2026.03.0, each with its own default line:
+a generator that ignored the overrides would fail it. Then, through the real hook in a project copy made by
 ``scripts/traceability/selftest.py``'s ``copy_project``: the clean copy builds
 with the count line and one HTML section per parameter; a missing field and a
 removed entry each fail the strict build; a generator that writes nothing (with
@@ -2206,7 +2560,9 @@ items fails on the defect it exists to catch. It is registered in
      - 8
      - None of its own: ``scripts/cometparams_selftest.py`` is invoked in the
        sandbox (:ref:`dev-comet-parameter-generated-reference`).
-     - Its OK line with at least 27 generator cases and 4 hook defects, the
+     - Its OK line with at least 27 generator cases (40 since the Comet
+       2026.03.0 intake's unit 1; the floor is the falsifiability unit's to
+       raise) and 4 hook defects, the
        removed entry named, and the hook's count equal to the metadata's 118.
    * - 9
      - 9
