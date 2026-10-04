@@ -50,6 +50,21 @@ public record MigrationEntry(
         RESHAPED,
 
         /**
+         * Modelled in both versions; the value written as another that the target release gives the
+         * same meaning, as the target's version record states ({@code valueMigrations}) -- Comet
+         * 2026.02.2's {@code index_search_type = 1}, which Comet 2026.03.0 spells {@code -1} --
+         * with its origin. The explanation gives the record's reason and source.
+         */
+        CONVERTED,
+
+        /**
+         * Modelled in both versions; the value carried with the same meaning, but the target's
+         * version record notes how that release treats it differently -- a warning the source
+         * release never gave, for example. The explanation gives the notice and its source.
+         */
+        NOTED,
+
+        /**
          * New in the target version: it takes the target's default, origin {@code COMET_DEFAULT}.
          */
         ADDED,
@@ -71,8 +86,9 @@ public record MigrationEntry(
 
         /**
          * The target has the parameter but cannot hold the value with its meaning (for example two
-         * neutral losses where the target's tuple takes one). The migrated model holds the target's
-         * default; the source value is in the report and the user must decide.
+         * neutral losses where the target's tuple takes one, or a value the target's version record
+         * says has no equivalent there). The migrated model holds the target's default; the source
+         * value is in the report and the user must decide.
          */
         NEEDS_ATTENTION;
 

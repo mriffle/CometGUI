@@ -68,7 +68,8 @@ public final class ConstructedVersions {
                         + "{\"rule\": \"variable_mod_tuple.distance_undocumented\","
                         + " \"severity\": \"WARNING\", \"source\": \"https://example.org/d\"},"
                         + " {\"rule\": \"index_search_type.ignored_without_idx\","
-                        + " \"severity\": \"OFF\", \"source\": \"https://example.org/i\"}]},\n";
+                        + " \"severity\": \"OFF\", \"source\": \"https://example.org/i\"}],"
+                        + " \"valueMigrations\": []},\n";
         String anchor = "\"versions\": [\n";
         int at = json.indexOf(anchor);
         return MetadataLoader.load(

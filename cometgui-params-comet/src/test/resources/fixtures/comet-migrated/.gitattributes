@@ -1,0 +1,6 @@
+# The migrated canonical files are CometGUI's own output -- schema migration to a
+# newer Comet release, written by the canonical writer -- pinned byte for byte by
+# MigrationTo202603Test and run by the real Comet binary in
+# MigratedFileRealBinaryTest.  Git must never convert their line endings on
+# checkout, or the byte-equality test and SHA256SUMS fail on a CRLF checkout.
+* -text

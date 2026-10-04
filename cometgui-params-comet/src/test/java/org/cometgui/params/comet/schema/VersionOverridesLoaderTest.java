@@ -56,6 +56,7 @@ class VersionOverridesLoaderTest {
         newer.put("variableModTuple", ConstructedMetadata.tupleLayout());
         newer.put("overrides", new ArrayList<>(List.of(overrides)));
         newer.put("ruleSeverities", ConstructedMetadata.ruleSeverities());
+        newer.put("valueMigrations", new ArrayList<>());
         doc.list("versions").add(newer);
         return doc;
     }

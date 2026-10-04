@@ -280,6 +280,7 @@ class MetadataLoaderTest {
             older.put("variableModTuple", sevenFields);
             older.put("overrides", List.of());
             older.put("ruleSeverities", ConstructedMetadata.ruleSeverities());
+            older.put("valueMigrations", List.of());
             doc.list("versions").add(older);
             addTuple(doc, "variable_mod01", "15.9949 M 0 3 -1 0 0 0.0");
             CuratedMetadata metadata = doc.load();

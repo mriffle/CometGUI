@@ -111,11 +111,18 @@ public final class MetadataLoader {
                     "source",
                     "variableModTuple",
                     "overrides",
-                    "ruleSeverities");
+                    "ruleSeverities",
+                    "valueMigrations");
 
     private static final List<String> OVERRIDE_REQUIRED = List.of("name", "source");
 
     private static final List<String> RULE_SEVERITY_FIELDS = List.of("rule", "severity", "source");
+
+    private static final List<String> MIGRATION_REQUIRED =
+            List.of("from", "action", "reason", "source");
+
+    private static final List<String> MIGRATION_OPTIONAL =
+            List.of("parameter", "value", "rule", "field", "becomes");
 
     private static final List<String> TUPLE_FIELDS = List.of("source", "fields", "residueAlphabet");
 
@@ -212,6 +219,15 @@ public final class MetadataLoader {
             versions.add(version.withOverrides(overrides(version, parameters)));
         }
         tupleDefaults(parameters, versions);
+        List<CometVersionRecord> withMigrations = new ArrayList<>();
+        for (int index = 0; index < versions.size(); index++) {
+            CometVersionRecord record = versions.get(index);
+            withMigrations.add(
+                    record.withValueMigrations(
+                            valueMigrations(
+                                    pending.get(index).node(), record, versions, parameters)));
+        }
+        versions = withMigrations;
         List<InternalParameter> internal = internal(top, parameters);
         EnzymeTableMetadata enzymeTable = enzymeTable(top, parameters);
         return new CuratedMetadata(SCHEMA_VERSION, versions, parameters, internal, enzymeTable);
@@ -389,6 +405,231 @@ public final class MetadataLoader {
                             node));
         }
         return records;
+    }
+
+    /**
+     * A version record's {@code valueMigrations}: what migration into this release does with
+     * particular values written for another. Each entry is held to its form against the two
+     * releases it joins -- a choice of an enumerated parameter both model, or a well-formed rule
+     * identifier and a tuple field both releases' layouts have. Which rules exist is the
+     * validator's to know, so migration refuses an identifier that names none.
+     */
+    private static List<ValueMigration> valueMigrations(
+            Node version,
+            CometVersionRecord record,
+            List<CometVersionRecord> all,
+            List<ParameterDefinition> parameters) {
+        List<JsonValue> array = version.array("valueMigrations");
+        List<ValueMigration> migrations = new ArrayList<>();
+        Set<String> matched = new HashSet<>();
+        for (int index = 0; index < array.size(); index++) {
+            Node entry =
+                    Node.of(array.get(index), version.where(), "valueMigrations[" + index + "]");
+            entry.onlyFields(MIGRATION_REQUIRED, MIGRATION_OPTIONAL);
+            Node named = entry.renamed(version.where() + " value migration " + index);
+            ToolVersion from = named.version("from");
+            if (from.equals(record.version())) {
+                throw named.failure(
+                        "from",
+                        "is this record's own version; a value migration carries a value written"
+                                + " for another release");
+            }
+            CometVersionRecord source =
+                    all.stream()
+                            .filter(r -> r.version().equals(from))
+                            .findFirst()
+                            .orElseThrow(
+                                    () ->
+                                            named.failure(
+                                                    "from",
+                                                    "is Comet "
+                                                            + from.text()
+                                                            + ", which the metadata does not"
+                                                            + " describe"));
+            ValueMigration.Action action = named.constant("action", ValueMigration.Action.class);
+            String reason = named.text("reason");
+            String url = named.url("source");
+            boolean byValue = named.has("parameter");
+            if (byValue == named.has("rule")) {
+                throw named.failure(
+                        "parameter",
+                        "an entry is matched by \"parameter\" and \"value\", or by \"rule\":"
+                                + " exactly one");
+            }
+            Optional<String> becomes = Optional.empty();
+            if (named.has("becomes")) {
+                if (action != ValueMigration.Action.CONVERT) {
+                    throw named.failure(
+                            "becomes", "is given, and only a CONVERT entry has a target text");
+                }
+                becomes = Optional.of(named.string("becomes"));
+            } else if (action == ValueMigration.Action.CONVERT) {
+                throw named.failure("becomes", "is missing; a CONVERT entry names the target text");
+            }
+            Said said = new Said(action, becomes, reason, url);
+            ValueMigration migration =
+                    byValue
+                            ? byValue(named, source, record, parameters, said)
+                            : byRule(named, source, record, said);
+            if (!matched.add(from.text() + " " + migration.matches())) {
+                throw named.failure(
+                        byValue ? "value" : "rule",
+                        migration.matches() + " is matched a second time for Comet " + from.text());
+            }
+            migrations.add(migration);
+        }
+        return migrations;
+    }
+
+    /** What a value migration does and why, read before what it matches. */
+    private record Said(
+            ValueMigration.Action action, Optional<String> becomes, String reason, String url) {}
+
+    private static ValueMigration byValue(
+            Node named,
+            CometVersionRecord source,
+            CometVersionRecord target,
+            List<ParameterDefinition> parameters,
+            Said said) {
+        Optional<String> becomes = said.becomes();
+        if (named.has("field")) {
+            throw named.failure(
+                    "field", "is given, and only an entry matched by rule names a tuple field");
+        }
+        String name = named.text("parameter");
+        String value = named.string("value");
+        ParameterDefinition curated =
+                parameters.stream()
+                        .filter(p -> p.name().equals(name))
+                        .findFirst()
+                        .orElseThrow(
+                                () -> named.failure("parameter", "is not a modelled parameter"));
+        for (CometVersionRecord release : List.of(source, target)) {
+            if (!curated.supportedVersions().contains(release.version())) {
+                throw named.failure(
+                        "parameter",
+                        name + " is not modelled for Comet " + release.version().text());
+            }
+        }
+        if (!curated.kind().isEnumeration()) {
+            throw named.failure(
+                    "parameter",
+                    name
+                            + " is of kind "
+                            + curated.kind()
+                            + "; an entry matched by value names a choice of an enumerated"
+                            + " parameter");
+        }
+        if (!isChoice(curated, source, value)) {
+            throw named.failure(
+                    "value",
+                    "\""
+                            + value
+                            + "\" is not one of Comet "
+                            + source.version().text()
+                            + "'s choices for "
+                            + name);
+        }
+        if (becomes.isPresent()) {
+            if (!isChoice(curated, target, becomes.get())) {
+                throw named.failure(
+                        "becomes",
+                        "\""
+                                + becomes.get()
+                                + "\" is not one of Comet "
+                                + target.version().text()
+                                + "'s choices for "
+                                + name);
+            }
+            if (becomes.get().equals(value)) {
+                throw named.failure(
+                        "becomes", "repeats the value; a conversion writes another one");
+            }
+        } else if (said.action() == ValueMigration.Action.NOTICE
+                && !isChoice(curated, target, value)) {
+            throw named.failure(
+                    "value",
+                    "\""
+                            + value
+                            + "\" is not one of Comet "
+                            + target.version().text()
+                            + "'s choices, so it cannot be carried unchanged; convert or flag"
+                            + " it");
+        }
+        return new ValueMigration(
+                source.version(),
+                Optional.of(name),
+                Optional.of(value),
+                Optional.empty(),
+                said.action(),
+                Optional.empty(),
+                becomes,
+                said.reason(),
+                said.url());
+    }
+
+    /** Whether a text is one of a release's own choices for a parameter, its override applied. */
+    private static boolean isChoice(
+            ParameterDefinition curated, CometVersionRecord release, String text) {
+        ParameterDefinition definition =
+                release.override(curated.name()).map(o -> o.applyTo(curated)).orElse(curated);
+        return definition.choices().stream().anyMatch(choice -> choice.value().equals(text));
+    }
+
+    private static ValueMigration byRule(
+            Node named, CometVersionRecord source, CometVersionRecord target, Said said) {
+        Optional<String> becomes = said.becomes();
+        if (named.has("value")) {
+            throw named.failure(
+                    "value", "is given, and only an entry matched by a parameter names a value");
+        }
+        String rule = named.text("rule");
+        if (!RuleSeverity.RULE_ID.matcher(rule).matches()) {
+            throw named.failure("rule", "is not a rule identifier such as family.what_it_checks");
+        }
+        Optional<VariableModField> field = Optional.empty();
+        if (becomes.isPresent()) {
+            VariableModField rewritten = named.constant("field", VariableModField.class);
+            for (CometVersionRecord release : List.of(source, target)) {
+                if (release.variableModTuple().position(rewritten).isEmpty()) {
+                    throw named.failure(
+                            "field",
+                            "Comet "
+                                    + release.version().text()
+                                    + "'s variable-modification tuple has no "
+                                    + rewritten.label()
+                                    + " field");
+                }
+            }
+            checkField(named, rewritten, becomes.get());
+            field = Optional.of(rewritten);
+        } else if (named.has("field")) {
+            throw named.failure(
+                    "field", "is given, and only an entry that converts rewrites a tuple field");
+        }
+        return new ValueMigration(
+                source.version(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(rule),
+                said.action(),
+                field,
+                becomes,
+                said.reason(),
+                said.url());
+    }
+
+    /** A tuple field's new text: one value of the field's kind. */
+    private static void checkField(Node named, VariableModField field, String text) {
+        switch (field.kind()) {
+            case INTEGER -> requireNumber(named, "becomes", text, true);
+            case DECIMAL -> requireNumber(named, "becomes", text, false);
+            case RESIDUES -> {
+                if (text.isBlank() || text.chars().anyMatch(Character::isWhitespace)) {
+                    throw named.failure("becomes", "\"" + text + "\" is not one residue token");
+                }
+            }
+        }
     }
 
     /**

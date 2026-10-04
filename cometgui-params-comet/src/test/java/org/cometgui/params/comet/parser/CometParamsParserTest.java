@@ -612,7 +612,8 @@ class CometParamsParserTest {
                         + "{\"rule\": \"variable_mod_tuple.distance_undocumented\","
                         + " \"severity\": \"WARNING\", \"source\": \"https://example.org/d\"},"
                         + " {\"rule\": \"index_search_type.ignored_without_idx\","
-                        + " \"severity\": \"OFF\", \"source\": \"https://example.org/i\"}]}";
+                        + " \"severity\": \"OFF\", \"source\": \"https://example.org/i\"}],"
+                        + " \"valueMigrations\": []}";
         int parametersEnd = json.lastIndexOf("\n  ]\n}");
         String knob =
                 ",\n    {\"name\": \"future_knob\", \"displayName\": \"Future knob\","

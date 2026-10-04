@@ -17,11 +17,14 @@
 package org.cometgui.params.comet.migration;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.Diagnostic;
@@ -37,6 +40,10 @@ import org.cometgui.params.comet.parser.ParseResult;
 import org.cometgui.params.comet.schema.CometVersionMarker;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.ParameterDefinition;
+import org.cometgui.params.comet.schema.ValueMigration;
+import org.cometgui.params.comet.validation.CometValidator;
+import org.cometgui.params.comet.validation.Finding;
+import org.cometgui.params.comet.validation.Rule;
 import org.cometgui.params.comet.value.ValueSyntaxException;
 
 /**
@@ -52,9 +59,10 @@ import org.cometgui.params.comet.value.ValueSyntaxException;
  *   <li>modelled in both versions: the value is carried by {@link VersionConversion} with its
  *       origin -- {@link MigrationEntry.Outcome#CARRIED} as the same text, {@link
  *       MigrationEntry.Outcome#RESHAPED} re-written in the target's syntax with the same meaning,
- *       or {@link MigrationEntry.Outcome#NEEDS_ATTENTION} when the target cannot hold it: the
- *       target's default is used and the source value is reported, never silently lost or guessed
- *       at;
+ *       {@link MigrationEntry.Outcome#CONVERTED} as the equivalent the target's version record
+ *       states, {@link MigrationEntry.Outcome#NOTED} carried with the record's notice, or {@link
+ *       MigrationEntry.Outcome#NEEDS_ATTENTION} when the target cannot hold it: the target's
+ *       default is used and the source value is reported, never silently lost or guessed at;
  *   <li>new in the target ({@link MigrationEntry.Outcome#ADDED}): the target's default, origin
  *       {@link ValueOrigin#COMET_DEFAULT};
  *   <li>not in the target ({@link MigrationEntry.Outcome#REMOVED_KEPT_AS_UNKNOWN}): kept as an
@@ -64,6 +72,11 @@ import org.cometgui.params.comet.value.ValueSyntaxException;
  *       where the target models the name, read as its value ({@link
  *       MigrationEntry.Outcome#UNKNOWN_ADOPTED}, origin {@link ValueOrigin#IMPORTED}).
  * </ul>
+ *
+ * <p>Which values the target's version record converts, flags or notes is data ({@link
+ * ValueMigration}, decision C-2), keyed by the source release; an entry matched by a validation
+ * rule applies where the source model's own validation finds that rule on the parameter. Nothing
+ * here asks which version a model is.
  *
  * <p>The enzyme table is the file's content, not the schema's, and is carried unchanged. The
  * migrated model carries no parse diagnostics: it was not produced by a parse, and the source keeps
@@ -93,6 +106,7 @@ public final class SchemaMigration {
         CuratedMetadata metadata = source.metadata();
         ToolVersion from = source.version();
         VersionConversion conversion = VersionConversion.between(metadata, from, target);
+        Map<String, Set<String>> sourceRules = sourceRules(source, target, conversion);
         ParameterValueCodec codec = ParameterValueCodec.forVersion(metadata, target);
         Map<String, UnknownParameter> sourceUnknowns = new LinkedHashMap<>();
         source.unknownParameters().forEach(u -> sourceUnknowns.put(u.name(), u));
@@ -103,7 +117,9 @@ public final class SchemaMigration {
             String name = definition.name();
             Optional<ParameterEntry> carried = source.entry(name);
             if (carried.isPresent()) {
-                VersionConversion.Result result = conversion.convert(name, source.text(name));
+                VersionConversion.Result result =
+                        conversion.convert(
+                                name, source.text(name), sourceRules.getOrDefault(name, Set.of()));
                 if (result.status().usable()) {
                     entries.add(
                             new ParameterEntry(
@@ -113,9 +129,7 @@ public final class SchemaMigration {
                     report.add(
                             new MigrationEntry(
                                     name,
-                                    result.status() == VersionConversion.Status.SAME
-                                            ? MigrationEntry.Outcome.CARRIED
-                                            : MigrationEntry.Outcome.RESHAPED,
+                                    outcome(result),
                                     Optional.of(result.sourceText()),
                                     result.targetText().orElseThrow(),
                                     result.explanation()));
@@ -203,6 +217,61 @@ public final class SchemaMigration {
                 CometParameters.of(
                         metadata, target, entries, source.enzymeTable(), kept, List.of());
         return new MigrationResult(source, migrated, new MigrationReport(from, target, report));
+    }
+
+    /** What a usable conversion is, in the report's words. */
+    private static MigrationEntry.Outcome outcome(VersionConversion.Result result) {
+        if (result.applied().stream().anyMatch(m -> m.action() == ValueMigration.Action.CONVERT)) {
+            return MigrationEntry.Outcome.CONVERTED;
+        }
+        if (result.status() == VersionConversion.Status.CONVERTED) {
+            return MigrationEntry.Outcome.RESHAPED;
+        }
+        return result.applied().isEmpty()
+                ? MigrationEntry.Outcome.CARRIED
+                : MigrationEntry.Outcome.NOTED;
+    }
+
+    /**
+     * The rules the target's value migrations from the source release are matched by, found on each
+     * parameter of the source model by its own validation; empty, and no validation run, when no
+     * entry is matched by a rule.
+     *
+     * @throws IllegalStateException if any of the target's value migrations names a rule that does
+     *     not exist
+     */
+    private static Map<String, Set<String>> sourceRules(
+            CometParameters source, ToolVersion target, VersionConversion conversion) {
+        for (ValueMigration migration :
+                source.metadata().version(target).orElseThrow().valueMigrations()) {
+            migration
+                    .rule()
+                    .filter(id -> Rule.byId(id).isEmpty())
+                    .ifPresent(
+                            id -> {
+                                throw new IllegalStateException(
+                                        "Comet "
+                                                + target.text()
+                                                + "'s version record migrates values by the rule"
+                                                + " \""
+                                                + id
+                                                + "\", which is not a rule");
+                            });
+        }
+        Set<String> consulted = new HashSet<>();
+        conversion.migrations().forEach(m -> m.rule().ifPresent(consulted::add));
+        Map<String, Set<String>> found = new HashMap<>();
+        if (consulted.isEmpty()) {
+            return found;
+        }
+        for (Finding finding : CometValidator.standard().validate(source).findings()) {
+            if (consulted.contains(finding.rule().id())) {
+                for (String parameter : finding.parameters()) {
+                    found.computeIfAbsent(parameter, p -> new HashSet<>()).add(finding.rule().id());
+                }
+            }
+        }
+        return found;
     }
 
     private static void adopt(

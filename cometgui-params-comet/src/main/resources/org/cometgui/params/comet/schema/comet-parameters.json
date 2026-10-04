@@ -175,6 +175,57 @@
           "severity": "ERROR",
           "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1436-L1450"
         }
+      ],
+      "valueMigrations": [
+        {
+          "from": "2026.02.2",
+          "parameter": "index_search_type",
+          "value": "1",
+          "action": "CONVERT",
+          "becomes": "-1",
+          "reason": "Comet 2026.02.2 reads index_search_type only to choose the index it builds for a named .idx file that does not exist yet, and builds a fragment-ion index for every value but 0, so 1 (what its comet -q writes) is its ordinary setting. Comet 2026.03.0's -1 (not set, what its comet -q writes) does exactly the same and never warns; 1 there draws a warning on every FASTA search that the value is ignored.",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1524"
+        },
+        {
+          "from": "2026.02.2",
+          "parameter": "index_search_type",
+          "value": "0",
+          "action": "NOTICE",
+          "reason": "0 (build a peptide index for a named .idx file that does not exist yet) means the same in both releases and does nothing to a FASTA search in either, but Comet 2026.03.0 says so: it warns on every search whose database_name is not an .idx file, and on an existing fragment-ion index.",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1764-L1775"
+        },
+        {
+          "from": "2026.02.2",
+          "rule": "variable_mod_tuple.distance_undocumented",
+          "action": "CONVERT",
+          "field": "TERMINAL_DISTANCE",
+          "becomes": "-1",
+          "reason": "Comet 2026.02.2 reads a terminal distance below -2 as -1, no constraint (searches with -3 and with -1 give identical results), and Comet 2026.03.0 refuses it, so it is written -1. One difference no 2026.03.0 value can keep: with two or more exclusive slots (required -1), Comet 2026.02.2 skipped its one-exclusive-modification-per-peptide check unless an active slot had a distance of exactly -1; Comet 2026.03.0 always applies it.",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5371-L5372"
+        },
+        {
+          "from": "2026.02.2",
+          "rule": "variable_mod_tuple.terminus_undocumented",
+          "action": "NEEDS_ATTENTION",
+          "reason": "With a terminal distance of 0 or more, Comet 2026.02.2 matches no terminus outside 0-3, so this modification was never applied (searches gave the same results as with the slot switched off), and Comet 2026.03.0 refuses the setting. Choose the terminus that was meant (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), or switch the slot off.",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5373-L5390"
+        },
+        {
+          "from": "2024.01.0",
+          "rule": "variable_mod_tuple.distance_undocumented",
+          "action": "CONVERT",
+          "field": "TERMINAL_DISTANCE",
+          "becomes": "-1",
+          "reason": "Comet 2024.01.0 reads a terminal distance below -2 as -1, no constraint (searches with -3 and with -1 give identical results), and Comet 2026.03.0 refuses it, so it is written -1. One difference no 2026.03.0 value can keep: with two or more exclusive slots (required -1), Comet 2024.01.0 skipped its one-exclusive-modification-per-peptide check unless an active slot had a distance of exactly -1; Comet 2026.03.0 always applies it.",
+          "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometSearch.cpp#L4757-L4758"
+        },
+        {
+          "from": "2024.01.0",
+          "rule": "variable_mod_tuple.terminus_undocumented",
+          "action": "NEEDS_ATTENTION",
+          "reason": "With a terminal distance of 0 or more, Comet 2024.01.0 matches no terminus outside 0-3, so this modification was never applied (searches gave the same results as with the slot switched off), and Comet 2026.03.0 refuses the setting. Choose the terminus that was meant (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), or switch the slot off.",
+          "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometSearch.cpp#L4759-L4776"
+        }
       ]
     },
     {
@@ -210,6 +261,17 @@
           "rule": "variable_mod_tuple.distance_undocumented",
           "severity": "WARNING",
           "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5369-L5372"
+        }
+      ],
+      "valueMigrations": [
+        {
+          "from": "2026.03.0",
+          "parameter": "index_search_type",
+          "value": "-1",
+          "action": "CONVERT",
+          "becomes": "1",
+          "reason": "Comet 2026.03.0's -1 (not set) builds a fragment-ion index for a named .idx file that does not exist yet. Comet 2026.02.2 does not document -1, and its 1 does exactly the same.",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1524"
         }
       ]
     },
@@ -258,7 +320,8 @@
           "severity": "WARNING",
           "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometSearch.cpp#L4754-L4758"
         }
-      ]
+      ],
+      "valueMigrations": []
     }
   ],
   "categories": [

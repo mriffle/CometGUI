@@ -16,13 +16,18 @@
 
 package org.cometgui.params.comet.migration;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.ParameterValue;
 import org.cometgui.params.comet.model.ParameterValueCodec;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.ParameterDefinition;
+import org.cometgui.params.comet.schema.ValueMigration;
+import org.cometgui.params.comet.schema.VariableModLayout;
 
 /**
  * Carries one parameter's value text from one curated Comet version's schema to another's: the one
@@ -36,6 +41,16 @@ import org.cometgui.params.comet.schema.ParameterDefinition;
  * takes one, or a non-default value in a field the target's tuple lacks. A conversion therefore
  * never changes what a value means: it is the same typed value written in the target's syntax, or
  * it is reported as not convertible.
+ *
+ * <p>Where two releases treat the same text differently, or different text the same, the
+ * <strong>target</strong> release's version record says so ({@link ValueMigration}, keyed by the
+ * source release -- decision C-2: data, never an {@code if (version ...)}), and the conversion does
+ * what the entry says, naming it in {@link Result#applied()} and its reason in the explanation: it
+ * writes the value as the entry's equivalent ({@link Status#CONVERTED}), refuses it as having none
+ * ({@link Status#NOT_CONVERTIBLE}), or carries it with the entry's notice ({@link Status#SAME}). An
+ * entry matched by value applies wherever this conversion is used; one matched by a validation rule
+ * applies only where the caller says which rules the source model's validation found on the
+ * parameter ({@link #convert(String, String, Set)}), as schema migration does.
  */
 public final class VersionConversion {
 
@@ -73,13 +88,34 @@ public final class VersionConversion {
      * @param targetText the value as the target version writes it; present exactly when the status
      *     is usable
      * @param explanation one sentence saying what happened, naming both versions
+     * @param applied the target's value-migration entries that decided this result, in the
+     *     metadata's order; empty when the value was carried by its typed meaning alone
      */
     public record Result(
             String parameter,
             Status status,
             String sourceText,
             Optional<String> targetText,
-            String explanation) {
+            String explanation,
+            List<ValueMigration> applied) {
+
+        /**
+         * A result no value-migration entry decided.
+         *
+         * @param parameter the parameter name
+         * @param status what became of it
+         * @param sourceText the value as the source version writes it
+         * @param targetText the value as the target version writes it
+         * @param explanation one sentence saying what happened
+         */
+        public Result(
+                String parameter,
+                Status status,
+                String sourceText,
+                Optional<String> targetText,
+                String explanation) {
+            this(parameter, status, sourceText, targetText, explanation, List.of());
+        }
 
         /**
          * Validates the components.
@@ -92,6 +128,7 @@ public final class VersionConversion {
             Objects.requireNonNull(sourceText, "sourceText");
             Objects.requireNonNull(targetText, "targetText");
             Objects.requireNonNull(explanation, "explanation");
+            applied = List.copyOf(applied);
             if (targetText.isPresent() != status.usable()) {
                 throw new IllegalArgumentException(
                         parameter
@@ -114,12 +151,18 @@ public final class VersionConversion {
 
     private final ParameterValueCodec toCodec;
 
+    private final VariableModLayout fromLayout;
+
+    private final List<ValueMigration> migrations;
+
     private VersionConversion(CuratedMetadata metadata, ToolVersion from, ToolVersion to) {
         this.metadata = metadata;
         this.from = from;
         this.to = to;
         this.fromCodec = ParameterValueCodec.forVersion(metadata, from);
         this.toCodec = ParameterValueCodec.forVersion(metadata, to);
+        this.fromLayout = metadata.version(from).orElseThrow().variableModTuple();
+        this.migrations = metadata.version(to).orElseThrow().valueMigrationsFrom(from);
     }
 
     /**
@@ -168,7 +211,16 @@ public final class VersionConversion {
     }
 
     /**
-     * Carries one value.
+     * The target release's value-migration entries for values written for the source release.
+     *
+     * @return the entries, in the metadata's order; empty when the target states none
+     */
+    public List<ValueMigration> migrations() {
+        return List.copyOf(migrations);
+    }
+
+    /**
+     * Carries one value, applying the target's value-migration entries matched by value.
      *
      * @param parameter a parameter the source version models
      * @param text its value text, as the source version reads it
@@ -178,8 +230,30 @@ public final class VersionConversion {
      *     the parameter's kind in the source version
      */
     public Result convert(String parameter, String text) {
+        return convert(parameter, text, Set.of());
+    }
+
+    /**
+     * Carries one value, applying the target's value-migration entries matched by value and those
+     * matched by any of the given rules.
+     *
+     * <p>Every matching entry applies: if any has no equivalent, the value is {@link
+     * Status#NOT_CONVERTIBLE} with every such entry's reason; otherwise each converting entry
+     * rewrites the value in turn, and each notice is reported.
+     *
+     * @param parameter a parameter the source version models
+     * @param text its value text, as the source version reads it
+     * @param sourceRules the identifiers of the validation rules whose findings the source model
+     *     has on this parameter
+     * @return what became of it
+     * @throws IllegalArgumentException if the source version does not model the parameter
+     * @throws org.cometgui.params.comet.value.ValueSyntaxException if the text cannot be read as
+     *     the parameter's kind in the source version
+     */
+    public Result convert(String parameter, String text, Set<String> sourceRules) {
         Objects.requireNonNull(parameter, "parameter");
         Objects.requireNonNull(text, "text");
+        Objects.requireNonNull(sourceRules, "sourceRules");
         ParameterDefinition source =
                 metadata.parameter(parameter, from)
                         .orElseThrow(
@@ -204,6 +278,41 @@ public final class VersionConversion {
                             + "; it is a parameter of Comet "
                             + from.text());
         }
+        List<ValueMigration> applied = new ArrayList<>();
+        for (ValueMigration migration : migrations) {
+            if (migration.matchesValue(parameter, sourceText)
+                    || migration.rule().filter(sourceRules::contains).isPresent()) {
+                applied.add(migration);
+            }
+        }
+        List<ValueMigration> flagged =
+                applied.stream()
+                        .filter(m -> m.action() == ValueMigration.Action.NEEDS_ATTENTION)
+                        .toList();
+        if (!flagged.isEmpty()) {
+            return new Result(
+                    parameter,
+                    Status.NOT_CONVERTIBLE,
+                    sourceText,
+                    Optional.empty(),
+                    parameter
+                            + " = "
+                            + sourceText
+                            + " (Comet "
+                            + from.text()
+                            + ") has no equivalent in Comet "
+                            + to.text()
+                            + ": "
+                            + reasons(flagged),
+                    applied);
+        }
+        List<ValueMigration> rewritten = new ArrayList<>();
+        for (ValueMigration migration : applied) {
+            if (migration.action() == ValueMigration.Action.CONVERT) {
+                value = rewrite(source, value, migration);
+                rewritten.add(migration);
+            }
+        }
         String targetText;
         try {
             targetText = toCodec.format(target.get(), value);
@@ -221,7 +330,30 @@ public final class VersionConversion {
                             + ") cannot be written for Comet "
                             + to.text()
                             + ": "
-                            + cannotHold.getMessage());
+                            + cannotHold.getMessage(),
+                    applied);
+        }
+        List<ValueMigration> notices =
+                applied.stream().filter(m -> m.action() == ValueMigration.Action.NOTICE).toList();
+        if (!rewritten.isEmpty()) {
+            return new Result(
+                    parameter,
+                    Status.CONVERTED,
+                    sourceText,
+                    Optional.of(targetText),
+                    parameter
+                            + " = "
+                            + sourceText
+                            + " (Comet "
+                            + from.text()
+                            + ") is written "
+                            + targetText
+                            + " for Comet "
+                            + to.text()
+                            + ", which means the same there: "
+                            + reasons(rewritten)
+                            + (notices.isEmpty() ? "" : "; " + reasons(notices)),
+                    applied);
         }
         if (targetText.equals(sourceText)) {
             return new Result(
@@ -235,7 +367,9 @@ public final class VersionConversion {
                             + " means the same in Comet "
                             + from.text()
                             + " and Comet "
-                            + to.text());
+                            + to.text()
+                            + (notices.isEmpty() ? "" : ", but: " + reasons(notices)),
+                    applied);
         }
         return new Result(
                 parameter,
@@ -251,6 +385,32 @@ public final class VersionConversion {
                         + targetText
                         + " for Comet "
                         + to.text()
-                        + ", with the same meaning");
+                        + ", with the same meaning"
+                        + (notices.isEmpty() ? "" : "; " + reasons(notices)),
+                applied);
+    }
+
+    /**
+     * A tuple value with one field rewritten as an entry says: the source release's text, the field
+     * at its position in the source layout replaced, read back under the source codec.
+     */
+    private ParameterValue rewrite(
+            ParameterDefinition definition, ParameterValue value, ValueMigration migration) {
+        String becomes = migration.becomes().orElseThrow();
+        if (migration.field().isEmpty()) {
+            return fromCodec.parse(definition, becomes);
+        }
+        String[] fields = fromCodec.format(definition, value).split(" ");
+        fields[fromLayout.position(migration.field().get()).orElseThrow()] = becomes;
+        return fromCodec.parse(definition, String.join(" ", fields));
+    }
+
+    /** The entries' reasons, each with its source, in order. */
+    private static String reasons(List<ValueMigration> entries) {
+        List<String> said = new ArrayList<>();
+        for (ValueMigration entry : entries) {
+            said.add(entry.reason() + " (" + entry.source() + ")");
+        }
+        return String.join("; ", said);
     }
 }

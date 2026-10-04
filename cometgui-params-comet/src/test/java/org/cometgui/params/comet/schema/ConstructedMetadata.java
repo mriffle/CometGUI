@@ -46,6 +46,7 @@ final class ConstructedMetadata {
         version.put("variableModTuple", tupleLayout());
         version.put("overrides", new ArrayList<>());
         version.put("ruleSeverities", ruleSeverities());
+        version.put("valueMigrations", new ArrayList<>());
         List<Object> categories = new ArrayList<>();
         for (ParameterCategory category : ParameterCategory.values()) {
             Map<String, Object> entry = new LinkedHashMap<>();

@@ -17,6 +17,7 @@
 package org.cometgui.params.comet.schema;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,6 +44,11 @@ import org.cometgui.domain.tools.ToolVersion;
  * accepts what the rule checks ({@link RuleSeverity}), so a rule reads its severity from the
  * version the model carries rather than asking which version it is.
  *
+ * <p>So is what this release does with a value written for another: {@link #valueMigrations()}
+ * holds, keyed by the source release, the values schema migration converts, flags or carries with a
+ * notice on the way into this release ({@link ValueMigration}) -- Comet 2026.02.2's {@code
+ * index_search_type = 1}, which Comet 2026.03.0 spells {@code -1}.
+ *
  * @param version the version as the manifest spells it, such as {@code 2026.02.2}
  * @param marker how that release's binary spells itself on its {@code # comet_version} line
  * @param parameterPages the upstream parameter documentation for the release
@@ -51,6 +57,8 @@ import org.cometgui.domain.tools.ToolVersion;
  * @param overrides parameter name to what this version says differently about it; empty for a
  *     version that agrees with every curated definition
  * @param ruleSeverities rule identifier to this release's severity for that version-scoped rule
+ * @param valueMigrations what migration into this release does with particular values written for
+ *     another, in the metadata's order; empty when it carries every value by its typed meaning
  */
 public record CometVersionRecord(
         ToolVersion version,
@@ -59,14 +67,16 @@ public record CometVersionRecord(
         String source,
         VariableModLayout variableModTuple,
         Map<String, ParameterOverride> overrides,
-        Map<String, RuleSeverity> ruleSeverities) {
+        Map<String, RuleSeverity> ruleSeverities,
+        List<ValueMigration> valueMigrations) {
 
     /**
      * Validates the components and takes immutable, name-ordered copies of the overrides and the
-     * rule severities.
+     * rule severities, and an immutable copy of the value migrations.
      *
      * @throws IllegalArgumentException if an override is filed under another parameter's name, or a
-     *     rule severity under another rule's identifier
+     *     rule severity under another rule's identifier, or a value migration is from this release
+     *     itself
      */
     public CometVersionRecord {
         Objects.requireNonNull(version, "version");
@@ -90,6 +100,46 @@ public record CometVersionRecord(
                                 "the severity filed under " + rule + " is for " + severity.rule());
                     }
                 });
+        valueMigrations = List.copyOf(valueMigrations);
+        for (ValueMigration migration : valueMigrations) {
+            if (migration.from().equals(version)) {
+                throw new IllegalArgumentException(
+                        "Comet "
+                                + version.text()
+                                + " has a value migration from itself: "
+                                + migration.matches());
+            }
+        }
+    }
+
+    /**
+     * A record with overrides and rule severities and no value migrations.
+     *
+     * @param version the version as the manifest spells it
+     * @param marker how that release's binary spells itself
+     * @param parameterPages the upstream parameter documentation for the release
+     * @param source the upstream source tree at the release's tag
+     * @param variableModTuple the field layout of the release's variable-modification tuple
+     * @param overrides parameter name to what this version says differently about it
+     * @param ruleSeverities rule identifier to this release's severity for that rule
+     */
+    public CometVersionRecord(
+            ToolVersion version,
+            CometVersionMarker marker,
+            String parameterPages,
+            String source,
+            VariableModLayout variableModTuple,
+            Map<String, ParameterOverride> overrides,
+            Map<String, RuleSeverity> ruleSeverities) {
+        this(
+                version,
+                marker,
+                parameterPages,
+                source,
+                variableModTuple,
+                overrides,
+                ruleSeverities,
+                List.of());
     }
 
     /**
@@ -138,7 +188,43 @@ public record CometVersionRecord(
      */
     public CometVersionRecord withRuleSeverities(Map<String, RuleSeverity> severities) {
         return new CometVersionRecord(
-                version, marker, parameterPages, source, variableModTuple, overrides, severities);
+                version,
+                marker,
+                parameterPages,
+                source,
+                variableModTuple,
+                overrides,
+                severities,
+                valueMigrations);
+    }
+
+    /**
+     * This record with other value migrations, everything else kept.
+     *
+     * @param migrations the value migrations
+     * @return the record
+     */
+    public CometVersionRecord withValueMigrations(List<ValueMigration> migrations) {
+        return new CometVersionRecord(
+                version,
+                marker,
+                parameterPages,
+                source,
+                variableModTuple,
+                overrides,
+                ruleSeverities,
+                migrations);
+    }
+
+    /**
+     * The value migrations into this release from one source release.
+     *
+     * @param from the release the values were written for
+     * @return its entries, in the metadata's order; empty when there are none
+     */
+    public List<ValueMigration> valueMigrationsFrom(ToolVersion from) {
+        Objects.requireNonNull(from, "from");
+        return valueMigrations.stream().filter(m -> m.from().equals(from)).toList();
     }
 
     /**
