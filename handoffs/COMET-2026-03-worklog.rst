@@ -395,7 +395,53 @@ pick 2026.03.0 aarch64.
 Unit 3
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-04 at ``6aadcf1``, no rework.** One fresh agent; commits
+``6159488`` (alphabet, codec, round trips, generator) and ``6aadcf1``
+(developer page). 25 paths, all in scope.
+
+What I ran and saw:
+
+* **Read the production diff.** Each release's ``variableModTuple`` carries a
+  ``residueAlphabet`` (``characters``, ``source``): 2026.03.0 ``A-Z n c ^ $``
+  (``CometSearchManager.cpp`` L1538-1563 at ``v2026.03.0``); 2026.02.2 and
+  2024.01.0 ``A-Z n c``. ``MetadataLoader`` validates it; ``VariableModCodec``
+  is built per release (``forVersion``) and refuses a character outside that
+  release's alphabet **on read and on write**, naming the release.
+  ``TerminalCode`` gives ``^``/``$`` their words. ``VariableModification`` now
+  admits the union of every release's characters -- the per-release law moved
+  to the codec. Accepted, with a condition placed on unit 4: a model built in
+  code (Phase 07's editor) can hold a ``^`` slot for 2026.02.2 until it is
+  written, so validation must also report it at the field.
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``;
+  ``Tests run: 1731, Failures: 0, Errors: 0, Skipped: 0``;
+  ``VariableModRoundTripTest`` alone 917 test cases.
+* **PIT** over ``ResidueAlphabet``, ``TerminalCode``, ``VariableModLayout``,
+  ``MetadataLoader``, ``VariableModCodec*``, ``VariableModification``:
+  **314/314 killed**.
+* **Injection 1, version-blind** (``VariableModCodec.forVersion`` takes the
+  first -- newest -- release's layout for every version): class ``e3e84a02``
+  -> ``35c1b6ab``; ``Tests run: 1731, Failures: 277, Errors: 3``, e.g.
+  ``VersionConversionTest.notConvertible:83 expected: <NOT_CONVERTIBLE> but
+  was: <SAME>`` and ``RealMigrationTest.aPairedLossNeedsAttention expected:
+  <NEEDS_ATTENTION> but was: <CARRIED>``. Restored, ``sha256sum -c`` OK.
+* **Injection 2** (the read path checks ``"A"`` instead of the token, so a
+  2026.02.2 file with ``^`` would parse): the change is in the inner class
+  ``VariableModCodec$Reading``, so the outer class's hash only returned from
+  injection 1's build to pristine; 272 failures, 1 error, e.g.
+  ``VariableModRoundTripTest ... acetylation of the protein N-terminus, ^ ==>
+  Expected ...ValueSyntaxException to be thrown, but nothing was thrown.``
+  Restored, ``sha256sum -c`` OK; ``git status`` clean.
+* **Execution claim checked independently**: my own 2026.02.2 searches over
+  scans 11188-11300 with and without ``variable_mod02 = 42.010565 ^ 0 1 -1 0 0
+  0.0`` gave identical ``.txt`` results (517 lines, same SHA-256 of the body)
+  -- ``^`` is a silent no-op in 2026.02.2, which is why it stays refused there.
+* ``scripts/ci/docs-build.sh`` PASSED. ``--only docs --only traceability``
+  -> 2 passed in 56 s; ``--only params`` -> ``68 controls in 271s``.
+
+Residue: ``variable_modNN``'s curated help still says "n and c for termini"
+for every release, and the 2026.03.0 inline comment of ``output_txtfile``
+still mentions 2026.02.2 -- both carried to unit 4 as metadata fixes in its
+scope; harness controls for the 2026.03.0 round trip are unit 6's.
 
 .. _c2603-u4-signoff:
 
