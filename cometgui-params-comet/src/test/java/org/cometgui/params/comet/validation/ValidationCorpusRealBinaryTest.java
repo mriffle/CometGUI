@@ -48,7 +48,6 @@ import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.fixtures.CometManifest;
 import org.cometgui.params.comet.fixtures.UpstreamMirror;
-import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.tools.process.ProcessService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -63,8 +62,17 @@ import org.junit.jupiter.params.provider.MethodSource;
  * The validation corpus replayed against the REAL pinned Comet binaries, 2026.03.0 and 2026.02.2:
  * for every case and both releases, {@code comet -P<case>.params -N<out> <spectra>} is run through
  * {@link ProcessService}, and its exit code and its Warning and Error lines (beyond the release's
- * control run) must be the recorded ones; the validator, given the same parameters for that
- * release, must give the recorded findings; and the two must meet the agreement criterion.
+ * control run) must be the recorded ones, and each recorded verdict must meet the agreement
+ * criterion. This is the binary half of the agreement: {@link ValidationCorpusTest} holds the
+ * validator to the same recorded verdicts, so the two together prove that the validator agrees with
+ * each release's binary.
+ *
+ * <p>This test deliberately runs <strong>no production class of this module</strong>: each case's
+ * file is built by plain text edits of the release's real {@code -q} fixture bytes ({@link
+ * ValidationCorpus#file}), and the corpus is read with the provenance module's JSON reader. A test
+ * that parsed or validated here would be mapped by PIT's coverage to every parser and validator
+ * mutant and would re-run all 86 searches for each, which times out (the params gate's control 9
+ * scores a timeout as not killed).
  *
  * <p>The search reads local inputs that are never committed ({@code D-006}): the Crux K562 run
  * {@code scratch/fixture/20100614_Velos1_TaGe_SA_K562_3.mzML} and the UniProt human proteome {@code
@@ -84,7 +92,8 @@ class ValidationCorpusRealBinaryTest {
 
     private static final ValidationCorpus CORPUS = ValidationCorpus.load();
 
-    private static final List<ToolVersion> RELEASES = List.of(Models.COMET_2026_03_0, Models.COMET);
+    private static final List<ToolVersion> RELEASES =
+            List.of(ToolVersion.parse("2026.03.0"), ToolVersion.parse("2026.02.2"));
 
     private static final Map<String, Run> RUNS = new ConcurrentHashMap<>();
 
@@ -100,15 +109,8 @@ class ValidationCorpusRealBinaryTest {
      * @param exit the exit code
      * @param lines its Warning and Error lines, standard output first, stripped
      * @param database the database path it was given
-     * @param model the validator's model of the same parameters
-     * @param refused the edits the release's codec refused
      */
-    record Run(
-            int exit,
-            List<String> lines,
-            String database,
-            CometParameters model,
-            List<String> refused) {}
+    record Run(int exit, List<String> lines, String database) {}
 
     static Stream<ValidationCorpus.Case> cases() {
         return CORPUS.cases().stream();
@@ -265,9 +267,7 @@ class ValidationCorpusRealBinaryTest {
                 }
             }
         }
-        List<String> refused = new ArrayList<>();
-        CometParameters model = ValidationCorpus.model(release, base, own, refused);
-        return new Run(collector.exitCode.get(), lines, path, model, refused);
+        return new Run(collector.exitCode.get(), lines, path);
     }
 
     private static final class Collector implements ProcessListener {
@@ -306,7 +306,7 @@ class ValidationCorpusRealBinaryTest {
 
     @ParameterizedTest
     @MethodSource("cases")
-    @DisplayName("both real binaries give the recorded verdict, and the validator agrees")
+    @DisplayName("both real binaries give the recorded verdict, which meets the criterion")
     void replay(ValidationCorpus.Case kase) {
         for (ToolVersion release : RELEASES) {
             ValidationCorpus.Verdict verdict = kase.verdict(release);
@@ -332,12 +332,6 @@ class ValidationCorpusRealBinaryTest {
                             .toList();
             assertEquals(verdict.exit(), run.exit(), where + ": exit code; lines " + run.lines());
             assertEquals(expected, beyond, where + ": Warning and Error lines");
-            ValidationReport report = CometValidator.standard().validate(run.model());
-            assertEquals(
-                    verdict.findings(),
-                    ValidationCorpusTest.findings(report),
-                    where + ": " + report);
-            assertEquals(verdict.builtInCode(), !run.refused().isEmpty(), where);
             ValidationCorpus.assertAgreement(kase, verdict);
             assertEquals(
                     ValidationCorpus.of(run.exit(), beyond),

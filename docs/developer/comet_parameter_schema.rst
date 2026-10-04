@@ -2366,8 +2366,15 @@ of parameter files was run through **both** real binaries, 2026.03.0 and
 2026.02.2, and the validator, given each release, was made to agree with that
 release's binary on every case. The corpus is
 ``cometgui-params-comet/src/test/resources/fixtures/comet-validation/corpus.json``;
-``ValidationCorpusTest`` holds the validator to it on every platform and
-``ValidationCorpusRealBinaryTest`` re-runs both binaries on it (Linux).
+the agreement is proved in two halves against the verdicts recorded there.
+``ValidationCorpusTest`` (every platform, no binary) holds the **validator** to
+each recorded finding; ``ValidationCorpusRealBinaryTest`` (Linux) re-runs both
+**binaries** and holds each to its recorded exit code and lines. The
+real-binary half runs no production class of the module -- it builds each
+file by plain text edits of the ``-q`` fixture bytes -- because a test that
+parsed or validated after 86 searches would be mapped by PIT to every parser
+and validator mutant, re-run the searches for each, and time out; the params
+gate scores a timeout as not killed.
 
 The agreement criterion
 -----------------------
@@ -2385,8 +2392,8 @@ exits 0 and prints a ``Warning`` line beyond its release's control run) or
 The validator is **never** less severe than the binary. A case recorded
 ``same`` must have equal classes; one recorded ``stricter`` must be strictly
 more severe and carry its reason (``S1``-``S8`` below). Both tests assert it
-for every case and release, and the exact findings and the binary's exact
-lines.
+for every recorded verdict; the validator half also asserts the exact
+findings, and the binary half the exact exit code and lines.
 
 How each case was run
 ---------------------

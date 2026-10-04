@@ -36,11 +36,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * The validator against the validation corpus, on every platform: for each case and release, the
- * validator's findings are exactly the recorded ones, and each recorded verdict meets the agreement
- * criterion against what the real binary was recorded doing ({@link ValidationCorpusRealBinaryTest}
- * re-proves that half on Linux). The database path is a stand-in here: no rule reads the file, and
- * the one rule that reads the name looks only at its {@code .idx} suffix.
+ * The validator half of the agreement, on every platform: for each case and release, the
+ * validator's findings for the case's parameters are exactly the recorded ones, and each recorded
+ * verdict meets the agreement criterion against what the real binary was recorded doing. {@link
+ * ValidationCorpusRealBinaryTest} holds the real binaries to the same recorded verdicts on Linux;
+ * together the two prove the validator agrees with each release's binary. The database path is a
+ * stand-in here: no rule reads the file, and the one rule that reads the name looks only at its
+ * {@code .idx} suffix.
  */
 class ValidationCorpusTest {
 
