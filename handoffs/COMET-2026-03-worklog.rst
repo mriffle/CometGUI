@@ -522,7 +522,72 @@ the validator could report an AScorePro error the binary would not); the
 Unit 5
 ------
 
-Not yet dispatched.
+**ACCEPTED 2026-10-04 at ``876dc91``, no rework; two judgement calls carried
+as residue.** One fresh agent; commits ``7f9e1b1`` (code, data, tests,
+migrated files), ``92f3ea6`` (PIT follow-up), ``876dc91`` (developer page). 24
+paths, all in scope; no spectra or FASTA committed.
+
+What I ran and saw:
+
+* **Read the diff and the data.** Each version record carries a required
+  ``valueMigrations`` list, filed under the **target** release and naming the
+  ``from`` release; an entry matches one value of a parameter or a validation
+  rule the **source** model's own validation reports there, and has one action
+  (``CONVERT`` with ``becomes``/``field``, ``NEEDS_ATTENTION`` or
+  ``NOTICE``), a reason and an https source. Into 2026.03.0 from 2026.02.2:
+  ``index_search_type`` ``1`` -> ``-1``; ``0`` carried with a notice; a
+  distance below -2 -> ``-1``; a terminus outside 0-3 with a distance ->
+  NEEDS_ATTENTION. From 2024.01.0: the same two tuple entries. Into 2026.02.2
+  from 2026.03.0: ``-1`` -> ``1``. Two new report outcomes, ``CONVERTED`` and
+  ``NOTED``. No ``if`` on a version or a parameter name (C-2).
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` -> ``BUILD SUCCESS``,
+  ``Tests run: 1917, Failures: 0, Errors: 0, Skipped: 0``
+  (``MigrationTo202603Test`` 27, ``MigratedFileRealBinaryTest`` 6,
+  ``ValueMigrationsLoaderTest`` 15, ``ValueMigrationConversionTest`` 7).
+* **The real binary, run myself** on the four committed migrated files
+  (``fixtures/comet-migrated/2026.03.0/from-{2026.02.2,2024.01.0}-{q,p}.params``,
+  each holding ``index_search_type = -1``) with only the database, scan range
+  and an emptied ``spectral_library_name`` changed: 2026.03.0 rc **0** on all
+  four, **no Warning or Error line**.
+* **PIT** over the six changed classes and their inner types, **no test
+  excluded**: **332/332 killed**.
+* **Injection A, version-blind** (``CometVersionRecord.valueMigrationsFrom``
+  ignores ``from``): class ``df4e1de5`` -> ``fd6a2f4f``; 6 failures, e.g.
+  ``MigrationTo202603Test.sameRelease expected: <118> but was: <116>`` and a
+  2024.01.0 distance migration explained with 2026.02.2's reason. Restored,
+  ``sha256sum -c`` OK.
+* **Injection B** (``SchemaMigration`` hands conversion no source findings, so
+  rule-keyed entries never apply): class ``4998091f`` -> ``b827eaf5``; 3
+  failures -- ``distanceBelowMinusTwo 2026.02.2 ==> expected: <CONVERTED> but
+  was: <CARRIED>`` and ``terminusOutsideZeroToThree expected: <NEEDS_ATTENTION>
+  but was: <CARRIED>``. Restored, ``sha256sum -c`` OK; ``git status`` clean.
+* ``scripts/ci/docs-build.sh`` PASSED; ``--only docs --only traceability`` ->
+  2 passed in 58 s; ``--only params`` -> PASS, 68 controls in 317 s; control 9:
+  parser 96/101, writer 30/30, validation 251/252, module 1360/1367, migration
+  84/84 with nothing timed out.
+
+The four real migrations: 2026.02.2 ``-q`` and ``-p`` -> CONVERTED 1
+(``index_search_type``), CARRIED 117; 2024.01.0 ``-q`` and ``-p`` -> ADDED 9,
+CARRIED 109. The migrated 2026.02.2 ``-q`` writes byte for byte what 2026.03.0's
+own ``-q`` writes canonically.
+
+Residue, for tier 1 (judgement calls, not defects in the gate):
+
+* **Distance below -2 is converted to -1 although one edge case differs.** In
+  2026.02.2 and 2024.01.0 the exclusive-modification check switches on only
+  when some active slot has a distance of exactly -1; with two exclusive slots
+  at -3 the agent measured 7265 result lines against 7263 at -1. No 2026.03.0
+  value reproduces the old behaviour; the conversion's reason states the
+  exception. Flagging instead would replace the slot with its default.
+* **NEEDS_ATTENTION puts the slot's default into the migrated set** (Phase 06
+  semantics). For ``variable_mod01`` that default is an active methionine
+  oxidation, so a migrated set that is run without review searches a
+  modification the user never had. The report says so; Phase 07/08 should
+  make an unresolved NEEDS_ATTENTION block a run.
+* The preset compatibility check applies only value-matched entries; a preset
+  carrying a distance of -3 is caught later by validation.
+* Upstream: 2024.01.0 with every variable-modification slot unused stops with
+  ``Error in StorePeptides. stored twice``, exit 1 (outside scope).
 
 .. _c2603-u6-signoff:
 
