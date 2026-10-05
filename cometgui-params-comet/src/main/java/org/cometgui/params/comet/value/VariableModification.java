@@ -132,21 +132,41 @@ public record VariableModification(
     public enum Requirement {
 
         /** {@code 0}: not forced to be present. */
-        OPTIONAL(0, "optional"),
+        OPTIONAL(
+                0,
+                "optional",
+                "Peptides are analysed with and without the modification; it is not forced to be"
+                        + " present."),
 
         /** {@code 1}: only peptides carrying the modification are analysed. */
-        REQUIRED(1, "required"),
+        REQUIRED(1, "required", "Only peptides that contain the modification are analysed."),
 
         /** {@code -1}: at most one of the set of exclusive modifications in a peptide. */
-        EXCLUSIVE(-1, "exclusive");
+        EXCLUSIVE(
+                -1,
+                "exclusive",
+                "Only one of the set of exclusive modifications can appear in a peptide.");
 
         private final int code;
 
         private final String words;
 
-        Requirement(int code, String words) {
+        private final String explanation;
+
+        Requirement(int code, String words, String explanation) {
             this.code = code;
             this.words = words;
+            this.explanation = explanation;
+        }
+
+        /**
+         * What the requirement does, in a sentence: the meaning Comet's {@code variable_modXX} page
+         * gives the seventh field's value.
+         *
+         * @return for example {@code Only peptides that contain the modification are analysed.}
+         */
+        public String explanation() {
+            return explanation;
         }
 
         /**
@@ -257,13 +277,23 @@ public record VariableModification(
     }
 
     /**
+     * Whether the residue token holds a character: a residue letter or a terminal code.
+     *
+     * @param character the character
+     * @return {@code true} if it is in the token
+     */
+    public boolean holds(char character) {
+        return residues.indexOf(character) >= 0;
+    }
+
+    /**
      * Whether the residue token holds a terminal code.
      *
      * @param terminal the code
      * @return {@code true} if the code's character is in the token
      */
     public boolean has(TerminalCode terminal) {
-        return residues.indexOf(terminal.code()) >= 0;
+        return holds(terminal.code());
     }
 
     /**

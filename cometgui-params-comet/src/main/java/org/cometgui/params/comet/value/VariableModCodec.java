@@ -20,6 +20,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalInt;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.schema.CometVersionRecord;
@@ -191,20 +192,9 @@ public final class VariableModCodec {
      *     or a residue character outside the version's alphabet
      */
     public String format(VariableModification value) {
-        Objects.requireNonNull(value, "value");
-        String refused = refusedResidues(value.residues());
-        if (refused != null) {
-            throw new IllegalArgumentException(refused + ", so it cannot be written");
-        }
-        for (VariableModField field : VariableModField.values()) {
-            if (layout.entry(field).isEmpty() && !Defaults.holds(field, value)) {
-                throw new IllegalArgumentException(
-                        "this Comet version's tuple has no "
-                                + field.label()
-                                + " field, so a value whose "
-                                + field.label()
-                                + " is not Comet's default cannot be written under it");
-            }
+        Optional<String> unwritable = unwritable(value);
+        if (unwritable.isPresent()) {
+            throw new IllegalArgumentException(unwritable.get());
         }
         List<String> tokens = new ArrayList<>();
         for (VariableModLayout.Entry entry : layout.fields()) {
@@ -214,10 +204,57 @@ public final class VariableModCodec {
     }
 
     /**
+     * Why a value cannot be written under this codec's layout and alphabet -- the refusal {@link
+     * #format} would make -- without writing it.
+     *
+     * @param value the value
+     * @return the reason, or empty if {@link #format} would write it
+     */
+    public Optional<String> unwritable(VariableModification value) {
+        Objects.requireNonNull(value, "value");
+        String refused = refusedResidues(value.residues());
+        if (refused != null) {
+            return Optional.of(refused + ", so it cannot be written");
+        }
+        for (VariableModField field : VariableModField.values()) {
+            if (layout.entry(field).isEmpty() && !Defaults.holds(field, value)) {
+                return Optional.of(
+                        "this Comet version's tuple has no "
+                                + field.label()
+                                + " field, so a value whose "
+                                + field.label()
+                                + " is not Comet's default cannot be written under it");
+            }
+        }
+        for (VariableModLayout.Entry entry : layout.fields()) {
+            if (entry.acceptsPair()) {
+                continue;
+            }
+            if (entry.field() == VariableModField.COUNT && value.minimumCount().isPresent()) {
+                return Optional.of(pairRefusal(entry, "a min,max count"));
+            }
+            if (entry.field() == VariableModField.NEUTRAL_LOSS
+                    && value.neutralLosses().size() > 1) {
+                return Optional.of(pairRefusal(entry, "two neutral losses"));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The release as this codec's diagnostics name it.
+     *
+     * @return for example {@code Comet 2026.02.2}, or {@code this Comet version}
+     */
+    String release() {
+        return release;
+    }
+
+    /**
      * Why a residue token holds a character the version does not accept, or {@code null} if it
      * holds none.
      */
-    private String refusedResidues(String residues) {
+    String refusedResidues(String residues) {
         return layout.residueAlphabet()
                 .firstRefused(residues)
                 .map(
@@ -244,7 +281,6 @@ public final class VariableModCodec {
                 if (value.minimumCount().isEmpty()) {
                     yield maximum;
                 }
-                requirePair(entry, "a min,max count");
                 yield value.minimumCount().getAsInt() + "," + maximum;
             }
             case TERMINAL_DISTANCE -> Integer.toString(value.terminalDistance());
@@ -252,23 +288,17 @@ public final class VariableModCodec {
             case REQUIRED -> Integer.toString(value.requirementCode());
             case NEUTRAL_LOSS -> {
                 List<BigDecimal> losses = value.neutralLosses();
-                if (losses.size() > 1) {
-                    requirePair(entry, "two neutral losses");
-                }
                 yield String.join(",", losses.stream().map(Numbers::text).toList());
             }
         };
     }
 
-    private static void requirePair(VariableModLayout.Entry entry, String what) {
-        if (!entry.acceptsPair()) {
-            throw new IllegalArgumentException(
-                    "this Comet version's "
-                            + entry.field().label()
-                            + " field takes one value, so "
-                            + what
-                            + " cannot be written under it");
-        }
+    private static String pairRefusal(VariableModLayout.Entry entry, String what) {
+        return "this Comet version's "
+                + entry.field().label()
+                + " field takes one value, so "
+                + what
+                + " cannot be written under it";
     }
 
     /**

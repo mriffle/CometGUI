@@ -91,6 +91,20 @@ public record EnzymeTable(List<EnzymeDefinition> rows) {
     }
 
     /**
+     * The number a new row takes: one more than the highest number in the table, so that rows stay
+     * numbered "starting at 0 and increasing by 1" as Comet's page asks when they already are.
+     *
+     * @return the number; 0 for an empty table
+     */
+    public int nextNumber() {
+        int highest = -1;
+        for (EnzymeDefinition row : rows) {
+            highest = Math.max(highest, row.number());
+        }
+        return highest + 1;
+    }
+
+    /**
      * This table with one more row at the end, such as a custom enzyme.
      *
      * @param row the new row

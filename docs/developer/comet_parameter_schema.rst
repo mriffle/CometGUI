@@ -1498,6 +1498,91 @@ Ion-series family (``IonSeries``, ``IonSeriesSelection``)
     family is read as a whole and written back in ``-q`` order. A test holds
     the enum equal to the metadata's ``ION_SERIES_FLAG`` parameters.
 
+.. _dev-comet-parameter-editing:
+
+Editing a structured value without parsing in the editor
+--------------------------------------------------------
+
+Phase 07, unit 4. The parameter editor's view-models may not split a tuple,
+read a number or write a comma (decision P7-1; the ArchUnit rule
+``UiThroughTheModelRule`` keeps the codecs and ``Numbers`` out of
+``org.cometgui.ui``), so every structured control hands the model *texts*,
+one per control, and the model reads them. What the model offers for that:
+
+``VariableModSlots`` (``value``)
+    The variable-modification slots of one release:
+    ``VariableModSlots.forRelease(metadata, version)``. ``slots()`` are the
+    release's ``VARIABLE_MOD_TUPLE`` parameters; ``parts()`` are one
+    ``VariableModPart`` per field of the release's **layout**, in its order --
+    ``MASS``, ``RESIDUES``, ``BINARY_GROUP``, ``MINIMUM_COUNT``,
+    ``MAXIMUM_COUNT``, ``TERMINAL_DISTANCE``, ``TERMINUS``, ``REQUIRED``,
+    ``NEUTRAL_LOSS``, ``SECOND_NEUTRAL_LOSS`` for 2026.03.0 and 2026.02.2 --
+    where a field that accepts a comma pair is two parts and the optional half
+    (the minimum count, the second loss) exists only where the layout accepts
+    the pair: 2024.01.0, whose loss takes one value, has no
+    ``SECOND_NEUTRAL_LOSS``. ``partText(value, part)`` is a part's text (empty
+    for an absent optional half); ``withPart(slot, value, part, text)`` reads
+    one part's text as the layout's field reads it and returns the changed
+    value, every other part kept, an empty text clearing an optional half. It
+    refuses, with a ``ValueSyntaxException`` naming the slot and the part, text
+    that is not one value, not a number of the field's kind, a residue token
+    with a character outside the release's alphabet, and a part the layout
+    does not have::
+
+        variable_mod04, maximum count per peptide: "2.5" is not a whole number
+        variable_mod03, residues: "^M" holds '^', which Comet 2026.02.2 does not accept in a
+        residue token; its residue alphabet is A-Z, n (N-terminus), c (C-terminus)
+
+    ``withResidue(slot, value, character, selected)`` is the residue
+    multi-select: it adds or clears one character of the release's alphabet
+    (``ResidueAlphabet.letters()`` and ``terminalCodes()`` are what an editor
+    offers -- ``n``, ``c``, ``^`` and ``$`` for 2026.03.0, ``n`` and ``c`` for
+    2026.02.2), refuses a character the alphabet lacks and clearing the last
+    one, and writes the token in one fixed order -- ``n``, ``^``, letters, ``c``,
+    ``$`` -- which carries no meaning, since Comet sorts and de-duplicates the
+    characters [V26E]_. ``choices(TERMINUS)`` and ``choices(REQUIRED)`` give each
+    documented code with its words and, for the requirement, the page's
+    explanation (``VariableModification.Requirement.explanation()``: "Only
+    peptides that contain the modification are analysed."); ``explanation(part)``
+    explains every part from the ``variable_modXX`` page [VM]_.
+    ``unused()`` is what a slot holds when the editor removes its modification:
+    the curated default of the first slot whose default has no mass difference,
+    ``0.0 X 0 3 -1 0 0 0.0`` in both offered releases -- what ``-q`` writes for
+    slots 2 to 15 and what the page gives as the value of a missing slot. It is
+    **not** ``resetToDefault``: ``variable_mod01``'s default is an active
+    oxidation. ``unwritable(value)`` says why the release cannot hold a value
+    (``VariableModCodec.unwritable``, the refusal ``format`` makes, without
+    writing). Whether a value that reads is *legal* -- a minimum above the
+    maximum, a terminus outside 0-3 -- stays validation's question: a part
+    accepts any text its field can hold, as the parser does.
+
+Ranges (``model``, ``value``)
+    ``CometParameters.rangeTexts(name)`` gives a two-value range's first and
+    second text, scale kept; ``rangeValue(name, first, second)`` reads the two
+    texts as the parameter's kind (``IntegerRange.parse(name, first, second)``,
+    ``DecimalRange.parse(...)``) and returns the value for ``withValue``. A
+    reversed pair is read, not judged: order is ``ordered_range``'s.
+
+Custom enzymes (``value``)
+    ``EnzymeDefinition.fromTexts(number, name, sense, cut, noCut)`` reads a
+    custom row's texts -- the number a whole number 0 or more, the name one
+    word, residues one token each, empty or ``-`` for none -- naming the field
+    it refuses (``custom enzyme, number: "-1" is negative; enzyme numbers start
+    at 0``). ``EnzymeTable.nextNumber()`` is one more than the highest number.
+    A duplicate number is still the table's refusal.
+
+Static-modification targets (``schema``)
+    ``StaticModTarget.of(definition)`` reads Comet's naming convention so the
+    editor does not: ``add_C_cysteine`` is the residue ``C``, "cysteine (C)";
+    ``add_Nterm_peptide`` the "peptide N-terminus". Every ``static_mods``
+    parameter of both offered releases has one: four termini and 26 residues.
+
+Tests, expectations typed by hand: ``VariableModSlotsTest`` (every part set
+on both offered releases, the refusals, the multi-select, ``^`` and ``$`` on
+2026.03.0 only, a CONSTRUCTED reordered layout with and without pairs, and
+2024.01.0's missing second loss), ``EditorInputsTest``, ``EditorFactsTest``
+and ``RangeTextsTest``.
+
 .. _dev-comet-parameter-model:
 
 The typed model
@@ -2974,6 +3059,72 @@ duplicates what the workflow already enforces (``R-CMT-01``'s outputs, the
 decoy rules) or would set scientific values Comet's documentation does not
 give. Fewer is better than invented; this is a decision for review, not an
 omission.
+
+.. _dev-comet-parameter-modification-presets:
+
+Common-modification presets
+---------------------------
+
+Phase 07, unit 4. The variable-modification editor offers common
+modifications in one step (``R-PARAM-09``, "common modification presets").
+Their masses are scientific data, so they are not in the editor: they are
+``comet-modification-presets.json`` beside the metadata, read by
+``ModificationPresets`` with the preset file's rules (every field required,
+no other allowed)::
+
+    {"modificationPresetFormat": 1, "description": "...",
+     "presets": [{"id": "oxidation-m", "name": "Oxidation", "description": "...",
+                  "cometVersion": "2026.02.2",              // whose tuple syntax "tuple" is in
+                  "tuple": "15.994915 M 0 3 -1 0 0 0.0",
+                  "massSource": "https://www.unimod.org/...editid1=35 -- ... 15.994915 ...",
+                  "formSource": "https://uwpr.github.io/Comet/..."}]}
+
+A preset is refused, naming it and the field, when its id is not one or is
+used twice, its ``cometVersion`` is not curated, its tuple does not read under
+that release's codec, its mass difference is 0, a source cites no ``https://``
+reference, or the mass source does not quote the mass exactly as the tuple
+writes it. ``offeredIn(slots)`` is the presets a release's slots can hold
+(``VariableModSlots.unwritable``), so the one written with ``^`` is offered
+for 2026.03.0 and not for 2026.02.2 -- by the alphabet, not by a version test.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 30 46
+
+   * - Preset
+     - Tuple
+     - Mass [UMx]_, form
+   * - Oxidation (M)
+     - ``15.994915 M 0 3 -1 0 0 0.0``
+     - Unimod 35, 15.994915; the fields of ``-q``'s own ``variable_mod01``
+       and the page's first example [VM]_
+   * - Phospho (STY)
+     - ``79.966331 STY 0 3 -1 0 0 0.0``
+     - Unimod 21, 79.966331; the page's phospho example without its neutral
+       loss
+   * - Acetyl (protein N-term)
+     - ``42.010565 n 0 1 0 0 0 0.0``
+     - Unimod 1, 42.010565; ``n`` at distance 0 from the protein N-terminus,
+       the page's "oxidation of protein N-terminus" form; both releases
+   * - Acetyl (protein N-term, ``^``)
+     - ``42.010565 ^ 0 1 -1 0 0 0.0``
+     - Unimod 1; the 2026.03.0 ``-q`` comment's own example [V26M]_;
+       2026.03.0 only
+   * - Deamidation (NQ)
+     - ``0.984016 NQ 0 3 -1 0 0 0.0``
+     - Unimod 7, 0.984016
+   * - Gln->pyro-Glu (N-term Q)
+     - ``-17.026549 Q 0 1 0 2 0 0.0``
+     - Unimod 28, -17.026549; the page's own pyroglutamate example
+
+The Unimod records were fetched on 2026-10-05 and each file entry quotes the
+record's monoisotopic delta and site. ``ModificationPresetsTest`` types the
+six tuples, summaries and Unimod record numbers by hand, the per-release
+offer, and one CONSTRUCTED breach per rule.
+
+.. [UMx] https://www.unimod.org/modifications_view.php?editid1=35 (Oxidation),
+   ``editid1=21`` (Phospho), ``editid1=1`` (Acetyl), ``editid1=7``
+   (Deamidated), ``editid1=28`` (Gln->pyro-Glu); fetched 2026-10-05.
 
 .. _dev-comet-parameter-diffs:
 

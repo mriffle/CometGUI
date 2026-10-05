@@ -51,11 +51,47 @@ public record IntegerRange(int first, int second) {
     }
 
     /**
+     * Reads a range from its two values entered separately, as a range control's two fields hold
+     * them.
+     *
+     * @param name the parameter, for the diagnostic
+     * @param firstText the first value
+     * @param secondText the second value
+     * @return the range
+     * @throws ValueSyntaxException naming the parameter and the value at fault, if either is not
+     *     one whole number
+     */
+    public static IntegerRange parse(String name, String firstText, String secondText) {
+        Objects.requireNonNull(name, "name");
+        return new IntegerRange(
+                Numbers.whole(name, Ranges.FIRST, Ranges.one(name, Ranges.FIRST, firstText)),
+                Numbers.whole(name, Ranges.SECOND, Ranges.one(name, Ranges.SECOND, secondText)));
+    }
+
+    /**
      * The value text.
      *
      * @return for example {@code 5 50}
      */
     public String text() {
-        return first + " " + second;
+        return firstText() + " " + secondText();
+    }
+
+    /**
+     * The first value's text.
+     *
+     * @return for example {@code 5}
+     */
+    public String firstText() {
+        return Integer.toString(first);
+    }
+
+    /**
+     * The second value's text.
+     *
+     * @return for example {@code 50}
+     */
+    public String secondText() {
+        return Integer.toString(second);
     }
 }

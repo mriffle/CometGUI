@@ -78,6 +78,39 @@ public record ResidueAlphabet(String characters, String source) {
     }
 
     /**
+     * The residue letters the release accepts, in alphabetical order: what a residue multi-select
+     * offers.
+     *
+     * @return for example {@code ABCDEFGHIJKLMNOPQRSTUVWXYZ}
+     */
+    public String letters() {
+        StringBuilder letters = new StringBuilder();
+        for (char letter = 'A'; letter <= 'Z'; letter++) {
+            if (accepts(letter)) {
+                letters.append(letter);
+            }
+        }
+        return letters.toString();
+    }
+
+    /**
+     * The terminal codes the release accepts, in {@link TerminalCode} order: the terminus choices
+     * an editor offers. Comet 2026.03.0's include {@code ^} and {@code $}; earlier releases' do
+     * not.
+     *
+     * @return the codes
+     */
+    public List<TerminalCode> terminalCodes() {
+        List<TerminalCode> codes = new ArrayList<>();
+        for (TerminalCode terminal : TerminalCode.values()) {
+            if (accepts(terminal.code())) {
+                codes.add(terminal);
+            }
+        }
+        return List.copyOf(codes);
+    }
+
+    /**
      * Why a residue token is not one this release accepts.
      *
      * @param token the residue token
@@ -101,22 +134,15 @@ public record ResidueAlphabet(String characters, String source) {
      * @return for example {@code A-Z, n (N-terminus), c (C-terminus)}
      */
     public String describe() {
-        StringBuilder letters = new StringBuilder();
-        for (char letter = 'A'; letter <= 'Z'; letter++) {
-            if (accepts(letter)) {
-                letters.append(letter);
-            }
-        }
+        String letters = letters();
         List<String> words = new ArrayList<>();
         if (letters.length() == LETTERS) {
             words.add("A-Z");
-        } else if (letters.length() > 0) {
-            words.add(letters.toString());
+        } else if (!letters.isEmpty()) {
+            words.add(letters);
         }
-        for (TerminalCode terminal : TerminalCode.values()) {
-            if (accepts(terminal.code())) {
-                words.add(terminal.code() + " (" + terminal.words() + ")");
-            }
+        for (TerminalCode terminal : terminalCodes()) {
+            words.add(terminal.code() + " (" + terminal.words() + ")");
         }
         return String.join(", ", words);
     }

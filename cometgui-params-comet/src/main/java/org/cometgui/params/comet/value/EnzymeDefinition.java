@@ -46,6 +46,9 @@ public record EnzymeDefinition(
     /** What Comet's row writes for an empty residue set. */
     public static final String NONE = "-";
 
+    /** What {@link #fromTexts} names in a diagnostic. */
+    private static final String CUSTOM = "custom enzyme";
+
     /** The documented values of a row's sense field. */
     public enum Sense {
 
@@ -113,6 +116,55 @@ public record EnzymeDefinition(
                                 + "\" must be letters with no white space, or empty for none");
             }
         }
+    }
+
+    /**
+     * A row from the texts a custom-enzyme editor holds, so that the editor reads no number itself.
+     * Surrounding white space is ignored; an empty residue text or {@code -} means none.
+     *
+     * @param numberText the row number, a whole number 0 or more
+     * @param name the name, one token
+     * @param sense the side it cleaves on
+     * @param cutText the cut residues
+     * @param noCutText the no-cut residues
+     * @return the row
+     * @throws ValueSyntaxException naming the field, if a text is not what its field can hold
+     */
+    public static EnzymeDefinition fromTexts(
+            String numberText, String name, Sense sense, String cutText, String noCutText) {
+        Objects.requireNonNull(sense, "sense");
+        String number = Objects.requireNonNull(numberText, "numberText").strip();
+        int value = Numbers.whole(CUSTOM, "number", number);
+        if (value < 0) {
+            throw new ValueSyntaxException(
+                    CUSTOM, "number", "\"" + number + "\" is negative; enzyme numbers start at 0");
+        }
+        String strippedName = Objects.requireNonNull(name, "name").strip();
+        if (strippedName.isEmpty() || hasWhiteSpace(strippedName)) {
+            throw new ValueSyntaxException(
+                    CUSTOM,
+                    "name",
+                    "\"" + strippedName + "\" is not one word; Comet reads the name as one token");
+        }
+        return new EnzymeDefinition(
+                value,
+                strippedName,
+                sense,
+                residueText("cut residues", cutText),
+                residueText("no-cut residues", noCutText));
+    }
+
+    private static String residueText(String field, String text) {
+        String stripped = Objects.requireNonNull(text, field).strip();
+        if (hasWhiteSpace(stripped)) {
+            throw new ValueSyntaxException(
+                    CUSTOM,
+                    field,
+                    "\""
+                            + stripped
+                            + "\" holds white space; write the residues as one token, such as KR");
+        }
+        return NONE.equals(stripped) ? "" : stripped;
     }
 
     private static boolean hasWhiteSpace(String text) {

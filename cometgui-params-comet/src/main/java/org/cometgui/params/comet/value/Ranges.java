@@ -48,4 +48,23 @@ final class Ranges {
         }
         return tokens;
     }
+
+    /**
+     * One value of a range, entered on its own control.
+     *
+     * @param name the parameter
+     * @param field {@link #FIRST} or {@link #SECOND}
+     * @param text the text entered
+     * @return the one token it holds
+     * @throws ValueSyntaxException naming the parameter and the field, if it holds not exactly one
+     */
+    static String one(String name, String field, String text) {
+        Objects.requireNonNull(text, "text");
+        String[] tokens = Numbers.tokens(text);
+        if (tokens.length != 1) {
+            throw new ValueSyntaxException(
+                    name, field, "\"" + text.strip() + "\" is not one number");
+        }
+        return tokens[0];
+    }
 }

@@ -62,6 +62,42 @@ public record DecimalRange(BigDecimal first, BigDecimal second) {
      * @return for example {@code 600.0 5000.0}
      */
     public String text() {
-        return Numbers.text(first) + " " + Numbers.text(second);
+        return firstText() + " " + secondText();
+    }
+
+    /**
+     * Reads a range from its two values entered separately, as a range control's two fields hold
+     * them.
+     *
+     * @param name the parameter, for the diagnostic
+     * @param firstText the first value
+     * @param secondText the second value
+     * @return the range
+     * @throws ValueSyntaxException naming the parameter and the value at fault, if either is not
+     *     one number
+     */
+    public static DecimalRange parse(String name, String firstText, String secondText) {
+        Objects.requireNonNull(name, "name");
+        return new DecimalRange(
+                Numbers.decimal(name, Ranges.FIRST, Ranges.one(name, Ranges.FIRST, firstText)),
+                Numbers.decimal(name, Ranges.SECOND, Ranges.one(name, Ranges.SECOND, secondText)));
+    }
+
+    /**
+     * The first value's text, with the scale written.
+     *
+     * @return for example {@code 600.0}
+     */
+    public String firstText() {
+        return Numbers.text(first);
+    }
+
+    /**
+     * The second value's text, with the scale written.
+     *
+     * @return for example {@code 5000.0}
+     */
+    public String secondText() {
+        return Numbers.text(second);
     }
 }

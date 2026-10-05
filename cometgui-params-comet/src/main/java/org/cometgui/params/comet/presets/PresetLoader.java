@@ -240,8 +240,11 @@ public final class PresetLoader {
                                                 + ", the version the preset was made against"));
     }
 
-    /** One JSON object being read, and where it is, so that every failure can say so. */
-    private record Fields(JsonValue.JsonObject object, String where) {
+    /**
+     * One JSON object being read, and where it is, so that every failure can say so. Shared with
+     * {@link ModificationPresets}, whose documents follow the same rules.
+     */
+    record Fields(JsonValue.JsonObject object, String where) {
 
         static Fields of(JsonValue value, String where, String field) {
             if (!(value instanceof JsonValue.JsonObject jsonObject)) {

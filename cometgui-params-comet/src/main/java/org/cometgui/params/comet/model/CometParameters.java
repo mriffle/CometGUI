@@ -30,7 +30,9 @@ import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.ParameterDefinition;
 import org.cometgui.params.comet.schema.ValidatorId;
 import org.cometgui.params.comet.schema.ValueKind;
+import org.cometgui.params.comet.value.DecimalRange;
 import org.cometgui.params.comet.value.EnzymeTable;
+import org.cometgui.params.comet.value.IntegerRange;
 import org.cometgui.params.comet.value.IonSeriesSelection;
 import org.cometgui.params.comet.value.TolerancePair;
 
@@ -341,6 +343,54 @@ public final class CometParameters {
             }
         }
         return IonSeriesSelection.parse(texts);
+    }
+
+    /**
+     * The two values of a two-value range parameter, as a range control's two fields show them.
+     *
+     * @param name an {@code INTEGER_RANGE} or {@code DECIMAL_RANGE} parameter, such as {@code
+     *     peptide_length_range}
+     * @return the first and the second value's text, scale kept
+     * @throws IllegalArgumentException if the parameter is not modelled for this version or is not
+     *     a two-value range
+     */
+    public List<String> rangeTexts(String name) {
+        return switch (value(name)) {
+            case ParameterValue.WholeRange range ->
+                    List.of(range.range().firstText(), range.range().secondText());
+            case ParameterValue.DecimalPair range ->
+                    List.of(range.range().firstText(), range.range().secondText());
+            default -> throw notARange(name);
+        };
+    }
+
+    /**
+     * A two-value range parameter's value from its two values entered separately, read as the
+     * parameter's kind. Whether the two are in order is validation's question ({@code
+     * ordered_range}), never this method's.
+     *
+     * @param name an {@code INTEGER_RANGE} or {@code DECIMAL_RANGE} parameter
+     * @param firstText the first value
+     * @param secondText the second value
+     * @return the value, for {@link #withValue}
+     * @throws IllegalArgumentException if the parameter is not modelled for this version or is not
+     *     a two-value range
+     * @throws org.cometgui.params.comet.value.ValueSyntaxException naming the parameter and the
+     *     value at fault, if either is not one number of the kind
+     */
+    public ParameterValue rangeValue(String name, String firstText, String secondText) {
+        ValueKind kind = require(name).definition().kind();
+        return switch (kind) {
+            case INTEGER_RANGE ->
+                    new ParameterValue.WholeRange(IntegerRange.parse(name, firstText, secondText));
+            case DECIMAL_RANGE ->
+                    new ParameterValue.DecimalPair(DecimalRange.parse(name, firstText, secondText));
+            default -> throw notARange(name);
+        };
+    }
+
+    private static IllegalArgumentException notARange(String name) {
+        return new IllegalArgumentException(name + " is not a two-value range");
     }
 
     /**
