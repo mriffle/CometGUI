@@ -306,6 +306,49 @@ class VariableModsViewModelTest {
             assertEquals(15, editor.slots().size());
             assertEquals(C02, editor.field("variable_mod01").release());
         }
+
+        /**
+         * The session publishes the new report before the new model. A switch whose report differs
+         * from the last one -- here a slot holding the protein N-terminus code {@code ^}, which
+         * 2026.02.2 cannot write, so the migration's review carries an entry -- therefore reaches
+         * the slots while the configuration is still the old release's, with the new release's
+         * migration already under review. Found by the Phase 07 unit 6 GUI test of the release
+         * switch: the slots read the review against the old configuration and {@code
+         * MigrationReview} refused ("this review is of a migration to Comet 2026.02.2, not of a
+         * Comet 2026.03.0 set").
+         */
+        @Test
+        @DisplayName("a release switch whose report changes waits for the new configuration")
+        void releaseSwitchWithAChangedReport() {
+            ParameterSession session = startingIn(C03);
+            VariableModsViewModel editor = new VariableModsViewModel(session);
+            session.edit("variable_mod03", "42.010565 ^ 0 1 -1 0 0 0.0");
+            List<Finding> before = session.report().findings();
+            // JavaFX hands an exception thrown by a listener to the thread's handler and carries
+            // on,
+            // so the refusal is caught there rather than by the call that caused it.
+            List<Throwable> thrownInListeners = new ArrayList<>();
+            Thread.UncaughtExceptionHandler previous =
+                    Thread.currentThread().getUncaughtExceptionHandler();
+            Thread.currentThread()
+                    .setUncaughtExceptionHandler((thread, thrown) -> thrownInListeners.add(thrown));
+            try {
+                assertEquals(EditOutcome.applied(), session.selectRelease(C02));
+            } finally {
+                Thread.currentThread().setUncaughtExceptionHandler(previous);
+            }
+            assertEquals(List.of(), thrownInListeners, "no listener may fail during the switch");
+            assertFalse(
+                    before.equals(session.report().findings()),
+                    "the switch must change the report, or this test proves nothing");
+            assertEquals(2, editor.terminusCodes().size());
+            assertEquals(C02, editor.field("variable_mod03").release());
+            assertEquals(DEFAULT_OXIDATION, editor.slot("variable_mod01").serialised());
+            assertEquals(
+                    session.model().text("variable_mod03"),
+                    editor.slot("variable_mod03").serialised(),
+                    "the slot shows the migrated configuration");
+        }
     }
 
     @Nested
