@@ -158,7 +158,7 @@ Run serially, one fresh agent each, in this order.
        2024.01.0 two-loss. Developer page updated. ``--only params``,
        ``docs``, ``traceability`` green.
      - R-PARAM-13; gate 6
-     -
+     - **Accepted** 2026-10-05, ``cce4116``; :ref:`p07w-u1`.
    * - 2
      - **Settings removed from navigation** (P7-8). Nine sections; ids,
        pins, arrival notes, navigation and accessibility tests, documents
@@ -246,6 +246,54 @@ Run serially, one fresh agent each, in this order.
        tests that prove them.
      - R-DOC; all ACs above
      -
+
+Sign-off entries
+================
+
+.. _p07w-u1:
+
+Unit 1 -- migration review (``cce4116``)
+----------------------------------------
+
+Agent: fresh tier-3 agent. Built ``migration.MigrationReview`` (a
+``MigrationResult`` plus acknowledged names; ``resolve(name)``;
+``unresolved(model)``; ``validate(model)``), ``Rule.MIGRATION_NEEDS_ATTENTION``
+(``migration.needs_attention``, fixed ERROR), 16 tests in
+``MigrationReviewTest``, a ``ReportModelTest`` pin, and the developer page
+(rule catalogue row; section *The review: an entry needing attention blocks a
+run*). "Resolved" means acknowledged **or** the parameter's origin is ``USER``
+in the validated model -- a constraint on units 3-5: only a value the
+scientist set on *that* parameter may carry ``USER``.
+
+What I ran (2026-10-05):
+
+* Read the whole production diff (``MigrationReview``, ``Rule``, the
+  ``ValidationReport`` javadoc). In scope; nothing outside the module and its
+  page changed. The review calls ``CometValidator.standard()`` itself, so the
+  editor gets one report and combines nothing.
+* ``mvn -B -o -pl cometgui-params-comet -am verify`` (unfiltered, coverage
+  rules on): BUILD SUCCESS in 3m04s; module ``Tests run: 1932, Failures: 0,
+  Errors: 0, Skipped: 0``; three "All coverage checks have been met".
+* PIT, ``-DtargetClasses='org.cometgui.params.comet.migration.MigrationReview*'``:
+  27 mutations, 27 KILLED.
+* Injection 1 (production): the finding's category replaced by
+  ``Optional.empty()`` -- red: ``MigrationReviewTest.blocks ... expected:
+  <[... ERROR migration.needs_attention [variable_mod02] variable_mods]> but
+  was: <[... [variable_mod02] -]>`` and ``bothInOrder``.
+* Injection 2 (production, **version-blind**): ``requireTarget``'s release
+  check made ``if (false)``, so a review of a migration to 2026.03.0 judges a
+  set of another release -- red: ``MigrationReviewTest.anotherRelease:
+  Expected java.lang.IllegalArgumentException to be thrown, but nothing was
+  thrown.``
+* Both restored; ``sha256sum -c``: ``MigrationReview.java: OK``. Anchors
+  matched once; markers ``ORCH-INJ-1``/``-2`` grepped back before each run;
+  surefire reports deleted before each run.
+* ``bash scripts/verify-all-gates.sh --only params --only docs --only
+  traceability``: rc 0, ``3 control(s) passed, 0 failed, in 512 seconds``;
+  ``params: 109 controls in 453s`` (floor 109), ``docs: 1 injected
+  cross-reference``, ``traceability: 8 injected defects caught``.
+
+No test reads a file outside the module.
 
 Rejections and rework
 =====================
