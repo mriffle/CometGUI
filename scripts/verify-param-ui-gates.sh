@@ -898,7 +898,11 @@ readonly SEL_6B="${T6},${T6M}"
 readonly SEL_7A="${T7},${T7N}"
 readonly SEL_7="${T7}"
 readonly SEL_8="${T8}"
-readonly SEL_8V="${T8V},${T8}"
+readonly SEL_8V="${T8V}"
+# Control 8v's second, GUI run.  A run whose cometgui-ui tests fail stops the
+# reactor before cometgui-app, so the view-model test and the GUI test cannot
+# share one run: 8v makes two, on the same injection.
+readonly SEL_8VG="${T8}"
 # Control H: H3 needs a cheap run (its bytecode check refuses it whatever the
 # tests say); H6 must run the class unit 6's equivalent injection was graded on.
 readonly SEL_H="${T8V},${T6}"
@@ -915,7 +919,7 @@ control_selectors() {
         7a) printf '%s' "${SEL_7A}" ;;
         7b|7v) printf '%s' "${SEL_7}" ;;
         8a|8b) printf '%s' "${SEL_8}" ;;
-        8v) printf '%s' "${SEL_8V}" ;;
+        8v) printf '%s,%s' "${SEL_8V}" "${SEL_8VG}" ;;
         H) printf '%s' "${SEL_H}" ;;
         *) die "no control '$1'. Controls: ${ALL_CONTROLS[*]}" 2 ;;
     esac
@@ -1319,8 +1323,14 @@ control_8v() {
         '        return session.metadata().parameter(definition.name()).orElseThrow().shortHelp();'
     assert_testcase "the release-help search is the method that failed" failed \
         ParameterSearchViewModelTest releaseHelp
-    assert_log_contains "and the launched application's search misses 2026.03.0's help text" \
-        "${DIRTY_LOG}" 'Comet 2026.03.0, help text "not set" (3 failures)'
+    # The same injection, the GUI test: a second run, because a failing
+    # cometgui-ui test stops the reactor before cometgui-app runs anything.
+    DIRTY_LOG="${LOGS}/${CONTROL_ID}-gui-dirty.log"
+    printf '   %s\n' "$(gate_command "${SEL_8VG}")"
+    dirty_run "curated help for every release, through the launched application" \
+        "${FIELD_VM}" "${SEL_8VG}" "${DIRTY_LOG}"
+    grade_red fixed "the launched application's search misses 2026.03.0's help text" \
+        "${DIRTY_RC}" "${DIRTY_LOG}" 'Comet 2026.03.0, help text "not set" (3 failures)'
     assert_log_contains "naming the parameter whose 2026.03.0 help says it" \
         "${DIRTY_LOG}" 'expected: <[Index type for an index built on demand (index_search_type) -- Matched by help text]> but was: <[]>'
     assert_testcase "the GUI test of 2026.03.0's help is the GUI method that failed" failed \

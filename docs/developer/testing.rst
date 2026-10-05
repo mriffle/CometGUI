@@ -782,7 +782,9 @@ parameter on its own release and nothing on the other. Before that, unit 8
 found that the GUI test's only help-text query (``placeholder``) is the same in
 both releases' help, so 8v could be graded on the view-model test alone.
 Control 8v now also runs ``ParameterSearchUiTest`` and grades it (four checks
-added), and the floor was raised to the count measured with them.
+added) -- in a second run on the same injection, because a failing
+``cometgui-ui`` test stops the reactor before ``cometgui-app`` runs anything --
+and the floor was raised to the count measured with them.
 
 Traps
 =====
