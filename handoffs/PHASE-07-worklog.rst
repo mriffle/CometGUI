@@ -230,7 +230,8 @@ Run serially, one fresh agent each, in this order.
        reorder, remove; serialised tuple after each step), gate 5, gate 6,
        gate 7, each version-dependent control on both releases.
      - AC-PAR-03, -04, -05, -09, -10; gates 1, 2, 5, 6, 7
-     -
+     - **Accepted after one rework** 2026-10-05, ``6edbaee``, ``7a484fb``,
+       ``9871aab``, ``5e1cd8b``, ``fc68afa``; :ref:`p07w-u6`.
    * - 7
      - **Views, part 2, with their gate tests**: custom enzyme editor, ion
        series and range controls where Advanced needs more than the generic
@@ -548,6 +549,87 @@ What I ran (2026-10-05):
 
 No test reads a file outside its module (``ReleaseDefaults`` reads a
 class-path resource of the model module).
+
+.. _p07w-u6:
+
+Unit 6 -- views part 1 and gate tests 1, 2, 5, 6, 7 (``6edbaee`` .. ``fc68afa``)
+---------------------------------------------------------------------------------
+
+Agent: fresh tier-3 agent (resumed once for the rework below).
+
+Built: ``CometParametersView`` (release selector, Essentials/Advanced/Expert
+switch -- Expert a labelled placeholder for unit 7 --, the validation summary
+whose entries move focus to their field, save, start-again), ``EssentialsView``
+(curated groups incl. spectra, database status, precursor, fragment instrument
+choice, three enzyme selectors, static modifications, the variable-modification
+editor with limit and requirement, decoy source, threads, locked outputs; the
+search-preset choice a placeholder for unit 7), ``AdvancedView`` (14 categories,
+per-field and confirmed per-category reset), ``FieldControl`` and the other
+controls in ``org.cometgui.ui.controls.params``, ``RunControl`` in the Run
+section, ``ParameterEditorViewModel``. Composition root: ``ParameterEditorWiring``
+(offered releases = manifest ∩ metadata ∩ bundled starting sets, newest first),
+``BuildIdentityResource`` (one Maven-filtered properties file; ``cometgui-app``
+POM), ``FxFileChooser`` with a dialog seam. ``UiIds`` +29 constants and a
+per-parameter scheme (``ess-``/``adv-`` + Comet's name); pins 128 -> 317.
+``FxUiDriver`` gains ``type``/``typeInto``/``pressWith`` in both drivers. Gate
+tests in ``cometgui-app``: ``EssentialsTrypticSearchUiTest`` (1; saved file
+byte-equal to ``essentials-tryptic-dda-2026.03.0.params``, build ``0.0.0-guitest``
+injected), ``VariableModificationEditorUiTest`` (2), ``WorkflowOutputsLockedUiTest``
+(5), ``CrossParameterValidationUiTest`` (6), ``ParameterControlsAccessibilityUiTest``
+(7), ``TextEntryUiTest``. A defect in unit 4's ``VariableModsViewModel``
+(a report listener reading a half-published release switch; exceptions in
+JavaFX listeners are swallowed, so suites stayed green) was found by the new
+GUI test and fixed (``6edbaee``).
+
+**Rework (rejected: gate 7's test could not go red).** Two of my injections did
+not bite: removing ``named(input, ...)`` from ``FieldControl`` and removing the
+Advanced category toggle's name left ``ParameterControlsAccessibilityUiTest``
+green. Cause: Phase 02's ``AccessibleControls`` fallback names every unnamed
+control under a watched parent, and the test accepted any non-blank name. Fixed
+in ``fc68afa``: generated names are marked (``hasGeneratedName``); both
+``ParameterControlsAccessibilityUiTest`` and ``AccessibleNameEnumerationUiTest``
+refuse a generated name on any control with an id (JavaFX's own combo-box skin
+list, id ``list-view``, is the one documented exclusion); each parameter
+control's name must contain its release display name, and 17 representative
+names are hand-typed. Also at my request, ``5e1cd8b`` fixes the root cause of
+the listener defect: ``ParameterSession`` holds model, report and review in one
+``State`` replaced before any property fires; the guards were removed;
+``listenersReadOneConsistentConfiguration`` is red on the old session.
+
+What I ran (2026-10-05):
+
+* Read the diff; scanned views/controls for parsing or rules (none); read the
+  POM change (one filtered resource, by name).
+* Before the rework: ``mvn -B -o -pl cometgui-app -am verify -Dtest='org.cometgui.ui.**,org.cometgui.app.**' ...``
+  -- ui 786 / app 154 (1 skipped), BUILD SUCCESS in 8m48s.
+* Injection 6a (production, **version-blind**): ``VariableModEditor`` offers
+  ``TerminalCode.values()`` instead of the release's codes -- red:
+  ``VariableModificationEditorUiTest.theOlderReleaseOffersPeptideTerminiOnly:
+  Comet 2026.02.2 (2 failures)``.
+* Injection 6b: Run disabled only by the engine reason -- **green**, and
+  rightly: until Phase 08 the engine reason always disables Run, so this
+  injection is equivalent today. Replaced by 6e: the parameters' readiness text
+  forced to "do not block" -- red: ``CrossParameterValidationUiTest`` 4/4.
+* Injections 6c (category toggle unnamed) and 6d (``FieldControl`` input
+  unnamed) -- **green before the rework** (rejection above); after it, red:
+  6d ``AccessibleNameEnumerationUiTest.noProjectControlCarriesAGeneratedName:
+  148 controls this project created have no name of their own: TextField with
+  id #ess-database_name ...`` and ``ParameterControlsAccessibilityUiTest``
+  ``Comet 2026.03.0: 296 failures``, ``representativeNames: #adv-allowed_missed_cleavage
+  is named "text field within adv-category-digestion_enzymes", not "Allowed
+  missed cleavages"``; 6c ``Comet 2026.03.0: 14 failures ... ToggleButton
+  #adv-category-database_peff-toggle ... has only the generated fallback
+  name`` (and 2026.02.2).
+* All restored, ``sha256sum -c`` OK each time. (Static checks and JaCoCo
+  skipped on the command line for injection runs only.)
+* After the rework: the same ui+app command -- ui 788 / 0 failures, view-model
+  coverage met; app 156 / 0 failures / 1 skipped (opt-in upstream install).
+  ``--only shell``: 30 controls in 291s. ``--only quality`` (POM touched): 42
+  controls in 133s.
+
+No test reads a file outside its module (the gate-1 expected file is a
+``cometgui-app`` test resource). Unverified: the native file dialogs (never
+opened headless); the gate-1 file holds a Linux path.
 
 Rejections and rework
 =====================
