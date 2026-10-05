@@ -301,7 +301,7 @@ gate_spec() {
                 "Four controls were version-blind (2v, 4v, 7v and 8v)"
                 "bytecode as a HARNESS ERROR, not as a pass"
             )
-            GATE_FLOOR=70
+            GATE_FLOOR=84
             GATE_UNIT="controls"
             ;;
         *)

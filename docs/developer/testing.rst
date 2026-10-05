@@ -817,6 +817,19 @@ added) -- in a second run on the same injection, because a failing
 ``cometgui-ui`` test stops the reactor before ``cometgui-app`` runs anything --
 and the floor was raised to the count measured with them.
 
+Unit 10 (2026-10-05) gave the Essentials fragment instrument choice a preview
+of its own and built the static-modification table, and added four controls:
+``1c`` (a table row writes its mass to the next row's parameter, graded in
+``StaticModificationTableUiTest`` and in the gate-1 saved file), ``3c`` (the
+instrument choice applies its rows the moment it is chosen), ``3d`` (its
+preview not scoped to the fragment rows, with ``PresetPreviewUiTest`` required
+to stay green) and ``7c`` (a table mass field unnamed). Controls ``3a`` and
+``3b`` anchor on the same lines as before, which moved unchanged from
+``PresetControl`` into ``PresetReviewPane``. The baseline and the final clean
+run now cover thirteen graded classes. Measured: 84 controls passed in 1680 s
+(28 m 00 s), the baseline 366 s and the clean run 353 s; the floor was raised
+from 70 to 84.
+
 Traps
 =====
 
