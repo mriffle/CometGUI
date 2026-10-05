@@ -86,6 +86,7 @@ readonly -a ALL_GATES=(
     provenance
     install
     params
+    paramui
 )
 
 PASSED=0
@@ -128,7 +129,8 @@ declare -a COVERED=()
 #                2026-10-02, phase 06 unit 8's first shipping count; 109 on
 #                2026-10-04, when COMET-2026-03 unit 6 added the fifteen
 #                version-blind controls v3a-v6b, control 8's two per-release
-#                checks and control H's H8-H10.)
+#                checks and control H's H8-H10.  paramui: 66 on 2026-10-05,
+#                phase 07 unit 8's first shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -285,6 +287,21 @@ gate_spec() {
             GATE_FLOOR=109
             GATE_UNIT="controls"
             ;;
+        paramui)
+            GATE_PHASE="07"
+            GATE_ITEMS="1,2,3,4,5,6,7,8"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-07-worklog.rst (and new ones, each marked so), each into production code of cometgui-ui in a git-archive sandbox, each proved to have reached the compiled classes and graded on the failing assertion's own words in the GUI gate test that asserts the item: the Essentials decoy control always choosing decoys-in-the-FASTA, and the save quietly writing decoy_search = 0 while the screen shows the choice (the saved file must differ from the checked-in expected file in that one line); the slot editor's Move up moving down; Cancel applying every preset row, and Apply selected applying every row; a failed raw Expert apply resetting the configuration, and a raw apply adopted without confirmation; a locked output's check box left enabled, and its reason never shown; a summary entry that no longer moves the focus, and the parameters' readiness forced to 'do not block' (with the migrated NEEDS_ATTENTION entry's test); a parameter control's own accessible name removed so only the generated fallback is left, and the validation state left out of its accessible help; alias matching removed, and a search result that no longer focuses its field; VERSION-BLIND, each with the untouched release required to stay green where its test can show it: the slot editor offering ^ and $ on every release, the Expert draft parsed as the first offered release, a field's choices taken from the curated definition, and a field's help taken from the curated definition (graded on the view-model test, which the harness says); and, as controls on the harness itself, an unchanged file, a missing anchor, an injection that reached the source but not the bytecode, a green run graded as red, a red without its diagnostic, and unit 6's EQUIVALENT injection (Run disabled only by the engine's reason), which must be reported as a HARNESS FAILURE"
+            GATE_SCRIPT="scripts/verify-param-ui-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-07 exit gate items 1 to 8 were proved here"
+                "Four controls were version-blind (2v, 4v, 7v and 8v)"
+                "bytecode as a HARNESS ERROR, not as a pass"
+            )
+            GATE_FLOOR=66
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -321,6 +338,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         params)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        paramui)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -328,8 +347,8 @@ gate_count() {
 usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
-that every PHASE-01, PHASE-02, PHASE-04, PHASE-05 and PHASE-06 gate still
-fails on the defect it exists to catch.
+that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06 and PHASE-07 gate
+still fails on the defect it exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -404,7 +423,8 @@ list_gates() {
         printf '  %-13s %-9s injects: %s\n\n' "" "" "${GATE_DEFECT}"
     done
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
-    printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06.\n'
+    printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06, 07:n of\n'
+    printf '  PHASE-07.\n'
     printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
@@ -433,10 +453,19 @@ list_gates() {
     printf '  output under a comma-decimal locale; 6 an unknown parameter kept and\n'
     printf '  reported; 7 the tolerance pair by its own rule; 8 the generated reference\n'
     printf '  strict and complete; 9 PIT >= 80%% over parser, writer and validation.\n'
+    printf '  PHASE-07 items: 1 an Essentials-only tryptic DDA search saved as the\n'
+    printf '  expected canonical file; 2 a variable modification added, edited,\n'
+    printf '  reordered and removed; 3 a preset diff, an exact subset, a cancel that\n'
+    printf '  changes nothing; 4 a raw Expert edit that fails to parse changing\n'
+    printf '  nothing; 5 a workflow-required output that cannot be disabled, with its\n'
+    printf '  reason; 6 a cross-parameter error blocking Run, at the field, in the\n'
+    printf '  summary, by keyboard; 7 every parameter control named, validation in\n'
+    printf '  text; 8 search by name, display name, help text and alias.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
-    printf '  phases/PHASE-05-tool-registry.rst and phases/PHASE-06-comet-param-model.rst.\n\n'
+    printf '  phases/PHASE-05-tool-registry.rst, phases/PHASE-06-comet-param-model.rst and\n'
+    printf '  phases/PHASE-07-comet-param-ui.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -598,7 +627,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05 and PHASE-06 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06 and PHASE-07 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -636,7 +665,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05 06; do
+    for phase in 01 02 04 05 06 07; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"

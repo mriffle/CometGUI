@@ -55,19 +55,20 @@ Commands
 
    * - ``bash scripts/verify-all-gates.sh``
      - **Prove every gate still fails on the defect it exists to catch.** Runs
-       all thirteen falsifiability controls and exits non-zero if any control
+       all fourteen falsifiability controls and exits non-zero if any control
        stops biting. About an hour since Phases 05 and 06 (3875 s recorded in
-       ``scripts/dev-verify.sh``). Run it before signing off a phase.
+       ``scripts/dev-verify.sh``), and Phase 07's ``paramui`` adds about
+       twenty minutes. Run it before signing off a phase.
 
    * - ``bash scripts/verify-all-gates.sh --list``
-     - The thirteen controls, what each injects, and the command that proves
+     - The fourteen controls, what each injects, and the command that proves
        it.
 
    * - ``bash scripts/verify-all-gates.sh --only NAME``
      - One control. Names: ``license``, ``workflows``, ``docs``,
        ``traceability``, ``sbom``, ``depscan``, ``pipeline``, ``quality``,
-       ``shell``, ``tests``, ``provenance``, ``install``, ``params``.
-       Repeatable, or comma-separated.
+       ``shell``, ``tests``, ``provenance``, ``install``, ``params``,
+       ``paramui``. Repeatable, or comma-separated.
 
    * - ``bash scripts/ci/docs-build.sh``
      - The documentation gate on its own: both strict Sphinx builds. About 6 s.
@@ -385,7 +386,7 @@ catch, requires the narrowest command that should catch it to exit non-zero
 once the defect is removed. Every harness damages a copy under ``_build/``;
 the working tree is never touched.
 
-``bash scripts/verify-all-gates.sh`` runs all thirteen in one command. It injects
+``bash scripts/verify-all-gates.sh`` runs all fourteen in one command. It injects
 nothing itself -- it delegates -- and it fails if a sub-harness is missing or
 not executable rather than skipping it, because a skipped control counted as a
 pass is worse than no aggregator at all.
@@ -539,6 +540,17 @@ pass is worse than no aggregator at all.
        is graded BELOW the 80% threshold`` while the module-wide score, all
        ``scripts/build.sh`` grades, still passes.
 
+   * - Comet parameter editor (Phase 07, ``paramui``)
+     - ``scripts/verify-param-ui-gates.sh``: nineteen injections into the
+       views, controls and view-models of ``cometgui-ui``, at least two per
+       exit gate item, four of them version-blind, each graded in the GUI
+       gate test that asserts the item. See :ref:`dev-param-ui-falsifiability`.
+     - Each failing assertion's own words, e.g. ``Enter on the summary entry
+       moves the focus to the field ==> expected:
+       <ess-peptide_mass_tolerance_lower> but was: <param-summary-entry-0>``;
+       and unit 6's equivalent injection reported
+       as ``HARNESS FAILURE -- the check PASSED with the defect present``.
+
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs
 from the pristine state -- and reports a control whose defect was *not*
@@ -560,6 +572,202 @@ checks in 4 m 58 s. Phase 02 added a tenth, ``shell``
 items fail on the defects they exist to catch), re-sized the ``tests``
 controls against a tree that had outgrown them, and added seven derived-file
 controls to ``quality``; on 2026-08-31 the ten controls graded 176 checks.
+
+.. _dev-param-ui-falsifiability:
+
+The parameter editor's harness (Phase 07, ``paramui``)
+-------------------------------------------------------
+
+``bash scripts/verify-param-ui-gates.sh`` proves that each of Phase 07's eight
+exit gate items fails on a defect it exists to catch. It is registered in
+``scripts/verify-all-gates.sh`` as ``paramui`` and is built from the two
+harnesses before it: Phase 02's ``scripts/verify-shell-gates.sh`` (GUI gate
+tests) and Phase 06's ``scripts/verify-param-gates.sh`` (the private overlay
+and the bytecode proof).
+
+* It extracts ``git archive HEAD`` into ``_build/paramui-gate-sandbox`` and
+  damages only that. ``tools/`` is gitignored, so it is symlinked into the
+  sandbox: the headless JavaFX tests find the font stack through the
+  sandbox's own project directory, and without the link every control would
+  fail for that reason instead of the injected one.
+* Every module ``cometgui-app`` depends on, except ``cometgui-ui``, is built
+  once from the sandbox and installed into a private overlay repository
+  (``_build/paramui-gate-m2``, every other entry a symlink into
+  ``_build/m2repo``). Each control then builds ``cometgui-ui`` and
+  ``cometgui-app`` alone and runs only the test classes it grades;
+  ``cometgui-app`` takes ``cometgui-ui`` from the reactor, and the overlay is
+  checked to hold no copy of either. The shared repository's project jars are
+  checked unchanged at the end.
+* Each injection's anchor must match exactly once; the damaged file must
+  differ from its pristine copy; after the run its compiled classes must
+  differ from the clean baseline and every other file under both modules'
+  ``target/classes`` must be identical to it. One file is compared with one
+  line removed: ``build-identity.properties`` is Maven-filtered and carries
+  the build's timestamp, which changes on every run, so its digest leaves out
+  the ``cometgui.buildTimestamp`` line -- and the line must be there.
+* The GUI tests are ordered and later methods start where earlier ones
+  stopped, so a control runs whole test classes and then reads surefire's XML
+  to require a named method red -- and, for a version-blind control, the
+  method of the release the defect does not touch green.
+* A final clean run of every graded class must pass with both compiled
+  modules byte-identical to the baseline.
+* Control ``H`` requires the harness to refuse, as a harness error or
+  failure, an injection equal to its anchor, a missing anchor, an injection
+  that reaches the source but not the bytecode (a real Maven run), a green run
+  graded as red, a red without its diagnostic -- and unit 6's **equivalent**
+  injection, run for real: Run disabled only by the workflow engine's reason
+  leaves ``CrossParameterValidationUiTest`` green, because until Phase 08 the
+  engine's reason always disables Run. The harness must report that as
+  ``HARNESS FAILURE -- the check PASSED with the defect present``, never as a
+  control that bit; if the injection ever goes red (Phase 08's engine has
+  arrived), control ``H`` fails and says the premise is stale.
+
+``--self-test`` runs control ``H`` alone (with the baseline it needs);
+``--only 1b,4v`` runs named controls plus the baseline and the final clean run.
+
+.. list-table:: The controls (production code of ``cometgui-ui``; "recorded" names the injection in ``handoffs/PHASE-07-worklog.rst``)
+   :header-rows: 1
+   :widths: 6 6 42 46
+
+   * - Control
+     - Item
+     - Injected defect
+     - Diagnostic required (the failing assertion's own words)
+   * - 1
+     - 1
+     - The Essentials decoy control always sets decoys-in-the-FASTA (named in
+       the unit-8 brief; the work log records no item-1 injection).
+     - ``EssentialsTrypticSearchUiTest``: ``#ess-decoy_search after choosing
+       "Concatenated: ..." ==> expected: <Concatenated: ...> but was: <No
+       internal decoys>``.
+   * - 1b
+     - 1
+     - New: every control shows the choice, and the save writes
+       ``decoy_search = 0`` -- visible only in the saved file.
+     - ``the saved file differs from the checked-in
+       essentials-tryptic-dda-2026.03.0.params``; and the copy the test leaves
+       differs from the expected file in line 6, ``decoy_search``, alone.
+   * - 2a
+     - 2
+     - New: the slot editor's *Move up* moves the slot down.
+     - ``VariableModificationEditorUiTest``: ``after moving slot 2 up (2
+       failures)``, ``expected: <Serialised: variable_mod01 = 79.96633 SY 0 2
+       -1 0 0 0.0> but was: <Serialised: variable_mod01 = 15.9949 M 0 3 -1 0 0
+       0.0>``.
+   * - 2v
+     - 2
+     - **Version-blind** (recorded, unit 6, 6a): the slot editor offers every
+       terminus code, ``^`` and ``$`` included, on every release.
+     - ``Comet 2026.02.2 (2 failures)`` in
+       ``theOlderReleaseOffersPeptideTerminiOnly``;
+       ``theDefaultReleaseOffersProteinTermini`` must stay green.
+   * - 3a
+     - 3
+     - Recorded (unit 7, 7b): the preset preview's *Cancel* applies every row.
+     - ``PresetPreviewUiTest``: ``cancelling changes nothing; changed: ==>
+       expected: <[]> but was: <[fragment_bin_offset = 0.4, ...``.
+   * - 3b
+     - 3
+     - New: *Apply selected* applies every row.
+     - ``expected: <Applied 2 changes of Low-res precursor, low-res
+       fragments: ...> but was: <Applied 8 changes of ...``.
+   * - 4a
+     - 4
+     - Recorded (unit 7, 7a): a raw apply that fails to parse resets the
+       configuration.
+     - ``ExpertRawEditUiTest``: ``a draft that does not parse (3 failures)``,
+       ``the configured values and origins after the refused raw edit``.
+   * - 4b
+     - 4
+     - New: a raw apply that parses is adopted without confirmation.
+     - ``not before confirming ==> expected: <0> but was: <6>``.
+   * - 4v
+     - 4
+     - **Version-blind** (recorded, unit 7 agent): the draft is parsed as the
+       first offered release whatever release is selected.
+     - ``Comet 2026.02.2 refuses the ^ at line 27 (2 failures)`` in
+       ``theCaretDependsOnTheRelease``; ``aFailedParseChangesNothing`` (on
+       2026.03.0) must stay green.
+   * - 5a
+     - 5
+     - Recorded (unit 6): a locked output's check box left enabled. The
+       session still refuses the edit, so the value stays 1.
+     - ``WorkflowOutputsLockedUiTest``: ``disabled for change ==> expected:
+       <true> but was: <false>``, naming ``ess-output_pepxmlfile``.
+   * - 5b
+     - 5
+     - New: the lock's reason is never shown.
+     - ``the reason is on screen ==> expected: <true> but was: <false>``.
+   * - 6a
+     - 6
+     - Recorded (unit 6): a validation-summary entry no longer moves the focus
+       to its field.
+     - ``CrossParameterValidationUiTest``: ``Enter on the summary entry moves
+       the focus to the field ==> expected: <ess-peptide_mass_tolerance_lower>
+       but was: <param-summary-entry-0>``.
+   * - 6b
+     - 6
+     - Recorded (unit 6, 6e): the parameters' readiness text forced to "do not
+       block".
+     - ``the Run section (2 failures)``; and
+       ``MigrationReviewBlocksRunUiTest`` (an unresolved migration entry
+       blocks Run, decision P7-3) red with ``but was: <The parameters do not
+       block a run.>``.
+   * - 7a
+     - 7
+     - Recorded (unit 6, 6d, after its rework): a parameter control's own
+       accessible name removed, leaving Phase 02's generated fallback.
+     - ``ParameterControlsAccessibilityUiTest``: ``TextField
+       #ess-database_name under #param-essentials has only the generated
+       fallback name``; the representative names, typed out; and
+       ``AccessibleNameEnumerationUiTest``: ``... controls this project
+       created have no name of their own``.
+   * - 7b
+     - 7
+     - New: the validation state left out of a parameter control's accessible
+       help.
+     - ``#ess-database_name's accessible help does not carry its state``.
+   * - 7v
+     - 7
+     - **Version-blind**, new: a field's choices are the curated definition's,
+       not the selected release's.
+     - ``indexSearchTypeOnTheDefaultRelease``: ``expected: <[Not set: ...,
+       Peptide index (PI_DB), Fragment-ion index (FI_DB)]> but was: <[Peptide
+       index (PI_DB), Fragment-ion index (FI_DB)]>``; ``theOlderRelease`` must
+       stay green.
+   * - 8a
+     - 8
+     - Recorded (unit 7, 7c): alias matching removed from the search.
+     - ``ParameterSearchUiTest``: ``by alias (3 failures)``.
+   * - 8b
+     - 8
+     - New: activating a search result no longer moves the focus to its field.
+     - ``after activating the result for #adv-allowed_missed_cleavage``, ``the
+       field has the focus``.
+   * - 8v
+     - 8
+     - **Version-blind** (recorded, unit 5, 5c): a field's help is the curated
+       definition's, not the release's.
+     - ``ParameterSearchViewModelTest.releaseHelp``: ``expected:
+       <[index_search_type]> but was: <[]>``. Graded on this **view-model**
+       test: the item-8 GUI test searches no release-specific help text, so
+       it does not see this defect.
+   * - H
+     - --
+     - The harness itself, as above.
+     - Each a ``HARNESS ERROR`` or a recorded ``HARNESS FAILURE``.
+
+What it does not cover: the native file dialogs (never opened headless) and the
+gate-1 file's Linux path, which unit 6's sign-off records as unverified; the
+``R-PARAM-06`` warning on reading a file as the selected release, tested at
+view-model level only; and the unlocking of an output when its stage is
+switched off, which is deferred to Phases 11 and 12 -- in this phase every
+stage is enabled, so item 5's controls prove the lock and its reason only.
+
+Measured on 2026-10-05: 1272 s (21 m 12 s) for a full run, of which the
+baseline and the final clean run (all eleven graded classes, once each) take
+about ten minutes together, and a control between 8 s and 68 s; 66 controls
+passed, and that count is the floor ``verify-all-gates.sh`` holds it to.
 
 Traps
 =====
