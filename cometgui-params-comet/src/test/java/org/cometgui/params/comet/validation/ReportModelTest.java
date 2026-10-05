@@ -158,6 +158,9 @@ class ReportModelTest {
         assertEquals(
                 Optional.of(Severity.ERROR), Rule.VARMOD_RESIDUE_NOT_IN_RELEASE.fixedSeverity());
         assertEquals(Optional.of(Severity.ERROR), Rule.VARMODS_ASCOREPRO_SLOT.fixedSeverity());
+        assertEquals("migration.needs_attention", Rule.MIGRATION_NEEDS_ATTENTION.id());
+        assertEquals(Optional.of(Severity.ERROR), Rule.MIGRATION_NEEDS_ATTENTION.fixedSeverity());
+        assertEquals(Optional.empty(), Rule.MIGRATION_NEEDS_ATTENTION.family());
         for (Rule rule : Rule.values()) {
             assertTrue(
                     org.cometgui.params.comet.schema.RuleSeverity.RULE_ID

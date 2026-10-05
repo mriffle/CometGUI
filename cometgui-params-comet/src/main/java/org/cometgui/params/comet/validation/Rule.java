@@ -194,7 +194,16 @@ public enum Rule {
      * A warning of the parse that produced the model, such as a {@code # comet_version} marker
      * naming another version ({@code R-PARAM-06}), carried into the report unchanged.
      */
-    IMPORT_DIAGNOSTIC("import.diagnostic", Severity.WARNING, null);
+    IMPORT_DIAGNOSTIC("import.diagnostic", Severity.WARNING, null),
+
+    /**
+     * {@code R-PARAM-13}: a schema migration could not carry a value with its meaning, substituted
+     * the target release's default, and the scientist has not yet resolved the entry. {@link
+     * CometValidator} never reports it, because it needs the migration's report: {@code
+     * org.cometgui.params.comet.migration.MigrationReview#validate} adds it to the validator's
+     * findings, the one place the two meet.
+     */
+    MIGRATION_NEEDS_ATTENTION("migration.needs_attention", Severity.ERROR, null);
 
     private final String id;
 

@@ -1897,7 +1897,10 @@ category -- *Errors shall be attached to the responsible field and category*.
 ``hasErrors()`` is what Phase 08 blocks a run on; ``forParameter(name)`` and
 ``forCategory(category)`` are what Phase 07 shows at a control and a category
 heading (``AC-PAR-10``). The report is in a stable order: per parameter in the
-model's order, then the cross-field rules, then what the import left.
+model's order, then the cross-field rules, then what the import left -- and,
+for a migrated set validated through its review, last, one
+``migration.needs_attention`` error per unresolved entry, in the migration
+report's order (:ref:`dev-comet-parameter-migration-review`).
 
 What validation checks is the **model**. It reads no file: whether the
 database and spectra exist and are readable, output paths are writable, the
@@ -2245,6 +2248,17 @@ rule with none encodes this project's choice or the specification's.
      - Every other warning of the parse that produced the model (version
        marker mismatched or missing, ``R-PARAM-06``), carried in unchanged.
      - --
+   * - ``migration.needs_attention``
+     - E
+     - the entry's parameter (its category; none if the set does not model
+       the name)
+     - A schema migration could not keep the value with its meaning and put
+       the target release's default in its place (``NEEDS_ATTENTION``), and
+       the scientist has not resolved the entry. Reported only by
+       ``MigrationReview.validate``, never by ``CometValidator``, because it
+       needs the migration's report
+       (:ref:`dev-comet-parameter-migration-review`).
+     - ``R-PARAM-13``
 
 A slot is **active** when its mass difference is not 0 [M1368]_; the meaning
 rules apply to active slots only.
@@ -3416,6 +3430,82 @@ the byte-equality test is what ties the bytes it runs to production code.
   "<db>" is not an .idx file (plain FASTA search). It only selects the index
   type to auto-build when database_name names an .idx file that does not
   exist yet.`` -- the warning migration spares every search.
+
+.. _dev-comet-parameter-migration-review:
+
+The review: an entry needing attention blocks a run
+---------------------------------------------------
+
+Phase 07, unit 1. A ``NEEDS_ATTENTION`` entry leaves the target's default in
+the migrated set, and that default is not always harmless: Comet 2026.03.0's
+``variable_mod01`` default is ``15.9949 M 0 3 -1 0 0 0.0``, an **active**
+methionine oxidation, so a 2026.02.2 file whose ``variable_mod01`` had a
+terminus Comet never applied would, unreviewed, search with a modification the
+scientist never chose. ``R-PARAM-13``: "an entry needing the scientist's
+attention blocks a run until resolved".
+
+``MigrationReview`` (package ``org.cometgui.params.comet.migration``) holds a
+``MigrationResult`` and the names of the ``NEEDS_ATTENTION`` entries the
+scientist has acknowledged. It is immutable: ``MigrationReview.of(result)``
+starts with none, and ``resolve(name)`` returns a new review. An entry is
+**resolved** in exactly two ways:
+
+* **acknowledged** -- ``resolve(name)``: the scientist accepts the value the
+  set holds. It is recorded in the review and holds whatever the value later
+  is;
+* **set by the scientist** -- in the model being validated the parameter's
+  origin is ``USER``. Migration gives every such parameter origin
+  ``COMET_DEFAULT``, so ``USER`` there is a value entered after the migration.
+  This is read from the model at each validation, not recorded: a reset to the
+  default, a preset (``PRESET``) or any other origin leaves an unacknowledged
+  entry unresolved again. A caller gives origin ``USER`` only to a value the
+  scientist set on that parameter.
+
+``resolve`` refuses, with an ``IllegalArgumentException`` naming it, a name
+that is not a ``NEEDS_ATTENTION`` entry of the report ("``<name>`` is not an
+entry of the migration from Comet ``<from>`` to Comet ``<to>`` that needs
+attention, so there is nothing to resolve") and one already acknowledged
+("``<name>`` has already been resolved in this migration's review"); the
+constructor refuses an acknowledged set holding such a name.
+
+``validate(model)`` is the **one** place a migration's review and validation
+meet, and the editor shows its report and never combines two: every finding of
+``CometValidator.standard().validate(model)``, in its order, then one
+``migration.needs_attention`` error per unresolved entry, in the migration
+report's order. Each is attached to the entry's parameter and that
+parameter's category -- ``forParameter``, ``forCategory``, ``errors()`` and
+``hasErrors()`` see it as any other error -- or, for a name the set does not
+model, to the name alone with no category, as unknown names are. A model of
+another release than the migration's target is refused. The message names the
+parameter, the source release's value, the default migration put in its
+place, the value the set holds now, and the entry's explanation; for the case
+above::
+
+    variable_mod01 needs your decision: migrating from Comet 2026.02.2 to Comet 2026.03.0
+    could not keep its value 15.9949 M 0 3 2 4 0 0.0 and put Comet 2026.03.0's default
+    15.9949 M 0 3 -1 0 0 0.0 in its place; the set now holds 15.9949 M 0 3 -1 0 0 0.0. Set a
+    value, or accept this one, before running. Why: variable_mod01 = 15.9949 M 0 3 2 4 0 0.0
+    (Comet 2026.02.2) has no equivalent in Comet 2026.03.0: With a terminal distance of 0 or
+    more, ... or switch the slot off. (https://github.com/UWPR/Comet/blob/v2026.02.2/...);
+    the migrated set holds Comet 2026.03.0's default instead, and the source value is kept
+    only in this report
+
+(one line; wrapped and shortened here). ``MigrationReviewTest`` proves it on
+the real 2026.02.2 ``-q`` file with that one CONSTRUCTED edit, migrated to
+2026.03.0: the review has exactly that entry; the set holds the active
+default; the report is the validator's ``workflow_enforced.output_off`` error
+followed by ``migration.needs_attention`` at ``variable_mod01`` in
+``variable_mods``, with the whole message typed by hand; once the outputs are
+enforced the entry is the only error; acknowledging it, or a ``USER`` value,
+leaves exactly the validator's report, while a reset, a ``PRESET``,
+``IMPORTED``, ``COMET_DEFAULT`` or ``WORKFLOW_ENFORCED`` value does not. With
+two entries (``variable_mod01`` and ``variable_mod02``) resolving one clears
+exactly its finding. The real 2026.02.2 file with a two-loss
+``variable_mod02`` migrated to 2024.01.0 gives the validator's ten errors
+(``workflow_enforced.output_off`` and nine ``version.parameter_unavailable``)
+then the entry's; a migration with nothing needing attention (either older
+real ``-q`` file to 2026.03.0) gives exactly the validator's report; and the
+refusals are asserted with their messages.
 
 .. _dev-comet-parameter-older-release:
 

@@ -22,7 +22,10 @@ import org.cometgui.params.comet.schema.ParameterCategory;
 
 /**
  * Everything the validators found in one model, in a stable order: per parameter in the model's
- * order, then the cross-field rules, then what the import left behind.
+ * order, then the cross-field rules, then what the import left behind -- and, for a migrated set
+ * validated through its {@code org.cometgui.params.comet.migration.MigrationReview}, last, one
+ * {@link Rule#MIGRATION_NEEDS_ATTENTION} error per unresolved entry, in the migration report's
+ * order.
  *
  * <p>{@link #hasErrors()} is what blocks a run (Phase 08); {@link #forParameter(String)} and {@link
  * #forCategory(ParameterCategory)} are what the editor shows at a control and a category heading
