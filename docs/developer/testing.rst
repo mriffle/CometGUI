@@ -749,9 +749,14 @@ and the bytecode proof).
      - **Version-blind** (recorded, unit 5, 5c): a field's help is the curated
        definition's, not the release's.
      - ``ParameterSearchViewModelTest.releaseHelp``: ``expected:
-       <[index_search_type]> but was: <[]>``. Graded on this **view-model**
-       test: the item-8 GUI test searches no release-specific help text, so
-       it does not see this defect.
+       <[index_search_type]> but was: <[]>`` (the view-model grading unit 8
+       shipped); and, since unit 9, the item-8 GUI test through the launched
+       application: ``Comet 2026.03.0, help text "not set" (3 failures)`` and
+       ``expected: <[Index type for an index built on demand
+       (index_search_type) -- Matched by help text]> but was: <[]>`` in
+       ``ParameterSearchUiTest.helpTextOfTheDefaultRelease``;
+       ``helpTextOfTheOlderRelease`` must stay green, because the curated
+       help *is* 2026.02.2's.
    * - H
      - --
      - The harness itself, as above.
@@ -767,7 +772,17 @@ stage is enabled, so item 5's controls prove the lock and its reason only.
 Measured on 2026-10-05: 1272 s (21 m 12 s) for a full run, of which the
 baseline and the final clean run (all eleven graded classes, once each) take
 about ten minutes together, and a control between 8 s and 68 s; 66 controls
-passed, and that count is the floor ``verify-all-gates.sh`` holds it to.
+passed, and that count was the floor ``verify-all-gates.sh`` held it to.
+
+Unit 9 (2026-10-05) gave ``ParameterSearchUiTest`` two methods, one per
+release, each searching a phrase only that release's help says -- ``not set``
+in 2026.03.0's help of ``index_search_type``, ``is ignored`` in 2026.02.2's
+help of ``spectral_library_ms_level`` -- and requiring it to find that
+parameter on its own release and nothing on the other. Before that, unit 8
+found that the GUI test's only help-text query (``placeholder``) is the same in
+both releases' help, so 8v could be graded on the view-model test alone.
+Control 8v now also runs ``ParameterSearchUiTest`` and grades it (four checks
+added), and the floor was raised to the count measured with them.
 
 Traps
 =====

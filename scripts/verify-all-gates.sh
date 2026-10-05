@@ -130,7 +130,9 @@ declare -a COVERED=()
 #                2026-10-04, when COMET-2026-03 unit 6 added the fifteen
 #                version-blind controls v3a-v6b, control 8's two per-release
 #                checks and control H's H8-H10.  paramui: 66 on 2026-10-05,
-#                phase 07 unit 8's first shipping count.)
+#                phase 07 unit 8's first shipping count; 70 on 2026-10-05,
+#                when phase 07 unit 9 made control 8v also grade the item-8
+#                GUI test on both releases (four checks).)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -290,7 +292,7 @@ gate_spec() {
         paramui)
             GATE_PHASE="07"
             GATE_ITEMS="1,2,3,4,5,6,7,8"
-            GATE_DEFECT="from the injections recorded in handoffs/PHASE-07-worklog.rst (and new ones, each marked so), each into production code of cometgui-ui in a git-archive sandbox, each proved to have reached the compiled classes and graded on the failing assertion's own words in the GUI gate test that asserts the item: the Essentials decoy control always choosing decoys-in-the-FASTA, and the save quietly writing decoy_search = 0 while the screen shows the choice (the saved file must differ from the checked-in expected file in that one line); the slot editor's Move up moving down; Cancel applying every preset row, and Apply selected applying every row; a failed raw Expert apply resetting the configuration, and a raw apply adopted without confirmation; a locked output's check box left enabled, and its reason never shown; a summary entry that no longer moves the focus, and the parameters' readiness forced to 'do not block' (with the migrated NEEDS_ATTENTION entry's test); a parameter control's own accessible name removed so only the generated fallback is left, and the validation state left out of its accessible help; alias matching removed, and a search result that no longer focuses its field; VERSION-BLIND, each with the untouched release required to stay green where its test can show it: the slot editor offering ^ and $ on every release, the Expert draft parsed as the first offered release, a field's choices taken from the curated definition, and a field's help taken from the curated definition (graded on the view-model test, which the harness says); and, as controls on the harness itself, an unchanged file, a missing anchor, an injection that reached the source but not the bytecode, a green run graded as red, a red without its diagnostic, and unit 6's EQUIVALENT injection (Run disabled only by the engine's reason), which must be reported as a HARNESS FAILURE"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-07-worklog.rst (and new ones, each marked so), each into production code of cometgui-ui in a git-archive sandbox, each proved to have reached the compiled classes and graded on the failing assertion's own words in the GUI gate test that asserts the item: the Essentials decoy control always choosing decoys-in-the-FASTA, and the save quietly writing decoy_search = 0 while the screen shows the choice (the saved file must differ from the checked-in expected file in that one line); the slot editor's Move up moving down; Cancel applying every preset row, and Apply selected applying every row; a failed raw Expert apply resetting the configuration, and a raw apply adopted without confirmation; a locked output's check box left enabled, and its reason never shown; a summary entry that no longer moves the focus, and the parameters' readiness forced to 'do not block' (with the migrated NEEDS_ATTENTION entry's test); a parameter control's own accessible name removed so only the generated fallback is left, and the validation state left out of its accessible help; alias matching removed, and a search result that no longer focuses its field; VERSION-BLIND, each with the untouched release required to stay green where its test can show it: the slot editor offering ^ and $ on every release, the Expert draft parsed as the first offered release, a field's choices taken from the curated definition, and a field's help taken from the curated definition (graded on its view-model test and on the item-8 GUI test, whose 2026.02.2 method must stay green); and, as controls on the harness itself, an unchanged file, a missing anchor, an injection that reached the source but not the bytecode, a green run graded as red, a red without its diagnostic, and unit 6's EQUIVALENT injection (Run disabled only by the engine's reason), which must be reported as a HARNESS FAILURE"
             GATE_SCRIPT="scripts/verify-param-ui-gates.sh"
             GATE_ARGS=()
             GATE_PROOF=(
@@ -299,7 +301,7 @@ gate_spec() {
                 "Four controls were version-blind (2v, 4v, 7v and 8v)"
                 "bytecode as a HARNESS ERROR, not as a pass"
             )
-            GATE_FLOOR=66
+            GATE_FLOOR=70
             GATE_UNIT="controls"
             ;;
         *)

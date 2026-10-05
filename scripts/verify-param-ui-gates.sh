@@ -100,9 +100,11 @@
 #       the curated definition's instead of the selected release's, so search by
 #       help text searches the wrong release's words.  Graded on the
 #       VIEW-MODEL test ParameterSearchViewModelTest#releaseHelp in
-#       cometgui-ui, NOT on a GUI test: ParameterSearchUiTest's queries do not
-#       touch a release-specific help text, and this script says so rather than
-#       pretend otherwise
+#       cometgui-ui (unit 8's grading, kept) AND, since unit 9, on the GUI
+#       test ParameterSearchUiTest through the launched application: its
+#       2026.03.0 method (a query only 2026.03.0's help says) goes red, and
+#       its 2026.02.2 method -- the release whose help the curated text is --
+#       must STAY GREEN
 #   H   the harness itself: a replacement equal to its anchor, an anchor that
 #       matches nothing, an injection that reaches the source but not the
 #       bytecode, a green run graded as a red, and a red without the expected
@@ -896,7 +898,7 @@ readonly SEL_6B="${T6},${T6M}"
 readonly SEL_7A="${T7},${T7N}"
 readonly SEL_7="${T7}"
 readonly SEL_8="${T8}"
-readonly SEL_8V="${T8V}"
+readonly SEL_8V="${T8V},${T8}"
 # Control H: H3 needs a cheap run (its bytecode check refuses it whatever the
 # tests say); H6 must run the class unit 6's equivalent injection was graded on.
 readonly SEL_H="${T8V},${T6}"
@@ -1305,15 +1307,26 @@ control_8v() {
     # Unit 5's sign-off, injection 5c: "FieldViewModel.shortHelp returns the
     # curated help instead of the release's -- red:
     # ParameterSearchViewModelTest.releaseHelp expected: <[index_search_type]>
-    # but was: <[]>".  Graded on that VIEW-MODEL test: the GUI test's help-text
-    # query ("placeholder") is not release-specific, so the GUI gate test does
-    # not see this defect -- said here, and in docs/developer/testing.rst.
+    # but was: <[]>".  Graded on that VIEW-MODEL test, as unit 8 shipped it,
+    # AND on the item-8 GUI test: unit 9 gave ParameterSearchUiTest one method
+    # per release whose query only that release's help says ("not set" in
+    # 2026.03.0's help of index_search_type, "is ignored" in 2026.02.2's help
+    # of spectral_library_ms_level).  The curated help IS 2026.02.2's, so the
+    # defect blinds the 2026.03.0 method and leaves the 2026.02.2 one green.
     inject_and_run "curated help for every release" "${FIELD_VM}" "${SEL_8V}" fixed \
         'expected: <[index_search_type]> but was: <[]>' \
         '        return definition.shortHelp();' \
         '        return session.metadata().parameter(definition.name()).orElseThrow().shortHelp();'
     assert_testcase "the release-help search is the method that failed" failed \
         ParameterSearchViewModelTest releaseHelp
+    assert_log_contains "and the launched application's search misses 2026.03.0's help text" \
+        "${DIRTY_LOG}" 'Comet 2026.03.0, help text "not set" (3 failures)'
+    assert_log_contains "naming the parameter whose 2026.03.0 help says it" \
+        "${DIRTY_LOG}" 'expected: <[Index type for an index built on demand (index_search_type) -- Matched by help text]> but was: <[]>'
+    assert_testcase "the GUI test of 2026.03.0's help is the GUI method that failed" failed \
+        "${T8}" helpTextOfTheDefaultRelease
+    assert_testcase "2026.02.2, whose help the curated text is, stays green" passed \
+        "${T8}" helpTextOfTheOlderRelease
     restore_pristine "${FIELD_VM}"
     end_control
 }
@@ -1565,8 +1578,8 @@ main() {
     printf '  the failing assertion'"'"'s own words in the gate test that asserts the item.\n'
     printf '  Four controls were version-blind (2v, 4v, 7v and 8v), each requiring the\n'
     printf '  release the defect does not touch to stay green where its test can show it;\n'
-    printf '  8v is graded on a view-model test, because the item-8 GUI test does not\n'
-    printf '  search a release-specific help text.\n'
+    printf '  8v is graded on the item-8 GUI test on both releases and on its view-model\n'
+    printf '  test.\n'
     printf '  The harness reports an injection that reached the source but not the\n'
     printf '  bytecode as a HARNESS ERROR, not as a pass, and an equivalent injection as\n'
     printf '  a HARNESS FAILURE.\n'
