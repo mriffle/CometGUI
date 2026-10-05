@@ -32,8 +32,10 @@ import org.cometgui.ui.viewmodel.NonNullProperty;
  * <p>Two independent halves, both stated in text:
  *
  * <ul>
- *   <li><strong>The parameters.</strong> {@link #parametersBlockRun()} is true exactly when the
- *       session's one report holds an error -- including an unresolved entry of a migration under
+ *   <li><strong>The parameters.</strong> {@link #parametersBlockRun()} is true exactly when a field
+ *       holds an edit the model refused -- the screen then shows a value that is not the one that
+ *       would be searched, which is view-model state, not a scientific rule -- or when the
+ *       session's one report holds an error, including an unresolved entry of a migration under
  *       review, which that report carries as an error ({@code R-PARAM-13}). Each error is a
  *       blocking reason (exit gate item 6 asserts this half).
  *   <li><strong>The workflow engine.</strong> Phase 08 builds the engine that runs Comet and
@@ -84,10 +86,13 @@ public final class RunReadinessViewModel {
         this.reasonsText = new NonNullProperty<>(this, "reasonsText", "");
         show(session.report());
         session.reportProperty().addListener((observable, before, after) -> show(after));
+        session.pendingRefusalsProperty()
+                .addListener((observable, before, after) -> show(session.report()));
     }
 
     /**
-     * Whether the parameters block a run: the report holds an error.
+     * Whether the parameters block a run: a field holds a refused edit, or the report holds an
+     * error.
      *
      * @return the read-only property
      */
@@ -98,14 +103,15 @@ public final class RunReadinessViewModel {
     /**
      * Whether the parameters block a run.
      *
-     * @return {@code true} if the report holds an error
+     * @return {@code true} if a refused edit is pending or the report holds an error
      */
     public boolean parametersBlockRun() {
         return parametersBlockRun.get();
     }
 
     /**
-     * Why the parameters block a run: one line per error of the report, in its order.
+     * Why the parameters block a run: one line per field holding a refused edit, in field order,
+     * naming the field and the model's refusal; then one per error of the report, in its order.
      *
      * @return the read-only property
      */
@@ -170,11 +176,11 @@ public final class RunReadinessViewModel {
     private void show(ValidationReport report) {
         List<String> reasons = new ArrayList<>();
         for (SummaryEntry entry : SummaryEntry.listOf(report, session)) {
-            if (entry.finding().isError()) {
+            if (entry.kind().blocksRun()) {
                 reasons.add(entry.text());
             }
         }
-        boolean blocked = report.hasErrors();
+        boolean blocked = !reasons.isEmpty();
         parametersBlockRun.set(blocked);
         blockingReasons.set(List.copyOf(reasons));
         runEnabled.set(!blocked && engineUnavailable.isEmpty());

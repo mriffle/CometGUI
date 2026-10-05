@@ -29,14 +29,17 @@ import org.cometgui.ui.viewmodel.NonNullProperty;
  * order, with counts ("Errors shall be ... summarised at the top of the editor, and reachable by
  * keyboard").
  *
- * <p>It follows the session's report and nothing else: no finding is added, dropped or re-ordered
- * here.
+ * <p>It follows the session's report and its pending refusals and nothing else: first every field
+ * holding an edit the model refused (kind "Not applied", in field order), then every finding of the
+ * report, none added, dropped or re-ordered.
  */
 public final class ValidationSummaryViewModel {
 
     private final ParameterSession session;
 
     private final NonNullProperty<List<SummaryEntry>> entries;
+
+    private final ReadOnlyIntegerWrapper notAppliedCount;
 
     private final ReadOnlyIntegerWrapper errorCount;
 
@@ -52,11 +55,14 @@ public final class ValidationSummaryViewModel {
     public ValidationSummaryViewModel(ParameterSession session) {
         this.session = Objects.requireNonNull(session, "session");
         this.entries = new NonNullProperty<>(this, "entries", List.of());
+        this.notAppliedCount = new ReadOnlyIntegerWrapper(this, "notAppliedCount", 0);
         this.errorCount = new ReadOnlyIntegerWrapper(this, "errorCount", 0);
         this.warningCount = new ReadOnlyIntegerWrapper(this, "warningCount", 0);
-        this.headline = new NonNullProperty<>(this, "headline", headlineFor(0, 0));
+        this.headline = new NonNullProperty<>(this, "headline", headlineFor(0, 0, 0));
         show(session.report());
         session.reportProperty().addListener((observable, before, after) -> show(after));
+        session.pendingRefusalsProperty()
+                .addListener((observable, before, after) -> show(session.report()));
     }
 
     /**
@@ -75,6 +81,24 @@ public final class ValidationSummaryViewModel {
      */
     public List<SummaryEntry> entries() {
         return entries.get();
+    }
+
+    /**
+     * How many fields hold an edit the model refused.
+     *
+     * @return the read-only property
+     */
+    public ReadOnlyIntegerProperty notAppliedCountProperty() {
+        return notAppliedCount.getReadOnlyProperty();
+    }
+
+    /**
+     * How many fields hold an edit the model refused.
+     *
+     * @return the count
+     */
+    public int notAppliedCount() {
+        return notAppliedCount.get();
     }
 
     /**
@@ -132,17 +156,19 @@ public final class ValidationSummaryViewModel {
     }
 
     /**
-     * The sentence for a pair of counts.
+     * The sentence for a set of counts.
      *
+     * @param notApplied how many fields hold a refused edit
      * @param errors how many errors
      * @param warnings how many warnings
-     * @return the sentence
+     * @return for example {@code 1 edit not applied, 2 errors and 0 warnings.}
      */
-    public static String headlineFor(int errors, int warnings) {
-        if (errors == 0 && warnings == 0) {
+    public static String headlineFor(int notApplied, int errors, int warnings) {
+        if (notApplied == 0 && errors == 0 && warnings == 0) {
             return "No errors or warnings.";
         }
-        return count(errors, "error") + " and " + count(warnings, "warning") + ".";
+        String counts = count(errors, "error") + " and " + count(warnings, "warning") + ".";
+        return notApplied == 0 ? counts : count(notApplied, "edit") + " not applied, " + counts;
     }
 
     private static String count(int number, String noun) {
@@ -150,11 +176,13 @@ public final class ValidationSummaryViewModel {
     }
 
     private void show(ValidationReport report) {
+        int notApplied = session.pendingRefusals().size();
         int errors = report.errors().size();
         int warnings = report.warnings().size();
         entries.set(SummaryEntry.listOf(report, session));
+        notAppliedCount.set(notApplied);
         errorCount.set(errors);
         warningCount.set(warnings);
-        headline.set(headlineFor(errors, warnings));
+        headline.set(headlineFor(notApplied, errors, warnings));
     }
 }

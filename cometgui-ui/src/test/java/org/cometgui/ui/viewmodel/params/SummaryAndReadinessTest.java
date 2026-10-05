@@ -66,7 +66,7 @@ class SummaryAndReadinessTest {
             List<SummaryEntry> entries = summary.entries();
             assertEquals(
                     session.report().findings(),
-                    entries.stream().map(SummaryEntry::finding).toList());
+                    entries.stream().map(e -> e.finding().orElseThrow()).toList());
             assertEquals(2, entries.size());
             assertEquals(1, summary.errorCount());
             assertEquals(1, summary.warningCount());
@@ -85,7 +85,8 @@ class SummaryAndReadinessTest {
                     "Error -- Enzymatic termini (num_enzyme_termini), Digestion and enzymes: "
                             + termini.message(),
                     termini.text());
-            assertEquals(termini.finding().message(), termini.message());
+            assertEquals(termini.finding().orElseThrow().message(), termini.message());
+            assertEquals(SummaryEntry.Kind.ERROR, termini.kind());
 
             SummaryEntry window = only(entries, "peptide_mass_tolerance_lower");
             assertEquals("Warning", window.severityText());
@@ -131,9 +132,17 @@ class SummaryAndReadinessTest {
         @Test
         @DisplayName("the headline counts in words")
         void headlines() {
-            assertEquals("No errors or warnings.", ValidationSummaryViewModel.headlineFor(0, 0));
-            assertEquals("1 error and 0 warnings.", ValidationSummaryViewModel.headlineFor(1, 0));
-            assertEquals("2 errors and 3 warnings.", ValidationSummaryViewModel.headlineFor(2, 3));
+            assertEquals("No errors or warnings.", ValidationSummaryViewModel.headlineFor(0, 0, 0));
+            assertEquals(
+                    "1 error and 0 warnings.", ValidationSummaryViewModel.headlineFor(0, 1, 0));
+            assertEquals(
+                    "2 errors and 3 warnings.", ValidationSummaryViewModel.headlineFor(0, 2, 3));
+            assertEquals(
+                    "1 edit not applied, 0 errors and 0 warnings.",
+                    ValidationSummaryViewModel.headlineFor(1, 0, 0));
+            assertEquals(
+                    "2 edits not applied, 1 error and 1 warning.",
+                    ValidationSummaryViewModel.headlineFor(2, 1, 1));
         }
 
         private SummaryEntry only(List<SummaryEntry> entries, String parameter) {
@@ -249,6 +258,146 @@ class SummaryAndReadinessTest {
                                     IllegalArgumentException.class,
                                     () -> new RunReadinessViewModel(session, Optional.of(" ")))
                             .getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("edits the model refused: shown, not applied, so they block Run")
+    class RefusedEdits {
+
+        private static final String THREADS_REASON =
+                "Not applied -- Search threads (num_threads), CPU and execution: num_threads,"
+                        + " value: \"lots\" is not a whole number";
+
+        private static final String CLEAVAGE_REASON =
+                "Not applied -- Allowed missed cleavages (allowed_missed_cleavage), Digestion and"
+                        + " enzymes: allowed_missed_cleavage, value: \"many\" is not a whole"
+                        + " number";
+
+        private final ParameterSession session = startingIn(C03);
+
+        private final RunReadinessViewModel readiness =
+                new RunReadinessViewModel(session, Optional.empty());
+
+        private final ValidationSummaryViewModel summary = new ValidationSummaryViewModel(session);
+
+        @Test
+        @DisplayName("a refused edit blocks Run with its field and the refusal in text")
+        void refusedEditBlocks() {
+            assertTrue(readiness.runEnabled());
+
+            session.edit("num_threads", "lots");
+
+            assertEquals(List.of(), session.report().findings());
+            assertTrue(readiness.parametersBlockRun());
+            assertFalse(readiness.runEnabled());
+            assertEquals(List.of(THREADS_REASON), readiness.blockingReasons());
+            assertEquals(THREADS_REASON, readiness.reasonsText());
+            assertEquals(1, summary.entries().size());
+            SummaryEntry entry = summary.entries().get(0);
+            assertEquals(SummaryEntry.Kind.NOT_APPLIED, entry.kind());
+            assertEquals("Not applied", entry.severityText());
+            assertEquals(Optional.empty(), entry.finding());
+            assertEquals(Optional.of("num_threads"), entry.focusTarget());
+            assertEquals(Optional.of(ParameterCategory.CPU_EXECUTION), entry.category());
+            assertEquals(THREADS_REASON, entry.text());
+            assertEquals(1, summary.notAppliedCount());
+            assertEquals(1, summary.notAppliedCountProperty().get());
+            assertEquals("1 edit not applied, 0 errors and 0 warnings.", summary.headline());
+            assertEquals(
+                    List.of(session.field("num_threads")), session.pendingRefusalsProperty().get());
+        }
+
+        @Test
+        @DisplayName("an accepted edit of the field unblocks")
+        void acceptedEditUnblocks() {
+            session.edit("num_threads", "lots");
+            session.edit("num_threads", "4");
+            assertFalse(readiness.parametersBlockRun());
+            assertTrue(readiness.runEnabled());
+            assertEquals(List.of(), readiness.blockingReasons());
+            assertEquals("Ready to run.", readiness.reasonsText());
+            assertEquals(List.of(), summary.entries());
+            assertEquals(0, summary.notAppliedCount());
+            assertEquals("No errors or warnings.", summary.headline());
+        }
+
+        @Test
+        @DisplayName("a reset of the field unblocks")
+        void resetUnblocks() {
+            session.edit("num_threads", "lots");
+            session.field("num_threads").reset();
+            assertFalse(readiness.parametersBlockRun());
+            assertTrue(readiness.runEnabled());
+            assertEquals(List.of(), summary.entries());
+        }
+
+        @Test
+        @DisplayName("two refused fields are two reasons, in field order, before the report's")
+        void twoInFieldOrder() {
+            session.edit("allowed_missed_cleavage", "many");
+            session.edit("num_threads", "lots");
+            session.edit("num_enzyme_termini", "3");
+
+            Finding termini = session.report().errors().get(0);
+            String terminiReason =
+                    "Error -- Enzymatic termini (num_enzyme_termini), Digestion and enzymes: "
+                            + termini.message();
+            assertEquals(
+                    List.of(THREADS_REASON, CLEAVAGE_REASON, terminiReason),
+                    readiness.blockingReasons());
+            assertEquals(
+                    List.of("num_threads", "allowed_missed_cleavage", "num_enzyme_termini"),
+                    summary.entries().stream().map(e -> e.parameter().orElseThrow()).toList());
+            assertEquals("2 edits not applied, 1 error and 0 warnings.", summary.headline());
+
+            session.edit("num_enzyme_termini", "2");
+            assertEquals(List.of(THREADS_REASON, CLEAVAGE_REASON), readiness.blockingReasons());
+            assertTrue(readiness.parametersBlockRun());
+        }
+
+        @Test
+        @DisplayName("an adopted set and a release change clear every refusal")
+        void adoptAndReleaseChangeUnblock() {
+            session.edit("num_threads", "lots");
+            session.adopt(session.model(), Adoption.RAW_APPLIED);
+            assertFalse(readiness.parametersBlockRun());
+
+            session.edit("num_threads", "lots");
+            assertTrue(readiness.parametersBlockRun());
+            assertEquals(EditOutcome.applied(), session.selectRelease(C02));
+            assertEquals(List.of(), session.pendingRefusals());
+            assertFalse(readiness.parametersBlockRun());
+            assertEquals(List.of(), summary.entries());
+        }
+
+        @Test
+        @DisplayName("an entry's kind must match what it holds")
+        void kindMatches() {
+            session.edit("num_threads", "lots");
+            SummaryEntry notApplied = SummaryEntry.notApplied(session.field("num_threads"));
+            assertEquals(
+                    "a summary entry of kind ERROR must be of kind NOT_APPLIED",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () ->
+                                            new SummaryEntry(
+                                                    SummaryEntry.Kind.ERROR,
+                                                    Optional.empty(),
+                                                    notApplied.parameter(),
+                                                    notApplied.parameterDisplayName(),
+                                                    notApplied.category(),
+                                                    notApplied.message()))
+                            .getMessage());
+            assertEquals(
+                    "decoy_prefix holds no refused edit",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () -> SummaryEntry.notApplied(session.field("decoy_prefix")))
+                            .getMessage());
+            assertTrue(SummaryEntry.Kind.NOT_APPLIED.blocksRun());
+            assertTrue(SummaryEntry.Kind.ERROR.blocksRun());
+            assertFalse(SummaryEntry.Kind.WARNING.blocksRun());
         }
     }
 }

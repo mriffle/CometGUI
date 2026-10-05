@@ -102,6 +102,8 @@ public final class ParameterSession {
 
     private final NonNullProperty<List<FieldViewModel>> fields;
 
+    private final NonNullProperty<List<FieldViewModel>> pendingRefusals;
+
     private Map<String, FieldViewModel> byName = Map.of();
 
     /**
@@ -150,6 +152,7 @@ public final class ParameterSession {
         this.review = new NonNullProperty<>(this, "review", Optional.empty());
         this.report = new NonNullProperty<>(this, "report", validate(start, Optional.empty()));
         this.fields = new NonNullProperty<>(this, "fields", List.of());
+        this.pendingRefusals = new NonNullProperty<>(this, "pendingRefusals", List.of());
         rebuildFields(start);
         commit(start);
     }
@@ -271,6 +274,26 @@ public final class ParameterSession {
      */
     public List<FieldViewModel> fields() {
         return fields.get();
+    }
+
+    /**
+     * The fields holding an edit the model refused, in field order: each shows text the
+     * configuration does not hold, so each blocks a run until the refusal is cleared (by an
+     * accepted edit, a reset, an adopted set or a release change).
+     *
+     * @return the read-only property
+     */
+    public ReadOnlyObjectProperty<List<FieldViewModel>> pendingRefusalsProperty() {
+        return pendingRefusals.getReadOnlyProperty();
+    }
+
+    /**
+     * The fields holding an edit the model refused, in field order.
+     *
+     * @return the fields, immutable
+     */
+    public List<FieldViewModel> pendingRefusals() {
+        return pendingRefusals.get();
     }
 
     /**
@@ -661,6 +684,15 @@ public final class ParameterSession {
         }
         byName = built;
         fields.set(List.copyOf(built.values()));
+        for (FieldViewModel field : built.values()) {
+            field.refusalProperty().addListener((observable, before, after) -> collectRefusals());
+        }
+        collectRefusals();
+    }
+
+    private void collectRefusals() {
+        pendingRefusals.set(
+                fields.get().stream().filter(field -> field.refusal().isPresent()).toList());
     }
 
     /**
