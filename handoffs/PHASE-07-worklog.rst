@@ -273,7 +273,8 @@ Run serially, one fresh agent each, in this order.
        ``IonSeriesViewModel``: use it for the ion-series family or remove it.
        ``--only paramui`` (floor 70) after the change.
      - AC-PAR-08; spec *Typed control requirements*
-     -
+     - **Accepted** 2026-10-05, ``8844706``, ``c16b1fd``, ``2691ff4``;
+       :ref:`p07w-u10`.
 
 Sign-off entries
 ================
@@ -774,6 +775,43 @@ What I ran (2026-10-05):
 * Spot-checked the map's entries against the test methods and the user page's
   sections against the views.
 * ``--only paramui`` is re-run by me after unit 10, which changes Essentials.
+
+No test reads a file outside its module.
+
+.. _p07w-u10:
+
+Unit 10 -- repairs from unit 9's findings (``8844706``, ``c16b1fd``, ``2691ff4``)
+---------------------------------------------------------------------------------
+
+Agent: fresh tier-3 agent. (a) The Essentials fragment instrument choice now
+opens a preview limited to that option's fragment parameters
+(``PresetsViewModel.previewFragment``; the preview display moved into a shared
+``PresetReviewPane``); nothing changes before Apply; the instant-apply path
+(``ToleranceViewModel.chooseFragment``) is removed; gate 1's expected file is
+unchanged. New ``FragmentInstrumentPreviewUiTest``. (b) ``StaticModTable`` over
+``StaticModsViewModel`` in Essentials (26 rows) and Advanced (30 rows):
+residue/terminus in words, mass through the model, name (the display name --
+Comet has none), default state and origin, reset, validation state; existing
+per-parameter ids kept. New ``StaticModificationTableUiTest``. (c)
+``IonSeriesViewModel`` deleted (``FieldControl`` already shows each series as a
+named check box through the model; a test pins the eight names on both
+releases). Pins 382 -> 396. ``paramui`` controls 1c, 3c, 3d, 7c added; floor
+**raised** 70 -> 84.
+
+What I ran (2026-10-05):
+
+* Read the diff summary and the table's reset/origin path.
+* Injection (production): ``StaticModTable``'s reset does nothing -- red:
+  ``StaticModificationTableUiTest.theTable: the reset drops the refused text
+  ==> expected: <[serine (S), 0.0000, ...]> but was: <[serine (S), heavy,
+  ...]>``. Restored, ``sha256sum -c`` OK.
+* ``mvn -B -o -pl cometgui-app -am verify -Dtest='org.cometgui.ui.**,org.cometgui.app.**' ...``:
+  ui 822 / 0 failures, view-model coverage met; app 176 / 0 failures / 1
+  skipped.
+* ``bash scripts/verify-all-gates.sh --only docs --only traceability --only
+  quality --only shell --only paramui``: ``5 control(s) passed, 0 failed, in
+  2203 seconds``; ``paramui: 84 controls in 1700s`` (floor 84), shell 30,
+  quality 42, docs 1, traceability 8.
 
 No test reads a file outside its module.
 
