@@ -815,6 +815,23 @@ What I ran (2026-10-05):
 
 No test reads a file outside its module.
 
+Phase-end checks
+================
+
+Run by me after unit 10, on the final code (2026-10-05):
+
+* ``bash scripts/verify-all-gates.sh --only tests`` -- first run **HARNESS
+  ERROR**: ``no PIT report for cometgui-domain in the sandbox or the working
+  tree`` (control 6 sizes from the report ``build.sh`` writes; a unit's
+  ``-am clean verify`` had deleted it). Recreated as ``build.sh``'s PIT stage
+  writes it, for that module only: ``mvn -B -o -Dcometgui.pit.threads=16 -pl
+  cometgui-domain test-compile org.pitest:pitest-maven:mutationCoverage``
+  (380 mutations, 379 killed). Second run: ``PASS tests: 37 assertions in
+  3939s`` (floor 37). No harness, control or floor changed.
+* Already on the final code (unit 10 sign-off): ui 822 / app 176 suites;
+  ``docs``, ``traceability``, ``quality`` (42), ``shell`` (30), ``paramui``
+  (84) -- ``5 control(s) passed, 0 failed``.
+
 Rejections and rework
 =====================
 
