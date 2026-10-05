@@ -643,4 +643,93 @@ class ParameterSessionTest {
             assertEquals("2", session.field("decoy_search").text());
         }
     }
+
+    /**
+     * No listener of any of the session's properties can observe a model, a report, a release, a
+     * review and fields that do not belong together -- whichever property it listens to, and
+     * whichever change: an edit, a release switch whose report changes (a slot holding {@code ^},
+     * which 2026.02.2 cannot write), resolving a migration entry, a switch back, starting again.
+     *
+     * <p>Before, the session published the report before the model, so a report listener read the
+     * new release's review against the old release's model: {@code MigrationReview} refused, and
+     * JavaFX handed the exception to the thread's handler, where no test saw it. This test records
+     * both kinds of failure: an inconsistency a listener reads, and an exception a listener throws.
+     */
+    @Test
+    @DisplayName("every listener of every property reads one consistent configuration")
+    void listenersReadOneConsistentConfiguration() {
+        ParameterSession session = startingIn(C03);
+        List<String> seen = new ArrayList<>();
+        Runnable check =
+                () -> {
+                    CometParameters model = session.model();
+                    if (!model.version().equals(session.release())) {
+                        seen.add(
+                                "model of "
+                                        + model.version().text()
+                                        + " while the release is "
+                                        + session.release().text());
+                    }
+                    session.review()
+                            .filter(r -> !r.report().to().equals(model.version()))
+                            .ifPresent(
+                                    r ->
+                                            seen.add(
+                                                    "a review of a migration to "
+                                                            + r.report().to().text()));
+                    if (!session.field("variable_mod01").release().equals(model.version())) {
+                        seen.add("fields of another release");
+                    }
+                    session.unresolved();
+                };
+        session.modelProperty()
+                .addListener(
+                        (o, before, after) -> {
+                            if (after != session.model()) {
+                                seen.add("the model property is not the model");
+                            }
+                            check.run();
+                        });
+        session.reportProperty()
+                .addListener(
+                        (o, before, after) -> {
+                            if (after != session.report()) {
+                                seen.add("the report property is not the report");
+                            }
+                            check.run();
+                        });
+        session.releaseProperty().addListener((o, before, after) -> check.run());
+        session.reviewProperty().addListener((o, before, after) -> check.run());
+        session.fieldsProperty().addListener((o, before, after) -> check.run());
+        session.pendingRefusalsProperty().addListener((o, before, after) -> check.run());
+
+        List<Throwable> thrown = new ArrayList<>();
+        Thread.UncaughtExceptionHandler previous =
+                Thread.currentThread().getUncaughtExceptionHandler();
+        Thread.currentThread()
+                .setUncaughtExceptionHandler((thread, failure) -> thrown.add(failure));
+        try {
+            session.edit("variable_mod03", "42.010565 ^ 0 1 -1 0 0 0.0");
+            assertEquals(EditOutcome.applied(), session.selectRelease(C02));
+            for (MigrationEntry open : session.unresolved()) {
+                session.resolve(open.parameter());
+            }
+            session.edit("allowed_missed_cleavage", "many");
+            assertEquals(EditOutcome.applied(), session.selectRelease(C03));
+            session.resetAll();
+        } finally {
+            Thread.currentThread().setUncaughtExceptionHandler(previous);
+        }
+        assertEquals(List.of(), thrown, "no listener may fail");
+        assertEquals(List.of(), seen, "no listener may read a half-published change");
+        assertEquals(C03, session.release());
+        assertEquals(C03, session.releaseProperty().get(), "the property holds the release too");
+        assertEquals(Optional.empty(), session.reviewProperty().get());
+        assertSame(session.model(), session.modelProperty().get());
+        assertSame(session.report(), session.reportProperty().get());
+        assertEquals(EditOutcome.applied(), session.selectRelease(C02));
+        assertEquals(C02, session.releaseProperty().get());
+        assertSame(session.fields(), session.fieldsProperty().get(), "the new release's fields");
+        assertEquals(C02, session.fieldsProperty().get().get(0).release());
+    }
 }

@@ -76,9 +76,8 @@ import org.cometgui.ui.viewmodel.params.RangeViewModel;
  * <h2>Refreshing</h2>
  *
  * <p>The control re-reads its field after every change of the configuration, and after every change
- * of the field's own state. The model property is what makes that reliable: the session updates a
- * field before it publishes the model, so a value read from the model inside a field listener can
- * be the previous one.
+ * of the field's own state. Whichever fires first, the session's getters already answer for the new
+ * configuration: it replaces its state before it publishes anything.
  */
 public final class FieldControl extends VBox {
 

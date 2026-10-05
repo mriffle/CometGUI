@@ -94,21 +94,7 @@ public final class VariableModsViewModel {
         this.slots = VariableModSlots.forRelease(session.metadata(), slotsRelease);
         this.views = new NonNullProperty<>(this, "slots", build());
         session.modelProperty().addListener((observable, before, after) -> refresh());
-        session.reportProperty().addListener((observable, before, after) -> refreshOnReport());
-    }
-
-    /**
-     * Refreshes after a report that came without a new configuration -- a resolved migration entry
-     * changes the report and keeps the model -- but not while a release change is half published.
-     * The session sets the new report before the new configuration, so during a switch the report
-     * and the migration under review are the new release's while the model is still the old one's;
-     * reading the review against that model is refused by {@code MigrationReview}. The new
-     * configuration follows at once, and its own event refreshes the slots.
-     */
-    private void refreshOnReport() {
-        if (session.model().version().equals(session.release())) {
-            refresh();
-        }
+        session.reportProperty().addListener((observable, before, after) -> refresh());
     }
 
     /**

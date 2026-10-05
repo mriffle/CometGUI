@@ -108,6 +108,20 @@ public final class ParameterSession {
 
     private Map<String, FieldViewModel> byName = Map.of();
 
+    private List<FieldViewModel> fieldList = List.of();
+
+    /**
+     * The configuration, its report and the migration under review, as one value: what every getter
+     * answers from. It is replaced before any property of a change is published, so a listener of
+     * any property -- whichever fires first -- reads a model, a report, a release, a review and
+     * fields that belong together.
+     */
+    private State state;
+
+    /** One consistent configuration: the model, its report, and the migration under review. */
+    private record State(
+            CometParameters model, ValidationReport report, Optional<MigrationReview> review) {}
+
     /**
      * A session holding a new configuration of the first offered release.
      *
@@ -155,8 +169,10 @@ public final class ParameterSession {
         this.report = new NonNullProperty<>(this, "report", validate(start, Optional.empty()));
         this.fields = new NonNullProperty<>(this, "fields", List.of());
         this.pendingRefusals = new NonNullProperty<>(this, "pendingRefusals", List.of());
-        rebuildFields(start);
-        commit(start);
+        this.state = new State(start, report.get(), Optional.empty());
+        buildFields(start);
+        showFields(start, report.get());
+        fields.set(fieldList);
     }
 
     /**
@@ -192,7 +208,7 @@ public final class ParameterSession {
      * @return the model
      */
     public CometParameters model() {
-        return model.get();
+        return state.model();
     }
 
     /**
@@ -210,7 +226,7 @@ public final class ParameterSession {
      * @return the report
      */
     public ValidationReport report() {
-        return report.get();
+        return state.report();
     }
 
     /**
@@ -228,7 +244,7 @@ public final class ParameterSession {
      * @return the Comet version
      */
     public ToolVersion release() {
-        return release.get();
+        return state.model().version();
     }
 
     /**
@@ -247,7 +263,7 @@ public final class ParameterSession {
      * @return the review, or empty
      */
     public Optional<MigrationReview> review() {
-        return review.get();
+        return state.review();
     }
 
     /**
@@ -256,7 +272,7 @@ public final class ParameterSession {
      * @return the unresolved entries in report order; empty when nothing is under review
      */
     public List<MigrationEntry> unresolved() {
-        return review.get().map(r -> r.unresolved(model.get())).orElse(List.of());
+        return state.review().map(r -> r.unresolved(state.model())).orElse(List.of());
     }
 
     /**
@@ -275,7 +291,7 @@ public final class ParameterSession {
      * @return the fields, immutable
      */
     public List<FieldViewModel> fields() {
-        return fields.get();
+        return fieldList;
     }
 
     /**
@@ -309,7 +325,7 @@ public final class ParameterSession {
         FieldViewModel field = byName.get(Objects.requireNonNull(name, "name"));
         if (field == null) {
             throw new IllegalArgumentException(
-                    "Comet " + release.get().text() + " has no parameter named " + name);
+                    "Comet " + release().text() + " has no parameter named " + name);
         }
         return field;
     }
@@ -376,7 +392,7 @@ public final class ParameterSession {
         if (lock.isPresent()) {
             return refuseLocked(field, lock.get());
         }
-        CometParameters current = model.get();
+        CometParameters current = model();
         CometParameters candidate;
         try {
             candidate = current.withText(name, text, ValueOrigin.USER);
@@ -432,7 +448,7 @@ public final class ParameterSession {
             }
             touched.add(field);
         }
-        CometParameters current = model.get();
+        CometParameters current = model();
         CometParameters next = current;
         for (Map.Entry<String, ParameterValue> change : values.entrySet()) {
             if (!change.getValue().equals(current.value(change.getKey()))) {
@@ -456,8 +472,8 @@ public final class ParameterSession {
      */
     void setEnzymeTable(EnzymeTable table) {
         Objects.requireNonNull(table, "table");
-        if (!table.equals(model.get().enzymeTable())) {
-            commit(model.get().withEnzymeTable(table));
+        if (!table.equals(model().enzymeTable())) {
+            commit(model().withEnzymeTable(table));
         }
     }
 
@@ -471,7 +487,7 @@ public final class ParameterSession {
      */
     public EditOutcome removeUnknown(String name) {
         Objects.requireNonNull(name, "name");
-        CometParameters current = model.get();
+        CometParameters current = model();
         if (current.unknownParameters().stream().noneMatch(u -> u.name().equals(name))) {
             return EditOutcome.refused(
                     name
@@ -510,7 +526,7 @@ public final class ParameterSession {
             return refuseLocked(field, lock.get());
         }
         field.clearRefusal();
-        commit(model.get().resetToDefault(name));
+        commit(model().resetToDefault(name));
         return EditOutcome.applied();
     }
 
@@ -523,7 +539,7 @@ public final class ParameterSession {
      */
     public List<String> resetCategory(ParameterCategory category) {
         Objects.requireNonNull(category, "category");
-        CometParameters next = model.get();
+        CometParameters next = model();
         List<String> reset = new ArrayList<>();
         for (FieldViewModel field : fieldsOf(category)) {
             if (lockOf(field.name()).isEmpty()) {
@@ -541,7 +557,7 @@ public final class ParameterSession {
      * review, if any, is dropped with the configuration it was about.
      */
     public void resetAll() {
-        adopt(ReleaseDefaults.load(metadata, release.get()), Adoption.NEW);
+        adopt(ReleaseDefaults.load(metadata, release()), Adoption.NEW);
     }
 
     /**
@@ -569,17 +585,18 @@ public final class ParameterSession {
         Objects.requireNonNull(adopted, "adopted");
         Objects.requireNonNull(source, "source");
         ToolVersion version = adopted.version();
+        Optional<MigrationReview> kept = review();
         if (source.startsAfresh()) {
             requireOffered(version);
-            review.set(Optional.empty());
-        } else if (!version.equals(release.get())) {
+            kept = Optional.empty();
+        } else if (!version.equals(release())) {
             throw new IllegalArgumentException(
                     "a set of Comet "
                             + version.text()
                             + " cannot be applied to a configuration of Comet "
-                            + release.get().text());
+                            + release().text());
         }
-        replace(adopted.withWorkflowEnforcedOutputs());
+        replace(adopted.withWorkflowEnforcedOutputs(), kept);
     }
 
     /**
@@ -591,8 +608,9 @@ public final class ParameterSession {
     public void adoptMigration(MigrationResult migration) {
         Objects.requireNonNull(migration, "migration");
         requireOffered(migration.model().version());
-        review.set(Optional.of(MigrationReview.of(migration)));
-        replace(migration.model().withWorkflowEnforcedOutputs());
+        replace(
+                migration.model().withWorkflowEnforcedOutputs(),
+                Optional.of(MigrationReview.of(migration)));
     }
 
     /**
@@ -608,12 +626,12 @@ public final class ParameterSession {
      */
     public EditOutcome selectRelease(ToolVersion target) {
         requireOffered(target);
-        if (target.equals(release.get())) {
+        if (target.equals(release())) {
             return EditOutcome.applied();
         }
         List<MigrationEntry> open = unresolved();
         if (!open.isEmpty()) {
-            MigrationReview current = review.get().orElseThrow();
+            MigrationReview current = review().orElseThrow();
             return EditOutcome.refused(
                     "Resolve the migration from Comet "
                             + current.report().from().text()
@@ -624,7 +642,7 @@ public final class ParameterSession {
                             + " still need your decision: "
                             + open.stream().map(MigrationEntry::parameter).toList());
         }
-        adoptMigration(SchemaMigration.migrate(model.get(), target));
+        adoptMigration(SchemaMigration.migrate(model(), target));
         return EditOutcome.applied();
     }
 
@@ -639,14 +657,12 @@ public final class ParameterSession {
      */
     public void resolve(String name) {
         MigrationReview current =
-                review.get()
-                        .orElseThrow(
+                review().orElseThrow(
                                 () ->
                                         new IllegalStateException(
                                                 "no migration is under review, so there is nothing"
                                                         + " to resolve"));
-        review.set(Optional.of(current.resolve(name)));
-        commit(model.get());
+        publish(model(), Optional.of(current.resolve(name)), false);
     }
 
     /**
@@ -655,7 +671,7 @@ public final class ParameterSession {
      * @return the source, or empty for a value Comet does not document
      */
     public Optional<DecoySource> decoySource() {
-        return model.get().decoySource();
+        return model().decoySource();
     }
 
     /**
@@ -689,8 +705,8 @@ public final class ParameterSession {
     public EditOutcome setDecoySource(DecoySource source) {
         Objects.requireNonNull(source, "source");
         field(DecoySource.PARAMETER).clearRefusal();
-        if (!model.get().decoySource().equals(Optional.of(source))) {
-            commit(model.get().withDecoySource(source, ValueOrigin.USER));
+        if (!model().decoySource().equals(Optional.of(source))) {
+            commit(model().withDecoySource(source, ValueOrigin.USER));
         }
         return EditOutcome.applied();
     }
@@ -708,10 +724,10 @@ public final class ParameterSession {
      */
     public void setStageSwitches(StageSwitches switches) {
         this.stages = Objects.requireNonNull(switches, "switches");
-        CometParameters current = model.get();
+        CometParameters current = model();
         CometParameters enforced = current.withWorkflowEnforcedOutputs();
         CometParameters next = current;
-        for (FieldViewModel field : fields.get()) {
+        for (FieldViewModel field : fieldList) {
             String name = field.name();
             if (lockOf(name).isPresent()) {
                 next = next.withValue(name, enforced.value(name), enforced.origin(name));
@@ -757,31 +773,71 @@ public final class ParameterSession {
 
     private List<ParameterDefinition> definitions() {
         List<ParameterDefinition> definitions = new ArrayList<>();
-        for (FieldViewModel field : fields.get()) {
+        for (FieldViewModel field : fieldList) {
             definitions.add(field.definition());
         }
         return definitions;
     }
 
     private List<FieldViewModel> fieldsOf(ParameterCategory category) {
-        return fields.get().stream().filter(f -> f.category() == category).toList();
+        return fieldList.stream().filter(f -> f.category() == category).toList();
     }
 
-    /** Replaces the whole configuration: new fields if the release changed, no refusal pending. */
-    private void replace(CometParameters next) {
-        boolean newRelease = !next.version().equals(release.get());
-        release.set(next.version());
+    /**
+     * Replaces the whole configuration and the migration under review: new fields if the release
+     * changed, no refusal pending.
+     */
+    private void replace(CometParameters next, Optional<MigrationReview> nextReview) {
+        publish(next, nextReview, true);
+    }
+
+    /** Makes a configuration of the same release current, the migration under review kept. */
+    private void commit(CometParameters next) {
+        publish(next, review(), false);
+    }
+
+    /**
+     * Makes a configuration current, in an order no listener can observe half done.
+     *
+     * <p>First everything a getter answers from is replaced at once -- the fields of a new release,
+     * and the one {@link State} holding model, report and review. Only then is anything published:
+     * pending refusals cleared, every field shown, and the properties set. A listener of any of
+     * them, in any order, therefore reads a model, its report, its release, its review and its
+     * fields together; before, the report was published while the model was still the previous
+     * release's, and a report listener that read the review against the model was refused.
+     *
+     * @param next the configuration
+     * @param nextReview the migration under review with it
+     * @param clearRefusals whether every pending refusal is dropped (a whole set adopted)
+     */
+    private void publish(
+            CometParameters next, Optional<MigrationReview> nextReview, boolean clearRefusals) {
+        ValidationReport nextReport = validate(next, nextReview);
+        boolean newRelease = !next.version().equals(release());
+        List<FieldViewModel> previous = fieldList;
         if (newRelease) {
-            rebuildFields(next);
-        } else {
-            for (FieldViewModel field : fields.get()) {
+            buildFields(next);
+        }
+        state = new State(next, nextReport, nextReview);
+
+        if (clearRefusals && !newRelease) {
+            for (FieldViewModel field : previous) {
                 field.clearRefusal();
             }
         }
-        commit(next);
+        showFields(next, nextReport);
+        if (newRelease) {
+            fields.set(fieldList);
+            collectRefusals();
+        }
+        release.set(next.version());
+        review.set(nextReview);
+        report.set(nextReport);
+        model.set(next);
     }
 
-    private void rebuildFields(CometParameters next) {
+    /** Makes the fields of a release, listening to their refusals; publishes nothing. */
+    private void buildFields(CometParameters next) {
         ToolVersion version = next.version();
         Map<String, FieldViewModel> built = new LinkedHashMap<>();
         for (ParameterEntry entry : next.entries()) {
@@ -790,29 +846,21 @@ public final class ParameterSession {
             built.put(entry.name(), new FieldViewModel(this, definition, version));
         }
         byName = built;
-        fields.set(List.copyOf(built.values()));
-        for (FieldViewModel field : built.values()) {
+        fieldList = List.copyOf(built.values());
+        for (FieldViewModel field : fieldList) {
             field.refusalProperty().addListener((observable, before, after) -> collectRefusals());
         }
-        collectRefusals();
+    }
+
+    private void showFields(CometParameters next, ValidationReport nextReport) {
+        for (FieldViewModel field : fieldList) {
+            field.show(next, nextReport, lockOf(field.name()));
+        }
     }
 
     private void collectRefusals() {
         pendingRefusals.set(
-                fields.get().stream().filter(field -> field.refusal().isPresent()).toList());
-    }
-
-    /**
-     * Makes a configuration current: its report, then every field, then the model property, so a
-     * listener on the model sees fields that already show it.
-     */
-    private void commit(CometParameters next) {
-        ValidationReport nextReport = validate(next, review.get());
-        for (FieldViewModel field : fields.get()) {
-            field.show(next, nextReport, lockOf(field.name()));
-        }
-        report.set(nextReport);
-        model.set(next);
+                fieldList.stream().filter(field -> field.refusal().isPresent()).toList());
     }
 
     private static ValidationReport validate(

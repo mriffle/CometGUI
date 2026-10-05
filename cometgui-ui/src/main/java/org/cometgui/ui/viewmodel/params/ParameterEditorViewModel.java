@@ -25,7 +25,6 @@ import javafx.beans.property.ReadOnlyObjectProperty;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.tools.ToolVersion;
-import org.cometgui.params.comet.migration.MigrationReview;
 import org.cometgui.params.comet.writer.WrittenParams;
 import org.cometgui.ui.viewmodel.NonNullProperty;
 
@@ -340,17 +339,11 @@ public final class ParameterEditorViewModel {
                 + ").";
     }
 
-    /**
-     * The release in words, with the migration under review when it is of the configuration held.
-     * The session publishes a new review before the configuration it is about, so a review of
-     * another release than the configuration's is one whose configuration has not arrived yet; the
-     * configuration's own event brings the words up to date.
-     */
+    /** The release in words, with the migration under review, if any. */
     private String releaseWords() {
         List<String> words = new ArrayList<>();
         words.add("Comet " + session.release().text() + " is selected.");
-        Optional<MigrationReview> review = session.review();
-        if (review.isPresent() && review.get().report().to().equals(session.model().version())) {
+        if (migrationReview.underReview()) {
             words.add("Migrated: " + migrationReview.headline() + ".");
         }
         return String.join(" ", words);
