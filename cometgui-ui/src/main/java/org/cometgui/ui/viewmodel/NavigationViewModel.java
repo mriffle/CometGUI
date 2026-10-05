@@ -43,7 +43,7 @@ import javafx.collections.ObservableList;
  *
  * <p>Two reasons, and neither is taste. The first is that this is what every list control the user
  * has ever used does -- a {@code ListView}, a menu, a browser's tab strip -- and a navigation list
- * that silently jumped from Settings back to Run would make "press Down until you reach it" an
+ * that silently jumped from Tool Manager back to Run would make "press Down until you reach it" an
  * unreliable way to find a section, which is exactly the interaction a keyboard-only user relies
  * on. The second is that a screen reader announces the boundary: reaching the end of the list is
  * information, and wrapping destroys it. Reachability does not need wrapping, because both
@@ -78,7 +78,7 @@ public final class NavigationViewModel {
     }
 
     /**
-     * The sections in display order: the eight primary sections, then the two secondary ones.
+     * The sections in display order: the eight primary sections, then the secondary one.
      *
      * <p>Observable, because a view binds a list control to it, and unmodifiable, because the set
      * of sections is fixed by {@link SectionId} -- a caller that could add one would create a
@@ -86,7 +86,7 @@ public final class NavigationViewModel {
      * that no caller ever holds a reference to the backing list; it observes the backing list
      * weakly, so holding one is cheap and dropping one leaks nothing.
      *
-     * @return an unmodifiable observable list of all ten sections; attempting to change it throws
+     * @return an unmodifiable observable list of all nine sections; attempting to change it throws
      *     {@link UnsupportedOperationException}
      */
     public ObservableList<SectionId> sections() {

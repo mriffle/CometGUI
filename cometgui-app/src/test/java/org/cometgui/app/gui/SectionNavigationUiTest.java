@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -62,7 +63,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 class SectionNavigationUiTest {
 
-    /** The ten section identifiers, written out so that the walk below cannot be vacuous. */
+    /** The nine section identifiers, written out so that the walk below cannot be vacuous. */
     private static final List<String> EXPECTED_SECTION_IDS =
             List.of(
                     "run",
@@ -73,8 +74,7 @@ class SectionNavigationUiTest {
                     "limelight",
                     "provenance",
                     "console",
-                    "tool-manager",
-                    "settings");
+                    "tool-manager");
 
     private static RunningApplication application;
 
@@ -121,13 +121,39 @@ class SectionNavigationUiTest {
     }
 
     @Test
-    @DisplayName("the ten sections the walk visits are the ten the information architecture names")
+    @DisplayName(
+            "the nine sections the walk visits are the nine the information architecture names")
     void theSectionsAreTheOnesTheArchitectureNames() {
         assertEquals(
                 EXPECTED_SECTION_IDS,
                 SectionId.displayOrder().stream().map(SectionId::id).toList(),
                 "the walk below iterates SectionId.displayOrder(); if that list changed, the"
                         + " coverage of this test changed with it");
+    }
+
+    /**
+     * The running application has no Settings navigation entry and no Settings pane.
+     *
+     * <p>Phase 07 removed the section (tier-1 decision, {@code STATUS.rst}, <em>The Settings
+     * section</em>) because nothing the specification requires is configurable at application
+     * level. The identifiers it used to carry are typed by hand, so this asserts the absence in the
+     * real scene rather than in a list the test computed.
+     */
+    @Test
+    @DisplayName("the running application has no Settings entry and no Settings pane")
+    void theApplicationHasNoSettingsSection() {
+        FxUiDriver driver = new TestFxUiDriver(application);
+        for (String removed : List.of("nav-settings", "section-settings")) {
+            AssertionError thrown = assertThrows(AssertionError.class, () -> driver.node(removed));
+            assertTrue(
+                    thrown.getMessage()
+                            .startsWith("no node with the stable identifier #" + removed + " "),
+                    () ->
+                            "the lookup failure does not name "
+                                    + removed
+                                    + ": "
+                                    + thrown.getMessage());
+        }
     }
 
     @ParameterizedTest(name = "{0}")

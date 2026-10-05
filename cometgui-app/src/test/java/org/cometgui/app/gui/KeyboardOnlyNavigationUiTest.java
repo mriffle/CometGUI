@@ -56,7 +56,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  *
  * <p>It is a roving tab stop. {@code #navigation} is not focus traversable and exactly one
  * navigation entry -- the selected one -- is, so Tab moves into and out of the navigation in one
- * press rather than ten, and the arrow keys move within it. Up and Left go back, Down and Right go
+ * press rather than nine, and the arrow keys move within it. Up and Left go back, Down and Right go
  * forward, an event filter on the container makes the arrows win over JavaFX's own directional
  * traversal, and the ends do not wrap. Each of those is a value this test reads back: the
  * identifier of the focus owner, which entries are traversable, and which pane is showing.

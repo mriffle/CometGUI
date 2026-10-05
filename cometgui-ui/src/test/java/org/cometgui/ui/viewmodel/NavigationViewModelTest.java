@@ -71,8 +71,8 @@ class NavigationViewModelTest {
         void selectMovesTheSelection() {
             navigation.select(SectionId.PROVENANCE);
             assertEquals(SectionId.PROVENANCE, navigation.selectedSection());
-            navigation.select(SectionId.SETTINGS);
-            assertEquals(SectionId.SETTINGS, navigation.selectedSection());
+            navigation.select(SectionId.TOOL_MANAGER);
+            assertEquals(SectionId.TOOL_MANAGER, navigation.selectedSection());
         }
 
         @Test
@@ -110,9 +110,9 @@ class NavigationViewModelTest {
         @Test
         @DisplayName("selectPrevious steps one section earlier and reports that it moved")
         void selectPreviousStepsBackward() {
-            navigation.select(SectionId.SETTINGS);
+            navigation.select(SectionId.TOOL_MANAGER);
             assertTrue(navigation.selectPrevious());
-            assertEquals(SectionId.TOOL_MANAGER, navigation.selectedSection());
+            assertEquals(SectionId.CONSOLE, navigation.selectedSection());
         }
 
         /**
@@ -152,9 +152,9 @@ class NavigationViewModelTest {
         }
 
         @Test
-        @DisplayName("reaches every section backwards from Settings using selectPrevious alone")
+        @DisplayName("reaches every section backwards from Tool Manager using selectPrevious alone")
         void reachesEverySectionBackwards() {
-            navigation.select(SectionId.SETTINGS);
+            navigation.select(SectionId.TOOL_MANAGER);
             List<SectionId> expected = new ArrayList<>(SectionId.displayOrder());
             java.util.Collections.reverse(expected);
             assertEquals(expected, walk(navigation::selectPrevious));
@@ -163,9 +163,9 @@ class NavigationViewModelTest {
         @Test
         @DisplayName("does not wrap past the last section: it reports false and stays there")
         void selectNextDoesNotWrapAtTheEnd() {
-            navigation.select(SectionId.SETTINGS);
+            navigation.select(SectionId.TOOL_MANAGER);
             assertFalse(navigation.selectNext(), "the ends must not wrap");
-            assertEquals(SectionId.SETTINGS, navigation.selectedSection());
+            assertEquals(SectionId.TOOL_MANAGER, navigation.selectedSection());
         }
 
         @Test

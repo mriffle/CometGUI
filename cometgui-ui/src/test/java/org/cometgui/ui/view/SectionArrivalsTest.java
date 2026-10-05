@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.EnumSet;
 import java.util.Map;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.junit.jupiter.api.DisplayName;
@@ -57,9 +58,9 @@ class SectionArrivalsTest {
             assertFalse(note.isBlank(), "the arrival note for " + section.id() + " is blank");
         }
         assertEquals(
-                10,
+                9,
                 SectionId.displayOrder().size(),
-                "ten sections, so ten notes; a new one needs a note here");
+                "nine sections, so nine notes; a new one needs a note here");
     }
 
     @Test
@@ -79,18 +80,24 @@ class SectionArrivalsTest {
         }
     }
 
+    /**
+     * Every section in navigation has a phase that owns it.
+     *
+     * <p>Phase 02 shipped a Settings section whose note said no phase claimed it; Phase 07 removed
+     * that section from navigation rather than keep a pane that could never be filled (the tier-1
+     * decision in {@code STATUS.rst}, <em>The Settings section</em>). This pins the consequence: a
+     * section can only be in navigation if this table names the phase that fills it, so an unowned
+     * section -- Settings re-added as it was, or any other -- fails here.
+     */
     @Test
-    @DisplayName("Settings says plainly that no phase claims it, rather than naming a guess")
-    void settingsSaysNoPhaseClaimsIt() {
-        String note = SectionArrivals.noteFor(SectionId.SETTINGS);
-        assertEquals(
-                "No phase in phases/index.rst claims this section. It arrives with the first phase"
-                        + " that needs a preference to persist between runs; until then it is empty"
-                        + " on purpose rather than by omission.",
-                note);
-        assertTrue(
-                OWNING_PHASE.keySet().size() + 1 == SectionId.displayOrder().size(),
-                "Settings is the only section with no owning phase");
+    @DisplayName("every section in navigation has an owning phase; none is unclaimed")
+    void everySectionHasAnOwningPhase() {
+        assertEquals(EnumSet.allOf(SectionId.class), EnumSet.copyOf(OWNING_PHASE.keySet()));
+        for (SectionId section : SectionId.displayOrder()) {
+            assertFalse(
+                    SectionArrivals.noteFor(section).contains("claims this section"),
+                    () -> "the note for " + section.id() + " says no phase claims it");
+        }
     }
 
     @Test

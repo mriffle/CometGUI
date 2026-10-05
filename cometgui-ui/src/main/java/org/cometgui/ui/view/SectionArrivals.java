@@ -100,11 +100,6 @@ final class SectionArrivals {
                         + " upstream does not publish for this platform and the ones this host"
                         + " cannot run, because a build that is absent is a fact a user needs"
                         + " rather than a row to hide.");
-        notes.put(
-                SectionId.SETTINGS,
-                "No phase in phases/index.rst claims this section. It arrives with the first phase"
-                        + " that needs a preference to persist between runs; until then it is"
-                        + " empty on purpose rather than by omission.");
         return Map.copyOf(notes);
     }
 }

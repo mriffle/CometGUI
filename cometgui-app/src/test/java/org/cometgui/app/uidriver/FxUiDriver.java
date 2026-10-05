@@ -81,7 +81,7 @@ public interface FxUiDriver {
      *
      * <p>Not merely {@code Node.isVisible()}, which is a local flag: this answers the question a
      * test actually asks, which is whether the thing is on screen. A node inside an invisible
-     * ancestor is not showing however visible it says it is, and the shell hides nine of its ten
+     * ancestor is not showing however visible it says it is, and the shell hides eight of its nine
      * section panes exactly that way.
      *
      * @param id the stable identifier

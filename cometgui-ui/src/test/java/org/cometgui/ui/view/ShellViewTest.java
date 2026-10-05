@@ -58,7 +58,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The shell: its navigation, its ten section panes, the pane the content area shows, and the
+ * The shell: its navigation, its nine section panes, the pane the content area shows, and the
  * keyboard reachability the phase's first exit-gate item requires.
  *
  * <p>These are construction-level tests, built headless the way {@code HeadlessSceneTest} proved
@@ -132,9 +132,9 @@ class ShellViewTest {
                                     ((ToggleButton) entry).getAccessibleText()));
         }
         assertEquals(
-                10,
+                9,
                 SectionId.displayOrder().size(),
-                "the information architecture has eight primary and two secondary sections");
+                "eight primary sections and one secondary (Settings was removed in Phase 07)");
     }
 
     @Test
@@ -153,11 +153,11 @@ class ShellViewTest {
     }
 
     @Test
-    @DisplayName("the navigation lists the eight primary sections, a rule, then the two secondary")
+    @DisplayName("the navigation lists the eight primary sections, a rule, then the Tool Manager")
     void theNavigationSeparatesTheSecondarySections() {
         Parent bar = (Parent) scene.lookup("#" + UiIds.NAVIGATION);
         List<Node> children = List.copyOf(bar.getChildrenUnmodifiable());
-        assertEquals(11, children.size(), "eight primary entries, a separator, two secondary");
+        assertEquals(10, children.size(), "eight primary entries, a separator, one secondary");
         for (int i = 0; i < 8; i++) {
             assertEquals(
                     UiIds.navigationEntry(SectionId.primarySections().get(i)),
@@ -166,8 +166,7 @@ class ShellViewTest {
         }
         assertInstanceOf(Separator.class, children.get(8));
         assertEquals(UiIds.NAVIGATION_SEPARATOR, children.get(8).getId());
-        assertEquals(UiIds.navigationEntry(SectionId.TOOL_MANAGER), children.get(9).getId());
-        assertEquals(UiIds.navigationEntry(SectionId.SETTINGS), children.get(10).getId());
+        assertEquals("nav-tool-manager", children.get(9).getId());
     }
 
     @Test
@@ -208,7 +207,7 @@ class ShellViewTest {
     }
 
     @Test
-    @DisplayName("arrow keys walk the selection through all ten sections and stop at the ends")
+    @DisplayName("arrow keys walk the selection through all nine sections and stop at the ends")
     void arrowKeysWalkThroughEverySectionIncludingTheSecondaryOnes() throws InterruptedException {
         List<SectionId> order = SectionId.displayOrder();
         List<SectionId> walked = new ArrayList<>();
@@ -218,17 +217,17 @@ class ShellViewTest {
             walked.add(navigation.selectedSection());
         }
         assertEquals(order, walked, "Down must reach every section in display order");
-        assertShowsOnly(SectionId.SETTINGS);
+        assertShowsOnly(SectionId.TOOL_MANAGER);
 
         press(KeyCode.DOWN);
         assertEquals(
-                SectionId.SETTINGS,
+                SectionId.TOOL_MANAGER,
                 navigation.selectedSection(),
                 "the selection does not wrap past the last section");
 
         press(KeyCode.UP);
-        assertEquals(SectionId.TOOL_MANAGER, navigation.selectedSection());
-        assertShowsOnly(SectionId.TOOL_MANAGER);
+        assertEquals(SectionId.CONSOLE, navigation.selectedSection());
+        assertShowsOnly(SectionId.CONSOLE);
 
         for (int i = 0; i < order.size(); i++) {
             press(KeyCode.UP);
@@ -324,7 +323,7 @@ class ShellViewTest {
                                 SectionArrivals.noteFor(SectionId.TOOL_MANAGER),
                                 note.getText(),
                                 "filling a section does not delete the arrival-note mechanism the"
-                                        + " other nine sections still use"),
+                                        + " other eight sections still use"),
                 () ->
                         assertTrue(
                                 note.getText().contains("phase 05"),

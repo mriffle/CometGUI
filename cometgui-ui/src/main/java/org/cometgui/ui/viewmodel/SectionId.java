@@ -31,12 +31,24 @@ import java.util.Objects;
  * sections</strong> -- {@link #RUN}, {@link #COMET_PARAMETERS}, {@link #PERCOLATOR}, {@link
  * #RESULTS}, {@link #VISUALISATION}, {@link #LIMELIGHT}, {@link #PROVENANCE} and {@link #CONSOLE}
  * -- and then says that "Tool Manager and application Settings may be secondary navigation or
- * dialogs". Both kinds are constants of this enum, told apart by {@link #isPrimary()}.
+ * dialogs". Both kinds are constants of this enum, told apart by {@link #isPrimary()}. There is one
+ * secondary section, {@link #TOOL_MANAGER}.
  *
- * <p>Modelling the two secondary sections here rather than leaving them to whichever view happens
- * to open them is deliberate. Whether they end up in the left navigation or behind a dialog, each
- * one still needs an accessible name and a stable test identifier, and the shell has to be able to
- * reach them; a section that exists only as a hand-written string in one FXML file has neither.
+ * <h2>Why there is no Settings section</h2>
+ *
+ * <p>Phase 02 modelled application Settings as a second secondary section with an empty pane that
+ * said it was empty. Phase 07 removed it. The specification's one sentence about it is permissive
+ * ("may"), it names no content, and no phase has produced an application-level, run-independent
+ * preference that cites an {@code R-} rule or {@code AC-} criterion requiring it to be
+ * configurable. A navigation entry that leads to a permanently empty pane is a control that
+ * pretends, and filling it with invented preferences would add unspecified scope; the tier-1
+ * decision in {@code STATUS.rst} (<em>The Settings section</em>) chose removal. A later phase that
+ * earns such a preference brings the section back, with its content, as a specified change.
+ *
+ * <p>Modelling the secondary section here rather than leaving it to whichever view happens to open
+ * it is deliberate. Whether a secondary section ends up in the left navigation or behind a dialog,
+ * it still needs an accessible name and a stable test identifier, and the shell has to be able to
+ * reach it; a section that exists only as a hand-written string in one FXML file has neither.
  * {@link #isPrimary()} is what a view uses to decide where a section is drawn, so the distinction
  * stays a presentation decision and never becomes a difference in identity.
  *
@@ -135,20 +147,6 @@ public enum SectionId {
             "Tool Manager",
             "Managed, registered and custom tool installations, the versions available and runnable"
                     + " on this platform, and their verification state.",
-            false),
-
-    /**
-     * Secondary: application settings.
-     *
-     * <p>The specification names this section and says it may be secondary navigation or a dialog,
-     * but does not enumerate its contents; the phase that gives it content owns the wording. What
-     * is fixed here is only that it has an identity, a name and a description, because the shell
-     * must be able to reach it and a test must be able to find it.
-     */
-    SETTINGS(
-            "settings",
-            "Settings",
-            "Application-wide preferences and defaults that persist between runs.",
             false);
 
     /*
@@ -161,15 +159,13 @@ public enum SectionId {
      * nothing at run time.  Fixed in the code rather than by adding a SpotBugs exclusion.
      */
 
-    /**
-     * Every section in display order: the eight primary ones first, then the two secondary ones.
-     */
+    /** Every section in display order: the eight primary ones first, then the secondary one. */
     private static final List<SectionId> DISPLAY_ORDER = displayOrderOf(values());
 
     /** The eight primary sections, in display order. */
     private static final List<SectionId> PRIMARY = filter(DISPLAY_ORDER, true);
 
-    /** The two secondary sections, in display order. */
+    /** The secondary sections, in display order: today only the Tool Manager. */
     private static final List<SectionId> SECONDARY = filter(DISPLAY_ORDER, false);
 
     /** Every section by {@link #id()}, for {@link #fromId(String)}. */
@@ -197,7 +193,7 @@ public enum SectionId {
      * <p>Built by partitioning rather than by trusting declaration order, so that moving a constant
      * cannot silently interleave a secondary section into the primary navigation.
      *
-     * @return an immutable list of all ten sections
+     * @return an immutable list of all nine sections
      */
     public static List<SectionId> displayOrder() {
         return List.copyOf(DISPLAY_ORDER);
@@ -215,8 +211,9 @@ public enum SectionId {
     /**
      * The secondary sections, in display order.
      *
-     * @return an immutable list of the two sections the specification allows to be secondary
-     *     navigation or dialogs
+     * @return an immutable list of the sections drawn as secondary navigation -- today only the
+     *     Tool Manager, one of the two the specification allows to be secondary navigation or
+     *     dialogs (the other, application Settings, was removed in Phase 07)
      */
     public static List<SectionId> secondarySections() {
         return List.copyOf(SECONDARY);

@@ -292,9 +292,11 @@ Five classes and one package-private helper:
 
 * ``SectionId`` -- the specification's Information Architecture as a type: the
   eight primary sections (Run, Comet Parameters, Percolator, Results,
-  Visualisation, Limelight, Provenance, Console) and the two the specification
-  allows to be secondary (Tool Manager, Settings), told apart by
-  ``isPrimary()``.
+  Visualisation, Limelight, Provenance, Console) and one secondary section
+  (Tool Manager), told apart by ``isPrimary()``. The specification allows two
+  secondary sections, Tool Manager and application Settings; Settings was
+  built empty by Phase 02 and **removed from navigation in Phase 07** -- see
+  `The Settings section was removed`_ below.
 * ``NavigationViewModel`` -- the section list and which one is selected, plus
   ``selectNext()`` / ``selectPrevious()``.
 * ``ConsoleViewModel`` -- a stage filter and a minimum-severity filter over the
@@ -771,7 +773,7 @@ The left navigation is a **roving tab stop**, and this trips people up.
   one. ``ShellView.showSelection()`` sets ``setFocusTraversable(isSelected)`` on
   every entry.
 * Tab therefore moves *into* and *out of* the navigation in one press each
-  rather than ten; arrow keys move within it. Up and Left go back, Down and
+  rather than nine; arrow keys move within it. Up and Left go back, Down and
   Right go forward.
 * The arrow handler is an event **filter** on the container, so it runs before
   the focused button's own behaviour and cannot be beaten to the key by JavaFX's
@@ -787,12 +789,12 @@ Mnemonics are deliberately not the mechanism. They are a shortcut for a user who
 already knows the interface, not a way to reach a control, and a gate item
 resting on them would be proved by a test that never moved focus.
 
-All ten section panes are built and attached from the moment the shell exists;
+All nine section panes are built and attached from the moment the shell exists;
 the selection decides which one is *visible and managed*, not which one exists.
 That is what lets a test look a section up by identifier without navigating to
 it, and what lets the accessible-name enumeration see every control in the shell
 in one pass rather than only the selected section's. Unmanaged children are
-excluded from layout, so the nine hidden panes cost a construction and nothing
+excluded from layout, so the eight hidden panes cost a construction and nothing
 per frame.
 
 The derived-file regime (``D-001``, ``R-SEC-01``)
@@ -1126,7 +1128,7 @@ Stated plainly, so a later phase does not assume it exists.
        baseline check ask. ``ApplicationServices.forThisHost()`` does no I/O and
        creates no directory.
 
-   * - Any content in the ten section panes
+   * - Any content in the nine section panes
      - 03, 05, 07--13
      - ``SectionArrivals`` names the phase per section, read from
        ``phases/index.rst``.
@@ -1144,10 +1146,11 @@ Stated plainly, so a later phase does not assume it exists.
 Two loose ends this phase surfaced and did **not** decide, recorded here so they
 are not rediscovered:
 
-**The Settings section has no owning phase.** Neither ``phases/index.rst`` nor
-``specification.rst`` claims it. ``SectionId.SETTINGS`` exists, is reachable and
-carries an accessible name and a stable identifier, and its pane says so in
-text. It was escalated rather than guessed at.
+**The Settings section had no owning phase.** Neither ``phases/index.rst`` nor
+``specification.rst`` claimed it. Phase 02 built ``SectionId.SETTINGS`` as a
+reachable, named pane that said in text it was empty, and escalated the question
+rather than guessing at content. It has since been answered by removal; see
+`The Settings section was removed`_.
 
 **Phase 01's two ``JavaFxAvailability`` scaffolding classes are gone.** They
 existed to prove that ``cometgui-ui`` and ``cometgui-app`` compile against the
@@ -1159,3 +1162,34 @@ run rather than merely compile. Deleting the scaffolding meant editing
 name; it now names those two real classes instead, which makes the census a
 stronger statement than it was -- an import that reaches the product's shell and
 its ``Application`` subclass cannot be an import of stubs.
+
+The Settings section was removed
+--------------------------------
+
+**Phase 07 removed the Settings section from navigation.** The shell has nine
+sections: the eight primary ones and the Tool Manager.
+
+Why removal rather than content: the specification's only sentence about it is
+permissive -- "Tool Manager and application Settings *may* be secondary
+navigation or dialogs" -- and names no content, and nothing the specification
+requires is configurable at application level. No phase up to and including
+Phase 07 produced an application-level, run-independent preference that cites
+an ``R-`` rule or ``AC-`` criterion. A navigation entry leading to a pane that
+can never be filled is a control that pretends, and filling it with invented
+preferences would be unspecified scope. The decision is tier 1's, recorded in
+``STATUS.rst`` under *The Settings section: owner assigned, content deliberately
+empty*.
+
+What went with it: the ``SectionId.SETTINGS`` constant, its arrival note in
+``SectionArrivals``, and its five stable identifiers (``section-settings``,
+``section-settings-heading``, ``section-settings-description``,
+``section-settings-note``, ``nav-settings``), which ``StableIdentifierPinTest``
+no longer pins. What pins the removal: ``SectionIdTest`` asserts no section has
+the identifier ``settings`` or the title ``Settings``;
+``SectionArrivalsTest`` asserts every section in navigation has an owning
+phase; and ``SectionNavigationUiTest`` asserts the running application has no
+``#nav-settings`` and no ``#section-settings``.
+
+If a later phase does earn an application preference that a rule or criterion
+requires to be configurable, the section comes back with that content, as a
+specified change, and those tests change with it deliberately.

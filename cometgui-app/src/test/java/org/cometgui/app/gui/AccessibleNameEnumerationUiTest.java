@@ -48,9 +48,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The enumeration walks the whole scene graph of the launched application and collects every
  * {@link Control}. It is not a list of identifiers to check: a list would pass on the day someone
- * adds a control and forgets to add it to the list, which is the only day the gate matters. All ten
- * section panes are children of the content area at all times, so one walk sees the whole interface
- * rather than only the selected section.
+ * adds a control and forgets to add it to the list, which is the only day the gate matters. All
+ * nine section panes are children of the content area at all times, so one walk sees the whole
+ * interface rather than only the selected section.
  *
  * <h2>After applyCss() and layout(), because half the controls do not exist before that</h2>
  *
@@ -65,31 +65,40 @@ import org.junit.jupiter.api.Test;
  *
  * <p>A walk that found three controls and named all three would pass while proving nothing. So the
  * test asserts a floor on how many controls were seen, and separately that a specific handful --
- * the ten navigation entries, the console's text area, its filters -- were among them. The floor is
- * a floor and not an exact number on purpose: adding a control to the interface must not break this
- * test, only failing to name one must.
+ * the nine navigation entries, the console's text area, its filters -- were among them. The floor
+ * is a floor and not an exact number on purpose: adding a control to the interface must not break
+ * this test, only failing to name one must.
  */
 class AccessibleNameEnumerationUiTest {
 
     /**
-     * The fewest controls a shell with ten section panes, ten navigation entries, a stage stepper
+     * The fewest controls a shell with nine section panes, nine navigation entries, a stage stepper
      * and a console can possibly contain.
      *
      * <p>Derived rather than guessed, and deliberately an underestimate:
      *
      * <ul>
-     *   <li>navigation: 10 entries + 1 separator = 11
+     *   <li>navigation: 9 entries + 1 separator = 10
      *   <li>header: the application title, the selected-section echo and the baseline banner = 3
-     *   <li>section panes: 10 x (heading, description, arrival note) = 30
+     *   <li>section panes: 9 x (heading, description, arrival note) = 27
      *   <li>console: title, output, summary, clear, copy, "all stages" and 4 severity filters = 10
      *   <li>stage stepper: 5 core stages x (name, state) + the run-state line = 11
+     *   <li>stage stepper arrows, each a named {@code Label}: 4 on the core path + 3 on the
+     *       branches = 7
      * </ul>
      *
-     * <p>65 in total, before the stepper's arrows and branch rows, the console's per-stage filters
-     * and everything the skins build. This build's walk finds 91; the floor is what must hold, and
-     * the failure message prints the number actually seen.
+     * <p>68 in total, before the stepper's branch rows, the console's per-stage filters, the Tool
+     * Manager's content and everything the skins build. The failure message prints the number
+     * actually seen.
+     *
+     * <p><strong>History of this floor.</strong> Phase 02 set it at 65 for ten sections and a
+     * derivation that left the arrows out (its walk found 91). Phase 07 unit 2 removed the Settings
+     * section from navigation (tier-1 decision, {@code STATUS.rst}, <em>The Settings section</em>),
+     * which takes one navigation entry and three pane labels out of the derivation (65 - 4 = 61).
+     * Rather than lower the floor to 61, the arrows -- which were always there and always counted
+     * by the walk -- were added to the derivation, and the floor was raised to 68.
      */
-    private static final int MINIMUM_CONTROLS = 65;
+    private static final int MINIMUM_CONTROLS = 68;
 
     private static RunningApplication application;
 

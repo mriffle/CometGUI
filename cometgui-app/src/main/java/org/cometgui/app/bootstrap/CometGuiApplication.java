@@ -69,9 +69,9 @@ import org.cometgui.ui.viewmodel.ToolManagerViewModel;
  * org.cometgui.domain.platform.HostBaselineOutcome#GLIBC_TOO_OLD} are blocking: no managed tool can
  * run on such a host. <strong>This phase reports them and starts anyway.</strong> There is no
  * {@code Platform.exit()} and no {@code System.exit()} on this path, deliberately: a user whose
- * machine is unsupported should be able to read the diagnostic, look at the tool manager and the
- * settings, and copy the message -- not watch a window vanish. The phase that owns running a
- * workflow owns refusing to start one, which is where a blocking outcome has to bite.
+ * machine is unsupported should be able to read the diagnostic, look at the tool manager, and copy
+ * the message -- not watch a window vanish. The phase that owns running a workflow owns refusing to
+ * start one, which is where a blocking outcome has to bite.
  *
  * <p>Blocking and warning are distinguishable in <em>text</em>, not by colour alone: {@link
  * HostBaselineViewModel#bannerText()} begins with {@code "Cannot continue: "} for a blocking

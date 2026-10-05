@@ -43,7 +43,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 class SectionIdTest {
 
-    /** The ten identifiers, primary first, exactly as the shell and the tests use them. */
+    /** The nine identifiers, primary first, exactly as the shell and the tests use them. */
     private static final List<String> EXPECTED_IDS =
             List.of(
                     "run",
@@ -54,8 +54,7 @@ class SectionIdTest {
                     "limelight",
                     "provenance",
                     "console",
-                    "tool-manager",
-                    "settings");
+                    "tool-manager");
 
     private static List<String> idsOf(List<SectionId> sections) {
         List<String> ids = new ArrayList<>();
@@ -86,15 +85,35 @@ class SectionIdTest {
         }
 
         @Test
-        @DisplayName("are the specification's two secondary sections: Tool Manager and Settings")
-        void secondarySectionsAreToolManagerAndSettings() {
-            assertEquals(
-                    List.of(SectionId.TOOL_MANAGER, SectionId.SETTINGS),
-                    SectionId.secondarySections());
+        @DisplayName("have one secondary section, the Tool Manager")
+        void theOnlySecondarySectionIsTheToolManager() {
+            assertEquals(List.of(SectionId.TOOL_MANAGER), SectionId.secondarySections());
+        }
+
+        /**
+         * The Settings section was removed from navigation in Phase 07 (tier-1 decision, {@code
+         * STATUS.rst}, <em>The Settings section</em>): nothing the specification requires is
+         * configurable at application level, so the section had no content to hold. Asserted by its
+         * old identifier and title, both typed by hand, so that putting it back -- under any
+         * constant name -- is a deliberate act that has to change this test.
+         */
+        @Test
+        @DisplayName("do not include Settings, which Phase 07 removed: no such id, no such title")
+        void settingsIsNotASection() {
+            for (SectionId section : SectionId.values()) {
+                assertNotEquals("settings", section.id(), "a section has the id settings");
+                assertNotEquals("Settings", section.title(), "a section is titled Settings");
+            }
+            IllegalArgumentException thrown =
+                    assertThrows(
+                            IllegalArgumentException.class, () -> SectionId.fromId("settings"));
+            assertTrue(
+                    thrown.getMessage().startsWith("no navigation section has the id: settings;"),
+                    thrown.getMessage());
         }
 
         @Test
-        @DisplayName("are ten in display order, primary first")
+        @DisplayName("are nine in display order, primary first")
         void displayOrderIsPrimaryThenSecondary() {
             assertEquals(EXPECTED_IDS, idsOf(SectionId.displayOrder()));
         }
@@ -112,10 +131,10 @@ class SectionIdTest {
         }
 
         @Test
-        @DisplayName("split into eight primary and two secondary, and the two lists do not overlap")
+        @DisplayName("split into eight primary and one secondary, and the two lists do not overlap")
         void primaryAndSecondaryPartitionTheSections() {
             assertEquals(8, SectionId.primarySections().size());
-            assertEquals(2, SectionId.secondarySections().size());
+            assertEquals(1, SectionId.secondarySections().size());
             Set<SectionId> both = new HashSet<>(SectionId.primarySections());
             both.retainAll(SectionId.secondarySections());
             assertEquals(Set.of(), both, "no section is both primary and secondary");
@@ -178,7 +197,6 @@ class SectionIdTest {
             assertEquals("Provenance", SectionId.PROVENANCE.title());
             assertEquals("Console", SectionId.CONSOLE.title());
             assertEquals("Tool Manager", SectionId.TOOL_MANAGER.title());
-            assertEquals("Settings", SectionId.SETTINGS.title());
         }
     }
 
@@ -202,7 +220,7 @@ class SectionIdTest {
             assertEquals(
                     "no navigation section has the id: comet-params; the ids are: run,"
                             + " comet-parameters, percolator, results, visualisation, limelight,"
-                            + " provenance, console, tool-manager, settings",
+                            + " provenance, console, tool-manager",
                     thrown.getMessage());
         }
 

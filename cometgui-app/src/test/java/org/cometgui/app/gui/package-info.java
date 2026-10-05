@@ -24,7 +24,7 @@
  * <ul>
  *   <li>{@code SectionNavigationUiTest} -- items 1 (by mouse) and 2: a robot click on every
  *       navigation entry, and every section asserted present and showing by its stable identifier
- *       while the other nine are not.
+ *       while the other eight are not.
  *   <li>{@code KeyboardOnlyNavigationUiTest} -- item 1 (by keyboard alone): Tab into the
  *       navigation, then every primary section reached with arrow keys and nothing else.
  *   <li>{@code AccessibleNameEnumerationUiTest} -- item 4: every {@code Control} in the whole scene

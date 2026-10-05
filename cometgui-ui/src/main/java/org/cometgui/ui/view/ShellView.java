@@ -48,7 +48,7 @@ import org.cometgui.ui.viewmodel.ToolManagerViewModel;
  * The application shell: a header, a left navigation over every section, and a content area holding
  * exactly the selected section's pane.
  *
- * <h2>All ten panes are built; exactly one is shown</h2>
+ * <h2>All nine panes are built; exactly one is shown</h2>
  *
  * <p>Every section's pane is a child of the content area from the moment the shell is built, and
  * the selection decides which one is visible and managed -- not which one exists. Two things follow
@@ -57,7 +57,7 @@ import org.cometgui.ui.viewmodel.ToolManagerViewModel;
  * this phase's second exit-gate item asks for; and the enumeration behind the fourth gate item --
  * "every control that exists has an accessible name" -- sees every control in the whole shell in
  * one pass, rather than only the controls of whichever section happened to be selected. Unmanaged
- * children are excluded from layout, so the nine hidden panes cost a construction and nothing per
+ * children are excluded from layout, so the eight hidden panes cost a construction and nothing per
  * frame.
  *
  * <h2>The view-models are injected, never made here</h2>
@@ -88,10 +88,10 @@ import org.cometgui.ui.viewmodel.ToolManagerViewModel;
  *       entry.
  *   <li><b>Exactly one navigation entry is focus traversable: the selected one.</b> This is the
  *       roving-tab-stop pattern. Tab moves <em>into</em> and <em>out of</em> the navigation in one
- *       press each rather than ten, and arrow keys move within it -- which is how every real
+ *       press each rather than nine, and arrow keys move within it -- which is how every real
  *       navigation list behaves and what a keyboard user expects.
- *   <li><b>Arrow keys move the selection, through the secondary sections as well.</b> Up and Left
- *       go back, Down and Right go forward, and the handler is an event <em>filter</em> on the
+ *   <li><b>Arrow keys move the selection, through the secondary section as well.</b> Up and Left go
+ *       back, Down and Right go forward, and the handler is an event <em>filter</em> on the
  *       navigation container so that it runs before the focused button's own behaviour and cannot
  *       be beaten to the key by JavaFX's directional focus traversal. The keys are consumed whether
  *       or not the selection moved, so that arrows only ever mean "move the selection" and Tab only
@@ -218,8 +218,8 @@ public final class ShellView extends BorderPane {
     }
 
     /**
-     * The left navigation: every section in display order, with the two secondary ones below a
-     * rule.
+     * The left navigation: every section in display order, with the secondary one (the Tool
+     * Manager) below a rule.
      *
      * @return the navigation container
      */

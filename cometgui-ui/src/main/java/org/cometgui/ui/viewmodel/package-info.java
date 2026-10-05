@@ -34,8 +34,9 @@
  *
  * <ul>
  *   <li>{@link org.cometgui.ui.viewmodel.SectionId} -- the specification's information architecture
- *       as a type: eight primary sections, two secondary ones, each with a stable identifier used
- *       verbatim as an {@code fx:id} and in tests.
+ *       as a type: eight primary sections and one secondary one (Phase 07 removed the empty
+ *       Settings section), each with a stable identifier used verbatim as an {@code fx:id} and in
+ *       tests.
  *   <li>{@link org.cometgui.ui.viewmodel.NavigationViewModel} -- which section is selected, and the
  *       keyboard movement the phase's first exit-gate item requires.
  *   <li>{@link org.cometgui.ui.viewmodel.ConsoleViewModel} -- the stage and severity filters over

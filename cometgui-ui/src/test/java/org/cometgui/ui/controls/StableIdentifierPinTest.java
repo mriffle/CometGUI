@@ -108,7 +108,7 @@ class StableIdentifierPinTest {
             "cometgui-ui/src/test/java/org/cometgui/ui/controls/StableIdentifierPinTest.java";
 
     /**
-     * How many identifiers are pinned: 25 constants, 50 section identifiers, 24 stepper stage
+     * How many identifiers are pinned: 25 constants, 45 section identifiers, 24 stepper stage
      * identifiers, 11 Tool Manager row identifiers, 8 console stage filters, 7 stepper arrows, 4
      * branch identifiers and 4 severity filters. Stated so that deleting a whole category of pins
      * is a failure rather than a smaller test.
@@ -117,8 +117,14 @@ class StableIdentifierPinTest {
      * containers and the eleven identifiers one tool build's row carries. Adding an entry because
      * the thing it describes was added is maintenance; removing one, or lowering this number to
      * make a build pass, is not.
+     *
+     * <p>Lowered from 133 to 128 by phase 07 unit 2, which removed the Settings section from
+     * navigation (tier-1 decision, {@code STATUS.rst}, <em>The Settings section</em>): its five
+     * identifiers -- {@code section-settings}, {@code -heading}, {@code -description}, {@code
+     * -note} and {@code nav-settings} -- went with the {@code SectionId} constant. That is the
+     * removal of the thing described, not of a pin for something that still exists.
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 133;
+    private static final int PINNED_IDENTIFIER_COUNT = 128;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -197,8 +203,7 @@ class StableIdentifierPinTest {
                     Map.entry(SectionId.LIMELIGHT, "section-limelight"),
                     Map.entry(SectionId.PROVENANCE, "section-provenance"),
                     Map.entry(SectionId.CONSOLE, "section-console"),
-                    Map.entry(SectionId.TOOL_MANAGER, "section-tool-manager"),
-                    Map.entry(SectionId.SETTINGS, "section-settings"));
+                    Map.entry(SectionId.TOOL_MANAGER, "section-tool-manager"));
 
     /** Each section pane's heading. */
     private static final Map<SectionId, String> SECTION_HEADING =
@@ -211,8 +216,7 @@ class StableIdentifierPinTest {
                     Map.entry(SectionId.LIMELIGHT, "section-limelight-heading"),
                     Map.entry(SectionId.PROVENANCE, "section-provenance-heading"),
                     Map.entry(SectionId.CONSOLE, "section-console-heading"),
-                    Map.entry(SectionId.TOOL_MANAGER, "section-tool-manager-heading"),
-                    Map.entry(SectionId.SETTINGS, "section-settings-heading"));
+                    Map.entry(SectionId.TOOL_MANAGER, "section-tool-manager-heading"));
 
     /** Each section pane's description. */
     private static final Map<SectionId, String> SECTION_DESCRIPTION =
@@ -225,8 +229,7 @@ class StableIdentifierPinTest {
                     Map.entry(SectionId.LIMELIGHT, "section-limelight-description"),
                     Map.entry(SectionId.PROVENANCE, "section-provenance-description"),
                     Map.entry(SectionId.CONSOLE, "section-console-description"),
-                    Map.entry(SectionId.TOOL_MANAGER, "section-tool-manager-description"),
-                    Map.entry(SectionId.SETTINGS, "section-settings-description"));
+                    Map.entry(SectionId.TOOL_MANAGER, "section-tool-manager-description"));
 
     /** Each section pane's "this arrives in phase NN" note. */
     private static final Map<SectionId, String> SECTION_NOTE =
@@ -239,8 +242,7 @@ class StableIdentifierPinTest {
                     Map.entry(SectionId.LIMELIGHT, "section-limelight-note"),
                     Map.entry(SectionId.PROVENANCE, "section-provenance-note"),
                     Map.entry(SectionId.CONSOLE, "section-console-note"),
-                    Map.entry(SectionId.TOOL_MANAGER, "section-tool-manager-note"),
-                    Map.entry(SectionId.SETTINGS, "section-settings-note"));
+                    Map.entry(SectionId.TOOL_MANAGER, "section-tool-manager-note"));
 
     /** Each section's navigation entry. */
     private static final Map<SectionId, String> SECTION_NAVIGATION_ENTRY =
@@ -253,8 +255,7 @@ class StableIdentifierPinTest {
                     Map.entry(SectionId.LIMELIGHT, "nav-limelight"),
                     Map.entry(SectionId.PROVENANCE, "nav-provenance"),
                     Map.entry(SectionId.CONSOLE, "nav-console"),
-                    Map.entry(SectionId.TOOL_MANAGER, "nav-tool-manager"),
-                    Map.entry(SectionId.SETTINGS, "nav-settings"));
+                    Map.entry(SectionId.TOOL_MANAGER, "nav-tool-manager"));
 
     /** Each stage's box in the stage stepper. */
     private static final Map<WorkflowStage, String> STAGE_BOX =

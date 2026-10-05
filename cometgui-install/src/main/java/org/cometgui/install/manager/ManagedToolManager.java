@@ -179,10 +179,11 @@ public final class ManagedToolManager implements ToolManager {
      * <h2>This session only, and that is a stated boundary</h2>
      *
      * <p><strong>A registration does not survive a restart.</strong> Persisting one needs a store
-     * this phase does not own -- no phase in {@code phases/index.rst} claims the Settings section,
-     * which is where an application preference would live -- so after a restart the Tool Manager
-     * shows the managed rows and the user registers again. Written down here so that it is a limit
-     * somebody decided rather than one nobody noticed.
+     * this phase does not own -- no phase has built an application preference store, and the empty
+     * Settings section Phase 02 left for one was removed from navigation in Phase 07 because no
+     * specified preference needed it -- so after a restart the Tool Manager shows the managed rows
+     * and the user registers again. Written down here so that it is a limit somebody decided rather
+     * than one nobody noticed.
      */
     private final Map<Path, ToolOffer> registeredBinaries = new LinkedHashMap<>();
 
