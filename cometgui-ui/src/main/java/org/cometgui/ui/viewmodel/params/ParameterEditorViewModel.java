@@ -41,8 +41,9 @@ import org.cometgui.ui.viewmodel.NonNullProperty;
  * nothing here publishes them. A composition root handing out shared mutable state is what SpotBugs
  * reports as {@code EI_EXPOSE_REP}, and this project's answer is the one {@code
  * ApplicationServices} gives for the message log: inject at the call site, where the sharing is
- * stated. The stateless view-models over the session -- enzymes, tolerance, ranges -- are made on
- * each call: they hold nothing but the session, so two of them are the same editor.
+ * stated. The stateless view-models over the session -- enzymes, tolerance, ranges, static
+ * modifications -- are made on each call: they hold nothing but the session, so two of them are the
+ * same editor.
  *
  * <p>Toolkit-free and single-threaded, like every view-model in this package.
  */
@@ -63,6 +64,8 @@ public final class ParameterEditorViewModel {
     private final MigrationReviewViewModel migrationReview;
 
     private final PresetsViewModel presets;
+
+    private final PresetsViewModel fragmentPresets;
 
     private final NonNullProperty<EditorMode> mode;
 
@@ -98,6 +101,7 @@ public final class ParameterEditorViewModel {
         this.files = new ParameterFilesViewModel(session, build, hashService);
         this.migrationReview = new MigrationReviewViewModel(session);
         this.presets = new PresetsViewModel(session, List.of());
+        this.fragmentPresets = new PresetsViewModel(session, List.of());
         this.mode = new NonNullProperty<>(this, "mode", EditorMode.ESSENTIALS);
         this.releaseStatus = new NonNullProperty<>(this, "releaseStatus", releaseWords());
         this.saveStatus = new NonNullProperty<>(this, "saveStatus", "Not saved yet.");
@@ -156,6 +160,15 @@ public final class ParameterEditorViewModel {
     }
 
     /**
+     * The static-modification table.
+     *
+     * @return the table's view-model, made on each call (it holds the session, nothing else)
+     */
+    public StaticModsViewModel staticMods() {
+        return new StaticModsViewModel(session);
+    }
+
+    /**
      * Saving and importing parameter files.
      *
      * @return the files' view-model
@@ -180,6 +193,17 @@ public final class ParameterEditorViewModel {
      */
     public PresetsViewModel presets() {
         return presets;
+    }
+
+    /**
+     * The fragment instrument choice's own preview of the built-in presets, scoped to the fragment
+     * parameters ({@link PresetsViewModel#previewFragment}). Its own, so that a fragment preview
+     * and a whole-preset preview are never the same preview shown in two places.
+     *
+     * @return the fragment choice's presets' view-model
+     */
+    public PresetsViewModel fragmentPresets() {
+        return fragmentPresets;
     }
 
     /**

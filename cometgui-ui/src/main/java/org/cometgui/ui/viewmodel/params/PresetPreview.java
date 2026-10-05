@@ -19,6 +19,8 @@ package org.cometgui.ui.viewmodel.params;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import org.cometgui.params.comet.migration.VersionConversion;
 import org.cometgui.params.comet.presets.DiffRow;
 import org.cometgui.params.comet.presets.Preset;
@@ -30,22 +32,63 @@ import org.cometgui.params.comet.presets.PresetDiff;
  *
  * <p>Building a preview changes nothing; {@link PresetsViewModel#applyAll()} and {@link
  * PresetsViewModel#applySelected()} apply it, and {@link PresetsViewModel#cancel()} drops it.
+ *
+ * <p>A preview may be <em>scoped</em> to some of the preset's parameters -- the Essentials fragment
+ * instrument choice previews only the fragment rows of its preset ({@link
+ * PresetsViewModel#previewFragment}). A scoped preview's rows, problems and conversions are those
+ * of its parameters alone, so <em>Apply all</em> applies exactly what it shows and nothing else.
  */
 public final class PresetPreview {
 
     private final PresetDiff diff;
 
+    private final String title;
+
+    private final Optional<Set<String>> scope;
+
     private final List<PresetRowViewModel> rows;
 
     PresetPreview(PresetDiff diff, ParameterSession session) {
+        this(diff, session, diff.preset().displayName(), Optional.empty());
+    }
+
+    PresetPreview(
+            PresetDiff diff, ParameterSession session, String title, Optional<Set<String>> scope) {
         this.diff = Objects.requireNonNull(diff, "diff");
+        this.title = Objects.requireNonNull(title, "title");
+        this.scope = Objects.requireNonNull(scope, "scope").map(Set::copyOf);
         List<PresetRowViewModel> built = new ArrayList<>();
         for (DiffRow row : diff.rows()) {
-            built.add(
-                    new PresetRowViewModel(
-                            DiffRowView.of(row, session), session.lockOf(row.key())));
+            if (inScope(row.key())) {
+                built.add(
+                        new PresetRowViewModel(
+                                DiffRowView.of(row, session), session.lockOf(row.key())));
+            }
         }
         this.rows = List.copyOf(built);
+    }
+
+    private boolean inScope(String parameter) {
+        return scope.map(names -> names.contains(parameter)).orElse(true);
+    }
+
+    /**
+     * What the preview is called in the editor's words: the preset's display name, or for a scoped
+     * preview what the scope is.
+     *
+     * @return for example {@code Low-res precursor, low-res fragments}
+     */
+    public String title() {
+        return title;
+    }
+
+    /**
+     * The parameters a scoped preview is limited to.
+     *
+     * @return the names, or empty for a preview of the whole preset
+     */
+    public Optional<Set<String>> scope() {
+        return scope;
     }
 
     /**
@@ -114,12 +157,16 @@ public final class PresetPreview {
     }
 
     /**
-     * The deltas the configuration's release cannot take, in words: never a row, never applied.
+     * The deltas the configuration's release cannot take, in words: never a row, never applied. A
+     * scoped preview lists only its own parameters' problems.
      *
      * @return one line per problem, in the preset's order
      */
     public List<String> problems() {
-        return diff.compatibility().problems().stream().map(PresetPreview::problemWords).toList();
+        return diff.compatibility().problems().stream()
+                .filter(problem -> inScope(problem.parameter()))
+                .map(PresetPreview::problemWords)
+                .toList();
     }
 
     /**
@@ -129,6 +176,7 @@ public final class PresetPreview {
      */
     public List<String> conversions() {
         return diff.compatibility().converted().stream()
+                .filter(result -> inScope(result.parameter()))
                 .map(result -> "Converted -- " + result.explanation())
                 .toList();
     }

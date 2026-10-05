@@ -123,14 +123,40 @@ public final class PresetsViewModel {
      * @throws IllegalArgumentException if the preset is not one offered here
      */
     public PresetPreview preview(Preset preset) {
+        PresetPreview made =
+                new PresetPreview(PresetDiff.of(session.model(), offered(preset)), session);
+        preview.set(Optional.of(made));
+        return made;
+    }
+
+    /**
+     * Previews an instrument setting of the fragment parameters: its source preset's diff against
+     * the configuration as it is now, scoped to the option's parameters ({@code AC-PAR-08}: the
+     * Essentials instrument choice changes nothing until a row is applied). Nothing changes.
+     *
+     * @param option an instrument setting, whose source preset is one of {@link #presets()}
+     * @return the preview, also held by {@link #previewProperty()}; its title names the setting
+     * @throws IllegalArgumentException if the option's preset is not one offered here
+     */
+    public PresetPreview previewFragment(FragmentOption option) {
+        Objects.requireNonNull(option, "option");
+        PresetPreview made =
+                new PresetPreview(
+                        PresetDiff.of(session.model(), offered(option.source())),
+                        session,
+                        option.words() + " (fragment ions only)",
+                        Optional.of(option.values().keySet()));
+        preview.set(Optional.of(made));
+        return made;
+    }
+
+    private Preset offered(Preset preset) {
         Objects.requireNonNull(preset, "preset");
         if (!presets.contains(preset)) {
             throw new IllegalArgumentException(
                     "preset " + preset.id() + " is not one of the presets offered here");
         }
-        PresetPreview made = new PresetPreview(PresetDiff.of(session.model(), preset), session);
-        preview.set(Optional.of(made));
-        return made;
+        return preset;
     }
 
     /**

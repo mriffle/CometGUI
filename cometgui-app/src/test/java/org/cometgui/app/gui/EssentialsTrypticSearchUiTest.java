@@ -160,11 +160,14 @@ class EssentialsTrypticSearchUiTest {
         choose(driver, "ess-peptide_mass_units", "ppm");
         choose(driver, "ess-isotope_error", "0, +1");
 
-        // Fragment ions: the instrument setting for low-resolution fragments.
+        // Fragment ions: the instrument setting for low-resolution fragments, previewed and then
+        // applied (AC-PAR-08: choosing it changes nothing until its rows are applied).
         choose(
                 driver,
                 "ess-fragment-setting",
                 "Low-res precursor, low-res fragments / High-res precursor, low-res fragments");
+        assertEquals("0.02", driver.textOf("ess-fragment_bin_tol"), "nothing changed yet");
+        driver.clickOn("ess-fragment-apply-all");
 
         // Digestion: trypsin, fully specific, one missed cleavage.
         choose(driver, "ess-search_enzyme_number", "1. Trypsin");

@@ -47,10 +47,11 @@
  *       org.cometgui.ui.viewmodel.params.VariableModsViewModel} (every slot of the release's
  *       layout, presets, add, edit, move, remove, and the two parameters beside the slots), {@link
  *       org.cometgui.ui.viewmodel.params.EnzymesViewModel}, {@link
- *       org.cometgui.ui.viewmodel.params.StaticModsViewModel}, {@link
- *       org.cometgui.ui.viewmodel.params.IonSeriesViewModel}, {@link
+ *       org.cometgui.ui.viewmodel.params.StaticModsViewModel} (the residue/terminus table), {@link
  *       org.cometgui.ui.viewmodel.params.ToleranceViewModel} and {@link
- *       org.cometgui.ui.viewmodel.params.RangesViewModel}.
+ *       org.cometgui.ui.viewmodel.params.RangesViewModel}. The ion series need none of their own:
+ *       each series and the neutral-loss switch is a parameter of its own, shown as a check box
+ *       named by the release's display name over the model's flag ({@code FieldViewModel.setOn}).
  *   <li>{@link org.cometgui.ui.viewmodel.params.PresetsViewModel} -- a preset previewed as the
  *       model's diff with a check box per row, applied whole or in part (origin {@code PRESET}), or
  *       cancelled with the very same configuration kept.

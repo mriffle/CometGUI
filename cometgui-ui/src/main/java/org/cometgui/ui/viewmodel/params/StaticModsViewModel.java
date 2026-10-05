@@ -27,6 +27,10 @@ import org.cometgui.params.comet.schema.StaticModTarget;
  * The static-modification table: one row per {@code add_*} parameter of the selected release, keyed
  * by the residue or terminus the model says it modifies ({@code StaticModTarget}), the termini
  * first as the release lists them. Every edit and reset is the field's, through the model.
+ *
+ * <p>Comet has no name for a static modification -- only a mass per residue or terminus -- so the
+ * table's name column is the parameter's display name, such as {@code Static modification: lysine
+ * (K)}.
  */
 public final class StaticModsViewModel {
 
@@ -96,6 +100,18 @@ public final class StaticModsViewModel {
      */
     public EditOutcome reset(StaticModRow row) {
         return field(row).reset();
+    }
+
+    /**
+     * The row of a parameter, for a table that shows some of the rows -- Essentials shows the
+     * twenty-six it curates, Advanced all of them.
+     *
+     * @param parameter a parameter name
+     * @return the row, or empty if the parameter is not a static modification of the release
+     */
+    public Optional<StaticModRow> row(String parameter) {
+        Objects.requireNonNull(parameter, "parameter");
+        return rows().stream().filter(row -> row.parameter().equals(parameter)).findFirst();
     }
 
     /**

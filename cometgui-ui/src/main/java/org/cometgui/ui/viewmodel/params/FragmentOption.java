@@ -30,13 +30,14 @@ import org.cometgui.params.comet.presets.PresetDelta;
  * fragment-scoring values one or more of Comet's example parameter files share, with those files'
  * names, so that the scientist picks "low-res fragments" rather than recalling 1.0005 and 0.4.
  *
- * <p>Choosing one applies those rows of its {@link #source()} preset through the model's preset
+ * <p>Choosing one previews those rows of its {@link #source()} preset ({@link
+ * PresetsViewModel#previewFragment}); applying the preview sets them through the model's preset
  * diff, so the values carry origin {@code PRESET}: they are the preset's values, not ones the
  * scientist typed.
  *
  * @param presetNames the display names of the built-in presets that use these values
  * @param values the values by parameter, as the presets write them, in schema order
- * @param source the first of those presets, whose rows choosing this option applies
+ * @param source the first of those presets, whose rows choosing this option previews
  */
 public record FragmentOption(List<String> presetNames, Map<String, String> values, Preset source) {
 

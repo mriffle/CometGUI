@@ -280,8 +280,9 @@ class ExpertRawEditUiTest {
     /**
      * Puts the configuration in a state that is not the release's defaults, through Essentials: the
      * precursor window typed (origin USER), the second enzyme row chosen (USER), the fragment bins
-     * set by the instrument choice (origin PRESET) and, on 2026.03.0, protein N-terminal
-     * acetylation added to slot 2. A defect that reset the typed model would undo every one.
+     * set by the instrument choice's preview, applied (origin PRESET) and, on 2026.03.0, protein
+     * N-terminal acetylation added to slot 2. A defect that reset the typed model would undo every
+     * one.
      */
     private static void configure(FxUiDriver driver, boolean acetylSlot) {
         driver.clickOn("param-mode-essentials");
@@ -292,6 +293,7 @@ class ExpertRawEditUiTest {
                 driver,
                 "ess-fragment-setting",
                 "Low-res precursor, low-res fragments / High-res precursor, low-res fragments");
+        driver.clickOn("ess-fragment-apply-all");
         if (acetylSlot) {
             ParameterEditorApp.choose(
                     driver,

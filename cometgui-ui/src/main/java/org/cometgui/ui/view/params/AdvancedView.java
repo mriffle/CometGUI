@@ -20,9 +20,11 @@ import static org.cometgui.ui.controls.AccessibleControls.named;
 
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -36,12 +38,15 @@ import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.UiIds.Surface;
 import org.cometgui.ui.controls.params.EnzymeTableEditor;
 import org.cometgui.ui.controls.params.FieldControl;
+import org.cometgui.ui.controls.params.StaticModTable;
 import org.cometgui.ui.controls.params.Subscriptions;
 import org.cometgui.ui.controls.params.VariableModEditor;
 import org.cometgui.ui.viewmodel.params.AdvancedCategory;
 import org.cometgui.ui.viewmodel.params.FieldViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.StaticModRow;
+import org.cometgui.ui.viewmodel.params.StaticModsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 
 /**
@@ -49,10 +54,10 @@ import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
  * categories, each category shown or hidden by its own switch (a toggle button, reachable by Tab
  * and operated with Space) and each with a reset that asks to confirm before it changes anything.
  *
- * <p>Every field is its typed control; the variable-modification slots are the slot editor, as in
- * Essentials; the digestion category also holds the custom-enzyme editor over the enzyme table. A
- * hidden category's controls stay in the scene, hidden, so that a summary entry can show the
- * category and move the focus into it.
+ * <p>Every field is its typed control; the variable-modification slots are the slot editor and the
+ * static modifications the residue/terminus table, as in Essentials; the digestion category also
+ * holds the custom-enzyme editor over the enzyme table. A hidden category's controls stay in the
+ * scene, hidden, so that a summary entry can show the category and move the focus into it.
  *
  * <p>Built for one release; the editor builds a new one when the release changes.
  */
@@ -162,9 +167,30 @@ final class AdvancedView extends VBox {
 
         VBox content = new VBox(8);
         content.setPadding(new Insets(0, 0, 0, 16));
+        StaticModsViewModel staticMods = editor.staticMods();
+        Set<String> staticRows = new HashSet<>();
+        for (StaticModRow row : staticMods.rows()) {
+            staticRows.add(row.parameter());
+        }
+        List<FieldViewModel> tabled =
+                fields.stream().filter(field -> staticRows.contains(field.name())).toList();
         boolean slotsShown = false;
+        boolean tableShown = false;
         for (FieldViewModel field : fields) {
             categoryOf.put(field.name(), id);
+            if (staticRows.contains(field.name())) {
+                if (!tableShown) {
+                    StaticModTable table =
+                            new StaticModTable(
+                                    staticMods, tabled, Surface.ADVANCED, session, subscriptions);
+                    content.getChildren().add(table);
+                    for (FieldViewModel row : tabled) {
+                        focusers.put(row.name(), () -> table.focus(row.name()));
+                    }
+                    tableShown = true;
+                }
+                continue;
+            }
             if (field.kind() == ValueKind.VARIABLE_MOD_TUPLE) {
                 if (!slotsShown) {
                     VariableModEditor slots =

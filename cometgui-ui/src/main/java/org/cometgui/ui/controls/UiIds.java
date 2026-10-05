@@ -353,6 +353,30 @@ public final class UiIds {
     /** The fragment settings in words. */
     public static final String FRAGMENT_SETTING_WORDS = "ess-fragment-setting-words";
 
+    /**
+     * The fragment instrument choice's preview: the fragment rows of the chosen setting's preset,
+     * with their check boxes and the three actions. Nothing changes until one is applied.
+     */
+    public static final String FRAGMENT_REVIEW = "ess-fragment-review";
+
+    /** Which release the fragment preview's preset was made for, in words. */
+    public static final String FRAGMENT_MADE_FOR = "ess-fragment-made-for";
+
+    /** The fragment preview's compatibility problems and conversions, in words. */
+    public static final String FRAGMENT_PROBLEMS = "ess-fragment-problems";
+
+    /** Apply every row of the fragment preview that can be applied. */
+    public static final String FRAGMENT_APPLY_ALL = "ess-fragment-apply-all";
+
+    /** Apply exactly the selected rows of the fragment preview. */
+    public static final String FRAGMENT_APPLY_SELECTED = "ess-fragment-apply-selected";
+
+    /** Drop the fragment preview; nothing changes. */
+    public static final String FRAGMENT_CANCEL = "ess-fragment-cancel";
+
+    /** The last fragment-choice action's outcome in words. */
+    public static final String FRAGMENT_STATUS = "ess-fragment-status";
+
     /** The Run section's Run control. */
     public static final String RUN_START = "run-start";
 
@@ -967,6 +991,32 @@ public final class UiIds {
     }
 
     /**
+     * The identifier of the static-modification table on a surface: one row per residue or
+     * terminus, whose cells carry the per-parameter identifiers of the row's parameter (the mass
+     * field is {@link #parameterControl}, the residue or terminus {@link #parameterLabel}, the
+     * default state {@link #parameterOrigin}, the reset {@link #parameterReset}, the validation
+     * state {@link #parameterState}) and {@link #staticModName}.
+     *
+     * @param surface where the table is
+     * @return the surface prefix and {@code "-static-mods"}
+     */
+    public static String staticModTable(Surface surface) {
+        return Objects.requireNonNull(surface, "surface").prefix() + "-static-mods";
+    }
+
+    /**
+     * The identifier of a static-modification row's name cell: the parameter's display name, as
+     * Comet has no name for a static modification.
+     *
+     * @param surface where the table is
+     * @param name the row's parameter, such as {@code add_K_lysine}
+     * @return the control identifier with {@code "-name"} appended
+     */
+    public static String staticModName(Surface surface, String name) {
+        return parameterControl(surface, name) + "-name";
+    }
+
+    /**
      * The identifier of one Essentials group.
      *
      * @param section the group's section
@@ -1112,6 +1162,38 @@ public final class UiIds {
      */
     public static String presetRowPreset(int index) {
         return presetRow(index) + "-preset";
+    }
+
+    /**
+     * The identifier of one row's check box in the fragment instrument choice's preview, by its
+     * place in the preview.
+     *
+     * @param index the row's 0-based position
+     * @return {@code "ess-fragment-row-"} and the position
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String fragmentRow(int index) {
+        return "ess-fragment-row-" + nonNegative(index);
+    }
+
+    /**
+     * The identifier of one fragment preview row's current value.
+     *
+     * @param index the row's 0-based position
+     * @return the row's identifier with {@code "-current"} appended
+     */
+    public static String fragmentRowCurrent(int index) {
+        return fragmentRow(index) + "-current";
+    }
+
+    /**
+     * The identifier of one fragment preview row's preset value.
+     *
+     * @param index the row's 0-based position
+     * @return the row's identifier with {@code "-preset"} appended
+     */
+    public static String fragmentRowPreset(int index) {
+        return fragmentRow(index) + "-preset";
     }
 
     /**

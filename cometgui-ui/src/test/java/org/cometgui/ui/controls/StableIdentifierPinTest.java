@@ -143,8 +143,14 @@ class StableIdentifierPinTest {
      * named; 47 constants added (the Expert level 17, import 8, search 3, migration review 3,
      * preset preview 9, custom-enzyme editor 7); the 5 search filters; and 15 identifiers built
      * from a position, one per new method that builds one (two for the search result).
+     *
+     * <p>Raised from 382 to 396 by phase 07 unit 10, which routed the Essentials fragment
+     * instrument choice through a preview of its own and built the static-modification table: 7
+     * constants (the fragment preview's container, made-for, problems, three actions and status); 3
+     * identifiers built from a position (one per new fragment-row method); the table's container on
+     * both surfaces (2); and a row's name cell on both surfaces (2).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 382;
+    private static final int PINNED_IDENTIFIER_COUNT = 396;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -249,6 +255,13 @@ class StableIdentifierPinTest {
                     Map.entry("PRECURSOR_SUMMARY", "ess-precursor-summary"),
                     Map.entry("FRAGMENT_SETTING", "ess-fragment-setting"),
                     Map.entry("FRAGMENT_SETTING_WORDS", "ess-fragment-setting-words"),
+                    Map.entry("FRAGMENT_REVIEW", "ess-fragment-review"),
+                    Map.entry("FRAGMENT_MADE_FOR", "ess-fragment-made-for"),
+                    Map.entry("FRAGMENT_PROBLEMS", "ess-fragment-problems"),
+                    Map.entry("FRAGMENT_APPLY_ALL", "ess-fragment-apply-all"),
+                    Map.entry("FRAGMENT_APPLY_SELECTED", "ess-fragment-apply-selected"),
+                    Map.entry("FRAGMENT_CANCEL", "ess-fragment-cancel"),
+                    Map.entry("FRAGMENT_STATUS", "ess-fragment-status"),
                     Map.entry("RUN_START", "run-start"),
                     Map.entry("RUN_PARAMETERS", "run-parameters"),
                     Map.entry("RUN_ENGINE", "run-engine"));
@@ -412,7 +425,13 @@ class StableIdentifierPinTest {
                             List.of(
                                     "variable_mod15",
                                     "ess-variable_mod15-remove",
-                                    "adv-variable_mod15-remove")));
+                                    "adv-variable_mod15-remove")),
+                    Map.entry(
+                            "staticModName",
+                            List.of(
+                                    "add_K_lysine",
+                                    "ess-add_K_lysine-name",
+                                    "adv-add_K_lysine-name")));
 
     /** Every UiIds method taking a surface alone: Essentials, then Advanced. */
     private static final Map<String, List<String>> PER_SURFACE =
@@ -422,8 +441,8 @@ class StableIdentifierPinTest {
                     Map.entry("variableModAdd", List.of("ess-varmod-add", "adv-varmod-add")),
                     Map.entry("variableModCross", List.of("ess-varmod-cross", "adv-varmod-cross")),
                     Map.entry(
-                            "variableModStatus",
-                            List.of("ess-varmod-status", "adv-varmod-status")));
+                            "variableModStatus", List.of("ess-varmod-status", "adv-varmod-status")),
+                    Map.entry("staticModTable", List.of("ess-static-mods", "adv-static-mods")));
 
     /** Each tuple part's control of {@code variable_mod01} on Essentials. */
     private static final Map<VariableModPart, String> VARIABLE_MOD_PART =
@@ -620,6 +639,9 @@ class StableIdentifierPinTest {
                     Map.entry("presetRow(0)", "ess-preset-row-0"),
                     Map.entry("presetRowCurrent(5)", "ess-preset-row-5-current"),
                     Map.entry("presetRowPreset(7)", "ess-preset-row-7-preset"),
+                    Map.entry("fragmentRow(0)", "ess-fragment-row-0"),
+                    Map.entry("fragmentRowCurrent(2)", "ess-fragment-row-2-current"),
+                    Map.entry("fragmentRowPreset(1)", "ess-fragment-row-1-preset"),
                     Map.entry("expertLine(8)", "param-expert-line-8"),
                     Map.entry("expertDiagnostic(0)", "param-expert-diagnostic-0"),
                     Map.entry("expertUnknown(1)", "param-expert-unknown-1"),
@@ -695,6 +717,11 @@ class StableIdentifierPinTest {
                     "presetRow",
                     "presetRowCurrent",
                     "presetRowPreset",
+                    "fragmentRow",
+                    "fragmentRowCurrent",
+                    "fragmentRowPreset",
+                    "staticModTable",
+                    "staticModName",
                     "expertLine",
                     "expertDiagnostic",
                     "expertUnknown",
@@ -1193,6 +1220,9 @@ class StableIdentifierPinTest {
         actual.put("presetRow(0)", UiIds.presetRow(0));
         actual.put("presetRowCurrent(5)", UiIds.presetRowCurrent(5));
         actual.put("presetRowPreset(7)", UiIds.presetRowPreset(7));
+        actual.put("fragmentRow(0)", UiIds.fragmentRow(0));
+        actual.put("fragmentRowCurrent(2)", UiIds.fragmentRowCurrent(2));
+        actual.put("fragmentRowPreset(1)", UiIds.fragmentRowPreset(1));
         actual.put("expertLine(8)", UiIds.expertLine(8));
         actual.put("expertDiagnostic(0)", UiIds.expertDiagnostic(0));
         actual.put("expertUnknown(1)", UiIds.expertUnknown(1));

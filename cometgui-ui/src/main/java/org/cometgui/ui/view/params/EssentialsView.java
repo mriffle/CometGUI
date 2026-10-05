@@ -18,8 +18,10 @@ package org.cometgui.ui.view.params;
 
 import static org.cometgui.ui.controls.AccessibleControls.named;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -37,7 +39,9 @@ import org.cometgui.ui.controls.UiIds.Surface;
 import org.cometgui.ui.controls.params.DecoySourceControl;
 import org.cometgui.ui.controls.params.FieldControl;
 import org.cometgui.ui.controls.params.PresetControl;
+import org.cometgui.ui.controls.params.PresetReviewPane;
 import org.cometgui.ui.controls.params.SpectrumInputsControl;
+import org.cometgui.ui.controls.params.StaticModTable;
 import org.cometgui.ui.controls.params.Subscriptions;
 import org.cometgui.ui.controls.params.VariableModEditor;
 import org.cometgui.ui.viewmodel.params.EssentialsGroup;
@@ -45,7 +49,10 @@ import org.cometgui.ui.viewmodel.params.FieldViewModel;
 import org.cometgui.ui.viewmodel.params.FragmentOption;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.PresetsViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
+import org.cometgui.ui.viewmodel.params.StaticModRow;
+import org.cometgui.ui.viewmodel.params.StaticModsViewModel;
 import org.cometgui.ui.viewmodel.params.ToleranceViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 
@@ -57,10 +64,12 @@ import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
  * <p>Most groups are their fields' typed controls. Some carry a structured control the
  * specification asks for: the spectrum files beside the database; the precursor window, units, type
  * and isotope offsets with the whole setting in words; the fragment bins with their instrument
- * choice; the search, second and sample enzyme selectors beside the termini and missed cleavages;
+ * choice, previewed before it changes anything; the search, second and sample enzyme selectors
+ * beside the termini and missed cleavages; the static modifications as a residue/terminus table;
  * the decoy source as one control beside its prefix; and the variable-modification slot editor with
- * the per-peptide limit and the requirement beside it; and the search/acquisition preset choice,
- * applied only through its reviewable diff.
+ * the per-peptide limit and the requirement beside it. Both preset paths -- the search/acquisition
+ * preset choice and the fragment instrument choice -- change nothing until their reviewable diff is
+ * applied ({@code AC-PAR-08}).
  *
  * <p>Built for one release; the editor builds a new one when the release changes.
  */
@@ -116,13 +125,39 @@ final class EssentialsView extends VBox {
                 }
                 case FRAGMENT -> {
                     box.getChildren()
-                            .add(fragmentChoice(editor.tolerance(), session, subscriptions));
+                            .add(
+                                    fragmentChoice(
+                                            editor.tolerance(),
+                                            editor.fragmentPresets(),
+                                            session,
+                                            subscriptions));
                     addFields(box, group, editor, subscriptions, shown);
                 }
                 case DIGESTION -> {
                     for (FieldViewModel selector : editor.enzymes().selectors()) {
                         addField(box, selector, editor, subscriptions, shown);
                     }
+                    addFields(box, group, editor, subscriptions, shown);
+                }
+                case STATIC_MODIFICATIONS -> {
+                    StaticModsViewModel staticMods = editor.staticMods();
+                    Set<String> rows = new LinkedHashSet<>();
+                    for (StaticModRow row : staticMods.rows()) {
+                        rows.add(row.parameter());
+                    }
+                    List<FieldViewModel> tabled = new ArrayList<>();
+                    for (FieldViewModel field : group.fields()) {
+                        if (rows.contains(field.name()) && shown.add(field.name())) {
+                            tabled.add(field);
+                        }
+                    }
+                    StaticModTable table =
+                            new StaticModTable(
+                                    staticMods, tabled, Surface.ESSENTIALS, session, subscriptions);
+                    for (FieldViewModel field : tabled) {
+                        focusers.put(field.name(), () -> table.focus(field.name()));
+                    }
+                    box.getChildren().add(table);
                     addFields(box, group, editor, subscriptions, shown);
                 }
                 case VARIABLE_MODIFICATIONS -> {
@@ -231,7 +266,10 @@ final class EssentialsView extends VBox {
     }
 
     private static VBox fragmentChoice(
-            ToleranceViewModel tolerance, ParameterSession session, Subscriptions subscriptions) {
+            ToleranceViewModel tolerance,
+            PresetsViewModel fragmentPresets,
+            ParameterSession session,
+            Subscriptions subscriptions) {
         ComboBox<FragmentOption> choice = new ComboBox<>();
         choice.setId(UiIds.FRAGMENT_SETTING);
         named(choice, "Fragment ion setting, by instrument");
@@ -249,13 +287,13 @@ final class EssentialsView extends VBox {
                     }
                 });
         choice.setAccessibleHelp(
-                "Sets the fragment bins as one of Comet's example parameter files does: "
+                "Previews the fragment bins as one of Comet's example parameter files sets them: "
                         + String.join(
                                 "; ",
                                 tolerance.fragmentOptions().stream()
                                         .map(o -> o.words() + " (" + o.valuesText() + ")")
                                         .toList())
-                        + ".");
+                        + ". Nothing changes until you apply the preview.");
         Label words = new Label();
         words.setId(UiIds.FRAGMENT_SETTING_WORDS);
         words.setWrapText(true);
@@ -273,12 +311,24 @@ final class EssentialsView extends VBox {
                         updating[0] = false;
                     }
                 };
+        // Choosing a setting previews it (AC-PAR-08): nothing changes until a row is applied, and
+        // Cancel puts the choice back to what the configuration holds.
+        PresetReviewPane preview =
+                new PresetReviewPane(
+                        fragmentPresets,
+                        PresetReviewPane.Ids.FRAGMENT,
+                        "Choosing an instrument setting shows what it would change; nothing"
+                                + " changes until you apply it.",
+                        () -> {
+                            show.run();
+                            choice.requestFocus();
+                        },
+                        subscriptions);
         choice.valueProperty()
                 .addListener(
                         (observable, before, after) -> {
                             if (!updating[0] && after != null) {
-                                tolerance.chooseFragment(after);
-                                show.run();
+                                preview.previewing(fragmentPresets.previewFragment(after));
                             }
                         });
         show.run();
@@ -289,6 +339,6 @@ final class EssentialsView extends VBox {
         label.setLabelFor(choice);
         HBox line = new HBox(8, label, choice);
         line.setAlignment(Pos.CENTER_LEFT);
-        return new VBox(2, line, words);
+        return new VBox(2, line, words, preview);
     }
 }

@@ -124,7 +124,6 @@ class ViewModelIndependenceTest {
                         "params/ImportOffer.java",
                         "params/ImportOutcome.java",
                         "params/InputFile.java",
-                        "params/IonSeriesViewModel.java",
                         "params/MigrationReviewViewModel.java",
                         "params/MigrationRow.java",
                         "params/ParameterEditorViewModel.java",

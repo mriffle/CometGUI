@@ -311,6 +311,183 @@ class PresetsViewModelTest {
     }
 
     @Nested
+    @DisplayName("the fragment instrument choice: a preview scoped to the fragment rows")
+    class FragmentPreview {
+
+        /** The fragment rows of low-low against the defaults: label, current, preset. */
+        private static final List<List<String>> FRAGMENT_ROWS =
+                List.of(
+                        List.of("Fragment bin width (fragment_bin_tol)", "0.02", "1.0005"),
+                        List.of("Fragment bin offset (fragment_bin_offset)", "0.0", "0.4"),
+                        List.of("Flanking-bin scoring (theoretical_fragment_ions)", "0", "1"));
+
+        private static List<List<String>> shown(PresetPreview preview) {
+            return preview.rows().stream()
+                    .map(r -> List.of(r.view().label(), r.view().current(), r.view().other()))
+                    .toList();
+        }
+
+        @ParameterizedTest(name = "Comet {0}")
+        @ValueSource(strings = {"2026.03.0", "2026.02.2"})
+        @DisplayName(
+                "previewing changes nothing; cancel changes nothing; apply all sets exactly"
+                        + " the three fragment rows")
+        void previewCancelApply(String release) {
+            ParameterSession session = startingIn(ToolVersion.parse(release));
+            // away from the defaults first, so a reset could not pass for "nothing changed"
+            assertEquals(EditOutcome.applied(), session.edit("peptide_mass_tolerance_upper", "10"));
+            assertEquals(EditOutcome.applied(), session.edit("num_threads", "4"));
+            CometParameters before = session.model();
+            PresetsViewModel presets = new PresetsViewModel(session, List.of());
+            FragmentOption lowRes = new ToleranceViewModel(session).fragmentOptions().get(0);
+
+            PresetPreview preview = presets.previewFragment(lowRes);
+            assertSame(before, session.model());
+            assertEquals(FRAGMENT_ROWS, shown(preview));
+            assertEquals(
+                    "Low-res precursor, low-res fragments / High-res precursor, low-res fragments"
+                            + " (fragment ions only)",
+                    preview.title());
+            assertEquals(
+                    Optional.of(
+                            java.util.Set.of(
+                                    "fragment_bin_tol",
+                                    "fragment_bin_offset",
+                                    "theoretical_fragment_ions")),
+                    preview.scope());
+            assertEquals("low-low", preview.preset().id());
+            assertEquals(Optional.of(preview), presets.preview());
+
+            presets.cancel();
+            assertSame(before, session.model());
+            assertEquals(Optional.empty(), presets.preview());
+
+            presets.previewFragment(lowRes);
+            assertEquals(EditOutcome.applied(), presets.applyAll());
+            CometParameters after = session.model();
+            assertEquals("1.0005", after.text("fragment_bin_tol"));
+            assertEquals("0.4", after.text("fragment_bin_offset"));
+            assertEquals("1", after.text("theoretical_fragment_ions"));
+            assertEquals(ValueOrigin.PRESET, after.origin("fragment_bin_tol"));
+            assertEquals(ValueOrigin.PRESET, after.origin("theoretical_fragment_ions"));
+            // the preset's precursor rows were never offered, so nothing else moved
+            assertEquals("10", after.text("peptide_mass_tolerance_upper"));
+            assertEquals(ValueOrigin.USER, after.origin("peptide_mass_tolerance_upper"));
+            assertEquals("-20.0", after.text("peptide_mass_tolerance_lower"));
+            assertEquals("2", after.text("peptide_mass_units"));
+            assertEquals("4", after.text("num_threads"));
+            assertEquals(
+                    List.of("fragment_bin_tol", "fragment_bin_offset", "theoretical_fragment_ions"),
+                    presets.lastAppliedRows().stream().map(r -> r.row().key()).toList());
+        }
+
+        @Test
+        @DisplayName("apply selected applies exactly the ticked fragment row")
+        void subset() {
+            ParameterSession session = startingIn(C03);
+            PresetsViewModel presets = new PresetsViewModel(session, List.of());
+            PresetPreview preview =
+                    presets.previewFragment(
+                            new ToleranceViewModel(session).fragmentOptions().get(0));
+            preview.rows().get(0).setSelected(false);
+            preview.rows().get(2).setSelected(false);
+            assertEquals(EditOutcome.applied(), presets.applySelected());
+            assertEquals("0.02", session.model().text("fragment_bin_tol"));
+            assertEquals("0.4", session.model().text("fragment_bin_offset"));
+            assertEquals("0", session.model().text("theoretical_fragment_ions"));
+            assertEquals(ValueOrigin.COMET_DEFAULT, session.model().origin("fragment_bin_tol"));
+        }
+
+        @Test
+        @DisplayName("an option of a preset not offered here is refused")
+        void notOffered() {
+            ParameterSession session = startingIn(C03);
+            Preset elsewhere =
+                    Preset.fromModel(
+                            "elsewhere",
+                            "Elsewhere",
+                            "CONSTRUCTED, not offered",
+                            session.model(),
+                            List.of("fragment_bin_tol"));
+            FragmentOption option =
+                    new FragmentOption(
+                            List.of("constructed"), Map.of("fragment_bin_tol", "0.02"), elsewhere);
+            PresetsViewModel presets = new PresetsViewModel(session, List.of());
+            assertEquals(
+                    "preset elsewhere is not one of the presets offered here",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () -> presets.previewFragment(option))
+                            .getMessage());
+            assertEquals(Optional.empty(), presets.preview());
+        }
+
+        @Test
+        @DisplayName("a scoped preview lists only its own parameters' problems and conversions")
+        void scopedCompatibility() {
+            ParameterSession newer = startingIn(C03);
+            Preset caret =
+                    Preset.fromModel(
+                            "caret-and-bins",
+                            "Caret and bins",
+                            "CONSTRUCTED user preset made on 2026.03.0",
+                            newer.model()
+                                    .withText(
+                                            "variable_mod02",
+                                            "42.010565 ^ 0 1 -1 0 0 0.0",
+                                            ValueOrigin.USER)
+                                    .withText("fragment_bin_tol", "1.0005", ValueOrigin.USER),
+                            List.of("variable_mod02", "fragment_bin_tol"));
+            ParameterSession older = startingIn(C02);
+            PresetsViewModel onOlder = new PresetsViewModel(older, List.of(caret));
+            assertEquals(1, onOlder.preview(caret).problems().size());
+            PresetPreview bins =
+                    onOlder.previewFragment(
+                            new FragmentOption(
+                                    List.of("bins"), Map.of("fragment_bin_tol", "1.0005"), caret));
+            assertEquals(List.of(), bins.problems());
+            assertEquals(
+                    List.of("fragment_bin_tol"),
+                    bins.rows().stream().map(PresetRowViewModel::parameter).toList());
+            PresetPreview slot =
+                    onOlder.previewFragment(
+                            new FragmentOption(
+                                    List.of("slot"),
+                                    Map.of("variable_mod02", "42.010565 ^ 0 1 -1 0 0 0.0"),
+                                    caret));
+            assertEquals(1, slot.problems().size());
+            assertEquals(List.of(), slot.rows());
+
+            Preset index =
+                    Preset.fromModel(
+                            "index-and-bins",
+                            "Index and bins",
+                            "CONSTRUCTED user preset made on 2026.02.2",
+                            older.model(),
+                            List.of("index_search_type", "fragment_bin_tol"));
+            PresetsViewModel onNewer = new PresetsViewModel(newer, List.of(index));
+            assertEquals(1, onNewer.preview(index).conversions().size());
+            assertEquals(
+                    List.of(),
+                    onNewer.previewFragment(
+                                    new FragmentOption(
+                                            List.of("bins"),
+                                            Map.of("fragment_bin_tol", "0.02"),
+                                            index))
+                            .conversions());
+            assertEquals(
+                    1,
+                    onNewer.previewFragment(
+                                    new FragmentOption(
+                                            List.of("index"),
+                                            Map.of("index_search_type", "1"),
+                                            index))
+                            .conversions()
+                            .size());
+        }
+    }
+
+    @Nested
     @DisplayName("a preset of another release: the compatibility check in words")
     class Compatibility {
 

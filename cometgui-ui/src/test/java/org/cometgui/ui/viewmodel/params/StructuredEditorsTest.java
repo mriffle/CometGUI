@@ -36,7 +36,6 @@ import org.cometgui.params.comet.presets.Preset;
 import org.cometgui.params.comet.validation.Finding;
 import org.cometgui.params.comet.validation.Rule;
 import org.cometgui.params.comet.value.EnzymeDefinition;
-import org.cometgui.params.comet.value.IonSeries;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -44,9 +43,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * The enzyme, static-modification, ion-series, tolerance and range view-models: every structured
- * value set through the model, findings from the session's one report, expectations typed by hand
- * and, where the release could matter, run on both offered releases.
+ * The enzyme, static-modification, tolerance and range view-models: every structured value set
+ * through the model, findings from the session's one report, expectations typed by hand and, where
+ * the release could matter, run on both offered releases.
  */
 class StructuredEditorsTest {
 
@@ -243,6 +242,14 @@ class StructuredEditorsTest {
             assertTrue(cysteine.atDefault());
             assertEquals("Default -- Comet " + release + " default", cysteine.stateText());
             assertEquals(Optional.empty(), table.residue('1'));
+            assertEquals("lysine (K)", table.row("add_K_lysine").orElseThrow().words());
+            assertEquals(
+                    "user amino acid (B)",
+                    table.row("add_B_user_amino_acid").orElseThrow().words());
+            assertEquals(
+                    "peptide N-terminus", table.row("add_Nterm_peptide").orElseThrow().words());
+            assertEquals(Optional.empty(), table.row("num_threads"));
+            assertEquals(Optional.empty(), table.row("variable_mod01"));
         }
 
         @Test
@@ -271,41 +278,42 @@ class StructuredEditorsTest {
     @DisplayName("ion series")
     class Ions {
 
+        /**
+         * The ion-series family needs no view-model of its own (unit 10 removed an unused one):
+         * each series and the neutral-loss switch is its own on/off field, named by the release's
+         * display name and set through the model's flag.
+         */
         @ParameterizedTest(name = "Comet {0}")
         @MethodSource("org.cometgui.ui.viewmodel.params.StructuredEditorsTest#releases")
-        @DisplayName(
-                "named boxes for seven series and the neutral-loss peaks, set through the model")
-        void boxes(String release) {
+        @DisplayName("seven named series and the neutral-loss peaks, each an on/off field")
+        void namedOnOffFields(String release) {
             ParameterSession session = session(release);
-            IonSeriesViewModel ions = new IonSeriesViewModel(session);
-            assertEquals(
-                    List.of(
-                            IonSeries.A,
-                            IonSeries.B,
-                            IonSeries.C,
-                            IonSeries.X,
-                            IonSeries.Y,
-                            IonSeries.Z,
-                            IonSeries.Z1),
-                    ions.series());
-            assertEquals("Score a ions", ions.field(IonSeries.A).displayName());
-            assertEquals("use_Z1_ions", ions.field(IonSeries.Z1).name());
-            assertTrue(ions.isOn(IonSeries.B));
-            assertTrue(ions.isOn(IonSeries.Y));
-            assertFalse(ions.isOn(IonSeries.A));
-            assertFalse(ions.neutralLossOn());
-            assertEquals("Score water and ammonia losses", ions.neutralLossField().displayName());
-
-            assertEquals(EditOutcome.applied(), ions.set(IonSeries.A, true));
-            assertEquals(EditOutcome.applied(), ions.set(IonSeries.B, false));
-            assertEquals(EditOutcome.applied(), ions.setNeutralLoss(true));
-            assertTrue(ions.isOn(IonSeries.A));
-            assertFalse(ions.isOn(IonSeries.B));
-            assertTrue(ions.neutralLossOn());
+            Map<String, String> names = new LinkedHashMap<>();
+            names.put("use_A_ions", "Score a ions");
+            names.put("use_B_ions", "Score b ions");
+            names.put("use_C_ions", "Score c ions");
+            names.put("use_X_ions", "Score x ions");
+            names.put("use_Y_ions", "Score y ions");
+            names.put("use_Z_ions", "Score z ions");
+            names.put("use_Z1_ions", "Score z+1 ions");
+            names.put("use_NL_ions", "Score water and ammonia losses");
+            Map<String, String> shown = new LinkedHashMap<>();
+            for (String name : names.keySet()) {
+                shown.put(name, session.field(name).displayName());
+            }
+            assertEquals(names, shown);
+            assertTrue(session.field("use_B_ions").isOn());
+            assertTrue(session.field("use_Y_ions").isOn());
+            assertFalse(session.field("use_A_ions").isOn());
+            assertFalse(session.field("use_NL_ions").isOn());
+            assertEquals(EditOutcome.applied(), session.field("use_A_ions").setOn(true));
+            assertEquals(EditOutcome.applied(), session.field("use_B_ions").setOn(false));
+            assertEquals(EditOutcome.applied(), session.field("use_NL_ions").setOn(true));
             assertEquals("1", session.model().text("use_A_ions"));
             assertEquals("0", session.model().text("use_B_ions"));
             assertEquals("1", session.model().text("use_NL_ions"));
             assertEquals(ValueOrigin.USER, session.model().origin("use_A_ions"));
+            assertTrue(session.model().ionSeries().neutralLossPeaks());
         }
     }
 
@@ -373,7 +381,7 @@ class StructuredEditorsTest {
 
         @ParameterizedTest(name = "Comet {0}")
         @MethodSource("org.cometgui.ui.viewmodel.params.StructuredEditorsTest#releases")
-        @DisplayName("fragment bins in the built-in presets' words, applied as the preset, PRESET")
+        @DisplayName("fragment bins in the built-in presets' words, previewed then applied, PRESET")
         void fragments(String release) {
             ParameterSession session = session(release);
             ToleranceViewModel tolerance = new ToleranceViewModel(session);
@@ -396,7 +404,13 @@ class StructuredEditorsTest {
             assertEquals(
                     "As in: High-res precursor, high-res fragments", tolerance.fragmentWords());
 
-            assertEquals(EditOutcome.applied(), tolerance.chooseFragment(options.get(0)));
+            assertEquals("low-low", options.get(0).source().id());
+            assertEquals("high-high", options.get(1).source().id());
+            // Choosing is a preview (AC-PAR-08): applying it sets the values, origin PRESET.
+            PresetsViewModel presets = new PresetsViewModel(session, List.of());
+            presets.previewFragment(options.get(0));
+            assertEquals("0.02", session.model().text("fragment_bin_tol"));
+            assertEquals(EditOutcome.applied(), presets.applyAll());
             assertEquals("1.0005", session.model().text("fragment_bin_tol"));
             assertEquals("0.4", session.model().text("fragment_bin_offset"));
             assertEquals("1", session.model().text("theoretical_fragment_ions"));
@@ -404,12 +418,15 @@ class StructuredEditorsTest {
             assertEquals(ValueOrigin.PRESET, session.model().origin("fragment_bin_offset"));
             assertEquals(ValueOrigin.PRESET, session.model().origin("theoretical_fragment_ions"));
             assertEquals(ValueOrigin.COMET_DEFAULT, session.model().origin("peptide_mass_units"));
-            assertEquals("low-low", options.get(0).source().id());
-            assertEquals("high-high", options.get(1).source().id());
             assertEquals(options.get(0), tolerance.fragmentMatch().orElseThrow());
-            // choosing the setting the configuration already holds changes nothing
+            // previewing the setting the configuration already holds shows no row
             CometParameters held = session.model();
-            assertEquals(EditOutcome.applied(), tolerance.chooseFragment(options.get(0)));
+            assertEquals(List.of(), presets.previewFragment(options.get(0)).rows());
+            assertEquals(
+                    EditOutcome.refused(
+                            "The configuration already holds every value of this preset that its"
+                                    + " release can take; nothing was applied."),
+                    presets.applyAll());
             assertSame(held, session.model());
             assertEquals(
                     "As in: Low-res precursor, low-res fragments / High-res precursor, low-res"
@@ -461,7 +478,13 @@ class StructuredEditorsTest {
                                     () -> new FragmentOption(List.of("x"), Map.of(), lowLow))
                             .getMessage());
             FragmentOption narrow = new FragmentOption(List.of("constructed"), good, lowLow);
-            assertEquals(EditOutcome.applied(), tolerance.chooseFragment(narrow));
+            PresetsViewModel presets = new PresetsViewModel(session, List.of());
+            assertEquals(
+                    List.of("fragment_bin_tol"),
+                    presets.previewFragment(narrow).rows().stream()
+                            .map(PresetRowViewModel::parameter)
+                            .toList());
+            assertEquals(EditOutcome.applied(), presets.applyAll());
             assertEquals("1.0005", session.model().text("fragment_bin_tol"));
             assertEquals("0.0", session.model().text("fragment_bin_offset"));
             assertEquals(ValueOrigin.COMET_DEFAULT, session.model().origin("fragment_bin_offset"));

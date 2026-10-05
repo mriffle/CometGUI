@@ -22,10 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import org.cometgui.params.comet.presets.DiffRow;
 import org.cometgui.params.comet.presets.Preset;
 import org.cometgui.params.comet.presets.PresetDelta;
-import org.cometgui.params.comet.presets.PresetDiff;
 import org.cometgui.params.comet.presets.PresetLoader;
 import org.cometgui.params.comet.schema.ParameterCategory;
 import org.cometgui.params.comet.validation.Finding;
@@ -41,8 +39,10 @@ import org.cometgui.params.comet.value.TolerancePair;
  *
  * <p>The fragment settings are offered as the built-in presets give them: each distinct set of
  * fragment-scoring values among Comet's example parameter files, named after the files that use it.
- * No value is invented here, and choosing one applies those rows of the preset itself, so the
- * values carry origin {@code PRESET} (Phase 07, unit 5).
+ * No value is invented here, and nothing here changes the configuration: choosing an option
+ * previews those rows of the preset itself ({@link PresetsViewModel#previewFragment}), and only
+ * applying the preview sets them, with origin {@code PRESET} ({@code AC-PAR-08}; Phase 07, unit 10
+ * -- unit 5's immediate application is gone).
  */
 public final class ToleranceViewModel {
 
@@ -254,30 +254,6 @@ public final class ToleranceViewModel {
         return fragmentMatch()
                 .map(option -> "As in: " + option.words())
                 .orElse("Not one of the built-in instrument settings");
-    }
-
-    /**
-     * Sets the fragment parameters to an instrument setting: the option's rows of its source
-     * preset's diff against the configuration, applied through the model ({@link
-     * PresetDiff#applySelected}) and adopted as {@link Adoption#PRESET_APPLIED}, so each value
-     * carries origin {@code PRESET}. A value the configuration already holds is not a row and keeps
-     * its origin; an option the configuration already matches changes nothing.
-     *
-     * @param option one of {@link #fragmentOptions()}
-     * @return accepted
-     */
-    public EditOutcome chooseFragment(FragmentOption option) {
-        Objects.requireNonNull(option, "option");
-        PresetDiff diff = PresetDiff.of(session.model(), option.source());
-        List<String> rows =
-                diff.rows().stream()
-                        .map(DiffRow::key)
-                        .filter(option.values()::containsKey)
-                        .toList();
-        if (!rows.isEmpty()) {
-            session.adopt(diff.applySelected(rows).model(), Adoption.PRESET_APPLIED);
-        }
-        return EditOutcome.applied();
     }
 
     private Optional<FieldViewModel> fieldOf(String name) {
