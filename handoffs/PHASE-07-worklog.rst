@@ -214,7 +214,7 @@ Run serially, one fresh agent each, in this order.
        leaves the model untouched on parse failure; the migration report as a
        reviewable diff with per-entry resolution.
      - R-PARAM-05, -07, -08, -13; AC-PAR-07, -08; gates 3, 4, 8
-     -
+     - **Accepted** 2026-10-05, ``562798c``, ``4c3ab49``; :ref:`p07w-u5`.
    * - 6
      - **Views, part 1, with their gate tests**: the Comet Parameters editor
        (mode switch, typed generic controls, Essentials surface, Advanced
@@ -485,6 +485,64 @@ What I ran (2026-10-05):
   params 109, quality 42.
 
 No test reads a file outside its module.
+
+.. _p07w-u5:
+
+Unit 5 -- presets, search, Expert, files, migration review (``562798c``, ``4c3ab49``)
+--------------------------------------------------------------------------------------
+
+Agent: fresh tier-3 agent.
+
+* **Model** (``562798c``): ``parser.ParamsHighlighting`` -- per-line kind
+  (``ParamsLineReader``'s own classification) and spans for the Expert view,
+  and ``declaredRelease(text)``.
+* **View-models** (``4c3ab49``): ``PresetsViewModel`` (diff rows with
+  selection; apply all / selected (origin ``PRESET``) / cancel -- same model
+  object; locked outputs not selectable), ``ParameterSearchViewModel`` (name,
+  display name, the release's help, category, aliases; each hit says which
+  attribute matched; five filters, AND-combined; "modified" = differs from the
+  reset value), ``ExpertViewModel`` (canonical text, draft, per-line
+  diagnostics, diffs against defaults/preset/last saved, unknown list,
+  apply-then-confirm; a failed parse leaves the same model object),
+  ``ParameterFilesViewModel`` (save through ``writeOnce`` and the hash port,
+  refused while anything blocks Run; import with a migrate / read-as-own /
+  read-as-selected offer), ``MigrationReviewViewModel`` (one row per change,
+  ``NEEDS_ATTENTION`` rows blocking until accepted or set at the field). Unit
+  4's fragment "instrument" choice now applies the built-in preset (origin
+  ``PRESET``).
+
+Notes for units 6/7 (from the agent, checked): JavaFX change listeners fire
+only on a non-equal value and ``ValidationReport`` is value-equal, and
+``commit`` sets the report before the model -- views bind to the model
+property too. "Versus last run" does not exist until Phase 08 has runs.
+
+What I ran (2026-10-05):
+
+* Read the diffs (model class in full; view-model public API and the search
+  match, review row and Expert apply paths).
+* ``mvn -B -o -pl cometgui-params-comet -am verify``: ``Tests run: 2000,
+  Failures: 0``; three "All coverage checks have been met".
+* ``mvn -B -o -pl cometgui-archtests -am verify -Dtest='org.cometgui.ui.**,org.cometgui.archtests.**' ...``:
+  BUILD SUCCESS; archtests 29/29 (``UiThroughTheModelRule`` accepts the new
+  view-models); view-model coverage met.
+* Injection 5a (search reads the curated help): my first form called an
+  instance field from a static method -- a **compilation error, no verdict**;
+  re-made as 5c.
+* Injection 5c (production, **version-blind**): ``FieldViewModel.shortHelp``
+  returns the curated help instead of the release's -- red:
+  ``ParameterSearchViewModelTest.releaseHelp expected: <[index_search_type]>
+  but was: <[]>``.
+* Injection 5b (production): ``MigrationRow.blocking`` returns ``false`` --
+  red: ``MigrationReviewViewModelTest.blocks expected: <true> but was:
+  <false>``, ``setAtTheField``.
+* Restored; ``sha256sum -c`` OK. (Spotless/Checkstyle/SpotBugs skipped on the
+  command line for injection runs only.)
+* ``bash scripts/verify-all-gates.sh --only params --only docs --only
+  traceability``: ``3 control(s) passed, 0 failed, in 519 seconds``; params
+  109.
+
+No test reads a file outside its module (``ReleaseDefaults`` reads a
+class-path resource of the model module).
 
 Rejections and rework
 =====================
