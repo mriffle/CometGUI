@@ -216,25 +216,30 @@ Run serially, one fresh agent each, in this order.
      - R-PARAM-05, -07, -08, -13; AC-PAR-07, -08; gates 3, 4, 8
      - **Accepted** 2026-10-05, ``562798c``, ``4c3ab49``; :ref:`p07w-u5`.
    * - 6
-     - **Views, part 1, with their gate tests**: the Comet Parameters editor
-       (mode switch, typed generic controls, Essentials surface, Advanced
-       categories, error summary with keyboard navigation, locked outputs),
-       the Run control, composition-root wiring of metadata and offered
-       releases; ``FxUiDriver`` gains text entry. GUI tests: gate 1
-       (Essentials-only tryptic DDA, file equal to a checked-in expected
-       canonical file), gate 5, gate 6, gate 7 (every parameter control
-       named, validation in text), each version-dependent control on both
-       releases.
-     - AC-PAR-03, -04, -09, -10; gates 1, 5, 6, 7
+     - **Views, part 1, with their gate tests** (rebalanced 2026-10-05,
+       before dispatch: everything Essentials needs moves here). The Comet
+       Parameters editor: release selector, mode switch, typed generic
+       controls, the Essentials surface with its structured controls
+       (compound tolerance, enzyme selectors, static-modification table,
+       variable-modification editor), Advanced categories, the error summary
+       with keyboard navigation, locked outputs; the Run control;
+       composition-root wiring (metadata, offered releases, build identity,
+       hash service, file chooser with a test injection); ``FxUiDriver`` gains
+       text entry. GUI tests: gate 1 (Essentials-only tryptic DDA, saved file
+       equal to a checked-in expected canonical file), gate 2 (add, edit,
+       reorder, remove; serialised tuple after each step), gate 5, gate 6,
+       gate 7, each version-dependent control on both releases.
+     - AC-PAR-03, -04, -05, -09, -10; gates 1, 2, 5, 6, 7
      -
    * - 7
-     - **Views, part 2, with their gate tests**: variable-modification
-       editor, enzyme and static-modification editors, preset diff dialog,
-       Expert pane, search field and filters, migration review pane. GUI
-       tests: gate 2 (add, edit, reorder, remove; serialised tuple after
-       each step), gate 3, gate 4, gate 8, and a migrated file with an
-       unresolved ``NEEDS_ATTENTION`` blocking Run until resolved.
-     - AC-PAR-05, -07, -08; gates 2, 3, 4, 8
+     - **Views, part 2, with their gate tests**: custom enzyme editor, ion
+       series and range controls where Advanced needs more than the generic
+       control, preset diff dialog, Expert pane (highlighting, diagnostics,
+       diffs, unknown list, apply with confirmation), search field and
+       filters, import/save, migration review pane. GUI tests: gate 3, gate
+       4, gate 8, and a migrated file with an unresolved ``NEEDS_ATTENTION``
+       blocking Run until resolved.
+     - AC-PAR-07, -08; R-PARAM-13; gates 3, 4, 8
      -
    * - 8
      - **Falsifiability harness** ``scripts/verify-param-ui-gates.sh``,
