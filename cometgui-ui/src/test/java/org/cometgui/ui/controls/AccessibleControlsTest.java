@@ -122,6 +122,44 @@ class AccessibleControlsTest {
                                 + built.stream().map(Control::getAccessibleText).toList());
     }
 
+    @Test
+    @DisplayName("a generated name is marked as generated; an explicit name never is")
+    void aGeneratedNameIsMarked() throws InterruptedException {
+        TextArea area = new TextArea("output");
+        area.setId("probe-marked");
+        AccessibleControls.named(area, "probe output");
+        Button added = new Button("unnamed");
+        added.setId("added-unnamed");
+        FxToolkit.onFxThread(
+                () -> {
+                    Scene scene = new Scene(new VBox(area), 200, 80);
+                    scene.getRoot().applyCss();
+                    scene.getRoot().layout();
+                });
+        List<Control> built = controlsUnder(area);
+        assertFalse(built.isEmpty());
+        for (Control control : built) {
+            assertTrue(
+                    AccessibleControls.hasGeneratedName(control),
+                    control.getClass().getSimpleName() + " was named by the fallback");
+        }
+        assertFalse(AccessibleControls.hasGeneratedName(area), "named explicitly");
+        assertFalse(AccessibleControls.hasGeneratedName(added), "never named at all");
+
+        Control first = built.get(0);
+        AccessibleControls.named(first, "given a real name later");
+        assertFalse(AccessibleControls.hasGeneratedName(first), "named() replaces the fallback");
+        assertEquals("given a real name later", first.getAccessibleText());
+
+        Control second = built.get(built.size() - 1);
+        if (second != first) {
+            second.setAccessibleText("set directly");
+            assertFalse(
+                    AccessibleControls.hasGeneratedName(second),
+                    "a name set directly afterwards is not the generated one");
+        }
+    }
+
     /** Every control below this one: by construction, everything a skin built. */
     private static List<Control> controlsUnder(Parent root) {
         List<Control> found = new ArrayList<>();

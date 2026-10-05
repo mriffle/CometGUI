@@ -59,6 +59,13 @@ import javafx.scene.control.Control;
  * The watch is recursive and permanent, so a scroll bar that appears only when the console
  * overflows, three minutes into a run, is named the moment it is added.
  *
+ * <p><strong>A generated name is marked as one</strong> ({@link #hasGeneratedName(Control)}). The
+ * fallback is for the controls a skin builds; a control this project created that ends up with it
+ * has lost its real name, and a test that only asked for a non-blank name could not tell -- Phase
+ * 07's sign-off found exactly that by removing a parameter control's {@code named(...)}. The
+ * enumeration tests therefore refuse a generated name on every control that carries a stable
+ * identifier, which every control this project creates does and no skin-built one does.
+ *
  * <p><strong>This is not a sweep over the whole scene, and that is the point.</strong> Only the
  * descendants of a control that was itself explicitly named are ever given a generated name. A
  * control that a view forgot to name is not a descendant of anything -- it is a child of a layout
@@ -73,6 +80,9 @@ public final class AccessibleControls {
      * does not accumulate a second listener.
      */
     private static final Object WATCHED_KEY = new Object();
+
+    /** Holds, in a control's properties, the name this class generated for it. */
+    private static final Object GENERATED_KEY = new Object();
 
     private AccessibleControls() {}
 
@@ -98,6 +108,7 @@ public final class AccessibleControls {
                             + " with id "
                             + control.getId());
         }
+        control.getProperties().remove(GENERATED_KEY);
         control.setAccessibleText(accessibleText);
         watch(control);
         return control;
@@ -120,6 +131,20 @@ public final class AccessibleControls {
         Objects.requireNonNull(control, "control")
                 .setAccessibleRole(Objects.requireNonNull(role, "role"));
         return named(control, accessibleText);
+    }
+
+    /**
+     * Whether a control's accessible name is the fallback this class generated for a control it
+     * found unnamed under a named one, rather than a name the code gave it.
+     *
+     * @param control the control
+     * @return {@code true} while its accessible text is the generated name
+     * @throws NullPointerException if {@code control} is {@code null}
+     */
+    public static boolean hasGeneratedName(Control control) {
+        Object generated =
+                Objects.requireNonNull(control, "control").getProperties().get(GENERATED_KEY);
+        return generated != null && generated.equals(control.getAccessibleText());
     }
 
     /**
@@ -152,7 +177,9 @@ public final class AccessibleControls {
             if (node instanceof Control control
                     && (control.getAccessibleText() == null
                             || control.getAccessibleText().isBlank())) {
-                control.setAccessibleText(generatedNameFor(control));
+                String generated = generatedNameFor(control);
+                control.getProperties().put(GENERATED_KEY, generated);
+                control.setAccessibleText(generated);
             }
             if (node instanceof Parent parent) {
                 watch(parent);
@@ -167,7 +194,13 @@ public final class AccessibleControls {
      * @return for example {@code "scroll bar within console-output"}
      */
     private static String generatedNameFor(Control control) {
-        String kind = spacedTypeName(control.getClass().getSimpleName());
+        Class<?> type = control.getClass();
+        // A skin may build an anonymous subclass (ComboBox's popup list is one), whose simple name
+        // is empty: name it after the class it extends, never as a blank kind.
+        while (type.getSimpleName().isEmpty()) {
+            type = type.getSuperclass();
+        }
+        String kind = spacedTypeName(type.getSimpleName());
         String owner = nearestIdentifiedAncestor(control);
         return owner == null ? kind : kind + " within " + owner;
     }

@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Control;
@@ -29,6 +30,7 @@ import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.RunningApplication;
 import org.cometgui.app.uidriver.TestFxUiDriver;
 import org.cometgui.domain.log.MessageSeverity;
+import org.cometgui.ui.controls.AccessibleControls;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.junit.jupiter.api.AfterAll;
@@ -100,6 +102,15 @@ class AccessibleNameEnumerationUiTest {
      */
     private static final int MINIMUM_CONTROLS = 68;
 
+    /**
+     * The identifiers JavaFX's own skins give the controls they build. Every control this project
+     * creates carries a stable identifier and skin-built ones carry none -- except this one: {@code
+     * ComboBoxListViewSkin} identifies the list it builds for a combo box's choices as {@code
+     * list-view}. Observed, not assumed: it is the only identified control the walk found with a
+     * generated name before any of this project's controls were checked.
+     */
+    static final Set<String> SKIN_IDENTIFIERS = Set.of("list-view");
+
     private static RunningApplication application;
 
     private static FxUiDriver driver;
@@ -150,6 +161,43 @@ class AccessibleNameEnumerationUiTest {
                                 + controls.size()
                                 + " controls have none: "
                                 + String.join("; ", unnamed));
+    }
+
+    /**
+     * A control this project created carries a name the code gave it, never the fallback {@code
+     * AccessibleControls} generates for controls a skin builds. Every control this project creates
+     * carries a stable identifier and no skin-built one does, so the identifier is what tells them
+     * apart. Without this, a control whose {@code named(...)} call was removed would still pass the
+     * test above on its generated "... within ..." name: Phase 07's sign-off showed exactly that.
+     */
+    @Test
+    @DisplayName("no control this project created carries a generated name")
+    void noProjectControlCarriesAGeneratedName() {
+        List<String> generated = new ArrayList<>();
+        int identified = 0;
+        for (Control control : controls) {
+            String id = driver.callOnFxThread(control::getId);
+            if (id != null && !id.isBlank() && !SKIN_IDENTIFIERS.contains(id)) {
+                identified++;
+                if (driver.callOnFxThread(() -> AccessibleControls.hasGeneratedName(control))) {
+                    generated.add(
+                            describe(control)
+                                    + " is named only by the fallback: \""
+                                    + driver.callOnFxThread(control::getAccessibleText)
+                                    + "\"");
+                }
+            }
+        }
+        assertTrue(
+                identified >= MINIMUM_CONTROLS,
+                "the walk found " + identified + " identified controls");
+        assertEquals(
+                List.of(),
+                generated,
+                () ->
+                        generated.size()
+                                + " controls this project created have no name of their own: "
+                                + String.join("; ", generated));
     }
 
     @Test

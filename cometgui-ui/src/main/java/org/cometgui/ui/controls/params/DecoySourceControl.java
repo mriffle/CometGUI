@@ -72,7 +72,7 @@ public final class DecoySourceControl extends VBox {
         label.setPrefWidth(240);
         named(label, "Decoy source");
         sources.setId(UiIds.parameterControl(surface, name));
-        named(sources, "Decoy source");
+        named(sources, "Decoy source: " + field.displayName());
         label.setLabelFor(sources);
         sources.getItems().setAll(session.decoyOptions());
         sources.setConverter(

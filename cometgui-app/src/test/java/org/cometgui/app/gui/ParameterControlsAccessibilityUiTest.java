@@ -38,6 +38,7 @@ import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.MetadataLoader;
 import org.cometgui.params.comet.schema.ParameterDefinition;
 import org.cometgui.params.comet.schema.ValueKind;
+import org.cometgui.ui.controls.AccessibleControls;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -188,6 +189,60 @@ class ParameterControlsAccessibilityUiTest {
 
     @Test
     @Order(2)
+    @DisplayName("a parameter of every value kind is named by its own display name, typed out")
+    void representativeNames() {
+        driver.clickOn("param-mode-advanced");
+        for (String toggle : CATEGORY_TOGGLES) {
+            ParameterEditorApp.showCategory(driver, toggle);
+        }
+        List<List<String>> expected =
+                List.of(
+                        List.of("adv-allowed_missed_cleavage", "Allowed missed cleavages"),
+                        List.of("adv-fragment_bin_tol", "Fragment bin width"),
+                        List.of("adv-decoy_prefix", "Decoy protein prefix"),
+                        List.of("adv-require_variable_mod", "Require a variable modification"),
+                        List.of("adv-peptide_mass_units", "Precursor tolerance units"),
+                        List.of("adv-activation_method", "Activation method filter"),
+                        List.of("adv-database_name", "Sequence database (FASTA)"),
+                        List.of("adv-peptide_length_range", "Peptide length range"),
+                        List.of(
+                                "adv-peptide_length_range-second",
+                                "Peptide length range, second value"),
+                        List.of("adv-digest_mass_range", "Peptide mass range (MH+)"),
+                        List.of("adv-mass_offsets", "Precursor mass offsets"),
+                        List.of(
+                                "adv-peptide_mass_tolerance_lower",
+                                "Precursor tolerance, lower bound"),
+                        List.of("adv-search_enzyme_number", "Search enzyme"),
+                        List.of("adv-use_A_ions", "Score a ions"),
+                        List.of(
+                                "adv-variable_mod02",
+                                "Variable modification 2: unused (mass difference 0.0)"),
+                        List.of("ess-decoy_search", "Decoy source: Internal decoy search"),
+                        List.of("ess-num_threads", "Search threads"));
+        List<String> failures = new ArrayList<>();
+        for (List<String> pair : expected) {
+            String actual = driver.accessibleTextOf(pair.get(0));
+            if (!pair.get(1).equals(actual)) {
+                failures.add(
+                        "#"
+                                + pair.get(0)
+                                + " is named \""
+                                + actual
+                                + "\", not \""
+                                + pair.get(1)
+                                + "\"");
+            }
+        }
+        for (String toggle : CATEGORY_TOGGLES) {
+            driver.clickOn(toggle);
+        }
+        driver.clickOn("param-mode-essentials");
+        assertEquals(List.of(), failures);
+    }
+
+    @Test
+    @Order(3)
     @DisplayName("a field with a finding states it in text, on Essentials and on Advanced")
     void aFindingIsStatedInText() {
         driver.clickOn("param-mode-essentials");
@@ -218,7 +273,7 @@ class ParameterControlsAccessibilityUiTest {
     }
 
     @Test
-    @Order(3)
+    @Order(4)
     @DisplayName("index_search_type offers -1 on 2026.03.0 only")
     void indexSearchTypeOnTheDefaultRelease() {
         driver.clickOn("param-mode-advanced");
@@ -234,7 +289,7 @@ class ParameterControlsAccessibilityUiTest {
     }
 
     @Test
-    @Order(4)
+    @Order(5)
     @DisplayName(
             "Comet 2026.02.2: every parameter control is named and states its validation in text")
     void theOlderRelease() {
@@ -261,7 +316,7 @@ class ParameterControlsAccessibilityUiTest {
         driver.clickOn("param-mode-essentials");
         unnamedControls("param-essentials", failures);
         for (String name : ESSENTIALS) {
-            checkParameter("ess-" + name, kindOf(name, release), failures);
+            checkParameter("ess-" + name, definitionOf(name, release), failures);
         }
 
         driver.clickOn("param-mode-advanced");
@@ -272,7 +327,7 @@ class ParameterControlsAccessibilityUiTest {
         List<ParameterDefinition> every = METADATA.parametersFor(ToolVersion.parse(release));
         assertEquals(118, every.size(), "Comet " + release + " models 118 parameters");
         for (ParameterDefinition parameter : every) {
-            checkParameter("adv-" + parameter.name(), parameter.kind(), failures);
+            checkParameter("adv-" + parameter.name(), parameter, failures);
         }
         for (String toggle : CATEGORY_TOGGLES) {
             driver.clickOn(toggle);
@@ -282,8 +337,8 @@ class ParameterControlsAccessibilityUiTest {
                 List.of(), failures, "Comet " + release + ": " + failures.size() + " failures");
     }
 
-    private static ValueKind kindOf(String name, String release) {
-        return METADATA.parameter(name, ToolVersion.parse(release)).orElseThrow().kind();
+    private static ParameterDefinition definitionOf(String name, String release) {
+        return METADATA.parameter(name, ToolVersion.parse(release)).orElseThrow();
     }
 
     /** Every control under a level, each required to carry a non-blank accessible name. */
@@ -293,26 +348,47 @@ class ParameterControlsAccessibilityUiTest {
                 controls.size() > 300, "#" + levelId + " holds " + controls.size() + " controls");
         for (Control control : controls) {
             String name = driver.callOnFxThread(control::getAccessibleText);
+            String id = driver.callOnFxThread(control::getId);
             if (name == null || name.isBlank()) {
                 failures.add(
                         control.getClass().getSimpleName()
                                 + " "
-                                + driver.callOnFxThread(control::getId)
+                                + id
                                 + " under #"
                                 + levelId
                                 + " has no accessible name");
+            } else if (id != null
+                    && !AccessibleNameEnumerationUiTest.SKIN_IDENTIFIERS.contains(id)
+                    && driver.callOnFxThread(() -> AccessibleControls.hasGeneratedName(control))) {
+                failures.add(
+                        control.getClass().getSimpleName()
+                                + " #"
+                                + id
+                                + " under #"
+                                + levelId
+                                + " has only the generated fallback name \""
+                                + name
+                                + "\", not a name of its own");
             }
         }
     }
 
-    private static void checkParameter(String id, ValueKind kind, List<String> failures) {
+    private static void checkParameter(
+            String id, ParameterDefinition parameter, List<String> failures) {
+        ValueKind kind = parameter.kind();
         if (!exists(driver, id)) {
             failures.add("#" + id + " does not exist");
             return;
         }
         String name = driver.accessibleTextOf(id);
-        if (name == null || name.isBlank()) {
-            failures.add("#" + id + " has no accessible name");
+        if (name == null || !name.contains(parameter.displayName())) {
+            failures.add(
+                    "#"
+                            + id
+                            + "'s accessible name does not name its parameter \""
+                            + parameter.displayName()
+                            + "\": "
+                            + name);
         }
         if (kind != ValueKind.VARIABLE_MOD_TUPLE && !exists(driver, id + "-label")) {
             failures.add("#" + id + " has no label");
