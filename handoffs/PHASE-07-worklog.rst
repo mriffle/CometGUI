@@ -168,7 +168,13 @@ Run serially, one fresh agent each, in this order.
      - STATUS decision; spec IA
      - **Accepted** 2026-10-05, ``b7a02be``; :ref:`p07w-u2`.
    * - 3
-     - **Editor session view-models** (``org.cometgui.ui.viewmodel.params``):
+     - **Release default sets and editor session view-models.** First, in
+       ``cometgui-params-comet``: each offered release's starting set is
+       Comet's own ``-q`` output (the metadata curates no enzyme rows), so
+       the module gains a main-resource copy of each release's ``-q`` file,
+       byte-equal to the checked-in fixture, and a loader giving the parsed
+       default set (``--only params``). Then the view-models
+       (``org.cometgui.ui.viewmodel.params``):
        the session (model, selected release from an offered list, adopting
        a model with outputs enforced, release switch through migration with
        its review), per-parameter field view-models (display name, help,
