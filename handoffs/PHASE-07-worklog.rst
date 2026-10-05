@@ -188,7 +188,8 @@ Run serially, one fresh agent each, in this order.
        the value codecs, ``Numbers`` or ``java.util.regex``. Independence scan
        extended to the subpackage.
      - R-PARAM-03, -06, -08, R-CMT-01; AC-PAR-03, -09, -10; gates 1, 5, 6, 7
-     -
+     - **Accepted after one rework** 2026-10-05, ``9c03e63``, ``00ad4ab``,
+       ``adce760``; :ref:`p07w-u3`.
    * - 4
      - **Structured-value view-models**: variable-modification editor over
        all slots of the release's layout (summary text from the model, add,
@@ -345,15 +346,101 @@ What I ran (2026-10-05):
 
 No test reads a file outside its module.
 
+.. _p07w-u3:
+
+Unit 3 -- release default sets and session view-models (``9c03e63``, ``00ad4ab``, ``adce760``)
+------------------------------------------------------------------------------------------------
+
+Agent: fresh tier-3 agent (resumed once for the rework below).
+
+* **Model** (``9c03e63``): ``parser.ReleaseDefaults`` loads each offered
+  release's bundled ``comet -q`` file (``src/main/resources/.../parser/defaults/
+  {2026.03.0,2026.02.2}/comet-q.params``, byte copies of the fixtures; a
+  ``-text`` rule in ``.gitattributes``), origins ``COMET_DEFAULT``; refuses a
+  release with none (2024.01.0 deliberately has none) and any parse
+  diagnostic. Developer page section *Each release's starting set*.
+* **View-models** (``00ad4ab``), ``org.cometgui.ui.viewmodel.params``:
+  ``ParameterSession`` (one model; release from a caller-given list;
+  ``adopt``/``adoptMigration`` always enforce outputs; ``selectRelease``
+  migrates and keeps the ``MigrationReview``, and is refused while entries
+  are unresolved; edits via ``withText(..., USER)``; an edit equal to the
+  held value changes nothing, origin included, so re-committing text cannot
+  resolve a migration entry), ``FieldViewModel`` (from ``parameter(name,
+  version)``), Essentials (10 task-ordered groups, 57 parameters, held equal
+  to the metadata's ESSENTIALS set for both releases), Advanced (14
+  categories, 118 each), resets, ``ValidationSummaryViewModel``,
+  ``RunReadinessViewModel``, ``SpectrumInputsViewModel`` with
+  ``FileChooserPort`` and ``FileSystemAccess``, ``StageSwitches``. New
+  ArchUnit rule ``UiThroughTheModelRule`` (no ``ParamsLineReader``,
+  ``Numbers``, value codecs, ``ParameterValueCodec`` or ``java.util.regex`` in
+  ``org.cometgui.ui``); ``UiIds``' one regex replaced by a character loop with
+  new ``UiIdsTest`` pins; the view-model independence scan now reads
+  subpackages.
+
+**Rework (rejected design call).** The agent reported that a field holding a
+refused edit did not block Run. I rejected that: the screen would show a value
+that is not the one searched. ``adce760`` makes every pending refusal a
+blocking reason (``Not applied -- <display name> (<name>), <category>:
+<model's message>``), listed first in the summary with its focus target; an
+accepted edit, reset, adoption or release change clears it. View-model state,
+no model rule.
+
+Accepted design calls, for later units: no "unit" field (the metadata has
+none; units are parameters such as ``peptide_mass_units``); with a stage
+switched off an output can be switched off but model validation still errors
+(no stage can be switched off before Phases 11/12 -- deferred, see
+*Deferred*).
+
+What I ran (2026-10-05):
+
+* Read the diffs; searched the view-models for parsing (``split``,
+  ``parse``, ``Integer.``, ``BigDecimal``, ``matches``): one
+  ``Integer.toString(source.decoySearch())`` to match a model enum's token
+  against the release's choice tokens -- formatting, not a rule.
+* ``mvn -B -o -pl cometgui-params-comet -am verify``: ``Tests run: 1941,
+  Failures: 0``; three "All coverage checks have been met". PIT on
+  ``ReleaseDefaults*``: 9/9 KILLED.
+* ``mvn -B -o -pl cometgui-archtests -am verify -Dtest='org.cometgui.ui.**,org.cometgui.archtests.**'
+  ...``: BUILD SUCCESS; archtests 29 tests, 0 failures. ``jacoco.xml``
+  package ``org/cometgui/ui/viewmodel/params``: LINE 546/546, BRANCH
+  145/145 before the rework (agent: 600/600, 159/159 after; the view-model
+  rule passed in my post-rework run).
+* Injection 3a (production): ``adopt`` without ``withWorkflowEnforcedOutputs()``
+  -- red: ``ParameterSessionTest.editsKeepTheRelease expected: <1> but was:
+  <0>``, ``imported`` (5 failures).
+* Injection 3b (production, **version-blind**): ``selectRelease`` migrates to
+  the current release instead of the target -- red:
+  ``ParameterSessionTest.migrates expected: <2026.2.2> but was: <2026.3>``,
+  ``needsAttentionBlocksUntilResolved expected: <[variable_mod01]> but was:
+  <[]>``, ``editsKeepTheReview`` (6 failures). My first attempt at 3b was
+  stopped by Spotless (line too long) -- no verdict; re-injected formatted.
+* Injection 3c (production, after the rework): the per-field refusal
+  listener removed -- red: ``SummaryAndReadinessTest.refusedEditBlocks
+  expected: <true> but was: <false>``, ``adoptAndReleaseChangeUnblock``.
+* All restored; ``sha256sum -c`` OK each time.
+* After the rework: ``mvn -B -o -pl cometgui-ui -am verify -Dtest='org.cometgui.ui.**'
+  ...``: ``Tests run: 508, Failures: 0, Errors: 0, Skipped: 0``, "All
+  coverage checks have been met".
+* ``bash scripts/verify-all-gates.sh --only params --only quality --only docs
+  --only traceability``: ``4 control(s) passed, 0 failed, in 642 seconds``;
+  params 109 controls, quality 42, docs 1, traceability 8.
+
+No test reads a file outside its module.
+
 Rejections and rework
 =====================
 
-None yet.
+* Unit 3, 2026-10-05: design call "a pending refused edit does not block
+  Run" rejected; reworked in ``adce760`` (see :ref:`p07w-u3`).
 
 Deferred
 ========
 
-None yet.
+* **Stage-dependent unlocking of workflow outputs.** In this phase every
+  dependent stage is enabled (no stage can be switched off before Phases 11
+  and 12), so both outputs are always locked. ``StageSwitches`` is the input
+  those phases set; reconciling a switched-off stage with the model rule
+  ``workflow_enforced.output_off`` is theirs.
 
 Blockers escalated
 ==================
