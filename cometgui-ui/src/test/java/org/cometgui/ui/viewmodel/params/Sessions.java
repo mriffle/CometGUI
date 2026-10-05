@@ -16,8 +16,12 @@
 
 package org.cometgui.ui.viewmodel.params;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
+import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.params.comet.parser.ReleaseDefaults;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.MetadataLoader;
 
@@ -33,7 +37,22 @@ final class Sessions {
     /** Comet 2026.02.2, the older offered release. */
     static final ToolVersion C02 = ToolVersion.parse("2026.02.2");
 
+    /** The build the canonical header names: the version the developer page's sizes are for. */
+    static final BuildIdentity BUILD =
+            BuildIdentity.of("0.1.0-SNAPSHOT", "unknown", Instant.parse("2026-10-05T00:00:00Z"));
+
     private Sessions() {}
+
+    /**
+     * A release's own {@code comet -q} file, as bundled in the model module's jar (Comet's own
+     * output, on the class path; no file outside this module is read).
+     *
+     * @param release the release
+     * @return the text
+     */
+    static String cometQ(ToolVersion release) {
+        return new String(ReleaseDefaults.bundledFile(release), StandardCharsets.UTF_8);
+    }
 
     /**
      * A session offering both releases, the given one first, every stage enabled.

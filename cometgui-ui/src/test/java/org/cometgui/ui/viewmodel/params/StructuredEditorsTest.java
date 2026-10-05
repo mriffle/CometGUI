@@ -21,6 +21,7 @@ import static org.cometgui.ui.viewmodel.params.Sessions.C03;
 import static org.cometgui.ui.viewmodel.params.Sessions.startingIn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,7 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ValueOrigin;
+import org.cometgui.params.comet.presets.Preset;
 import org.cometgui.params.comet.validation.Finding;
 import org.cometgui.params.comet.validation.Rule;
 import org.cometgui.params.comet.value.EnzymeDefinition;
@@ -370,7 +373,7 @@ class StructuredEditorsTest {
 
         @ParameterizedTest(name = "Comet {0}")
         @MethodSource("org.cometgui.ui.viewmodel.params.StructuredEditorsTest#releases")
-        @DisplayName("fragment bins in the built-in presets' words, set through the model")
+        @DisplayName("fragment bins in the built-in presets' words, applied as the preset, PRESET")
         void fragments(String release) {
             ParameterSession session = session(release);
             ToleranceViewModel tolerance = new ToleranceViewModel(session);
@@ -397,8 +400,17 @@ class StructuredEditorsTest {
             assertEquals("1.0005", session.model().text("fragment_bin_tol"));
             assertEquals("0.4", session.model().text("fragment_bin_offset"));
             assertEquals("1", session.model().text("theoretical_fragment_ions"));
-            assertEquals(ValueOrigin.USER, session.model().origin("fragment_bin_offset"));
+            assertEquals(ValueOrigin.PRESET, session.model().origin("fragment_bin_tol"));
+            assertEquals(ValueOrigin.PRESET, session.model().origin("fragment_bin_offset"));
+            assertEquals(ValueOrigin.PRESET, session.model().origin("theoretical_fragment_ions"));
+            assertEquals(ValueOrigin.COMET_DEFAULT, session.model().origin("peptide_mass_units"));
+            assertEquals("low-low", options.get(0).source().id());
+            assertEquals("high-high", options.get(1).source().id());
             assertEquals(options.get(0), tolerance.fragmentMatch().orElseThrow());
+            // choosing the setting the configuration already holds changes nothing
+            CometParameters held = session.model();
+            assertEquals(EditOutcome.applied(), tolerance.chooseFragment(options.get(0)));
+            assertSame(held, session.model());
             assertEquals(
                     "As in: Low-res precursor, low-res fragments / High-res precursor, low-res"
                             + " fragments",
@@ -410,32 +422,49 @@ class StructuredEditorsTest {
         }
 
         @Test
-        @DisplayName("an option holding text the model refuses reports the first refusal")
-        void refusedOption() {
+        @DisplayName("an option holds its source preset's values and nothing else")
+        void optionIsItsPreset() {
             ParameterSession session = startingIn(C03);
             ToleranceViewModel tolerance = new ToleranceViewModel(session);
+            Preset lowLow = tolerance.fragmentOptions().get(0).source();
             Map<String, String> values = new LinkedHashMap<>();
-            values.put("fragment_bin_tol", "wide");
-            values.put("fragment_bin_offset", "0.4");
-            values.put("theoretical_fragment_ions", "narrow");
-            EditOutcome outcome =
-                    tolerance.chooseFragment(new FragmentOption(List.of("constructed"), values));
+            values.put("fragment_bin_tol", "1.0005");
+            values.put("fragment_bin_offset", "0.5");
             assertEquals(
-                    EditOutcome.refused("fragment_bin_tol, value: \"wide\" is not a number"),
-                    outcome);
-            assertEquals("0.4", session.model().text("fragment_bin_offset"));
+                    "fragment_bin_offset = 0.5 is not what preset low-low sets, so choosing it"
+                            + " could not apply that preset",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () ->
+                                            new FragmentOption(
+                                                    List.of("constructed"), values, lowLow))
+                            .getMessage());
+            Map<String, String> unset = Map.of("num_threads", "4");
+            assertEquals(
+                    "num_threads = 4 is not what preset low-low sets, so choosing it could not"
+                            + " apply that preset",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () -> new FragmentOption(List.of("constructed"), unset, lowLow))
+                            .getMessage());
+            Map<String, String> good = Map.of("fragment_bin_tol", "1.0005");
             assertEquals(
                     "a fragment setting names at least one preset and one value",
                     assertThrows(
                                     IllegalArgumentException.class,
-                                    () -> new FragmentOption(List.of(), values))
+                                    () -> new FragmentOption(List.of(), good, lowLow))
                             .getMessage());
             assertEquals(
                     "a fragment setting names at least one preset and one value",
                     assertThrows(
                                     IllegalArgumentException.class,
-                                    () -> new FragmentOption(List.of("x"), Map.of()))
+                                    () -> new FragmentOption(List.of("x"), Map.of(), lowLow))
                             .getMessage());
+            FragmentOption narrow = new FragmentOption(List.of("constructed"), good, lowLow);
+            assertEquals(EditOutcome.applied(), tolerance.chooseFragment(narrow));
+            assertEquals("1.0005", session.model().text("fragment_bin_tol"));
+            assertEquals("0.0", session.model().text("fragment_bin_offset"));
+            assertEquals(ValueOrigin.COMET_DEFAULT, session.model().origin("fragment_bin_offset"));
         }
     }
 

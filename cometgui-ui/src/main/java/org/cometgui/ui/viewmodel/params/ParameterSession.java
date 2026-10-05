@@ -462,6 +462,27 @@ public final class ParameterSession {
     }
 
     /**
+     * Removes an unknown parameter the configuration carries, as the scientist decided in Expert
+     * mode ({@code R-PARAM-07}: kept and written back unless the user explicitly removes it),
+     * through the model's {@code withoutUnknown}.
+     *
+     * @param name the unknown parameter's name
+     * @return accepted, or refused when the configuration carries no unknown parameter of that name
+     */
+    public EditOutcome removeUnknown(String name) {
+        Objects.requireNonNull(name, "name");
+        CometParameters current = model.get();
+        if (current.unknownParameters().stream().noneMatch(u -> u.name().equals(name))) {
+            return EditOutcome.refused(
+                    name
+                            + " is not an unknown parameter of this configuration, so there is"
+                            + " nothing to remove");
+        }
+        commit(current.withoutUnknown(name));
+        return EditOutcome.applied();
+    }
+
+    /**
      * Shows a structured editor's refused input at a parameter's field, so that it blocks a run and
      * is listed in the summary as any refused edit is ({@link #pendingRefusals()}).
      *

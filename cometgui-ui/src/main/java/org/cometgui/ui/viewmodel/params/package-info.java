@@ -51,6 +51,20 @@
  *       org.cometgui.ui.viewmodel.params.IonSeriesViewModel}, {@link
  *       org.cometgui.ui.viewmodel.params.ToleranceViewModel} and {@link
  *       org.cometgui.ui.viewmodel.params.RangesViewModel}.
+ *   <li>{@link org.cometgui.ui.viewmodel.params.PresetsViewModel} -- a preset previewed as the
+ *       model's diff with a check box per row, applied whole or in part (origin {@code PRESET}), or
+ *       cancelled with the very same configuration kept.
+ *   <li>{@link org.cometgui.ui.viewmodel.params.ParameterSearchViewModel} -- the global search over
+ *       name, display name, help, category and aliases, each hit saying which matched, and the five
+ *       filters.
+ *   <li>{@link org.cometgui.ui.viewmodel.params.ExpertViewModel} -- the canonical raw text, a draft
+ *       with the model's line classes and diagnostics, diffs, unknown parameters, and a validating
+ *       apply that changes nothing until confirmed.
+ *   <li>{@link org.cometgui.ui.viewmodel.params.ParameterFilesViewModel} -- saving once through the
+ *       writer and the hash port (refused while anything would block a run), and importing, with
+ *       the choice offered for a file of another release.
+ *   <li>{@link org.cometgui.ui.viewmodel.params.MigrationReviewViewModel} -- the migration under
+ *       review as one row per change, a decision row blocking until accepted or set.
  * </ul>
  *
  * <p>The view-model coverage rule ({@code coverage-check-viewmodel}, {@code
