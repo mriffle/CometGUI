@@ -202,7 +202,7 @@ Run serially, one fresh agent each, in this order.
        family; compound precursor tolerance (pair, units, type, isotope);
        two-value ranges.
      - R-PARAM-04, -09, -10, -13; AC-PAR-05; gate 2
-     -
+     - **Accepted** 2026-10-05, ``afc533c``, ``74df799``; :ref:`p07w-u4`.
    * - 5
      - **Presets, search, Expert and migration-review view-models**: preset
        preview as a diff with per-row selection, apply all / apply subset /
@@ -424,6 +424,65 @@ What I ran (2026-10-05):
 * ``bash scripts/verify-all-gates.sh --only params --only quality --only docs
   --only traceability``: ``4 control(s) passed, 0 failed, in 642 seconds``;
   params 109 controls, quality 42, docs 1, traceability 8.
+
+No test reads a file outside its module.
+
+.. _p07w-u4:
+
+Unit 4 -- structured-value view-models (``afc533c``, ``74df799``)
+-----------------------------------------------------------------
+
+Agent: fresh tier-3 agent.
+
+* **Model** (``afc533c``): ``value.VariableModSlots`` (the release's slots and
+  parts from its layout; ``withPart`` reads one part's text and refuses with
+  slot and part named; ``withResidue`` over the release's alphabet;
+  ``unused()`` = ``0.0 X 0 3 -1 0 0 0.0``), ``VariableModPart``,
+  ``VariableModChoice``, ``VariableModCodec.unwritable()``,
+  ``ResidueAlphabet.letters()/terminalCodes()``, ``EnzymeDefinition.fromTexts``,
+  ``EnzymeTable.nextNumber``, two-text ranges, ``schema.StaticModTarget``,
+  and ``comet-modification-presets.json`` + ``ModificationPresets`` (six
+  presets, each mass citing its Unimod record; offered where a release's
+  slots can hold it, so the ``^`` Acetyl is 2026.03.0's only).
+* **View-models** (``74df799``): ``VariableModsViewModel`` (summary from the
+  model, serialised value, every part, add/edit/remove/move, presets, the
+  ``R-PARAM-10`` pair beside the slots), ``EnzymesViewModel``,
+  ``StaticModsViewModel``, ``IonSeriesViewModel``, ``ToleranceViewModel``,
+  ``RangesViewModel``. A move to or from a slot with an unresolved migration
+  entry is refused and *add* skips it; editing or removing that slot is the
+  scientist's decision and resolves it.
+
+For the owner's eye (recorded in the handoff): the presets' non-mass fields
+(count 3; Phospho without the page's neutral loss; both Acetyl forms on
+2026.03.0) are the agent's choices, each grounded in a Comet page example.
+
+What I ran (2026-10-05):
+
+* Read the diffs and the presets file (every mass and citation). Scanned the
+  view-models for parsing: only ``Integer.toString`` of model codes to match
+  choice tokens.
+* ``mvn -B -o -pl cometgui-params-comet -am verify``: ``Tests run: 1988,
+  Failures: 0``; three "All coverage checks have been met".
+* ``mvn -B -o -pl cometgui-ui -am verify -Dtest='org.cometgui.ui.**' ...``:
+  ``Tests run: 589, Failures: 0``; view-model coverage met.
+* PIT on ``VariableModSlots*``, ``ModificationPreset*``, ``StaticModTarget*``,
+  ``VariableModPart*``: 108/108 KILLED.
+* Injection 4a (production, **version-blind**): ``ModificationPresets
+  .offeredIn`` offers every preset to every release -- red:
+  ``ModificationPresetsTest.offeredPerRelease expected: <[oxidation-m,
+  phospho-sty, acetyl-protein-n-term, deamidation-nq, gln-pyro-glu]> but
+  was: <[..., acetyl-protein-n-term-caret, ...]>``.
+* Injection 4b (production): ``EnzymesViewModel.select``'s table check made
+  ``if (false)`` -- red: ``StructuredEditorsTest.select expected:
+  <EditOutcome[accepted=false, refusal=Optional[40. Elsewhere is not a row of
+  this configuration's enzyme table, so it cannot be selected]]> but was:
+  <EditOutcome[accepted=true, ...]>``.
+* (Spotless/Checkstyle/SpotBugs skipped on the command line for the two
+  injection runs only, so the tests were reached; reports deleted first.)
+  Both restored; ``sha256sum -c`` OK.
+* ``bash scripts/verify-all-gates.sh --only params --only quality --only docs
+  --only traceability``: ``4 control(s) passed, 0 failed, in 647 seconds``;
+  params 109, quality 42.
 
 No test reads a file outside its module.
 
