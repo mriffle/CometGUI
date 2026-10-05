@@ -46,6 +46,11 @@ Comet parameter schema
    2026.02.2 and 2024.01.0 files to 2026.03.0, accepted by the real 2026.03.0
    binary (:ref:`dev-comet-parameter-migration-202603`).
 
+   **Phase 07, unit 1**: the migration review that blocks a run
+   (:ref:`dev-comet-parameter-migration-review`). **Unit 3**: each offered
+   release's starting set, bundled as its own ``-q`` output
+   (:ref:`dev-comet-parameter-release-defaults`).
+
 What this page covers
 =====================
 
@@ -1701,6 +1706,73 @@ says. Taking the last would match Comet but drop the first value; taking the
 first would misrepresent what Comet does. Refusing the file, with both line
 numbers, drops nothing and lets the user say which one they meant. This is
 the same choice unit 3 made for an enzyme number defined twice.
+
+.. _dev-comet-parameter-release-defaults:
+
+Each release's starting set
+===========================
+
+Phase 07, unit 3. A new configuration in the editor starts from the selected
+release's defaults, and ``CometParameters.defaults(metadata, version, table)``
+cannot give them alone: the metadata curates every parameter's default but
+**no enzyme rows** -- the ``[COMET_ENZYME_INFO]`` table is a file's content,
+not the schema's. So the module bundles, for each release the editor offers,
+that release's own ``comet -q`` output, and
+``org.cometgui.params.comet.parser.ReleaseDefaults`` parses it::
+
+    cometgui-params-comet/src/main/resources/org/cometgui/params/comet/parser/defaults/
+        2026.03.0/comet-q.params
+        2026.02.2/comet-q.params
+
+Each file is a byte-for-byte copy of the fixture of the same release
+(:ref:`dev-comet-parameter-fixtures`) -- Comet's own Apache-2.0 output, the
+same bytes the real-binary test re-proves -- and Git keeps it unconverted
+(a path rule in the root ``.gitattributes``; a ``.gitattributes`` beside the
+files would be copied into the jar, since the directory is a resource root).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Call
+     - What it gives
+   * - ``bundledReleases()``
+     - ``2026.03.0`` and ``2026.02.2``, newest first.
+   * - ``isBundled(release)``
+     - Whether a release has a starting set.
+   * - ``bundledFile(release)``
+     - The file's bytes, exactly as Comet wrote them.
+   * - ``load(metadata, release)``
+     - The file parsed for that release by ``CometParamsParser``, with every
+       origin ``COMET_DEFAULT`` (the parser marks a declared value
+       ``IMPORTED``; nothing was imported here): 118 entries, Comet's own
+       twelve enzyme rows, no unknown parameter and no diagnostic.
+
+What it refuses: a release with no bundled file, with an
+``IllegalArgumentException`` naming it and the releases that have one
+("Comet 2024.01.0 has no bundled starting set; the releases with one are
+[2026.03.0, 2026.02.2]"); and a bundled file that does not parse **cleanly**
+as its own release -- any diagnostic at all, which includes a marker naming
+another release and a parameter the metadata does not model -- with an
+``IllegalStateException`` naming the release and every diagnostic. A
+release's starting set cannot carry a warning.
+
+**Comet 2024.01.0 has no starting set**, deliberately: it is the migration
+fixture's release and is never offered to a user, so a starting set for it
+would be dead weight. Adding a release to the editor means adding its file
+here (copied from its fixture, never typed) and its row to
+``ReleaseDefaultsTest``.
+
+``ReleaseDefaultsTest`` proves, for both releases: the bundled bytes' size
+and SHA-256, typed in from the fixture's ``SHA256SUMS`` (11 844 B
+``d1504870...``, 12 551 B ``4bbf39f9...``), and equality with the fixture's
+bytes; a clean parse; every value and value text equal to the fixture's
+model, every origin ``COMET_DEFAULT``, the same enzyme table; and that the
+set equals ``CometParameters.defaults`` over that enzyme table, so the
+curated defaults and Comet's own file agree. The two releases' own values are
+asserted by hand (``index_search_type`` ``-1`` for 2026.03.0, ``1`` for
+2026.02.2). The refusals are asserted with their messages, the second on
+CONSTRUCTED metadata that claims ``scan_range`` from 2026.03.0 only.
 
 .. _dev-comet-parameter-canonical:
 

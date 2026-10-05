@@ -39,3 +39,11 @@
 
 *.sh text eol=lf
 *.py text eol=lf
+
+# THE ONE PATH RULE.  Each Comet release's starting parameter set is bundled as
+# that release's own `comet -q` output (ReleaseDefaults, cometgui-params-comet),
+# byte-equal to the pinned test fixture -- a test asserts the SHA-256.  Like the
+# fixtures it must never be converted on checkout.  It is set here rather than
+# in a .gitattributes beside the files because that directory is a resource
+# root: a file placed there would be copied into the module's jar.
+cometgui-params-comet/src/main/resources/org/cometgui/params/comet/parser/defaults/** -text
