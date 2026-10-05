@@ -288,6 +288,8 @@ abstract class AbstractFxUiDriver implements FxUiDriver {
             case '/' -> new KeyStroke(KeyCode.SLASH, false);
             case ',' -> new KeyStroke(KeyCode.COMMA, false);
             case '+' -> new KeyStroke(KeyCode.EQUALS, true);
+            case '=' -> new KeyStroke(KeyCode.EQUALS, false);
+            case '^' -> new KeyStroke(KeyCode.DIGIT6, true);
             default -> fail("this driver does not type the character '" + character + "'");
         };
     }

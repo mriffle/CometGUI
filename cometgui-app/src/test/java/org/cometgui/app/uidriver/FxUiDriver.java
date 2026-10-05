@@ -114,7 +114,7 @@ public interface FxUiDriver {
      * Types text into whatever has the keyboard focus, one character at a time, using synthetic
      * input: what a scientist typing would produce, and nothing else -- no text is set directly.
      *
-     * @param text the characters to type: letters, digits, space and {@code - _ . / , +}
+     * @param text the characters to type: letters, digits, space and {@code - _ . / , + = ^}
      * @throws AssertionError if the text holds a character this driver cannot type, naming it
      */
     void type(String text);
