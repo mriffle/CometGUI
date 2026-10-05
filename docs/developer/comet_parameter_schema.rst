@@ -1792,6 +1792,38 @@ first would misrepresent what Comet does. Refusing the file, with both line
 numbers, drops nothing and lets the user say which one they meant. This is
 the same choice unit 3 made for an enzyme number defined twice.
 
+.. _dev-comet-parameter-highlighting:
+
+Line classes for the Expert editor
+----------------------------------
+
+Phase 07, unit 5. Expert mode colours the raw text it shows, and the editor
+may not read a ``comet.params`` line itself (decision P7-1; the architecture
+rule ``UiThroughTheModelRule`` keeps ``org.cometgui.ui`` away from
+``ParamsLineReader``). ``org.cometgui.params.comet.parser.ParamsHighlighting``
+is the reader's classification made available to it:
+
+* ``of(text)`` gives one ``Line`` per line of the text, in order, none
+  dropped: its number, its text as read (without the ``\n``), its kind -- one
+  per ``ParamsLine`` variant: ``VERSION_MARKER``, ``COMMENT``, ``BLANK``,
+  ``DECLARATION``, ``ENZYME_HEADER``, ``ENZYME_ROW``, ``MALFORMED`` -- the
+  spans of its parts, and for a malformed line the reader's own reason. A
+  declaration has a ``NAME`` span, a ``VALUE`` span unless the value is empty,
+  and an ``INLINE_COMMENT`` span from its ``#`` to the end of the line; every
+  other kind but a blank line is one span over the whole line. Spans are
+  offsets into the line and never cover a CRLF file's ``\r``.
+* ``declaredRelease(text)`` is the release the text's first ``#
+  comet_version`` line names, read by ``CometVersionMarker``; empty when there
+  is no marker or it names no readable version. An import consults it to
+  decide whether to offer a migration (the parser itself never migrates).
+
+Nothing classifies a line a second way: the kind is the reader's variant, and
+a declaration's spans are where the reader's own name, value and comment texts
+lie in the line. ``ParamsHighlightingTest`` types every span by hand over
+CONSTRUCTED lines, one of each kind (an indented declaration with a CRLF
+ending among them), and classifies each offered release's bundled ``-q`` file:
+118 declarations, twelve enzyme rows, nothing malformed.
+
 .. _dev-comet-parameter-release-defaults:
 
 Each release's starting set
