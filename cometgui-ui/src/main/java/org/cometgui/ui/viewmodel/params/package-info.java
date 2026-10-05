@@ -42,6 +42,15 @@
  *   <li>{@link org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel} and {@link
  *       org.cometgui.ui.viewmodel.params.FileChooserPort} -- spectrum files and the database,
  *       chosen through a port the view implements and a test replaces.
+ *   <li>The structured-value editors, each handing the model one text per control and never
+ *       splitting, reading or judging a value itself: {@link
+ *       org.cometgui.ui.viewmodel.params.VariableModsViewModel} (every slot of the release's
+ *       layout, presets, add, edit, move, remove, and the two parameters beside the slots), {@link
+ *       org.cometgui.ui.viewmodel.params.EnzymesViewModel}, {@link
+ *       org.cometgui.ui.viewmodel.params.StaticModsViewModel}, {@link
+ *       org.cometgui.ui.viewmodel.params.IonSeriesViewModel}, {@link
+ *       org.cometgui.ui.viewmodel.params.ToleranceViewModel} and {@link
+ *       org.cometgui.ui.viewmodel.params.RangesViewModel}.
  * </ul>
  *
  * <p>The view-model coverage rule ({@code coverage-check-viewmodel}, {@code

@@ -3730,6 +3730,17 @@ then the entry's; a migration with nothing needing attention (either older
 real ``-q`` file to 2026.03.0) gives exactly the validator's report; and the
 refusals are asserted with their messages.
 
+**The variable-modification editor keeps that promise** (unit 4). Editing a
+part of a slot, or removing its modification, is the scientist's decision on
+that very slot and is written ``USER``. A move swaps two slots' values and
+writes both ``USER``, so the editor **refuses a move to or from a slot whose
+entry is unresolved** ("``variable_mod01`` needs your decision in the
+migration review before a modification can be moved to or from it"), and an
+added common modification skips an unused slot whose entry is unresolved:
+either would otherwise resolve an entry with a value the scientist never set
+on that parameter. ``VariableModsViewModelTest`` (*a migration under review*)
+proves both on the real 2026.02.2 starting set migrated to 2026.03.0.
+
 .. _dev-comet-parameter-older-release:
 
 The migration fixture: Comet 2024.01.0

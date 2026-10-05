@@ -33,6 +33,7 @@ import org.cometgui.params.comet.migration.SchemaMigration;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.DecoySource;
 import org.cometgui.params.comet.model.ParameterEntry;
+import org.cometgui.params.comet.model.ParameterValue;
 import org.cometgui.params.comet.model.ValueOrigin;
 import org.cometgui.params.comet.parser.ReleaseDefaults;
 import org.cometgui.params.comet.schema.CuratedMetadata;
@@ -41,6 +42,7 @@ import org.cometgui.params.comet.schema.ParameterDefinition;
 import org.cometgui.params.comet.validation.CometValidator;
 import org.cometgui.params.comet.validation.ValidationReport;
 import org.cometgui.params.comet.validation.WorkflowOutputs;
+import org.cometgui.params.comet.value.EnzymeTable;
 import org.cometgui.params.comet.value.ValueSyntaxException;
 import org.cometgui.ui.viewmodel.NonNullProperty;
 
@@ -387,6 +389,90 @@ public final class ParameterSession {
             commit(candidate);
         }
         return EditOutcome.applied();
+    }
+
+    /**
+     * Sets one parameter to a typed value the model made, as the scientist chose it, with origin
+     * {@code USER}: what a structured editor calls after the model has read its texts ({@code
+     * VariableModSlots.withPart}, {@code CometParameters.rangeValue}) or for a choice that is a
+     * value already ({@code Flag}, an enzyme row's number). The same rules as {@link #edit}: a
+     * locked field is refused with its reason, and a value equal to the one held changes nothing,
+     * origin included.
+     *
+     * @param name the parameter name
+     * @param value the new value, of the variant the parameter's kind holds
+     * @return whether the configuration now holds it, or why not
+     * @throws IllegalArgumentException if the selected release does not model the parameter, or the
+     *     value is of the wrong variant
+     */
+    EditOutcome setValue(String name, ParameterValue value) {
+        Map<String, ParameterValue> one = new LinkedHashMap<>();
+        one.put(name, Objects.requireNonNull(value, "value"));
+        return setValues(one);
+    }
+
+    /**
+     * Sets several parameters at once, as one change of the configuration: every value origin
+     * {@code USER}, or nothing at all if any field is locked. A value equal to the one held changes
+     * nothing for that parameter, origin included. Used where one action of the scientist changes
+     * two parameters, such as moving a variable modification to another slot.
+     *
+     * @param values the new values by parameter name, in the order to check them
+     * @return whether the configuration now holds them all, or why not (the first lock met)
+     * @throws IllegalArgumentException if the selected release does not model a parameter, or a
+     *     value is of the wrong variant
+     */
+    EditOutcome setValues(Map<String, ParameterValue> values) {
+        List<FieldViewModel> touched = new ArrayList<>();
+        for (String name : values.keySet()) {
+            FieldViewModel field = field(name);
+            Optional<String> lock = lockOf(name);
+            if (lock.isPresent()) {
+                return refuseLocked(field, lock.get());
+            }
+            touched.add(field);
+        }
+        CometParameters current = model.get();
+        CometParameters next = current;
+        for (Map.Entry<String, ParameterValue> change : values.entrySet()) {
+            if (!change.getValue().equals(current.value(change.getKey()))) {
+                next = next.withValue(change.getKey(), change.getValue(), ValueOrigin.USER);
+            }
+        }
+        for (FieldViewModel field : touched) {
+            field.clearRefusal();
+        }
+        if (next != current) {
+            commit(next);
+        }
+        return EditOutcome.applied();
+    }
+
+    /**
+     * Replaces the enzyme table, as the scientist edited it: a custom row added, or a row removed.
+     * The model's {@code enzyme_in_table} rule reports any selected number the new table lacks.
+     *
+     * @param table the new table
+     */
+    void setEnzymeTable(EnzymeTable table) {
+        Objects.requireNonNull(table, "table");
+        if (!table.equals(model.get().enzymeTable())) {
+            commit(model.get().withEnzymeTable(table));
+        }
+    }
+
+    /**
+     * Shows a structured editor's refused input at a parameter's field, so that it blocks a run and
+     * is listed in the summary as any refused edit is ({@link #pendingRefusals()}).
+     *
+     * @param name the parameter name
+     * @param refusedText what the scientist entered, as the editor shows it
+     * @param message the model's own message
+     * @return the refused outcome carrying the message
+     */
+    EditOutcome refuse(String name, String refusedText, String message) {
+        field(name).refuse(refusedText, message);
+        return EditOutcome.refused(message);
     }
 
     /**
