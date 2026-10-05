@@ -166,7 +166,7 @@ Run serially, one fresh agent each, in this order.
        anchors updated. No count floor lowered without the measured reason
        recorded. ``--only shell`` and ``--only docs`` green.
      - STATUS decision; spec IA
-     -
+     - **Accepted** 2026-10-05, ``b7a02be``; :ref:`p07w-u2`.
    * - 3
      - **Editor session view-models** (``org.cometgui.ui.viewmodel.params``):
        the session (model, selected release from an offered list, adopting
@@ -294,6 +294,50 @@ What I ran (2026-10-05):
   cross-reference``, ``traceability: 8 injected defects caught``.
 
 No test reads a file outside the module.
+
+.. _p07w-u2:
+
+Unit 2 -- Settings removed from navigation (``b7a02be``)
+--------------------------------------------------------
+
+Agent: fresh tier-3 agent. ``SectionId.SETTINGS`` and its arrival note
+removed; nine sections, Tool Manager the one secondary section; five pinned
+identifiers removed with the constant (``PINNED_IDENTIFIER_COUNT`` 133 ->
+128, an exact count, not a floor); new tests ``settingsIsNotASection``,
+``everySectionHasAnOwningPhase`` and ``SectionNavigationUiTest
+.theApplicationHasNoSettingsSection``; ``AccessibleNameEnumerationUiTest``'s
+floor **raised** 65 -> 68 (removal took 4 out of the derivation; the seven
+always-present stepper arrows were added to it -- I read the derivation and
+agree; the walk measures 161); ``docs/developer/architecture.rst`` gains *The
+Settings section was removed*. Comment-only edits in
+``cometgui-install``'s ``ManagedToolManager`` and in ``CometGuiApplication``
+(they claimed the section exists). No shell-harness anchor needed a change.
+
+What I ran (2026-10-05):
+
+* Read the diff. Production changes are the enum constant, the note, and
+  comments; test changes as above.
+* ``mvn -B -o -pl cometgui-app -am verify -Dtest='org.cometgui.ui.**,org.cometgui.app.**'
+  -Dsurefire.failIfNoSpecifiedTests=false -Dcometgui.coverage.core.skip=true``:
+  BUILD SUCCESS, 4m09s; ``cometgui-ui`` 197 tests, 0 failures/errors/skips
+  (200 before: four parameterised tests over ``SectionId`` lose a case, one
+  test added); ``cometgui-app`` 121 tests, 0 failures, 1 skipped (the opt-in
+  ``UpstreamInstallUiTest``).
+* Injection (production, ``ShellView.buildNavigation``): a stale "Settings"
+  toggle with id ``nav-settings`` and no pane. Red in ``cometgui-ui``:
+  ``ShellViewTest.theNavigationSeparatesTheSecondarySections: eight primary
+  entries, a separator, one secondary ==> expected: <10> but was: <11>``; red
+  in ``cometgui-app`` (run alone): ``SectionNavigationUiTest
+  .theApplicationHasNoSettingsSection: Expected java.lang.AssertionError to
+  be thrown, but nothing was thrown.`` Restored, ``sha256sum -c``: OK.
+* The agent's PIT (31/31 on ``SectionId*``, ``SectionArrivals*``,
+  ``NavigationViewModel*``, with ``-DtargetTests`` limited to toolkit-free
+  tests on the command line) -- not re-run: the production change is a
+  removed enum constant and map entry, both killed by my injection's tests.
+* ``bash scripts/verify-all-gates.sh --only shell``: rc 0, ``shell: 30
+  controls in 201s`` (floor 30). ``bash scripts/ci/docs-build.sh``: PASSED.
+
+No test reads a file outside its module.
 
 Rejections and rework
 =====================
