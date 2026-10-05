@@ -151,6 +151,8 @@ class MigrationReviewBlocksRunUiTest {
         ParameterEditorApp.openEditor(driver);
         driver.clickOn("param-mode-essentials");
         assertFalse(driver.isVisible("param-migration"), "nothing is under review yet");
+        // A value set by hand, so that the waiting offer can be seen to change nothing.
+        ParameterEditorApp.enter(driver, "ess-num_threads", "4");
 
         // Import: the file names another release, so the choice is offered, both releases named.
         app.chooser().parameterFile(file);
@@ -168,7 +170,15 @@ class MigrationReviewBlocksRunUiTest {
                         assertEquals(
                                 "Not imported yet: choose how to read it.\n" + question,
                                 driver.textOf("param-import-status")),
-                () -> assertEquals(List.of("parameter file"), app.chooser().asked()));
+                () -> assertEquals(List.of("parameter file"), app.chooser().asked()),
+                () -> assertEquals("4", driver.textOf("ess-num_threads"), "nothing imported yet"),
+                () ->
+                        assertEquals(
+                                "Value from: Set by you", driver.textOf("adv-num_threads-origin")),
+                () ->
+                        assertEquals(
+                                "Comet 2026.03.0 (default)",
+                                ParameterEditorApp.comboText(driver, "param-release")));
 
         driver.clickOn("param-import-migrate");
         assertAll(

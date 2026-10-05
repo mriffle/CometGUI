@@ -19,6 +19,7 @@ package org.cometgui.app.gui;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -52,8 +53,11 @@ import org.junit.jupiter.params.provider.MethodSource;
  * layout, the same in both releases: line 8 is {@code num_threads}, line 27 {@code variable_mod02}.
  *
  * <ol>
- *   <li>Comet 2026.03.0, both drivers: line 8 typed without its {@code =}. Apply is refused, the
- *       configuration's canonical text and the typed field are unchanged, and the error with line 8
+ *   <li>Comet 2026.03.0, both drivers: the configuration is first moved away from the defaults
+ *       through Essentials (precursor window and enzyme set by hand, fragment bins by the
+ *       instrument preset, an acetylation slot), so that "unchanged" cannot be met by a reset. Line
+ *       8 typed without its {@code =}. Apply is refused, the configuration's canonical text, every
+ *       configured value and origin, and the typed field are unchanged, and the error with line 8
  *       and the line's text is reported in the apply status, the offending-lines list, the
  *       diagnostics and the line's own words. Then a valid edit, {@code num_threads = 6}: Apply
  *       shows what would change and changes nothing; Confirm changes it, and the typed field shows
@@ -113,8 +117,13 @@ class ExpertRawEditUiTest {
     void aFailedParseChangesNothing(FxUiDriver driver) {
         ParameterEditorApp.openEditor(driver);
         driver.clickOn("param-mode-expert");
+        String defaults = driver.textOf("param-expert-canonical");
+        configure(driver, true);
+        driver.clickOn("param-mode-expert");
         String before = driver.textOf("param-expert-canonical");
+        assertNotEquals(defaults, before, "the configuration is not the release's defaults");
         assertEquals(before, driver.textOf("param-expert-draft"), "the draft starts canonical");
+        assertConfigured(driver, "before the raw edit", true);
         assertEquals("0", driver.textOf("adv-num_threads"));
 
         replaceLine(driver, 8, "num_threads 0");
@@ -147,7 +156,8 @@ class ExpertRawEditUiTest {
                         assertEquals(
                                 "Offending lines:\nLine 8: num_threads 0",
                                 driver.textOf("param-expert-offending")),
-                () -> assertEquals(before, driver.textOf("param-expert-canonical")),
+                () -> assertConfigured(driver, "after the refused raw edit", true),
+                () -> assertUnchanged(before, driver.textOf("param-expert-canonical")),
                 () -> assertEquals("0", driver.textOf("adv-num_threads"), "typed model unchanged"),
                 () -> assertEquals("0", driver.textOf("ess-num_threads")),
                 () -> assertFalse(driver.isVisible("param-expert-confirmation")));
@@ -206,7 +216,7 @@ class ExpertRawEditUiTest {
 
         driver.clickOn("param-reset-all");
         driver.clickOn("param-reset-all-confirm");
-        assertEquals(before, driver.textOf("param-expert-canonical"));
+        assertEquals(defaults, driver.textOf("param-expert-canonical"), "started again");
         driver.clickOn("param-mode-essentials");
     }
 
@@ -217,8 +227,10 @@ class ExpertRawEditUiTest {
     void theCaretDependsOnTheRelease(FxUiDriver driver) {
         ParameterEditorApp.openEditor(driver);
         ParameterEditorApp.choose(driver, "param-release", "Comet 2026.02.2");
+        configure(driver, false);
         driver.clickOn("param-mode-expert");
         String before = driver.textOf("param-expert-canonical");
+        assertConfigured(driver, "on Comet 2026.02.2, before the raw edit", false);
         assertTrue(before.startsWith("# comet_version 2026.02 rev. 2 (6edec91)\n"), before);
 
         replaceLine(driver, 27, CARET_LINE);
@@ -232,7 +244,10 @@ class ExpertRawEditUiTest {
                         assertEquals(
                                 "Offending lines:\nLine 27: " + CARET_LINE,
                                 driver.textOf("param-expert-offending")),
-                () -> assertEquals(before, driver.textOf("param-expert-canonical")),
+                () ->
+                        assertConfigured(
+                                driver, "on Comet 2026.02.2, after the refused raw edit", false),
+                () -> assertUnchanged(before, driver.textOf("param-expert-canonical")),
                 () ->
                         assertEquals(
                                 "Serialised: variable_mod02 = 0.0 X 0 3 -1 0 0 0.0",
@@ -260,6 +275,70 @@ class ExpertRawEditUiTest {
         driver.clickOn("param-reset-all");
         driver.clickOn("param-reset-all-confirm");
         driver.clickOn("param-mode-essentials");
+    }
+
+    /**
+     * Puts the configuration in a state that is not the release's defaults, through Essentials: the
+     * precursor window typed (origin USER), the second enzyme row chosen (USER), the fragment bins
+     * set by the instrument choice (origin PRESET) and, on 2026.03.0, protein N-terminal
+     * acetylation added to slot 2. A defect that reset the typed model would undo every one.
+     */
+    private static void configure(FxUiDriver driver, boolean acetylSlot) {
+        driver.clickOn("param-mode-essentials");
+        ParameterEditorApp.enter(driver, "ess-peptide_mass_tolerance_upper", "10");
+        ParameterEditorApp.enter(driver, "ess-peptide_mass_tolerance_lower", "-10");
+        ParameterEditorApp.choose(driver, "ess-search_enzyme_number", "2. Trypsin/P");
+        ParameterEditorApp.choose(
+                driver,
+                "ess-fragment-setting",
+                "Low-res precursor, low-res fragments / High-res precursor, low-res fragments");
+        if (acetylSlot) {
+            ParameterEditorApp.choose(
+                    driver,
+                    "ess-varmod-preset",
+                    "Acetyl: +42.010565 on protein N-terminus; max 1 per peptide; optional");
+            driver.clickOn("ess-varmod-add");
+        }
+    }
+
+    /** Every value {@link #configure} set, with its origin, as the editor shows it; typed out. */
+    private static void assertConfigured(FxUiDriver driver, String when, boolean acetylSlot) {
+        List<String> expected =
+                new ArrayList<>(
+                        List.of(
+                                "upper: 10 / Value from: Set by you",
+                                "lower: -10 / Value from: Set by you",
+                                "enzyme: 2. Trypsin/P / Value from: Set by you",
+                                "bin width: 1.0005 / Value from: Set by a preset",
+                                "bin offset: 0.4 / Value from: Set by a preset",
+                                "slot 2: Serialised: variable_mod02 = "
+                                        + (acetylSlot
+                                                ? "42.010565 ^ 0 1 -1 0 0 0.0"
+                                                : "0.0 X 0 3 -1 0 0 0.0")));
+        List<String> shown =
+                List.of(
+                        "upper: "
+                                + driver.textOf("adv-peptide_mass_tolerance_upper")
+                                + " / "
+                                + driver.textOf("adv-peptide_mass_tolerance_upper-origin"),
+                        "lower: "
+                                + driver.textOf("adv-peptide_mass_tolerance_lower")
+                                + " / "
+                                + driver.textOf("adv-peptide_mass_tolerance_lower-origin"),
+                        "enzyme: "
+                                + ParameterEditorApp.comboText(driver, "adv-search_enzyme_number")
+                                + " / "
+                                + driver.textOf("adv-search_enzyme_number-origin"),
+                        "bin width: "
+                                + driver.textOf("adv-fragment_bin_tol")
+                                + " / "
+                                + driver.textOf("adv-fragment_bin_tol-origin"),
+                        "bin offset: "
+                                + driver.textOf("adv-fragment_bin_offset")
+                                + " / "
+                                + driver.textOf("adv-fragment_bin_offset-origin"),
+                        "slot 2: " + driver.textOf("adv-variable_mod02-serialised"));
+        assertEquals(expected, shown, "the configured values and origins " + when);
     }
 
     /**
@@ -304,6 +383,18 @@ class ExpertRawEditUiTest {
                                 + " of the draft; the lines that differ from the canonical"
                                 + " text: "
                                 + differing(canonical, draft));
+    }
+
+    /**
+     * The configuration's canonical text is the one before, compared line by line so that a failure
+     * names the lines that changed rather than printing two whole files.
+     */
+    private static void assertUnchanged(String before, String now) {
+        assertEquals(
+                List.of(),
+                differing(before, now),
+                "the configuration's canonical text changed; its lines that differ now read");
+        assertEquals(before, now, "the canonical text, byte for byte");
     }
 
     private static List<String> differing(String canonical, String draft) {

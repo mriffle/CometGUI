@@ -19,6 +19,7 @@ package org.cometgui.app.gui;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -41,14 +42,17 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Phase 07 exit-gate item 3 ({@code AC-PAR-08}): "Applying a preset shows a diff, applying a subset
  * applies exactly that subset, and cancelling changes nothing."
  *
- * <p>The low-low preset (Comet's low-resolution precursor and fragment example) previewed against
- * Comet 2026.03.0's own defaults from Essentials. The preview's eight rows -- parameter, current
- * value, preset value -- are typed out below from Comet's two {@code comet -q} files and the preset
- * file, not read from the application. Cancelling leaves the configuration's canonical text
- * identical and every origin as it was. Then two rows of the eight are applied: the canonical text
- * differs from before in exactly those two declarations, the six unticked parameters still hold
- * Comet's defaults with Comet's origin, and the two applied ones say they were set by a preset.
- * Both drivers; the configuration is started again from the defaults at the end of each.
+ * <p>The low-low preset (Comet's low-resolution precursor and fragment example) previewed from
+ * Essentials against Comet 2026.03.0's defaults with three values first set by hand -- the upper
+ * precursor bound (a row of the preview, so its current value is 10), the search enzyme and the
+ * thread count (rows of none) -- so that "nothing changed" cannot be met by a reset to defaults.
+ * The preview's eight rows -- parameter, current value, preset value -- are typed out below from
+ * Comet's two {@code comet -q} files and the preset file, not read from the application. Cancelling
+ * leaves the configuration's canonical text identical and every origin as it was. Then two rows of
+ * the eight are applied: the canonical text differs from before in exactly those two declarations,
+ * the six unticked parameters still hold Comet's defaults with Comet's origin, and the two applied
+ * ones say they were set by a preset. Both drivers; the configuration is started again from the
+ * defaults at the end of each.
  */
 class PresetPreviewUiTest {
 
@@ -62,7 +66,7 @@ class PresetPreviewUiTest {
             List.of(
                     List.of(
                             "Precursor tolerance, upper bound (peptide_mass_tolerance_upper)",
-                            "20.0",
+                            "10",
                             "3.0"),
                     List.of(
                             "Precursor tolerance, lower bound (peptide_mass_tolerance_lower)",
@@ -89,6 +93,10 @@ class PresetPreviewUiTest {
 
     private static final String DEFAULT_ORIGIN = "Value from: Comet 2026.03.0 default";
 
+    /** The previewed parameter set by hand before the preview. */
+    private static final Map<String, String> BY_HAND =
+            Map.of("peptide_mass_tolerance_upper", "Value from: Set by you");
+
     private static ParameterEditorApp app;
 
     @BeforeAll
@@ -113,9 +121,17 @@ class PresetPreviewUiTest {
     @DisplayName("a preset shows its diff; cancel changes nothing; a subset applies exactly that")
     void previewCancelAndApplyASubset(FxUiDriver driver) {
         ParameterEditorApp.openEditor(driver);
+        String defaults = canonicalText(driver);
+        // Away from the defaults first, so that "nothing changed" cannot be met by a reset: one
+        // previewed parameter and two others set by hand.
         driver.clickOn("param-mode-essentials");
+        ParameterEditorApp.enter(driver, "ess-peptide_mass_tolerance_upper", "10");
+        ParameterEditorApp.choose(driver, "ess-search_enzyme_number", "2. Trypsin/P");
+        ParameterEditorApp.enter(driver, "ess-num_threads", "4");
         String before = canonicalText(driver);
-        assertOrigins(driver, "before anything", Map.of());
+        assertNotEquals(defaults, before);
+        assertOrigins(driver, "before anything", BY_HAND);
+        assertUntouched(driver, "before anything");
         driver.clickOn("param-mode-essentials");
 
         // Preview: the diff, and nothing changed.
@@ -140,15 +156,16 @@ class PresetPreviewUiTest {
                         assertEquals(
                                 "Previewing " + LOW_LOW + ": 8 changes. Nothing has changed yet.",
                                 driver.textOf("ess-preset-status")));
-        assertEquals(before, canonicalText(driver), "previewing changes nothing");
+        assertNothingChanged(before, canonicalText(driver), "previewing changes nothing");
         driver.clickOn("param-mode-essentials");
 
         // Cancel: nothing changes, origins included.
         driver.clickOn("ess-preset-cancel");
         assertFalse(driver.isVisible("ess-preset-review"));
         assertEquals("Cancelled: nothing was changed.", driver.textOf("ess-preset-status"));
-        assertEquals(before, canonicalText(driver), "cancelling changes nothing");
-        assertOrigins(driver, "after cancelling", Map.of());
+        assertNothingChanged(before, canonicalText(driver), "cancelling changes nothing");
+        assertOrigins(driver, "after cancelling", BY_HAND);
+        assertUntouched(driver, "after cancelling");
 
         // Apply a subset: the upper bound and the fragment bin width only.
         driver.clickOn("param-mode-essentials");
@@ -166,7 +183,7 @@ class PresetPreviewUiTest {
         assertEquals(
                 "Applied 2 changes of "
                         + LOW_LOW
-                        + ": Precursor tolerance, upper bound (peptide_mass_tolerance_upper) 20.0"
+                        + ": Precursor tolerance, upper bound (peptide_mass_tolerance_upper) 10"
                         + " -> 3.0; Fragment bin width (fragment_bin_tol) 0.02 -> 1.0005.",
                 driver.textOf("ess-preset-status"));
         assertFalse(driver.isVisible("ess-preset-review"));
@@ -186,12 +203,33 @@ class PresetPreviewUiTest {
                 () -> assertEquals("-20.0", driver.textOf("ess-peptide_mass_tolerance_lower")),
                 () -> assertEquals("1.0005", driver.textOf("ess-fragment_bin_tol")),
                 () -> assertEquals("0.0", driver.textOf("ess-fragment_bin_offset")));
+        assertUntouched(driver, "after applying two rows");
 
         // Start again for the next driver.
         driver.clickOn("param-reset-all");
         driver.clickOn("param-reset-all-confirm");
-        assertEquals(before, canonicalText(driver));
+        assertEquals(defaults, canonicalText(driver));
         driver.clickOn("param-mode-essentials");
+    }
+
+    /** The canonical text is the one before; a failure names the declarations that changed. */
+    private static void assertNothingChanged(String before, String now, String what) {
+        assertEquals(List.of(), changedDeclarations(before, now), what + "; changed:");
+        assertEquals(before, now, what + ", byte for byte");
+    }
+
+    /** The two values set by hand that no row of the preset touches, with their origins. */
+    private static void assertUntouched(FxUiDriver driver, String when) {
+        assertEquals(
+                List.of("2. Trypsin/P / Value from: Set by you", "4 / Value from: Set by you"),
+                List.of(
+                        ParameterEditorApp.comboText(driver, "adv-search_enzyme_number")
+                                + " / "
+                                + driver.textOf("adv-search_enzyme_number-origin"),
+                        driver.textOf("adv-num_threads")
+                                + " / "
+                                + driver.textOf("adv-num_threads-origin")),
+                "the values set by hand " + when);
     }
 
     /** The preview's rows as shown: each check box's text, the current and the preset value. */
