@@ -30,6 +30,7 @@ import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.install.registry.ArtefactManifest;
 import org.cometgui.install.registry.ArtefactManifestReader;
+import org.cometgui.install.registry.ArtefactRecord;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.MetadataLoader;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
@@ -93,6 +94,37 @@ class ParameterEditorWiringTest {
                 "no Comet release can be offered: none is published by the artefact manifest,"
                         + " described by the parameter metadata and bundled with a starting set",
                 refused.getMessage());
+
+        // Another tool published at a Comet release's version number is not Comet.
+        ArtefactRecord pdv =
+                shipped.artefacts().stream()
+                        .filter(artefact -> artefact.tool() == ToolName.PDV)
+                        .findFirst()
+                        .orElseThrow();
+        ArtefactRecord pdvAtACometVersion =
+                new ArtefactRecord(
+                        pdv.tool(),
+                        ToolVersion.parse("2026.03.0"),
+                        pdv.releaseTag(),
+                        pdv.platform(),
+                        pdv.kind(),
+                        pdv.url(),
+                        pdv.sizeBytes(),
+                        pdv.hashes(),
+                        pdv.member(),
+                        pdv.expectedExecutablePath(),
+                        pdv.executable(),
+                        pdv.licence(),
+                        pdv.companions(),
+                        pdv.capabilities(),
+                        pdv.advisories(),
+                        pdv.minimumHostRequirements(),
+                        pdv.minimumCometGuiVersion());
+        ArtefactManifest notComet =
+                new ArtefactManifest(shipped.schemaVersion(), List.of(pdvAtACometVersion));
+        assertThrows(
+                IllegalStateException.class,
+                () -> ParameterEditorWiring.offeredReleases(notComet, METADATA));
     }
 
     @Test

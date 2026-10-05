@@ -84,6 +84,14 @@ class ParameterEditorViewModelTest {
         }
 
         @Test
+        @DisplayName("each level is named in words")
+        void words() {
+            assertEquals("Essentials", EditorMode.ESSENTIALS.words());
+            assertEquals("Advanced", EditorMode.ADVANCED.words());
+            assertEquals("Expert", EditorMode.EXPERT.words());
+        }
+
+        @Test
         @DisplayName("a summary entry stays on Essentials for an Essentials parameter")
         void essentialsKeepsItsOwn() {
             build(new ScriptedChooser(), new KnownFiles());
@@ -176,6 +184,13 @@ class ParameterEditorViewModelTest {
                             + " [variable_mod01]",
                     editor.releaseStatus());
             assertEquals(C03, session.release());
+
+            // An edit changes the configuration and nothing under review: the status follows it.
+            session.edit("variable_mod01", "16.0 M 0 3 -1 0 0 0.0");
+            assertEquals(
+                    "Comet 2026.03.0 is selected. Migrated: Comet 2026.02.2 -> 2026.03.0: 118"
+                            + " parameters, 2 changed, 116 unchanged; 0 need your decision.",
+                    editor.releaseStatus());
         }
 
         @Test

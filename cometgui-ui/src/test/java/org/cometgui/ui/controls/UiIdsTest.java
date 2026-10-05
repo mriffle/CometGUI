@@ -233,6 +233,10 @@ class UiIdsTest {
                 "ess-Az09_",
                 UiIds.parameterControl(UiIds.Surface.ESSENTIALS, "Az09_"),
                 "every class of usable character, at both ends");
+        assertEquals(
+                "adv-aZ9_0z",
+                UiIds.parameterControl(UiIds.Surface.ADVANCED, "aZ9_0z"),
+                "the other ends of each range");
         assertThrows(
                 NullPointerException.class, () -> UiIds.parameterControl(null, "decoy_prefix"));
         assertThrows(
