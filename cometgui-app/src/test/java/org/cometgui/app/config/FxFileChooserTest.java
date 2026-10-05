@@ -130,9 +130,11 @@ class FxFileChooserTest {
                 () -> assertEquals(Optional.empty(), chooser.chooseDatabase()),
                 () -> assertEquals(Optional.empty(), chooser.chooseFile("Spectral library file")),
                 () -> assertEquals(Optional.empty(), chooser.chooseSaveTarget()),
+                () -> assertEquals(Optional.empty(), chooser.chooseParameterFile()),
                 () ->
                         assertEquals(
-                                List.of("open multiple", "open", "open", "save"), dialogs.asked));
+                                List.of("open multiple", "open", "open", "save", "open"),
+                                dialogs.asked));
     }
 
     @Test
@@ -185,6 +187,22 @@ class FxFileChooserTest {
     }
 
     @Test
+    @DisplayName("importing: an open dialog for a parameter file, Comet's files first")
+    void importParameterFile() {
+        RecordingDialogs dialogs = new RecordingDialogs();
+        dialogs.single = file("runs", "older.params");
+        FxFileChooser chooser = new FxFileChooser(() -> null, dialogs);
+        assertEquals(Optional.of(path("runs", "older.params")), chooser.chooseParameterFile());
+        assertAll(
+                () -> assertEquals(List.of("open"), dialogs.asked),
+                () -> assertEquals("Import a Comet parameter file", dialogs.last().getTitle()),
+                () ->
+                        assertEquals(
+                                List.of("Comet parameter files [*.params]", "All files [*]"),
+                                filters(dialogs.last())));
+    }
+
+    @Test
     @DisplayName("the owner window is asked for each time a dialog opens, not once")
     void ownerIsAskedEachTime() {
         RecordingDialogs dialogs = new RecordingDialogs();
@@ -200,8 +218,9 @@ class FxFileChooserTest {
         chooser.chooseSpectrumFiles();
         chooser.chooseFile("x");
         chooser.chooseSaveTarget();
-        assertEquals(4, asked[0]);
-        assertEquals(4, dialogs.owners.size());
+        chooser.chooseParameterFile();
+        assertEquals(5, asked[0]);
+        assertEquals(5, dialogs.owners.size());
         assertThrows(NullPointerException.class, () -> new FxFileChooser(null, dialogs));
         assertThrows(NullPointerException.class, () -> new FxFileChooser(() -> null, null));
     }

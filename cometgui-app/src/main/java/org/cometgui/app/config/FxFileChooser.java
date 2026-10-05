@@ -157,6 +157,16 @@ public final class FxFileChooser implements FileChooserPort {
     }
 
     @Override
+    public Optional<Path> chooseParameterFile() {
+        FileChooser chooser = chooser("Import a Comet parameter file");
+        chooser.getExtensionFilters()
+                .addAll(
+                        new FileChooser.ExtensionFilter("Comet parameter files", "*.params"),
+                        allFiles());
+        return Optional.ofNullable(dialogs.open(chooser, owner.get())).map(File::toPath);
+    }
+
+    @Override
     public Optional<Path> chooseSaveTarget() {
         FileChooser chooser = chooser("Save the Comet parameter file");
         chooser.setInitialFileName(SUGGESTED_PARAMETER_FILE);

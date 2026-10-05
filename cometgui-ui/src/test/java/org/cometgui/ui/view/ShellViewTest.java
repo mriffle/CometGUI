@@ -52,6 +52,8 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
@@ -108,6 +110,7 @@ class ShellViewTest {
         ParameterSession session = Editors.session();
         Editors.ScriptedChooser chooser = new Editors.ScriptedChooser();
         SpectrumInputsViewModel inputs = Editors.inputs(session, chooser, new Editors.KnownFiles());
+        ParameterEditorViewModel editor = Editors.editor(session, inputs, chooser);
         FxToolkit.onFxThread(
                 () -> {
                     shell =
@@ -118,9 +121,11 @@ class ShellViewTest {
                                     console,
                                     toolManager,
                                     session,
-                                    Editors.editor(session, inputs, chooser),
+                                    editor,
                                     inputs,
-                                    new VariableModsViewModel(session));
+                                    new VariableModsViewModel(session),
+                                    new ParameterSearchViewModel(session),
+                                    Editors.expert(session, editor));
                     scene = new Scene(shell, 1280, 800);
                     scene.getRoot().applyCss();
                     scene.getRoot().layout();
@@ -383,6 +388,7 @@ class ShellViewTest {
         ParameterSession session = Editors.session();
         Editors.ScriptedChooser chooser = new Editors.ScriptedChooser();
         SpectrumInputsViewModel inputs = Editors.inputs(session, chooser, new Editors.KnownFiles());
+        ParameterEditorViewModel editor = Editors.editor(session, inputs, chooser);
         Scene other =
                 FxToolkit.callOnFxThread(
                         () ->
@@ -395,9 +401,11 @@ class ShellViewTest {
                                                 new ToolManagerViewModel(
                                                         new ScriptedToolManager(), Runnable::run),
                                                 session,
-                                                Editors.editor(session, inputs, chooser),
+                                                editor,
                                                 inputs,
-                                                new VariableModsViewModel(session)),
+                                                new VariableModsViewModel(session),
+                                                new ParameterSearchViewModel(session),
+                                                Editors.expert(session, editor)),
                                         800,
                                         600));
         Label banner = (Label) other.lookup("#" + UiIds.HOST_BASELINE_BANNER);

@@ -39,11 +39,18 @@ import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.ui.controls.UiIds;
+import org.cometgui.ui.controls.params.ExpertPane;
+import org.cometgui.ui.controls.params.ImportControl;
+import org.cometgui.ui.controls.params.MigrationReviewPane;
+import org.cometgui.ui.controls.params.ParameterSearchPane;
 import org.cometgui.ui.controls.params.Subscriptions;
 import org.cometgui.ui.controls.params.ValidationSummaryPane;
 import org.cometgui.ui.viewmodel.params.EditorMode;
+import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.SearchHit;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 
@@ -54,13 +61,17 @@ import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
  *   <li>A <strong>release selector</strong> over the offered releases, the default first; a switch
  *       migrates the configuration, and a refused switch says why in text beside it.
  *   <li>A <strong>level switch</strong> -- Essentials, Advanced, Expert -- with the save action and
- *       the reset of the whole configuration (which asks to confirm).
+ *       the reset of the whole configuration (which asks to confirm); below it, the import of a
+ *       parameter file and the choice a file for another release waits for.
  *   <li>The <strong>validation summary</strong>, at the top: the counts in words and one focusable
  *       entry per finding; activating an entry shows the level and category holding its field and
  *       moves the keyboard focus there.
- *   <li>The <strong>body</strong>: the Essentials level, the Advanced level and the Expert region,
- *       exactly one shown. The Expert region holds a label saying it is not built yet; it is a
- *       region for the Expert pane, not a stand-in for one.
+ *   <li>The <strong>migration review</strong>, while a migrated configuration is under review: one
+ *       row per change, the ones needing a decision marked as blocking the run.
+ *   <li>The <strong>parameter search</strong> with its five filters; activating a result shows the
+ *       parameter's field on the Advanced level and moves the focus there.
+ *   <li>The <strong>body</strong>: the Essentials level, the Advanced level and the Expert level,
+ *       exactly one shown.
  * </ul>
  *
  * <p>Changing release gives the session new fields, so the two levels are rebuilt for the new
@@ -82,6 +93,8 @@ public final class CometParametersView extends VBox {
     private final VBox advancedHolder = new VBox();
 
     private final VBox expert = new VBox(6);
+
+    private final ExpertPane expertPane;
 
     private final ScrollPane body = new ScrollPane();
 
@@ -108,12 +121,17 @@ public final class CometParametersView extends VBox {
      * @param editor the editor's own state, summary and readiness over the session
      * @param inputs the spectrum inputs over the session
      * @param mods the variable-modification view-model over the session
+     * @param search the global parameter search over the session
+     * @param expertMode the Expert level's view-model over the session, comparing with the editor's
+     *     saves
      */
     public CometParametersView(
             ParameterSession session,
             ParameterEditorViewModel editor,
             SpectrumInputsViewModel inputs,
-            VariableModsViewModel mods) {
+            VariableModsViewModel mods,
+            ParameterSearchViewModel search,
+            ExpertViewModel expertMode) {
         this.session = Objects.requireNonNull(session, "session");
         this.editor = Objects.requireNonNull(editor, "editor");
         this.inputs = Objects.requireNonNull(inputs, "inputs");
@@ -124,19 +142,18 @@ public final class CometParametersView extends VBox {
 
         session.modelProperty().addListener((observable, before, after) -> follow());
 
-        getChildren().addAll(releaseRow(), modeRow());
+        getChildren().addAll(releaseRow(), modeRow(), new ImportControl(editor));
         getChildren().add(new ValidationSummaryPane(editor.summary(), this::focusParameter));
+        getChildren()
+                .add(
+                        new MigrationReviewPane(
+                                editor.migrationReview(), session, this::focusParameter));
+        getChildren().add(new ParameterSearchPane(search, this::openSearchHit));
 
         expert.setId(UiIds.PARAM_EXPERT);
-        Label placeholder =
-                new Label(
-                        "Expert level: not built yet. It will show the canonical comet.params"
-                                + " text with line diagnostics, diffs and a validating apply;"
-                                + " until then, use Essentials and Advanced.");
-        placeholder.setId(UiIds.PARAM_EXPERT_PLACEHOLDER);
-        placeholder.setWrapText(true);
-        named(placeholder, placeholder.getText());
-        expert.getChildren().add(placeholder);
+        expertPane =
+                new ExpertPane(expertMode, editor.files(), editor.presets().presets(), session);
+        expert.getChildren().add(expertPane);
 
         levels.getChildren().addAll(essentialsHolder, advancedHolder, expert);
         body.setId(UiIds.PARAM_BODY);
@@ -311,6 +328,7 @@ public final class CometParametersView extends VBox {
         show(essentialsHolder, shown == EditorMode.ESSENTIALS);
         show(advancedHolder, shown == EditorMode.ADVANCED);
         show(expert, shown == EditorMode.EXPERT);
+        expertPane.setShown(shown == EditorMode.EXPERT);
     }
 
     private static void show(Node level, boolean visible) {
@@ -330,6 +348,28 @@ public final class CometParametersView extends VBox {
         boolean focused =
                 shown == EditorMode.ESSENTIALS ? essentials.focus(name) : advanced.focus(name);
         if (focused && getScene() != null && getScene().getFocusOwner() != null) {
+            scrollTo(getScene().getFocusOwner());
+        }
+    }
+
+    /**
+     * Moves to a search result: a modelled parameter's field on the Advanced level, which has every
+     * parameter of the release, with its category shown and the focus on it; an unknown parameter's
+     * entry on the Expert level, where unknown parameters are listed.
+     *
+     * @param hit the result activated
+     */
+    void openSearchHit(SearchHit hit) {
+        if (hit.unknown()) {
+            editor.setMode(EditorMode.EXPERT);
+            showMode();
+            return;
+        }
+        editor.showInAdvanced(hit.name());
+        showMode();
+        if (advanced.focus(hit.name())
+                && getScene() != null
+                && getScene().getFocusOwner() != null) {
             scrollTo(getScene().getFocusOwner());
         }
     }

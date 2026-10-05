@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -30,16 +31,21 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.stage.Stage;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.ui.testing.Editors;
 import org.cometgui.ui.testing.FxToolkit;
+import org.cometgui.ui.viewmodel.params.ChoiceOption;
 import org.cometgui.ui.viewmodel.params.EditorMode;
+import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.FieldViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
@@ -61,6 +67,8 @@ class CometParametersViewTest {
 
     private ParameterEditorViewModel editor;
 
+    private ExpertViewModel expert;
+
     private Stage stage;
 
     private Scene scene;
@@ -77,11 +85,14 @@ class CometParametersViewTest {
         SpectrumInputsViewModel inputs = Editors.inputs(session, chooser, new Editors.KnownFiles());
         editor = Editors.editor(session, inputs, chooser);
         VariableModsViewModel mods = new VariableModsViewModel(session);
+        expert = Editors.expert(session, editor);
+        ParameterSearchViewModel search = new ParameterSearchViewModel(session);
         FxToolkit.onFxThread(
                 () -> {
                     scene =
                             new Scene(
-                                    new CometParametersView(session, editor, inputs, mods),
+                                    new CometParametersView(
+                                            session, editor, inputs, mods, search, expert),
                                     1280,
                                     800);
                     stage = new Stage();
@@ -135,11 +146,11 @@ class CometParametersViewTest {
                     assertNull(node("ess-activation_method"), "not an Essentials parameter");
                     assertTrue(node("param-essentials").isVisible());
                     assertFalse(node("param-advanced").getParent().isVisible());
-                    assertEquals(
-                            "Expert level: not built yet. It will show the canonical comet.params"
-                                    + " text with line diagnostics, diffs and a validating apply;"
-                                    + " until then, use Essentials and Advanced.",
-                            ((Label) node("param-expert-placeholder")).getText());
+                    assertNull(node("param-expert-placeholder"), "the Expert pane, not a label");
+                    assertNull(node("ess-preset-placeholder"), "the preset choice, not a label");
+                    assertNotNull(node("param-expert-draft"));
+                    assertFalse(node("param-expert").isVisible());
+                    assertNotNull(node("ess-preset-choice"));
                 });
     }
 
@@ -267,6 +278,287 @@ class CometParametersViewTest {
                     assertEquals(
                             state, ((Label) node("adv-allowed_missed_cleavage-state")).getText());
                     assertTrue(missed.getAccessibleHelp().contains("Validation: " + state));
+                });
+    }
+
+    /** The canonical text with one line (1-based) replaced. */
+    private static String replaceLine(String text, int number, String line) {
+        String[] lines = text.split("\n", -1);
+        lines[number - 1] = line;
+        return String.join("\n", lines);
+    }
+
+    @Test
+    @DisplayName("the custom-enzyme editor adds a row the selectors offer, and keeps a used one")
+    void customEnzyme() throws InterruptedException {
+        FxToolkit.onFxThread(
+                () -> {
+                    editor.setMode(EditorMode.ADVANCED);
+                    settle();
+                    assertEquals("12", ((TextField) node("adv-enzyme-new-number")).getText());
+                    ((TextField) node("adv-enzyme-new-name")).setText("Custom_AspN");
+                    ((TextField) node("adv-enzyme-new-cut")).setText("D");
+                    ((TextField) node("adv-enzyme-new-nocut")).setText("-");
+                    @SuppressWarnings("unchecked")
+                    ComboBox<ChoiceOption> sense =
+                            (ComboBox<ChoiceOption>) node("adv-enzyme-new-sense");
+                    sense.setValue(sense.getItems().get(1));
+                    ((Button) node("adv-enzyme-add")).fire();
+                    settle();
+                    assertEquals(
+                            "Added enzyme 12. Custom_AspN.",
+                            ((Label) node("adv-enzyme-status")).getText());
+                    assertTrue(
+                            ((Label) node("adv-enzyme-row-12"))
+                                    .getText()
+                                    .startsWith("12. Custom_AspN -- "),
+                            ((Label) node("adv-enzyme-row-12")).getText());
+                    assertEquals("13", ((TextField) node("adv-enzyme-new-number")).getText());
+                    assertTrue(
+                            ((ComboBox<?>) node("adv-search_enzyme_number"))
+                                    .getItems().stream()
+                                            .anyMatch(o -> o.toString().contains("Custom_AspN")));
+                    ((Button) node("adv-enzyme-row-1-remove")).fire();
+                    assertTrue(
+                            ((Label) node("adv-enzyme-status"))
+                                    .getText()
+                                    .startsWith("Not removed: 1. Trypsin is selected as "),
+                            ((Label) node("adv-enzyme-status")).getText());
+                    ((Button) node("adv-enzyme-row-12-remove")).fire();
+                    settle();
+                    assertNull(node("adv-enzyme-row-12"));
+                });
+    }
+
+    @Test
+    @DisplayName("Expert: a failed apply changes nothing and names the line; a good one confirms")
+    void expertApply() throws InterruptedException {
+        FxToolkit.onFxThread(
+                () -> {
+                    editor.setMode(EditorMode.EXPERT);
+                    settle();
+                    assertTrue(node("param-expert").isVisible());
+                    TextArea draft = (TextArea) node("param-expert-draft");
+                    assertEquals(expert.canonicalText(), draft.getText());
+                    var before = session.model();
+                    draft.setText(replaceLine(draft.getText(), 8, "num_threads 0"));
+                    settle();
+                    String malformed =
+                            "Error, line 8: line 8 is not a comment, a declaration or an enzyme"
+                                    + " row: not a comment, a blank line or a declaration: there"
+                                    + " is no '=' before any '#': \"num_threads 0\"";
+                    assertEquals(malformed, ((Button) node("param-expert-diagnostic-0")).getText());
+                    assertEquals(
+                            "Line 8, not readable -- " + malformed,
+                            ((Label) node("param-expert-line-8")).getText());
+                    ((Button) node("param-expert-diagnostic-0")).fire();
+                    assertSame(draft, scene.getFocusOwner());
+                    assertEquals(expert.lineStart(8), draft.getCaretPosition());
+
+                    ((Button) node("param-expert-apply")).fire();
+                    settle();
+                    assertSame(before, session.model());
+                    assertEquals(
+                            "The draft was not applied; the configuration is unchanged.\n"
+                                    + malformed,
+                            ((Label) node("param-expert-apply-status")).getText());
+                    assertEquals(
+                            "Offending lines:\nLine 8: num_threads 0",
+                            ((Label) node("param-expert-offending")).getText());
+                    assertFalse(node("param-expert-confirmation").isVisible());
+
+                    draft.setText(replaceLine(draft.getText(), 8, "num_threads = 6"));
+                    ((Button) node("param-expert-apply")).fire();
+                    settle();
+                    assertSame(before, session.model(), "nothing changes before confirming");
+                    assertTrue(node("param-expert-confirmation").isVisible());
+                    assertEquals(
+                            "Applying changes 1 value:\nSearch threads (num_threads): 0 -> 6",
+                            ((Label) node("param-expert-changes")).getText());
+                    ((Button) node("param-expert-confirm")).fire();
+                    settle();
+                    assertEquals("6", session.model().text("num_threads"));
+                    assertEquals(
+                            "Applied: the configuration now holds the draft.",
+                            ((Label) node("param-expert-apply-status")).getText());
+                    assertEquals(expert.canonicalText(), draft.getText());
+                    assertEquals(
+                            "Compared with Comet 2026.03.0's defaults: 2 differences (this"
+                                    + " configuration, then the other).\nSearch threads"
+                                    + " (num_threads): 6 / 0\nWrite Percolator input (PIN)"
+                                    + " (output_percolatorfile): 1 / 0",
+                            ((Label) node("param-expert-compare-rows")).getText());
+                    assertEquals(
+                            "Compared with the last saved configuration: Nothing has been saved"
+                                    + " yet.",
+                            ((Label) node("param-expert-saved-rows")).getText());
+                });
+    }
+
+    @Test
+    @DisplayName("Expert lists an imported unknown parameter, and removes it on request")
+    void unknownParameters() throws InterruptedException {
+        FxToolkit.onFxThread(
+                () -> {
+                    editor.files()
+                            .importText(
+                                    expert.canonicalText()
+                                            .replace(
+                                                    "\npeff_format = ",
+                                                    "\nmystery_setting = 7\npeff_format = "),
+                                    "mystery.params");
+                    editor.setMode(EditorMode.EXPERT);
+                    settle();
+                    assertEquals(
+                            "1 unknown parameter is kept as imported and written back unless"
+                                    + " removed.",
+                            ((Label) node("param-expert-unknown-headline")).getText());
+                    assertTrue(
+                            ((Label) node("param-expert-unknown-0"))
+                                    .getText()
+                                    .startsWith("mystery_setting = 7 -- WARNING: "),
+                            ((Label) node("param-expert-unknown-0")).getText());
+                    ((Button) node("param-expert-unknown-0-remove")).fire();
+                    settle();
+                    assertEquals(List.of(), session.model().unknownParameters());
+                    assertNull(node("param-expert-unknown-0"));
+                    assertEquals(
+                            "Removed mystery_setting.",
+                            ((Label) node("param-expert-unknown-headline")).getText());
+                });
+    }
+
+    @Test
+    @DisplayName("a preset preview changes nothing; a subset applies exactly that subset")
+    void presetPreview() throws InterruptedException {
+        FxToolkit.onFxThread(
+                () -> {
+                    var before = session.model();
+                    @SuppressWarnings("unchecked")
+                    ComboBox<org.cometgui.params.comet.presets.Preset> choice =
+                            (ComboBox<org.cometgui.params.comet.presets.Preset>)
+                                    node("ess-preset-choice");
+                    choice.setValue(choice.getItems().get(0));
+                    ((Button) node("ess-preset-preview")).fire();
+                    settle();
+                    assertSame(before, session.model());
+                    assertTrue(node("ess-preset-review").isVisible());
+                    assertEquals(
+                            "Precursor tolerance, upper bound (peptide_mass_tolerance_upper)",
+                            ((CheckBox) node("ess-preset-row-0")).getText());
+                    assertEquals("20.0", ((Label) node("ess-preset-row-0-current")).getText());
+                    assertEquals("3.0", ((Label) node("ess-preset-row-0-preset")).getText());
+                    assertNull(node("ess-preset-row-8"));
+                    ((Button) node("ess-preset-cancel")).fire();
+                    settle();
+                    assertSame(before, session.model());
+                    assertFalse(node("ess-preset-review").isVisible());
+                    assertEquals(
+                            "Cancelled: nothing was changed.",
+                            ((Label) node("ess-preset-status")).getText());
+
+                    ((Button) node("ess-preset-preview")).fire();
+                    settle();
+                    for (int row = 1; row < 8; row++) {
+                        if (row != 5) {
+                            ((CheckBox) node("ess-preset-row-" + row)).fire();
+                        }
+                    }
+                    ((Button) node("ess-preset-apply-selected")).fire();
+                    settle();
+                    assertEquals("3.0", session.model().text("peptide_mass_tolerance_upper"));
+                    assertEquals("1.0005", session.model().text("fragment_bin_tol"));
+                    assertEquals("-20.0", session.model().text("peptide_mass_tolerance_lower"));
+                    assertEquals("0.0", session.model().text("fragment_bin_offset"));
+                    assertEquals(
+                            "Applied 2 changes of Low-res precursor, low-res fragments: Precursor"
+                                    + " tolerance, upper bound (peptide_mass_tolerance_upper) 20.0"
+                                    + " -> 3.0; Fragment bin width (fragment_bin_tol) 0.02 ->"
+                                    + " 1.0005.",
+                            ((Label) node("ess-preset-status")).getText());
+                });
+    }
+
+    @Test
+    @DisplayName("a search result says why it matched, and opens the field on Advanced")
+    void search() throws InterruptedException {
+        FxToolkit.onFxThread(
+                () -> {
+                    assertNull(node("param-search-result-0"));
+                    assertEquals(
+                            "Type to find a parameter, or tick a filter.",
+                            ((Label) node("param-search-headline")).getText());
+                    ((TextField) node("param-search")).setText("semi-tryptic");
+                    settle();
+                    assertEquals(
+                            "1 parameter found.",
+                            ((Label) node("param-search-headline")).getText());
+                    Button hit = (Button) node("param-search-result-0");
+                    assertTrue(
+                            hit.getText().endsWith(" -- Matched by alias \"semi-tryptic\""),
+                            hit.getText());
+                    hit.fire();
+                    settle();
+                    assertEquals(EditorMode.ADVANCED, editor.mode());
+                    assertEquals("adv-num_enzyme_termini", scene.getFocusOwner().getId());
+                    assertTrue(
+                            ((ToggleButton) node("adv-category-digestion_enzymes-toggle"))
+                                    .isSelected());
+                    ((CheckBox) node("param-search-filter-modified")).fire();
+                    ((TextField) node("param-search")).setText("");
+                    settle();
+                    assertEquals(
+                            "Write Percolator input (PIN) (output_percolatorfile) -- Listed by the"
+                                    + " filters",
+                            ((Button) node("param-search-result-0")).getText());
+                    assertNull(node("param-search-result-1"));
+                });
+    }
+
+    @Test
+    @DisplayName("an imported file of the older release waits, then migrates under review")
+    void importAndReview() throws InterruptedException {
+        FxToolkit.onFxThread(
+                () -> {
+                    assertFalse(node("param-import-offer").isVisible());
+                    assertFalse(node("param-migration").isVisible());
+                    String older =
+                            new String(
+                                    org.cometgui.params.comet.parser.ReleaseDefaults.bundledFile(
+                                            ToolVersion.parse("2026.02.2")),
+                                    java.nio.charset.StandardCharsets.UTF_8);
+                    older =
+                            older.replace(
+                                    "variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0",
+                                    "variable_mod01 = 15.9949 M 0 3 2 4 0 0.0");
+                    editor.files().importText(older, "older.params");
+                    settle();
+                    assertTrue(node("param-import-offer").isVisible());
+                    assertTrue(
+                            ((Label) node("param-import-question"))
+                                    .getText()
+                                    .startsWith(
+                                            "older.params was written for Comet 2026.02.2; the"
+                                                    + " editor is set to Comet 2026.03.0."));
+                    ((Button) node("param-import-migrate")).fire();
+                    settle();
+                    assertFalse(node("param-import-offer").isVisible());
+                    assertTrue(node("param-migration").isVisible());
+                    assertEquals(
+                            "Migration review: Comet 2026.02.2 -> 2026.03.0: 118 parameters, 2"
+                                    + " changed, 116 unchanged; 1 needs your decision.",
+                            ((Label) node("param-migration-headline")).getText());
+                    assertEquals(
+                            "Blocks the run until you decide.",
+                            ((Label) node("param-migration-row-1-state")).getText());
+                    assertTrue(editor.readiness().parametersBlockRun());
+                    ((Button) node("param-migration-row-1-accept")).fire();
+                    settle();
+                    assertEquals(
+                            "Resolved: you accepted the value it holds.",
+                            ((Label) node("param-migration-row-1-state")).getText());
+                    assertNull(node("param-migration-row-1-accept"));
+                    assertFalse(editor.readiness().parametersBlockRun());
                 });
     }
 }

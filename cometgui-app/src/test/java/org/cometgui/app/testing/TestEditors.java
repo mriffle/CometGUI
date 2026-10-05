@@ -26,6 +26,8 @@ import org.cometgui.ui.viewmodel.HostBaselineViewModel;
 import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
@@ -64,6 +66,8 @@ public final class TestEditors {
         SpectrumInputsViewModel inputs =
                 new SpectrumInputsViewModel(
                         session, chooser, ApplicationServices.forThisHost().fileSystem());
+        ParameterEditorViewModel editor =
+                ParameterEditorWiring.editor(session, inputs, chooser, BUILD);
         return new ShellView(
                 navigation,
                 hostBaseline,
@@ -71,8 +75,10 @@ public final class TestEditors {
                 console,
                 toolManager,
                 session,
-                ParameterEditorWiring.editor(session, inputs, chooser, BUILD),
+                editor,
                 inputs,
-                new VariableModsViewModel(session));
+                new VariableModsViewModel(session),
+                new ParameterSearchViewModel(session),
+                ParameterEditorWiring.expert(session, editor, BUILD));
     }
 }

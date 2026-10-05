@@ -53,6 +53,13 @@ public interface FileChooserPort {
     Optional<Path> chooseFile(String what);
 
     /**
+     * Asks for a Comet parameter file to import.
+     *
+     * @return the file chosen, or empty if cancelled
+     */
+    Optional<Path> chooseParameterFile();
+
+    /**
      * Asks where to save a new parameter file.
      *
      * @return the path to write, or empty if cancelled; the file is never overwritten if it exists

@@ -33,7 +33,9 @@ import java.util.List;
 import java.util.Optional;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ValueOrigin;
+import org.cometgui.params.comet.parser.ReleaseDefaults;
 import org.cometgui.params.comet.writer.WrittenParams;
 import org.cometgui.ui.testing.Editors;
 import org.cometgui.ui.testing.Editors.KnownFiles;
@@ -319,6 +321,123 @@ class ParameterEditorViewModelTest {
     }
 
     @Nested
+    @DisplayName("importing through the chooser")
+    class Importing {
+
+        private Path write(Path directory, String name, ToolVersion release) throws IOException {
+            Path file = directory.resolve(name);
+            Files.write(file, ReleaseDefaults.bundledFile(release));
+            return file;
+        }
+
+        @Test
+        @DisplayName("before any import, and a cancelled chooser: nothing imported, said so")
+        void cancelled() {
+            build(new ScriptedChooser(), new KnownFiles());
+            assertEquals("No parameter file imported yet.", editor.importStatus());
+            CometParameters before = session.model();
+            assertEquals(Optional.empty(), editor.importFile());
+            assertEquals(
+                    "Nothing imported: no file was chosen.", editor.importStatusProperty().get());
+            assertSame(before, session.model());
+        }
+
+        @Test
+        @DisplayName("a file of the selected release is read and adopted")
+        void sameRelease(@TempDir Path directory) throws IOException {
+            ScriptedChooser chooser = new ScriptedChooser();
+            build(chooser, new KnownFiles());
+            chooser.parameterFile(write(directory, "new.params", C03));
+            ImportOutcome outcome = editor.importFile().orElseThrow();
+            assertEquals(ImportOutcome.Kind.IMPORTED, outcome.kind());
+            assertEquals("Imported as a Comet 2026.03.0 parameter file.", editor.importStatus());
+            assertEquals(ValueOrigin.IMPORTED, session.model().origin("num_threads"));
+        }
+
+        @Test
+        @DisplayName("a file of another release waits; migrating it puts it under review")
+        void offeredThenMigrated(@TempDir Path directory) throws IOException {
+            ScriptedChooser chooser = new ScriptedChooser();
+            build(chooser, new KnownFiles());
+            Path old = write(directory, "old.params", C02);
+            chooser.parameterFile(old);
+            CometParameters before = session.model();
+            assertEquals(ImportOutcome.Kind.OFFERED, editor.importFile().orElseThrow().kind());
+            assertSame(before, session.model());
+            assertEquals(
+                    "Not imported yet: choose how to read it.\n"
+                            + old
+                            + " was written for Comet 2026.02.2; the editor is set to Comet"
+                            + " 2026.03.0. Migrate it to Comet 2026.03.0 with a reviewable report,"
+                            + " switch the editor to Comet 2026.02.2, or read it as Comet"
+                            + " 2026.03.0 as it is.",
+                    editor.importStatus());
+            assertEquals(ImportOutcome.Kind.MIGRATED, editor.migrateOffered().kind());
+            assertEquals(
+                    "Migrated to Comet 2026.03.0; review the changes below before running:\n"
+                            + "Comet 2026.02.2 -> 2026.03.0: 118 parameters, 1 changes, 0 needing"
+                            + " attention",
+                    editor.importStatus());
+            assertTrue(editor.migrationReview().underReview());
+        }
+
+        @Test
+        @DisplayName("read as its own release, or as the selected one with the mismatch warning")
+        void readAs(@TempDir Path directory) throws IOException {
+            ScriptedChooser chooser = new ScriptedChooser();
+            build(chooser, new KnownFiles());
+            Path old = write(directory, "old.params", C02);
+            chooser.parameterFile(old).parameterFile(old);
+            editor.importFile();
+            assertEquals(ImportOutcome.Kind.IMPORTED, editor.readOfferedAsItsRelease().kind());
+            assertEquals(C02, session.release());
+            assertEquals("Imported as a Comet 2026.02.2 parameter file.", editor.importStatus());
+
+            session.newConfiguration(C03);
+            editor.importFile();
+            assertEquals(ImportOutcome.Kind.IMPORTED, editor.readOfferedAsSelected().kind());
+            assertEquals(C03, session.release());
+            String status = editor.importStatus();
+            assertTrue(
+                    status.startsWith(
+                            "Imported as a Comet 2026.03.0 parameter file, with warnings:\n"
+                                    + "Warning, line 1: line 1 says the file was written for Comet"
+                                    + " 2026.02.2 (\"2026.02 rev. 2 (6edec91)\"), and the"
+                                    + " selected Comet is 2026.03.0"),
+                    status);
+        }
+
+        @Test
+        @DisplayName("putting the waiting file aside imports nothing; a broken file is refused")
+        void asideAndRefused(@TempDir Path directory) throws IOException {
+            ScriptedChooser chooser = new ScriptedChooser();
+            build(chooser, new KnownFiles());
+            chooser.parameterFile(write(directory, "old.params", C02));
+            editor.importFile();
+            editor.dismissOffer();
+            assertEquals("Nothing imported: the file was put aside.", editor.importStatus());
+            assertEquals(Optional.empty(), editor.files().offer());
+
+            Path broken = directory.resolve("broken.params");
+            Files.writeString(broken, "num_threads 4\n", StandardCharsets.UTF_8);
+            chooser.parameterFile(broken);
+            CometParameters before = session.model();
+            assertEquals(ImportOutcome.Kind.REFUSED, editor.importFile().orElseThrow().kind());
+            assertSame(before, session.model());
+            assertEquals(
+                    "Not imported:\n"
+                            + broken
+                            + " was not imported: it does not read as a Comet 2026.03.0 parameter"
+                            + " file.\nError: the file has no [COMET_ENZYME_INFO] table, so no"
+                            + " enzyme number it names is defined\nError, line 1: line 1 is not a"
+                            + " comment, a declaration or an enzyme row: not a comment, a blank"
+                            + " line or a declaration: there is no '=' before any '#':"
+                            + " \"num_threads 4\"",
+                    editor.importStatus());
+        }
+    }
+
+    @Nested
     @DisplayName("the view-models it holds")
     class Holds {
 
@@ -355,6 +474,34 @@ class ParameterEditorViewModelTest {
             session.edit("allowed_missed_cleavage", "many");
             assertTrue(editor.readiness().parametersBlockRun());
             assertEquals(1, editor.summary().notAppliedCount());
+        }
+
+        @Test
+        @DisplayName("the presets are held, the built-in ones offered, over the one session")
+        void presets() {
+            build(new ScriptedChooser(), new KnownFiles());
+            assertSame(editor.presets(), editor.presets());
+            assertEquals(
+                    List.of("low-low", "high-low", "high-high"),
+                    editor.presets().presets().stream().map(p -> p.id()).toList());
+            session.edit("fragment_bin_tol", "0.5");
+            PresetPreview preview = editor.presets().preview(editor.presets().presets().get(0));
+            assertEquals("0.5", preview.rows().get(5).view().current());
+            assertEquals("1.0005", preview.rows().get(5).view().other());
+        }
+
+        @Test
+        @DisplayName("a search result is shown on Advanced, whichever level is shown")
+        void showInAdvanced() {
+            build(new ScriptedChooser(), new KnownFiles());
+            assertEquals(EditorMode.ADVANCED, editor.showInAdvanced("num_enzyme_termini"));
+            assertEquals(EditorMode.ADVANCED, editor.mode());
+            editor.setMode(EditorMode.EXPERT);
+            editor.showInAdvanced("database_name");
+            assertEquals(EditorMode.ADVANCED, editor.mode());
+            editor.setMode(EditorMode.ESSENTIALS);
+            assertThrows(IllegalArgumentException.class, () -> editor.showInAdvanced("nonsense"));
+            assertEquals(EditorMode.ESSENTIALS, editor.mode(), "an unknown name changes nothing");
         }
     }
 }

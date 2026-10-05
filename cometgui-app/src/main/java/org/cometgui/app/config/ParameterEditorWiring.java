@@ -32,6 +32,7 @@ import org.cometgui.params.comet.parser.ReleaseDefaults;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.MetadataLoader;
 import org.cometgui.provenance.hashing.StreamingHashService;
+import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
@@ -111,6 +112,20 @@ public final class ParameterEditorWiring {
                 build,
                 new StreamingHashService(),
                 Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT));
+    }
+
+    /**
+     * The Expert level's view-model over a session: its canonical text names the running build, and
+     * its "last saved" comparison is the editor's own saves.
+     *
+     * @param session the session
+     * @param editor the editor's state over the session
+     * @param build the running build
+     * @return the Expert view-model
+     */
+    public static ExpertViewModel expert(
+            ParameterSession session, ParameterEditorViewModel editor, BuildIdentity build) {
+        return new ExpertViewModel(session, build, editor.files());
     }
 
     /**

@@ -34,6 +34,7 @@ import org.cometgui.params.comet.schema.ParameterCategory;
 import org.cometgui.params.comet.schema.ValueKind;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.UiIds.Surface;
+import org.cometgui.ui.controls.params.EnzymeTableEditor;
 import org.cometgui.ui.controls.params.FieldControl;
 import org.cometgui.ui.controls.params.Subscriptions;
 import org.cometgui.ui.controls.params.VariableModEditor;
@@ -49,8 +50,9 @@ import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
  * and operated with Space) and each with a reset that asks to confirm before it changes anything.
  *
  * <p>Every field is its typed control; the variable-modification slots are the slot editor, as in
- * Essentials. A hidden category's controls stay in the scene, hidden, so that a summary entry can
- * show the category and move the focus into it.
+ * Essentials; the digestion category also holds the custom-enzyme editor over the enzyme table. A
+ * hidden category's controls stay in the scene, hidden, so that a summary entry can show the
+ * category and move the focus into it.
  *
  * <p>Built for one release; the editor builds a new one when the release changes.
  */
@@ -182,6 +184,10 @@ final class AdvancedView extends VBox {
                     new FieldControl(field, Surface.ADVANCED, session, editor, subscriptions);
             focusers.put(field.name(), control::focus);
             content.getChildren().add(control);
+        }
+        if (id == ParameterCategory.DIGESTION_ENZYMES) {
+            content.getChildren()
+                    .add(new EnzymeTableEditor(editor.enzymes(), session, subscriptions));
         }
         Runnable show =
                 () -> {

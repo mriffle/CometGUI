@@ -62,11 +62,15 @@ public final class ParameterEditorViewModel {
 
     private final MigrationReviewViewModel migrationReview;
 
+    private final PresetsViewModel presets;
+
     private final NonNullProperty<EditorMode> mode;
 
     private final NonNullProperty<String> releaseStatus;
 
     private final NonNullProperty<String> saveStatus;
+
+    private final NonNullProperty<String> importStatus;
 
     /**
      * The editor's state over a session.
@@ -93,9 +97,12 @@ public final class ParameterEditorViewModel {
         this.readiness = new RunReadinessViewModel(session, engineUnavailable);
         this.files = new ParameterFilesViewModel(session, build, hashService);
         this.migrationReview = new MigrationReviewViewModel(session);
+        this.presets = new PresetsViewModel(session, List.of());
         this.mode = new NonNullProperty<>(this, "mode", EditorMode.ESSENTIALS);
         this.releaseStatus = new NonNullProperty<>(this, "releaseStatus", releaseWords());
         this.saveStatus = new NonNullProperty<>(this, "saveStatus", "Not saved yet.");
+        this.importStatus =
+                new NonNullProperty<>(this, "importStatus", "No parameter file imported yet.");
         session.modelProperty()
                 .addListener((observable, before, after) -> releaseStatus.set(releaseWords()));
         session.reviewProperty()
@@ -167,6 +174,15 @@ public final class ParameterEditorViewModel {
     }
 
     /**
+     * The presets: the built-in instrument-resolution presets, previewed as a reviewable diff.
+     *
+     * @return the presets' view-model
+     */
+    public PresetsViewModel presets() {
+        return presets;
+    }
+
+    /**
      * The editor level shown.
      *
      * @return the read-only property
@@ -211,6 +227,20 @@ public final class ParameterEditorViewModel {
                         : EditorMode.ADVANCED;
         mode.set(target);
         return target;
+    }
+
+    /**
+     * Shows a parameter on the Advanced level, which has every parameter of the release: where a
+     * search result leads, whichever level is shown.
+     *
+     * @param name the parameter
+     * @return {@link EditorMode#ADVANCED}, the mode now shown
+     * @throws IllegalArgumentException if the selected release does not model the parameter
+     */
+    public EditorMode showInAdvanced(String name) {
+        session.field(name);
+        mode.set(EditorMode.ADVANCED);
+        return EditorMode.ADVANCED;
     }
 
     /**
@@ -315,6 +345,108 @@ public final class ParameterEditorViewModel {
         SaveOutcome outcome = files.save(target.get());
         saveStatus.set(describe(outcome));
         return Optional.of(outcome);
+    }
+
+    /**
+     * The outcome of the last import step, in words.
+     *
+     * @return the read-only property
+     */
+    public ReadOnlyObjectProperty<String> importStatusProperty() {
+        return importStatus.getReadOnlyProperty();
+    }
+
+    /**
+     * The outcome of the last import step, in words.
+     *
+     * @return the text
+     */
+    public String importStatus() {
+        return importStatus.get();
+    }
+
+    /**
+     * Imports the parameter file the chooser gives, through {@link
+     * ParameterFilesViewModel#importFile(Path)}: read for the selected release, refused with every
+     * error, or -- for a file naming another release -- offered for the scientist's choice ({@link
+     * ParameterFilesViewModel#offer()}).
+     *
+     * @return the import's outcome, or empty if the chooser was cancelled (the status then says so)
+     */
+    public Optional<ImportOutcome> importFile() {
+        Optional<Path> chosen = chooser.chooseParameterFile();
+        if (chosen.isEmpty()) {
+            importStatus.set("Nothing imported: no file was chosen.");
+            return Optional.empty();
+        }
+        return Optional.of(reported(files.importFile(chosen.get())));
+    }
+
+    /**
+     * Migrates the file waiting for a choice to the selected release; its report goes under review.
+     *
+     * @return the outcome
+     */
+    public ImportOutcome migrateOffered() {
+        return reported(files.migrateOffered());
+    }
+
+    /**
+     * Reads the file waiting for a choice as its own release, switching the editor to it.
+     *
+     * @return the outcome
+     */
+    public ImportOutcome readOfferedAsItsRelease() {
+        return reported(files.readOfferedAsItsRelease());
+    }
+
+    /**
+     * Reads the file waiting for a choice as the selected release, with the parser's mismatch
+     * warning naming both versions ({@code R-PARAM-06}).
+     *
+     * @return the outcome
+     */
+    public ImportOutcome readOfferedAsSelected() {
+        return reported(files.readOfferedAsSelected());
+    }
+
+    /** Imports nothing: drops the file waiting for a choice. */
+    public void dismissOffer() {
+        files.dismissOffer();
+        importStatus.set("Nothing imported: the file was put aside.");
+    }
+
+    private ImportOutcome reported(ImportOutcome outcome) {
+        importStatus.set(describe(outcome, session.release()));
+        return outcome;
+    }
+
+    /**
+     * An import step's outcome in words.
+     *
+     * @param outcome the outcome
+     * @param release the release selected after it
+     * @return what happened, then the outcome's messages, one per line
+     */
+    static String describe(ImportOutcome outcome, ToolVersion release) {
+        List<String> lines = new ArrayList<>();
+        switch (outcome.kind()) {
+            case IMPORTED ->
+                    lines.add(
+                            "Imported as a Comet "
+                                    + release.text()
+                                    + " parameter file"
+                                    + (outcome.messages().isEmpty() ? "." : ", with warnings:"));
+            case MIGRATED ->
+                    lines.add(
+                            "Migrated to Comet "
+                                    + release.text()
+                                    + "; review the changes below before running:");
+            case OFFERED -> lines.add("Not imported yet: choose how to read it.");
+            case REFUSED -> lines.add("Not imported:");
+        }
+        lines.addAll(outcome.messages());
+        return String.join("\n", lines);
     }
 
     /**

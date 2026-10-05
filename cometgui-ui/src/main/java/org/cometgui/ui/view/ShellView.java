@@ -45,7 +45,9 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
@@ -141,6 +143,8 @@ public final class ShellView extends BorderPane {
      *     section's Run control shows
      * @param spectrumInputs the spectrum inputs over that session
      * @param variableMods the variable-modification editor over that session
+     * @param parameterSearch the global parameter search over that session
+     * @param expertMode the Expert level's view-model over that session
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
@@ -152,7 +156,9 @@ public final class ShellView extends BorderPane {
             ParameterSession parameterSession,
             ParameterEditorViewModel parameterEditor,
             SpectrumInputsViewModel spectrumInputs,
-            VariableModsViewModel variableMods) {
+            VariableModsViewModel variableMods,
+            ParameterSearchViewModel parameterSearch,
+            ExpertViewModel expertMode) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
@@ -179,7 +185,12 @@ public final class ShellView extends BorderPane {
          */
         CometParametersView editorView =
                 new CometParametersView(
-                        parameterSession, parameterEditor, spectrumInputs, variableMods);
+                        parameterSession,
+                        parameterEditor,
+                        spectrumInputs,
+                        variableMods,
+                        parameterSearch,
+                        expertMode);
         panes.get(SectionId.COMET_PARAMETERS).addContent(editorView);
         VBox.setVgrow(editorView, Priority.ALWAYS);
 

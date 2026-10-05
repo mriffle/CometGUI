@@ -38,6 +38,7 @@ import org.cometgui.params.comet.schema.ValueKind;
 import org.cometgui.params.comet.value.VariableModPart;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.params.EssentialsSection;
+import org.cometgui.ui.viewmodel.params.SearchFilter;
 import org.cometgui.workflow.state.WorkflowStage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -136,8 +137,14 @@ class StableIdentifierPinTest {
      * surfaces (24); the 4 per-surface methods on both surfaces (8); the 10 tuple parts and the 4
      * terminal codes of one slot; the 10 Essentials groups; the 14 Advanced categories times five
      * (70); and 6 identifiers built from a position or a character.
+     *
+     * <p>Raised from 317 to 382 by phase 07 unit 7, which filled the editor's two placeholders and
+     * added its remaining parts: the two placeholder constants removed with the placeholders they
+     * named; 47 constants added (the Expert level 17, import 8, search 3, migration review 3,
+     * preset preview 9, custom-enzyme editor 7); the 5 search filters; and 15 identifiers built
+     * from a position, one per new method that builds one (two for the search result).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 317;
+    private static final int PINNED_IDENTIFIER_COUNT = 382;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -183,13 +190,58 @@ class StableIdentifierPinTest {
                     Map.entry("PARAM_ESSENTIALS", "param-essentials"),
                     Map.entry("PARAM_ADVANCED", "param-advanced"),
                     Map.entry("PARAM_EXPERT", "param-expert"),
-                    Map.entry("PARAM_EXPERT_PLACEHOLDER", "param-expert-placeholder"),
                     Map.entry("PARAM_SAVE", "param-save"),
                     Map.entry("PARAM_SAVE_STATUS", "param-save-status"),
                     Map.entry("PARAM_RESET_ALL", "param-reset-all"),
                     Map.entry("PARAM_RESET_ALL_CONFIRM", "param-reset-all-confirm"),
                     Map.entry("PARAM_RESET_ALL_CANCEL", "param-reset-all-cancel"),
-                    Map.entry("ESSENTIALS_PRESET_PLACEHOLDER", "ess-preset-placeholder"),
+                    Map.entry("EXPERT_CANONICAL", "param-expert-canonical"),
+                    Map.entry("EXPERT_CANONICAL_STATUS", "param-expert-canonical-status"),
+                    Map.entry("EXPERT_DRAFT", "param-expert-draft"),
+                    Map.entry("EXPERT_LINES", "param-expert-lines"),
+                    Map.entry("EXPERT_DIAGNOSTICS_HEADLINE", "param-expert-diagnostics-headline"),
+                    Map.entry("EXPERT_APPLY", "param-expert-apply"),
+                    Map.entry("EXPERT_REVERT", "param-expert-revert"),
+                    Map.entry("EXPERT_APPLY_STATUS", "param-expert-apply-status"),
+                    Map.entry("EXPERT_OFFENDING", "param-expert-offending"),
+                    Map.entry("EXPERT_CONFIRMATION", "param-expert-confirmation"),
+                    Map.entry("EXPERT_CHANGES", "param-expert-changes"),
+                    Map.entry("EXPERT_CONFIRM", "param-expert-confirm"),
+                    Map.entry("EXPERT_CANCEL", "param-expert-cancel"),
+                    Map.entry("EXPERT_COMPARE", "param-expert-compare"),
+                    Map.entry("EXPERT_COMPARE_ROWS", "param-expert-compare-rows"),
+                    Map.entry("EXPERT_SAVED_ROWS", "param-expert-saved-rows"),
+                    Map.entry("EXPERT_UNKNOWN_HEADLINE", "param-expert-unknown-headline"),
+                    Map.entry("PARAM_IMPORT", "param-import"),
+                    Map.entry("PARAM_IMPORT_STATUS", "param-import-status"),
+                    Map.entry("PARAM_IMPORT_OFFER", "param-import-offer"),
+                    Map.entry("PARAM_IMPORT_QUESTION", "param-import-question"),
+                    Map.entry("PARAM_IMPORT_MIGRATE", "param-import-migrate"),
+                    Map.entry("PARAM_IMPORT_OWN", "param-import-own"),
+                    Map.entry("PARAM_IMPORT_SELECTED", "param-import-selected"),
+                    Map.entry("PARAM_IMPORT_DISMISS", "param-import-dismiss"),
+                    Map.entry("PARAM_SEARCH", "param-search"),
+                    Map.entry("PARAM_SEARCH_HEADLINE", "param-search-headline"),
+                    Map.entry("PARAM_SEARCH_RESULTS", "param-search-results"),
+                    Map.entry("PARAM_MIGRATION", "param-migration"),
+                    Map.entry("PARAM_MIGRATION_HEADLINE", "param-migration-headline"),
+                    Map.entry("PARAM_MIGRATION_STATUS", "param-migration-status"),
+                    Map.entry("PRESET_CHOICE", "ess-preset-choice"),
+                    Map.entry("PRESET_PREVIEW", "ess-preset-preview"),
+                    Map.entry("PRESET_REVIEW", "ess-preset-review"),
+                    Map.entry("PRESET_MADE_FOR", "ess-preset-made-for"),
+                    Map.entry("PRESET_PROBLEMS", "ess-preset-problems"),
+                    Map.entry("PRESET_APPLY_ALL", "ess-preset-apply-all"),
+                    Map.entry("PRESET_APPLY_SELECTED", "ess-preset-apply-selected"),
+                    Map.entry("PRESET_CANCEL", "ess-preset-cancel"),
+                    Map.entry("PRESET_STATUS", "ess-preset-status"),
+                    Map.entry("ENZYME_NEW_NUMBER", "adv-enzyme-new-number"),
+                    Map.entry("ENZYME_NEW_NAME", "adv-enzyme-new-name"),
+                    Map.entry("ENZYME_NEW_SENSE", "adv-enzyme-new-sense"),
+                    Map.entry("ENZYME_NEW_CUT", "adv-enzyme-new-cut"),
+                    Map.entry("ENZYME_NEW_NO_CUT", "adv-enzyme-new-nocut"),
+                    Map.entry("ENZYME_ADD", "adv-enzyme-add"),
+                    Map.entry("ENZYME_STATUS", "adv-enzyme-status"),
                     Map.entry("SPECTRA_ADD", "ess-spectra-add"),
                     Map.entry("SPECTRA_LIST", "ess-spectra-list"),
                     Map.entry("SPECTRA_SUMMARY", "ess-spectra-summary"),
@@ -419,6 +471,15 @@ class StableIdentifierPinTest {
                     Map.entry(EssentialsSection.EXECUTION, "ess-group-execution"),
                     Map.entry(EssentialsSection.OUTPUTS, "ess-group-outputs"));
 
+    /** Each filter of the global parameter search, by its constant. */
+    private static final Map<SearchFilter, String> SEARCH_FILTER =
+            Map.ofEntries(
+                    Map.entry(SearchFilter.MODIFIED, "param-search-filter-modified"),
+                    Map.entry(SearchFilter.ERRORS, "param-search-filter-errors"),
+                    Map.entry(SearchFilter.WARNINGS, "param-search-filter-warnings"),
+                    Map.entry(SearchFilter.EXPERT, "param-search-filter-expert"),
+                    Map.entry(SearchFilter.UNSUPPORTED, "param-search-filter-unsupported"));
+
     /**
      * Each Advanced category's five identifiers: the container, the switch, the reset, its
      * confirmation and its cancellation.
@@ -553,7 +614,22 @@ class StableIdentifierPinTest {
                             "ess-variable_mod01-residue-M"),
                     Map.entry(
                             "variableModResidue(ADVANCED, variable_mod07, Y)",
-                            "adv-variable_mod07-residue-Y"));
+                            "adv-variable_mod07-residue-Y"),
+                    Map.entry("searchResult(0)", "param-search-result-0"),
+                    Map.entry("searchResult(4)", "param-search-result-4"),
+                    Map.entry("presetRow(0)", "ess-preset-row-0"),
+                    Map.entry("presetRowCurrent(5)", "ess-preset-row-5-current"),
+                    Map.entry("presetRowPreset(7)", "ess-preset-row-7-preset"),
+                    Map.entry("expertLine(8)", "param-expert-line-8"),
+                    Map.entry("expertDiagnostic(0)", "param-expert-diagnostic-0"),
+                    Map.entry("expertUnknown(1)", "param-expert-unknown-1"),
+                    Map.entry("expertUnknownRemove(1)", "param-expert-unknown-1-remove"),
+                    Map.entry("migrationRow(2)", "param-migration-row-2"),
+                    Map.entry("migrationRowState(2)", "param-migration-row-2-state"),
+                    Map.entry("migrationRowAccept(2)", "param-migration-row-2-accept"),
+                    Map.entry("migrationRowGoTo(2)", "param-migration-row-2-goto"),
+                    Map.entry("enzymeRow(12)", "adv-enzyme-row-12"),
+                    Map.entry("enzymeRowRemove(12)", "adv-enzyme-row-12-remove"));
 
     /**
      * Every {@code public static String} method of {@link UiIds}, by name, that the tables above or
@@ -613,7 +689,22 @@ class StableIdentifierPinTest {
                     "advancedCategoryResetCancel",
                     "summaryEntry",
                     "spectrum",
-                    "spectrumRemove");
+                    "spectrumRemove",
+                    "searchFilter",
+                    "searchResult",
+                    "presetRow",
+                    "presetRowCurrent",
+                    "presetRowPreset",
+                    "expertLine",
+                    "expertDiagnostic",
+                    "expertUnknown",
+                    "expertUnknownRemove",
+                    "migrationRow",
+                    "migrationRowState",
+                    "migrationRowAccept",
+                    "migrationRowGoTo",
+                    "enzymeRow",
+                    "enzymeRowRemove");
 
     /**
      * The row key the Tool Manager's per-row identifiers are pinned for.
@@ -1064,6 +1155,12 @@ class StableIdentifierPinTest {
                     UiIds.essentialsGroup(section),
                     "UiIds.essentialsGroup(" + section.name() + ")");
         }
+        for (SearchFilter filter : SearchFilter.values()) {
+            assertPinned(
+                    pinned(SEARCH_FILTER, filter, "search filter " + filter.name()),
+                    UiIds.searchFilter(filter),
+                    "UiIds.searchFilter(" + filter.name() + ")");
+        }
         for (ParameterCategory category : ParameterCategory.values()) {
             assertPinned(
                     pinned(ADVANCED_CATEGORY, category, "Advanced category " + category.name()),
@@ -1091,6 +1188,21 @@ class StableIdentifierPinTest {
         actual.put(
                 "variableModResidue(ADVANCED, variable_mod07, Y)",
                 UiIds.variableModResidue(UiIds.Surface.ADVANCED, "variable_mod07", 'Y'));
+        actual.put("searchResult(0)", UiIds.searchResult(0));
+        actual.put("searchResult(4)", UiIds.searchResult(4));
+        actual.put("presetRow(0)", UiIds.presetRow(0));
+        actual.put("presetRowCurrent(5)", UiIds.presetRowCurrent(5));
+        actual.put("presetRowPreset(7)", UiIds.presetRowPreset(7));
+        actual.put("expertLine(8)", UiIds.expertLine(8));
+        actual.put("expertDiagnostic(0)", UiIds.expertDiagnostic(0));
+        actual.put("expertUnknown(1)", UiIds.expertUnknown(1));
+        actual.put("expertUnknownRemove(1)", UiIds.expertUnknownRemove(1));
+        actual.put("migrationRow(2)", UiIds.migrationRow(2));
+        actual.put("migrationRowState(2)", UiIds.migrationRowState(2));
+        actual.put("migrationRowAccept(2)", UiIds.migrationRowAccept(2));
+        actual.put("migrationRowGoTo(2)", UiIds.migrationRowGoTo(2));
+        actual.put("enzymeRow(12)", UiIds.enzymeRow(12));
+        actual.put("enzymeRowRemove(12)", UiIds.enzymeRowRemove(12));
         assertEquals(BY_POSITION_OR_CHARACTER.keySet(), actual.keySet());
         for (Map.Entry<String, String> entry : actual.entrySet()) {
             assertPinned(
@@ -1196,6 +1308,7 @@ class StableIdentifierPinTest {
                 "VARIABLE_MOD_TERMINUS", VARIABLE_MOD_TERMINUS.keySet(), TerminalCode.values());
         assertEveryConstantIsPinned(
                 "ESSENTIALS_GROUP", ESSENTIALS_GROUP.keySet(), EssentialsSection.values());
+        assertEveryConstantIsPinned("SEARCH_FILTER", SEARCH_FILTER.keySet(), SearchFilter.values());
         assertEveryConstantIsPinned(
                 "ADVANCED_CATEGORY", ADVANCED_CATEGORY.keySet(), ParameterCategory.values());
         assertEveryConstantIsPinned(
@@ -1282,6 +1395,7 @@ class StableIdentifierPinTest {
         addPins(pins, "variable-modification part ", VARIABLE_MOD_PART);
         addPins(pins, "variable-modification terminal code ", VARIABLE_MOD_TERMINUS);
         addPins(pins, "Essentials group ", ESSENTIALS_GROUP);
+        addPins(pins, "search filter ", SEARCH_FILTER);
         addListPins(pins, "Advanced category ", ADVANCED_CATEGORY);
         for (Map.Entry<String, String> entry : BY_POSITION_OR_CHARACTER.entrySet()) {
             pins.add(new Pin("UiIds." + entry.getKey(), entry.getValue()));

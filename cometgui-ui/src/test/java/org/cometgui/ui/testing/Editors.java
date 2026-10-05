@@ -30,6 +30,7 @@ import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.MetadataLoader;
 import org.cometgui.provenance.hashing.StreamingHashService;
+import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
@@ -99,6 +100,18 @@ public final class Editors {
                 Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT));
     }
 
+    /**
+     * The Expert level's view-model over a session, comparing with the editor's saves.
+     *
+     * @param session the session
+     * @param editor the editor over the session
+     * @return the Expert view-model
+     */
+    public static ExpertViewModel expert(
+            ParameterSession session, ParameterEditorViewModel editor) {
+        return new ExpertViewModel(session, BUILD, editor.files());
+    }
+
     /** A chooser answering from a script, one answer per call; an unscripted call cancels. */
     public static final class ScriptedChooser implements FileChooserPort {
 
@@ -107,6 +120,8 @@ public final class Editors {
         private final Deque<Path> files = new ArrayDeque<>();
 
         private final Deque<Path> targets = new ArrayDeque<>();
+
+        private final Deque<Path> parameterFiles = new ArrayDeque<>();
 
         /**
          * Scripts the next spectrum choice.
@@ -141,6 +156,17 @@ public final class Editors {
             return this;
         }
 
+        /**
+         * Scripts the next parameter file to import.
+         *
+         * @param chosen the file
+         * @return this chooser
+         */
+        public ScriptedChooser parameterFile(Path chosen) {
+            parameterFiles.add(chosen);
+            return this;
+        }
+
         @Override
         public List<Path> chooseSpectrumFiles() {
             return spectra.isEmpty() ? List.of() : spectra.removeFirst();
@@ -154,6 +180,11 @@ public final class Editors {
         @Override
         public Optional<Path> chooseFile(String what) {
             return Optional.ofNullable(files.pollFirst());
+        }
+
+        @Override
+        public Optional<Path> chooseParameterFile() {
+            return Optional.ofNullable(parameterFiles.pollFirst());
         }
 
         @Override

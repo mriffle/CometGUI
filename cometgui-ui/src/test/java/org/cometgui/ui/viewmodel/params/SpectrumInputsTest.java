@@ -63,6 +63,11 @@ class SpectrumInputsTest {
         }
 
         @Override
+        public Optional<Path> chooseParameterFile() {
+            throw new AssertionError("the inputs never ask for a parameter file to import");
+        }
+
+        @Override
         public Optional<Path> chooseSaveTarget() {
             throw new AssertionError("the inputs never ask where to save");
         }

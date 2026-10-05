@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -33,12 +34,14 @@ import org.cometgui.install.registry.ArtefactManifestReader;
 import org.cometgui.install.registry.ArtefactRecord;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.MetadataLoader;
+import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
 import org.cometgui.ui.viewmodel.params.RunReadinessViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The parameter editor's composition: the releases offered are derived from the shipped manifest,
@@ -150,5 +153,32 @@ class ParameterEditorWiringTest {
                                 Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT),
                                 editor.readiness().engineReason()),
                 () -> assertEquals("1", session.model().text("output_percolatorfile")));
+    }
+
+    @Test
+    @DisplayName("the Expert level names the running build and compares with the editor's saves")
+    void theExpertLevel(@TempDir Path directory) {
+        BuildIdentity build =
+                BuildIdentity.of("0.0.0-test", "unknown", Instant.parse("2026-10-05T00:00:00Z"));
+        ParameterSession session = ParameterEditorWiring.newSession();
+        ScriptedChooser chooser = new ScriptedChooser();
+        SpectrumInputsViewModel inputs =
+                new SpectrumInputsViewModel(
+                        session, chooser, ApplicationServices.forThisHost().fileSystem());
+        ParameterEditorViewModel editor =
+                ParameterEditorWiring.editor(session, inputs, chooser, build);
+        ExpertViewModel expert = ParameterEditorWiring.expert(session, editor, build);
+        assertEquals(
+                "# Written by CometGUI 0.0.0-test for Comet 2026.03.0. Canonical form, generated"
+                        + " from the typed model.",
+                expert.canonicalText().lines().toList().get(1));
+        assertEquals(
+                Optional.of("Nothing has been saved yet."),
+                expert.againstLastSaved().unavailable());
+        editor.files().save(directory.resolve("saved.params"));
+        session.edit("num_threads", "3");
+        assertEquals(
+                List.of("num_threads"),
+                expert.againstLastSaved().rows().stream().map(r -> r.row().key()).toList());
     }
 }

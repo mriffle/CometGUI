@@ -43,6 +43,8 @@ public final class ScriptedChooser implements FileChooserPort {
 
     private final Deque<Path> targets = new ArrayDeque<>();
 
+    private final Deque<Path> parameterFiles = new ArrayDeque<>();
+
     private final List<String> asked = new ArrayList<>();
 
     /** A lock of this object's own, so that no caller can hold it. */
@@ -101,8 +103,21 @@ public final class ScriptedChooser implements FileChooserPort {
     }
 
     /**
-     * Every question asked so far, in order: {@code spectra}, {@code database}, {@code file:<what>}
-     * or {@code save}.
+     * Scripts the next parameter file to import.
+     *
+     * @param chosen the file
+     * @return this chooser
+     */
+    public ScriptedChooser parameterFile(Path chosen) {
+        synchronized (lock) {
+            parameterFiles.add(chosen);
+            return this;
+        }
+    }
+
+    /**
+     * Every question asked so far, in order: {@code spectra}, {@code database}, {@code
+     * file:<what>}, {@code parameter file} or {@code save}.
      *
      * @return a copy of the questions
      */
@@ -133,6 +148,14 @@ public final class ScriptedChooser implements FileChooserPort {
         synchronized (lock) {
             asked.add("file:" + what);
             return Optional.ofNullable(files.pollFirst());
+        }
+    }
+
+    @Override
+    public Optional<Path> chooseParameterFile() {
+        synchronized (lock) {
+            asked.add("parameter file");
+            return Optional.ofNullable(parameterFiles.pollFirst());
         }
     }
 

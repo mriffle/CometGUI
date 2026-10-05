@@ -25,6 +25,7 @@ import org.cometgui.params.comet.schema.TerminalCode;
 import org.cometgui.params.comet.value.VariableModPart;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.params.EssentialsSection;
+import org.cometgui.ui.viewmodel.params.SearchFilter;
 
 /**
  * Every stable identifier the user interface sets with {@code setId(...)}, in one place.
@@ -175,8 +176,56 @@ public final class UiIds {
     /** The Expert level's region. */
     public static final String PARAM_EXPERT = "param-expert";
 
-    /** The label the Expert region holds until the Expert pane fills it. */
-    public static final String PARAM_EXPERT_PLACEHOLDER = "param-expert-placeholder";
+    /** The Expert level's canonical raw text of the configuration, read-only. */
+    public static final String EXPERT_CANONICAL = "param-expert-canonical";
+
+    /** Why the writer refuses the configuration, or that it writes it. */
+    public static final String EXPERT_CANONICAL_STATUS = "param-expert-canonical-status";
+
+    /** The Expert level's editable draft. */
+    public static final String EXPERT_DRAFT = "param-expert-draft";
+
+    /** The draft's lines, each with its kind and diagnostics in words beside its colours. */
+    public static final String EXPERT_LINES = "param-expert-lines";
+
+    /** How many diagnostics the draft has, in words. */
+    public static final String EXPERT_DIAGNOSTICS_HEADLINE = "param-expert-diagnostics-headline";
+
+    /** The action that checks the draft and asks to confirm what applying it changes. */
+    public static final String EXPERT_APPLY = "param-expert-apply";
+
+    /** The action that throws the draft away. */
+    public static final String EXPERT_REVERT = "param-expert-revert";
+
+    /** The last apply's outcome in words: the errors with their lines, or what awaits. */
+    public static final String EXPERT_APPLY_STATUS = "param-expert-apply-status";
+
+    /** The lines the last failed apply's errors name, with their text. */
+    public static final String EXPERT_OFFENDING = "param-expert-offending";
+
+    /** The confirmation step: what applying the checked draft would change. */
+    public static final String EXPERT_CONFIRMATION = "param-expert-confirmation";
+
+    /** The changes, warnings and enforced values of the checked draft, in words. */
+    public static final String EXPERT_CHANGES = "param-expert-changes";
+
+    /** The confirmation that applies the checked draft to the typed configuration. */
+    public static final String EXPERT_CONFIRM = "param-expert-confirm";
+
+    /** The cancellation of the confirmation step. */
+    public static final String EXPERT_CANCEL = "param-expert-cancel";
+
+    /** The choice of what to compare the configuration with: the defaults or a preset. */
+    public static final String EXPERT_COMPARE = "param-expert-compare";
+
+    /** The comparison with the chosen defaults or preset, in words. */
+    public static final String EXPERT_COMPARE_ROWS = "param-expert-compare-rows";
+
+    /** The comparison with the last saved configuration, in words. */
+    public static final String EXPERT_SAVED_ROWS = "param-expert-saved-rows";
+
+    /** How many unknown parameters the configuration keeps, in words. */
+    public static final String EXPERT_UNKNOWN_HEADLINE = "param-expert-unknown-headline";
 
     /** The action that saves the configuration as a new parameter file. */
     public static final String PARAM_SAVE = "param-save";
@@ -193,8 +242,95 @@ public final class UiIds {
     /** The cancellation of a reset of the whole configuration. */
     public static final String PARAM_RESET_ALL_CANCEL = "param-reset-all-cancel";
 
-    /** The Essentials search-preset group's statement that the preset choice is not built yet. */
-    public static final String ESSENTIALS_PRESET_PLACEHOLDER = "ess-preset-placeholder";
+    /** The action that imports a parameter file through the file chooser. */
+    public static final String PARAM_IMPORT = "param-import";
+
+    /** The last import's outcome in words. */
+    public static final String PARAM_IMPORT_STATUS = "param-import-status";
+
+    /** The choice an import of a file for another release waits for. */
+    public static final String PARAM_IMPORT_OFFER = "param-import-offer";
+
+    /** The waiting import's question in words, naming both releases. */
+    public static final String PARAM_IMPORT_QUESTION = "param-import-question";
+
+    /** Migrate the waiting file to the selected release. */
+    public static final String PARAM_IMPORT_MIGRATE = "param-import-migrate";
+
+    /** Read the waiting file as its own release, switching the editor to it. */
+    public static final String PARAM_IMPORT_OWN = "param-import-own";
+
+    /** Read the waiting file as the selected release, with the mismatch warning. */
+    public static final String PARAM_IMPORT_SELECTED = "param-import-selected";
+
+    /** Import nothing. */
+    public static final String PARAM_IMPORT_DISMISS = "param-import-dismiss";
+
+    /** The global parameter search's query field. */
+    public static final String PARAM_SEARCH = "param-search";
+
+    /** How many parameters the search found, in words. */
+    public static final String PARAM_SEARCH_HEADLINE = "param-search-headline";
+
+    /** The search's results. */
+    public static final String PARAM_SEARCH_RESULTS = "param-search-results";
+
+    /** The review of the migration of the configuration, while one is under review. */
+    public static final String PARAM_MIGRATION = "param-migration";
+
+    /** The migration review's headline: releases, counts, and what needs a decision. */
+    public static final String PARAM_MIGRATION_HEADLINE = "param-migration-headline";
+
+    /** The last review action's outcome in words. */
+    public static final String PARAM_MIGRATION_STATUS = "param-migration-status";
+
+    /** The Essentials search/acquisition preset choice. */
+    public static final String PRESET_CHOICE = "ess-preset-choice";
+
+    /** The action that shows what the chosen preset would change. Nothing changes. */
+    public static final String PRESET_PREVIEW = "ess-preset-preview";
+
+    /** The preset preview: the diff rows with their check boxes, and the three actions. */
+    public static final String PRESET_REVIEW = "ess-preset-review";
+
+    /** Which release the previewed preset was made for, in words. */
+    public static final String PRESET_MADE_FOR = "ess-preset-made-for";
+
+    /** The previewed preset's compatibility problems and conversions, in words. */
+    public static final String PRESET_PROBLEMS = "ess-preset-problems";
+
+    /** Apply every row of the preview that can be applied. */
+    public static final String PRESET_APPLY_ALL = "ess-preset-apply-all";
+
+    /** Apply exactly the selected rows of the preview. */
+    public static final String PRESET_APPLY_SELECTED = "ess-preset-apply-selected";
+
+    /** Drop the preview; nothing changes. */
+    public static final String PRESET_CANCEL = "ess-preset-cancel";
+
+    /** The last preset action's outcome in words. */
+    public static final String PRESET_STATUS = "ess-preset-status";
+
+    /** The custom-enzyme editor's number field for a new row. */
+    public static final String ENZYME_NEW_NUMBER = "adv-enzyme-new-number";
+
+    /** The custom-enzyme editor's name field for a new row. */
+    public static final String ENZYME_NEW_NAME = "adv-enzyme-new-name";
+
+    /** The custom-enzyme editor's sense choice for a new row. */
+    public static final String ENZYME_NEW_SENSE = "adv-enzyme-new-sense";
+
+    /** The custom-enzyme editor's cut-residues field for a new row. */
+    public static final String ENZYME_NEW_CUT = "adv-enzyme-new-cut";
+
+    /** The custom-enzyme editor's no-cut-residues field for a new row. */
+    public static final String ENZYME_NEW_NO_CUT = "adv-enzyme-new-nocut";
+
+    /** The action that adds the new row to the configuration's enzyme table. */
+    public static final String ENZYME_ADD = "adv-enzyme-add";
+
+    /** The custom-enzyme editor's last outcome in words. */
+    public static final String ENZYME_STATUS = "adv-enzyme-status";
 
     /** The action that adds spectrum files through the file chooser. */
     public static final String SPECTRA_ADD = "ess-spectra-add";
@@ -923,6 +1059,165 @@ public final class UiIds {
      */
     public static String spectrumRemove(int index) {
         return spectrum(index) + "-remove";
+    }
+
+    /**
+     * The identifier of one filter of the global parameter search.
+     *
+     * @param filter the filter
+     * @return {@code "param-search-filter-"} and the constant name in lower case with hyphens, for
+     *     example {@code param-search-filter-modified}
+     */
+    public static String searchFilter(SearchFilter filter) {
+        return "param-search-filter-" + hyphenated(Objects.requireNonNull(filter, "filter").name());
+    }
+
+    /**
+     * The identifier of one result of the global parameter search, by its place in the results.
+     *
+     * @param index the result's 0-based position
+     * @return {@code "param-search-result-"} and the position
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String searchResult(int index) {
+        return "param-search-result-" + nonNegative(index);
+    }
+
+    /**
+     * The identifier of one row's check box in the preset preview, by its place in the preview.
+     *
+     * @param index the row's 0-based position
+     * @return {@code "ess-preset-row-"} and the position
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String presetRow(int index) {
+        return "ess-preset-row-" + nonNegative(index);
+    }
+
+    /**
+     * The identifier of one preview row's current value.
+     *
+     * @param index the row's 0-based position
+     * @return the row's identifier with {@code "-current"} appended
+     */
+    public static String presetRowCurrent(int index) {
+        return presetRow(index) + "-current";
+    }
+
+    /**
+     * The identifier of one preview row's preset value.
+     *
+     * @param index the row's 0-based position
+     * @return the row's identifier with {@code "-preset"} appended
+     */
+    public static String presetRowPreset(int index) {
+        return presetRow(index) + "-preset";
+    }
+
+    /**
+     * The identifier of one line of the Expert draft, by its line number.
+     *
+     * @param number the 1-based line number
+     * @return {@code "param-expert-line-"} and the number
+     * @throws IllegalArgumentException if {@code number} is negative
+     */
+    public static String expertLine(int number) {
+        return "param-expert-line-" + nonNegative(number);
+    }
+
+    /**
+     * The identifier of one diagnostic of the Expert draft, by its place in the list.
+     *
+     * @param index the diagnostic's 0-based position
+     * @return {@code "param-expert-diagnostic-"} and the position
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String expertDiagnostic(int index) {
+        return "param-expert-diagnostic-" + nonNegative(index);
+    }
+
+    /**
+     * The identifier of one unknown parameter in the Expert list, by its place in the list.
+     *
+     * @param index the parameter's 0-based position
+     * @return {@code "param-expert-unknown-"} and the position
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String expertUnknown(int index) {
+        return "param-expert-unknown-" + nonNegative(index);
+    }
+
+    /**
+     * The identifier of the action removing one unknown parameter.
+     *
+     * @param index the parameter's 0-based position
+     * @return the parameter's identifier with {@code "-remove"} appended
+     */
+    public static String expertUnknownRemove(int index) {
+        return expertUnknown(index) + "-remove";
+    }
+
+    /**
+     * The identifier of one change of the migration under review, by its place in the review.
+     *
+     * @param index the change's 0-based position
+     * @return {@code "param-migration-row-"} and the position
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String migrationRow(int index) {
+        return "param-migration-row-" + nonNegative(index);
+    }
+
+    /**
+     * The identifier of one migration change's state in words.
+     *
+     * @param index the change's 0-based position
+     * @return the row's identifier with {@code "-state"} appended
+     */
+    public static String migrationRowState(int index) {
+        return migrationRow(index) + "-state";
+    }
+
+    /**
+     * The identifier of the action accepting the value a migration change needing a decision put in
+     * place.
+     *
+     * @param index the change's 0-based position
+     * @return the row's identifier with {@code "-accept"} appended
+     */
+    public static String migrationRowAccept(int index) {
+        return migrationRow(index) + "-accept";
+    }
+
+    /**
+     * The identifier of the action moving the focus to a migration change's field.
+     *
+     * @param index the change's 0-based position
+     * @return the row's identifier with {@code "-goto"} appended
+     */
+    public static String migrationRowGoTo(int index) {
+        return migrationRow(index) + "-goto";
+    }
+
+    /**
+     * The identifier of one row of the configuration's enzyme table in the custom-enzyme editor.
+     *
+     * @param index the row's 0-based position in the table
+     * @return {@code "adv-enzyme-row-"} and the position
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String enzymeRow(int index) {
+        return "adv-enzyme-row-" + nonNegative(index);
+    }
+
+    /**
+     * The identifier of the action removing one row of the enzyme table.
+     *
+     * @param index the row's 0-based position in the table
+     * @return the row's identifier with {@code "-remove"} appended
+     */
+    public static String enzymeRowRemove(int index) {
+        return enzymeRow(index) + "-remove";
     }
 
     private static int nonNegative(int index) {

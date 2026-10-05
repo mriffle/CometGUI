@@ -36,6 +36,7 @@ import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.UiIds.Surface;
 import org.cometgui.ui.controls.params.DecoySourceControl;
 import org.cometgui.ui.controls.params.FieldControl;
+import org.cometgui.ui.controls.params.PresetControl;
 import org.cometgui.ui.controls.params.SpectrumInputsControl;
 import org.cometgui.ui.controls.params.Subscriptions;
 import org.cometgui.ui.controls.params.VariableModEditor;
@@ -58,9 +59,8 @@ import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
  * and isotope offsets with the whole setting in words; the fragment bins with their instrument
  * choice; the search, second and sample enzyme selectors beside the termini and missed cleavages;
  * the decoy source as one control beside its prefix; and the variable-modification slot editor with
- * the per-peptide limit and the requirement beside it. The search-preset group says in text that
- * its choice is not built yet: a preset is applied only through a reviewable diff, and that view is
- * not part of this build.
+ * the per-peptide limit and the requirement beside it; and the search/acquisition preset choice,
+ * applied only through its reviewable diff.
  *
  * <p>Built for one release; the editor builds a new one when the release changes.
  */
@@ -107,7 +107,9 @@ final class EssentialsView extends VBox {
                     addFields(box, group, editor, subscriptions, shown);
                     box.getChildren().add(databaseStatus(inputs, subscriptions));
                 }
-                case SEARCH_PRESET -> box.getChildren().add(presetPlaceholder());
+                case SEARCH_PRESET ->
+                        box.getChildren()
+                                .add(new PresetControl(editor.presets(), session, subscriptions));
                 case PRECURSOR -> {
                     addFields(box, group, editor, subscriptions, shown);
                     box.getChildren().add(precursorSummary(session, editor, subscriptions));
@@ -189,18 +191,6 @@ final class EssentialsView extends VBox {
                 new FieldControl(field, Surface.ESSENTIALS, session, editor, subscriptions);
         focusers.put(field.name(), control::focus);
         box.getChildren().add(control);
-    }
-
-    private static Label presetPlaceholder() {
-        Label placeholder =
-                new Label(
-                        "Not built yet: a search preset is applied only after you have reviewed"
-                                + " what it changes, and that review is not part of this build."
-                                + " Set the values below directly.");
-        placeholder.setId(UiIds.ESSENTIALS_PRESET_PLACEHOLDER);
-        placeholder.setWrapText(true);
-        named(placeholder, placeholder.getText());
-        return placeholder;
     }
 
     private static Label databaseStatus(

@@ -46,6 +46,7 @@ import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
@@ -223,16 +224,16 @@ public final class CometGuiApplication extends Application {
 
         /*
          * The parameter editor's collaborators are made here and injected into the views, never
-         * handed out by a holder: one session, the spectrum inputs and the variable-modification
-         * editor over it, and the editor's state.
+         * handed out by a holder: one session, the spectrum inputs, the variable-modification
+         * editor, the parameter search and the Expert level over it, and the editor's state.
          */
         ParameterSession parameterSession = ParameterEditorWiring.newSession();
         FileChooserPort chooser = choosers.apply(() -> primaryStage);
         SpectrumInputsViewModel spectrumInputs =
                 new SpectrumInputsViewModel(parameterSession, chooser, services.fileSystem());
+        BuildIdentity running = build.get();
         ParameterEditorViewModel parameterEditor =
-                ParameterEditorWiring.editor(
-                        parameterSession, spectrumInputs, chooser, build.get());
+                ParameterEditorWiring.editor(parameterSession, spectrumInputs, chooser, running);
 
         ShellView shell =
                 new ShellView(
@@ -244,7 +245,9 @@ public final class CometGuiApplication extends Application {
                         parameterSession,
                         parameterEditor,
                         spectrumInputs,
-                        new VariableModsViewModel(parameterSession));
+                        new VariableModsViewModel(parameterSession),
+                        new ParameterSearchViewModel(parameterSession),
+                        ParameterEditorWiring.expert(parameterSession, parameterEditor, running));
 
         /*
          * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds

@@ -233,6 +233,26 @@ public final class ExpertViewModel {
     }
 
     /**
+     * Where a line of the draft starts, as an offset into the draft: where a diagnostic moves the
+     * caret. The lines are the model's ({@link ParamsHighlighting}), each followed by the {@code
+     * \n} it was read without.
+     *
+     * @param number a 1-based line number of the draft
+     * @return the offset of the line's first character
+     * @throws IllegalArgumentException if the draft has no such line
+     */
+    public int lineStart(int number) {
+        int offset = 0;
+        for (ParamsHighlighting.Line line : ParamsHighlighting.of(draft.get())) {
+            if (line.number() == number) {
+                return offset;
+            }
+            offset += line.text().length() + 1;
+        }
+        throw new IllegalArgumentException("the draft has no line " + number);
+    }
+
+    /**
      * Every diagnostic of the draft parsed for the selected release, ordered by line.
      *
      * @return the diagnostics

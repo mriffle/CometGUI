@@ -185,6 +185,56 @@ class ExpertViewModelTest {
             assertEquals(List.of(), expert.diagnostics());
         }
 
+        @Test
+        @DisplayName("each line in words: number, kind and the diagnostics naming it")
+        void inWords() {
+            ExpertViewModel expert = expert(startingIn(C03));
+            String draft = replaceLine(expert.canonicalText(), 8, "num_threads 0");
+            expert.setDraft(draft);
+            List<ExpertLine> lines = expert.lines();
+            assertEquals(
+                    List.of(
+                            "Line 1, version marker",
+                            "Line 2, comment",
+                            "Line 8, not readable -- " + MALFORMED_8,
+                            "Line 9, parameter",
+                            "Line 127, enzyme table heading",
+                            "Line 139, enzyme table row"),
+                    List.of(
+                            lines.get(0).description(),
+                            lines.get(1).description(),
+                            lines.get(7).description(),
+                            lines.get(8).description(),
+                            lines.get(126).description(),
+                            lines.get(138).description()));
+            expert.setDraft("num_threads = 4\n\nnum_threads = 5\n");
+            List<ExpertLine> twice = expert.lines();
+            assertEquals("blank", twice.get(1).kindWords());
+            assertEquals("Error", twice.get(0).stateText(), "declared twice");
+            assertTrue(
+                    twice.get(2)
+                            .description()
+                            .startsWith("Line 3, parameter -- Error, lines 1, 3: "));
+        }
+
+        @Test
+        @DisplayName("where a line starts in the draft, for moving the caret to it")
+        void lineStart() {
+            ExpertViewModel expert = expert(startingIn(C03));
+            expert.setDraft("num_threads = 4\r\n\nallowed_missed_cleavage = 1\n");
+            assertEquals(0, expert.lineStart(1));
+            assertEquals(17, expert.lineStart(2));
+            assertEquals(18, expert.lineStart(3));
+            assertEquals(
+                    "the draft has no line 9",
+                    assertThrows(IllegalArgumentException.class, () -> expert.lineStart(9))
+                            .getMessage());
+            ExpertViewModel canonical = expert(startingIn(C03));
+            int eight = canonical.lineStart(8);
+            assertTrue(canonical.draft().startsWith("num_threads = 0 ", eight));
+            assertEquals('\n', canonical.draft().charAt(eight - 1));
+        }
+
         @ParameterizedTest(name = "Comet {0}")
         @ValueSource(strings = {"2026.03.0", "2026.02.2"})
         @DisplayName("every diagnostic with its lines; a malformed line is one of the reader's")

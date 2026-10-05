@@ -37,6 +37,40 @@ public record ExpertLine(ParamsHighlighting.Line line, List<Diagnostic> diagnost
     }
 
     /**
+     * What the line is, in words: the text equivalent of its colours.
+     *
+     * @return for example {@code parameter} for a declaration
+     */
+    public String kindWords() {
+        return switch (line.kind()) {
+            case VERSION_MARKER -> "version marker";
+            case COMMENT -> "comment";
+            case BLANK -> "blank";
+            case DECLARATION -> "parameter";
+            case ENZYME_HEADER -> "enzyme table heading";
+            case ENZYME_ROW -> "enzyme table row";
+            case MALFORMED -> "not readable";
+        };
+    }
+
+    /**
+     * Everything the line's colours and marks say, in words: its number, its kind, and every
+     * diagnostic naming it.
+     *
+     * @return for example {@code Line 8, not readable -- Error, line 8: ...}; {@code Line 9,
+     *     parameter} for a line nothing names
+     */
+    public String description() {
+        String head = "Line " + line.number() + ", " + kindWords();
+        if (diagnostics.isEmpty()) {
+            return head;
+        }
+        return head
+                + " -- "
+                + String.join("; ", diagnostics.stream().map(ExpertViewModel::describe).toList());
+    }
+
+    /**
      * The line's state in words, so that it is never conveyed by colour alone (exit gate item 7).
      *
      * @return {@code Error}, {@code Warning}, or empty when nothing names the line
