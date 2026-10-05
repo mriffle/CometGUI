@@ -20,7 +20,11 @@ import java.util.Locale;
 import java.util.Objects;
 import org.cometgui.domain.log.MessageSeverity;
 import org.cometgui.domain.run.StageTag;
+import org.cometgui.params.comet.schema.ParameterCategory;
+import org.cometgui.params.comet.schema.TerminalCode;
+import org.cometgui.params.comet.value.VariableModPart;
 import org.cometgui.ui.viewmodel.SectionId;
+import org.cometgui.ui.viewmodel.params.EssentialsSection;
 
 /**
  * Every stable identifier the user interface sets with {@code setId(...)}, in one place.
@@ -134,6 +138,122 @@ public final class UiIds {
 
     /** The container holding one row per tool build the port offered. */
     public static final String TOOL_MANAGER_ROWS = "tool-manager-rows";
+
+    /** The Comet parameter editor's root, in the Comet Parameters section. */
+    public static final String PARAM_EDITOR = "param-editor";
+
+    /** The Comet release selector. */
+    public static final String PARAM_RELEASE = "param-release";
+
+    /** What the last release choice did, in words, or why it was refused. */
+    public static final String PARAM_RELEASE_STATUS = "param-release-status";
+
+    /** The switch to the Essentials level. */
+    public static final String PARAM_MODE_ESSENTIALS = "param-mode-essentials";
+
+    /** The switch to the Advanced level. */
+    public static final String PARAM_MODE_ADVANCED = "param-mode-advanced";
+
+    /** The switch to the Expert level. */
+    public static final String PARAM_MODE_EXPERT = "param-mode-expert";
+
+    /** The validation summary at the top of the editor. */
+    public static final String PARAM_SUMMARY = "param-summary";
+
+    /** The validation summary's headline: the counts in words. */
+    public static final String PARAM_SUMMARY_HEADLINE = "param-summary-headline";
+
+    /** The scrolling body below the summary, holding the three levels. */
+    public static final String PARAM_BODY = "param-body";
+
+    /** The Essentials level. */
+    public static final String PARAM_ESSENTIALS = "param-essentials";
+
+    /** The Advanced level. */
+    public static final String PARAM_ADVANCED = "param-advanced";
+
+    /** The Expert level's region. */
+    public static final String PARAM_EXPERT = "param-expert";
+
+    /** The label the Expert region holds until the Expert pane fills it. */
+    public static final String PARAM_EXPERT_PLACEHOLDER = "param-expert-placeholder";
+
+    /** The action that saves the configuration as a new parameter file. */
+    public static final String PARAM_SAVE = "param-save";
+
+    /** The last save's outcome, in words. */
+    public static final String PARAM_SAVE_STATUS = "param-save-status";
+
+    /** The action that starts again from the selected release's defaults (asks to confirm). */
+    public static final String PARAM_RESET_ALL = "param-reset-all";
+
+    /** The confirmation of a reset of the whole configuration. */
+    public static final String PARAM_RESET_ALL_CONFIRM = "param-reset-all-confirm";
+
+    /** The cancellation of a reset of the whole configuration. */
+    public static final String PARAM_RESET_ALL_CANCEL = "param-reset-all-cancel";
+
+    /** The Essentials search-preset group's statement that the preset choice is not built yet. */
+    public static final String ESSENTIALS_PRESET_PLACEHOLDER = "ess-preset-placeholder";
+
+    /** The action that adds spectrum files through the file chooser. */
+    public static final String SPECTRA_ADD = "ess-spectra-add";
+
+    /** The list of chosen spectrum files. */
+    public static final String SPECTRA_LIST = "ess-spectra-list";
+
+    /** How many spectrum files are chosen, in words. */
+    public static final String SPECTRA_SUMMARY = "ess-spectra-summary";
+
+    /** What the file system says about the database, with its full path. */
+    public static final String DATABASE_STATUS = "ess-database-status";
+
+    /** The whole precursor setting in words. */
+    public static final String PRECURSOR_SUMMARY = "ess-precursor-summary";
+
+    /** The fragment settings' instrument choice. */
+    public static final String FRAGMENT_SETTING = "ess-fragment-setting";
+
+    /** The fragment settings in words. */
+    public static final String FRAGMENT_SETTING_WORDS = "ess-fragment-setting-words";
+
+    /** The Run section's Run control. */
+    public static final String RUN_START = "run-start";
+
+    /** Why the parameters block a run, or that they do not. */
+    public static final String RUN_PARAMETERS = "run-parameters";
+
+    /** Why the workflow engine cannot run, or that it can. */
+    public static final String RUN_ENGINE = "run-engine";
+
+    /**
+     * The two surfaces a parameter's control appears on. A parameter shown in Essentials is shown
+     * in Advanced too, so the surface is part of every parameter identifier and the two controls
+     * never share one.
+     */
+    public enum Surface {
+
+        /** The curated Essentials level: identifiers begin {@code ess-}. */
+        ESSENTIALS("ess"),
+
+        /** The Advanced level: identifiers begin {@code adv-}. */
+        ADVANCED("adv");
+
+        private final String prefix;
+
+        Surface(String prefix) {
+            this.prefix = prefix;
+        }
+
+        /**
+         * The identifier prefix.
+         *
+         * @return {@code ess} or {@code adv}
+         */
+        public String prefix() {
+            return prefix;
+        }
+    }
 
     private UiIds() {}
 
@@ -468,5 +588,376 @@ public final class UiIds {
             }
         }
         return !expectingWord;
+    }
+
+    /*
+     * THE PARAMETER EDITOR'S IDENTIFIERS ARE BUILT FROM THE PARAMETER'S OWN NAME, exactly as Comet
+     * spells it (database_name, use_A_ions), behind the surface's prefix: ess-database_name,
+     * adv-use_A_ions.  A name is checked rather than trusted, for the reason toolRow gives: these
+     * are looked up as CSS selectors, so a character other than a letter, a digit or an underscore
+     * would make the lookup find nothing.
+     */
+
+    /**
+     * The identifier of a parameter's input control on a surface: the check box, combo box or text
+     * field that edits it (the first of a range's two fields; a variable-modification slot's
+     * heading).
+     *
+     * @param surface where the control is
+     * @param name the parameter name, as Comet spells it
+     * @return the surface prefix, a hyphen and the name, for example {@code ess-fragment_bin_tol}
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws IllegalArgumentException if the name is not letters, digits and underscores
+     */
+    public static String parameterControl(Surface surface, String name) {
+        Objects.requireNonNull(surface, "surface");
+        Objects.requireNonNull(name, "name");
+        if (!isParameterName(name)) {
+            throw new IllegalArgumentException(
+                    "not a usable parameter name for an identifier: \""
+                            + name
+                            + "\" (expected letters, digits and underscores, as Comet spells a"
+                            + " parameter)");
+        }
+        return surface.prefix() + "-" + name;
+    }
+
+    /**
+     * The identifier of the label naming a parameter's control.
+     *
+     * @param surface where the control is
+     * @param name the parameter name
+     * @return the control identifier with {@code "-label"} appended
+     */
+    public static String parameterLabel(Surface surface, String name) {
+        return parameterControl(surface, name) + "-label";
+    }
+
+    /**
+     * The identifier of a parameter's reset action.
+     *
+     * @param surface where the control is
+     * @param name the parameter name
+     * @return the control identifier with {@code "-reset"} appended
+     */
+    public static String parameterReset(Surface surface, String name) {
+        return parameterControl(surface, name) + "-reset";
+    }
+
+    /**
+     * The identifier of the label saying where a parameter's value came from.
+     *
+     * @param surface where the control is
+     * @param name the parameter name
+     * @return the control identifier with {@code "-origin"} appended
+     */
+    public static String parameterOrigin(Surface surface, String name) {
+        return parameterControl(surface, name) + "-origin";
+    }
+
+    /**
+     * The identifier of the label stating a parameter's validation state in words.
+     *
+     * @param surface where the control is
+     * @param name the parameter name
+     * @return the control identifier with {@code "-state"} appended
+     */
+    public static String parameterState(Surface surface, String name) {
+        return parameterControl(surface, name) + "-state";
+    }
+
+    /**
+     * The identifier of the label saying why a parameter is locked.
+     *
+     * @param surface where the control is
+     * @param name the parameter name
+     * @return the control identifier with {@code "-lock"} appended
+     */
+    public static String parameterLock(Surface surface, String name) {
+        return parameterControl(surface, name) + "-lock";
+    }
+
+    /**
+     * The identifier of a range parameter's second field.
+     *
+     * @param surface where the control is
+     * @param name the parameter name
+     * @return the control identifier with {@code "-second"} appended
+     */
+    public static String parameterSecond(Surface surface, String name) {
+        return parameterControl(surface, name) + "-second";
+    }
+
+    /**
+     * The identifier of a file-path parameter's chooser action.
+     *
+     * @param surface where the control is
+     * @param name the parameter name
+     * @return the control identifier with {@code "-choose"} appended
+     */
+    public static String parameterChoose(Surface surface, String name) {
+        return parameterControl(surface, name) + "-choose";
+    }
+
+    /**
+     * The identifier of the label showing a variable-modification slot's serialised value.
+     *
+     * @param surface where the editor is
+     * @param slot the slot's parameter name, such as {@code variable_mod01}
+     * @return the slot's identifier with {@code "-serialised"} appended
+     */
+    public static String variableModSerialised(Surface surface, String slot) {
+        return parameterControl(surface, slot) + "-serialised";
+    }
+
+    /**
+     * The identifier of the control editing one part of a variable-modification slot's tuple.
+     *
+     * @param surface where the editor is
+     * @param slot the slot's parameter name
+     * @param part the part
+     * @return the slot's identifier, {@code "-part-"}, and the part's constant name in lower case
+     *     with hyphens, for example {@code ess-variable_mod01-part-maximum-count}
+     */
+    public static String variableModPart(Surface surface, String slot, VariableModPart part) {
+        Objects.requireNonNull(part, "part");
+        return parameterControl(surface, slot) + "-part-" + hyphenated(part.name());
+    }
+
+    /**
+     * The identifier of the check box selecting one residue letter of a slot's residue token.
+     *
+     * @param surface where the editor is
+     * @param slot the slot's parameter name
+     * @param letter an upper-case residue letter
+     * @return the slot's identifier, {@code "-residue-"} and the letter
+     * @throws IllegalArgumentException if {@code letter} is not {@code A} to {@code Z}
+     */
+    public static String variableModResidue(Surface surface, String slot, char letter) {
+        if (letter < 'A' || letter > 'Z') {
+            throw new IllegalArgumentException("a residue letter is A to Z, not '" + letter + "'");
+        }
+        return parameterControl(surface, slot) + "-residue-" + letter;
+    }
+
+    /**
+     * The identifier of the check box selecting one terminal code of a slot's residue token. Named
+     * after the code's meaning, never its character: {@code ^} and {@code $} cannot appear in a CSS
+     * identifier.
+     *
+     * @param surface where the editor is
+     * @param slot the slot's parameter name
+     * @param code the terminal code
+     * @return the slot's identifier, {@code "-terminus-"} and the code's constant name in lower
+     *     case with hyphens, for example {@code ess-variable_mod01-terminus-protein-n}
+     */
+    public static String variableModTerminus(Surface surface, String slot, TerminalCode code) {
+        Objects.requireNonNull(code, "code");
+        return parameterControl(surface, slot) + "-terminus-" + hyphenated(code.name());
+    }
+
+    /**
+     * The identifier of the action moving a slot's modification one slot up.
+     *
+     * @param surface where the editor is
+     * @param slot the slot's parameter name
+     * @return the slot's identifier with {@code "-up"} appended
+     */
+    public static String variableModUp(Surface surface, String slot) {
+        return parameterControl(surface, slot) + "-up";
+    }
+
+    /**
+     * The identifier of the action moving a slot's modification one slot down.
+     *
+     * @param surface where the editor is
+     * @param slot the slot's parameter name
+     * @return the slot's identifier with {@code "-down"} appended
+     */
+    public static String variableModDown(Surface surface, String slot) {
+        return parameterControl(surface, slot) + "-down";
+    }
+
+    /**
+     * The identifier of the action removing a slot's modification.
+     *
+     * @param surface where the editor is
+     * @param slot the slot's parameter name
+     * @return the slot's identifier with {@code "-remove"} appended
+     */
+    public static String variableModRemove(Surface surface, String slot) {
+        return parameterControl(surface, slot) + "-remove";
+    }
+
+    /**
+     * The identifier of the variable-modification editor's common-modification choice.
+     *
+     * @param surface where the editor is
+     * @return the surface prefix and {@code "-varmod-preset"}
+     */
+    public static String variableModPreset(Surface surface) {
+        return Objects.requireNonNull(surface, "surface").prefix() + "-varmod-preset";
+    }
+
+    /**
+     * The identifier of the action adding the chosen common modification to the first free slot.
+     *
+     * @param surface where the editor is
+     * @return the surface prefix and {@code "-varmod-add"}
+     */
+    public static String variableModAdd(Surface surface) {
+        return Objects.requireNonNull(surface, "surface").prefix() + "-varmod-add";
+    }
+
+    /**
+     * The identifier of the label carrying the slots' cross-validation against the limit and the
+     * requirement ({@code R-PARAM-10}), in words.
+     *
+     * @param surface where the editor is
+     * @return the surface prefix and {@code "-varmod-cross"}
+     */
+    public static String variableModCross(Surface surface) {
+        return Objects.requireNonNull(surface, "surface").prefix() + "-varmod-cross";
+    }
+
+    /**
+     * The identifier of the last add's or move's outcome in words.
+     *
+     * @param surface where the editor is
+     * @return the surface prefix and {@code "-varmod-status"}
+     */
+    public static String variableModStatus(Surface surface) {
+        return Objects.requireNonNull(surface, "surface").prefix() + "-varmod-status";
+    }
+
+    /**
+     * The identifier of one Essentials group.
+     *
+     * @param section the group's section
+     * @return {@code "ess-group-"} and the constant name in lower case with hyphens, for example
+     *     {@code ess-group-variable-modifications}
+     */
+    public static String essentialsGroup(EssentialsSection section) {
+        return "ess-group-" + hyphenated(Objects.requireNonNull(section, "section").name());
+    }
+
+    /**
+     * The identifier of one Advanced category's container.
+     *
+     * @param category the category
+     * @return {@code "adv-category-"} and the category's own identifier, for example {@code
+     *     adv-category-database_peff}
+     */
+    public static String advancedCategory(ParameterCategory category) {
+        return "adv-category-" + Objects.requireNonNull(category, "category").id();
+    }
+
+    /**
+     * The identifier of the switch that shows or hides one Advanced category's parameters.
+     *
+     * @param category the category
+     * @return the category identifier with {@code "-toggle"} appended
+     */
+    public static String advancedCategoryToggle(ParameterCategory category) {
+        return advancedCategory(category) + "-toggle";
+    }
+
+    /**
+     * The identifier of one Advanced category's reset action (asks to confirm).
+     *
+     * @param category the category
+     * @return the category identifier with {@code "-reset"} appended
+     */
+    public static String advancedCategoryReset(ParameterCategory category) {
+        return advancedCategory(category) + "-reset";
+    }
+
+    /**
+     * The identifier of the confirmation of one Advanced category's reset.
+     *
+     * @param category the category
+     * @return the category identifier with {@code "-reset-confirm"} appended
+     */
+    public static String advancedCategoryResetConfirm(ParameterCategory category) {
+        return advancedCategory(category) + "-reset-confirm";
+    }
+
+    /**
+     * The identifier of the cancellation of one Advanced category's reset.
+     *
+     * @param category the category
+     * @return the category identifier with {@code "-reset-cancel"} appended
+     */
+    public static String advancedCategoryResetCancel(ParameterCategory category) {
+        return advancedCategory(category) + "-reset-cancel";
+    }
+
+    /**
+     * The identifier of one entry of the validation summary, by its place in the summary.
+     *
+     * @param index the entry's 0-based position
+     * @return {@code "param-summary-entry-"} and the position
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String summaryEntry(int index) {
+        return "param-summary-entry-" + nonNegative(index);
+    }
+
+    /**
+     * The identifier of one chosen spectrum file's row, by its place in the list.
+     *
+     * @param index the row's 0-based position
+     * @return {@code "ess-spectrum-"} and the position
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String spectrum(int index) {
+        return "ess-spectrum-" + nonNegative(index);
+    }
+
+    /**
+     * The identifier of the action removing one chosen spectrum file.
+     *
+     * @param index the row's 0-based position
+     * @return the row's identifier with {@code "-remove"} appended
+     * @throws IllegalArgumentException if {@code index} is negative
+     */
+    public static String spectrumRemove(int index) {
+        return spectrum(index) + "-remove";
+    }
+
+    private static int nonNegative(int index) {
+        if (index < 0) {
+            throw new IllegalArgumentException("a position is 0 or more, not " + index);
+        }
+        return index;
+    }
+
+    /**
+     * A constant name in lower case with hyphens: {@code MAXIMUM_COUNT} is {@code maximum-count}.
+     */
+    private static String hyphenated(String constantName) {
+        return constantName.toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /**
+     * Whether a parameter name can be part of an identifier: non-empty, letters, digits and
+     * underscores only.
+     */
+    private static boolean isParameterName(String name) {
+        if (name.isEmpty()) {
+            return false;
+        }
+        for (int index = 0; index < name.length(); index++) {
+            char c = name.charAt(index);
+            boolean usable =
+                    (c >= 'a' && c <= 'z')
+                            || (c >= 'A' && c <= 'Z')
+                            || (c >= '0' && c <= '9')
+                            || c == '_';
+            if (!usable) {
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -21,6 +21,7 @@ import static org.cometgui.ui.viewmodel.params.Sessions.C03;
 import static org.cometgui.ui.viewmodel.params.Sessions.startingIn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -233,5 +234,46 @@ class FieldViewModelTest {
         assertEquals("0", threads.text());
         assertFalse(threads.lockedProperty().get());
         assertEquals(Optional.empty(), threads.lockReasonProperty().get());
+    }
+
+    @Test
+    @DisplayName("an on/off parameter is read from and set to the model's flag, origin USER")
+    void flags() {
+        ParameterSession session = startingIn(C03);
+        FieldViewModel nl = session.field("use_NL_ions");
+        FieldViewModel b = session.field("use_B_ions");
+        assertFalse(nl.isOn());
+        assertTrue(b.isOn());
+        assertEquals(EditOutcome.applied(), nl.setOn(true));
+        assertTrue(nl.isOn());
+        assertEquals("1", session.model().text("use_NL_ions"));
+        assertEquals(ValueOrigin.USER, session.model().origin("use_NL_ions"));
+        assertEquals(EditOutcome.applied(), b.setOn(false));
+        assertEquals("0", session.model().text("use_B_ions"));
+    }
+
+    @Test
+    @DisplayName("a locked flag is refused with its reason and stays on")
+    void lockedFlag() {
+        ParameterSession session = startingIn(C03);
+        FieldViewModel pin = session.field("output_percolatorfile");
+        EditOutcome refused = pin.setOn(false);
+        assertEquals(
+                Optional.of(
+                        "Write Percolator input (PIN) cannot be changed while the stage that needs"
+                                + " it is enabled. Required by CometGUI workflow: Percolator"
+                                + " rescoring reads the .pin file."),
+                refused.refusal());
+        assertTrue(pin.isOn());
+    }
+
+    @Test
+    @DisplayName("isOn and setOn refuse a parameter that is not on/off, naming its kind")
+    void notAFlag() {
+        FieldViewModel threads = startingIn(C03).field("num_threads");
+        IllegalStateException read = assertThrows(IllegalStateException.class, threads::isOn);
+        assertEquals("num_threads is a INTEGER parameter, not an on/off one", read.getMessage());
+        assertThrows(IllegalStateException.class, () -> threads.setOn(true));
+        assertEquals("0", threads.text());
     }
 }

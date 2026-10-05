@@ -17,14 +17,21 @@
 package org.cometgui.app.bootstrap;
 
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import org.cometgui.app.config.ApplicationServices;
+import org.cometgui.app.config.BuildIdentityResource;
+import org.cometgui.app.config.FxFileChooser;
+import org.cometgui.app.config.ParameterEditorWiring;
 import org.cometgui.app.config.ToolManagerUnavailableException;
 import org.cometgui.app.config.ToolManagerWiring;
 import org.cometgui.app.config.derived.AtlantaFxThemes;
+import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.log.LogMessage;
 import org.cometgui.domain.log.MessageSeverity;
@@ -37,6 +44,11 @@ import org.cometgui.ui.viewmodel.HostBaselineViewModel;
 import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.params.FileChooserPort;
+import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
+import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 
 /**
  * The running application: build the composition root, check the host, build the shell, show the
@@ -52,8 +64,9 @@ import org.cometgui.ui.viewmodel.ToolManagerViewModel;
  *       {@link HostBaselineViewModel}.
  *   <li>The report is appended to the shared message log, so the console carries the same statement
  *       the banner does and a later provenance record can quote it.
- *   <li>The shell is built with that view-model and the three others, put into a {@link Scene},
- *       given to the primary {@link Stage}, and shown.
+ *   <li>The shell is built with that view-model and the others -- the Tool Manager's, and the Comet
+ *       parameter editor's from {@link ParameterEditorWiring} -- put into a {@link Scene}, given to
+ *       the primary {@link Stage}, and shown.
  * </ol>
  *
  * <p><strong>The order is the requirement, not an implementation detail.</strong> {@code R-PLAT-01}
@@ -123,6 +136,10 @@ public final class CometGuiApplication extends Application {
 
     private final BoundedMessageLog messageLog;
 
+    private final Supplier<BuildIdentity> build;
+
+    private final Function<Supplier<Window>, FileChooserPort> choosers;
+
     /**
      * The constructor JavaFX itself calls: the real services for this host and a fresh run message
      * log.
@@ -151,8 +168,34 @@ public final class CometGuiApplication extends Application {
      * @throws NullPointerException if either argument is {@code null}
      */
     public CometGuiApplication(ApplicationServices services, BoundedMessageLog messageLog) {
+        this(services, messageLog, BuildIdentityResource::load, FxFileChooser::new);
+    }
+
+    /**
+     * The application over a given composition root, run message log, build identity and file
+     * chooser.
+     *
+     * <p>The parameter editor's two seams a GUI test needs (Phase 07): the build the canonical
+     * {@code comet.params} header names, and the file chooser -- the specification's "file chooser
+     * abstraction and its test injection". Production passes {@link BuildIdentityResource#load()},
+     * read when the window is built, and {@link FxFileChooser} over the application window; a test
+     * passes a build it names and a chooser that answers from a script.
+     *
+     * @param services the wiring to run with
+     * @param messageLog the bounded log the console shows
+     * @param build the running build, asked for once when the window is built
+     * @param choosers makes the parameter editor's file chooser, given the window it is modal over
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public CometGuiApplication(
+            ApplicationServices services,
+            BoundedMessageLog messageLog,
+            Supplier<BuildIdentity> build,
+            Function<Supplier<Window>, FileChooserPort> choosers) {
         this.services = Objects.requireNonNull(services, "services");
         this.messageLog = Objects.requireNonNull(messageLog, "messageLog");
+        this.build = Objects.requireNonNull(build, "build");
+        this.choosers = Objects.requireNonNull(choosers, "choosers");
     }
 
     /**
@@ -178,13 +221,30 @@ public final class CometGuiApplication extends Application {
 
         ToolManagerViewModel toolManager = toolManagerViewModel();
 
+        /*
+         * The parameter editor's collaborators are made here and injected into the views, never
+         * handed out by a holder: one session, the spectrum inputs and the variable-modification
+         * editor over it, and the editor's state.
+         */
+        ParameterSession parameterSession = ParameterEditorWiring.newSession();
+        FileChooserPort chooser = choosers.apply(() -> primaryStage);
+        SpectrumInputsViewModel spectrumInputs =
+                new SpectrumInputsViewModel(parameterSession, chooser, services.fileSystem());
+        ParameterEditorViewModel parameterEditor =
+                ParameterEditorWiring.editor(
+                        parameterSession, spectrumInputs, chooser, build.get());
+
         ShellView shell =
                 new ShellView(
                         new NavigationViewModel(),
                         hostBaseline,
                         new StageStepperViewModel(),
                         new ConsoleViewModel(messageLog),
-                        toolManager);
+                        toolManager,
+                        parameterSession,
+                        parameterEditor,
+                        spectrumInputs,
+                        new VariableModsViewModel(parameterSession));
 
         /*
          * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds

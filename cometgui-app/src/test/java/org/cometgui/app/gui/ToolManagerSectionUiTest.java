@@ -40,6 +40,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import org.cometgui.app.config.ToolManagerWiring;
 import org.cometgui.app.testing.FxToolkit;
+import org.cometgui.app.testing.TestEditors;
 import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.platform.GlibcVersion;
 import org.cometgui.domain.platform.HostBaselineOutcome;
@@ -247,7 +248,7 @@ class ToolManagerSectionUiTest {
         FxToolkit.onFxThread(
                 () -> {
                     ShellView shell =
-                            new ShellView(
+                            TestEditors.shell(
                                     new NavigationViewModel(),
                                     new HostBaselineViewModel(
                                             new HostBaselineReport(

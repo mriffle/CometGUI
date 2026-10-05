@@ -16,6 +16,8 @@
 
 package org.cometgui.app.uidriver;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import javafx.geometry.Point2D;
 import javafx.scene.Node;
@@ -69,6 +71,7 @@ public final class RobotFxUiDriver extends AbstractFxUiDriver {
         Node target = node(id);
         onFxThread(
                 () -> {
+                    reveal(target);
                     Point2D centre = centreOf(target);
                     robot.mouseMove(centre);
                     robot.mouseClick(MouseButton.PRIMARY);
@@ -79,6 +82,38 @@ public final class RobotFxUiDriver extends AbstractFxUiDriver {
     @Override
     public void press(KeyCode code) {
         onFxThread(() -> robot.keyType(code));
+        barrier();
+    }
+
+    @Override
+    public void type(String text) {
+        List<KeyStroke> strokes = new ArrayList<>();
+        for (char character : text.toCharArray()) {
+            strokes.add(strokeFor(character));
+        }
+        for (KeyStroke stroke : strokes) {
+            onFxThread(
+                    () -> {
+                        if (stroke.shift()) {
+                            robot.keyPress(KeyCode.SHIFT);
+                        }
+                        robot.keyType(stroke.code());
+                        if (stroke.shift()) {
+                            robot.keyRelease(KeyCode.SHIFT);
+                        }
+                    });
+        }
+        barrier();
+    }
+
+    @Override
+    public void pressWith(KeyCode modifier, KeyCode code) {
+        onFxThread(
+                () -> {
+                    robot.keyPress(modifier);
+                    robot.keyType(code);
+                    robot.keyRelease(modifier);
+                });
         barrier();
     }
 

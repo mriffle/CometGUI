@@ -56,6 +56,16 @@ class SpectrumInputsTest {
         public Optional<Path> chooseDatabase() {
             return databases.removeFirst();
         }
+
+        @Override
+        public Optional<Path> chooseFile(String what) {
+            throw new AssertionError("the inputs never ask for a file parameter's file");
+        }
+
+        @Override
+        public Optional<Path> chooseSaveTarget() {
+            throw new AssertionError("the inputs never ask where to save");
+        }
     }
 
     /** What the file system says, per path; anything not listed does not exist. */

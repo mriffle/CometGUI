@@ -47,3 +47,10 @@
 # in a .gitattributes beside the files because that directory is a resource
 # root: a file placed there would be copied into the module's jar.
 cometgui-params-comet/src/main/resources/org/cometgui/params/comet/parser/defaults/** -text
+
+# Phase 07 exit-gate item 1 compares a saved comet.params with this checked-in
+# canonical file byte for byte; a checkout that converted its line endings would
+# turn the gate red for a reason that is not the product's.  Same reasoning as
+# the rule above: set here, not beside the file, because that directory is a
+# test resource root.
+cometgui-app/src/test/resources/org/cometgui/app/gui/*.params -text

@@ -42,6 +42,7 @@ import org.cometgui.ui.controls.StageStepper;
 import org.cometgui.ui.controls.ToolManagerPane;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
+import org.cometgui.ui.testing.Editors;
 import org.cometgui.ui.testing.FxToolkit;
 import org.cometgui.ui.testing.ScriptedToolManager;
 import org.cometgui.ui.testing.ToolOffers;
@@ -51,6 +52,9 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
+import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.workflow.state.WorkflowStage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -101,9 +105,22 @@ class ShellViewTest {
         toolManager =
                 new ToolManagerViewModel(
                         new ScriptedToolManager(ToolOffers.percolatorAvailable()), Runnable::run);
+        ParameterSession session = Editors.session();
+        Editors.ScriptedChooser chooser = new Editors.ScriptedChooser();
+        SpectrumInputsViewModel inputs = Editors.inputs(session, chooser, new Editors.KnownFiles());
         FxToolkit.onFxThread(
                 () -> {
-                    shell = new ShellView(navigation, baseline, stepper, console, toolManager);
+                    shell =
+                            new ShellView(
+                                    navigation,
+                                    baseline,
+                                    stepper,
+                                    console,
+                                    toolManager,
+                                    session,
+                                    Editors.editor(session, inputs, chooser),
+                                    inputs,
+                                    new VariableModsViewModel(session));
                     scene = new Scene(shell, 1280, 800);
                     scene.getRoot().applyCss();
                     scene.getRoot().layout();
@@ -363,6 +380,9 @@ class ShellViewTest {
                         new HostBaselineReport(
                                 HostBaselineOutcome.NOT_64_BIT,
                                 "This host reports a 32-bit JVM; the managed tools are 64-bit."));
+        ParameterSession session = Editors.session();
+        Editors.ScriptedChooser chooser = new Editors.ScriptedChooser();
+        SpectrumInputsViewModel inputs = Editors.inputs(session, chooser, new Editors.KnownFiles());
         Scene other =
                 FxToolkit.callOnFxThread(
                         () ->
@@ -373,7 +393,11 @@ class ShellViewTest {
                                                 new StageStepperViewModel(),
                                                 new ConsoleViewModel(new BoundedMessageLog(8)),
                                                 new ToolManagerViewModel(
-                                                        new ScriptedToolManager(), Runnable::run)),
+                                                        new ScriptedToolManager(), Runnable::run),
+                                                session,
+                                                Editors.editor(session, inputs, chooser),
+                                                inputs,
+                                                new VariableModsViewModel(session)),
                                         800,
                                         600));
         Label banner = (Label) other.lookup("#" + UiIds.HOST_BASELINE_BANNER);

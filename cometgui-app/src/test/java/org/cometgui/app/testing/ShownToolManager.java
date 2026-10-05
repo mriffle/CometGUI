@@ -144,7 +144,7 @@ public final class ShownToolManager implements AutoCloseable {
         FxToolkit.onFxThread(
                 () -> {
                     ShellView shell =
-                            new ShellView(
+                            TestEditors.shell(
                                     new NavigationViewModel(),
                                     new HostBaselineViewModel(
                                             new HostBaselineReport(

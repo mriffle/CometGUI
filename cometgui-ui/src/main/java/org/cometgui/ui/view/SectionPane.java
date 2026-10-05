@@ -35,11 +35,12 @@ import org.cometgui.ui.viewmodel.SectionId;
  * each pane says so in text, so an empty section can be told apart from a broken one without
  * reading the source.
  *
- * <p>Three panes are given content by the shell: {@link SectionId#RUN} hosts the stage stepper,
- * {@link SectionId#CONSOLE} hosts the console and {@link SectionId#TOOL_MANAGER} hosts the tool
- * list. All three arrive through {@link #addContent(Node)} rather than through a subclass, because
- * a section pane differs from another only in what it holds, and nine near-identical classes would
- * be nine places for the heading, the description and the note to drift apart.
+ * <p>Four panes are given content by the shell: {@link SectionId#RUN} hosts the stage stepper and
+ * the Run control, {@link SectionId#COMET_PARAMETERS} hosts the parameter editor, {@link
+ * SectionId#CONSOLE} hosts the console and {@link SectionId#TOOL_MANAGER} hosts the tool list. All
+ * four arrive through {@link #addContent(Node)} rather than through a subclass, because a section
+ * pane differs from another only in what it holds, and nine near-identical classes would be nine
+ * places for the heading, the description and the note to drift apart.
  *
  * <p>The heading and the description are the section's own {@link SectionId#title()} and {@link
  * SectionId#description()}: the specification's information architecture, read from the model

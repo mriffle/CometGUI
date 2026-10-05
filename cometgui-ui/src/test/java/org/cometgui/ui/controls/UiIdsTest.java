@@ -211,4 +211,57 @@ class UiIdsTest {
         }
         return List.copyOf(all);
     }
+
+    @Test
+    @DisplayName("a parameter name that is not letters, digits and underscores is refused, quoted")
+    void parameterNamesAreChecked() {
+        for (String unusable :
+                List.of("", "fragment.bin", "a b", "x-y", "[COMET_ENZYME_INFO]", "é")) {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> UiIds.parameterControl(UiIds.Surface.ADVANCED, unusable),
+                            () -> "\"" + unusable + "\" must be refused");
+            assertEquals(
+                    "not a usable parameter name for an identifier: \""
+                            + unusable
+                            + "\" (expected letters, digits and underscores, as Comet spells a"
+                            + " parameter)",
+                    refused.getMessage());
+        }
+        assertEquals(
+                "ess-Az09_",
+                UiIds.parameterControl(UiIds.Surface.ESSENTIALS, "Az09_"),
+                "every class of usable character, at both ends");
+        assertThrows(
+                NullPointerException.class, () -> UiIds.parameterControl(null, "decoy_prefix"));
+        assertThrows(
+                NullPointerException.class,
+                () -> UiIds.parameterControl(UiIds.Surface.ESSENTIALS, null));
+    }
+
+    @Test
+    @DisplayName("a residue is A to Z, and a position is not negative")
+    void residuesAndPositionsAreChecked() {
+        for (char outside : new char[] {'a', '@', '[', '^', '$'}) {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    UiIds.variableModResidue(
+                                            UiIds.Surface.ESSENTIALS, "variable_mod01", outside));
+            assertEquals("a residue letter is A to Z, not '" + outside + "'", refused.getMessage());
+        }
+        assertEquals(
+                "ess-variable_mod01-residue-A",
+                UiIds.variableModResidue(UiIds.Surface.ESSENTIALS, "variable_mod01", 'A'));
+        assertEquals(
+                "ess-variable_mod01-residue-Z",
+                UiIds.variableModResidue(UiIds.Surface.ESSENTIALS, "variable_mod01", 'Z'));
+        IllegalArgumentException negative =
+                assertThrows(IllegalArgumentException.class, () -> UiIds.summaryEntry(-1));
+        assertEquals("a position is 0 or more, not -1", negative.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> UiIds.spectrumRemove(-2));
+        assertEquals("ess-spectrum-0", UiIds.spectrum(0));
+    }
 }

@@ -37,12 +37,18 @@ import org.cometgui.ui.controls.StageStepper;
 import org.cometgui.ui.controls.ToolManagerPane;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
+import org.cometgui.ui.controls.params.RunControl;
+import org.cometgui.ui.view.params.CometParametersView;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
 import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
+import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
+import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 
 /**
  * The application shell: a header, a left navigation over every section, and a content area holding
@@ -123,13 +129,18 @@ public final class ShellView extends BorderPane {
     private final Label sectionTitle = new Label();
 
     /**
-     * The shell, over the five view-models it presents.
+     * The shell, over the view-models it presents.
      *
      * @param navigation which sections there are and which one is selected
      * @param hostBaseline the startup host-baseline banner
      * @param stepper the Run screen's stage states
      * @param console the console's filters and the messages they admit
      * @param toolManager the tool builds this machine may have, their states and their actions
+     * @param parameterSession the Comet parameter configuration being edited
+     * @param parameterEditor the editor's state over that session, whose run readiness the Run
+     *     section's Run control shows
+     * @param spectrumInputs the spectrum inputs over that session
+     * @param variableMods the variable-modification editor over that session
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
@@ -137,12 +148,17 @@ public final class ShellView extends BorderPane {
             HostBaselineViewModel hostBaseline,
             StageStepperViewModel stepper,
             ConsoleViewModel console,
-            ToolManagerViewModel toolManager) {
+            ToolManagerViewModel toolManager,
+            ParameterSession parameterSession,
+            ParameterEditorViewModel parameterEditor,
+            SpectrumInputsViewModel spectrumInputs,
+            VariableModsViewModel variableMods) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
         Objects.requireNonNull(console, "console");
         Objects.requireNonNull(toolManager, "toolManager");
+        Objects.requireNonNull(parameterEditor, "parameterEditor");
 
         setId(UiIds.SHELL_ROOT);
         content.setId(UiIds.CONTENT);
@@ -155,6 +171,17 @@ public final class ShellView extends BorderPane {
         }
 
         panes.get(SectionId.RUN).addContent(new StageStepper(stepper));
+        panes.get(SectionId.RUN).addContent(new RunControl(parameterEditor.readiness()));
+
+        /*
+         * The Comet parameter editor (phase 07) shares one session with the Run control above:
+         * what blocks a run is what the editor's summary lists.
+         */
+        CometParametersView editorView =
+                new CometParametersView(
+                        parameterSession, parameterEditor, spectrumInputs, variableMods);
+        panes.get(SectionId.COMET_PARAMETERS).addContent(editorView);
+        VBox.setVgrow(editorView, Priority.ALWAYS);
 
         /*
          * The console's stage filter is offered the stepper's own stages, in the stepper's own

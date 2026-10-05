@@ -110,6 +110,33 @@ public interface FxUiDriver {
      */
     void press(KeyCode code);
 
+    /**
+     * Types text into whatever has the keyboard focus, one character at a time, using synthetic
+     * input: what a scientist typing would produce, and nothing else -- no text is set directly.
+     *
+     * @param text the characters to type: letters, digits, space and {@code - _ . / , +}
+     * @throws AssertionError if the text holds a character this driver cannot type, naming it
+     */
+    void type(String text);
+
+    /**
+     * Clicks a text control, selects everything it holds with the keyboard (Ctrl+A), and types text
+     * in its place. Does not commit: the test presses Enter or Tab when it means to.
+     *
+     * @param id the stable identifier of the text control
+     * @param text what to type
+     * @throws AssertionError if no node carries that identifier, or a character cannot be typed
+     */
+    void typeInto(String id, String text);
+
+    /**
+     * Presses a key while holding a modifier, using synthetic input.
+     *
+     * @param modifier the modifier to hold, such as {@code CONTROL} or {@code SHIFT}
+     * @param code the key to press
+     */
+    void pressWith(KeyCode modifier, KeyCode code);
+
     /** Presses and releases Tab, moving the focus to the next focus stop. */
     void tab();
 

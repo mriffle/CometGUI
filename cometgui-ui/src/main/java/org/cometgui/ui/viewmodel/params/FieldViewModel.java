@@ -25,6 +25,7 @@ import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.comet.model.ParameterValue;
 import org.cometgui.params.comet.model.ValueOrigin;
 import org.cometgui.params.comet.schema.ParameterCategory;
 import org.cometgui.params.comet.schema.ParameterDefinition;
@@ -404,6 +405,40 @@ public final class FieldViewModel {
      */
     public EditOutcome choose(ChoiceOption choice) {
         return setText(Objects.requireNonNull(choice, "choice").token());
+    }
+
+    /**
+     * Whether an on/off parameter (a {@link ValueKind#BOOLEAN_FLAG} or {@link
+     * ValueKind#ION_SERIES_FLAG}) is on in the configuration, as the model holds it -- the check
+     * box reads this rather than comparing the text with {@code "1"}.
+     *
+     * @return {@code true} if the configuration holds the flag on
+     * @throws IllegalStateException if the parameter is not an on/off parameter
+     */
+    public boolean isOn() {
+        requireFlag();
+        return ((ParameterValue.Flag) session.model().value(name())).on();
+    }
+
+    /**
+     * Switches an on/off parameter, as the scientist ticked or cleared its check box: the model's
+     * own flag value, origin {@code USER}, through the session (a locked field is refused with its
+     * reason, and the value it already holds changes nothing).
+     *
+     * @param on whether the parameter is to be on
+     * @return whether the configuration now holds it, or why not
+     * @throws IllegalStateException if the parameter is not an on/off parameter
+     */
+    public EditOutcome setOn(boolean on) {
+        requireFlag();
+        return session.setValue(name(), new ParameterValue.Flag(on));
+    }
+
+    private void requireFlag() {
+        if (kind() != ValueKind.BOOLEAN_FLAG && kind() != ValueKind.ION_SERIES_FLAG) {
+            throw new IllegalStateException(
+                    name() + " is a " + kind() + " parameter, not an on/off one");
+        }
     }
 
     /**

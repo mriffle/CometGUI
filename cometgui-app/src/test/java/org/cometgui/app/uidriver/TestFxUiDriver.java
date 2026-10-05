@@ -61,8 +61,28 @@ public final class TestFxUiDriver extends AbstractFxUiDriver {
 
     @Override
     public void clickOn(String id) {
-        node(id);
+        Node target = node(id);
+        onFxThread(() -> reveal(target));
         robot.clickOn("#" + id);
+        barrier();
+    }
+
+    @Override
+    public void type(String text) {
+        // TestFX types any character; the same set as the robot is enforced so that a test passes
+        // or
+        // fails the same way through either driver, and nothing is typed if one character cannot
+        // be.
+        for (char character : text.toCharArray()) {
+            strokeFor(character);
+        }
+        robot.write(text);
+        barrier();
+    }
+
+    @Override
+    public void pressWith(KeyCode modifier, KeyCode code) {
+        robot.push(modifier, code);
         barrier();
     }
 

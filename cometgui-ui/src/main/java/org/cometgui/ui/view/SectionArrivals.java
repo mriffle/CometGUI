@@ -70,11 +70,15 @@ final class SectionArrivals {
                 SectionId.RUN,
                 "This section arrives in phase 08 (Workflow Engine and Comet Adapter): the inputs,"
                         + " the validation summary and the Run and Cancel controls. The stage"
-                        + " stepper below is already live and has no engine behind it yet.");
+                        + " stepper below is already live and has no engine behind it yet, and"
+                        + " the Run control below it says, in words, every reason it cannot"
+                        + " start a run: the parameters' (phase 07) and the missing engine's.");
         notes.put(
                 SectionId.COMET_PARAMETERS,
-                "This section arrives in phase 07 (Comet Parameter Editor UI), on the parameter"
-                        + " model phase 06 builds.");
+                "This section is being filled by phase 07 (Comet Parameter Editor UI), on the"
+                        + " parameter model phase 06 built: the release, the Essentials and"
+                        + " Advanced levels and the validation summary below are live; the Expert"
+                        + " level and the search preset choice are still to come.");
         notes.put(
                 SectionId.PERCOLATOR,
                 "This section arrives in phase 09 (Percolator Adapter and Version Capabilities).");

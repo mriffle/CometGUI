@@ -24,6 +24,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,7 +32,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.cometgui.domain.log.MessageSeverity;
+import org.cometgui.params.comet.schema.ParameterCategory;
+import org.cometgui.params.comet.schema.TerminalCode;
+import org.cometgui.params.comet.schema.ValueKind;
+import org.cometgui.params.comet.value.VariableModPart;
 import org.cometgui.ui.viewmodel.SectionId;
+import org.cometgui.ui.viewmodel.params.EssentialsSection;
 import org.cometgui.workflow.state.WorkflowStage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -123,8 +129,15 @@ class StableIdentifierPinTest {
      * identifiers -- {@code section-settings}, {@code -heading}, {@code -description}, {@code
      * -note} and {@code nav-settings} -- went with the {@code SectionId} constant. That is the
      * removal of the thing described, not of a pin for something that still exists.
+     *
+     * <p>Raised from 128 to 317 by phase 07 unit 6, which added the Comet parameter editor and the
+     * Run control: 29 constants; the per-parameter scheme pinned for one parameter of each of the
+     * 14 value kinds on both surfaces (28) and for each of the 12 per-parameter methods on both
+     * surfaces (24); the 4 per-surface methods on both surfaces (8); the 10 tuple parts and the 4
+     * terminal codes of one slot; the 10 Essentials groups; the 14 Advanced categories times five
+     * (70); and 6 identifiers built from a position or a character.
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 128;
+    private static final int PINNED_IDENTIFIER_COUNT = 317;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -157,7 +170,450 @@ class StableIdentifierPinTest {
                     Map.entry("CONSOLE_COPY", "console-copy"),
                     Map.entry("TOOL_MANAGER_PANE", "tool-manager-pane"),
                     Map.entry("TOOL_MANAGER_SUMMARY", "tool-manager-summary"),
-                    Map.entry("TOOL_MANAGER_ROWS", "tool-manager-rows"));
+                    Map.entry("TOOL_MANAGER_ROWS", "tool-manager-rows"),
+                    Map.entry("PARAM_EDITOR", "param-editor"),
+                    Map.entry("PARAM_RELEASE", "param-release"),
+                    Map.entry("PARAM_RELEASE_STATUS", "param-release-status"),
+                    Map.entry("PARAM_MODE_ESSENTIALS", "param-mode-essentials"),
+                    Map.entry("PARAM_MODE_ADVANCED", "param-mode-advanced"),
+                    Map.entry("PARAM_MODE_EXPERT", "param-mode-expert"),
+                    Map.entry("PARAM_SUMMARY", "param-summary"),
+                    Map.entry("PARAM_SUMMARY_HEADLINE", "param-summary-headline"),
+                    Map.entry("PARAM_BODY", "param-body"),
+                    Map.entry("PARAM_ESSENTIALS", "param-essentials"),
+                    Map.entry("PARAM_ADVANCED", "param-advanced"),
+                    Map.entry("PARAM_EXPERT", "param-expert"),
+                    Map.entry("PARAM_EXPERT_PLACEHOLDER", "param-expert-placeholder"),
+                    Map.entry("PARAM_SAVE", "param-save"),
+                    Map.entry("PARAM_SAVE_STATUS", "param-save-status"),
+                    Map.entry("PARAM_RESET_ALL", "param-reset-all"),
+                    Map.entry("PARAM_RESET_ALL_CONFIRM", "param-reset-all-confirm"),
+                    Map.entry("PARAM_RESET_ALL_CANCEL", "param-reset-all-cancel"),
+                    Map.entry("ESSENTIALS_PRESET_PLACEHOLDER", "ess-preset-placeholder"),
+                    Map.entry("SPECTRA_ADD", "ess-spectra-add"),
+                    Map.entry("SPECTRA_LIST", "ess-spectra-list"),
+                    Map.entry("SPECTRA_SUMMARY", "ess-spectra-summary"),
+                    Map.entry("DATABASE_STATUS", "ess-database-status"),
+                    Map.entry("PRECURSOR_SUMMARY", "ess-precursor-summary"),
+                    Map.entry("FRAGMENT_SETTING", "ess-fragment-setting"),
+                    Map.entry("FRAGMENT_SETTING_WORDS", "ess-fragment-setting-words"),
+                    Map.entry("RUN_START", "run-start"),
+                    Map.entry("RUN_PARAMETERS", "run-parameters"),
+                    Map.entry("RUN_ENGINE", "run-engine"));
+
+    // -----------------------------------------------------------------------------------------
+    // The parameter editor (Phase 07). A parameter's identifiers are built from its own name, so
+    // they cannot all be listed; the SCHEME is pinned instead, for a representative parameter of
+    // every value kind on both surfaces and for every method that builds one, each identifier
+    // typed out in full. Nothing below is produced by UiIds, ValueKind or the metadata.
+    // -----------------------------------------------------------------------------------------
+
+    /**
+     * For one parameter of every {@link ValueKind}: its name, then its control's identifier on
+     * Essentials and on Advanced. A kind whose parameters Essentials does not show is pinned on
+     * both all the same: the scheme does not depend on the surface showing the parameter.
+     */
+    private static final Map<ValueKind, List<String>> PARAMETER_OF_EACH_KIND =
+            Map.ofEntries(
+                    Map.entry(
+                            ValueKind.INTEGER,
+                            List.of(
+                                    "allowed_missed_cleavage",
+                                    "ess-allowed_missed_cleavage",
+                                    "adv-allowed_missed_cleavage")),
+                    Map.entry(
+                            ValueKind.DECIMAL,
+                            List.of(
+                                    "fragment_bin_tol",
+                                    "ess-fragment_bin_tol",
+                                    "adv-fragment_bin_tol")),
+                    Map.entry(
+                            ValueKind.STRING,
+                            List.of("decoy_prefix", "ess-decoy_prefix", "adv-decoy_prefix")),
+                    Map.entry(
+                            ValueKind.BOOLEAN_FLAG,
+                            List.of(
+                                    "require_variable_mod",
+                                    "ess-require_variable_mod",
+                                    "adv-require_variable_mod")),
+                    Map.entry(
+                            ValueKind.INTEGER_ENUM,
+                            List.of(
+                                    "peptide_mass_units",
+                                    "ess-peptide_mass_units",
+                                    "adv-peptide_mass_units")),
+                    Map.entry(
+                            ValueKind.STRING_ENUM,
+                            List.of(
+                                    "activation_method",
+                                    "ess-activation_method",
+                                    "adv-activation_method")),
+                    Map.entry(
+                            ValueKind.FILE_PATH,
+                            List.of("database_name", "ess-database_name", "adv-database_name")),
+                    Map.entry(
+                            ValueKind.INTEGER_RANGE,
+                            List.of(
+                                    "peptide_length_range",
+                                    "ess-peptide_length_range",
+                                    "adv-peptide_length_range")),
+                    Map.entry(
+                            ValueKind.DECIMAL_RANGE,
+                            List.of(
+                                    "digest_mass_range",
+                                    "ess-digest_mass_range",
+                                    "adv-digest_mass_range")),
+                    Map.entry(
+                            ValueKind.DECIMAL_LIST,
+                            List.of("mass_offsets", "ess-mass_offsets", "adv-mass_offsets")),
+                    Map.entry(
+                            ValueKind.TOLERANCE_PAIR_MEMBER,
+                            List.of(
+                                    "peptide_mass_tolerance_lower",
+                                    "ess-peptide_mass_tolerance_lower",
+                                    "adv-peptide_mass_tolerance_lower")),
+                    Map.entry(
+                            ValueKind.VARIABLE_MOD_TUPLE,
+                            List.of("variable_mod01", "ess-variable_mod01", "adv-variable_mod01")),
+                    Map.entry(
+                            ValueKind.ENZYME_REFERENCE,
+                            List.of(
+                                    "search_enzyme_number",
+                                    "ess-search_enzyme_number",
+                                    "adv-search_enzyme_number")),
+                    Map.entry(
+                            ValueKind.ION_SERIES_FLAG,
+                            List.of("use_A_ions", "ess-use_A_ions", "adv-use_A_ions")));
+
+    /**
+     * Every UiIds method taking a surface and a parameter name, by method name: the parameter it is
+     * pinned for, then the identifier on Essentials and on Advanced. {@code parameterControl} is
+     * pinned here for a parameter of its own as well as by kind above.
+     */
+    private static final Map<String, List<String>> PER_PARAMETER =
+            Map.ofEntries(
+                    Map.entry(
+                            "parameterControl",
+                            List.of(
+                                    "max_variable_mods_in_peptide",
+                                    "ess-max_variable_mods_in_peptide",
+                                    "adv-max_variable_mods_in_peptide")),
+                    Map.entry(
+                            "parameterLabel",
+                            List.of(
+                                    "max_variable_mods_in_peptide",
+                                    "ess-max_variable_mods_in_peptide-label",
+                                    "adv-max_variable_mods_in_peptide-label")),
+                    Map.entry(
+                            "parameterReset",
+                            List.of(
+                                    "max_variable_mods_in_peptide",
+                                    "ess-max_variable_mods_in_peptide-reset",
+                                    "adv-max_variable_mods_in_peptide-reset")),
+                    Map.entry(
+                            "parameterOrigin",
+                            List.of(
+                                    "max_variable_mods_in_peptide",
+                                    "ess-max_variable_mods_in_peptide-origin",
+                                    "adv-max_variable_mods_in_peptide-origin")),
+                    Map.entry(
+                            "parameterState",
+                            List.of(
+                                    "max_variable_mods_in_peptide",
+                                    "ess-max_variable_mods_in_peptide-state",
+                                    "adv-max_variable_mods_in_peptide-state")),
+                    Map.entry(
+                            "parameterLock",
+                            List.of(
+                                    "output_percolatorfile",
+                                    "ess-output_percolatorfile-lock",
+                                    "adv-output_percolatorfile-lock")),
+                    Map.entry(
+                            "parameterSecond",
+                            List.of(
+                                    "precursor_charge",
+                                    "ess-precursor_charge-second",
+                                    "adv-precursor_charge-second")),
+                    Map.entry(
+                            "parameterChoose",
+                            List.of("peff_obo", "ess-peff_obo-choose", "adv-peff_obo-choose")),
+                    Map.entry(
+                            "variableModSerialised",
+                            List.of(
+                                    "variable_mod15",
+                                    "ess-variable_mod15-serialised",
+                                    "adv-variable_mod15-serialised")),
+                    Map.entry(
+                            "variableModUp",
+                            List.of(
+                                    "variable_mod15",
+                                    "ess-variable_mod15-up",
+                                    "adv-variable_mod15-up")),
+                    Map.entry(
+                            "variableModDown",
+                            List.of(
+                                    "variable_mod15",
+                                    "ess-variable_mod15-down",
+                                    "adv-variable_mod15-down")),
+                    Map.entry(
+                            "variableModRemove",
+                            List.of(
+                                    "variable_mod15",
+                                    "ess-variable_mod15-remove",
+                                    "adv-variable_mod15-remove")));
+
+    /** Every UiIds method taking a surface alone: Essentials, then Advanced. */
+    private static final Map<String, List<String>> PER_SURFACE =
+            Map.ofEntries(
+                    Map.entry(
+                            "variableModPreset", List.of("ess-varmod-preset", "adv-varmod-preset")),
+                    Map.entry("variableModAdd", List.of("ess-varmod-add", "adv-varmod-add")),
+                    Map.entry("variableModCross", List.of("ess-varmod-cross", "adv-varmod-cross")),
+                    Map.entry(
+                            "variableModStatus",
+                            List.of("ess-varmod-status", "adv-varmod-status")));
+
+    /** Each tuple part's control of {@code variable_mod01} on Essentials. */
+    private static final Map<VariableModPart, String> VARIABLE_MOD_PART =
+            Map.ofEntries(
+                    Map.entry(VariableModPart.MASS, "ess-variable_mod01-part-mass"),
+                    Map.entry(VariableModPart.RESIDUES, "ess-variable_mod01-part-residues"),
+                    Map.entry(VariableModPart.BINARY_GROUP, "ess-variable_mod01-part-binary-group"),
+                    Map.entry(
+                            VariableModPart.MINIMUM_COUNT, "ess-variable_mod01-part-minimum-count"),
+                    Map.entry(
+                            VariableModPart.MAXIMUM_COUNT, "ess-variable_mod01-part-maximum-count"),
+                    Map.entry(
+                            VariableModPart.TERMINAL_DISTANCE,
+                            "ess-variable_mod01-part-terminal-distance"),
+                    Map.entry(VariableModPart.TERMINUS, "ess-variable_mod01-part-terminus"),
+                    Map.entry(VariableModPart.REQUIRED, "ess-variable_mod01-part-required"),
+                    Map.entry(VariableModPart.NEUTRAL_LOSS, "ess-variable_mod01-part-neutral-loss"),
+                    Map.entry(
+                            VariableModPart.SECOND_NEUTRAL_LOSS,
+                            "ess-variable_mod01-part-second-neutral-loss"));
+
+    /** Each terminal code's check box of {@code variable_mod01} on Essentials. */
+    private static final Map<TerminalCode, String> VARIABLE_MOD_TERMINUS =
+            Map.ofEntries(
+                    Map.entry(TerminalCode.PEPTIDE_N, "ess-variable_mod01-terminus-peptide-n"),
+                    Map.entry(TerminalCode.PEPTIDE_C, "ess-variable_mod01-terminus-peptide-c"),
+                    Map.entry(TerminalCode.PROTEIN_N, "ess-variable_mod01-terminus-protein-n"),
+                    Map.entry(TerminalCode.PROTEIN_C, "ess-variable_mod01-terminus-protein-c"));
+
+    /** Each Essentials group's container. */
+    private static final Map<EssentialsSection, String> ESSENTIALS_GROUP =
+            Map.ofEntries(
+                    Map.entry(EssentialsSection.INPUTS, "ess-group-inputs"),
+                    Map.entry(EssentialsSection.SEARCH_PRESET, "ess-group-search-preset"),
+                    Map.entry(EssentialsSection.PRECURSOR, "ess-group-precursor"),
+                    Map.entry(EssentialsSection.FRAGMENT, "ess-group-fragment"),
+                    Map.entry(EssentialsSection.DIGESTION, "ess-group-digestion"),
+                    Map.entry(
+                            EssentialsSection.STATIC_MODIFICATIONS,
+                            "ess-group-static-modifications"),
+                    Map.entry(
+                            EssentialsSection.VARIABLE_MODIFICATIONS,
+                            "ess-group-variable-modifications"),
+                    Map.entry(EssentialsSection.DECOYS, "ess-group-decoys"),
+                    Map.entry(EssentialsSection.EXECUTION, "ess-group-execution"),
+                    Map.entry(EssentialsSection.OUTPUTS, "ess-group-outputs"));
+
+    /**
+     * Each Advanced category's five identifiers: the container, the switch, the reset, its
+     * confirmation and its cancellation.
+     */
+    private static final Map<ParameterCategory, List<String>> ADVANCED_CATEGORY =
+            Map.ofEntries(
+                    Map.entry(
+                            ParameterCategory.DATABASE_PEFF,
+                            List.of(
+                                    "adv-category-database_peff",
+                                    "adv-category-database_peff-toggle",
+                                    "adv-category-database_peff-reset",
+                                    "adv-category-database_peff-reset-confirm",
+                                    "adv-category-database_peff-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.CPU_EXECUTION,
+                            List.of(
+                                    "adv-category-cpu_execution",
+                                    "adv-category-cpu_execution-toggle",
+                                    "adv-category-cpu_execution-reset",
+                                    "adv-category-cpu_execution-reset-confirm",
+                                    "adv-category-cpu_execution-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.PRECURSOR_MASS,
+                            List.of(
+                                    "adv-category-precursor_mass",
+                                    "adv-category-precursor_mass-toggle",
+                                    "adv-category-precursor_mass-reset",
+                                    "adv-category-precursor_mass-reset-confirm",
+                                    "adv-category-precursor_mass-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.DIGESTION_ENZYMES,
+                            List.of(
+                                    "adv-category-digestion_enzymes",
+                                    "adv-category-digestion_enzymes-toggle",
+                                    "adv-category-digestion_enzymes-reset",
+                                    "adv-category-digestion_enzymes-reset-confirm",
+                                    "adv-category-digestion_enzymes-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.FRAGMENT_SCORING,
+                            List.of(
+                                    "adv-category-fragment_scoring",
+                                    "adv-category-fragment_scoring-toggle",
+                                    "adv-category-fragment_scoring-reset",
+                                    "adv-category-fragment_scoring-reset-confirm",
+                                    "adv-category-fragment_scoring-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.FRAGMENT_INDEX,
+                            List.of(
+                                    "adv-category-fragment_index",
+                                    "adv-category-fragment_index-toggle",
+                                    "adv-category-fragment_index-reset",
+                                    "adv-category-fragment_index-reset-confirm",
+                                    "adv-category-fragment_index-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.SPECTRUM_FILTERS,
+                            List.of(
+                                    "adv-category-spectrum_filters",
+                                    "adv-category-spectrum_filters-toggle",
+                                    "adv-category-spectrum_filters-reset",
+                                    "adv-category-spectrum_filters-reset-confirm",
+                                    "adv-category-spectrum_filters-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.SPECTRAL_PROCESSING,
+                            List.of(
+                                    "adv-category-spectral_processing",
+                                    "adv-category-spectral_processing-toggle",
+                                    "adv-category-spectral_processing-reset",
+                                    "adv-category-spectral_processing-reset-confirm",
+                                    "adv-category-spectral_processing-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.SEARCH_RANGES,
+                            List.of(
+                                    "adv-category-search_ranges",
+                                    "adv-category-search_ranges-toggle",
+                                    "adv-category-search_ranges-reset",
+                                    "adv-category-search_ranges-reset-confirm",
+                                    "adv-category-search_ranges-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.OUTPUT,
+                            List.of(
+                                    "adv-category-output",
+                                    "adv-category-output-toggle",
+                                    "adv-category-output-reset",
+                                    "adv-category-output-reset-confirm",
+                                    "adv-category-output-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.MS1_REALTIME,
+                            List.of(
+                                    "adv-category-ms1_realtime",
+                                    "adv-category-ms1_realtime-toggle",
+                                    "adv-category-ms1_realtime-reset",
+                                    "adv-category-ms1_realtime-reset-confirm",
+                                    "adv-category-ms1_realtime-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.STATIC_MODS,
+                            List.of(
+                                    "adv-category-static_mods",
+                                    "adv-category-static_mods-toggle",
+                                    "adv-category-static_mods-reset",
+                                    "adv-category-static_mods-reset-confirm",
+                                    "adv-category-static_mods-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.VARIABLE_MODS,
+                            List.of(
+                                    "adv-category-variable_mods",
+                                    "adv-category-variable_mods-toggle",
+                                    "adv-category-variable_mods-reset",
+                                    "adv-category-variable_mods-reset-confirm",
+                                    "adv-category-variable_mods-reset-cancel")),
+                    Map.entry(
+                            ParameterCategory.MISC,
+                            List.of(
+                                    "adv-category-misc",
+                                    "adv-category-misc-toggle",
+                                    "adv-category-misc-reset",
+                                    "adv-category-misc-reset-confirm",
+                                    "adv-category-misc-reset-cancel")));
+
+    /**
+     * The identifiers built from a position or a single character, each pinned for the argument
+     * named in its key.
+     */
+    private static final Map<String, String> BY_POSITION_OR_CHARACTER =
+            Map.ofEntries(
+                    Map.entry("summaryEntry(0)", "param-summary-entry-0"),
+                    Map.entry("summaryEntry(12)", "param-summary-entry-12"),
+                    Map.entry("spectrum(0)", "ess-spectrum-0"),
+                    Map.entry("spectrumRemove(3)", "ess-spectrum-3-remove"),
+                    Map.entry(
+                            "variableModResidue(ESSENTIALS, variable_mod01, M)",
+                            "ess-variable_mod01-residue-M"),
+                    Map.entry(
+                            "variableModResidue(ADVANCED, variable_mod07, Y)",
+                            "adv-variable_mod07-residue-Y"));
+
+    /**
+     * Every {@code public static String} method of {@link UiIds}, by name, that the tables above or
+     * the earlier ones pin. A method missing from this set fails {@link
+     * #everyIdentifierMethodIsPinned()}: add its literals to a table, then its name here.
+     */
+    private static final Set<String> PINNED_METHODS =
+            Set.of(
+                    "sectionPane",
+                    "sectionHeading",
+                    "sectionDescription",
+                    "sectionNote",
+                    "navigationEntry",
+                    "stepperStage",
+                    "stepperStageName",
+                    "stepperStageState",
+                    "stepperArrow",
+                    "stepperBranch",
+                    "stepperBranchOrigin",
+                    "consoleStageFilter",
+                    "consoleSeverityFilter",
+                    "toolRow",
+                    "toolRowName",
+                    "toolRowState",
+                    "toolRowCapabilities",
+                    "toolRowAdvisories",
+                    "toolRowDownload",
+                    "toolRowDiagnostic",
+                    "toolRowPath",
+                    "toolRowProgress",
+                    "toolRowInstall",
+                    "toolRowCancel",
+                    "parameterControl",
+                    "parameterLabel",
+                    "parameterReset",
+                    "parameterOrigin",
+                    "parameterState",
+                    "parameterLock",
+                    "parameterSecond",
+                    "parameterChoose",
+                    "variableModSerialised",
+                    "variableModUp",
+                    "variableModDown",
+                    "variableModRemove",
+                    "variableModPreset",
+                    "variableModAdd",
+                    "variableModCross",
+                    "variableModStatus",
+                    "variableModPart",
+                    "variableModTerminus",
+                    "variableModResidue",
+                    "essentialsGroup",
+                    "advancedCategory",
+                    "advancedCategoryToggle",
+                    "advancedCategoryReset",
+                    "advancedCategoryResetConfirm",
+                    "advancedCategoryResetCancel",
+                    "summaryEntry",
+                    "spectrum",
+                    "spectrumRemove");
 
     /**
      * The row key the Tool Manager's per-row identifiers are pinned for.
@@ -543,6 +999,143 @@ class StableIdentifierPinTest {
                                 + " the surface is really covered.");
     }
 
+    @Test
+    @DisplayName(
+            "a parameter of every value kind has its pinned control identifier on both surfaces")
+    void parameterControlSchemeIsPinnedForEveryKind() {
+        assertEquals(
+                EnumSet.allOf(ValueKind.class),
+                EnumSet.copyOf(PARAMETER_OF_EACH_KIND.keySet()),
+                "every value kind is pinned. " + adviceFor("a new value kind's control"));
+        for (Map.Entry<ValueKind, List<String>> pinned : PARAMETER_OF_EACH_KIND.entrySet()) {
+            String name = pinned.getValue().get(0);
+            assertPinned(
+                    pinned.getValue().subList(1, 3),
+                    List.of(
+                            UiIds.parameterControl(UiIds.Surface.ESSENTIALS, name),
+                            UiIds.parameterControl(UiIds.Surface.ADVANCED, name)),
+                    "control of the " + pinned.getKey() + " parameter " + name);
+        }
+    }
+
+    @Test
+    @DisplayName("every per-parameter identifier still has its pinned spelling on both surfaces")
+    void perParameterIdentifiersAreExactlyTheseLiterals() throws ReflectiveOperationException {
+        for (Map.Entry<String, List<String>> pinned : PER_PARAMETER.entrySet()) {
+            Method method =
+                    UiIds.class.getMethod(pinned.getKey(), UiIds.Surface.class, String.class);
+            String name = pinned.getValue().get(0);
+            assertPinned(
+                    pinned.getValue().subList(1, 3),
+                    List.of(
+                            method.invoke(null, UiIds.Surface.ESSENTIALS, name),
+                            method.invoke(null, UiIds.Surface.ADVANCED, name)),
+                    "UiIds." + pinned.getKey() + "(surface, \"" + name + "\")");
+        }
+        for (Map.Entry<String, List<String>> pinned : PER_SURFACE.entrySet()) {
+            Method method = UiIds.class.getMethod(pinned.getKey(), UiIds.Surface.class);
+            assertPinned(
+                    pinned.getValue(),
+                    List.of(
+                            method.invoke(null, UiIds.Surface.ESSENTIALS),
+                            method.invoke(null, UiIds.Surface.ADVANCED)),
+                    "UiIds." + pinned.getKey() + "(surface)");
+        }
+        for (VariableModPart part : VariableModPart.values()) {
+            assertPinned(
+                    pinned(VARIABLE_MOD_PART, part, "variable-modification part " + part.name()),
+                    UiIds.variableModPart(UiIds.Surface.ESSENTIALS, "variable_mod01", part),
+                    "UiIds.variableModPart(ESSENTIALS, variable_mod01, " + part.name() + ")");
+        }
+        for (TerminalCode code : TerminalCode.values()) {
+            assertPinned(
+                    pinned(VARIABLE_MOD_TERMINUS, code, "terminal code " + code.name()),
+                    UiIds.variableModTerminus(UiIds.Surface.ESSENTIALS, "variable_mod01", code),
+                    "UiIds.variableModTerminus(ESSENTIALS, variable_mod01, " + code.name() + ")");
+        }
+    }
+
+    @Test
+    @DisplayName("every Essentials group and Advanced category identifier has its pinned spelling")
+    void groupAndCategoryIdentifiersAreExactlyTheseLiterals() {
+        for (EssentialsSection section : EssentialsSection.values()) {
+            assertPinned(
+                    pinned(ESSENTIALS_GROUP, section, "Essentials group " + section.name()),
+                    UiIds.essentialsGroup(section),
+                    "UiIds.essentialsGroup(" + section.name() + ")");
+        }
+        for (ParameterCategory category : ParameterCategory.values()) {
+            assertPinned(
+                    pinned(ADVANCED_CATEGORY, category, "Advanced category " + category.name()),
+                    List.of(
+                            UiIds.advancedCategory(category),
+                            UiIds.advancedCategoryToggle(category),
+                            UiIds.advancedCategoryReset(category),
+                            UiIds.advancedCategoryResetConfirm(category),
+                            UiIds.advancedCategoryResetCancel(category)),
+                    "the identifiers of Advanced category " + category.name());
+        }
+    }
+
+    @Test
+    @DisplayName("identifiers built from a position or a character have their pinned spelling")
+    void positionAndCharacterIdentifiersAreExactlyTheseLiterals() {
+        Map<String, String> actual = new LinkedHashMap<>();
+        actual.put("summaryEntry(0)", UiIds.summaryEntry(0));
+        actual.put("summaryEntry(12)", UiIds.summaryEntry(12));
+        actual.put("spectrum(0)", UiIds.spectrum(0));
+        actual.put("spectrumRemove(3)", UiIds.spectrumRemove(3));
+        actual.put(
+                "variableModResidue(ESSENTIALS, variable_mod01, M)",
+                UiIds.variableModResidue(UiIds.Surface.ESSENTIALS, "variable_mod01", 'M'));
+        actual.put(
+                "variableModResidue(ADVANCED, variable_mod07, Y)",
+                UiIds.variableModResidue(UiIds.Surface.ADVANCED, "variable_mod07", 'Y'));
+        assertEquals(BY_POSITION_OR_CHARACTER.keySet(), actual.keySet());
+        for (Map.Entry<String, String> entry : actual.entrySet()) {
+            assertPinned(
+                    BY_POSITION_OR_CHARACTER.get(entry.getKey()),
+                    entry.getValue(),
+                    "UiIds." + entry.getKey());
+        }
+    }
+
+    @Test
+    @DisplayName("a new UiIds identifier method fails until its literals are pinned")
+    void everyIdentifierMethodIsPinned() {
+        Set<String> declared = new TreeSet<>();
+        for (Method method : UiIds.class.getDeclaredMethods()) {
+            int modifiers = method.getModifiers();
+            if (!method.isSynthetic()
+                    && method.getReturnType() == String.class
+                    && Modifier.isPublic(modifiers)
+                    && Modifier.isStatic(modifiers)) {
+                declared.add(method.getName());
+            }
+        }
+        assertTrue(
+                declared.size() >= PINNED_METHODS.size(),
+                "reflection found "
+                        + declared.size()
+                        + " identifier methods; it has stopped working");
+        Set<String> unpinned = new TreeSet<>(declared);
+        unpinned.removeAll(PINNED_METHODS);
+        assertTrue(
+                unpinned.isEmpty(),
+                () ->
+                        "UiIds builds identifiers with methods no table here pins: "
+                                + String.join(", ", unpinned)
+                                + ". "
+                                + adviceFor("each new identifier method"));
+        Set<String> stale = new TreeSet<>(PINNED_METHODS);
+        stale.removeAll(declared);
+        assertTrue(
+                stale.isEmpty(),
+                () ->
+                        "this class pins methods UiIds no longer declares: "
+                                + String.join(", ", stale));
+    }
+
     // -----------------------------------------------------------------------------------------
     // Exhaustiveness: adding an identifier must fail here too, not only renaming one.
     // -----------------------------------------------------------------------------------------
@@ -597,6 +1190,16 @@ class StableIdentifierPinTest {
         assertEveryConstantIsPinned("STAGE_BRANCH", STAGE_BRANCH.keySet(), WorkflowStage.values());
         assertEveryConstantIsPinned(
                 "SEVERITY_FILTER", SEVERITY_FILTER.keySet(), MessageSeverity.values());
+        assertEveryConstantIsPinned(
+                "VARIABLE_MOD_PART", VARIABLE_MOD_PART.keySet(), VariableModPart.values());
+        assertEveryConstantIsPinned(
+                "VARIABLE_MOD_TERMINUS", VARIABLE_MOD_TERMINUS.keySet(), TerminalCode.values());
+        assertEveryConstantIsPinned(
+                "ESSENTIALS_GROUP", ESSENTIALS_GROUP.keySet(), EssentialsSection.values());
+        assertEveryConstantIsPinned(
+                "ADVANCED_CATEGORY", ADVANCED_CATEGORY.keySet(), ParameterCategory.values());
+        assertEveryConstantIsPinned(
+                "PARAMETER_OF_EACH_KIND", PARAMETER_OF_EACH_KIND.keySet(), ValueKind.values());
     }
 
     // -----------------------------------------------------------------------------------------
@@ -660,6 +1263,28 @@ class StableIdentifierPinTest {
         addListPins(pins, "branch row of stage ", STAGE_BRANCH);
         for (Map.Entry<String, String> rowIdentifier : TOOL_ROW.entrySet()) {
             pins.add(new Pin("UiIds." + rowIdentifier.getKey(), rowIdentifier.getValue()));
+        }
+        for (Map.Entry<ValueKind, List<String>> kind : PARAMETER_OF_EACH_KIND.entrySet()) {
+            for (String id : kind.getValue().subList(1, 3)) {
+                pins.add(new Pin("control of the " + kind.getKey().name() + " parameter", id));
+            }
+        }
+        for (Map.Entry<String, List<String>> method : PER_PARAMETER.entrySet()) {
+            for (String id : method.getValue().subList(1, 3)) {
+                pins.add(new Pin("UiIds." + method.getKey(), id));
+            }
+        }
+        for (Map.Entry<String, List<String>> method : PER_SURFACE.entrySet()) {
+            for (String id : method.getValue()) {
+                pins.add(new Pin("UiIds." + method.getKey(), id));
+            }
+        }
+        addPins(pins, "variable-modification part ", VARIABLE_MOD_PART);
+        addPins(pins, "variable-modification terminal code ", VARIABLE_MOD_TERMINUS);
+        addPins(pins, "Essentials group ", ESSENTIALS_GROUP);
+        addListPins(pins, "Advanced category ", ADVANCED_CATEGORY);
+        for (Map.Entry<String, String> entry : BY_POSITION_OR_CHARACTER.entrySet()) {
+            pins.add(new Pin("UiIds." + entry.getKey(), entry.getValue()));
         }
         return List.copyOf(pins);
     }

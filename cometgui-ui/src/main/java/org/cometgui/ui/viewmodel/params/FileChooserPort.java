@@ -25,7 +25,7 @@ import java.util.Optional;
  * a JavaFX file chooser on the interface thread, and a test replaces it with a scripted answer --
  * the specification's "file chooser abstraction and its test injection".
  *
- * <p>Both calls block until the scientist has chosen or cancelled, as a modal chooser does.
+ * <p>Every call blocks until the scientist has chosen or cancelled, as a modal chooser does.
  */
 public interface FileChooserPort {
 
@@ -42,4 +42,20 @@ public interface FileChooserPort {
      * @return the file chosen, or empty if cancelled
      */
     Optional<Path> chooseDatabase();
+
+    /**
+     * Asks for the file a file-path parameter names (an OBO file, a spectral library, a compound
+     * modification list): any one existing file.
+     *
+     * @param what the parameter's display name, which the chooser's title shows
+     * @return the file chosen, or empty if cancelled
+     */
+    Optional<Path> chooseFile(String what);
+
+    /**
+     * Asks where to save a new parameter file.
+     *
+     * @return the path to write, or empty if cancelled; the file is never overwritten if it exists
+     */
+    Optional<Path> chooseSaveTarget();
 }

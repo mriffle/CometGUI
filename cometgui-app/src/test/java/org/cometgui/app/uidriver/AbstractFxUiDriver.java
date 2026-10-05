@@ -30,7 +30,9 @@ import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Labeled;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.input.KeyCode;
 
 /**
  * Everything both drivers do the same way: marshalling onto the JavaFX application thread, and
@@ -104,6 +106,13 @@ abstract class AbstractFxUiDriver implements FxUiDriver {
                             + ")");
         }
         return found;
+    }
+
+    @Override
+    public final void typeInto(String id, String text) {
+        clickOn(id);
+        pressWith(KeyCode.CONTROL, KeyCode.A);
+        type(text);
     }
 
     @Override
@@ -211,6 +220,80 @@ abstract class AbstractFxUiDriver implements FxUiDriver {
         onFxThread(() -> value.set(work.get()));
         return value.get();
     }
+
+    /**
+     * Scrolls every scroll pane above a node so that the node is inside its viewport, the way a
+     * user scrolls to a control before clicking it. Called on the JavaFX application thread, before
+     * a pointer is aimed: a node scrolled out of view still has screen bounds, and a click there
+     * would land on whatever is drawn at that place instead.
+     *
+     * @param node the node about to be clicked
+     */
+    static void reveal(Node node) {
+        settle(node);
+        for (Node above = node.getParent(); above != null; above = above.getParent()) {
+            if (above instanceof ScrollPane scroll && scroll.getContent() != null) {
+                Node content = scroll.getContent();
+                Bounds inContent = content.sceneToLocal(node.localToScene(node.getBoundsInLocal()));
+                double contentHeight = content.getBoundsInLocal().getHeight();
+                double viewport = scroll.getViewportBounds().getHeight();
+                if (inContent != null && contentHeight > viewport) {
+                    double top = Math.max(0, inContent.getMinY() - viewport / 3);
+                    scroll.setVvalue(Math.min(1, top / (contentHeight - viewport)));
+                    scroll.layout();
+                }
+            }
+        }
+        settle(node);
+    }
+
+    /**
+     * Applies CSS and lays out the whole scene now, rather than at the next pulse: a control the
+     * application has just created (a summary entry, say) has no size until CSS has given it a
+     * skin, and a position computed before that is a position the next pulse moves.
+     *
+     * @param node any node of the scene
+     */
+    private static void settle(Node node) {
+        if (node.getScene() != null) {
+            node.getScene().getRoot().applyCss();
+            node.getScene().getRoot().layout();
+        }
+    }
+
+    /**
+     * The key and the modifier that type one character on a US keyboard layout, which is the layout
+     * Monocle's headless keyboard uses.
+     *
+     * @param character the character
+     * @return the key, and whether Shift is held
+     * @throws AssertionError if the character is not one this driver types
+     */
+    static KeyStroke strokeFor(char character) {
+        if (character >= 'a' && character <= 'z') {
+            return new KeyStroke(
+                    KeyCode.getKeyCode(String.valueOf(Character.toUpperCase(character))), false);
+        }
+        if (character >= 'A' && character <= 'Z') {
+            return new KeyStroke(KeyCode.getKeyCode(String.valueOf(character)), true);
+        }
+        if (character >= '0' && character <= '9') {
+            return new KeyStroke(KeyCode.getKeyCode(String.valueOf(character)), false);
+        }
+        return switch (character) {
+            case ' ' -> new KeyStroke(KeyCode.SPACE, false);
+            case '-' -> new KeyStroke(KeyCode.MINUS, false);
+            case '_' -> new KeyStroke(KeyCode.MINUS, true);
+            case '.' -> new KeyStroke(KeyCode.PERIOD, false);
+            case '/' -> new KeyStroke(KeyCode.SLASH, false);
+            case ',' -> new KeyStroke(KeyCode.COMMA, false);
+            case '+' -> new KeyStroke(KeyCode.EQUALS, true);
+            default -> fail("this driver does not type the character '" + character + "'");
+        };
+    }
+
+    /** One key, with or without Shift held. */
+    record KeyStroke(KeyCode code, boolean shift) {}
 
     /**
      * The centre of a node in screen coordinates. Called on the JavaFX application thread.
