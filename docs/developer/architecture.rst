@@ -152,7 +152,7 @@ The shape, with the table above as the authority::
                                       TEST-scope dependency on all eleven
 
 The tiers are a reading aid, not a declared concept; nothing in the build
-enforces "tier". What the build enforces is the eight rules below.
+enforces "tier". What the build enforces is the nine rules below.
 
 The layering rules and what enforces them
 =========================================
@@ -192,10 +192,10 @@ It is the **only** thing that refuses it, and phase 02 gate item 3 -- "an
 ArchUnit test proves the domain module has no JavaFX dependency, and it fails if
 one is introduced" -- rests on it entirely.
 
-The eight rules
----------------
+The nine rules
+--------------
 
-All eight live in
+All nine live in
 ``cometgui-archtests/src/test/java/org/cometgui/archtests/LayeringRulesTest.java``,
 one JUnit test each, every one checked against the single class import in
 ``ProductClasses``. They are the specification's *Architecture tests* list.
@@ -242,6 +242,17 @@ one JUnit test each, every one checked against the single class import in
      - ``org.cometgui.ui..`` may not reach ``java.security..``, ``java.net..``,
        ``java.util.zip..`` or ``java.util.jar..``.
 
+   * - the UI goes through the parameter model for every Comet value (Phase
+       07, decision P7-1)
+     - ``org.cometgui.ui..`` may not reach the parser's line reader
+       (``ParamsLineReader``), the one number reader and writer (``Numbers``),
+       any value codec (``*Codec`` in ``org.cometgui.params.comet.value``, and
+       ``model.ParameterValueCodec``) or ``java.util.regex``. Built once in
+       ``UiThroughTheModelRule``; ``UiThroughTheModelRuleTest`` requires the
+       same rule object to reject a fixture in ``org.cometgui.ui.archfixtures``
+       for each door (test sources, invisible to the product import) and to
+       accept one that hands text to ``CometParameters.withText``.
+
 The last rule's own source comment is honest about its limits, and this page
 repeats the limit rather than papering over it: *"no scientific logic"* and
 *"no parsing logic"* are **not** expressible as dependency rules. A hand-written
@@ -249,6 +260,14 @@ q-value comparison or a ``split(",")`` loop inside a controller uses nothing but
 ``java.lang`` and ``java.util``. Those halves of the specification's rule remain
 a review obligation, constrained indirectly by the UI allowlist -- a controller
 that cannot reach the results or install packages has nothing to parse.
+
+The ninth rule narrows that gap for Comet parameters without closing it: it
+shuts the doors to the model's own reading machinery and to regular
+expressions, but ``String.split`` and a character loop still depend on
+nothing it can see. When it was added, the only use of ``java.util.regex`` in
+``org.cometgui.ui`` was ``UiIds``'s check of a tool row key's shape; that check
+is now a character loop with the same verdicts, and ``UiIdsTest`` pins them
+(it had no test before) -- the rule has no exemption.
 
 A rule set that imports nothing passes everything
 --------------------------------------------------
@@ -288,7 +307,7 @@ The MVVM boundary as built
 ``org.cometgui.ui.viewmodel`` -- no toolkit
 --------------------------------------------
 
-Five classes and one package-private helper:
+Five classes and one helper they share:
 
 * ``SectionId`` -- the specification's Information Architecture as a type: the
   eight primary sections (Run, Comet Parameters, Percolator, Results,
@@ -305,7 +324,8 @@ Five classes and one package-private helper:
   ``RunState`` derived from them.
 * ``HostBaselineViewModel`` -- the startup banner: three levels from the
   domain's five outcomes.
-* ``NonNullProperty`` -- package-private; a ``ReadOnlyObjectWrapper`` that
+* ``NonNullProperty`` -- package-private until Phase 07, public since so that
+  the ``params`` subpackage shares it; a ``ReadOnlyObjectWrapper`` that
   rejects ``null`` at ``set`` and *refuses* ``bind``, because a bound JavaFX
   property is read straight from its binding and would walk past the null check.
 
@@ -324,8 +344,20 @@ FX application thread.
 
 ``ViewModelIndependenceTest`` enforces this over the whole package by scanning
 the source text, and -- because a scan that read the wrong directory would pass
-over anything -- it separately asserts that it read exactly the six files it
-expects and that each contains ``package org.cometgui.ui.viewmodel;``.
+over anything -- it separately asserts that it read exactly the files it
+expects and that each contains its package declaration.
+
+**Since Phase 07 the scan covers subpackages.** The parameter editor's
+view-models are in ``org.cometgui.ui.viewmodel.params`` (decision P7-4);
+``ViewModelSources`` walks the directory tree, and the non-vacuity assertion
+lists every file of both packages by its relative path
+(``params/ParameterSession.java``), each required to declare the package its
+directory names. ``NonNullProperty`` became public so the subpackage shares it
+rather than keeping a copy; view-models still publish only its read-only side.
+The coverage rule below reaches the subpackage too: its pattern
+``org.cometgui.ui.viewmodel*`` matches ``org.cometgui.ui.viewmodel.params``,
+which ``jacoco.xml`` reports as a package of its own and the rule judges on its
+own 80% line.
 
 ``org.cometgui.ui.view`` and ``.controls``
 -------------------------------------------

@@ -164,6 +164,17 @@ class LayeringRulesTest {
     }
 
     @Test
+    @DisplayName("the UI goes through the parameter model for every Comet value (P7-1)")
+    void uiGoesThroughTheParameterModel() {
+        /*
+         * Built once in UiThroughTheModelRule, where UiThroughTheModelRuleTest grades the same
+         * object against fixtures that must be rejected and one that must pass. Restating it here
+         * would make that test a test of a copy.
+         */
+        UiThroughTheModelRule.UI_GOES_THROUGH_THE_MODEL.check(ProductClasses.all());
+    }
+
+    @Test
     @DisplayName("the UI contains no hashing, download or archive-extraction logic")
     void uiContainsNoHashingDownloadOrArchiveLogic() {
         /*

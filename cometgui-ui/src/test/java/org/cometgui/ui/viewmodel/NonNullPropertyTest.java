@@ -32,11 +32,10 @@ import org.junit.jupiter.api.Test;
 /**
  * The guarded property every view-model in this package publishes its state through.
  *
- * <p>It is package-private, so this test is the only place its guards can be aimed at directly.
- * They are reachable through the view-models as well -- {@code select(null)}, {@code
- * setMinimumSeverity(null)} -- but those go through an argument check of their own first, so the
- * property's own guard would keep passing if it were deleted. Testing it here is what makes it
- * load-bearing.
+ * <p>This test is the only place its guards are aimed at directly. They are reachable through the
+ * view-models as well -- {@code select(null)}, {@code setMinimumSeverity(null)} -- but those go
+ * through an argument check of their own first, so the property's own guard would keep passing if
+ * it were deleted. Testing it here is what makes it load-bearing.
  */
 class NonNullPropertyTest {
 

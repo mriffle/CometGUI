@@ -88,7 +88,7 @@ class ViewModelIndependenceTest {
     }
 
     @Test
-    @DisplayName("the scan actually reads this package's eight classes and its package-info")
+    @DisplayName("the scan reads the package's classes and those of its params subpackage")
     void theScanIsNotVacuous() {
         Map<String, String> sources = ViewModelSources.all();
         assertEquals(
@@ -101,13 +101,37 @@ class ViewModelIndependenceTest {
                         "StageStepperViewModel.java",
                         "ToolManagerViewModel.java",
                         "ToolRowViewModel.java",
-                        "package-info.java"),
+                        "package-info.java",
+                        "params/Adoption.java",
+                        "params/AdvancedCategory.java",
+                        "params/ChoiceOption.java",
+                        "params/DecoyOption.java",
+                        "params/EditOutcome.java",
+                        "params/EssentialsGroup.java",
+                        "params/EssentialsSection.java",
+                        "params/FieldState.java",
+                        "params/FieldViewModel.java",
+                        "params/FileChooserPort.java",
+                        "params/FileStatus.java",
+                        "params/InputFile.java",
+                        "params/ParameterSession.java",
+                        "params/RunReadinessViewModel.java",
+                        "params/SpectrumInputsViewModel.java",
+                        "params/StageSwitches.java",
+                        "params/SummaryEntry.java",
+                        "params/ValidationSummaryViewModel.java",
+                        "params/package-info.java"),
                 List.copyOf(sources.keySet()),
-                "a source scan that read the wrong or an empty directory would pass over anything");
+                "a source scan that read the wrong or an empty directory, or stopped at the top"
+                        + " directory, would pass over anything");
         for (Map.Entry<String, String> source : sources.entrySet()) {
+            String expected =
+                    source.getKey().startsWith("params/")
+                            ? "package org.cometgui.ui.viewmodel.params;"
+                            : "package org.cometgui.ui.viewmodel;";
             assertTrue(
-                    source.getValue().contains("package org.cometgui.ui.viewmodel;"),
-                    source.getKey() + " is not in the view-model package");
+                    source.getValue().contains(expected),
+                    source.getKey() + " is not in the package its directory says: " + expected);
         }
     }
 

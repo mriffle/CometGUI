@@ -74,9 +74,14 @@ public final class ViewModelSources {
     }
 
     /**
-     * Every source file in the view-model package, by file name.
+     * Every source file in the view-model package and its subpackages, by path relative to the
+     * package directory -- {@code ConsoleViewModel.java}, {@code params/ParameterSession.java}.
      *
-     * @return file name to file content, in file-name order, never empty
+     * <p>Subpackages are read since Phase 07 put the parameter editor's view-models in {@code
+     * org.cometgui.ui.viewmodel.params}: the toolkit ban is the layer's, not one directory's, and a
+     * scan that stopped at the top directory would pass over a whole subpackage.
+     *
+     * @return relative path (with {@code /} separators) to file content, in path order, never empty
      * @throws IllegalStateException if the directory holds no {@code .java} file, which would make
      *     every test built on this vacuously true
      * @throws UncheckedIOException if a file cannot be read
@@ -84,16 +89,16 @@ public final class ViewModelSources {
     public static Map<String, String> all() {
         Path directory = directory();
         List<Path> files;
-        try (Stream<Path> listing = Files.list(directory)) {
-            files = listing.sorted().toList();
+        try (Stream<Path> listing = Files.walk(directory)) {
+            files = listing.filter(Files::isRegularFile).sorted().toList();
         } catch (IOException e) {
-            throw new UncheckedIOException("cannot list " + directory.toAbsolutePath(), e);
+            throw new UncheckedIOException("cannot walk " + directory.toAbsolutePath(), e);
         }
         Map<String, String> sources = new LinkedHashMap<>();
         for (Path file : files) {
             // relativize rather than getFileName: the latter is declared @Nullable, which SpotBugs
             // reports at threshold=Low, and the relative name is what this map is keyed by anyway.
-            String name = directory.relativize(file).toString();
+            String name = directory.relativize(file).toString().replace('\\', '/');
             if (name.endsWith(".java")) {
                 sources.put(name, read(file));
             }

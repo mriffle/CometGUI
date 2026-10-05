@@ -96,6 +96,42 @@ class UiIdsTest {
     }
 
     @Test
+    @DisplayName("a tool row key is lower-case words joined by single hyphens or underscores")
+    void toolRowKeyShape() {
+        assertEquals("tool-row-comet-2026_02_2-1", UiIds.toolRow("comet-2026_02_2-1"));
+        assertEquals("tool-row-percolator-3_07_1-1", UiIds.toolRow("percolator-3_07_1-1"));
+        assertEquals("tool-row-a", UiIds.toolRow("a"));
+        assertEquals("tool-row-0", UiIds.toolRow("0"));
+        assertEquals("tool-row-z9", UiIds.toolRow("z9"));
+        assertEquals("tool-row-9_z", UiIds.toolRow("9_z"));
+        for (String bad :
+                List.of(
+                        "",
+                        "comet-2026.02.2-1",
+                        "-comet",
+                        "comet-",
+                        "comet_",
+                        "comet--1",
+                        "comet-_1",
+                        "Comet-1",
+                        "comet 1",
+                        "comet/1",
+                        "comet:1",
+                        "comet{1",
+                        "com\u00e9t")) {
+            IllegalArgumentException refused =
+                    assertThrows(IllegalArgumentException.class, () -> UiIds.toolRow(bad), bad);
+            assertEquals(
+                    "not a usable tool row key: \""
+                            + bad
+                            + "\" (expected lower-case words joined by single hyphens or"
+                            + " underscores, such as percolator-3_07_1-1; a dot would be read as a"
+                            + " style class by Scene.lookup and the control would never be found)",
+                    refused.getMessage());
+        }
+    }
+
+    @Test
     @DisplayName("no two identifiers collide")
     void noTwoIdentifiersCollide() {
         Set<String> seen = new HashSet<>();

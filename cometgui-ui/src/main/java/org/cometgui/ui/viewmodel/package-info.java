@@ -47,6 +47,10 @@
  *       that does not meet the baseline.
  * </ul>
  *
+ * <p>Phase 07 adds the Comet parameter editor's view-models in the subpackage {@code
+ * org.cometgui.ui.viewmodel.params}, under the same rules, and makes {@link
+ * org.cometgui.ui.viewmodel.NonNullProperty} public so that the subpackage shares it.
+ *
  * <p>The specification gives this package a coverage target of its own -- 80% line on
  * "UI-independent view-model and presenter logic" -- and the parent POM's {@code
  * coverage-check-viewmodel} rule enforces it against {@code org.cometgui.ui.viewmodel*} alone. A

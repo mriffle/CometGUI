@@ -1,0 +1,254 @@
+/*
+ * CometGUI -- Comet to Percolator proteomics search workflow with provenance.
+ * Copyright (C) 2026 The CometGUI authors.
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License, version 3, as published
+ * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ * PARTICULAR PURPOSE. See the GNU General Public License for details.
+ *
+ * The full licence is the LICENSE file at the root of this repository. If it
+ * is missing, see <https://www.gnu.org/licenses/gpl-3.0.html>.
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+package org.cometgui.ui.viewmodel.params;
+
+import static org.cometgui.ui.viewmodel.params.Sessions.C02;
+import static org.cometgui.ui.viewmodel.params.Sessions.C03;
+import static org.cometgui.ui.viewmodel.params.Sessions.METADATA;
+import static org.cometgui.ui.viewmodel.params.Sessions.startingIn;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Optional;
+import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.comet.parser.CometParamsParser;
+import org.cometgui.params.comet.parser.ReleaseDefaults;
+import org.cometgui.params.comet.schema.ParameterCategory;
+import org.cometgui.params.comet.validation.Finding;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+/** The validation summary and run readiness follow the session's one report and nothing else. */
+class SummaryAndReadinessTest {
+
+    @Nested
+    @DisplayName("the validation summary")
+    class Summary {
+
+        @Test
+        @DisplayName("Comet's defaults with the outputs on: nothing to report")
+        void clean() {
+            ValidationSummaryViewModel summary = new ValidationSummaryViewModel(startingIn(C03));
+            assertEquals(List.of(), summary.entries());
+            assertEquals(0, summary.errorCount());
+            assertEquals(0, summary.warningCount());
+            assertEquals("No errors or warnings.", summary.headline());
+        }
+
+        @Test
+        @DisplayName("an error and a warning: the report's entries, in its order, with counts")
+        void entries() {
+            ParameterSession session = startingIn(C03);
+            ValidationSummaryViewModel summary = new ValidationSummaryViewModel(session);
+
+            session.edit("num_enzyme_termini", "3");
+            session.edit("peptide_mass_tolerance_lower", "5.0");
+
+            List<SummaryEntry> entries = summary.entries();
+            assertEquals(
+                    session.report().findings(),
+                    entries.stream().map(SummaryEntry::finding).toList());
+            assertEquals(2, entries.size());
+            assertEquals(1, summary.errorCount());
+            assertEquals(1, summary.warningCount());
+            assertEquals(1, summary.errorCountProperty().get());
+            assertEquals(1, summary.warningCountProperty().get());
+            assertEquals("1 error and 1 warning.", summary.headline());
+            assertEquals(summary.headline(), summary.headlineProperty().get());
+            assertEquals(entries, summary.entriesProperty().get());
+
+            SummaryEntry termini = only(entries, "num_enzyme_termini");
+            assertEquals("Error", termini.severityText());
+            assertEquals(Optional.of(ParameterCategory.DIGESTION_ENZYMES), termini.category());
+            assertEquals(Optional.of("num_enzyme_termini"), termini.focusTarget());
+            assertEquals(Optional.of("Enzymatic termini"), termini.parameterDisplayName());
+            assertEquals(
+                    "Error -- Enzymatic termini (num_enzyme_termini), Digestion and enzymes: "
+                            + termini.message(),
+                    termini.text());
+            assertEquals(termini.finding().message(), termini.message());
+
+            SummaryEntry window = only(entries, "peptide_mass_tolerance_lower");
+            assertEquals("Warning", window.severityText());
+            assertEquals(Optional.of(ParameterCategory.PRECURSOR_MASS), window.category());
+            assertEquals(Optional.of("peptide_mass_tolerance_lower"), window.focusTarget());
+
+            session.edit("num_enzyme_termini", "2");
+            assertEquals("0 errors and 1 warning.", summary.headline());
+        }
+
+        @Test
+        @DisplayName("an imported unknown parameter has no field to focus and no category")
+        void unknownParameter() {
+            String text =
+                    new String(ReleaseDefaults.bundledFile(C03), StandardCharsets.UTF_8)
+                            .replace(
+                                    "[COMET_ENZYME_INFO]",
+                                    "ms1_mass_range = 0.0 0.0\n[COMET_ENZYME_INFO]");
+            CometParameters imported =
+                    new CometParamsParser(METADATA, C03).parse(text).model().orElseThrow();
+            ParameterSession session = startingIn(C03);
+            ValidationSummaryViewModel summary = new ValidationSummaryViewModel(session);
+
+            session.adopt(imported, Adoption.IMPORTED);
+
+            SummaryEntry entry = only(summary.entries(), "ms1_mass_range");
+            assertEquals(Optional.empty(), entry.parameterDisplayName());
+            assertEquals(Optional.empty(), entry.focusTarget());
+            assertEquals(Optional.empty(), entry.category());
+            assertEquals("Warning -- ms1_mass_range: " + entry.message(), entry.text());
+        }
+
+        @Test
+        @DisplayName("a summary made after an error shows it at once")
+        void madeLate() {
+            ParameterSession session = startingIn(C03);
+            session.edit("num_enzyme_termini", "3");
+            ValidationSummaryViewModel summary = new ValidationSummaryViewModel(session);
+            assertEquals(1, summary.entries().size());
+            assertEquals("1 error and 0 warnings.", summary.headline());
+        }
+
+        @Test
+        @DisplayName("the headline counts in words")
+        void headlines() {
+            assertEquals("No errors or warnings.", ValidationSummaryViewModel.headlineFor(0, 0));
+            assertEquals("1 error and 0 warnings.", ValidationSummaryViewModel.headlineFor(1, 0));
+            assertEquals("2 errors and 3 warnings.", ValidationSummaryViewModel.headlineFor(2, 3));
+        }
+
+        private SummaryEntry only(List<SummaryEntry> entries, String parameter) {
+            List<SummaryEntry> matching =
+                    entries.stream()
+                            .filter(e -> e.parameter().equals(Optional.of(parameter)))
+                            .toList();
+            assertEquals(1, matching.size(), () -> "entries: " + entries);
+            return matching.get(0);
+        }
+    }
+
+    @Nested
+    @DisplayName("run readiness (P7-6, gate item 6's parameter half)")
+    class Readiness {
+
+        @Test
+        @DisplayName("before Phase 08 the engine's reason is always there and Run is disabled")
+        void engineNotBuilt() {
+            RunReadinessViewModel readiness =
+                    new RunReadinessViewModel(
+                            startingIn(C03), Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT));
+            assertFalse(readiness.parametersBlockRun());
+            assertEquals(List.of(), readiness.blockingReasons());
+            assertFalse(readiness.runEnabled());
+            assertFalse(readiness.runEnabledProperty().get());
+            assertEquals(
+                    Optional.of(
+                            "No run can start yet: the workflow engine that runs Comet and"
+                                    + " Percolator arrives in Phase 08."),
+                    readiness.engineReason());
+            assertEquals(RunReadinessViewModel.ENGINE_NOT_BUILT, readiness.reasonsText());
+        }
+
+        @Test
+        @DisplayName("an error blocks Run with its reason in text; fixing it unblocks")
+        void errorBlocks() {
+            ParameterSession session = startingIn(C03);
+            RunReadinessViewModel readiness =
+                    new RunReadinessViewModel(
+                            session, Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT));
+            RunReadinessViewModel engineReady =
+                    new RunReadinessViewModel(session, Optional.empty());
+            assertTrue(engineReady.runEnabled());
+            assertEquals("Ready to run.", engineReady.reasonsText());
+
+            // CONSTRUCTED cross-parameter error: the precursor window reversed
+            session.edit("peptide_mass_tolerance_lower", "30.0");
+
+            Finding error = session.report().errors().get(0);
+            String reason =
+                    "Error -- Precursor tolerance, lower bound (peptide_mass_tolerance_lower),"
+                            + " Precursor mass and isotope handling: "
+                            + error.message();
+            assertTrue(readiness.parametersBlockRun());
+            assertTrue(readiness.parametersBlockRunProperty().get());
+            assertEquals(List.of(reason), readiness.blockingReasons());
+            assertEquals(List.of(reason), readiness.blockingReasonsProperty().get());
+            assertEquals(
+                    reason + "\n" + RunReadinessViewModel.ENGINE_NOT_BUILT,
+                    readiness.reasonsText());
+            assertEquals(readiness.reasonsText(), readiness.reasonsTextProperty().get());
+            assertFalse(engineReady.runEnabled());
+            assertEquals(reason, engineReady.reasonsText());
+
+            session.edit("peptide_mass_tolerance_lower", "-20.0");
+            assertFalse(readiness.parametersBlockRun());
+            assertTrue(engineReady.runEnabled());
+        }
+
+        @Test
+        @DisplayName("a warning alone does not block Run")
+        void warningDoesNotBlock() {
+            ParameterSession session = startingIn(C02);
+            RunReadinessViewModel readiness = new RunReadinessViewModel(session, Optional.empty());
+            session.edit("peptide_mass_tolerance_lower", "5.0");
+            assertFalse(session.report().warnings().isEmpty());
+            assertFalse(readiness.parametersBlockRun());
+            assertTrue(readiness.runEnabled());
+        }
+
+        @Test
+        @DisplayName("an unresolved migration entry blocks Run until resolved")
+        void migrationBlocks() {
+            ParameterSession session = startingIn(C02);
+            RunReadinessViewModel readiness = new RunReadinessViewModel(session, Optional.empty());
+            session.edit("variable_mod01", "15.9949 M 0 3 2 4 0 0.0");
+            session.selectRelease(C03);
+            assertTrue(readiness.parametersBlockRun());
+            assertEquals(1, readiness.blockingReasons().size());
+            assertTrue(
+                    readiness
+                            .blockingReasons()
+                            .get(0)
+                            .startsWith(
+                                    "Error -- Variable modification 1 (variable_mod01),"
+                                            + " Variable modifications: variable_mod01 needs"
+                                            + " your decision:"),
+                    readiness.blockingReasons().get(0));
+            session.resolve("variable_mod01");
+            assertFalse(readiness.parametersBlockRun());
+            assertTrue(readiness.runEnabled());
+        }
+
+        @Test
+        @DisplayName("an engine that cannot run has to say why")
+        void blankEngineReason() {
+            ParameterSession session = startingIn(C03);
+            assertEquals(
+                    "a workflow engine that cannot run has to say why: a blank reason leaves the"
+                            + " Run control disabled with no explanation",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () -> new RunReadinessViewModel(session, Optional.of(" ")))
+                            .getMessage());
+        }
+    }
+}

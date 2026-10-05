@@ -18,7 +18,6 @@ package org.cometgui.ui.controls;
 
 import java.util.Locale;
 import java.util.Objects;
-import java.util.regex.Pattern;
 import org.cometgui.domain.log.MessageSeverity;
 import org.cometgui.domain.run.StageTag;
 import org.cometgui.ui.viewmodel.SectionId;
@@ -135,13 +134,6 @@ public final class UiIds {
 
     /** The container holding one row per tool build the port offered. */
     public static final String TOOL_MANAGER_ROWS = "tool-manager-rows";
-
-    /**
-     * The shape a tool row key must have: lower-case words joined by single hyphens or underscores.
-     * See the note above {@link #toolRow(String)} for why a dot is rejected.
-     */
-    private static final Pattern TOOL_ROW_KEY_SHAPE =
-            Pattern.compile("[a-z0-9]+(?:[-_][a-z0-9]+)*");
 
     private UiIds() {}
 
@@ -318,7 +310,7 @@ public final class UiIds {
      */
     public static String toolRow(String rowKey) {
         Objects.requireNonNull(rowKey, "rowKey");
-        if (!TOOL_ROW_KEY_SHAPE.matcher(rowKey).matches()) {
+        if (!isToolRowKey(rowKey)) {
             throw new IllegalArgumentException(
                     "not a usable tool row key: \""
                             + rowKey
@@ -447,5 +439,34 @@ public final class UiIds {
      */
     public static String toolRowCancel(String rowKey) {
         return toolRow(rowKey) + "-cancel";
+    }
+
+    /**
+     * Whether a key has the shape a tool row key must have: lower-case words ({@code a}-{@code z},
+     * {@code 0}-{@code 9}) joined by single hyphens or underscores. See the note above {@link
+     * #toolRow(String)} for why a dot is rejected.
+     *
+     * <p>Written out rather than as a regular expression since Phase 07, whose architecture rule
+     * keeps {@code java.util.regex} out of {@code org.cometgui.ui} altogether: the UI reads a
+     * parameter value only through the parameter model, and a rule with an exemption for "this one
+     * pattern is not about parameters" would be a rule nobody could rely on.
+     *
+     * @param key the candidate key
+     * @return {@code true} if it is non-empty, starts and ends with a word character, and has no
+     *     two joiners in a row
+     */
+    private static boolean isToolRowKey(String key) {
+        boolean expectingWord = true;
+        for (int index = 0; index < key.length(); index++) {
+            char c = key.charAt(index);
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+                expectingWord = false;
+            } else if ((c == '-' || c == '_') && !expectingWord) {
+                expectingWord = true;
+            } else {
+                return false;
+            }
+        }
+        return !expectingWord;
     }
 }

@@ -49,12 +49,14 @@ import javafx.beans.value.ObservableValue;
  * object never leaves its view-model, so this cannot happen from a view; refusing the operation
  * keeps it from happening inside one either.
  *
- * <p>Package-private: this is a mechanism the view-models in this package share, not part of the
- * interface they present to a view.
+ * <p>Public since Phase 07, so that the parameter editor's view-models in {@code
+ * org.cometgui.ui.viewmodel.params} share it rather than keep a second copy. It is still a
+ * mechanism the view-models share, not part of the interface they present to a view: a view-model
+ * keeps it private and publishes only {@link ReadOnlyObjectWrapper#getReadOnlyProperty()}.
  *
  * @param <T> the value type
  */
-final class NonNullProperty<T> extends ReadOnlyObjectWrapper<T> {
+public final class NonNullProperty<T> extends ReadOnlyObjectWrapper<T> {
 
     /**
      * A property holding {@code initialValue}.
@@ -64,7 +66,7 @@ final class NonNullProperty<T> extends ReadOnlyObjectWrapper<T> {
      * @param initialValue the value the property starts with
      * @throws NullPointerException if {@code initialValue} is {@code null}, naming the property
      */
-    NonNullProperty(Object bean, String name, T initialValue) {
+    public NonNullProperty(Object bean, String name, T initialValue) {
         super(bean, name, Objects.requireNonNull(initialValue, name));
     }
 

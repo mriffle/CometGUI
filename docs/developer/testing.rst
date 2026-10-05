@@ -247,14 +247,16 @@ reported ``inert`` -- see `Traps`_ for why an inert rule is not a passing rule.
 Architecture -- ArchUnit
 ------------------------
 
-:Checks: eight rules in
+:Checks: nine rules in
    ``cometgui-archtests/src/test/java/org/cometgui/archtests/LayeringRulesTest.java``
    -- the domain does not depend on JavaFX; the UI depends only on the domain
    and the application APIs; tool adapters do not depend on UI classes;
    provenance and hashing do not depend on the UI; the parameter parser and
    writer do not depend on JavaFX; the major layers have no dependency cycles;
-   process creation is confined to the process service (``R-PROC-02``); and
-   the UI contains no hashing, download or archive-extraction logic.
+   process creation is confined to the process service (``R-PROC-02``); the
+   UI contains no hashing, download or archive-extraction logic; and (Phase
+   07) the UI goes through the parameter model for every Comet value -- no
+   line reader, ``Numbers``, value codec or ``java.util.regex``.
 :Where the rules come from: ``specification.rst``, *Architecture tests*.
 :Threshold: zero violations.
 :Configured in: ``cometgui-archtests`` (ArchUnit 1.5.0),
