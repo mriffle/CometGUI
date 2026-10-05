@@ -259,6 +259,20 @@ Run serially, one fresh agent each, in this order.
        for AC-PAR-03, -04, -05, -07, -08, -09, -10 moved from planned to the
        tests that prove them.
      - R-DOC; all ACs above
+     - **Accepted** 2026-10-05, ``2515166``, ``7276ebf``, ``38c494f``;
+       :ref:`p07w-u9`.
+   * - 10
+     - **Repairs from unit 9's findings** (added 2026-10-05). (a) The
+       Essentials fragment "instrument" choice applies a built-in preset with
+       no preview -- AC-PAR-08 requires a diff before anything changes: route
+       it through the preset preview, with a GUI test that nothing changes
+       before Apply. (b) The static-modification control is a column of
+       generic fields; the specification's typed-control list asks for a
+       residue/terminus-oriented table with mass and reset/default state:
+       build it over the existing ``StaticModsViewModel``. (c) The unused
+       ``IonSeriesViewModel``: use it for the ion-series family or remove it.
+       ``--only paramui`` (floor 70) after the change.
+     - AC-PAR-08; spec *Typed control requirements*
      -
 
 Sign-off entries
@@ -724,6 +738,44 @@ What I ran (2026-10-05):
   ``paramui: 66 controls in 1283s`` (floor 66), docs 1, traceability 8.
 
 No Java changed; no test reads a file outside its module.
+
+.. _p07w-u9:
+
+Unit 9 -- documentation, traceability, a GUI search test (``2515166``, ``7276ebf``, ``38c494f``)
+------------------------------------------------------------------------------------------------
+
+Agent: fresh tier-3 agent. The three user pages written as built
+(``docs/comet_parameters.rst``, ``docs/variable_modifications.rst``,
+``docs/comet_parameter_presets.rst``), *The Comet parameter editor as built*
+in ``docs/developer/architecture.rst``, 25 test entries in
+``docs/traceability-map.toml`` replacing the "planned 07" ones for AC-PAR-03,
+-04, -05, -07, -08, -09, -10. ``ParameterSearchUiTest`` gains
+``helpTextOfTheDefaultRelease``/``helpTextOfTheOlderRelease`` (both drivers);
+harness control 8v now also grades them in a second dirty run; ``paramui``
+floor **raised** 66 -> 70.
+
+Findings the agent reported (each checked against the code): the Essentials
+fragment instrument choice applies a preset with **no preview** (contrary to
+AC-PAR-08); static modifications are a column of generic fields, not the
+specification's table, and ``StaticModsViewModel`` and ``IonSeriesViewModel``
+are unused; Advanced's "Miscellaneous and version-specific options" holds no
+parameter on either release (data, not a defect). The first two go to unit
+10.
+
+What I ran (2026-10-05):
+
+* ``bash scripts/verify-all-gates.sh --only docs --only traceability``: ``2
+  control(s) passed, 0 failed``.
+* Injection (production, **version-blind**): ``FieldViewModel.shortHelp``
+  returns the curated help -- red in the GUI: ``ParameterSearchUiTest
+  .helpTextOfTheDefaultRelease: Comet 2026.03.0, help text "not set" (3
+  failures)`` (both drivers), 6 run / 2 failures. Restored, ``sha256sum -c``
+  OK.
+* Spot-checked the map's entries against the test methods and the user page's
+  sections against the views.
+* ``--only paramui`` is re-run by me after unit 10, which changes Essentials.
+
+No test reads a file outside its module.
 
 Rejections and rework
 =====================
