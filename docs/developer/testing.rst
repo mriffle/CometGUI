@@ -541,7 +541,7 @@ pass is worse than no aggregator at all.
        ``scripts/build.sh`` grades, still passes.
 
    * - Comet parameter editor (Phase 07, ``paramui``)
-     - ``scripts/verify-param-ui-gates.sh``: nineteen injections into the
+     - ``scripts/verify-param-ui-gates.sh``: twenty-three injections into the
        views, controls and view-models of ``cometgui-ui``, at least two per
        exit gate item, four of them version-blind, each graded in the GUI
        gate test that asserts the item. See :ref:`dev-param-ui-falsifiability`.
@@ -647,6 +647,15 @@ and the bytecode proof).
      - ``the saved file differs from the checked-in
        essentials-tryptic-dda-2026.03.0.params``; and the copy the test leaves
        differs from the expected file in line 6, ``decoy_search``, alone.
+   * - 1c
+     - 1
+     - New (unit 10): a static-modification table row writes its mass to the
+       next row's parameter.
+     - ``StaticModificationTableUiTest``: ``the lysine row after its mass was
+       typed ==> expected: <[lysine (K), 229.162932, ...]> but was: <[lysine
+       (K), 0.0000, ...]>``; and ``EssentialsTrypticSearchUiTest``: ``the
+       saved file differs from the checked-in
+       essentials-tryptic-dda-2026.03.0.params``.
    * - 2a
      - 2
      - New: the slot editor's *Move up* moves the slot down.
@@ -671,6 +680,22 @@ and the bytecode proof).
      - New: *Apply selected* applies every row.
      - ``expected: <Applied 2 changes of Low-res precursor, low-res
        fragments: ...> but was: <Applied 8 changes of ...``.
+   * - 3c
+     - 3
+     - New (unit 10): the Essentials fragment instrument choice applies its
+       preset's rows the moment it is chosen -- unit 5's behaviour, removed by
+       unit 10 (``AC-PAR-08``).
+     - ``FragmentInstrumentPreviewUiTest``: ``choosing changes nothing;
+       changed: ==> expected: <[]> but was: <[fragment_bin_offset = 0.4,
+       fragment_bin_tol = 1.0005, theoretical_fragment_ions = 1]>``.
+   * - 3d
+     - 3
+     - New (unit 10): the fragment choice's preview is not scoped to the
+       fragment parameters, so it offers the preset's precursor rows too.
+     - ``expected: <[[Fragment bin width (fragment_bin_tol), 0.02, 1.0005],
+       ...]> but was: <[[Precursor tolerance, upper bound
+       (peptide_mass_tolerance_upper), 10, 3.0]``;
+       ``PresetPreviewUiTest`` (a whole-preset preview) must stay green.
    * - 4a
      - 4
      - Recorded (unit 7, 7a): a raw apply that fails to parse resets the
@@ -727,6 +752,12 @@ and the bytecode proof).
      - New: the validation state left out of a parameter control's accessible
        help.
      - ``#ess-database_name's accessible help does not carry its state``.
+   * - 7c
+     - 7
+     - New (unit 10): a static-modification table row's mass field loses its
+       own accessible name.
+     - ``TextField #ess-add_Cterm_peptide under #param-essentials has only
+       the generated fallback name``.
    * - 7v
      - 7
      - **Version-blind**, new: a field's choices are the curated definition's,

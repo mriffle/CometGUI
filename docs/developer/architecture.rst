@@ -510,12 +510,36 @@ exit-gate GUI tests drive the launched application in ``cometgui-app``
 ``scripts/verify-param-ui-gates.sh`` proves each gate item fails on a defect
 it exists to catch (:ref:`dev-param-ui-falsifiability`).
 
-**What the views do not use.** ``IonSeriesViewModel`` and
-``StaticModsViewModel`` exist and are tested, but no view is built on them
-today: the ion series are one ``FieldControl`` check box per series, and the
-static modifications one ``FieldControl`` per residue and terminus, so there is
-no static-modification table with a name column. (A range is one
-``FieldControl`` whose two text fields commit together through
+**Both preset paths preview.** The search/acquisition preset choice
+(``PresetControl``) and the Essentials fragment instrument choice share one
+preview control, ``PresetReviewPane``, each over its own ``PresetsViewModel``
+(``ParameterEditorViewModel.presets()`` and ``fragmentPresets()``) and its own
+identifiers. The instrument choice calls ``PresetsViewModel.previewFragment``,
+a preview of the option's source preset *scoped* to the option's fragment
+parameters: its rows, problems and conversions are those parameters' alone,
+so *Apply all* applies exactly what it shows. Nothing reaches the model before
+*Apply* (``AC-PAR-08``); Phase 07 unit 10 removed unit 5's
+``ToleranceViewModel.chooseFragment``, which applied at once.
+
+**Static modifications are a table.** ``StaticModTable`` (in
+``org.cometgui.ui.controls.params``) is built over ``StaticModsViewModel`` on
+Essentials and in Advanced's static-modification category: one row per
+``add_*`` parameter shown, keyed by the model's ``StaticModTarget``. Its cells
+carry the row parameter's own per-parameter identifiers -- the mass field is
+``parameterControl``, the residue or terminus its ``parameterLabel``, the
+default state ``parameterOrigin``, then ``parameterReset`` and
+``parameterState`` -- plus ``staticModName``, so gate 7's walk finds, names
+and checks each mass field exactly as any other parameter control. Comet has
+no name for a static modification, so the name cell is the parameter's
+display name.
+
+**The ion series need no view-model of their own.** Each series and the
+neutral-loss switch is a parameter of its own, which ``FieldControl`` shows as
+a check box named by the release's display name (``Score a ions`` ...
+``Score z+1 ions``, ``Score water and ammonia losses``) and sets through the
+model's flag (``FieldViewModel.setOn``). Unit 4's ``IonSeriesViewModel``
+duplicated exactly that and was never used by a view; unit 10 removed it.
+(A range is one ``FieldControl`` whose two text fields commit together through
 ``RangesViewModel``.)
 
 The injection seams (``R-PROC-01``)

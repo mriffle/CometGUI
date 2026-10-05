@@ -85,11 +85,17 @@ pages; the citations, and two things found in Comet's documentation along the
 way, are in :ref:`dev-comet-parameter-builtin-presets`.
 
 The *Instrument setting* choice in the *Fragment ions* group of Essentials
-uses the same values for the fragment parameters alone: choosing low- or
-high-resolution fragments there sets ``fragment_bin_tol``,
-``fragment_bin_offset`` and ``theoretical_fragment_ions`` from the matching
-preset at once, without a preview, and they then read ``Value from: Set by a
-preset``.
+uses the same values for the fragment parameters alone, and like a preset it
+changes nothing until you have seen what it would change. Choosing low- or
+high-resolution fragments there opens a preview of the matching preset's
+``fragment_bin_tol``, ``fragment_bin_offset`` and
+``theoretical_fragment_ions`` rows only -- titled, for example,
+``Previewing Low-res precursor, low-res fragments / High-res precursor,
+low-res fragments (fragment ions only): 3 changes. Nothing has changed yet.``
+-- with the same **Apply all**, **Apply selected** and **Cancel** as below.
+The preset's precursor rows are not part of it and are never applied from
+there. Applied values read ``Value from: Set by a preset``; after
+**Cancel**, the choice shows again what the configuration holds.
 
 Previewing and applying a preset
 ================================

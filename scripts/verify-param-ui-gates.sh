@@ -51,6 +51,11 @@
 #       file with the checked-in expected file, which must go red, and the
 #       copy the test leaves must differ from the expected file in that one
 #       line alone
+#   1c  item 1 [NEW, unit 10]: a row of the static-modification table writes
+#       its mass to the NEXT row's parameter, so the lysine TMT lands on
+#       glutamic acid -- red in the static-modification table's GUI test at
+#       the lysine row, and in the gate-1 search's saved-file comparison
+#       (StaticModificationTableUiTest, EssentialsTrypticSearchUiTest)
 #   2a  item 2 [NEW]: the slot editor's "Move up" moves the slot DOWN, so the
 #       serialised tuple after the reorder step is wrong
 #       (VariableModificationEditorUiTest)
@@ -61,6 +66,15 @@
 #       applies every row (PresetPreviewUiTest)
 #   3b  item 3 [NEW]: "Apply selected" applies every row, so the subset is not
 #       exactly the subset
+#   3c  item 3 [NEW, unit 10]: the Essentials fragment instrument choice
+#       applies its preset's rows the moment it is chosen, before the
+#       scientist has seen them (AC-PAR-08: "a diff before changing
+#       anything") -- unit 5's behaviour, which unit 9 found and unit 10
+#       removed (FragmentInstrumentPreviewUiTest)
+#   3d  item 3 [NEW, unit 10]: the fragment choice's preview is not scoped to
+#       the fragment parameters, so it offers -- and Apply all would apply --
+#       the preset's precursor rows too; the whole-preset preview, which the
+#       defect does not touch, must STAY GREEN (PresetPreviewUiTest)
 #   4a  item 4 [recorded, unit 7 injection 7a, after the rework]: a raw apply
 #       that fails to parse resets the configuration to the release's starting
 #       set (ExpertRawEditUiTest)
@@ -88,6 +102,10 @@
 #       (ParameterControlsAccessibilityUiTest, AccessibleNameEnumerationUiTest)
 #   7b  item 7 [NEW]: the validation state left out of a parameter control's
 #       accessible help, so a screen reader is not told what the screen shows
+#   7c  item 7 [NEW, unit 10]: a static-modification table row's mass field
+#       loses its own accessible name, so only Phase 02's generated fallback
+#       is left -- the table's cells are parameter controls like any other
+#       (ParameterControlsAccessibilityUiTest)
 #   7v  item 7, VERSION-BLIND [NEW]: a field's choices are the CURATED
 #       definition's, not the selected release's, so 2026.03.0's
 #       index_search_type loses its -1 "Not set" choice; the 2026.02.2 test of
@@ -203,7 +221,7 @@
 # WHAT IT COSTS.  Measured and printed per control; the total is on the SUMMARY
 # line.  The GUI test classes dominate: each control runs only the classes it
 # grades, but those launch the application, and the baseline and the final
-# clean run each run all eleven graded classes once.
+# clean run each run all thirteen graded classes once.
 #
 # EXIT STATUS
 #   0  every control bit
@@ -246,7 +264,13 @@ readonly IDENTITY_LINE='^cometgui\.buildTimestamp='
 readonly J="${UI}/src/main/java/org/cometgui/ui"
 readonly DECOY_CONTROL="${J}/controls/params/DecoySourceControl.java"
 readonly VARMOD_EDITOR="${J}/controls/params/VariableModEditor.java"
-readonly PRESET_CONTROL="${J}/controls/params/PresetControl.java"
+# The preset preview's actions moved from PresetControl into PresetReviewPane
+# in unit 10, unchanged, when the fragment instrument choice was given a
+# preview of its own; controls 3a and 3b anchor on the same lines there.
+readonly PRESET_CONTROL="${J}/controls/params/PresetReviewPane.java"
+readonly PRESET_PREVIEW="${J}/viewmodel/params/PresetPreview.java"
+readonly ESSENTIALS_VIEW="${J}/view/params/EssentialsView.java"
+readonly STATIC_MOD_TABLE="${J}/controls/params/StaticModTable.java"
 readonly EXPERT_VM="${J}/viewmodel/params/ExpertViewModel.java"
 readonly FIELD_CONTROL="${J}/controls/params/FieldControl.java"
 readonly SUMMARY_PANE="${J}/controls/params/ValidationSummaryPane.java"
@@ -260,6 +284,8 @@ readonly FILES_VM="${J}/viewmodel/params/ParameterFilesViewModel.java"
 readonly T1="EssentialsTrypticSearchUiTest"
 readonly T2="VariableModificationEditorUiTest"
 readonly T3="PresetPreviewUiTest"
+readonly T3F="FragmentInstrumentPreviewUiTest"
+readonly TSM="StaticModificationTableUiTest"
 readonly T4="ExpertRawEditUiTest"
 readonly T5="WorkflowOutputsLockedUiTest"
 readonly T6="CrossParameterValidationUiTest"
@@ -280,7 +306,7 @@ readonly -a QUIET=(
 )
 
 # Every control id, in the order they run.
-readonly -a ALL_CONTROLS=(1 1b 2a 2v 3a 3b 4a 4b 4v 5a 5b 6a 6b 7a 7b 7v 8a 8b 8v H)
+readonly -a ALL_CONTROLS=(1 1b 1c 2a 2v 3a 3b 3c 3d 4a 4b 4v 5a 5b 6a 6b 7a 7b 7c 7v 8a 8b 8v H)
 
 PASSED=0
 FAILED=0
@@ -889,8 +915,11 @@ build_sandbox() {
 # One place for every selector, so the baseline and the final clean run select
 # exactly what the dirty runs select.
 readonly SEL_1="${T1}"
+readonly SEL_1C="${T1},${TSM}"
 readonly SEL_2="${T2}"
 readonly SEL_3="${T3}"
+readonly SEL_3C="${T3F}"
+readonly SEL_3D="${T3F},${T3}"
 readonly SEL_4="${T4}"
 readonly SEL_5="${T5}"
 readonly SEL_6A="${T6}"
@@ -910,14 +939,17 @@ readonly SEL_H="${T8V},${T6}"
 control_selectors() {
     case "$1" in
         1|1b) printf '%s' "${SEL_1}" ;;
+        1c) printf '%s' "${SEL_1C}" ;;
         2a|2v) printf '%s' "${SEL_2}" ;;
         3a|3b) printf '%s' "${SEL_3}" ;;
+        3c) printf '%s' "${SEL_3C}" ;;
+        3d) printf '%s' "${SEL_3D}" ;;
         4a|4b|4v) printf '%s' "${SEL_4}" ;;
         5a|5b) printf '%s' "${SEL_5}" ;;
         6a) printf '%s' "${SEL_6A}" ;;
         6b) printf '%s' "${SEL_6B}" ;;
         7a) printf '%s' "${SEL_7A}" ;;
-        7b|7v) printf '%s' "${SEL_7}" ;;
+        7b|7c|7v) printf '%s' "${SEL_7}" ;;
         8a|8b) printf '%s' "${SEL_8}" ;;
         8v) printf '%s,%s' "${SEL_8V}" "${SEL_8VG}" ;;
         H) printf '%s' "${SEL_H}" ;;
@@ -1041,6 +1073,29 @@ control_1b() {
     end_control
 }
 
+control_1c() {
+    begin_control "1c" "item 1 [NEW, unit 10]: a static-modification row writes its mass to the next row's parameter"
+    # Gate 1's search sets TMT on lysine through the static-modification table
+    # (unit 10).  With each row writing to its neighbour's parameter, the table
+    # test's lysine row no longer holds what was typed -- named by its own
+    # message -- and the gate-1 search saves add_E_glutamic_acid and
+    # add_Cterm_protein instead of add_K_lysine and add_Nterm_peptide.
+    inject_and_run "row writes the next row's mass" "${STATIC_MOD_TABLE}" "${SEL_1C}" fixed \
+        'the lysine row after its mass was typed ==> expected: <[lysine (K), 229.162932, Static modification: lysine (K), Changed from default 0.0000 -- Set by you, No problems.]> but was: <[lysine (K), 0.0000, Static modification: lysine (K), Default -- Comet 2026.03.0 default, No problems.]>' \
+        '            table.setMass(table.row(field.name()).orElseThrow(), mass.getText());' \
+        '            List<StaticModRow> all = table.rows();
+            table.setMass(
+                    all.get(all.indexOf(table.row(field.name()).orElseThrow()) + 1),
+                    mass.getText());'
+    assert_testcase "the table walk is the method that failed" failed "${TSM}" theTable
+    assert_log_contains "and the gate-1 search's saved file is not the expected one" \
+        "${DIRTY_LOG}" 'the saved file differs from the checked-in essentials-tryptic-dda-2026.03.0.params'
+    assert_testcase "the Essentials search is a method that failed" failed \
+        "${T1}" essentialsConfiguresATrypticSearch
+    restore_pristine "${STATIC_MOD_TABLE}"
+    end_control
+}
+
 control_2a() {
     begin_control "2a" "item 2 [NEW]: the slot editor's Move up moves the slot down"
     # Gate 2: "adds, edits, reorders and removes a variable modification and
@@ -1104,6 +1159,43 @@ control_3b() {
     assert_testcase "the preview/cancel/subset walk is the method that failed" failed \
         "${T3}" previewCancelAndApplyASubset
     restore_pristine "${PRESET_CONTROL}"
+    end_control
+}
+
+control_3c() {
+    begin_control "3c" "item 3 [NEW, unit 10]: the fragment instrument choice applies its rows the moment it is chosen"
+    # AC-PAR-08: "Preset application shows a diff before changing anything".
+    # Unit 5 made the Essentials fragment choice apply its preset's rows at
+    # once; unit 9 found it and unit 10 routed it through a preview.  Put
+    # back, the configuration changes on the choice itself, and the test's
+    # canonical-text comparison names the three declarations.
+    inject_and_run "fragment choice applied at once" "${ESSENTIALS_VIEW}" "${SEL_3C}" fixed \
+        'choosing changes nothing; changed: ==> expected: <[]> but was: <[fragment_bin_offset = 0.4, fragment_bin_tol = 1.0005, theoretical_fragment_ions = 1]>' \
+        '                                preview.previewing(fragmentPresets.previewFragment(after));' \
+        '                                preview.previewing(fragmentPresets.previewFragment(after));
+                                fragmentPresets.applyAll();'
+    assert_testcase "the instrument-choice walk is the method that failed" failed \
+        "${T3F}" instrumentChoiceIsPreviewed
+    restore_pristine "${ESSENTIALS_VIEW}"
+    end_control
+}
+
+control_3d() {
+    begin_control "3d" "item 3 [NEW, unit 10]: the fragment preview is not scoped to the fragment parameters"
+    # The instrument choice previews the fragment rows of a preset that also
+    # sets the precursor window.  Unscoped, the preview offers the precursor
+    # rows as well, and Apply all would change them.  A whole-preset preview is
+    # unscoped anyway, so the gate-3 preset test must stay green: the red is the
+    # scope, nothing else.
+    inject_and_run "fragment preview unscoped" "${PRESET_PREVIEW}" "${SEL_3D}" fixed \
+        'expected: <[[Fragment bin width (fragment_bin_tol), 0.02, 1.0005], [Fragment bin offset (fragment_bin_offset), 0.1, 0.4], [Flanking-bin scoring (theoretical_fragment_ions), 0, 1]]> but was: <[[Precursor tolerance, upper bound (peptide_mass_tolerance_upper), 10, 3.0]' \
+        '        return scope.map(names -> names.contains(parameter)).orElse(true);' \
+        '        return scope.isPresent() || true;'
+    assert_testcase "the instrument-choice walk is the method that failed" failed \
+        "${T3F}" instrumentChoiceIsPreviewed
+    assert_testcase "the whole-preset preview, which the defect does not touch, stays green" passed \
+        "${T3}" previewCancelAndApplyASubset
+    restore_pristine "${PRESET_PREVIEW}"
     end_control
 }
 
@@ -1254,6 +1346,21 @@ control_7b() {
     assert_testcase "the 2026.03.0 walk failed" failed "${T7}" theDefaultRelease
     assert_testcase "the finding-in-text check failed" failed "${T7}" aFindingIsStatedInText
     restore_pristine "${FIELD_CONTROL}"
+    end_control
+}
+
+control_7c() {
+    begin_control "7c" "item 7 [NEW, unit 10]: a static-modification row's mass field loses its own accessible name"
+    # Unit 10 moved the add_* parameters out of FieldControl into the table;
+    # gate 7 still walks every one of them by its parameter identifier.  The
+    # table's mass field unnamed leaves Phase 02's generated fallback, which is
+    # not a name.
+    inject_and_run "static-mod mass field unnamed" "${STATIC_MOD_TABLE}" "${SEL_7}" fixed \
+        'TextField #ess-add_Cterm_peptide under #param-essentials has only the generated fallback name' \
+        '            named(mass, field.displayName());' \
+        '            // injected defect: the mass field is not named'
+    assert_testcase "the 2026.03.0 walk failed" failed "${T7}" theDefaultRelease
+    restore_pristine "${STATIC_MOD_TABLE}"
     end_control
 }
 
@@ -1462,13 +1569,13 @@ control_H() {
 
 run_control() {
     case "$1" in
-        1) control_1 ;; 1b) control_1b ;;
+        1) control_1 ;; 1b) control_1b ;; 1c) control_1c ;;
         2a) control_2a ;; 2v) control_2v ;;
-        3a) control_3a ;; 3b) control_3b ;;
+        3a) control_3a ;; 3b) control_3b ;; 3c) control_3c ;; 3d) control_3d ;;
         4a) control_4a ;; 4b) control_4b ;; 4v) control_4v ;;
         5a) control_5a ;; 5b) control_5b ;;
         6a) control_6a ;; 6b) control_6b ;;
-        7a) control_7a ;; 7b) control_7b ;; 7v) control_7v ;;
+        7a) control_7a ;; 7b) control_7b ;; 7c) control_7c ;; 7v) control_7v ;;
         8a) control_8a ;; 8b) control_8b ;; 8v) control_8v ;;
         H) control_H ;;
         *) die "no control '$1'. Controls: ${ALL_CONTROLS[*]}" 2 ;;

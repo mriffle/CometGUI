@@ -252,6 +252,12 @@ class = "org.cometgui.ui.viewmodel.params.PresetsViewModelTest"
 method = "applySubset"
 note = "Phase 07. Applying a subset applies exactly that subset, with origin PRESET."
 
+[[ac."AC-PAR-08".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.FragmentInstrumentPreviewUiTest"
+method = "instrumentChoiceIsPreviewed"
+note = "Phase 07 unit 10, gate item 3. Through the launched application, from a configuration set away from the defaults by hand: choosing an Essentials fragment instrument setting shows its three fragment rows and changes nothing; Cancel changes nothing, origins included; Apply selected and Apply all change exactly the rows applied."
+
 [[ac."AC-PAR-09".evidence]]
 kind = "test"
 class = "org.cometgui.app.gui.WorkflowOutputsLockedUiTest"

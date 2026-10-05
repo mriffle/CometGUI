@@ -159,9 +159,14 @@ setting. Each group has a heading and one sentence saying what it is for:
 
 **Fragment ions**
     The fragment tolerance as Comet's bin width and offset. **Instrument
-    setting** sets them in instrument terms -- low-resolution (ion trap) or
-    high-resolution fragments -- to the values of Comet's own example files,
-    and shows which one the current values match.
+    setting** offers them in instrument terms -- low-resolution (ion trap) or
+    high-resolution fragments -- with the values of Comet's own example files,
+    and shows which one the current values match. Choosing one **changes
+    nothing yet**: it opens a preview of what it would change -- one row per
+    fragment parameter, with your value and the setting's, each with a tick
+    box -- and only **Apply all** or **Apply selected** changes the
+    configuration; **Cancel** leaves it exactly as it was. The preview works as
+    a preset's does (see :doc:`comet_parameter_presets`).
 
 **Digestion**
     The enzyme, the second enzyme and the sample enzyme, chosen by name; how
@@ -169,9 +174,18 @@ setting. Each group has a heading and one sentence saying what it is for:
     allowed.
 
 **Static modifications**
-    One mass per residue and terminus, such as carbamidomethyl cysteine on
-    ``add_C_cysteine``. The four user-definable residues B, J, X and Z are on
-    Advanced.
+    A table with one row per residue and terminus, the four termini first:
+    the residue or terminus in words (``lysine (K)``, ``peptide
+    N-terminus``), the mass added -- carbamidomethyl cysteine is Comet's
+    default, ``57.021464`` on cysteine --, the modification's name, whether
+    the mass is the default and where it came from (for example ``Changed from
+    default 0.0000 -- Set by you``), a **Reset** back to the default, and
+    whether the row has a problem, in words. A mass that is not a number is
+    refused at its row, which says so and that the configuration still holds
+    the old value. **Comet has no name for a static modification** -- only a
+    mass per residue or terminus -- so the name column shows the setting's own
+    name, such as ``Static modification: lysine (K)``. The four user-definable
+    residues B, J, X and Z are in the same table on Advanced.
 
 **Variable modifications**
     The slot editor, with the per-peptide limit and the "require a
@@ -216,7 +230,8 @@ categories:
 #. Search ranges and peptide constraints
 #. Output options
 #. MS1 and real-time-search options
-#. Static modifications
+#. Static modifications -- the same residue/terminus table as Essentials,
+   with the four user-definable residues B, J, X and Z after the others
 #. Variable modifications -- the same slot editor as Essentials
 #. Miscellaneous and version-specific options -- which holds no parameter in
    either release offered today
@@ -407,9 +422,6 @@ runs yet; the comparison with the last saved file is there.
 **The outputs are always locked.** The pepXML and PIN outputs would be
 unlocked if the stage needing them were switched off, but no stage can be
 switched off yet, so both are locked on in every configuration.
-
-**Static modifications are a list of masses**, one setting per residue and
-terminus, not a table with a name for each modification.
 
 **Presets are applied from Essentials only**, and there are no presets of your
 own yet; see :doc:`comet_parameter_presets`.
