@@ -3,15 +3,14 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-04
-:Updated by: Main orchestrator, session 10 (**``D-010`` decided: Comet
-   2026.03.0 becomes the default**; specification revision 12; the intake work
-   package dispatched -- :ref:`status-comet-2603`)
-:Current phase: **Comet 2026.03.0 intake** (a work package amending Phases
-   05 and 06), dispatched 2026-10-04 with ``handoffs/COMET-2026-03-BRIEF.rst``.
-   The owner said yes to Phase 07 and to supporting the latest Comet; the
-   editor is built on the default version's schema, so the intake runs first
-   and Phase 07 follows it, one at a time.
+:Updated: 2026-10-05
+:Updated by: Main orchestrator, session 10 (**Comet 2026.03.0 intake signed
+   off PARTIAL** -- :ref:`status-comet-2603-signed`; specification revision
+   13; ``D-011`` raised; **Phase 07 dispatched**)
+:Current phase: **Phase 07 -- Comet Parameter Editor UI**, dispatched
+   2026-10-05 with ``handoffs/PHASE-07-BRIEF.rst``, on the owner's instruction
+   to commit, push and start it once the intake was green, without waiting
+   for confirmation.
 :Overall: Seven phases are signed off -- 02 and 06 PASSED; 00, 01, 03, 04 and
    05 PARTIAL. The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
@@ -19,7 +18,9 @@ Project Status
    ``scripts/verify-all-gates.sh`` (~105 minutes now) runs once per phase, at
    the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
-   :ref:`status-p06-signed`). The nightly is red **by the owner's decision**
+   :ref:`status-p06-signed`); and ``D-011``, what an Intel Mac gets now that
+   Comet is known to publish no Intel macOS build (raised 2026-10-05, blocks
+   nothing before Phase 15). The nightly is red **by the owner's decision**
    until Phase 15 replaces its stubs (:ref:`status-nightly-masking`).
 
 This file is the **only** authoritative record of where the project is. Update
@@ -228,13 +229,15 @@ Phase board
        signs off separately; the grade above stands for what was gated.
    * - 06+
      - Comet 2026.03.0 intake (amends 05 and 06)
-     - IN PROGRESS
-     - Dispatched 2026-10-04 (``D-010``). Eight-item gate in
-       ``handoffs/COMET-2026-03-BRIEF.rst``.
+     - PARTIAL
+     - **Signed off 2026-10-05** at ``fab1165`` on tier 1's full run (build
+       11/11, gates 13/13) and three injections of its own
+       (:ref:`status-comet-2603-signed`). Items 2-8 met; item 1 partial --
+       upstream has no Intel macOS Comet (``D-011``).
    * - 07
      - Comet parameter editor UI
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-10-05 (``handoffs/PHASE-07-BRIEF.rst``).
    * - 08
      - Workflow engine and Comet adapter
      - NOT STARTED
@@ -3254,6 +3257,88 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-comet-2603-signed:
+
+Comet 2026.03.0 intake signed off PARTIAL (2026-10-05)
+======================================================
+
+Six serial units, all accepted by the work-package orchestrator; unit 4 sent
+back once (its ``--only params`` claim was green, the orchestrator's run showed
+control 9 at 75.7% from PIT timeouts -- a real-binary corpus test re-ran 86
+Comet searches per mutant; reworked at the root, gate unchanged). The
+orchestrator stalled once mid-unit-2, having ended its turn while waiting on a
+check that was no longer running; tier 1 found it idle and resumed it. Record:
+``handoffs/COMET-2026-03-worklog.rst`` and ``-handoff.rst``.
+
+**What exists.** Comet 2026.03.0 is the default release in
+``manifests/tools.json`` (linux x86-64 and aarch64, macOS arm64, Windows
+x86-64), 2026.02.2 still offered; real ``-q``/``-p`` fixtures pinned by
+SHA-256; per-release parameter overrides, residue alphabet (``^``/``$`` from
+2026.03.0 only), rule severities, AScorePro and ``index_search_type`` rules;
+a 42-case validation corpus agreed with both real binaries; migration to
+2026.03.0 with a report (``CONVERTED``/``NOTED``/``NEEDS_ATTENTION``) whose
+migrated files the real binary accepts; harness floors raised -- ``install``
+88 to 95, ``params`` 68 to 109.
+
+**Tier 1's exit-gate run**, at ``fab1165`` on a quiet tree:
+``scripts/build.sh`` 11/11 stages in 984 s; ``scripts/verify-all-gates.sh``
+**13 of 13 controls passed** in 5500 s (``tests`` 37 assertions in 2745 s,
+``install`` 95, ``params`` 109). Nothing red.
+
+**Nothing weakened, checked rather than assumed:** no POM changed; every floor
+in ``verify-all-gates.sh`` rose; ``verify-test-gates.sh`` gained only a copied
+document and two precondition checks (the orchestrator's repair ``af5c45b``,
+for a test that reads ``docs/developer/comet_parameter_schema.rst``).
+
+**Tier 1's own injections**, into ``cometgui-params-comet`` over its 1914
+tests, each landed once, restored and verified with ``sha256sum -c``:
+
+* ``ResidueAlphabet.accepts`` admits ``^``/``$`` in every release -- 290
+  failures, e.g. ``VariableModCodecAlphabetTest.versionScoped``: expected
+  ``ValueSyntaxException``, nothing thrown;
+* AScorePro's last supported slot raised from 9 to 15 -- 25 failures, e.g.
+  ``MigrationTo202603Test.ascoreProIsNotHidden``: expected
+  ``[variable_mods.ascorepro_slot_unsupported]`` but was ``[]``;
+* ``ValueMigration.matchesValue`` never matches -- 16 failures and 1 error,
+  e.g. ``ValueMigrationConversionTest.throughMigration``: expected ``NOTED``
+  but was ``CARRIED``.
+
+Also re-checked independently: every Comet fixture ``SHA256SUMS`` verifies;
+tier 1 downloaded ``comet.linux.exe`` 2026.03.0 itself -- ``ad93b4cf…``,
+7 077 008 bytes, matching the manifest -- and it prints ``Comet version
+"2026.03 rev. 0 (fa08489)"``; and read the first bytes of all four upstream
+macOS Comet files: every one is Mach-O arm64 (CPU type ``0x0100000C``).
+
+**Grade: PARTIAL.** Items 2-8 met. Item 1 -- a row "for every platform the
+manifest already covers" -- cannot be met for macOS x86-64: upstream has never
+published an Intel macOS Comet, and the existing 2026.02.2 row so labelled
+points at the arm64 file. That is ``D-011``, raised for the owner. The macOS
+and Windows rows are, as for every phase so far, never executed.
+
+**Specification revision 13** records what execution established:
+``R-PARAM-01``'s counts for 2026.03.0 (118 ``-q``, 95 ``-p``), new
+``R-PARAM-13`` (release-scoped modification syntax and rules, ``.idx`` v5,
+reviewable migration with blocking ``NEEDS_ATTENTION``), and the macOS
+correction. ``R-PARAM-13`` is delivered by Phase 06 as extended, with Phase 07
+contributing.
+
+**Residue carried forward:**
+
+* ``D-011`` (Intel macOS) -- the owner's.
+* ``R-TOOL-02`` names ``CometWrapper.dll`` as a required Windows companion,
+  but ``comet.win64.exe`` references neither wrapper; kept required, which can
+  only withhold Thermo RAW, never claim it falsely. A specification question
+  for Phase 15.
+* The 2026.02.2 Windows row declares no Visual C++ runtime, though its binary
+  imports the same four DLLs the 2026.03.0 row declares.
+* A migrated ``NEEDS_ATTENTION`` slot holds the slot's default -- for
+  ``variable_mod01`` an *active* methionine oxidation -- so it must block a run
+  until reviewed; written into Phase 07's brief and ``R-PARAM-13``.
+* A distance below -2 migrates to -1; one exclusive-modification edge case
+  differs (7265 vs 7263 result lines). Recorded, accepted.
+* The "selected index is compatible" check still has no owner; 2026.03.0 reads
+  only ``Comet index database v5``.
+
 .. _status-p06-signed:
 
 Phase 06 signed off (2026-10-02)
@@ -3623,6 +3708,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-05
+     - 06+, 07
+     - **Comet 2026.03.0 intake signed off PARTIAL** (build 11/11, gates
+       13/13, three tier-1 injections; item 1 partial on ``D-011``).
+       Specification revision 13; ``D-011`` raised. **Phase 07 dispatched.**
+       See :ref:`status-comet-2603-signed`.
    * - 2026-10-04
      - 06+
      - **``D-010`` decided by the owner: Comet 2026.03.0 becomes the default

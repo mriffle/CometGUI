@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 12
-:Revision date: 2026-10-04
-:Supersedes: Revision 11, 2026-09-03
+:Revision: 13
+:Revision date: 2026-10-05
+:Supersedes: Revision 12, 2026-10-04
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,18 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 13
+     - 2026-10-05
+     - **Comet 2026.03.0 facts, established by executing the binaries** in the
+       intake work package (``handoffs/COMET-2026-03-handoff.rst``), replacing
+       release-note claims. ``R-PARAM-01`` gains 2026.03.0's counts (118 via
+       ``-q``, 95 via ``-p``); ``R-PARAM-13`` records the ``^``/``$`` residue
+       codes and the release-scoped rules. **Correction:** Comet has never
+       published an x86-64 macOS build -- ``comet.macos.exe`` is arm64 in
+       2026.02.2 and 2026.03.0 alike (Mach-O CPU type ``0x0100000C``, read by
+       tier 1 from the upstream files) -- so the *macOS x86-64* release-target
+       row and the ``D-004`` constraint below are amended, and what Intel Macs
+       get is ``D-011``.
    * - 12
      - 2026-10-04
      - **Comet 2026.03.0 becomes the default verified Comet version**, on the
@@ -618,6 +630,9 @@ supported matrix is normative and appears here once.
      - 2 -- best effort
      - ``.dmg``
      - Built and smoke-tested if CI runners permit; not release-blocking.
+       *Revision 13:* upstream publishes **no** x86-64 macOS Comet (both macOS
+       files are arm64), so there is no managed Comet for this platform; what
+       it offers instead is ``D-011``, open.
    * - Linux aarch64
      - 3 -- unsupported in release 1
      - not packaged
@@ -727,13 +742,31 @@ to the selected Comet version.
 
 ``R-PARAM-01``
     Schema discovery shall use ``comet -q``, not ``comet -p``. The verified
-    difference is 118 parameters versus 96: ``-p`` omits
+    difference is 118 parameters versus 96 for 2026.02.2, and 118 versus 95
+    for 2026.03.0, whose ``-p`` also omits ``index_search_type`` (its ``-q``
+    writes it as ``-1``, "not set"); the 118 ``-q`` names are the same in both
+    releases. ``-p`` omits
     ``variable_mod06``--``variable_mod15``, both ``mass_type_*`` parameters,
     ``num_results``, the PEFF parameters, the spectral-library parameters,
     ``pinfile_protein_delimiter``, ``print_expect_score``,
     ``print_ascorepro_score``, ``compoundmods_file`` and
     ``protein_modslist_file``. A GUI built from ``-p`` would silently offer 5
     variable-modification slots where Comet supports 15.
+
+``R-PARAM-13``
+    Variable-modification syntax and validation are scoped to the selected
+    release (revision 13, established by executing both binaries). From
+    2026.03.0 the residue field accepts ``^`` (protein N-terminus) and ``$``
+    (protein C-terminus); for 2026.02.2 the editor shall not offer them,
+    because that release accepts them silently and never applies them. In
+    2026.03.0 an undefined enzyme number is an error at parameter load, and a
+    terminal distance below -2, a terminus outside 0-3 with a distance, and
+    AScorePro with an active ``variable_mod10``..``15`` slot are errors at
+    search start; the last is an error for 2026.02.2 too, which crashes on it.
+    2026.03.0 searches only ``.idx`` format v5 and rejects earlier indexes. A
+    configuration migrated between releases is shown as a reviewable report,
+    and an entry needing the scientist's attention blocks a run until
+    resolved.
 
 ``R-PARAM-02``
     If a selected Comet binary does not support ``-q``, the schema provider
@@ -3441,7 +3474,8 @@ unsupported managed combinations and rely on local binaries.
 ``D-004`` macOS architecture policy
 -----------------------------------
 
-Comet publishes native ``aarch64`` and ``x86-64`` macOS builds; Percolator's
+Comet publishes a native ``aarch64`` macOS build and, despite its file name,
+no ``x86-64`` one (corrected in revision 13; ``D-011``); Percolator's
 XML-capable macOS artefacts are ``x86-64`` only. Decide whether release 1
 requires Rosetta 2 for the Percolator stage on Apple silicon, ships a
 project-built ``arm64`` Percolator, or scopes the Limelight path off macOS.

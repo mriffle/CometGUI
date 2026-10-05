@@ -6,7 +6,8 @@ PHASE-06: Comet Parameter Model
 :Status: PASSED (signed off 2026-10-02)
 :Depends on: 01, 05
 :Blocked by decisions: none
-:Delivers: R-PARAM-01..12, R-DOC-04, R-TEST-01
+:Delivers: R-PARAM-01..13, R-DOC-04, R-TEST-01 (R-PARAM-13 by the Comet
+   2026.03.0 intake work package, which extended this phase)
 :Proves: AC-PAR-01, AC-PAR-02, AC-PAR-06, AC-PAR-11 (headless parts)
 
 Purpose

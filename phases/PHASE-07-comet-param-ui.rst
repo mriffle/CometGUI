@@ -3,11 +3,11 @@ PHASE-07: Comet Parameter Editor UI
 ===================================
 
 :Phase: 07
-:Status: NOT STARTED
+:Status: IN PROGRESS (dispatched 2026-10-05)
 :Depends on: 02, 06
 :Blocked by decisions: none
 :Delivers: no rules owned -- UI half of the parameter rules
-:Contributes to: R-PARAM-03..10, R-CMT-01
+:Contributes to: R-PARAM-03..10, R-PARAM-13, R-CMT-01
 :Proves: AC-PAR-03, AC-PAR-04, AC-PAR-05, AC-PAR-07, AC-PAR-08, AC-PAR-09, AC-PAR-10
 
 .. note::

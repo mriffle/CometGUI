@@ -2,8 +2,8 @@
 Decisions
 =========
 
-:Updated: 2026-10-04 (D-010 decided by the owner: Comet 2026.03.0 becomes
-   the default; no decision now open)
+:Updated: 2026-10-05 (D-011 raised and OPEN: Comet publishes no Intel macOS
+   build; D-010 decided 2026-10-04)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -442,6 +442,10 @@ failing with an exec-format error.
 **Question.** On Apple silicon, how does the Percolator stage run?
 
 **Facts.** Comet publishes native ``aarch64`` and ``x86-64`` macOS builds.
+*Corrected 2026-10-05: false.* ``comet.macos.exe`` is arm64 like
+``comet.aarch64.macos.exe`` (Mach-O CPU type ``0x0100000C``) in 2026.02.2 and
+2026.03.0 alike. Nothing in this decision changes for Apple silicon; Intel
+Macs are ``D-011``.
 Percolator's XML-capable macOS artefacts are ``x86-64`` only; its 3.09 portable
 macOS archive is not XML-capable.
 
@@ -897,3 +901,42 @@ package (``handoffs/COMET-2026-03-BRIEF.rst``) is what earns that entry.
 **What this does not authorise.** No fact about 2026.03.0 is taken from its
 release notes alone. Parameter counts, defaults and acceptance rules are
 established by running the real binary, as they were for 2026.02.2.
+
+----
+
+D-011 -- What an Intel Mac gets, given no Intel macOS Comet exists
+==================================================================
+
+:Status: **OPEN** -- raised 2026-10-05; blocks nothing before Phase 15/16
+:Raised: 2026-10-05, by the Comet 2026.03.0 intake work package, confirmed by
+   tier 1 from the upstream files' headers
+:Blocks: the *macOS x86-64* release-target row (tier 2, best effort, not
+   release-blocking); Phase 15's version matrix and Phase 16's release notes
+:Owner: Project owner
+
+**Question.** Comet's ``comet.macos.exe`` is an arm64 binary, as is
+``comet.aarch64.macos.exe``, in 2026.02.2 and 2026.03.0 alike: upstream has
+never published an Intel macOS Comet. An arm64 binary cannot run on an Intel
+Mac (Rosetta 2 only translates the other way). What does CometGUI promise
+Intel Mac users?
+
+**What is wrong today.** Phase 05's manifest carries a 2026.02.2 row labelled
+macOS x86-64 that points at the arm64 file. On an Intel Mac the product's
+runtime probe (``R-PLAT-02``/``R-PLAT-03``) should refuse it as a
+wrong-architecture binary rather than run it, but that has never been executed
+on an Intel Mac. The intake did not add a 2026.03.0 row for it and left the
+2026.02.2 row unchanged, correctly, pending this decision.
+
+**Options.**
+
+A. **Intel Macs get no managed Comet.** Remove the false row; on Intel macOS
+   the Tool Manager offers local-binary registration only (a Comet the user
+   built), and says why. Cheapest and honest; the platform stays tier 2.
+B. **Drop Intel macOS from release 1** entirely, alongside Linux aarch64.
+C. **Build Comet from source for Intel macOS** in CI. Contradicts the
+   project's no-build-from-source stance for managed tools and adds a build
+   the project must maintain.
+D. **Ask upstream** (UWPR/Comet) for an x86-64 macOS asset; combinable with A.
+
+**Recommendation.** A, plus D. It costs one manifest row and one diagnostic,
+and the 2026.02.2 row is false whatever is chosen.
