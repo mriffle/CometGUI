@@ -241,7 +241,8 @@ Run serially, one fresh agent each, in this order.
        4, gate 8, and a migrated file with an unresolved ``NEEDS_ATTENTION``
        blocking Run until resolved.
      - AC-PAR-07, -08; R-PARAM-13; gates 3, 4, 8
-     -
+     - **Accepted after one rework** 2026-10-05, ``8993cfb``, ``6e3b67a``,
+       ``26430e2``; :ref:`p07w-u7`.
    * - 8
      - **Falsifiability harness** ``scripts/verify-param-ui-gates.sh``,
        registered additively in ``scripts/verify-all-gates.sh``: each of the
@@ -630,6 +631,65 @@ What I ran (2026-10-05):
 No test reads a file outside its module (the gate-1 expected file is a
 ``cometgui-app`` test resource). Unverified: the native file dialogs (never
 opened headless); the gate-1 file holds a Linux path.
+
+.. _p07w-u7:
+
+Unit 7 -- views part 2 and gate tests 3, 4, 8 (``8993cfb``, ``6e3b67a``, ``26430e2``)
+-------------------------------------------------------------------------------------
+
+Agent: fresh tier-3 agent (resumed once for the rework below).
+
+Built (``org.cometgui.ui.controls.params``): ``PresetControl`` (Essentials'
+preset placeholder filled: preview rows with check boxes, the release the
+preset was made for, compatibility problems, Apply all / Apply selected /
+Cancel), ``ExpertPane`` (Expert placeholder filled: canonical text, draft with
+per-line kind and diagnostics in words beside the colours, focusable
+diagnostics, diffs against defaults / a preset / last save, unknown list,
+apply-then-confirm), ``ParameterSearchPane`` (query, five filters, "why"
+per hit, activation opens the field in Advanced), ``ImportControl`` (migrate /
+switch release / read as selected / nothing), ``MigrationReviewPane``,
+``EnzymeTableEditor`` (custom rows in Advanced). ``UiIds`` +47 constants, the
+two placeholders removed; pins 317 -> 382. Gate tests: ``PresetPreviewUiTest``
+(3), ``ExpertRawEditUiTest`` (4), ``ParameterSearchUiTest`` (8),
+``MigrationReviewBlocksRunUiTest`` (fixture CONSTRUCTED from the real 2026.02.2
+``-q`` file, line 53 only: ``variable_mod01 = 15.9949 M 0 3 2 4 0 0.0``).
+Gaps the agent named (accepted, recorded in the handoff): presets are applied
+from Essentials only; no user presets are offered; the R-PARAM-06 warning on
+"read as the selected release" is tested at view-model level only.
+
+**Rework (rejected: gate 4's test could not see a reset).** My injection --
+``ExpertViewModel.apply()``'s failure branch calling
+``session.newConfiguration(session.release())`` -- left
+``ExpertRawEditUiTest`` 4/4 green: the test started from the defaults, which a
+reset reproduces. ``26430e2`` (tests only) moves the configuration away from
+the defaults first (typed bounds and enzyme, a preset's fragment bins, a
+``^`` slot on 2026.03.0) and asserts every value, origin and canonical line
+after the refusal; the same hardening for the preset Cancel and the import
+offer.
+
+What I ran (2026-10-05):
+
+* Read the diff (view classes bind only; no parsing or rule).
+* ``mvn -B -o -pl cometgui-app -am verify -Dtest='org.cometgui.ui.**,org.cometgui.app.**' ...``
+  (before the test-only rework): ui 812 / 0 failures, view-model coverage
+  met; app 168 / 0 failures / 1 skipped. ``--only shell``: 30 controls in
+  305s.
+* Injection 7b (production): ``PresetControl``'s Cancel calls
+  ``presets.applyAll()`` -- red: ``PresetPreviewUiTest.previewCancelAndApplyASubset:
+  cancelling changes nothing``.
+* Injection 7c (production): alias matching removed from
+  ``ParameterSearchViewModel`` -- red: ``ParameterSearchUiTest.findsByEachAttribute:
+  by alias (3 failures)``.
+* Injection 7a (production): a failed raw apply resets the configuration --
+  **green before the rework**; after it, red: ``ExpertRawEditUiTest
+  .aFailedParseChangesNothing: a draft that does not parse (3 failures)`` and
+  ``theCaretDependsOnTheRelease: Comet 2026.02.2 refuses the ^ at line 27 (4
+  failures)``. The agent's own version-blind injection (Expert parsing every
+  draft as the first offered release) is recorded red in its report.
+* All restored; ``sha256sum -c`` OK. After the rework, the three touched gate
+  classes run clean: 8 tests, 0 failures.
+
+No test reads a file outside its module.
 
 Rejections and rework
 =====================
