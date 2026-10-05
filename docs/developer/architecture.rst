@@ -370,6 +370,16 @@ text, with the phase numbers read from ``phases/index.rst``).
 ``controls`` holds ``UiIds``, ``AccessibleControls``, ``StageStepper`` and, under
 ``controls/derived/``, ``ConsolePane``.
 
+Since Phase 07 both have a ``params`` subpackage for the Comet parameter editor
+(decision P7-4): ``view.params`` holds ``CometParametersView`` and the two
+levels it builds, ``EssentialsView`` and ``AdvancedView``; ``controls.params``
+holds the editor's controls -- ``FieldControl`` (one parameter, any kind),
+``VariableModEditor``, ``EnzymeTableEditor``, ``DecoySourceControl``,
+``SpectrumInputsControl``, ``PresetControl``, ``ExpertPane``,
+``ParameterSearchPane``, ``ImportControl``, ``MigrationReviewPane``,
+``ValidationSummaryPane`` and the Run section's ``RunControl``. See
+`The Comet parameter editor as built`_.
+
 ``UiIds`` lives in ``controls`` rather than ``view`` on purpose: both packages
 set identifiers, and putting it here makes the dependency run one way --
 ``view`` composes ``controls`` -- instead of making the two point at each other.
@@ -437,6 +447,76 @@ while the gated package rotted underneath it.
 Work unit 6 added seventeen files of views and controls and left those package
 counters unchanged, which is the evidence that the views did not dilute the
 gated package.
+
+The Comet parameter editor as built
+===================================
+
+Phase 07 built the editor the user pages describe (:doc:`../comet_parameters`,
+:doc:`../variable_modifications`, :doc:`../comet_parameter_presets`). Its design
+decisions, P7-1 to P7-10, are recorded in ``handoffs/PHASE-07-worklog.rst``;
+this section is where they landed in the code.
+
+**One model, one report.** The editor's state is one ``ParameterSession``
+(``org.cometgui.ui.viewmodel.params``): an immutable ``CometParameters`` from
+``cometgui-params-comet``, the selected release, the migration under review if
+any, and one ``ValidationReport``. Every edit is a model operation --
+``withText(name, text, USER)``, a preset's ``applySelected``, a raw draft read
+by the model's parser, ``SchemaMigration`` -- and a refused edit's message is
+the model's own. Every finding shown anywhere (at a field, in the summary, in
+the Run section, in the search filters) comes from that one report, which
+``MigrationReview.validate`` produces so that an unresolved migration entry is
+an ERROR like any other (decision P7-3; the model side is
+:ref:`dev-comet-parameter-migration-review`). The session replaces model,
+report and review together in one ``State`` before any property fires, so a
+listener never reads a half-published release switch. The ninth layering rule
+above (``UiThroughTheModelRule``) shuts the UI's doors to the parser's line
+reader, the value codecs, ``Numbers`` and ``java.util.regex``.
+
+**Everything is per release.** Field view-models are built from
+``CuratedMetadata.parameter(name, version)`` for the selected release, so
+choices, defaults, help, inline comments and the residue alphabet are that
+release's; each release starts from its own bundled ``comet -q`` set
+(:ref:`dev-comet-parameter-release-defaults`). Which releases are offered is
+not written anywhere in the UI: ``ParameterEditorWiring`` in ``cometgui-app``
+offers a release where the shipped artefact manifest publishes Comet at that
+version, the metadata describes it and the model bundles its starting set,
+newest first -- today 2026.03.0 (the default) and 2026.02.2. The 2024.01.0
+migration fixture is described by the metadata but never offered.
+
+**Every adopted configuration has its outputs enforced.** New, imported,
+raw-applied, preset-applied and migrated models all pass through
+``withWorkflowEnforcedOutputs()``; the lock's reason is
+``WorkflowOutputs.stageNeeding``. Which stages are enabled is an input
+(``StageSwitches``), all enabled until Phases 11 and 12 can switch one off.
+
+**Run readiness.** ``RunReadinessViewModel`` gives the Run control its disabled
+state and its reasons in two halves: the parameters' (every error, every edit
+the model refused, every unresolved migration entry) and the workflow engine's,
+which until Phase 08 always says the engine is not built, so the Run button is
+never a control that pretends.
+
+**The composition root.** ``cometgui-app``'s ``ParameterEditorWiring`` builds
+the session and the editor over three seams a GUI test fills: the build
+identity a saved file's header names (``BuildIdentityResource``, one
+Maven-filtered properties file), the file chooser (``FxFileChooser``, with a
+dialog seam; the GUI tests script it instead), and the hash service a saved
+file is hashed with once, on disk (``R-PARAM-12``).
+
+**Stable identifiers and GUI tests.** Every control a test reaches has an
+identifier from ``UiIds`` -- per parameter, ``ess-`` or ``adv-`` and Comet's own
+name -- pinned as a hand-typed literal in ``StableIdentifierPinTest``. The
+exit-gate GUI tests drive the launched application in ``cometgui-app``
+(``org.cometgui.app.gui``) through ``FxUiDriver``, and
+``scripts/verify-param-ui-gates.sh`` proves each gate item fails on a defect
+it exists to catch (:ref:`dev-param-ui-falsifiability`).
+
+**What the views do not use.** ``IonSeriesViewModel`` and
+``StaticModsViewModel`` exist and are tested, but no view is built on them
+today: the ion series are one ``FieldControl`` check box per series, and the
+static modifications one ``FieldControl`` per residue and terminus, so there is
+no static-modification table with a name column. (A range is one
+``FieldControl`` whose two text fields commit together through
+``RangesViewModel``.)
 
 The injection seams (``R-PROC-01``)
 ===================================

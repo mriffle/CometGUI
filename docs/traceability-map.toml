@@ -139,16 +139,58 @@ method = "unmodelled"
 note = "Phase 06. A declared parameter with no metadata is UNMODELLED, named, with its line."
 
 [[ac."AC-PAR-03".evidence]]
-kind = "planned"
-phase = "07"
+kind = "test"
+class = "org.cometgui.app.gui.EssentialsTrypticSearchUiTest"
+method = "essentialsConfiguresATrypticSearch"
+note = "Phase 07, gate item 1. Through the launched application, a TMT tryptic DDA search on Comet 2026.03.0 is configured with Essentials controls only (Advanced and Expert never shown) and saved; the saved file equals the checked-in, hand-reviewed expected canonical file byte for byte."
+
+[[ac."AC-PAR-03".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.params.EssentialsAndAdvancedTest"
+method = "essentialsEqualsTheMetadataSet"
+note = "Phase 07. On each offered release the curated, task-ordered Essentials groups hold exactly the metadata ESSENTIALS set, so the two cannot drift apart."
 
 [[ac."AC-PAR-04".evidence]]
-kind = "planned"
-phase = "07"
+kind = "test"
+class = "org.cometgui.app.gui.ParameterControlsAccessibilityUiTest"
+method = "theDefaultRelease"
+note = "Phase 07. On Comet 2026.03.0 the launched Advanced level is walked category by category: all 118 parameters the release models have a named control, the count typed out."
+
+[[ac."AC-PAR-04".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.ParameterControlsAccessibilityUiTest"
+method = "theOlderRelease"
+note = "Phase 07. The same walk on Comet 2026.02.2: 118 parameters, each with a named control on Advanced."
+
+[[ac."AC-PAR-04".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.params.EssentialsAndAdvancedTest"
+method = "advancedHoldsEveryParameterOnce"
+note = "Phase 07. On each offered release Advanced holds every modelled parameter exactly once, in the fourteen categories the specification lists, in its order."
 
 [[ac."AC-PAR-05".evidence]]
-kind = "planned"
-phase = "07"
+kind = "test"
+class = "org.cometgui.app.gui.VariableModificationEditorUiTest"
+method = "addEditReorderRemove"
+note = "Phase 07, gate item 2. Through the launched application and both drivers: a modification is added, edited (count, residue, mass), moved and removed in the slot editor, the serialised tuple typed out after each step."
+
+[[ac."AC-PAR-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.VariableModificationEditorUiTest"
+method = "theDefaultReleaseOffersProteinTermini"
+note = "Phase 07. Comet 2026.03.0 offers the ^ and $ protein termini and the protein N-terminal acetyl preset written with ^."
+
+[[ac."AC-PAR-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.VariableModificationEditorUiTest"
+method = "theOlderReleaseOffersPeptideTerminiOnly"
+note = "Phase 07. Comet 2026.02.2 offers n and c only (R-PARAM-13), and no preset it cannot write."
+
+[[ac."AC-PAR-05".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.params.VariableModsViewModelTest"
+method = "slotsAndParts"
+note = "Phase 07. On each offered release the editor has fifteen slots, each with all ten parts of the release's tuple layout and every residue letter."
 
 [[ac."AC-PAR-06".evidence]]
 kind = "test"
@@ -169,20 +211,94 @@ method = "reported"
 note = "Phase 06. Each parse, before and after a write, reports each unknown parameter by name and line."
 
 [[ac."AC-PAR-07".evidence]]
-kind = "planned"
-phase = "07"
+kind = "test"
+class = "org.cometgui.app.gui.ExpertRawEditUiTest"
+method = "aFailedParseChangesNothing"
+note = "Phase 07, gate item 4. Through the launched application: a raw draft that fails to parse leaves every typed value, origin and canonical line unchanged and names the offending line; a draft that parses is applied only after confirmation and is then the canonical text."
+
+[[ac."AC-PAR-07".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.ExpertRawEditUiTest"
+method = "theCaretDependsOnTheRelease"
+note = "Phase 07. A raw ^ residue is refused at its line on Comet 2026.02.2 and round-trips into the typed slot on 2026.03.0."
+
+[[ac."AC-PAR-07".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.params.ExpertViewModelTest"
+method = "failedParseChangesNothing"
+note = "Phase 07. On each offered release a failed raw apply leaves the very same model object in the session (R-PARAM-08)."
+
+[[ac."AC-PAR-07".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.params.ExpertViewModelTest"
+method = "confirmAdopts"
+note = "Phase 07. A draft that parses is proposed with its changes, and only confirming adopts it into the typed model."
 
 [[ac."AC-PAR-08".evidence]]
-kind = "planned"
-phase = "07"
+kind = "test"
+class = "org.cometgui.app.gui.PresetPreviewUiTest"
+method = "previewCancelAndApplyASubset"
+note = "Phase 07, gate item 3. Through the launched application: previewing a preset shows its rows and changes nothing; Cancel changes nothing, origins included; Apply selected applies exactly the ticked rows."
+
+[[ac."AC-PAR-08".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.params.PresetsViewModelTest"
+method = "previewLowLow"
+note = "Phase 07. On each offered release, previewing low-low shows its eight rows and leaves the model unchanged."
+
+[[ac."AC-PAR-08".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.params.PresetsViewModelTest"
+method = "applySubset"
+note = "Phase 07. Applying a subset applies exactly that subset, with origin PRESET."
 
 [[ac."AC-PAR-09".evidence]]
-kind = "planned"
-phase = "07"
+kind = "test"
+class = "org.cometgui.app.gui.WorkflowOutputsLockedUiTest"
+method = "essentialsOutputsCannotBeSwitchedOff"
+note = "Phase 07, gate item 5. On Essentials, neither a click, the field reset, Tab nor Space switches output_pepxmlfile or output_percolatorfile off, and the stage needing each is shown in text."
+
+[[ac."AC-PAR-09".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.WorkflowOutputsLockedUiTest"
+method = "advancedOutputsCannotBeSwitchedOff"
+note = "Phase 07. The same on Advanced, including the category reset."
+
+[[ac."AC-PAR-09".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.WorkflowOutputsLockedUiTest"
+method = "theConfigurationHoldsBothOutputsOn"
+note = "Phase 07. The saved file holds both outputs at 1."
+
+[[ac."AC-PAR-09".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.params.ParameterSessionTest"
+method = "switchingOffIsRefused"
+note = "Phase 07. The session refuses switching a required output off, with the reason, and the model is unchanged, so the lock does not rest on the view alone."
 
 [[ac."AC-PAR-10".evidence]]
-kind = "planned"
-phase = "07"
+kind = "test"
+class = "org.cometgui.app.gui.CrossParameterValidationUiTest"
+method = "aReversedPrecursorWindow"
+note = "Phase 07, gate item 6. A reversed precursor window blocks Run with the reason in text, is stated at both fields, is listed in the summary, and Tab and Enter from the summary entry reach the field."
+
+[[ac."AC-PAR-10".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.CrossParameterValidationUiTest"
+method = "aRequiredModificationWithNoSlot"
+note = "Phase 07. require_variable_mod with no slot in use, set from Advanced: the same four properties (R-PARAM-10)."
+
+[[ac."AC-PAR-10".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.MigrationReviewBlocksRunUiTest"
+method = "aMigratedEntryNeedingAttentionBlocksRun"
+note = "Phase 07 (R-PARAM-13). A real 2026.02.2 file whose variable_mod01 2026.03.0 cannot hold, imported and migrated: the entry blocks Run at its field and in the summary until the scientist accepts it."
+
+[[ac."AC-PAR-10".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.params.SummaryAndReadinessTest"
+method = "errorBlocks"
+note = "Phase 07. An error blocks Run with its reason in text; fixing it unblocks."
 
 [[ac."AC-PAR-11".evidence]]
 kind = "test"
