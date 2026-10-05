@@ -250,7 +250,7 @@ Run serially, one fresh agent each, in this order.
        one version-blind) graded on its own diagnostic, harness self-test,
        floor recorded.
      - all gate items
-     -
+     - **Accepted** 2026-10-05, ``f393195``; :ref:`p07w-u8`.
    * - 9
      - **Documentation**: ``docs/comet_parameters.rst``,
        ``docs/variable_modifications.rst``,
@@ -690,6 +690,40 @@ What I ran (2026-10-05):
   classes run clean: 8 tests, 0 failures.
 
 No test reads a file outside its module.
+
+.. _p07w-u8:
+
+Unit 8 -- the falsifiability harness (``f393195``)
+--------------------------------------------------
+
+Agent: fresh tier-3 agent. ``scripts/verify-param-ui-gates.sh``: a
+``git archive`` sandbox (``_build/paramui-gate-sandbox``, ``tools/``
+symlinked), upstream modules built once into ``_build/paramui-gate-m2``; 19
+production injections in ``cometgui-ui`` (at least two per gate item; four
+version-blind: 2v, 4v, 7v, 8v, each with the untouched release required to
+stay green where its test can show it), each anchored, proved in the bytecode
+and graded on the failing assertion's own words; control H (unchanged file,
+missing anchor, comment-only change not reaching bytecode, green graded red,
+red without its diagnostic, and unit 6's equivalent injection reported as
+``HARNESS FAILURE``); a final clean run on byte-identical bytecode.
+Registered additively in ``scripts/verify-all-gates.sh`` as ``paramui``
+(``GATE_PHASE="07"``, items 1-8, floor 66). Documented in
+``docs/developer/testing.rst``.
+
+Finding (accepted, recorded): ``ParameterSearchUiTest`` cannot see a
+release-blind help text, so 8v is graded on the view-model test
+``ParameterSearchViewModelTest.releaseHelp``; the GUI test gains a
+release-specific query in unit 9.
+
+What I ran (2026-10-05):
+
+* Read the registration diff (additive; no other harness entry changed) and
+  the harness's structure (anchoring, bytecode comparison, grading, H).
+* ``bash scripts/verify-all-gates.sh --only paramui --only docs --only
+  traceability``: ``3 control(s) passed, 0 failed, in 1344 seconds``;
+  ``paramui: 66 controls in 1283s`` (floor 66), docs 1, traceability 8.
+
+No Java changed; no test reads a file outside its module.
 
 Rejections and rework
 =====================
