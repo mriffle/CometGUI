@@ -244,7 +244,8 @@ class CometIndexRealBinaryTest {
         }
         try (Stream<Path> listed = Files.list(inputs)) {
             besideTheFasta =
-                    listed.map(path -> path.getFileName().toString()).collect(Collectors.toSet());
+                    listed.map(path -> inputs.relativize(path).toString())
+                            .collect(Collectors.toSet());
         }
     }
 
