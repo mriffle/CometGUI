@@ -229,5 +229,15 @@ class IndexCacheKeyTest {
         assertEquals(
                 "the canonical parameter text has no [COMET_ENZYME_INFO] table to key",
                 noTable.getMessage());
+        assertTrue(
+                IndexCacheKey.encoding(
+                                FASTA_SHA,
+                                "db.fasta",
+                                IndexMode.PEPTIDE,
+                                RELEASE,
+                                model,
+                                "[COMET_ENZYME_INFO]\n0.  No_enzyme 0 - -\n")
+                        .endsWith("\nenzyme 0.  No_enzyme 0 - -\n"),
+                "a table at the very start of the text is still the table");
     }
 }

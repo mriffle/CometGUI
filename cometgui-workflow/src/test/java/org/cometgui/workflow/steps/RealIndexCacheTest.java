@@ -240,6 +240,9 @@ class RealIndexCacheTest {
             Path index = first.indexFile().orElseThrow();
             // A build that never finished left an index without a marker: cleared, not trusted.
             IndexHeaders.write(index, IndexHeaders.v5(fasta.toString()));
+            // ... and read-only: an index the build did not clear away would stop Comet writing.
+            Files.setPosixFilePermissions(
+                    index, java.nio.file.attribute.PosixFilePermissions.fromString("r--------"));
             assertEquals(AttemptOutcome.SUCCEEDED, project.run(first).outcome());
             assertEquals(5, CometIndexHeaderReader.read(index).formatVersion());
             assertTrue(Files.size(index) > 1_000_000, "the real index replaced the leftover");

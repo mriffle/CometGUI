@@ -157,6 +157,10 @@ class RealIndexTest {
                     RunEvidence.finished(first.layout(), EngineStep.BUILD_COMET_INDEX),
                     "index.cache",
                     "built");
+            RunEvidence.assertDetail(
+                    RunEvidence.finished(first.layout(), EngineStep.BUILD_COMET_INDEX),
+                    "index.sha256",
+                    indexSha256);
             // Measured: a fragment-ion index search finds far fewer PSMs than the FASTA search.
             Map<String, String> validated =
                     RunEvidence.finished(first.layout(), EngineStep.VALIDATE_COMET_OUTPUTS);
@@ -320,6 +324,67 @@ class RealIndexTest {
                     RunEvidence.finished(accepted.layout(), EngineStep.VALIDATE_COMET_OUTPUTS);
             RunEvidence.assertDetail(validated, "outputs.comet-01.targets", "1807");
             RunEvidence.assertDetail(validated, "outputs.comet-01.decoys", "1747");
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "index_search_type contradicting the index mode: only a warning before the build, then"
+                    + " the built index is judged and the run fails before Comet searches")
+    void anIndexSearchTypeContradictingTheModeFailsAfterTheBuild(@TempDir Path scratch)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
+        Path root = scratch.toRealPath();
+        Path comet = RealComet.stageComet(RealComet.NEWER, root.resolve("bin/comet"));
+        Path inputs = Files.createDirectories(root.resolve("inputs"));
+        List<Path> spectra = RealComet.spectra(inputs);
+        Path fasta = RealComet.subset(inputs.resolve("subset.fasta"));
+        try (RealProject project = RealProject.create(root.resolve("project"))) {
+            SearchRequest request =
+                    new SearchRequest(
+                            RealComet.model(
+                                            RealComet.NEWER,
+                                            fasta,
+                                            DecoySource.COMET_INTERNAL_CONCATENATED,
+                                            4)
+                                    .withText("index_search_type", "0", ValueOrigin.USER),
+                            spectra,
+                            RealComet.selection(RealComet.NEWER, comet),
+                            IndexMode.FRAGMENT_ION);
+            PreRunReport readiness = project.workflow().check(project.project(), request);
+            assertFalse(readiness.blocked(), readiness::message);
+            assertEquals(
+                    List.of("index_search_type.ignored_without_idx"),
+                    readiness.validation().warnings().stream()
+                            .map(finding -> finding.rule().id())
+                            .toList());
+            PreparedRun prepared = project.prepare(request);
+            RunResult result = project.run(prepared);
+            assertEquals(AttemptOutcome.FAILED, result.outcome());
+            assertEquals(
+                    org.cometgui.workflow.state.StepState.FAILED,
+                    result.states().get(EngineStep.BUILD_COMET_INDEX));
+            String message = result.failures().get(EngineStep.BUILD_COMET_INDEX);
+            Path index = prepared.indexFile().orElseThrow();
+            assertEquals(
+                    "the index "
+                            + index
+                            + " cannot be searched with these parameters:\n-"
+                            + " [index.contradicts_search]"
+                            + " the index "
+                            + index
+                            + " records \"IndexSearchType: fragment ion index\", and Comet"
+                            + " searches an"
+                            + " existing index with what it records, so index_search_type = 0 would"
+                            + " be silently ignored; set index_search_type to 1, or rebuild the"
+                            + " index"
+                            + " from its FASTA with this search's settings",
+                    message);
+            assertEquals(1, project.runner().launchesOf(comet).size(), "the build, no search");
+            assertFalse(
+                    Files.exists(
+                            RealComet.parentOf(prepared.indexFile().orElseThrow())
+                                    .resolve("index.complete")),
+                    "a judged-out index is never marked complete");
         }
     }
 }

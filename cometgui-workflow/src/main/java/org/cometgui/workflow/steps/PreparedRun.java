@@ -78,10 +78,6 @@ public final class PreparedRun {
         this.settings = Collections.unmodifiableMap(new TreeMap<>(settings));
     }
 
-    CometRun run() {
-        return run;
-    }
-
     /**
      * The run's directory.
      *
