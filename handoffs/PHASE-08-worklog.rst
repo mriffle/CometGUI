@@ -480,7 +480,38 @@ once.
        equal to the executed file (gate 9); a version-scoped index refusal.
      - R-CMT-01..08, R-DEC-02, R-RUN-01..06; gates 1-9; AC-WF-01..05,
        AC-PRV-03, AC-PRV-04
-     -
+     - **Signed off 2026-10-06** (``e77e388`` ``DecoySource.meaning()`` in
+       params-comet, ``--only params`` 109 after it; ``e84df85``,
+       ``ee04df9``, ``5c49aba``, ``926f5b6``, ``a987bef``, ``82d0a52``).
+       Two commits used a directory pathspec; I listed their files -- only
+       ``workflow/steps`` sources and tests. ``mvn -pl cometgui-workflow -am
+       install``: rc 0, 0 ``BugInstance``; workflow **598 tests** from 51
+       fresh reports (was 527), 0 failures, 214 s. My PIT
+       ``-DtargetClasses=org.cometgui.workflow.steps.*`` (13 min): 227 = 205
+       KILLED + 22 TIMED_OUT, 0 survived. Gate tests:
+       ``RealCometRunTest`` (gates 1, 2, 3 rows, 6, 9),
+       ``RealMergeMismatchTest`` (3), ``RealDecoyBlockTest`` (4, 5, and the
+       run's own validate step), ``RealCancellationTest`` (7, whole proteome,
+       one thread), ``RealChangedInputTest`` (8), ``RealIndexTest`` (index
+       cache, and v4 refused for 2026.03.0 / accepted for 2026.02.2 in one
+       test). Real numbers: 1807/1747 and 1478/1440 target/decoy rows,
+       merged 6472. My injections, landed and restored: (1) the existing
+       ``.idx`` header no longer added to the pre-run facts --
+       ``RealIndexTest.aVersion4IndexIsRefusedForTheNewerReleaseAndAcceptedForTheOlder:277
+       Expected RunBlockedException to be thrown, but nothing was thrown``;
+       (2) the ``COMET_PARAMETERS`` fingerprint input taken from the binary's
+       digest instead of the parameter file's --
+       ``RealCometRunTest.gate6RerunPreviewAfterARealRun:352 expected:
+       <[MERGE_PIN, RUN_COMET, ...]> but was: <[]>``. (A first form of (2)
+       failed Spotless and never compiled; the harness reported ``CLASS
+       UNCHANGED`` and it is not counted.) Gate 2 note: the one changed path
+       outside the run directory is ``project/runs``'s own mtime (an entry
+       was added). Judgement calls accepted: the Phase 08 run cannot be
+       retried across a restart (in-memory ``PreparedRun``); a retry refuses
+       changed inputs and asks for a new run (R-RUN-06). Escalated as a
+       recommendation: 2026.02.2's fragment-ion v4 index built with
+       ``decoy_search = 1`` searches to **zero decoy rows** (R-DEC-04 catches
+       it after the search; a pre-run rule may be wanted).
 
    * - 7
      - **Run in the application** (``cometgui-app``, ``cometgui-ui``). The
@@ -540,6 +571,9 @@ Recorded the day a unit lands, for ``--only tests``' sandbox.
   K562 mzML and the proteome under ``scratch/fixture`` (tools tests). Already
   in the sandbox's precondition set.
 * Unit 5: none (the JDK's own ``java``, ``javax.tools`` and ``/proc/self/fd``).
+* Unit 6: both pinned Comet binaries in ``scratch/phase05/artefacts``, both
+  K562 mzML and the proteome in ``scratch/fixture``, ``manifests/tools.json``.
+  Already in the sandbox's precondition set.
 
 Deferred
 ========
