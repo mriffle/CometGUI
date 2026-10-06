@@ -17,6 +17,7 @@
 package org.cometgui.workflow.state;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -26,9 +27,11 @@ import java.util.Objects;
  * The state of a run as a whole, derived from the state of its stages.
  *
  * <p>The specification says the overall run state "shall be derived from step states", so there is
- * no setter and no stored field anywhere: {@link #deriveFrom(Map)} is the only way to obtain one,
- * and it is a pure function of the stage states it is given. A run state that could be assigned
- * independently would eventually contradict the stepper the user is looking at.
+ * no setter and no stored field anywhere: {@link #deriveFrom(Map)}, over the stepper's stages, and
+ * {@link #deriveFrom(Plan, Map)}, over a plan's engine steps, are the only ways to obtain one, and
+ * each is a pure function of the states it is given. Both apply the one precedence below. A run
+ * state that could be assigned independently would eventually contradict the stepper the user is
+ * looking at.
  *
  * <h2>The precedence, in order</h2>
  *
@@ -128,22 +131,73 @@ public enum RunState {
      */
     public static RunState deriveFrom(Map<WorkflowStage, StepState> stageStates) {
         Map<WorkflowStage, StepState> states = complete(stageStates);
-        if (anyStageIs(states, StepState.CANCEL_REQUESTED)) {
+        List<StepState> core = new ArrayList<>();
+        for (WorkflowStage stage : WorkflowStage.coreStages()) {
+            core.add(states.get(stage));
+        }
+        return derive(states.values(), core);
+    }
+
+    /**
+     * Derives the run state of a {@link Plan} from the state of each planned engine step.
+     *
+     * <p>The same precedence as {@link #deriveFrom(Map)}, documented on this type, applied to the
+     * plan's steps instead of the stepper's stages: "every stage" becomes every planned step, and
+     * "core" becomes every planned step that is not {@link EngineStep#isOptional() optional}. Every
+     * optional step maps to an optional downstream stage and every other step to a core stage, so
+     * the two readings agree.
+     *
+     * <p>This is the derivation for a run that does not plan every core stage -- a phase 08 run,
+     * which finishes without Percolator. {@link #deriveFrom(Map)} cannot serve it: it requires a
+     * state for {@link WorkflowStage#PERCOLATOR}, and the only state an unplanned stage could be
+     * given that would let the run succeed is {@code SUCCEEDED} or {@code SKIPPED}, which would be
+     * false. Here a step outside the plan has no state at all, and supplying one is refused.
+     *
+     * @param plan the plan the run executes
+     * @param stepStates a state for every planned step, and for no other
+     * @return the derived run state, never {@code null}
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws IllegalArgumentException if a planned step has no state, naming every such step in
+     *     plan order, or a step outside the plan has one, naming those
+     */
+    public static RunState deriveFrom(Plan plan, Map<EngineStep, StepState> stepStates) {
+        StageProjection.checkStates(plan, stepStates);
+        List<StepState> every = new ArrayList<>();
+        List<StepState> core = new ArrayList<>();
+        for (EngineStep step : plan.steps()) {
+            StepState state = stepStates.get(step);
+            every.add(state);
+            if (!step.isOptional()) {
+                core.add(state);
+            }
+        }
+        return derive(every, core);
+    }
+
+    /**
+     * The precedence documented on this type, over every state and the core states.
+     *
+     * @param every the state of everything the run contains
+     * @param core the states of its core part
+     * @return the run state
+     */
+    private static RunState derive(Collection<StepState> every, Collection<StepState> core) {
+        if (every.contains(StepState.CANCEL_REQUESTED)) {
             return CANCEL_REQUESTED;
         }
-        if (anyStageIsActive(states)) {
+        if (anyIsActive(every)) {
             return RUNNING;
         }
-        if (everyStageIsPending(states)) {
+        if (everyIsPending(every)) {
             return NOT_STARTED;
         }
-        if (anyCoreStageIs(states, StepState.FAILED)) {
+        if (core.contains(StepState.FAILED)) {
             return FAILED;
         }
-        if (anyCoreStageIs(states, StepState.CANCELLED)) {
+        if (core.contains(StepState.CANCELLED)) {
             return CANCELLED;
         }
-        if (anyCoreStageIsUnfinished(states)) {
+        if (anyIsUnfinished(core)) {
             return RUNNING;
         }
         return SUCCEEDED;
@@ -179,17 +233,8 @@ public enum RunState {
         return states;
     }
 
-    private static boolean anyStageIs(Map<WorkflowStage, StepState> states, StepState wanted) {
-        for (StepState state : states.values()) {
-            if (state == wanted) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean anyStageIsActive(Map<WorkflowStage, StepState> states) {
-        for (StepState state : states.values()) {
+    private static boolean anyIsActive(Collection<StepState> states) {
+        for (StepState state : states) {
             if (state.isActive()) {
                 return true;
             }
@@ -197,8 +242,8 @@ public enum RunState {
         return false;
     }
 
-    private static boolean everyStageIsPending(Map<WorkflowStage, StepState> states) {
-        for (StepState state : states.values()) {
+    private static boolean everyIsPending(Collection<StepState> states) {
+        for (StepState state : states) {
             if (!state.isPending()) {
                 return false;
             }
@@ -206,18 +251,9 @@ public enum RunState {
         return true;
     }
 
-    private static boolean anyCoreStageIs(Map<WorkflowStage, StepState> states, StepState wanted) {
-        for (WorkflowStage stage : WorkflowStage.coreStages()) {
-            if (states.get(stage) == wanted) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean anyCoreStageIsUnfinished(Map<WorkflowStage, StepState> states) {
-        for (WorkflowStage stage : WorkflowStage.coreStages()) {
-            if (!states.get(stage).isTerminal()) {
+    private static boolean anyIsUnfinished(Collection<StepState> states) {
+        for (StepState state : states) {
+            if (!state.isTerminal()) {
                 return true;
             }
         }
