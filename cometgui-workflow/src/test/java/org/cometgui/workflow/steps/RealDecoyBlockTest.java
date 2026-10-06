@@ -103,7 +103,9 @@ class RealDecoyBlockTest {
     private static void assertBlockedBeforeComet(SearchRequest request, String expected)
             throws IOException {
         PreRunReport readiness = project.workflow().check(project.project(), request);
-        assertTrue(readiness.blocked());
+        assertTrue(
+                readiness.blocked(),
+                () -> "the decoy configuration did not block the run: " + readiness.message());
         assertEquals(List.of(), readiness.problems());
         assertEquals(expected, readiness.message());
         RunBlockedException blocked =
