@@ -297,7 +297,23 @@ once.
        Limelight q cutoff -> conversion and upload only); a cycle or an
        undeclared input is rejected; PIT on the new classes.
      - R-RUN-01; gate 6; AC-WF-04
-     -
+     - **Signed off 2026-10-06** (``ea174c5``). Diff read (30 files,
+       ``workflow.state`` only; ``RunState`` refactored onto one precedence,
+       old tests untouched). Tests: 13 fresh reports, **328 run, 0
+       failures** (was 133). PIT ``-DtargetClasses=org.cometgui.workflow.state.*``:
+       **234/234 KILLED**; census 20 compiled, 16 mutated, the 4 unmutated
+       are ``RerunDecision``, ``StepKind``, ``ValueType`` (constant enums) and
+       ``StepFingerprint`` (record). My injections, each landed (anchor gone,
+       class hash changed) and restored by ``sha256sum -c``: (1) ``run-percolator``
+       no longer declaring ``PERCOLATOR_SETTINGS`` -- 4 failures incl.
+       ``RerunPreviewTest.assertSets:107 re-executed ==> expected: <[...,
+       RUN_PERCOLATOR]> but was: <[]>``; (2) the ``merge-pin -> run-percolator``
+       edge deleted -- 10 failures incl. scenario (d) ``but was: <[RUN_COMET,
+       VALIDATE_COMET_OUTPUTS, MERGE_PIN, FINALISE_PROVENANCE, ...]>``.
+       Accepted design call: PREPARATION steps (validate, resolve x2, hash
+       inputs) run when needed and never invalidate downstream -- without it
+       scenario (b) would rerun Comet. Recorded fingerprints must be those of
+       steps that SUCCEEDED (units 2, 5 honour it).
 
    * - 2
      - **Project and run storage** (``domain.project``, ``domain.run``,
