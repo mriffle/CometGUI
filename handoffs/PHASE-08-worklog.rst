@@ -440,7 +440,32 @@ once.
        ``provenance.json`` parse after cancel and failure; concurrency bound
        observed, not assumed.
      - R-CMT-05, R-RUN-02, cancellation; gates 7 (fake), 8
-     -
+     - **Signed off 2026-10-06** (``4e50009``, ``db52ab1``; 57 files, all in
+       ``cometgui-workflow``). ``mvn -pl cometgui-workflow -am install``:
+       rc 0, 0 ``BugInstance``; workflow **527 tests** from 36 fresh reports
+       (was 445), 0 failures. My PIT ``-DtargetClasses=org.cometgui.workflow.engine.*``
+       (8 threads, **29 min**): 258 = 212 KILLED + 46 TIMED_OUT, 0 survived,
+       0 no coverage (the agent's run: 214 + 44 -- the split moves with load;
+       timeouts sit in the coordination loop, ``dispatchReady``, ``invokeAll``,
+       ``cancel``, where a mutant stops a run ending; under ``build.sh``'s
+       KILLED-only scoring 82%). My injections, landed and restored: (1)
+       ``RunExecution.cancel`` no longer calling ``requestCancellation`` on
+       running stages -- ``CancellationTest.cancellingARunningStep...:98``
+       Timeout, ``aJavaStepThatChecksForCancellationEndsCancelled:252``; (2)
+       ``ReuseValidator`` treating any re-hash as equal --
+       ``RetryRevalidationTest.aRecordedInputThatChangedRefusesReuse...:165
+       expected: <false> but was: <true>`` and the stale-cache test ``:263``.
+       No ``EngineFake`` process left alive after either. Accepted: the fake
+       uses ``ProcessBuilder`` once to create a real child (a test resource
+       compiled at test time, as Phase 03's ``FakeTool``; every launch goes
+       through ``ProcessService``); two tests park until the next
+       file-system second to plant a stale cache entry (Phase 04's
+       ``awaitSettled`` justification). Interfaces for unit 6: ``StepAction``,
+       ``StepContext.invoke/invokeAll(list, threads)``, ``addDetail``; for
+       unit 7: ``WorkflowEngine.checkReuse``, ``start``, ``RunHandle.cancel``.
+       Noted for unit 6: ``run.json`` must exist before ``start``, so the
+       parameter file is written before the engine runs and the serialise
+       step verifies and hashes it.
 
    * - 6
      - **Comet steps and the real run** (``workflow.steps``). Validate
@@ -514,6 +539,7 @@ Recorded the day a unit lands, for ``--only tests``' sandbox.
 * Unit 4: ``scratch/phase05/artefacts/v2026.03.0__comet.linux.exe``, both
   K562 mzML and the proteome under ``scratch/fixture`` (tools tests). Already
   in the sandbox's precondition set.
+* Unit 5: none (the JDK's own ``java``, ``javax.tools`` and ``/proc/self/fd``).
 
 Deferred
 ========
