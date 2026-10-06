@@ -266,7 +266,9 @@ scripts/verify-all-gates.sh --only NAME`` for every harness that reads what
 changed (``docs`` and ``traceability`` for documentation, ``quality`` for
 architecture rules, ``params`` whenever ``cometgui-params-comet`` is touched,
 ``paramui`` whenever ``cometgui-ui`` is). Injection scripts live in a private
-scratch subdirectory per unit.
+scratch subdirectory per unit. **Added after unit 3:** a per-module ``mvn
+install`` (with tests) through every module the unit touched, because the
+harnesses run PIT and never ``verify``, and so cannot see SpotBugs.
 
 Work units
 ==========
@@ -363,7 +365,35 @@ once.
        contradicting the search refused; ``--only params`` green with its
        floor.
      - R-DEC-01..03, R-PARAM-13, the index check; gates 4, 5 (rule half)
-     -
+     - **Signed off 2026-10-06 after one rework round** (``c4d7be4``,
+       ``097b2ac``; my repair ``028ff7e``; rework ``46443dc``). Fact types in
+       ``domain.params``; ``FastaDecoyScanner`` and ``CometIndexHeaderReader``
+       in ``tools.comet``; ``FastaDecoyRule``, ``IndexCompatibilityRule`` and
+       ``CometValidator.validate(model, PreRunFacts)`` in params-comet;
+       readable index formats are data (``indexFormats``: 2026.03.0 ``[5]``,
+       2026.02.2 ``[4]``, 2024.01.0 ``[]``, each measured on the real
+       binaries). Tests, fresh XML: domain 1139, tools 318 (was 232),
+       params-comet 2093 (was 1995), process 274, 0 failures. PIT:
+       ``domain.params.*`` 44/44; tools readers 123/123; params-comet new
+       rules + ``IndexFormats`` + ``CometValidator`` 180/180. My injections,
+       landed and restored: (1) **version-blind** -- format judged ``< 4``
+       for every release: ``IndexCompatibilityRulesTest.formatByRelease:105
+       expected: <INDEX_FORMAT_UNREADABLE> but was: <INDEX_OPTION_UNRECORDED>``;
+       (2) "no decoys anywhere" only for an empty FASTA:
+       ``FastaDecoyRulesTest.noDecoysAnywhere:67 expected exactly one
+       finding: ValidationReport[findings=[]]``. **Rejected first:** my
+       ``install`` found SpotBugs failing the build -- 1 finding in
+       cometgui-tools tests (repaired by me, ``028ff7e``) and 7 in
+       params-comet tests (returned; fixed at root, no exclusion,
+       ``46443dc``). The agent's gates (``--only params`` 109) run PIT, not
+       ``verify``, so cannot see SpotBugs; from unit 4 every brief requires a
+       per-module ``install``. After rework: ``mvn -pl cometgui-workflow -am
+       install`` rc 0, 0 ``BugInstance`` in all eight modules; ``--only
+       params`` 109 (agent, after the rework commit). Judgement call
+       accepted: ``index_search_type`` contradicting the index's type is an
+       ERROR, stricter than either binary. Residue for unit 8:
+       ``docs/comet_parameters.rst`` still says decoy counting "arrives with
+       the workflow".
 
    * - 4
      - **Comet adapter** (``tools.comet``). Per-file ``ToolCommand``: binary,
@@ -444,7 +474,10 @@ once.
 Rejections and rework
 =====================
 
-None yet.
+* **Unit 3, round 1** -- SpotBugs failed ``cometgui-tools`` (1) and
+  ``cometgui-params-comet`` (7) on the unit's test code; every gate the unit
+  ran was green because none of them runs ``verify``. One repaired by me, seven
+  returned and fixed at the root. See the unit 3 sign-off.
 
 Files read outside their module by tests
 ========================================
@@ -454,6 +487,12 @@ Recorded the day a unit lands, for ``--only tests``' sandbox.
 * Unit 1: none.
 * Unit 2: no path outside the module; ``RunStoreTest`` loads
   ``cometgui-params-comet``'s committed main resources from the class path.
+* Unit 3: ``scratch/phase05/artefacts/v2026.03.0__comet.linux.exe`` and
+  ``v2026.02.2__comet.linux.exe`` (tools and params-comet tests),
+  ``scratch/fixture/UP000005640_9606.fasta`` (both),
+  ``scratch/fixture/20100614_Velos1_TaGe_SA_K562_3.mzML`` and
+  ``manifests/tools.json`` (params-comet). All were already in the
+  ``tests`` sandbox's precondition set; nothing under ``docs/``.
 
 Deferred
 ========
