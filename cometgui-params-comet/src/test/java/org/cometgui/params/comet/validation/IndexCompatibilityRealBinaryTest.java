@@ -405,7 +405,7 @@ class IndexCompatibilityRealBinaryTest {
         String pin = "";
         try (Stream<Path> listed = Files.list(directory)) {
             for (Path file : listed.toList()) {
-                if (file.getFileName().toString().endsWith(".pin")) {
+                if (file.toString().endsWith(".pin")) {
                     pin =
                             Files.readString(file, StandardCharsets.ISO_8859_1)
                                     .replace(directory.toString(), "<run>");

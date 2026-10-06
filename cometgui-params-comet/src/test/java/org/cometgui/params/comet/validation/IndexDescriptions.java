@@ -48,13 +48,13 @@ import org.cometgui.domain.run.IndexMode;
 final class IndexDescriptions {
 
     /** Where the tests say the index is. */
-    static final Path INDEX = Path.of("/project/index-cache/k1/subset.fasta.idx");
+    static final Path INDEX = Path.of("project", "index-cache", "k1", "subset.fasta.idx");
 
     /** Where the tests say the subset is. */
-    static final Path SUBSET = Path.of("/data/subset.fasta");
+    static final Path SUBSET = Path.of("data", "subset.fasta");
 
     /** Where the tests say the target-decoy FASTA is. */
-    static final Path TARGET_DECOY = Path.of("/data/target-decoy.fasta");
+    static final Path TARGET_DECOY = Path.of("data", "target-decoy.fasta");
 
     private IndexDescriptions() {}
 

@@ -49,7 +49,7 @@ class IndexCompatibilityRulesTest {
 
     private static final ToolVersion OLDER = ToolVersion.parse("2026.02.2");
 
-    private static final String FILE = "/project/index-cache/k1/subset.fasta.idx";
+    private static final String FILE = IndexDescriptions.INDEX.toString();
 
     private static ValidationReport validate(CometParameters model, CometIndexDescription index) {
         return CometValidator.standard().validate(model, PreRunFacts.none().withIndex(index));

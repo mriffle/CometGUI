@@ -47,6 +47,16 @@ class FastaDecoyRulesTest {
 
     private static final ToolVersion OLDER = ToolVersion.parse("2026.02.2");
 
+    private static final Path ONE = Path.of("d", "one.fasta");
+
+    /**
+     * A {@code null} the compiler and SpotBugs cannot see through: the refusal tests below must
+     * pass the validator a real {@code null}, as a caller holding an unset reference would.
+     */
+    private static <T> T unset() {
+        return Optional.<T>empty().orElse(null);
+    }
+
     private static ValidationReport validate(CometParameters model, FastaDecoyCensus census) {
         return CometValidator.standard().validate(model, PreRunFacts.none().withCensus(census));
     }
@@ -73,7 +83,9 @@ class FastaDecoyRulesTest {
                 "database_name");
         assertEquals(Severity.ERROR, finding.severity());
         assertEquals(
-                "decoy_search = 0 (no internal decoys) and /data/subset.fasta holds no entry whose"
+                "decoy_search = 0 (no internal decoys) and "
+                        + IndexDescriptions.SUBSET
+                        + " holds no entry whose"
                         + " accession begins with DECOY_ (0 of 1000 records): Percolator would have"
                         + " no negative examples; set decoy_search to 1 or 2 so that Comet makes"
                         + " decoys, or choose a FASTA whose decoys begin with DECOY_",
@@ -99,7 +111,9 @@ class FastaDecoyRulesTest {
         assertEquals(Severity.ERROR, finding.severity());
         assertEquals(
                 "decoy_search = 1 (Comet's internal decoys, concatenated) and"
-                        + " /data/target-decoy.fasta already holds 1000 entries whose accession"
+                        + " "
+                        + IndexDescriptions.TARGET_DECOY
+                        + " already holds 1000 entries whose accession"
                         + " begins with DECOY_ (1000 of 2000 records; the first is"
                         + " DECOY_sp|A0A075B6H9|LV469_HUMAN): Comet would make decoys of those"
                         + " decoys too, so decoys would be counted twice; set decoy_search to 0 to"
@@ -124,7 +138,9 @@ class FastaDecoyRulesTest {
                 "database_name");
         assertEquals(
                 "decoy_search = 2 (Comet's internal decoys, reported separately) and"
-                        + " /data/target-decoy.fasta already holds 1000 entries whose accession"
+                        + " "
+                        + IndexDescriptions.TARGET_DECOY
+                        + " already holds 1000 entries whose accession"
                         + " begins with DECOY_ (1000 of 2000 records; the first is"
                         + " DECOY_sp|A0A075B6H9|LV469_HUMAN): Comet would make decoys of those"
                         + " decoys too, so decoys would be counted twice; set decoy_search to 0 to"
@@ -135,9 +151,7 @@ class FastaDecoyRulesTest {
     @Test
     @DisplayName("one decoy is named in the singular")
     void oneDecoy() {
-        FastaDecoyCensus census =
-                new FastaDecoyCensus(
-                        Path.of("/d/one.fasta"), "DECOY_", 3, 1, Optional.of("DECOY_x"));
+        FastaDecoyCensus census = new FastaDecoyCensus(ONE, "DECOY_", 3, 1, Optional.of("DECOY_x"));
         Finding finding =
                 Models.only(
                         new ValidationReport(
@@ -145,7 +159,9 @@ class FastaDecoyRulesTest {
                                         validate(
                                                 Models.with(NEWER, "decoy_search", "1"), census))));
         assertEquals(
-                "decoy_search = 1 (Comet's internal decoys, concatenated) and /d/one.fasta already"
+                "decoy_search = 1 (Comet's internal decoys, concatenated) and "
+                        + ONE
+                        + " already"
                         + " holds 1 entry whose accession begins with DECOY_ (1 of 3 records; the"
                         + " first is DECOY_x): Comet would make decoys of those decoys too, so"
                         + " decoys would be counted twice; set decoy_search to 0 to use the"
@@ -212,7 +228,9 @@ class FastaDecoyRulesTest {
         FastaDecoyCensus reversed =
                 new FastaDecoyCensus(IndexDescriptions.SUBSET, "REV_", 1000, 0, Optional.empty());
         assertEquals(
-                "the decoy census of /data/subset.fasta counted accessions beginning with REV_, but"
+                "the decoy census of "
+                        + IndexDescriptions.SUBSET
+                        + " counted accessions beginning with REV_, but"
                         + " decoy_prefix = DECOY_; scan the FASTA again for decoy_prefix before"
                         + " validating",
                 assertThrows(
@@ -232,9 +250,9 @@ class FastaDecoyRulesTest {
     void nullFacts() {
         assertThrows(
                 NullPointerException.class,
-                () -> CometValidator.standard().validate(Models.enforced(NEWER), null));
+                () -> CometValidator.standard().validate(Models.enforced(NEWER), unset()));
         assertThrows(
                 NullPointerException.class,
-                () -> CometValidator.standard().validate(null, PreRunFacts.none()));
+                () -> CometValidator.standard().validate(unset(), PreRunFacts.none()));
     }
 }
