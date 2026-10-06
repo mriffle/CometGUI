@@ -22,7 +22,7 @@ import java.util.Objects;
  * A search was refused before it became a run: the pre-run check blocked it. Nothing was created --
  * no run directory, no parameter file -- and nothing was launched. {@link #report()} says why.
  */
-public class RunBlockedException extends Exception {
+public final class RunBlockedException extends Exception {
 
     private static final long serialVersionUID = 1L;
 

@@ -38,6 +38,7 @@ import org.cometgui.params.comet.model.DecoySource;
 import org.cometgui.params.comet.validation.ValidationReport;
 import org.cometgui.params.comet.writer.CanonicalParamsWriter;
 import org.cometgui.workflow.engine.ReuseCheck;
+import org.cometgui.workflow.engine.ReuseRefusedException;
 import org.cometgui.workflow.engine.RunRequest;
 import org.cometgui.workflow.state.EngineStep;
 import org.cometgui.workflow.state.Plan;
@@ -72,7 +73,8 @@ class CometWorkflowTest {
     @Test
     @DisplayName(
             "prepare records the run: identity, parameter file written once, settings, actions")
-    void prepareRecordsTheRun(@TempDir Path directory) throws Exception {
+    void prepareRecordsTheRun(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         FakeSearch fake = FakeSearch.create(directory);
         try (RealProject project = RealProject.create(fake.project())) {
             SearchRequest request =
@@ -149,7 +151,8 @@ class CometWorkflowTest {
 
     @Test
     @DisplayName("prepare with an index mode: the cache entry, the key setting, -D delivery")
-    void prepareWithAnIndexMode(@TempDir Path directory) throws Exception {
+    void prepareWithAnIndexMode(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         FakeSearch fake = FakeSearch.create(directory);
         try (RealProject project = RealProject.create(fake.project())) {
             PreparedRun prepared =
@@ -158,7 +161,7 @@ class CometWorkflowTest {
                                     DecoySource.COMET_INTERNAL_CONCATENATED, IndexMode.PEPTIDE));
             assertTrue(prepared.buildsIndex());
             Path index = prepared.indexFile().orElseThrow();
-            String key = String.valueOf(index.getParent().getFileName());
+            String key = String.valueOf(RealComet.parentOf(index).getFileName());
             assertEquals(
                     fake.project().resolve("index-cache").resolve(key).resolve("db.fasta.idx"),
                     index);
@@ -167,13 +170,14 @@ class CometWorkflowTest {
             assertEquals("command-line", prepared.settings().get("comet.database-delivery"));
             assertEquals(DatabaseDelivery.COMMAND_LINE, prepared.identity().databaseDelivery());
             assertTrue(prepared.actions().containsKey(EngineStep.BUILD_COMET_INDEX));
-            assertFalse(Files.exists(index.getParent()), "nothing is built before the run");
+            assertFalse(Files.exists(RealComet.parentOf(index)), "nothing is built before the run");
         }
     }
 
     @Test
     @DisplayName("a blocked search creates nothing; the exception carries the report")
-    void blocked(@TempDir Path directory) throws Exception {
+    void blocked(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         FakeSearch fake = FakeSearch.create(directory);
         try (RealProject project = RealProject.create(fake.project())) {
             RunBlockedException blocked =
@@ -200,7 +204,10 @@ class CometWorkflowTest {
         assertEquals("nothing blocks the run", nothing.message());
         IllegalArgumentException notBlocking =
                 assertThrows(
-                        IllegalArgumentException.class, () -> new RunBlockedException(nothing));
+                        IllegalArgumentException.class,
+                        () -> {
+                            throw new RunBlockedException(nothing);
+                        });
         assertEquals("a report that blocks nothing does not block a run", notBlocking.getMessage());
         PreRunReport problems =
                 new PreRunReport(
@@ -275,7 +282,8 @@ class CometWorkflowTest {
 
     @Test
     @DisplayName("the recorded parameters of a prepared run are the canonical bytes, in UTF-8")
-    void canonicalBytes(@TempDir Path directory) throws Exception {
+    void canonicalBytes(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         FakeSearch fake = FakeSearch.create(directory);
         try (RealProject project = RealProject.create(fake.project())) {
             PreparedRun prepared =

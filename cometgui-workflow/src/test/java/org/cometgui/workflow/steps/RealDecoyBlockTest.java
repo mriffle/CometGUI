@@ -30,6 +30,7 @@ import java.util.List;
 import org.cometgui.domain.run.AttemptOutcome;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.params.comet.model.DecoySource;
+import org.cometgui.workflow.engine.ReuseRefusedException;
 import org.cometgui.workflow.engine.RunResult;
 import org.cometgui.workflow.engine.StepTransition;
 import org.cometgui.workflow.state.EngineStep;
@@ -157,7 +158,8 @@ class RealDecoyBlockTest {
     @DisplayName(
             "inside the engine: a FASTA that gains a decoy after the run was prepared fails"
                     + " validate-configuration in VALIDATING, and no Comet starts")
-    void theRunsOwnValidateStepBlocksBeforeComet() throws Exception {
+    void theRunsOwnValidateStepBlocksBeforeComet()
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Path changing = inputs.resolve("changing.fasta");
         Files.copy(targets, changing);
         try (RealProject own = RealProject.create(scratch.toRealPath().resolve("project-engine"))) {
@@ -165,7 +167,8 @@ class RealDecoyBlockTest {
         }
     }
 
-    private static void assertValidateStepBlocks(RealProject own, Path changing) throws Exception {
+    private static void assertValidateStepBlocks(RealProject own, Path changing)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         PreparedRun prepared =
                 own.prepare(request(changing, DecoySource.COMET_INTERNAL_CONCATENATED));
         Files.writeString(

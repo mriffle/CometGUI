@@ -134,6 +134,15 @@ final class RealComet {
         return cursor;
     }
 
+    /** A file's directory, which every file these tests name has. */
+    static Path parentOf(Path file) {
+        Path parent = file.getParent();
+        if (parent == null) {
+            throw new AssertionError(file + " has no directory");
+        }
+        return parent;
+    }
+
     /** The pinned SHA-256 of a linux/x86-64 Comet release, typed out here. */
     static String pinnedSha256(String release) {
         return switch (release) {
@@ -191,7 +200,7 @@ final class RealComet {
                         + " does not exist. The mirror is gitignored; refill it by fetching the"
                         + " artefact from the URL in manifests/tools.json and checking its"
                         + " SHA-256. This test fails rather than skips.");
-        Files.createDirectories(destination.getParent());
+        Files.createDirectories(parentOf(destination));
         Files.copy(mirrored, destination, StandardCopyOption.REPLACE_EXISTING);
         Files.setPosixFilePermissions(
                 destination,
@@ -238,7 +247,7 @@ final class RealComet {
                 repaired.write(value);
             }
         }
-        Files.createDirectories(copy.getParent());
+        Files.createDirectories(parentOf(copy));
         Files.write(copy, repaired.toByteArray());
         assertEquals(lfSha256, sha256(copy), "the LF-repaired copy of " + fetched);
         return copy;
@@ -271,7 +280,7 @@ final class RealComet {
             end = text.indexOf("\n>", end + 1);
             assertTrue(end > 0, "the proteome has fewer than 1000 records");
         }
-        Files.createDirectories(destination.getParent());
+        Files.createDirectories(parentOf(destination));
         Files.write(
                 destination, (text.substring(0, end) + "\n").getBytes(StandardCharsets.ISO_8859_1));
         assertEquals(SUBSET_SHA256, sha256(destination), "the first 1000 records");

@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -38,6 +39,7 @@ import org.cometgui.provenance.manifest.FileRecord;
 import org.cometgui.provenance.manifest.ProvenanceManifest;
 import org.cometgui.provenance.manifest.ProvenanceStatus;
 import org.cometgui.provenance.manifest.ToolRecord;
+import org.cometgui.workflow.engine.ReuseRefusedException;
 import org.cometgui.workflow.engine.RunHandle;
 import org.cometgui.workflow.engine.RunResult;
 import org.cometgui.workflow.state.EngineStep;
@@ -70,7 +72,13 @@ class RealCancellationTest {
     @DisplayName(
             "gate 7: cancelling the real Comet mid-search kills it and its descendants (by pid) and"
                     + " leaves parsable logs and a cancelled provenance with partial outputs")
-    void gate7CancelTheRealCometMidSearch(@TempDir Path scratch) throws Exception {
+    void gate7CancelTheRealCometMidSearch(@TempDir Path scratch)
+            throws IOException,
+                    InterruptedException,
+                    RunBlockedException,
+                    ReuseRefusedException,
+                    java.util.concurrent.ExecutionException,
+                    java.util.concurrent.TimeoutException {
         Path root = scratch.toRealPath();
         Path comet = RealComet.stageComet(RealComet.NEWER, root.resolve("bin/comet"));
         Path inputs = Files.createDirectories(root.resolve("inputs"));

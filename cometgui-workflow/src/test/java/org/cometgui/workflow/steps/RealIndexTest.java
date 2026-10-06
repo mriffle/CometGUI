@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -47,6 +48,7 @@ import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.comet.CometIndexCommand;
 import org.cometgui.tools.comet.CometIndexHeaderReader;
 import org.cometgui.tools.process.ProcessService;
+import org.cometgui.workflow.engine.ReuseRefusedException;
 import org.cometgui.workflow.engine.RunResult;
 import org.cometgui.workflow.state.EngineStep;
 import org.junit.jupiter.api.DisplayName;
@@ -79,7 +81,8 @@ class RealIndexTest {
     @DisplayName(
             "index check: a fragment-ion run builds its index in the project's cache, searches it"
                     + " with -D, and a second run reuses the cache")
-    void indexBuiltIntoTheProjectCacheAndReused(@TempDir Path scratch) throws Exception {
+    void indexBuiltIntoTheProjectCacheAndReused(@TempDir Path scratch)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Path root = scratch.toRealPath();
         Path comet = RealComet.stageComet(RealComet.NEWER, root.resolve("bin/comet"));
         Path inputs = Files.createDirectories(root.resolve("read-only inputs"));
@@ -102,8 +105,8 @@ class RealIndexTest {
             PreparedRun first = project.prepare(request);
             assertTrue(first.buildsIndex());
             Path index = first.indexFile().orElseThrow();
-            Path cache = index.getParent();
-            assertEquals(project.project().indexCacheDirectory(), cache.getParent());
+            Path cache = RealComet.parentOf(index);
+            assertEquals(project.project().indexCacheDirectory(), RealComet.parentOf(cache));
             assertEquals(
                     first.settings().get(CometWorkflow.INDEX_KEY_SETTING),
                     String.valueOf(cache.getFileName()));
@@ -218,7 +221,7 @@ class RealIndexTest {
                     + " 2026.03.0 run, and the same file is accepted and searched by a 2026.02.2"
                     + " run")
     void aVersion4IndexIsRefusedForTheNewerReleaseAndAcceptedForTheOlder(@TempDir Path scratch)
-            throws Exception {
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Path root = scratch.toRealPath();
         Path newer = RealComet.stageComet(RealComet.NEWER, root.resolve("bin-newer/comet"));
         Path older = RealComet.stageComet(RealComet.OLDER, root.resolve("bin-older/comet"));

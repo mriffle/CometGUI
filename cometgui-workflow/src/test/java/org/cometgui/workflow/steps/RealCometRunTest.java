@@ -40,6 +40,7 @@ import org.cometgui.provenance.manifest.ProvenanceManifest;
 import org.cometgui.provenance.manifest.ProvenanceStatus;
 import org.cometgui.provenance.manifest.ToolRecord;
 import org.cometgui.workflow.engine.ReuseCheck;
+import org.cometgui.workflow.engine.ReuseRefusedException;
 import org.cometgui.workflow.engine.RunResult;
 import org.cometgui.workflow.state.EngineStep;
 import org.cometgui.workflow.state.RerunPreview;
@@ -95,7 +96,8 @@ class RealCometRunTest {
     private static long searchMillis;
 
     @BeforeAll
-    static void runTheRealSearch() throws Exception {
+    static void runTheRealSearch()
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         root = scratch.toRealPath();
         comet = RealComet.stageComet(RealComet.NEWER, root.resolve("bin/comet"));
         inputs = Files.createDirectories(root.resolve("read-only inputs"));

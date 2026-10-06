@@ -90,7 +90,7 @@ final class IndexHeaders {
 
     /** Writes a header as an index file. */
     static Path write(Path file, String header) throws IOException {
-        Files.createDirectories(file.getParent());
+        Files.createDirectories(RealComet.parentOf(file));
         return Files.writeString(file, header, StandardCharsets.US_ASCII);
     }
 }

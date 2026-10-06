@@ -19,6 +19,7 @@ package org.cometgui.workflow.steps;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,7 +60,8 @@ class RealChangedInputTest {
     private record Searched(
             RealProject project, PreparedRun run, Path comet, List<Path> spectra, Path fasta) {}
 
-    private static Searched searched(Path scratch) throws Exception {
+    private static Searched searched(Path scratch)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Path root = scratch.toRealPath();
         Path comet = RealComet.stageComet(RealComet.NEWER, root.resolve("bin/comet"));
         Path inputs = Files.createDirectories(root.resolve("inputs"));
@@ -86,7 +88,7 @@ class RealChangedInputTest {
     /** The refusal, its offer, and the offer taken: each with no Comet launched. */
     private static void assertRefusedAndOffered(
             Searched searched, Path changed, String role, String recordedSha256, String what)
-            throws Exception {
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         RealProject project = searched.project();
         String now = RealComet.sha256(changed);
         ReuseRefusedException refused =
@@ -151,7 +153,8 @@ class RealChangedInputTest {
     @DisplayName(
             "gate 8: a spectrum file changed after a successful run refuses reuse, naming the file,"
                     + " and the offered plan re-executes run-comet and downstream")
-    void gate8ChangedSpectrumFileRefusesReuse(@TempDir Path scratch) throws Exception {
+    void gate8ChangedSpectrumFileRefusesReuse(@TempDir Path scratch)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Searched searched = searched(scratch);
         try (RealProject project = searched.project()) {
             Path k4 = searched.spectra().get(1);
@@ -165,7 +168,8 @@ class RealChangedInputTest {
     @DisplayName(
             "gate 8: a FASTA changed after a successful run refuses reuse, naming the file, and the"
                     + " offered plan re-executes run-comet and downstream")
-    void gate8ChangedFastaRefusesReuse(@TempDir Path scratch) throws Exception {
+    void gate8ChangedFastaRefusesReuse(@TempDir Path scratch)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Searched searched = searched(scratch);
         try (RealProject project = searched.project()) {
             Files.writeString(

@@ -30,6 +30,7 @@ import java.util.Set;
 import org.cometgui.domain.run.AttemptOutcome;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.params.comet.model.DecoySource;
+import org.cometgui.workflow.engine.ReuseRefusedException;
 import org.cometgui.workflow.engine.RunRequest;
 import org.cometgui.workflow.engine.RunResult;
 import org.cometgui.workflow.engine.StepAction;
@@ -84,7 +85,8 @@ class RealMergeMismatchTest {
 
     @Test
     @DisplayName("gate 3: a feature-column mismatch fails the merge-pin stage, naming both files")
-    void gate3FeatureColumnMismatchFailsTheStage(@TempDir Path scratch) throws Exception {
+    void gate3FeatureColumnMismatchFailsTheStage(@TempDir Path scratch)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Path root = scratch.toRealPath();
         Path comet = RealComet.stageComet(RealComet.NEWER, root.resolve("bin/comet"));
         Path inputs = Files.createDirectories(root.resolve("inputs"));
