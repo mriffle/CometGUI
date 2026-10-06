@@ -28,9 +28,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -40,13 +37,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.LockSupport;
 import org.cometgui.domain.ports.FileHashes;
-import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.run.AttemptOutcome;
 import org.cometgui.domain.run.RunDescriptor;
 import org.cometgui.provenance.hashing.CachingHashService;
-import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.provenance.manifest.FileRecord;
 import org.cometgui.provenance.manifest.ManifestReader;
 import org.cometgui.provenance.manifest.ProvenanceManifest;
@@ -248,7 +242,7 @@ class RetryRevalidationTest {
             attempts.run();
             Path changed = fixture.spectra().get(1);
             Files.writeString(changed, CHANGED_CONTENT, StandardCharsets.UTF_8);
-            awaitSettled(changed);
+            EngineAssertions.awaitSettled(changed);
 
             // Prime the cache with the digest the file had BEFORE it changed: a stale entry for a
             // file whose every attribute the cache checks is now unchanged.
@@ -272,24 +266,6 @@ class RetryRevalidationTest {
             assertEquals(Optional.of(CHANGED_SHA256), check.mismatches().get(0).currentSha256());
             assertEquals(
                     Optional.of(SPECTRUM_2_SHA256), check.mismatches().get(0).recordedSha256());
-        }
-    }
-
-    /**
-     * Waits until the wall clock is past the second in which the file last changed, so that the
-     * hash cache will remember it ({@code CachingHashService}'s "settled" rule). This waits on an
-     * observable state -- the clock passing a computed instant -- not for a fixed time.
-     */
-    private static void awaitSettled(Path file) throws IOException {
-        FileTime modified = Files.getLastModifiedTime(file);
-        FileTime changed = (FileTime) Files.getAttribute(file, "unix:ctime");
-        Instant latest =
-                modified.toInstant().isAfter(changed.toInstant())
-                        ? modified.toInstant()
-                        : changed.toInstant();
-        Instant settled = latest.truncatedTo(ChronoUnit.SECONDS).plusSeconds(1).plusMillis(20);
-        while (Instant.now().isBefore(settled)) {
-            LockSupport.parkUntil(settled.toEpochMilli());
         }
     }
 
@@ -347,34 +323,6 @@ class RetryRevalidationTest {
                         ExecutionException,
                         TimeoutException {
             return awaitResult(fixture.engine().start(fixture.request(actions), listener));
-        }
-    }
-
-    /** A hasher that can be told to return a stale digest for one file, standing in for a lie. */
-    private static final class StaleableHasher implements HashService {
-
-        private final StreamingHashService real = new StreamingHashService();
-
-        private volatile Path liePath;
-
-        private volatile FileHashes lie;
-
-        void lieAbout(Path path, FileHashes hashes) {
-            liePath = path;
-            lie = hashes;
-        }
-
-        void stopLying() {
-            lie = null;
-        }
-
-        @Override
-        public FileHashes hash(Path path) throws IOException {
-            FileHashes told = lie;
-            if (told != null && path.equals(liePath)) {
-                return told;
-            }
-            return real.hash(path);
         }
     }
 }

@@ -20,12 +20,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -267,6 +269,55 @@ class StepContextTest {
                     failed.getMessage());
             assertFalse(Files.exists(fixture.layout().cometLogFile(2)), "comet-02 never started");
             assertEquals(List.of(), context.toolRecords());
+        }
+    }
+
+    @Test
+    void oneInvocationReturnsItsOwnResult()
+            throws IOException, InterruptedException, StepFailedException {
+        try (EngineFixture fixture = EngineFixture.create(tmp, 1)) {
+            StepContext context = context(fixture, fixture.hashes());
+            InvocationResult result =
+                    context.invoke(
+                            fixture.fake("comet-02", "exit", "0", fixture.pin(1).toString()));
+            assertEquals("comet-02", result.stageId());
+            assertEquals(0, result.exitCode());
+            assertEquals(ProvenanceStatus.COMPLETED, result.status());
+            assertEquals(fixture.layout().cometLogFile(2), result.logFile());
+        }
+    }
+
+    @Test
+    void aToolThatCannotStartCancelsTheSiblingAlreadyRunning()
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
+        try (EngineFixture fixture = EngineFixture.create(tmp, 1)) {
+            StepContext context = context(fixture, fixture.hashes());
+            Invocation hanging =
+                    fixture.fake("comet-01", "fail-after", fixture.records().toString(), "1", "0");
+            Invocation missing =
+                    new Invocation(
+                            "comet-02",
+                            fixture.fakeTool(),
+                            new ToolCommand(
+                                    List.of(tmp.resolve("no-such-tool").toString()),
+                                    fixture.layout().root(),
+                                    Map.of()));
+            // Two may run at once. comet-01 waits for a pid record that never comes, so only
+            // cancellation ends it; comet-02 cannot start at all.
+            StepFailedException failed =
+                    assertTimeoutPreemptively(
+                            Duration.ofSeconds(60),
+                            () ->
+                                    assertThrows(
+                                            StepFailedException.class,
+                                            () -> context.invokeAll(List.of(hanging, missing), 1)));
+            assertTrue(
+                    failed.getMessage().startsWith("could not start comet-02: java.io.IOException"),
+                    failed.getMessage());
+            ToolRecord sibling = context.toolRecords().get(0);
+            assertEquals(Optional.of("comet-01"), sibling.stageId());
+            assertEquals(ProvenanceStatus.CANCELLED, sibling.execution().status());
+            assertEquals(143, sibling.execution().exitCode());
         }
     }
 

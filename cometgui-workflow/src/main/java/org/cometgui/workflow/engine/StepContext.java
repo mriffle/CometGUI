@@ -330,19 +330,20 @@ public final class StepContext {
     }
 
     private Optional<RunningStage> startUnlessCancelled(Invocation invocation) throws IOException {
+        RunningStage stage = null;
         synchronized (lock) {
-            if (cancelled) {
-                return Optional.empty();
+            if (!cancelled) {
+                stage =
+                        runner.start(
+                                new InvocationTag(
+                                        invocation.stageId(),
+                                        invocation.stageId() + " (" + step.displayName() + ")"),
+                                invocation.command());
+                active.add(stage);
             }
-            RunningStage stage =
-                    runner.start(
-                            new InvocationTag(
-                                    invocation.stageId(),
-                                    invocation.stageId() + " (" + step.displayName() + ")"),
-                            invocation.command());
-            active.add(stage);
-            return Optional.of(stage);
         }
+        // Returned outside the monitor, for the reason RunExecution.advance gives.
+        return Optional.ofNullable(stage);
     }
 
     /**
@@ -371,19 +372,18 @@ public final class StepContext {
                 List.of());
     }
 
+    /**
+     * Waits for an invocation's outcome on the invocation's own waiter thread. That thread belongs
+     * to this class and nothing interrupts it; should something do so, the wait simply resumes,
+     * because the outcome always arrives -- the process service completes it when the process
+     * exits, and cancellation makes it exit.
+     */
     private static StageOutcome await(RunningStage stage) {
-        boolean interrupted = false;
-        try {
-            while (true) {
-                try {
-                    return stage.awaitOutcome();
-                } catch (InterruptedException again) {
-                    interrupted = true;
-                }
-            }
-        } finally {
-            if (interrupted) {
-                Thread.currentThread().interrupt();
+        while (true) {
+            try {
+                return stage.awaitOutcome();
+            } catch (InterruptedException resumed) {
+                // Keep waiting; see above.
             }
         }
     }

@@ -22,9 +22,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.LockSupport;
 import java.util.regex.Pattern;
 import org.cometgui.provenance.events.ProvenanceEvent;
 import org.cometgui.provenance.events.ProvenanceEventLogReader;
@@ -112,6 +116,24 @@ final class EngineAssertions {
                 last.contains(" [cometgui] stage " + stageId + " ended: exit code "),
                 () -> log + " does not end with the stage's end: " + last);
         return lines;
+    }
+
+    /**
+     * Waits until the wall clock is past the second in which the file last changed, so that the
+     * hash cache will remember it ({@code CachingHashService}'s "settled" rule). This waits on an
+     * observable state -- the clock passing a computed instant -- not for a fixed time.
+     */
+    static void awaitSettled(Path file) throws IOException {
+        FileTime modified = Files.getLastModifiedTime(file);
+        FileTime changed = (FileTime) Files.getAttribute(file, "unix:ctime");
+        Instant latest =
+                modified.toInstant().isAfter(changed.toInstant())
+                        ? modified.toInstant()
+                        : changed.toInstant();
+        Instant settled = latest.truncatedTo(ChronoUnit.SECONDS).plusSeconds(1).plusMillis(20);
+        while (Instant.now().isBefore(settled)) {
+            LockSupport.parkUntil(settled.toEpochMilli());
+        }
     }
 
     static String sha256(Path file) throws IOException {

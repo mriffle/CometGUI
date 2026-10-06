@@ -263,7 +263,12 @@ final class RunExecution implements EventRecorder {
         } catch (StepFailedException | IOException | RuntimeException failure) {
             message = String.valueOf(failure.getMessage());
         } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
+            // The engine never interrupts its own workers, so this interrupt was the action's
+            // own signal and ends with the action. It is cleared rather than re-asserted: the
+            // worker still has to hash the step's files and write run.json, and an interrupted
+            // thread's file channels close themselves (ClosedByInterruptException) -- the step's
+            // record would be lost to an interrupt nobody outside the action asked for.
+            Thread.interrupted();
             message = step.id() + " was interrupted";
         }
         conclude(step, context, succeeded, message, rerun);
@@ -275,13 +280,16 @@ final class RunExecution implements EventRecorder {
      * @return {@code false} if the step is {@code CANCEL_REQUESTED} and must not proceed
      */
     private boolean advance(EngineStep step, StepState next) {
+        boolean proceed;
         synchronized (lock) {
-            if (states.get(step) == StepState.CANCEL_REQUESTED) {
-                return false;
+            proceed = states.get(step) != StepState.CANCEL_REQUESTED;
+            if (proceed) {
+                transition(step, next, Map.of());
             }
-            transition(step, next, Map.of());
-            return true;
         }
+        // Returned outside the monitor: a return inside a synchronized block compiles to a shape
+        // PIT reports as an unkillable "replaced return value" mutation of that very statement.
+        return proceed;
     }
 
     /**
