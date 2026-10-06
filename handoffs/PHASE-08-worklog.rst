@@ -408,7 +408,25 @@ once.
        has exactly one header and the summed rows; a mismatch names the
        files; zero decoy rows fails naming the decoy configuration.
      - R-CMT-03, 04, 06, 07 (command), R-DEC-04; gate 3; AC-WF-01 (merge)
-     -
+     - **Signed off 2026-10-06** (``60117e0``, 24 files in ``tools.comet``).
+       ``mvn -pl cometgui-tools -am install`` with tests: rc 0, 0
+       ``BugInstance``; tools **429 tests** from 29 fresh reports (was 318), 0
+       failures. PIT over the 12 new classes: 168 = 165 KILLED + 3 TIMED_OUT
+       (read: genuine infinite loops), 0 survived. Real facts: per-file PIN
+       rows 3554 (k562_3) + 2918 (k562_4) = **6472** merged under one header;
+       ``SpecId`` carries the absolute ``-N`` path (Phase 09 must know);
+       ``-N`` with two inputs re-measured on 2026.03.0 -- still ignored, Comet
+       writes beside the input; Comet runs with an empty environment, ``LANG``
+       set anyway. My injections, landed and restored: (1) feature columns
+       compared as sets -- ``PinMergerTest.swappedColumns:175`` and
+       ``CometAdapterRealBinaryTest.swappedRealColumns:442 Expected
+       CometOutputException to be thrown, but nothing was thrown``; (2) ``-N``
+       dropped from the per-file command -- 5 failures, including the real
+       search against the read-only input directory
+       (``CometAdapterRealBinaryTest.search:171``) and
+       ``parameterFileCommands:76``. Agent's gates: ``--only quality`` 42,
+       ``--only install`` 95 (floor). Left to unit 6: validating the extra
+       ``.decoy.pep.xml`` Comet writes for ``decoy_search = 2``.
 
    * - 5
      - **Engine core** (``workflow.engine``). Executes a plan over the
@@ -493,6 +511,9 @@ Recorded the day a unit lands, for ``--only tests``' sandbox.
   ``scratch/fixture/20100614_Velos1_TaGe_SA_K562_3.mzML`` and
   ``manifests/tools.json`` (params-comet). All were already in the
   ``tests`` sandbox's precondition set; nothing under ``docs/``.
+* Unit 4: ``scratch/phase05/artefacts/v2026.03.0__comet.linux.exe``, both
+  K562 mzML and the proteome under ``scratch/fixture`` (tools tests). Already
+  in the sandbox's precondition set.
 
 Deferred
 ========
