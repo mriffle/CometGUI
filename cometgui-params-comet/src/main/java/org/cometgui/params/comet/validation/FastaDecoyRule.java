@@ -82,7 +82,7 @@ final class FastaDecoyRule {
                         + " = "
                         + source.get().decoySearch()
                         + " ("
-                        + meaning(source.get())
+                        + source.get().meaning()
                         + ") and "
                         + census.fasta();
         if (source.get() == DecoySource.FASTA_CONTAINS_DECOYS && !census.hasDecoys()) {
@@ -121,14 +121,5 @@ final class FastaDecoyRule {
                             + " to 0 to use the FASTA's own decoys, or choose a FASTA of targets"
                             + " only");
         }
-    }
-
-    /** What a decoy source means, in words. */
-    static String meaning(DecoySource source) {
-        return switch (source) {
-            case FASTA_CONTAINS_DECOYS -> "no internal decoys";
-            case COMET_INTERNAL_CONCATENATED -> "Comet's internal decoys, concatenated";
-            case COMET_INTERNAL_SEPARATE -> "Comet's internal decoys, reported separately";
-        };
     }
 }

@@ -33,21 +33,35 @@ public enum DecoySource {
      * {@code decoy_search = 0}: Comet generates no decoys, so the FASTA must already contain them.
      * Whether it does is checked against the file before the run ({@code R-DEC-02}), not here.
      */
-    FASTA_CONTAINS_DECOYS(0),
+    FASTA_CONTAINS_DECOYS(0, "no internal decoys"),
 
     /** {@code decoy_search = 1}: Comet's internal decoys, reported together with the targets. */
-    COMET_INTERNAL_CONCATENATED(1),
+    COMET_INTERNAL_CONCATENATED(1, "Comet's internal decoys, concatenated"),
 
     /** {@code decoy_search = 2}: Comet's internal decoys, reported separately. */
-    COMET_INTERNAL_SEPARATE(2);
+    COMET_INTERNAL_SEPARATE(2, "Comet's internal decoys, reported separately");
 
     /** The parameter that holds the decoy source. */
     public static final String PARAMETER = "decoy_search";
 
     private final int decoySearch;
 
-    DecoySource(int decoySearch) {
+    private final String meaning;
+
+    DecoySource(int decoySearch, String meaning) {
         this.decoySearch = decoySearch;
+        this.meaning = meaning;
+    }
+
+    /**
+     * What this source means, in the words every message about a decoy configuration uses -- the
+     * pre-run decoy blocks ({@code R-DEC-02}) and the PIN's decoy check after Comet ({@code
+     * R-DEC-04}) -- so that the two can never describe one configuration differently.
+     *
+     * @return for example {@code Comet's internal decoys, concatenated}
+     */
+    public String meaning() {
+        return meaning;
     }
 
     /**

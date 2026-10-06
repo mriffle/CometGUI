@@ -63,6 +63,18 @@ class DecoyTextAndPathTest {
         }
 
         @Test
+        @DisplayName("each decoy source says what it means, in the words every decoy message uses")
+        void meanings() {
+            assertEquals("no internal decoys", DecoySource.FASTA_CONTAINS_DECOYS.meaning());
+            assertEquals(
+                    "Comet's internal decoys, concatenated",
+                    DecoySource.COMET_INTERNAL_CONCATENATED.meaning());
+            assertEquals(
+                    "Comet's internal decoys, reported separately",
+                    DecoySource.COMET_INTERNAL_SEPARATE.meaning());
+        }
+
+        @Test
         @DisplayName("the model reads and sets the source through decoy_search")
         void onTheModel() {
             CometParameters model = Models.real();
