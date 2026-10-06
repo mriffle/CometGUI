@@ -27,5 +27,12 @@
  * streams a FASTA into its decoy census ({@code R-DEC-02}), and {@code CometIndexHeaderReader},
  * which reads an existing {@code .idx} file's self-description ({@code R-CMT-07}). Both return pure
  * values of {@code org.cometgui.domain.params}, which the one validator judges.
+ *
+ * <p><strong>Phase 08 unit 4 landed the search adapter</strong>: {@code CometSearchCommands}, one
+ * command per spectrum file with {@code -N} into the run and never two inputs on one command line;
+ * {@code CometIndexCommand}, the {@code -i}/{@code -j} build through a link inside the cache;
+ * {@code CometPepXmlValidator} and {@code CometPinValidator}, the per-file output checks with
+ * {@code R-DEC-04}'s decoy check; and {@code PinMerger}, the merge into {@code merged.pin}. All PIN
+ * reading goes through the one parser, {@code PinReader}, whose rules {@code PinHeader} begins.
  */
 package org.cometgui.tools.comet;
