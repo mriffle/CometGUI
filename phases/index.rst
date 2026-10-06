@@ -56,7 +56,7 @@ authoritative for its own scope and exit gate.
      - Comet Parameter Editor UI
      - 02, 06
      - --
-     - IN PROGRESS (dispatched 2026-10-05)
+     - PASSED (signed off 2026-10-06)
    * - `08 <PHASE-08-workflow-comet.rst>`_
      - Workflow Engine and Comet Adapter
      - 03, 04, 05, 06

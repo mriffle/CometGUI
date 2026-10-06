@@ -3,22 +3,23 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-05
-:Updated by: Main orchestrator, session 10 (**Comet 2026.03.0 intake signed
-   off PARTIAL** -- :ref:`status-comet-2603-signed`; specification revision
-   13; ``D-011`` raised; **Phase 07 dispatched**)
-:Current phase: **Phase 07 -- Comet Parameter Editor UI**, dispatched
-   2026-10-05 with ``handoffs/PHASE-07-BRIEF.rst``, on the owner's instruction
-   to commit, push and start it once the intake was green, without waiting
-   for confirmation.
-:Overall: Seven phases are signed off -- 02 and 06 PASSED; 00, 01, 03, 04 and
-   05 PARTIAL. The repository, build and every quality gate exist and have each
+:Updated: 2026-10-06
+:Updated by: Main orchestrator, session 10 (**Phase 07 signed off PASSED** --
+   :ref:`status-p07-signed`)
+:Current phase: **none -- waiting for the owner.** Phase 07 is PASSED and
+   committed, **not pushed**: the owner's instruction to commit, push and
+   start the next phase covered the Comet 2026.03.0 intake and Phase 07's
+   dispatch, not what follows it. Phase 08 (Workflow engine and Comet
+   adapter) is ready and not dispatched.
+:Overall: Eight phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04
+   and 05 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (~105 minutes now) runs once per phase, at
-   the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
+   ``scripts/verify-all-gates.sh`` (about 2.5 hours since Phase 07 -- longer
+   than one background job may run, so the two are run separately) runs once
+   per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
-   :ref:`status-p06-signed`); and ``D-011``, what an Intel Mac gets now that
+   :ref:`status-p06-signed`); ``D-011``, what an Intel Mac gets now that
    Comet is known to publish no Intel macOS build (raised 2026-10-05, blocks
    nothing before Phase 15). The nightly is red **by the owner's decision**
    until Phase 15 replaces its stubs (:ref:`status-nightly-masking`).
@@ -236,8 +237,10 @@ Phase board
        upstream has no Intel macOS Comet (``D-011``).
    * - 07
      - Comet parameter editor UI
-     - IN PROGRESS
-     - Dispatched 2026-10-05 (``handoffs/PHASE-07-BRIEF.rst``).
+     - PASSED
+     - **Signed off 2026-10-06** at ``cce00b9`` on tier 1's full run (build
+       11/11, gates 14/14 including the new ``paramui``, 84 controls) and
+       three injections of its own (:ref:`status-p07-signed`).
    * - 08
      - Workflow engine and Comet adapter
      - NOT STARTED
@@ -3257,6 +3260,78 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-p07-signed:
+
+Phase 07 signed off PASSED (2026-10-06)
+=======================================
+
+Ten serial units, all accepted by the phase orchestrator; units 3, 6 and 7
+each sent back once. The orchestrator did not stall this time. Record:
+``handoffs/PHASE-07-worklog.rst`` and ``handoffs/PHASE-07-handoff.rst``.
+
+**What exists.** The Comet parameter editor in ``cometgui-ui``: Essentials,
+Advanced and Expert modes; the fifteen-slot variable-modification editor with
+release-scoped residue and terminus choices; enzyme, static-modification,
+tolerance and range controls; parameter search; presets with a reviewable diff
+and subset apply; reset at three levels; workflow-locked outputs with their
+reason; the migration review, whose unresolved ``NEEDS_ATTENTION`` entries
+block Run; validation at the field, in the summary and by keyboard. The
+``Settings`` section is removed from navigation, as decided. New harness
+``scripts/verify-param-ui-gates.sh`` (``paramui``, 84 controls, four of them
+version-blind), registered with floor 84. Additions to
+``cometgui-params-comet`` only; a new ArchUnit rule keeps parsing out of the
+UI.
+
+**Tier 1's exit-gate run**, at ``cce00b9`` on a quiet tree:
+``scripts/build.sh`` 11/11 stages in 1688 s (UI 508 tests, app 176, 0
+failures); ``scripts/verify-all-gates.sh`` 14 of 14 controls passed -- 11 in
+the first run, which tier 1's own background job then outlived (a 2-hour cap,
+not a failure), and ``install`` (95), ``params`` (109) and ``paramui`` (84,
+1698 s) in a second run on the same tree. ``tests`` took 4096 s.
+
+**Nothing weakened, checked rather than assumed:** the only POM change filters
+one named resource; ``verify-all-gates.sh`` changed only additively; no test
+was disabled or deleted; the assertions removed all belonged to the
+``Settings`` section the phase was told to remove.
+
+**Tier 1's own injections**, over the UI and application suites, each landed
+(old anchor gone), restored and verified with ``sha256sum -c``:
+
+* the modification editor offers ``^``/``$`` in every release -- 6 failures,
+  e.g. ``VariableModsViewModelTest.releaseSwitchWithAChangedReport``;
+* the migration review never has an unresolved entry -- 13 failures, e.g.
+  ``ParameterSessionTest.editsKeepTheReview``;
+* parameter errors never block Run -- 13 failures, e.g.
+  ``FieldViewModelTest.distanceBelowMinusTwo``: expected ``true`` but was
+  ``false``.
+
+Tier 1's instrument failed once first: the local Maven repository held a stale
+``cometgui-params-comet``, the UI did not compile, and zero tests ran. Caught
+because the script counts tests rather than trusting the exit code; repaired
+by installing the upstream modules before re-running. Shape 6 again, in tier
+1's hands.
+
+**Grade: PASSED.** All eight items met. Honest limits the gate does not ask
+for: native file dialogs never open under the headless toolkit; only Linux has
+run. Items 5 and 6 are met in their present form: no downstream stage can be
+disabled until Phases 11/12 exist, so the outputs are always locked; and Run is
+also always disabled by "engine not built" until Phase 08, so the gate proves
+the *parameter* reasons block it (the third injection above shows that is
+tested independently).
+
+**Residue and questions carried forward:**
+
+* **For the owner (a scientist's call):** the common-modification presets'
+  non-mass fields -- maximum count 3, Phospho with **no** neutral loss, both
+  Acetyl forms on 2026.03.0 -- were chosen by the agent from Comet
+  documentation examples. Worth a look before users rely on them.
+* The Essentials expected file used by gate item 1 holds a Linux path; Phase
+  15's cross-platform run must parameterise it.
+* Presets apply from Essentials only; no user presets exist yet.
+* The handoff's "ui 822" test count comes from a differently filtered command;
+  the canonical build runs 508 UI tests. A reporting discrepancy, not a defect.
+* ``paramui`` adds about 28 minutes to every full gate run.
+
 .. _status-comet-2603-signed:
 
 Comet 2026.03.0 intake signed off PARTIAL (2026-10-05)
@@ -3708,6 +3783,11 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-06
+     - 07
+     - **Phase 07 signed off PASSED** at ``cce00b9`` (build 11/11, gates 14/14,
+       three tier-1 injections). Committed, not pushed. See
+       :ref:`status-p07-signed`.
    * - 2026-10-05
      - 06+, 07
      - **Comet 2026.03.0 intake signed off PARTIAL** (build 11/11, gates
