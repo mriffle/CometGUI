@@ -79,6 +79,8 @@ public final class ConstructedVersions {
                         + " \"severity\": \"WARNING\", \"source\": \"https://example.org/d\"},"
                         + " {\"rule\": \"index_search_type.ignored_without_idx\","
                         + " \"severity\": \"OFF\", \"source\": \"https://example.org/i\"}],"
+                        + " \"indexFormats\": {\"readable\": [], \"source\":"
+                        + " \"https://example.org/x\"},"
                         + " \"valueMigrations\": ["
                         + migrations
                         + "]},\n";

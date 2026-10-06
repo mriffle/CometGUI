@@ -22,6 +22,7 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.cometgui.domain.params.PreRunFacts;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ParameterEntry;
 import org.cometgui.params.comet.schema.ValidatorId;
@@ -42,9 +43,15 @@ import org.cometgui.params.comet.schema.ValidatorId;
  * <p>Every {@link ValidatorId} must have an implementation: a validator built without one is
  * refused, so a validator id the metadata names can never silently go unchecked.
  *
- * <p>What this does not check, because it needs the file system or data and belongs to the workflow
- * (Phase 08): that the database and spectra exist and are readable, that output paths are writable,
- * whether the FASTA already holds decoys ({@code R-DEC-02}) and whether the PIN holds both targets
+ * <p>File-system facts are judged here too, but taken as data ({@link PreRunFacts}, design
+ * decisions P8-7 and P8-8), so that Run readiness and the workflow's validate step block on one
+ * report: the FASTA's decoy census ({@code R-DEC-02}: no decoys anywhere, or decoys twice) and the
+ * self-description of an existing index Comet would search (an index format the release cannot
+ * read, or recorded options the search contradicts). {@link #validate(CometParameters,
+ * PreRunFacts)} takes them; {@link #validate(CometParameters)} judges the model alone.
+ *
+ * <p>What this does not check, because it belongs to the workflow: that the database and spectra
+ * exist and are readable, that output paths are writable, and whether the PIN holds both targets
  * and decoys ({@code R-DEC-04}). Path parameters are checked for form only.
  */
 public final class CometValidator {
@@ -97,13 +104,30 @@ public final class CometValidator {
     }
 
     /**
-     * Validates a model.
+     * Validates a model on its own, with no file-system facts.
      *
      * @param model the model
      * @return every finding
      */
     public ValidationReport validate(CometParameters model) {
+        return validate(model, PreRunFacts.none());
+    }
+
+    /**
+     * Validates a model together with what the file system says about its search: every finding of
+     * {@link #validate(CometParameters)}, and the findings about the FASTA's decoy census and the
+     * existing index, after the decoy-prefix rule.
+     *
+     * @param model the model
+     * @param facts the FASTA's decoy census and the existing index's description, each optional
+     * @return every finding
+     * @throws IllegalArgumentException if the census was taken for another decoy prefix than the
+     *     model's {@code decoy_prefix}
+     */
+    public ValidationReport validate(CometParameters model, PreRunFacts facts) {
         Objects.requireNonNull(model, "model");
+        Objects.requireNonNull(facts, "facts");
+        facts.census().ifPresent(census -> FastaDecoyRule.requireSamePrefix(model, census));
         Findings findings = new Findings(model);
         for (ParameterEntry entry : model.entries()) {
             BoundsRule.check(entry, findings);
@@ -117,6 +141,8 @@ public final class CometValidator {
         AScoreProRule.check(model, findings);
         IndexSearchTypeRule.check(model, findings);
         DecoyRule.check(model, findings);
+        facts.census().ifPresent(census -> FastaDecoyRule.check(model, census, findings));
+        facts.index().ifPresent(index -> IndexCompatibilityRule.check(model, index, findings));
         ImportedRules.check(model, findings);
         return findings.report();
     }

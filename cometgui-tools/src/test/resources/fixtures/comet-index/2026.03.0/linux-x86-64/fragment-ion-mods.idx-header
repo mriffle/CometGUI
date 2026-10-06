@@ -1,0 +1,20 @@
+Comet index database v5.  Comet version 2026.03 rev. 0 (fa08489)
+IndexSearchType: fragment ion index
+InputDB:  subset.fasta
+MassRange: 600.000000 5000.000000
+LengthRange: 5 50
+MassType: 1 1
+DecoySearch: 1
+DecoyPrefix: DECOY_
+Enzyme: Trypsin [1 KR P]
+Enzyme2: Cut_everywhere [0 - -]
+NumEnzymeTermini: 2
+AllowedMissedCleavage: 1
+ClipNtermMethionine: 0
+NumPeptides: 81849
+StaticMod: 0.000000 0.000000 57.021464 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 1.500000 0.000000 0.000000 0.000000
+VariableMod: MW:15.994900:0.000000:0.000000:3:-1:0 -:0.000000:0.000000:0.000000:3:-1:0 STY:79.966331:97.976896:0.000000:5:-1:0 ^:42.010565:0.000000:0.000000:1:-1:0 X:0.000000:0.000000:0.000000:3:-1:0
+ProteinModList: 0
+RequireVariableMod: 8 0 0 1 0 0
+MaxVariableModsInPeptide: 6
+

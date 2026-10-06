@@ -31,7 +31,8 @@ import org.cometgui.params.comet.model.ParameterValue;
  * index_search_type = 1 is ignored: "..." is not an .idx file}, lines 1764-1775); 2026.02.2 says
  * nothing. Whether it is reported is therefore the release's, stated in its version record. A value
  * other than -1, 0 and 1 is the choice rule's; whether an existing {@code .idx} agrees with the
- * value needs the file and is not decided here.
+ * value needs the file, and is {@link IndexCompatibilityRule}'s when the validator is given the
+ * index's description.
  */
 final class IndexSearchTypeRule {
 

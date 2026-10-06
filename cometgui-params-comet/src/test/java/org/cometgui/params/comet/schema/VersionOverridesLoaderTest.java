@@ -57,6 +57,7 @@ class VersionOverridesLoaderTest {
         newer.put("overrides", new ArrayList<>(List.of(overrides)));
         newer.put("ruleSeverities", ConstructedMetadata.ruleSeverities());
         newer.put("valueMigrations", new ArrayList<>());
+        newer.put("indexFormats", ConstructedMetadata.indexFormats(5));
         doc.list("versions").add(newer);
         return doc;
     }

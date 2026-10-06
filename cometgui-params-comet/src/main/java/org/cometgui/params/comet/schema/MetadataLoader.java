@@ -112,11 +112,14 @@ public final class MetadataLoader {
                     "variableModTuple",
                     "overrides",
                     "ruleSeverities",
-                    "valueMigrations");
+                    "valueMigrations",
+                    "indexFormats");
 
     private static final List<String> OVERRIDE_REQUIRED = List.of("name", "source");
 
     private static final List<String> RULE_SEVERITY_FIELDS = List.of("rule", "severity", "source");
+
+    private static final List<String> INDEX_FORMAT_FIELDS = List.of("readable", "source");
 
     private static final List<String> MIGRATION_REQUIRED =
             List.of("from", "action", "reason", "source");
@@ -249,7 +252,9 @@ public final class MetadataLoader {
                     record.source(),
                     record.variableModTuple(),
                     overrides,
-                    record.ruleSeverities());
+                    record.ruleSeverities(),
+                    record.valueMigrations(),
+                    record.indexFormats());
         }
     }
 
@@ -401,7 +406,8 @@ public final class MetadataLoader {
             records.add(
                     new PendingVersion(
                             new CometVersionRecord(version, marker, parameterPages, source, layout)
-                                    .withRuleSeverities(ruleSeverities(node)),
+                                    .withRuleSeverities(ruleSeverities(node))
+                                    .withIndexFormats(indexFormats(node)),
                             node));
         }
         return records;
@@ -657,6 +663,36 @@ public final class MetadataLoader {
             severities.put(rule, new RuleSeverity(rule, level, named.url("source")));
         }
         return severities;
+    }
+
+    /**
+     * A version record's {@code indexFormats}: the formats of existing {@code .idx} file the
+     * release can search, each the {@code N} of a first line {@code Comet index database v<N>.},
+     * and the {@code https://} reference to the release's reader. An empty list is legal: a release
+     * that reads none of the versioned formats.
+     */
+    private static IndexFormats indexFormats(Node version) {
+        Node formats =
+                Node.of(version.required("indexFormats"), version.where(), "indexFormats")
+                        .renamed(version.where() + " indexFormats");
+        formats.onlyFields(INDEX_FORMAT_FIELDS);
+        List<Integer> readable = new ArrayList<>();
+        for (JsonValue element : formats.array("readable")) {
+            if (!(element instanceof JsonValue.JsonNumber number)
+                    || number.value() < 1
+                    || number.value() > Integer.MAX_VALUE) {
+                throw formats.failure(
+                        "readable",
+                        "must hold whole numbers of 1 or more: the N of the index formats"
+                                + " (\"Comet index database vN\") the release reads");
+            }
+            int format = (int) number.value();
+            if (readable.contains(format)) {
+                throw formats.failure("readable", "lists format " + format + " twice");
+            }
+            readable.add(format);
+        }
+        return new IndexFormats(readable, Optional.of(formats.url("source")));
     }
 
     private static VariableModLayout tupleLayout(Node version) {

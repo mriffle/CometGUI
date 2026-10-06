@@ -19,8 +19,10 @@ package org.cometgui.params.comet.validation;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ParameterEntry;
@@ -103,8 +105,32 @@ final class AScoreProRule {
      * @param number the slot number, 1 for {@code variable_mod01}
      * @param name the parameter name
      * @param modification its value
+     * @param merged the modifications Comet merges into this slot, this slot's own first, in slot
+     *     order: Comet appends each merged slot's residues to this one's
      */
-    record Slot(int number, String name, VariableModification modification) {}
+    record Slot(
+            int number,
+            String name,
+            VariableModification modification,
+            List<VariableModification> merged) {
+
+        /** Takes an immutable copy of the merged modifications. */
+        Slot {
+            merged = List.copyOf(merged);
+        }
+
+        /** A slot nothing has been merged into yet. */
+        Slot(int number, String name, VariableModification modification) {
+            this(number, name, modification, List.of(modification));
+        }
+
+        /** This slot with another merged into it. */
+        Slot absorbing(Slot other) {
+            List<VariableModification> all = new ArrayList<>(merged);
+            all.add(other.modification());
+            return new Slot(number, name, modification, all);
+        }
+    }
 
     /**
      * The fields Comet compares to decide that two slots are the same modification, as Comet holds
@@ -124,7 +150,7 @@ final class AScoreProRule {
 
     /**
      * The slots that are still active when Comet has merged every slot identical to a lower one, in
-     * slot order.
+     * slot order, each with the slots merged into it.
      *
      * @param model the model
      * @return the surviving active slots
@@ -143,12 +169,17 @@ final class AScoreProRule {
         int cap = cap(model);
         ResidueAlphabet alphabet = VariableModRules.alphabet(model);
         Set<MergeKey> seen = new HashSet<>();
+        Map<MergeKey, Integer> survivorOf = new HashMap<>();
         List<Slot> survivors = new ArrayList<>();
         for (Slot slot : slots) {
             MergeKey key = key(slot.modification(), cap, alphabet);
             boolean merged = key.requirement() != -1 && !seen.add(key);
             if (!merged) {
+                survivorOf.putIfAbsent(key, survivors.size());
                 survivors.add(slot);
+            } else {
+                int into = survivorOf.get(key);
+                survivors.set(into, survivors.get(into).absorbing(slot));
             }
         }
         return survivors;
@@ -163,7 +194,7 @@ final class AScoreProRule {
      * max_variable_mods_in_peptide}, or, when that is negative and Comet ignores it, the release's
      * default.
      */
-    private static int cap(CometParameters model) {
+    static int cap(CometParameters model) {
         int limit = ((ParameterValue.Whole) model.value(VariableModRules.LIMIT)).value();
         if (limit >= 0) {
             return limit;
@@ -196,8 +227,7 @@ final class AScoreProRule {
      * left: distance 0 from the protein N- (or C-) terminus, and a token of nothing but {@code n}
      * and {@code ^} (or {@code c} and {@code $}), in a release whose alphabet has the code.
      */
-    private static boolean rewrittenToProteinTerminus(
-            VariableModification mod, ResidueAlphabet alphabet) {
+    static boolean rewrittenToProteinTerminus(VariableModification mod, ResidueAlphabet alphabet) {
         if (mod.terminalDistance() != 0 || mod.terminusCode() < 0 || mod.terminusCode() > 1) {
             return false;
         }

@@ -246,6 +246,21 @@ def _severities_removed(document):
     _record(document, OVERRIDING_RELEASE).pop("ruleSeverities")
 
 
+def _formats_set(field, value):
+    """Damage one release's ``indexFormats``; a value of ``None`` removes the field."""
+    def damage(document):
+        formats = _record(document, OVERRIDING_RELEASE)["indexFormats"]
+        if value is None:
+            formats.pop(field)
+        else:
+            formats[field] = value
+    return damage
+
+
+def _formats_removed(document):
+    _record(document, OVERRIDING_RELEASE).pop("indexFormats")
+
+
 def generator_cases():
     """(id, input, damage, expected inner diagnostic) for part 1."""
     where = f'("{VICTIM}")'
@@ -358,6 +373,29 @@ def generator_cases():
         ("severity-unstated-for-a-release", "metadata", _severity_unstated,
          "Comet 2026.02.2's version record states the version-scoped rules "
          "['index_search_type.ignored_without_idx'], and Comet 2026.03.0's states"),
+    ]
+    formats = f"versions[0] ({OVERRIDING_RELEASE}) indexFormats"
+    cases += [
+        ("index-formats-missing", "metadata", _formats_removed,
+         f"{formats} is null; it must be an object naming the index formats"),
+        ("index-formats-unknown-field", "metadata", _formats_set("since", "2026.03.0"),
+         f"{formats} has the field 'since', which it does not have"),
+        ("index-formats-not-a-list", "metadata", _formats_set("readable", 5),
+         f"{formats} has \"readable\" = 5; it must be a list of index format numbers"),
+        ("index-formats-no-readable", "metadata", _formats_set("readable", None),
+         f"{formats} has \"readable\" = None; it must be a list of index format numbers"),
+        ("index-formats-zero", "metadata", _formats_set("readable", [0]),
+         f"{formats} readable[0] = 0 is not a whole number of 1 or more"),
+        ("index-formats-text", "metadata", _formats_set("readable", ["v5"]),
+         f"{formats} readable[0] = 'v5' is not a whole number of 1 or more"),
+        ("index-formats-boolean", "metadata", _formats_set("readable", [5, True]),
+         f"{formats} readable[1] = True is not a whole number of 1 or more"),
+        ("index-formats-twice", "metadata", _formats_set("readable", [5, 4, 5]),
+         f"{formats} lists format 5 twice"),
+        ("index-formats-source-not-https", "metadata",
+         _formats_set("source", "CometPeptideIndex.cpp line 1642"),
+         f"{formats} has \"source\" = 'CometPeptideIndex.cpp line 1642'; it must be an "
+         "https:// reference"),
     ]
     return cases
 

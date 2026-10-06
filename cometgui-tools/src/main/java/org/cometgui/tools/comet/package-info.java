@@ -22,5 +22,10 @@
  * which makes the binary write its own default and complete parameter files and reads what it
  * declared, plus {@code R-TOOL-02}'s Thermo companion rule as a lookup over manifest data. The
  * search invocation itself is still phase 08's.
+ *
+ * <p><strong>Phase 08 unit 3 landed the pre-run readers</strong>: {@code FastaDecoyScanner}, which
+ * streams a FASTA into its decoy census ({@code R-DEC-02}), and {@code CometIndexHeaderReader},
+ * which reads an existing {@code .idx} file's self-description ({@code R-CMT-07}). Both return pure
+ * values of {@code org.cometgui.domain.params}, which the one validator judges.
  */
 package org.cometgui.tools.comet;

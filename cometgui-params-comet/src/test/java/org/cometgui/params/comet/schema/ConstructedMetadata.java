@@ -47,6 +47,7 @@ final class ConstructedMetadata {
         version.put("overrides", new ArrayList<>());
         version.put("ruleSeverities", ruleSeverities());
         version.put("valueMigrations", new ArrayList<>());
+        version.put("indexFormats", indexFormats(4));
         List<Object> categories = new ArrayList<>();
         for (ParameterCategory category : ParameterCategory.values()) {
             Map<String, Object> entry = new LinkedHashMap<>();
@@ -129,6 +130,24 @@ final class ConstructedMetadata {
                 List.of(
                         ruleSeverity("variable_mod_tuple.distance_undocumented", "WARNING"),
                         ruleSeverity("index_search_type.ignored_without_idx", "OFF")));
+    }
+
+    /**
+     * A CONSTRUCTED {@code indexFormats} object reading the given formats, for a version record a
+     * test adds.
+     *
+     * @param readable the format numbers
+     * @return the object, mutable
+     */
+    static Map<String, Object> indexFormats(long... readable) {
+        Map<String, Object> formats = new LinkedHashMap<>();
+        List<Object> numbers = new ArrayList<>();
+        for (long format : readable) {
+            numbers.add(format);
+        }
+        formats.put("readable", numbers);
+        formats.put("source", "https://example.org/source/CometPeptideIndex.cpp");
+        return formats;
     }
 
     /**

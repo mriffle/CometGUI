@@ -176,6 +176,12 @@
           "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1436-L1450"
         }
       ],
+      "indexFormats": {
+        "readable": [
+          5
+        ],
+        "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometPeptideIndex.cpp#L1640-L1653"
+      },
       "valueMigrations": [
         {
           "from": "2026.02.2",
@@ -263,6 +269,12 @@
           "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearch.cpp#L5369-L5372"
         }
       ],
+      "indexFormats": {
+        "readable": [
+          4
+        ],
+        "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometPeptideIndex.cpp#L1112-L1120"
+      },
       "valueMigrations": [
         {
           "from": "2026.03.0",
@@ -321,6 +333,10 @@
           "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometSearch.cpp#L4754-L4758"
         }
       ],
+      "indexFormats": {
+        "readable": [],
+        "source": "https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometFragmentIndex.cpp#L830-L855"
+      },
       "valueMigrations": []
     }
   ],

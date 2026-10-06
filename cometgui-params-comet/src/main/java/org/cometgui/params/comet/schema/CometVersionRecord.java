@@ -49,6 +49,10 @@ import org.cometgui.domain.tools.ToolVersion;
  * notice on the way into this release ({@link ValueMigration}) -- Comet 2026.02.2's {@code
  * index_search_type = 1}, which Comet 2026.03.0 spells {@code -1}.
  *
+ * <p>And so is which formats of an existing {@code .idx} file the release can search, {@link
+ * #indexFormats()}: Comet 2026.03.0 reads format 5 only, Comet 2026.02.2 format 4 only, so the
+ * validator refuses an index the selected release would refuse, before Comet starts.
+ *
  * @param version the version as the manifest spells it, such as {@code 2026.02.2}
  * @param marker how that release's binary spells itself on its {@code # comet_version} line
  * @param parameterPages the upstream parameter documentation for the release
@@ -59,6 +63,7 @@ import org.cometgui.domain.tools.ToolVersion;
  * @param ruleSeverities rule identifier to this release's severity for that version-scoped rule
  * @param valueMigrations what migration into this release does with particular values written for
  *     another, in the metadata's order; empty when it carries every value by its typed meaning
+ * @param indexFormats the formats of existing index the release can search
  */
 public record CometVersionRecord(
         ToolVersion version,
@@ -68,7 +73,8 @@ public record CometVersionRecord(
         VariableModLayout variableModTuple,
         Map<String, ParameterOverride> overrides,
         Map<String, RuleSeverity> ruleSeverities,
-        List<ValueMigration> valueMigrations) {
+        List<ValueMigration> valueMigrations,
+        IndexFormats indexFormats) {
 
     /**
      * Validates the components and takes immutable, name-ordered copies of the overrides and the
@@ -84,6 +90,7 @@ public record CometVersionRecord(
         Objects.requireNonNull(parameterPages, "parameterPages");
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(variableModTuple, "variableModTuple");
+        Objects.requireNonNull(indexFormats, "indexFormats");
         overrides = Collections.unmodifiableSortedMap(new TreeMap<>(overrides));
         overrides.forEach(
                 (name, override) -> {
@@ -110,6 +117,40 @@ public record CometVersionRecord(
                                 + migration.matches());
             }
         }
+    }
+
+    /**
+     * A record with overrides, rule severities and value migrations, stating no index format
+     * ({@link IndexFormats#unstated()}: it reads no existing index).
+     *
+     * @param version the version as the manifest spells it
+     * @param marker how that release's binary spells itself
+     * @param parameterPages the upstream parameter documentation for the release
+     * @param source the upstream source tree at the release's tag
+     * @param variableModTuple the field layout of the release's variable-modification tuple
+     * @param overrides parameter name to what this version says differently about it
+     * @param ruleSeverities rule identifier to this release's severity for that rule
+     * @param valueMigrations what migration into this release does with values written for another
+     */
+    public CometVersionRecord(
+            ToolVersion version,
+            CometVersionMarker marker,
+            String parameterPages,
+            String source,
+            VariableModLayout variableModTuple,
+            Map<String, ParameterOverride> overrides,
+            Map<String, RuleSeverity> ruleSeverities,
+            List<ValueMigration> valueMigrations) {
+        this(
+                version,
+                marker,
+                parameterPages,
+                source,
+                variableModTuple,
+                overrides,
+                ruleSeverities,
+                valueMigrations,
+                IndexFormats.unstated());
     }
 
     /**
@@ -195,7 +236,8 @@ public record CometVersionRecord(
                 variableModTuple,
                 overrides,
                 severities,
-                valueMigrations);
+                valueMigrations,
+                indexFormats);
     }
 
     /**
@@ -213,7 +255,27 @@ public record CometVersionRecord(
                 variableModTuple,
                 overrides,
                 ruleSeverities,
-                migrations);
+                migrations,
+                indexFormats);
+    }
+
+    /**
+     * This record with other index formats, everything else kept.
+     *
+     * @param formats the formats of existing index the release can search
+     * @return the record
+     */
+    public CometVersionRecord withIndexFormats(IndexFormats formats) {
+        return new CometVersionRecord(
+                version,
+                marker,
+                parameterPages,
+                source,
+                variableModTuple,
+                overrides,
+                ruleSeverities,
+                valueMigrations,
+                formats);
     }
 
     /**

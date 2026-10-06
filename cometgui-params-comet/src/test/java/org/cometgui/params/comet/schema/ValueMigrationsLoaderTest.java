@@ -56,6 +56,7 @@ class ValueMigrationsLoaderTest {
         newer.put("overrides", new ArrayList<>());
         newer.put("ruleSeverities", ConstructedMetadata.ruleSeverities());
         newer.put("valueMigrations", new ArrayList<>(List.of(migrations)));
+        newer.put("indexFormats", ConstructedMetadata.indexFormats(5));
         doc.list("versions").add(newer);
         return doc;
     }

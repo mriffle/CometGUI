@@ -195,6 +195,11 @@ OVERRIDE_FIELDS = ("default", "choices", "inlineComment", "shortHelp", "helpUrl"
 #: release, and the ``https://`` reference to the behaviour that level encodes.
 RULE_SEVERITY_FIELDS = ("rule", "severity", "source")
 
+#: A version record's ``indexFormats`` (``org.cometgui.params.comet.schema.IndexFormats``):
+#: the formats of existing ``.idx`` file the release can search -- each the N of a first
+#: line ``Comet index database vN.`` -- and the ``https://`` reference to its reader.
+INDEX_FORMAT_FIELDS = ("readable", "source")
+
 #: ``RuleSeverity.Level``, with the words the reference uses for each.
 RULE_LEVELS = {"ERROR": "error", "WARNING": "warning", "OFF": "not reported"}
 
@@ -431,6 +436,7 @@ def validate(metadata: dict, presets: dict, metadata_path: Path, presets_path: P
                 )
         _validate_alphabet(path, index, record)
         _validate_rule_severities(path, index, record)
+        _validate_index_formats(path, index, record)
         records[record["version"]] = record
     stated = {version: sorted(entry["rule"] for entry in record["ruleSeverities"])
               for version, record in records.items()}
@@ -735,6 +741,39 @@ def _validate_rule_severities(path: Path, index: int, record: dict) -> None:
             raise CometParamsError(
                 f"{at} ({rule}) has \"source\" = {source!r}; it must be an https:// reference"
             )
+
+
+def _validate_index_formats(path: Path, index: int, record: dict) -> None:
+    """Refuse a release's ``indexFormats`` -- the rules ``MetadataLoader`` and
+    ``IndexFormats`` apply: an object with exactly ``readable`` (distinct whole numbers of 1
+    or more; empty for a release that reads none of the versioned formats) and an
+    ``https://`` ``source``."""
+    where = f"{path}: versions[{index}] ({record['version']}) indexFormats"
+    formats = record.get("indexFormats")
+    if not isinstance(formats, dict):
+        raise CometParamsError(
+            f"{where} is {_kind(formats)}; it must be an object naming the index formats "
+            "(\"Comet index database vN\") the release can search"
+        )
+    unknown = sorted(set(formats) - set(INDEX_FORMAT_FIELDS))
+    if unknown:
+        raise CometParamsError(f"{where} has the field {unknown[0]!r}, which it does not have")
+    readable = formats.get("readable")
+    if not isinstance(readable, list):
+        raise CometParamsError(
+            f"{where} has \"readable\" = {readable!r}; it must be a list of index format numbers"
+        )
+    for position, number in enumerate(readable):
+        if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+            raise CometParamsError(
+                f"{where} readable[{position}] = {number!r} is not a whole number of 1 or more"
+            )
+        if readable.index(number) != position:
+            raise CometParamsError(f"{where} lists format {number} twice")
+    source = formats.get("source")
+    if not isinstance(source, str) or not source.startswith("https://"):
+        raise CometParamsError(f"{where} has \"source\" = {source!r}; it must be an https:// "
+                               "reference")
 
 
 def describe_alphabet(characters: str) -> str:

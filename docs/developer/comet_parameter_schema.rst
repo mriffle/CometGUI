@@ -2570,6 +2570,342 @@ The specification's *Comet validation* list
      - Here (``version.parameter_unavailable``).
 
 
+.. _dev-comet-parameter-prerun-facts:
+
+Pre-run facts: the FASTA's decoys and an existing index
+=======================================================
+
+Phase 08, unit 3. Two checks need the file system: whether the FASTA already
+holds decoys (``R-DEC-02``), and whether an existing ``.idx`` file Comet would
+search agrees with the search (the specification's *selected index and search
+options are compatible*, assigned to Phase 08 by tier 1 on 2026-10-06). Each is
+split into a **reader**, which turns a file into a pure value, and **rules of
+the one validator**, which judge that value against the model -- so Run
+readiness and the workflow's validate step block on one report and there is no
+second validator (design decisions P8-1, P8-7, P8-8, P8-16).
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 26 40
+
+   * - Class
+     - Package
+     - What it is
+   * - ``FastaDecoyCensus``
+     - ``org.cometgui.domain.params``
+     - The prefix scanned for, the FASTA, its record count, its decoy count
+       and the first decoy's accession.
+   * - ``CometIndexDescription``
+     - ``org.cometgui.domain.params``
+     - An index header as typed values: format number and first line, the
+       Comet that wrote it, the index type (``IndexMode.FRAGMENT_ION`` or
+       ``PEPTIDE``), and every recorded option. Options a format does not
+       record are empty.
+   * - ``PreRunFacts``
+     - ``org.cometgui.domain.params``
+     - An optional census and an optional index description.
+   * - ``FastaDecoyScanner``
+     - ``org.cometgui.tools.comet``
+     - Streams a FASTA (LF, CRLF or CR) into a census. Refuses, with a
+       ``FastaScanException`` naming the file, a missing, unreadable or empty
+       file and one whose first non-blank line does not begin with ``>``.
+   * - ``CometIndexHeaderReader``
+     - ``org.cometgui.tools.comet``
+     - Reads at most the first 64 KiB of an ``.idx`` file into a description.
+       Refuses, with a ``CometIndexHeaderException`` naming the file, anything
+       that is not a versioned Comet index and any header line it cannot vouch
+       for (an unknown key, a repeated one, a missing required one, a value
+       that is not what Comet writes).
+   * - ``FastaDecoyRule``, ``IndexCompatibilityRule``
+     - ``org.cometgui.params.comet.validation``
+     - The rules, reached through ``CometValidator.validate(model,
+       PreRunFacts)``; ``validate(model)`` is ``validate(model,
+       PreRunFacts.none())``.
+
+**When to supply what.** A census whenever the FASTA has been scanned; it must
+be taken for the model's own ``decoy_prefix`` (``R-DEC-03``), and one taken for
+another prefix makes ``validate`` throw ``IllegalArgumentException`` rather
+than judge with it. An index description exactly when Comet will read an
+**existing** index -- ``database_name``, or ``-D``, names a file whose name
+ends in ``.idx`` (Comet's own case-sensitive test [V26S]_) and that file exists.
+An index Comet has yet to build has no description, and a plain FASTA search
+has none.
+
+The decoy rules
+---------------
+
+``decoy.none_anywhere`` (``decoy_search = 0`` and no decoy record) and
+``decoy.double_decoys`` (``decoy_search`` 1 or 2 and any decoy record) are
+errors at ``decoy_search`` and ``database_name``. Their messages, and the two
+combinations that pass, are on the user page :doc:`/decoys`; the tests hold
+the messages hand-typed against the censuses of the real ``D-006`` subset
+(1000 records, no decoy) and of a target-decoy FASTA built from it (2000
+records, 1000 decoys, the first ``DECOY_sp|A0A075B6H9|LV469_HUMAN``), which
+``CometIndexRealBinaryTest`` counts with the real scanner. An undocumented
+``decoy_search`` has no decoy source and is the choice rule's error only.
+
+The index header, measured
+--------------------------
+
+Every fact below was established on 2026-10-06 by running the pinned
+linux/x86-64 binaries (2026.03.0 SHA-256 ``ad93b4cf...``, 2026.02.2
+``af515b6e...``, and the migration fixture 2024.01.0 ``2834f928...``) in a
+private scratch directory, on the ``D-006`` subset (the UniProt proteome's first
+1000 records, SHA-256 ``5005d961...``) and the LF copy of the K562 run. Each
+index was built as the workflow builds one, in a directory holding the
+release's own ``comet -q`` output with ``database_name = subset.fasta``,
+``spectral_library_name`` empty and ``num_threads = 4``, and ``subset.fasta``, a
+symbolic link to the subset::
+
+    cd <index directory> && comet -Pcomet.params -i -Dsubset.fasta    # or -j
+
+Comet wrote ``subset.fasta.idx`` there and nothing beside the FASTA, and
+``InputDB:`` records the name it was given (``subset.fasta``), so the header
+holds no machine path and two builds write the same bytes. What the file holds:
+
+* **Line 1**: ``Comet index database v5.  Comet version 2026.03 rev. 0
+  (fa08489)`` (2026.03.0) or ``... v4.  Comet version 2026.02 rev. 2
+  (6edec91)`` (2026.02.2). Comet 2024.01.0 writes ``Comet peptide index.
+  Comet version 2024.01 rev. 0 (f00df0c)``: no format number, and no empty
+  line after its header [I24R]_. The reader refuses it as not a versioned
+  index.
+* **Then one ``Key: value`` line per option** [I26W]_ [I22W]_, in this order:
+  ``IndexSearchType`` (``fragment ion index`` or ``peptide index``),
+  ``InputDB``, ``MassRange``, ``LengthRange``, ``MassType``, ``DecoySearch``,
+  ``DecoyPrefix`` (format 5 only), ``Enzyme``, ``Enzyme2``,
+  ``NumEnzymeTermini``, ``AllowedMissedCleavage``, ``ClipNtermMethionine``
+  (these three format 5 only), ``NumPeptides``, ``StaticMod`` (30 values:
+  ``A``-``Z``, then the peptide N- and C-terminus and the protein N- and
+  C-terminus), ``VariableMod`` (five slots, ``residues:mass:loss:loss2:max``,
+  format 5 adding ``:distance:terminus``), ``ProteinModList``,
+  ``RequireVariableMod`` (six integers: Comet's requirement flags, whose
+  lowest bit is ``require_variable_mod``, then each slot's requirement) and
+  ``MaxVariableModsInPeptide``.
+* **Then an empty line** -- where the header ends. Both releases' readers stop
+  there [I26E]_. After it come the protein names, each padded with NUL bytes,
+  and the binary index. The headers measured 925 bytes (2026.03.0, ``-i``),
+  920 (``-j``), 812 and 807 (2026.02.2); the whole files 7.8 MB.
+
+Six captures are committed, header only, under
+``cometgui-tools/src/test/resources/fixtures/comet-index/<release>/linux-x86-64/``
+with their ``SHA256SUMS``: each release's ``-i`` and ``-j`` index of the subset
+from its own defaults, and a ``-i`` index built with modifications Comet
+rewrites, merges, caps and drops (``fragment-ion-mods.idx-header``: the edits
+are listed in ``IndexHeaders.MODS_EDITS``). ``CometIndexRealBinaryTest``
+rebuilds all six with both binaries on every Linux build and requires the same
+bytes; ``CometIndexHeaderReaderTest`` reads each field by field.
+
+.. _dev-comet-parameter-index-formats:
+
+Which index formats a release reads
+-----------------------------------
+
+Each release searched each release's fragment-ion index, with ``-P`` the
+release's ``-q`` file plus ``database_name = <the .idx>``,
+``spectral_library_name`` empty, ``num_threads = 4``,
+``output_percolatorfile = 1``, ``scan_range = 11000 11300``::
+
+    comet -P<case.params> -N<dir>/out <K562_3, LF copy>
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 41 41
+
+   * - Searched by
+     - Format 5 index (2026.03.0's)
+     - Format 4 index (2026.02.2's)
+   * - 2026.03.0
+     - exit 0, PIN written
+     - exit 1: ``Error - "<idx>" is not a v5 unified index file (v4 and older
+       are intentionally not read: the protein-list layout changed for
+       protein-terminal variable mods). Rebuild it from the FASTA with -i
+       (FI_DB) or -j (PI_DB).``
+   * - 2026.02.2
+     - exit 1: ``Error - "<idx>" is not a v4 unified index file; rebuild it
+       with -i or -j.``
+     - exit 0, PIN written
+   * - 2024.01.0
+     - aborted (exit 134)
+     - aborted (exit 134)
+
+Given 2024.01.0's unversioned index, 2026.03.0 and 2026.02.2 each stopped with
+the message in its row. So each release reads exactly its own format [I26V]_
+[I22V]_, and 2024.01.0 none of the versioned ones.
+
+That is a release fact, so by decision C-2 it is data, in each version
+record::
+
+    "indexFormats": {
+      "readable": [ 5 ],
+      "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometPeptideIndex.cpp#L1640-L1653"
+    }
+
+``readable`` is ``[5]`` for 2026.03.0, ``[4]`` for 2026.02.2 and ``[]`` for
+2024.01.0. Java holds it as ``IndexFormats`` (``CometVersionRecord.indexFormats()``;
+a record built in code without one reads no index, ``IndexFormats.unstated()``).
+What ``MetadataLoader`` refuses, naming ``versions[i] indexFormats`` and the
+field: a missing member or one that is not an object, a field other than
+``readable`` and ``source``, a ``readable`` that is not an array, an element
+that is not a whole number of 1 or more (or above the largest integer), a
+format listed twice, and a ``source`` that is not ``https://``
+(``IndexFormatsLoaderTest``). ``scripts/cometparams.py`` refuses the same
+(``_validate_index_formats``), each with its own diagnostic, and its self-test
+has a case for each (``index-formats-*`` in ``scripts/cometparams_selftest.py``).
+
+``index.format_unreadable`` (error, at ``database_name``) reads the model's
+release's record, never its version number::
+
+    the index /project/index-cache/k1/subset.fasta.idx is in format v4 (written
+    by Comet 2026.02 rev. 2 (6edec91)), and Comet 2026.03.0 reads index format
+    v5, so it would stop before searching; rebuild the index from its FASTA
+    with Comet 2026.03.0
+
+An index a release cannot read is judged for nothing else.
+``IndexCompatibilityRulesTest.formatByRelease`` judges the same two real
+indexes for both releases, and ``IndexCompatibilityRealBinaryTest`` holds both
+binaries to the metadata's ``readable`` lists, so a check that ignored the
+release fails one test or the other.
+
+What an index decides, measured
+-------------------------------
+
+Both releases' readers begin by discarding the parameter file's modifications:
+"only the values baked into the .idx header are authoritative for an index
+search" [I26H]_ [I22H]_, and the parse that follows restores every recorded
+option. To see what that means for each option, each release built a peptide
+index (``-j``) of the subset from its own defaults, then searched it with one
+option changed (the search command above), and searched the plain FASTA with
+the same change for comparison. The unchanged index search wrote 495 PIN rows.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 38 32
+
+   * - Changed in the search
+     - Both releases, index search
+     - Decision
+   * - ``decoy_search = 1``; ``search_enzyme_number = 3`` (Lys_C);
+       ``num_enzyme_termini = 1``; ``allowed_missed_cleavage = 0``;
+       ``clip_nterm_methionine = 1``; ``mass_type_parent = 0``;
+       ``mass_type_fragment = 0``; ``add_C_cysteine = 0.0``;
+       ``variable_mod01`` off; ``variable_mod02`` and ``variable_mod06`` set
+       to ``79.966331 STY``; ``require_variable_mod = 1``;
+       ``max_variable_mods_in_peptide = 1``; ``peptide_length_range = 3 50``
+     - exit 0, no warning, **the same 495 rows** as the unchanged search. The
+       same change to the FASTA search **changed** its rows.
+     - Silently ignored: an **error**, ``index.contradicts_search``, one
+       finding per option.
+   * - ``search_enzyme2_number = 3``; ``digest_mass_range = 400.0 6000.0``
+     - exit 0, no warning, the same rows. (On these scans the change does not
+       alter a FASTA search either.)
+     - The index cannot hold what the search asks for: an **error**.
+   * - ``digest_mass_range = 600.0 1500.0``;
+       ``peptide_length_range = 5 10``
+     - exit 0, **fewer** rows: Comet clamps an index search's range inward
+       only.
+     - Applied, so not a contradiction: no finding. Only a range reaching
+       outside the index's is one.
+   * - ``index_search_type = 1`` against a peptide index (and ``0`` against a
+       fragment-ion one)
+     - exit 0, the same rows. 2026.03.0: ``Warning - index_search_type = 1 is
+       ignored: "<idx>" is a peptide index and its own IndexSearchType:
+       header line decides. Delete the file or rebuild it with -i to change
+       the type.`` 2026.02.2: silent.
+     - An **error** in both releases -- stricter than 2026.03.0's warning,
+       because the search runs as a type the scientist did not ask for.
+       ``-1`` (2026.03.0, not set) asks for nothing and is never a finding;
+       2026.02.2 has no "not set", so its default ``1`` against a peptide
+       index is a finding, fixed by setting ``0``.
+   * - ``decoy_prefix = REV_``, on a fragment-ion index of the target-decoy
+       FASTA built with ``DECOY_``
+     - 2026.03.0: the same rows, decoys still labelled ``-1``: the index's
+       ``DecoyPrefix:`` wins. 2026.02.2 (format 4 records no prefix): every
+       row labelled a target -- the search's prefix is applied.
+     - An **error** where the index records a prefix; nothing to compare where
+       it does not.
+   * - ``protein_modslist_file`` naming a list of 400 accessions, at build
+       or search time, in all four combinations
+     - Both releases wrote ``ProteinModList: 0`` even when built with the list,
+       and all four searches wrote identical rows.
+     - Read, **not compared**: nothing measured depends on it.
+
+``IndexCompatibilityRealBinaryTest`` repeats every row of this table with both
+binaries on every Linux build and asserts it, running no production class of
+the module (as the corpus's binary half does, for PIT's sake).
+
+How the comparison is made
+--------------------------
+
+``IndexCompatibilityRule`` compares what Comet would hold, not the text the
+scientist wrote. The modifications capture shows Comet's own rewriting, and
+the rule models each step from the source:
+
+* identical slots are **merged** into the first (``variable_mod02`` ``W``
+  into slot 1, written ``MW``, slot 2 written ``-`` with mass 0) -- the merge
+  ``AScoreProRule.activeAfterMerge`` already models [V26G]_, now also
+  recording which slots each survivor absorbed;
+* each slot's count is **capped** at ``max_variable_mods_in_peptide`` and, for
+  a fragment-ion index, at 5 (``FRAGINDEX_MAX_MODS_PER_MOD``) [I26C]_: a count
+  of 7 is written 5;
+* in a release whose residue alphabet has ``^``, ``n`` at distance 0 from the
+  protein N-terminus is **rewritten** ``^`` with distance -1 [V26N]_
+  (2026.02.2 keeps ``n``);
+* only **five slots** are held [K77]_: ``variable_mod06`` is not in the index
+  at all, so an active sixth slot is a contradiction even for an index built
+  from the same settings -- Comet would search without it;
+* masses are compared to the header's six decimals (a difference of at most
+  0.0000005 is the same number); residues as sets of characters; a slot's
+  requirement against ``RequireVariableMod:``, and ``require_variable_mod``
+  against its lowest bit.
+
+``IndexCompatibilityRulesTest.modsIndex`` validates the settings the
+modifications capture was built from against that capture and finds exactly
+one contradiction, ``variable_mod06``, for both releases.
+
+What the rule cannot see, and says so: format 4 records no enzyme termini,
+missed cleavages or methionine clipping [I22W]_, although its peptides were
+digested with them and 2026.02.2 searches those peptides whatever the search
+says (rows ``num_enzyme_termini``, ``allowed_missed_cleavage`` and
+``clip_nterm_methionine`` above). ``index.option_unrecorded`` is a **warning**
+naming them and the search's values. Format 4 records no terminal distance
+either, but 2026.02.2 applies the search's, so it is not compared.
+
+Known edges, recorded rather than guessed at: Comet 2026.02.2 writes ``U`` as
+0 whatever ``add_U_selenocysteine`` says (it reads another name,
+:ref:`dev-comet-parameter-202603`), so a non-zero value there is reported
+against every 2026.02.2 index -- a value that release never applies anyway;
+and Comet applies the fragment-ion cap of 5 *before* merging, the model after,
+so two slots that differ only in counts above 5 merge in Comet and not in the
+rule (the same edge as :ref:`dev-comet-parameter-validation-corpus`'s). Comet
+2026.03.0 also warns, on its own, about ``decoy_search`` 1 or 2 against an
+index whose protein list already holds the decoy prefix [I26G]_; that index's
+decoys are the FASTA census's to catch.
+
+.. [I26V] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometPeptideIndex.cpp#L1640-L1653
+   -- 2026.03.0 refuses an index whose first line does not begin ``Comet
+   index database v5``.
+.. [I22V] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometPeptideIndex.cpp#L1112-L1120
+   -- 2026.02.2 refuses one that does not begin ``Comet index database v4``.
+.. [I26H] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometPeptideIndex.cpp#L1613-L1640
+   -- the header is authoritative: the parameter file's modifications are
+   discarded before the header is parsed.
+.. [I22H] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometPeptideIndex.cpp#L1090-L1131
+   -- the same in 2026.02.2.
+.. [I26W] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometPeptideIndex.cpp#L1350-L1429
+   -- the format-5 header writer.
+.. [I22W] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometPeptideIndex.cpp#L880-L943
+   -- the format-4 header writer: no ``DecoyPrefix``, ``NumEnzymeTermini``,
+   ``AllowedMissedCleavage`` or ``ClipNtermMethionine`` line.
+.. [I26E] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometPeptideIndex.cpp#L1661-L1665
+   -- the reader stops at the empty line (2026.02.2: lines 1128-1132).
+.. [I26C] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L1402-L1414
+   -- the count caps; ``FRAGINDEX_MAX_MODS_PER_MOD`` is 5
+   (``CometSearch/core/Constants.h`` line 53, both tags).
+.. [I26G] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometPeptideIndex.cpp#L484-L511
+   -- the warning about internal decoys on a target-decoy index.
+.. [I24R] https://github.com/UWPR/Comet/blob/v2024.01.0/CometSearch/CometFragmentIndex.cpp#L830-L855
+   -- 2024.01.0's reader of its unversioned index.
+
 .. _dev-comet-parameter-validation-corpus:
 
 Validation agreed with the real binaries

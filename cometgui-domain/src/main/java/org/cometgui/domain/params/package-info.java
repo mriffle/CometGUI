@@ -19,5 +19,10 @@
  * pairs and the value objects the editors bind to.
  *
  * <p>Filled by phase 06 (Comet parameter model).
+ *
+ * <p>Phase 08 adds the file-system facts the one validator judges a search against before Comet
+ * starts ({@link org.cometgui.domain.params.PreRunFacts}): the FASTA's decoy census ({@code
+ * R-DEC-02}) and an existing index's self-description ({@code R-CMT-07}). They are pure values; the
+ * readers that take them from files are in {@code org.cometgui.tools.comet}.
  */
 package org.cometgui.domain.params;

@@ -49,6 +49,7 @@ class VersionDefaultsLoaderTest {
         older.put("overrides", new ArrayList<>(List.of(overrides)));
         older.put("ruleSeverities", ConstructedMetadata.ruleSeverities());
         older.put("valueMigrations", new ArrayList<>());
+        older.put("indexFormats", ConstructedMetadata.indexFormats(5));
         doc.list("versions").add(older);
         ((Map<String, Object>) doc.parameter("allowed_missed_cleavage").get("versions"))
                 .put("from", "2024.01.0");

@@ -30,9 +30,9 @@ import org.cometgui.params.comet.model.ParameterValue;
  * reads the value as one token ({@code Comet.cpp} line 348), so an empty value is an empty prefix.
  * White space in it is {@link TextTokenRule}'s error.
  *
- * <p>Not here, because they need data: whether the FASTA already holds decoys ({@code R-DEC-02})
- * and whether the PIN holds both targets and decoys ({@code R-DEC-04}) are checked by the workflow
- * (Phase 08).
+ * <p>Not here, because they need data: whether the FASTA already holds decoys ({@code R-DEC-02}) is
+ * {@link FastaDecoyRule}'s, judged on the FASTA's decoy census when the validator is given one, and
+ * whether the PIN holds both targets and decoys ({@code R-DEC-04}) is the workflow's.
  */
 final class DecoyRule {
 

@@ -183,6 +183,39 @@ public enum Rule {
     DECOY_PREFIX_EMPTY("decoy.prefix_empty", Severity.ERROR, null),
 
     /**
+     * {@code R-DEC-02}: no decoys anywhere -- {@code decoy_search = 0} and the FASTA holds no entry
+     * whose accession begins with the decoy prefix, so Percolator would have no negative examples.
+     * Judged on the FASTA's decoy census, a file-system fact.
+     */
+    DECOY_NONE_ANYWHERE("decoy.none_anywhere", Severity.ERROR, null),
+
+    /**
+     * {@code R-DEC-02}: double decoys -- {@code decoy_search} 1 or 2 while the FASTA already holds
+     * entries whose accession begins with the decoy prefix, so Comet would make decoys of decoys.
+     */
+    DECOY_DOUBLE("decoy.double_decoys", Severity.ERROR, null),
+
+    /**
+     * The existing index Comet would search is of a format the selected release cannot read, so
+     * Comet would stop before searching. Which formats a release reads is its version record's
+     * {@code indexFormats}.
+     */
+    INDEX_FORMAT_UNREADABLE("index.format_unreadable", Severity.ERROR, null),
+
+    /**
+     * The existing index Comet would search records an option the search contradicts: Comet takes
+     * the option from the index and silently ignores the parameter file.
+     */
+    INDEX_CONTRADICTS_SEARCH("index.contradicts_search", Severity.ERROR, null),
+
+    /**
+     * The existing index does not record a digestion option its peptides were built with (format 4
+     * records no enzyme termini, missed cleavages or methionine clipping), so whether it agrees
+     * with the search cannot be checked.
+     */
+    INDEX_OPTION_UNRECORDED("index.option_unrecorded", Severity.WARNING, null),
+
+    /**
      * {@code R-PARAM-07}: an imported parameter the schema does not model, kept and written back.
      */
     UNKNOWN_PARAMETER("unknown_parameter.imported", Severity.WARNING, null),
