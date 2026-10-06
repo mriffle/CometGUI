@@ -18,6 +18,13 @@
  * Project identity and layout: the user's project, its directories, its inputs and the runs it
  * owns.
  *
- * <p>Filled by phase 08 (workflow engine and run storage).
+ * <p>Filled by phase 08 (workflow engine and run storage), as pure models with no file access:
+ * {@link org.cometgui.domain.project.ProjectId} and {@link
+ * org.cometgui.domain.project.ProjectDescriptor} (what {@code project.json} holds), {@link
+ * org.cometgui.domain.project.ProjectLayout} (where a project's files are), {@link
+ * org.cometgui.domain.project.LockOwner} (who holds {@code project.lock}, {@code R-RUN-05}) and
+ * {@link org.cometgui.domain.project.SchemaVersionPolicy} ({@code R-RUN-04}'s policy for an older
+ * or newer document, shared by {@code project.json} and {@code run.json}). Reading and writing them
+ * is {@code org.cometgui.workflow.storage}'s.
  */
 package org.cometgui.domain.project;

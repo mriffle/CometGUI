@@ -22,5 +22,13 @@
  * run's directory and its provenance manifest, and {@link org.cometgui.domain.run.StageTag}, the
  * one thing the domain needs to know about a workflow stage. The state model itself is filled by
  * phase 08 (workflow engine and Comet adapter).
+ *
+ * <p>Phase 08 added the run's on-disk model, pure and with no file access: {@link
+ * org.cometgui.domain.run.RunLayout} (design decision P8-3, every path of a run directory), {@link
+ * org.cometgui.domain.run.OutputBaseNames} (P8-4, the {@code -N} base name of each spectrum file),
+ * and what {@code run.json} holds -- {@link org.cometgui.domain.run.RunDescriptor}, made of a
+ * {@link org.cometgui.domain.run.RunIdentity} written once and a list of {@link
+ * org.cometgui.domain.run.RunAttempt}s only ever added to ({@code R-RUN-03}, {@code R-RUN-06}).
+ * Reading and writing them is {@code org.cometgui.workflow.storage}'s.
  */
 package org.cometgui.domain.run;

@@ -4,16 +4,604 @@
 Project format
 ==============
 
-.. note::
+This page is the **on-disk format** of a CometGUI project and of every run in
+it: where each file lives, every member of ``project.json`` and ``run.json``
+with its type and meaning, the lock file, and the rules a reader applies. It is
+written so that someone who has never seen this repository can find a run's
+inputs, outputs and logs, and parse its records, without reading the Java.
 
-   **Stub page -- no content yet.** Content is owned by **Phase 08 -- Workflow Engine and Comet Adapter** (``phases/PHASE-08-workflow-comet.rst``), which names this page in its deliverables.
+The provenance record inside each run has its own reference,
+:doc:`provenance_format`.
 
-   Phase 01 created it so that the documentation tree builds strictly
-   (``sphinx-build -n -W``) from the start and so that the page has a
-   stable name to link to. It does not yet describe the product.
+**This page describes schema version 1** of ``project.json``, ``run.json`` and
+``project.lock``. See :ref:`ref-project-format-versions`.
 
-What this page will cover
-=========================
+.. contents:: Contents
+   :depth: 2
+   :local:
 
-The on-disk layout of a CometGUI project and its runs: what is stored, where,
-and which parts are immutable once a run has finished.
+The layout on disk
+==================
+
+A project holds mutable user intent and immutable run records
+(``R-RUN-03``..``R-RUN-06``)::
+
+    MyProject/
+        project.json                 the project's identity (written once)
+        project.lock                 who has the project open (R-RUN-05)
+        presets/                     parameter presets (a later phase)
+        index-cache/<key>/           cached Comet indexes (design decision P8-8)
+        runs/
+            20260828T231500Z-run-0001/
+                run.json             the run's identity and attempts
+                parameters/
+                    comet.params     the canonical parameter file (written once)
+                inputs/
+                    pin/merged.pin   the merged PIN Percolator reads
+                outputs/
+                    comet/<base>.pep.xml
+                    comet/<base>.pin
+                logs/
+                    comet-01.log     one log per Comet invocation (see below)
+                    comet-02.log
+                provenance/
+                    provenance.json  the provenance manifest
+                    provenance.rst   the provenance report
+                    events.log       the provenance event log
+
+**A run directory's name** is the run's creation time in UTC to the second,
+``yyyyMMdd'T'HHmmss'Z'``, a hyphen, and the run id: ``20260828T231500Z-run-0001``.
+The timestamp comes first so that a directory listing sorts runs by age; the
+run id makes the name unique. A reader can rely on the name agreeing with the
+``created`` and ``runId`` members of the ``run.json`` inside it: CometGUI
+refuses a ``run.json`` that names another directory.
+
+**Inputs are recorded, never copied** (``R-RUN-03``). Spectrum files and the
+FASTA stay where the user keeps them; ``run.json`` records each one's canonical
+path, size, modification time, MD5 and SHA-256.
+
+**Comet's outputs** for spectrum file ``nn`` are named after its *base name*,
+which Comet receives as ``-N<run>/outputs/comet/<base>``:
+
+* the base name is the file name without its spectrum extension (``.mzML``,
+  ``.mzXML``, ``.mgf``, ``.ms2``, ``.cms2``, ``.bms2``, ``.raw``, in any case);
+  a file with none of those extensions keeps its whole name;
+* base names are distinct ignoring case and Unicode normalisation, because the
+  default file systems of macOS and Windows treat ``A.pin`` and ``a.pin`` as one
+  file;
+* a collision is resolved in input order: every file's own base name is
+  reserved first, and a later file whose name is taken gets the smallest
+  ``_2``, ``_3`` ... that is nobody's name. ``a.mzML``, ``A.mzXML``, ``a.mgf``
+  become ``a``, ``A_2``, ``a_3``; ``a.mzML``, ``A.mgf``, ``a_2.mzML`` become
+  ``a``, ``A_3``, ``a_2``;
+* a name whose base would be empty, ``.`` or ``..``, or would contain ``/``,
+  ``\`` or a control character, is refused: its outputs could land outside
+  ``outputs/comet/``.
+
+Each spectrum entry of ``run.json`` records the base name it was given.
+
+The provenance event log is ``provenance/events.log``. Phase 04 left that name
+to its callers; it is now a constant of the run layout.
+
+Where the logs differ from the specification
+--------------------------------------------
+
+**This is a divergence from the specification, stated rather than hidden.**
+The specification's *Project model* shows a Comet invocation's logs as
+``logs/comet.<spectrum-basename>.{stdout,stderr}.log``. CometGUI writes one log
+per invocation instead, ``logs/comet-<nn>.log``, where ``nn`` is the spectrum
+file's 1-based position with at least two digits:
+
+* the process service writes **one** timestamped log per process, each line
+  tagged with the stream it came from, because two separate files lose the
+  order in which a tool's two streams interleaved;
+* a log is named after the invocation's stage identifier, which must match
+  ``[A-Za-z0-9_-]{1,64}`` and so cannot carry an arbitrary spectrum file name;
+* a retried invocation's log is ``comet-<nn>.1.log``, ``comet-<nn>.2.log`` ...,
+  because the process service never overwrites a log.
+
+``run.json`` maps each ``nn`` back to its spectrum file and base name (the
+``stageId`` member of each spectrum entry). The divergence is design decision
+P8-3 of the Phase 08 work log, escalated there as a proposed specification
+amendment; until that amendment is made, this paragraph is the record of it.
+
+.. _ref-project-format-versions:
+
+Schema versions
+===============
+
+``project.json``, ``run.json`` and ``project.lock`` each begin with a
+``schemaVersion`` member, and every document of this format declares ``1``.
+The policy for any other version (``R-RUN-04``) is the same for all three:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 78
+
+   * - Declared version
+     - What CometGUI does
+
+   * - ``1``
+     - Reads the document.
+
+   * - Lower than ``1``
+     - Refuses it, with a message naming both versions and saying that no
+       migration exists. Version 1 is the first published format, so nothing
+       older was ever written; when version 2 exists, its migration from version
+       1 is registered and only versions below 1 stay refused.
+
+   * - Higher than ``1``
+     - Refuses it **before any other member is read**, with a message naming
+       both versions. A newer CometGUI may have changed what a member *means*,
+       not only added one, so a document read "as far as this build understands
+       it" would be misread without anyone noticing.
+
+In every case **the file is left byte-for-byte as it was**: refusal happens
+while reading, and nothing is written.
+
+Conventions a reader may rely on
+================================
+
+All three documents are written by the same JSON writer as the provenance
+manifest and follow its byte-level conventions
+(:ref:`ref-provenance-format`): UTF-8, ``\n`` line endings, two-space
+indentation, one member per line, ``": "`` between a name and its value, one
+trailing newline, ``{}`` and ``[]`` for empty containers, whole numbers only,
+and an absent optional written as ``null``, never omitted. Members are written
+in the order the tables below list them; the two open-ended maps
+(``succeededSteps`` and ``inputDigests``) are sorted by key.
+
+**Timestamps** are UTC with exactly three fractional digits,
+``uuuu-MM-dd'T'HH:mm:ss.SSS'Z'`` -- for example ``2026-08-28T23:15:00.250Z`` --
+truncated to the millisecond.
+
+**Digests** are lower-case hexadecimal: 32 characters for MD5, 64 for SHA-256.
+Upper case is refused, because nothing CometGUI writes produces it.
+
+**The reader is strict**, and a reader built from this page should be too:
+
+* the document must be UTF-8 and at most 64 MiB (``project.lock`` at most
+  64 KiB);
+* every member listed for an object must be present, and **no other member is
+  accepted**. ``run.json`` is rewritten whenever an attempt changes, and a
+  member this build did not understand would be silently dropped by the
+  rewrite;
+* a refusal names the file and the member -- for example
+  ``"spectra[1].sha256"`` -- and the rule it broke, and **never quotes a value
+  from the document**, which may hold anything.
+
+``project.json``
+================
+
+The project's identity. Written once, when the project is created; a directory
+that already holds one is refused.
+
+.. code-block:: json
+
+   {
+     "schemaVersion": 1,
+     "projectId": "project-beta",
+     "created": "2026-08-28T23:00:00.000Z"
+   }
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 14 66
+
+   * - Member
+     - Type
+     - Meaning
+
+   * - ``schemaVersion``
+     - number
+     - Always ``1`` for this format.
+
+   * - ``projectId``
+     - string
+     - The project's identifier: letters, digits, ``.``, ``-`` and ``_``,
+       starting with a letter or digit, at most 64 characters. Every run of the
+       project records it, as does the provenance manifest's ``run.projectId``.
+
+   * - ``created``
+     - timestamp
+     - When the project was created.
+
+**What later phases add.** Version 1 holds only what Phase 08 needs: an
+identity runs can name. The specification's "mutable user intent" -- the
+prospective parameter configuration, the chosen inputs and tools, the presets in
+``presets/`` -- is added by the phases that build those editors, each as a
+schema-version bump with a migration from version 1.
+
+``run.json``
+============
+
+What a run *is*, written once when the run starts, and what has happened to it
+since, only ever added to (``R-RUN-06``). The identity members come first, then
+``attempts``.
+
+.. code-block:: json
+
+   {
+     "schemaVersion": 1,
+     "runId": "run-0001",
+     "projectId": "project-beta",
+     "created": "2026-08-28T23:15:00.250Z",
+     "cometRelease": "2026.03.0",
+     "spectra": [
+       {
+         "position": 1,
+         "stageId": "comet-01",
+         "base": "k562_3",
+         "path": "/data/in/k562_3.mzML",
+         "size": 2602922,
+         "modified": "2026-08-01T10:00:00.000Z",
+         "md5": "0123456789abcdef0123456789abcdef",
+         "sha256": "a562f6e6b4c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5"
+       }
+     ],
+     "fasta": {
+       "path": "/data/db/sub.fasta",
+       "size": 512000,
+       "modified": "2026-07-30T08:00:00.000Z",
+       "md5": "11111111111111111111111111111111",
+       "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+     },
+     "parameters": {
+       "path": "parameters/comet.params",
+       "size": 12345,
+       "md5": "33333333333333333333333333333333",
+       "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+     },
+     "indexMode": "none",
+     "databaseDelivery": "parameter-file",
+     "attempts": [
+       {
+         "number": 1,
+         "started": "2026-08-28T23:15:01.000Z",
+         "ended": "2026-08-28T23:16:00.000Z",
+         "outcome": "failed",
+         "succeededSteps": {
+           "hash-inputs": {
+             "fingerprint": "5555555555555555555555555555555555555555555555555555555555555555",
+             "inputDigests": {
+               "fasta": "6666666666666666666666666666666666666666666666666666666666666666",
+               "spectrum-files": "7777777777777777777777777777777777777777777777777777777777777777"
+             }
+           }
+         }
+       },
+       {
+         "number": 2,
+         "started": "2026-08-28T23:17:00.000Z",
+         "ended": null,
+         "outcome": "running",
+         "succeededSteps": {}
+       }
+     ]
+   }
+
+That is a run whose first attempt failed after hashing its inputs, and whose
+retry is in progress. (The digests are illustrative.)
+
+The root
+--------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 14 66
+
+   * - Member
+     - Type
+     - Meaning
+
+   * - ``schemaVersion``
+     - number
+     - Always ``1`` for this format.
+
+   * - ``runId``
+     - string
+     - The run's identifier, constrained as ``projectId`` is. With ``created``
+       it names the run directory.
+
+   * - ``projectId``
+     - string
+     - The project the run belongs to; equal to that project's
+       ``project.json``.
+
+   * - ``created``
+     - timestamp
+     - When the run was created. Its whole seconds are the run directory's
+       timestamp.
+
+   * - ``cometRelease``
+     - string
+     - The Comet release that executes the run, as its version text, for
+       example ``2026.03.0``. Never blank.
+
+   * - ``spectra``
+     - array
+     - The spectrum files, at least one, in the order the user gave them. See
+       below.
+
+   * - ``fasta``
+     - object
+     - The protein database, recorded as a spectrum file is (without
+       ``position``, ``stageId`` and ``base``).
+
+   * - ``parameters``
+     - object
+     - The canonical Comet parameter file archived in the run, the one passed
+       to Comet with ``-P``. See below.
+
+   * - ``indexMode``
+     - string
+     - ``none`` (Comet searches the FASTA), ``fragment-ion`` (a prebuilt index
+       made with ``comet -i``) or ``peptide`` (``comet -j``).
+
+   * - ``databaseDelivery``
+     - string
+     - How the database reached Comet (``R-CMT-04``): ``parameter-file``
+       (``database_name`` in the parameter file) or ``command-line`` (``-D``,
+       overriding it -- for example to search a cached index).
+
+   * - ``attempts``
+     - array
+     - Every attempt to execute the run, oldest first; empty until the first
+       one starts. See below.
+
+A spectrum entry
+----------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 14 66
+
+   * - Member
+     - Type
+     - Meaning
+
+   * - ``position``
+     - number
+     - The file's 1-based position. Entries are in position order, 1, 2, 3 ...
+
+   * - ``stageId``
+     - string
+     - ``comet-`` and the position with at least two digits: the identifier of
+       this file's Comet invocation, and the name of its log,
+       ``logs/<stageId>.log``. Derived from ``position``; a reader may check it
+       and CometGUI does.
+
+   * - ``base``
+     - string
+     - The output base name: Comet wrote ``outputs/comet/<base>.pep.xml`` and
+       ``outputs/comet/<base>.pin`` for this file. It must be the name the rule
+       in `The layout on disk`_ gives these inputs in this order.
+
+   * - ``path``
+     - string
+     - The file's canonical path, absolute and normalised, when the run
+       started.
+
+   * - ``size``
+     - number
+     - The file's length in bytes.
+
+   * - ``modified``
+     - timestamp
+     - The file's last-modified time.
+
+   * - ``md5``, ``sha256``
+     - string
+     - The file's digests, computed by the hash service over the content the
+       run used.
+
+The parameter file
+------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 14 66
+
+   * - Member
+     - Type
+     - Meaning
+
+   * - ``path``
+     - string
+     - The file's path **relative to the run directory**, with ``/`` on every
+       platform; always under ``parameters/``. Relative because the file
+       belongs to the run, so the record stays true when a project is moved.
+
+   * - ``size``
+     - number
+     - Its length in bytes, as on disk when the run was recorded.
+
+   * - ``md5``, ``sha256``
+     - string
+     - Its digests, computed over the file on disk after it was written -- the
+       same values the provenance manifest carries.
+
+An attempt
+----------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 14 66
+
+   * - Member
+     - Type
+     - Meaning
+
+   * - ``number``
+     - number
+     - The attempt's number: 1 for the first execution, 2 for the first retry,
+       and so on, in order.
+
+   * - ``started``
+     - timestamp
+     - When the attempt started.
+
+   * - ``ended``
+     - timestamp or ``null``
+     - When it ended; ``null`` exactly while ``outcome`` is ``running``.
+
+   * - ``outcome``
+     - string
+     - ``running``, ``succeeded``, ``failed`` or ``cancelled``. Only the latest
+       attempt may be ``running``.
+
+   * - ``succeededSteps``
+     - object
+     - The input fingerprint of every workflow step that **succeeded** in this
+       attempt, keyed by the step's identifier (for example ``run-comet``). A
+       step that failed, was cancelled, was skipped or was reused from an
+       earlier attempt has no entry, so a later rerun preview is never told that
+       something was produced when it was not. Each value is an object with
+       ``fingerprint`` (the step's SHA-256 fingerprint) and ``inputDigests``
+       (the digest of each of the step's inputs, keyed by input kind, for
+       example ``comet-parameters``). Identifiers are lower-case letters and
+       digits in hyphen-separated words.
+
+A rerun preview compares against the fingerprints of every attempt merged,
+the latest attempt's winning where two recorded the same step.
+
+What may change, and what may not
+---------------------------------
+
+``run.json``'s identity -- every root member except ``attempts`` -- is written
+once, when the run is recorded, and a second recording of the same run is
+refused with the file untouched. After that the file is only ever replaced,
+atomically (write a temporary file, force it to disk, rename it over the old
+one), by a *successor*, which CometGUI checks against the file on disk:
+
+* every identity member is unchanged -- no input, hash, parameter file,
+  release, index mode or database mechanism is ever re-recorded;
+* every existing attempt is still there, in order;
+* an attempt that has ended is unchanged;
+* the running attempt may end and may gain fingerprints, but its start does
+  not change and a fingerprint it recorded is never changed or removed;
+* new attempts may be appended: **a retry is a new attempt, never a rewrite.**
+
+An update that breaks any of these is refused, naming the member, and the file
+is left byte-for-byte as it was.
+
+Everything under ``parameters/`` is written once as well: the canonical
+``comet.params`` is created by a write that refuses an existing file, and it is
+hashed as it lies on disk.
+
+A ``running`` attempt found in a project that nobody had locked was
+interrupted: the process that wrote it died. Ending it as ``failed`` is a
+permitted successor, and is how it is recovered.
+
+``project.lock``
+================
+
+The project lock (``R-RUN-05``): one CometGUI at a time per project, with a
+stale-lock recovery that names the owner.
+
+.. code-block:: json
+
+   {
+     "schemaVersion": 1,
+     "pid": 4242,
+     "host": "lab-pc",
+     "started": "2026-10-06T09:00:00.125Z"
+   }
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 14 66
+
+   * - Member
+     - Type
+     - Meaning
+
+   * - ``schemaVersion``
+     - number
+     - Always ``1`` for this format.
+
+   * - ``pid``
+     - number
+     - The operating-system process id of the CometGUI holding the project.
+       Positive.
+
+   * - ``host``
+     - string
+     - The name of the computer it runs on, or ``unknown-host`` when that
+       computer's name could not be determined.
+
+   * - ``started``
+     - timestamp
+     - When it took the lock.
+
+**An empty file means "not held".** Releasing the lock empties the file and
+only then releases it.
+
+**How the lock is taken.** The file is created (or opened, if it exists) and an
+operating-system lock is *tried* -- never waited for: a second CometGUI is
+refused at once, not frozen. The locked region is a single byte at offset
+2\ :sup:`30`, beyond any record, because Windows byte-range locks are
+mandatory and locking the record itself would stop a second CometGUI from
+reading whose lock it is. Within one CometGUI process, a second attempt on the
+same project is refused before the file is touched.
+
+**What a refusal says, and when a lock is stale.**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - What CometGUI finds
+     - What it does
+
+   * - Another process holds the operating-system lock.
+     - Refuses, naming the process, host and start time the file records
+       ("is open in another CometGUI: process 4242 on host lab-pc, since
+       ..."). The owner is live.
+
+   * - The lock is free, and the file records a process **on another
+       computer**.
+     - Refuses, naming it. **A lock from another computer is never broken**,
+       because this computer cannot tell whether that process is alive; the
+       message says to close CometGUI there or delete the file by hand.
+
+   * - The lock is free, and the file records a process on this computer that
+       **is no longer running**.
+     - The lock is **stale**: CometGUI takes it over and says whose it was
+       ("recovered a stale lock ... left by process 4242 on host lab-pc, since
+       ..., which is no longer running").
+
+   * - The lock is free, and the file records a process on this computer that
+       **is still running**.
+     - Refuses, naming it. Most likely an unrelated program reused the process
+       number; the message says to delete the file by hand if so.
+
+   * - The file is not a record this build can read.
+     - Refuses, naming the file. An unreadable lock is never broken
+       silently.
+
+**Written in place, not by rename.** Every other document is replaced
+atomically; the lock record cannot be, because the operating-system lock
+belongs to the file itself, and renaming a new file over it would leave the
+holder locking a file nobody else opens. The record is written with one write
+and forced to disk. For the same reason nothing else in a CometGUI process may
+open ``project.lock``: on POSIX systems closing *any* descriptor of a file
+releases every lock the process holds on it.
+
+**Across computers** the operating-system lock is not trusted -- network file
+systems do not propagate it reliably -- and the host check above is what
+protects a project on a shared drive.
+
+Where the code is
+=================
+
+The models are pure and live in ``org.cometgui.domain.project``
+(``ProjectDescriptor``, ``ProjectLayout``, ``LockOwner``,
+``SchemaVersionPolicy``) and ``org.cometgui.domain.run`` (``RunLayout``,
+``OutputBaseNames``, ``RunDescriptor``, ``RunIdentity``, ``RunAttempt``).
+Reading and writing them is ``org.cometgui.workflow.storage``
+(``ProjectJson``, ``RunJson``, ``ProjectStore``, ``RunStore``,
+``ProjectLock``). The tests that hold the writers to hand-typed documents byte
+for byte are ``RunJsonTest`` and ``ProjectJsonTest`` (the examples on this page
+are abridged from them); the readers' tests parse hand-typed documents and
+never ones the writer produced.
