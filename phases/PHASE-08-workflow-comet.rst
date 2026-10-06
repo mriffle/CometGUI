@@ -3,7 +3,7 @@ PHASE-08: Workflow Engine and Comet Adapter
 ===========================================
 
 :Phase: 08
-:Status: NOT STARTED
+:Status: IN PROGRESS (dispatched 2026-10-06)
 :Depends on: 03, 04, 05, 06
 :Blocked by decisions: none
 :Delivers: R-CMT-01..08, R-DEC-01..04, R-RUN-01..06
@@ -32,6 +32,12 @@ In scope
   column checks.
 * Index modes (``-i``, ``-j``) as a cached, keyed, provenance-recorded step,
   reading an existing ``.idx`` file's self-description.
+* *Assigned by tier 1, 2026-10-06:* the specification's pre-run validation
+  "selected index and search options are compatible", which no phase owned.
+  It needs the filesystem, so it belongs with the index step: read the
+  ``.idx`` self-description and refuse, before Comet starts, an index the
+  selected release cannot search (2026.03.0 reads only ``Comet index database
+  v5``, ``R-PARAM-13``) or one built with options the search contradicts.
 * The target/decoy model, FASTA decoy detection, and the blocking rules.
 * Project and run storage, schema versions, run immutability, project
   locking.

@@ -6,11 +6,11 @@ Project Status
 :Updated: 2026-10-06
 :Updated by: Main orchestrator, session 10 (**Phase 07 signed off PASSED** --
    :ref:`status-p07-signed`)
-:Current phase: **none -- waiting for the owner.** Phase 07 is PASSED and
-   committed, **not pushed**: the owner's instruction to commit, push and
-   start the next phase covered the Comet 2026.03.0 intake and Phase 07's
-   dispatch, not what follows it. Phase 08 (Workflow engine and Comet
-   adapter) is ready and not dispatched.
+:Current phase: **Phase 08 -- Workflow Engine and Comet Adapter**,
+   dispatched 2026-10-06 with ``handoffs/PHASE-08-BRIEF.rst`` on the owner's
+   instruction ("Push and start phase 08"); ``main`` pushed at ``6bb9ce6``.
+   Tier 1 assigned the unowned "selected index is compatible" validation to
+   this phase.
 :Overall: Eight phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04
    and 05 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
@@ -243,8 +243,9 @@ Phase board
        three injections of its own (:ref:`status-p07-signed`).
    * - 08
      - Workflow engine and Comet adapter
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-10-06 (``handoffs/PHASE-08-BRIEF.rst``); also owns the
+       index-compatibility check, assigned by tier 1.
    * - 09
      - Percolator adapter and version capabilities
      - NOT STARTED
@@ -3783,6 +3784,11 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-06
+     - 08
+     - ``main`` pushed at ``6bb9ce6``; **Phase 08 dispatched** on the owner's
+       instruction. The "selected index is compatible" validation, unowned
+       since Phase 06, assigned to it.
    * - 2026-10-06
      - 07
      - **Phase 07 signed off PASSED** at ``cce00b9`` (build 11/11, gates 14/14,
