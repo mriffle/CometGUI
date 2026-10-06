@@ -157,6 +157,22 @@ class FastaDecoyScannerTest {
     }
 
     @Test
+    @DisplayName("a quoted first line is cut after 40 characters, and one of exactly 40 is not")
+    void quotedLength() throws IOException {
+        String forty = "M".repeat(40);
+        Path exact = file("exact.txt", forty + "\n>sp|P1\nM\n");
+        assertEquals(
+                "the FASTA file "
+                        + exact
+                        + " is not a FASTA file: its first line that is not blank does not begin"
+                        + " with '>' (it begins \""
+                        + forty
+                        + "\")",
+                assertThrows(FastaScanException.class, () -> FastaDecoyScanner.scan(exact, "D"))
+                        .getMessage());
+    }
+
+    @Test
     @DisplayName("a line that does not begin a record after the first record is sequence")
     void sequenceAfterRecords() throws IOException {
         Path fasta = file("seq.fasta", ">sp|P1\nnot a header > DECOY_x\n\n>DECOY_y\nM");

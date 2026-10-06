@@ -176,10 +176,6 @@ final class IndexCompatibilityRule {
         contradiction(parameter, recorded, "silently ignored", fix);
     }
 
-    private boolean has(String parameter) {
-        return model.entry(parameter).isPresent();
-    }
-
     private int whole(String parameter) {
         return ((ParameterValue.Whole) model.value(parameter)).value();
     }
@@ -192,24 +188,26 @@ final class IndexCompatibilityRule {
         return "\"" + key + ": " + value + "\"";
     }
 
-    /** {@code index_search_type} 0 or 1 against the index's type; -1 asks for none. */
+    /**
+     * {@code index_search_type} 0 or 1 against the index's type; -1 asks for none, and a release
+     * without the parameter asks nothing.
+     */
     private void indexType() {
         String parameter = "index_search_type";
-        if (!has(parameter)) {
-            return;
-        }
-        int asked = whole(parameter);
         int recorded = index.type() == IndexMode.PEPTIDE ? 0 : 1;
-        if ((asked == 0 || asked == 1) && asked != recorded) {
-            contradiction(
-                    parameter,
-                    quoted(
-                            "IndexSearchType",
-                            index.type() == IndexMode.PEPTIDE
-                                    ? "peptide index"
-                                    : "fragment ion index"),
-                    "set " + parameter + " to " + recorded);
-        }
+        model.entry(parameter)
+                .map(entry -> ((ParameterValue.Whole) entry.value()).value())
+                .filter(asked -> (asked == 0 || asked == 1) && asked != recorded)
+                .ifPresent(
+                        asked ->
+                                contradiction(
+                                        parameter,
+                                        quoted(
+                                                "IndexSearchType",
+                                                index.type() == IndexMode.PEPTIDE
+                                                        ? "peptide index"
+                                                        : "fragment ion index"),
+                                        "set " + parameter + " to " + recorded));
     }
 
     private void decoys() {
@@ -350,7 +348,7 @@ final class IndexCompatibilityRule {
                                 "add_Nterm_protein",
                                 "add_Cterm_protein")
                         .get(position - CometIndexDescription.STATIC_RESIDUES.length());
-        return has(name) ? Optional.of(name) : Optional.empty();
+        return model.entry(name).map(ParameterEntry::name);
     }
 
     private void staticMods() {
@@ -416,7 +414,7 @@ final class IndexCompatibilityRule {
                     asked.isPresent()
                             ? recorded.isActive() && agrees(asked.get(), recorded, alphabet, cap)
                             : !recorded.isActive();
-            if (!agrees && has(slotName(number))) {
+            if (!agrees) {
                 contradiction(
                         slotName(number),
                         render(number, recorded),

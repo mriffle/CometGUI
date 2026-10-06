@@ -319,6 +319,28 @@ class CometIndexHeaderReaderTest {
                 refusal(replaced("MassRange: 600.000000 5000.000000", "MassRange: 600\0\n")));
     }
 
+    @Test
+    @DisplayName("a NUL byte first on a header line is refused too")
+    void nulFirst() {
+        assertEquals(
+                CANNOT
+                        + "line 4 holds a NUL byte, before the empty line that ends a Comet index"
+                        + " header",
+                refusal(replaced("MassRange: 600.000000 5000.000000", "\0MassRange: 600\n")));
+    }
+
+    @Test
+    @DisplayName("a quoted line is cut after 80 characters, and one of exactly 80 is not")
+    void quotedLength() {
+        String eighty = "y".repeat(80);
+        assertEquals(
+                CANNOT + "line 5, \"" + eighty + "\", is not a \"Key: value\" header line",
+                refusal(replaced("LengthRange: 5 50", eighty + "\n")));
+        assertEquals(
+                CANNOT + "line 5, \"" + eighty + "...\", is not a \"Key: value\" header line",
+                refusal(replaced("LengthRange: 5 50", eighty + "y\n")));
+    }
+
     static Stream<Arguments> damaged() {
         return Stream.of(
                 Arguments.of(

@@ -711,6 +711,101 @@ class IndexCompatibilityRulesTest {
         }
     }
 
+    /** A format-5 description with other variable-modification slots. */
+    private static CometIndexDescription withSlots(
+            CometIndexDescription index, List<CometIndexDescription.VariableMod> slots) {
+        return new CometIndexDescription(
+                index.file(),
+                index.formatVersion(),
+                index.firstLine(),
+                index.cometVersion(),
+                index.type(),
+                index.inputDatabase(),
+                index.massRange(),
+                index.lengthRange(),
+                index.parentMassType(),
+                index.fragmentMassType(),
+                index.decoySearch(),
+                index.decoyPrefix(),
+                index.enzyme(),
+                index.secondEnzyme(),
+                index.enzymeTermini(),
+                index.missedCleavages(),
+                index.clipNtermMethionine(),
+                index.peptides(),
+                index.staticMods(),
+                slots,
+                index.proteinModList(),
+                index.requireVariableMod(),
+                index.maxVariableModsInPeptide());
+    }
+
+    private static CometIndexDescription.VariableMod held(
+            String residues, String mass, int count, int distance, int terminus) {
+        return new CometIndexDescription.VariableMod(
+                residues,
+                new java.math.BigDecimal(mass),
+                java.math.BigDecimal.ZERO,
+                java.math.BigDecimal.ZERO,
+                count,
+                OptionalInt.of(distance),
+                OptionalInt.of(terminus),
+                0);
+    }
+
+    @Test
+    @DisplayName("the last slot an index holds is compared, and is not 'beyond' it")
+    void lastHeldSlot() {
+        CometIndexDescription plain = IndexDescriptions.formatFive(IndexMode.FRAGMENT_ION);
+        List<CometIndexDescription.VariableMod> slots = new ArrayList<>(plain.variableMods());
+        slots.set(4, held("K", "42.010565", 2, -1, 3));
+        CometIndexDescription index = withSlots(plain, slots);
+        assertEquals(
+                List.of(),
+                indexFindings(
+                        validate(
+                                Models.with(NEWER, "variable_mod05", "42.010565 K 0 2 -1 3 0 0.0"),
+                                index)),
+                "slot 5 as held, its terminus 3 kept");
+        CometParameters other = Models.with(NEWER, "variable_mod05", "42.010565 K 0 1 -1 3 0 0.0");
+        Finding finding = Models.only(new ValidationReport(indexFindings(validate(other, index))));
+        assertContradiction(
+                finding,
+                "variable_mod05",
+                other,
+                contradiction(
+                        "slot 5 of \"VariableMod:\", K:42.010565:0:0:2:-1:3, requirement 0",
+                        "variable_mod05",
+                        "42.010565 K 0 1 -1 3 0 0.0",
+                        "silently ignored",
+                        "set variable_mod05 to what the index records"));
+    }
+
+    @Test
+    @DisplayName("c at distance 0 from the protein C-terminus is held as $, with no position left")
+    void proteinCTerminusRewrite() {
+        CometIndexDescription plain = IndexDescriptions.formatFive(IndexMode.FRAGMENT_ION);
+        List<CometIndexDescription.VariableMod> slots = new ArrayList<>(plain.variableMods());
+        slots.set(1, held("$", "-0.984016", 1, -1, 0));
+        assertEquals(
+                List.of(),
+                indexFindings(
+                        validate(
+                                Models.with(NEWER, "variable_mod02", "-0.984016 c 0 1 0 1 0 0.0"),
+                                withSlots(plain, slots))));
+        assertEquals(
+                "$",
+                IndexCompatibilityRule.indexedResidues(
+                        ((org.cometgui.params.comet.model.ParameterValue.Tuple)
+                                        Models.with(
+                                                        NEWER,
+                                                        "variable_mod02",
+                                                        "-0.984016 c 0 1 0 1 0 0.0")
+                                                .value("variable_mod02"))
+                                .modification(),
+                        VariableModRules.alphabet(Models.enforced(NEWER))));
+    }
+
     @Test
     @DisplayName("several contradictions are each reported, in the rule's order")
     void several() {
