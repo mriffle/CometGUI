@@ -20,7 +20,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.format.DecimalStyle;
+import java.time.format.ResolverStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Objects;
@@ -91,6 +93,16 @@ public final class CanonicalTimestamp {
                     .withDecimalStyle(DecimalStyle.STANDARD);
 
     /**
+     * The same pattern, for reading: {@link ResolverStyle#STRICT}, so that a date that does not
+     * exist is refused rather than moved.
+     *
+     * <p>Under the default {@code SMART} style {@code 2026-02-30} resolves to 28 February, so a
+     * corrupted date would be read back as a different, plausible one.
+     */
+    private static final DateTimeFormatter UTC_MILLIS_STRICT =
+            UTC_MILLIS.withResolverStyle(ResolverStyle.STRICT);
+
+    /**
      * Never instantiated: this is one operation over an instant, with no state to carry.
      *
      * <p>It throws rather than being an empty private constructor so that the intent is enforced
@@ -110,6 +122,25 @@ public final class CanonicalTimestamp {
     public static String utcMillis(Instant instant) {
         Objects.requireNonNull(instant, "instant");
         return UTC_MILLIS.format(instant);
+    }
+
+    /**
+     * Reads back an instant {@link #utcMillis} wrote, and accepts nothing else.
+     *
+     * <p>The reading half of this class, added in phase 08 so that {@code project.json} and {@code
+     * run.json} are read by the same definition they are written by, rather than by a third copy of
+     * the pattern. Exactly {@link #PATTERN}: three fractional digits, a literal {@code Z}, ASCII
+     * digits, and a date that exists.
+     *
+     * @param text the rendering to read
+     * @return the instant it names
+     * @throws NullPointerException if {@code text} is {@code null}
+     * @throws DateTimeParseException if {@code text} is not exactly of the form {@link #PATTERN},
+     *     or names a date or time that does not exist
+     */
+    public static Instant parse(String text) {
+        Objects.requireNonNull(text, "text");
+        return UTC_MILLIS_STRICT.parse(text, Instant::from);
     }
 
     /**

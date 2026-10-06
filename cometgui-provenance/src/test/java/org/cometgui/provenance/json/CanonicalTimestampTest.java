@@ -27,6 +27,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.format.DecimalStyle;
 import java.util.Locale;
 import java.util.Optional;
@@ -374,6 +375,79 @@ class CanonicalTimestampTest {
                 Locale.setDefault(originalDefault);
                 Locale.setDefault(Locale.Category.FORMAT, originalFormat);
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("Reading back")
+    class ReadingBack {
+
+        @Test
+        @DisplayName("reads the canonical form to the instant it names")
+        void readsTheCanonicalForm() {
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    Instant.parse("2026-08-31T09:14:00.250Z"),
+                                    CanonicalTimestamp.parse("2026-08-31T09:14:00.250Z")),
+                    () ->
+                            assertEquals(
+                                    Instant.EPOCH,
+                                    CanonicalTimestamp.parse("1970-01-01T00:00:00.000Z")),
+                    () ->
+                            assertEquals(
+                                    Instant.parse("2024-02-29T23:59:59.999Z"),
+                                    CanonicalTimestamp.parse("2024-02-29T23:59:59.999Z")));
+        }
+
+        @Test
+        @DisplayName("refuses every other shape, and a date that does not exist")
+        void refusesOtherShapes() {
+            for (String text :
+                    new String[] {
+                        "2026-08-31T09:14:00Z",
+                        "2026-08-31T09:14:00.25Z",
+                        "2026-08-31T09:14:00.2500Z",
+                        "2026-08-31T09:14:00.250",
+                        "2026-08-31T09:14:00.250+00:00",
+                        "2026-08-31 09:14:00.250Z",
+                        "2026-02-30T00:00:00.000Z",
+                        "2026-02-29T00:00:00.000Z",
+                        "2026-08-31T24:00:00.000Z",
+                        "\u0e52\u0e50\u0e52\u0e56-08-31T09:14:00.250Z",
+                        ""
+                    }) {
+                assertThrows(
+                        DateTimeParseException.class,
+                        () -> CanonicalTimestamp.parse(text),
+                        () -> "accepted \"" + text + "\"");
+            }
+        }
+
+        @Test
+        @DisplayName("is the inverse of utcMillis at millisecond precision, under any locale")
+        void invertsUtcMillis() {
+            Locale before = Locale.getDefault();
+            try {
+                Locale.setDefault(THAI_DIGITS);
+                Instant instant = Instant.parse("2026-08-31T09:14:00.250999999Z");
+                assertEquals(
+                        Instant.parse("2026-08-31T09:14:00.250Z"),
+                        CanonicalTimestamp.parse(CanonicalTimestamp.utcMillis(instant)));
+            } finally {
+                Locale.setDefault(before);
+            }
+        }
+
+        @Test
+        @DisplayName("rejects null text, naming the parameter")
+        void rejectsNull() {
+            assertEquals(
+                    "text",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () -> CanonicalTimestamp.parse(deliberateNull()))
+                            .getMessage());
         }
     }
 
