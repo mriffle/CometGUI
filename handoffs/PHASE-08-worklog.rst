@@ -328,7 +328,27 @@ once.
        second write of a run's parameters refused; round trip pinned by
        hand-typed documents, not by the writer.
      - R-RUN-03..06
-     -
+     - **Signed off 2026-10-06** (``6643bf4`` adds the reading half of
+       ``CanonicalTimestamp`` to ``cometgui-provenance`` rather than a third
+       private copy; ``0da7414`` the unit). Diff read: 58 files inside the
+       brief's paths. Tests, fresh XML: domain **1132** (was 965), provenance
+       **672** (2 pre-existing skips), workflow **445** (was 328), 0
+       failures. PIT: ``domain.project.*,domain.run.*`` 234 = 231 KILLED + 3
+       TIMED_OUT (genuine infinite loops), 0 survived; ``workflow.storage.*``
+       181/181. My injections, landed and restored by ``sha256sum -c``: (1)
+       ``SchemaVersionPolicy.judge`` accepting ``current + 1`` --
+       ``SchemaVersionPolicyTest.newerRefused:60 Expected
+       UnsupportedSchemaVersionException to be thrown, but nothing was
+       thrown`` and ``judges:36``; (2) ``ProjectLock.isAlive`` always false
+       (a live owner taken for stale) -- ``ProjectLockTest.productionAcquire``
+       and ``liveness`` fail. Agent's own gates: ``--only quality`` 42,
+       ``--only docs``/``traceability``, ``--only provenance`` 24 -- all
+       pass. **Carried forward:** ``CanonicalParamsWriter.writeOnce`` uses
+       plain ``CREATE_NEW``, so a crash mid-write leaves a truncated
+       ``comet.params`` that ``RunStore`` checks only by existence -- unit 6
+       re-hashes it before use (P8-14); ``JsonWriter`` redacts string values,
+       so a path matching a secret pattern is stored redacted in
+       ``run.json`` (the store returns the re-read record for that reason).
 
    * - 3
      - **Pre-run facts and rules.** In ``tools.comet``: the streaming FASTA
@@ -431,7 +451,9 @@ Files read outside their module by tests
 
 Recorded the day a unit lands, for ``--only tests``' sandbox.
 
-None yet.
+* Unit 1: none.
+* Unit 2: no path outside the module; ``RunStoreTest`` loads
+  ``cometgui-params-comet``'s committed main resources from the class path.
 
 Deferred
 ========
