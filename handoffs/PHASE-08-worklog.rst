@@ -571,7 +571,35 @@ once.
        parameter. Acceptance: a real-binary test proving Comet itself fails on
        the placeholder, and the pre-run check refusing it with no launch.
      - Comet validation ("database exists and is readable" and its kin)
-     -
+     - **Signed off 2026-10-07** (``e1595e1``; app fixtures repaired by the
+       unit 7 agent at ``9a0f20c``). The set is every parameter whose
+       metadata carries validator ``path`` except ``database_name``
+       (``peff_obo``, ``compoundmods_file``, ``spectral_library_name``,
+       ``protein_modslist_file`` in both releases); proven metadata-derived by
+       ``theSetFollowsTheMetadata``. Real binary: the placeholder makes
+       2026.03.0 exit 1 (``Error (5) - cannot read spectral library file``);
+       the check refuses it with no run directory and zero launches. Workflow
+       **608 tests** from 53 fresh reports, 0 failures; the agent's PIT on
+       ``PreRunChecks*`` 57/57 detected. ``e1595e1`` left three cometgui-app
+       GUI tests red (they relied on the placeholder); returned to the unit 7
+       agent, fixtures repaired at ``9a0f20c`` (cleared through Advanced; the
+       Comet-failure test now uses an empty ``.file`` library, which
+       2026.03.0 refuses, while an empty file with no extension or ``.msp``
+       searches normally -- measured). My run of those three classes: 8
+       tests, 0 failures. ``--only paramui`` on ``9a0f20c``: 87/87 on the
+       agent's second run; its first run failed one clean re-run of Phase
+       07's ``VariableModificationEditorUiTest`` (``bounds are not visible
+       in Scene``) -- recorded as a flaky test, escalated. My injections,
+       landed and restored: (1) a directory or unreadable file accepted
+       (``Files.exists``) -- ``PathParameterChecksTest.eachPathParameterIsChecked:135
+       peff_obo = .../inputs/folder ... but was: <[]>``; (2) only values
+       beginning ``/some`` checked -- 4 failures incl.
+       ``theSetIsTheBundledMetadatas:227``. Escalated: a new configuration
+       starts with the placeholder, so every first run is blocked until the
+       scientist clears the field (correct, but a product decision whether
+       the default should be empty); and ``spectral_library_name``'s
+       ``shortHelp`` ("a file Comet cannot read means no spectral-library
+       search") is false on 2026.03.0.
 
    * - 8
      - **Documentation and traceability.**
