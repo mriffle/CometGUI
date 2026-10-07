@@ -468,7 +468,38 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
        inclusive at exactly 0.01, values 0 and 1 accepted, below 0 and above
        1 refused, PSM independent of peptide.
      - R-PERC-08 (parse), R-PERC-09; gates 1 (parse), 8; AC-RES-05
-     -
+     - **Signed off 2026-10-07** (``f2ef533``). Diff read: 49 files, all in
+       ``cometgui-results``; POM gains only its mutation switch.
+       ``ResultTableReader`` (columns by header name, streaming, unknown
+       q-values counted as their own category with status ``MISSING`` /
+       ``UNPARSABLE`` / ``OUT_OF_RANGE``, original text kept),
+       ``WeightsReader`` (split count read from the file; every split must
+       name the same features), ``PercolatorOutputException``;
+       ``filtering``: ``PsmQValueFilter``, ``PeptideQValueFilter``,
+       ``DisplayFilters`` (defaults 0.01, ``[0, 1]``, inclusive), separate
+       from ``TestFdr``/``TrainFdr``. **Fixtures:** real 3.07.1, 3.06.5 and
+       3.09 output over CometGUI's own ``SyntheticPin`` (not D-006 data),
+       each SHA-256 pinned, provenance in ``real/PROVENANCE.txt``; two- and
+       four-split weights and an unknown-q table constructed, recorded in
+       ``constructed/CONSTRUCTED.txt``. Version differences: identical
+       headers in all three; 3.09 differs from 3.07.1 only in
+       ``posterior_error_prob`` (I-spline PEP). ``mvn -pl cometgui-results
+       -am install`` with tests rc 0: results **167** tests, 0 failures, 0
+       ``BugInstance``; census 22 compiled = 22 in ``jacoco.xml``. Module
+       PIT (configured run): 181 = 177 KILLED + 1 TIMED_OUT, 2 SURVIVED + 1
+       NO_COVERAGE -- all three in the close-after-refused-open path (a
+       handle leak at worst; no row dropped, no comparison inverted, no
+       refusal suppressed): accepted as argued. My injections, landed and
+       restored by ``sha256sum -c``: (1) filter range check accepting up to
+       10 -- 4 failures, ``QValueFilterTest.outOfRange``; (2) the
+       same-features-per-split check disabled -- 2 failures,
+       ``WeightsReaderTest.refused:69``. ``--only quality`` PASS 42. No file
+       read outside the module. **Residue:** ``.gitattributes`` has no
+       ``-text`` rule for the pinned fixtures, so a Windows checkout with
+       ``core.autocrlf=true`` would fail their SHA-256 checks (tier 1's
+       file); the synthetic fixture has no q <= 0.01 row, so the boundary is
+       proved on the constructed table and at real values 0.0588235 and
+       0.166667.
 
    * - 5
      - **The Percolator workflow steps** (``workflow.steps``, ``workflow.state``
