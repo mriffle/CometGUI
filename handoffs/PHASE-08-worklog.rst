@@ -607,7 +607,24 @@ once.
        traceability entries for AC-WF-01..05, AC-PRV-03 and AC-PRV-04 naming
        the real tests. Acceptance: ``docs``, ``traceability`` green.
      - R-DOC; AC traceability
-     -
+     - **Signed off 2026-10-07** (``2f27d33``, docs only, 10 files). My runs:
+       ``scripts/ci/docs-build.sh`` rc 0, no ``problematic`` or
+       ``system-message`` span in ``workflow_engine.html``;
+       ``scripts/ci/traceability.sh`` rc 0, the rendered report shows
+       AC-WF-01..05 **automated** and AC-PRV-03/04 **partial** (Phase 08
+       tests plus Phase 13 planned). My injections into the unit's own
+       artefacts, restored and verified by ``sha256sum -c``: (1) a
+       traceability method renamed -- ``traceability.sh`` rc 1, ``[TEST-MISSING]
+       AC-WF-05: names the test method ...gate7CancelTheRealCometMidSearchX``;
+       (2) a ``:ref:`` in ``workflow_engine.rst`` pointed at a missing label
+       -- ``docs-build.sh`` rc 1, ``undefined label``. Corrections the unit
+       made to earlier pages, checked against code: one execution per tool
+       record (``provenance_schema.rst``), and ``cometgui-install``'s
+       ``provenance`` edge in the architecture table. Note for tier 1: the
+       planned Phase 08 entries for AC-WF-01..05 were removed, because the
+       generator rejects a planned entry once its phase is PASSED. AC-WF-04
+       scenarios (b), (c), (e) are proved on the declared graph only
+       (Percolator and Limelight do not exist yet); the entries say so.
 
    * - 9
      - **Falsifiability harness** ``scripts/verify-workflow-gates.sh``,
