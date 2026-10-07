@@ -69,7 +69,8 @@ import org.junit.jupiter.api.io.TempDir;
  *   <li>A parameter changed: the rerun preview names every step and why, before anything starts.
  *   <li>A spectrum file changed in place: a new run, and the last run's own refusal to reuse it in
  *       the words of Phase 08 gate 8 -- the file, its role, both SHA-256s.
- *   <li>A configuration Comet itself refuses (the release's placeholder spectral library): the
+ *   <li>The release's placeholder spectral library is refused before Comet, in words, Run disabled;
+ *       then a configuration Comet itself refuses (an empty file as the spectral library): the
  *       failure is stated with its step, never swallowed, and the stepper shows Comet failed.
  * </ol>
  *
@@ -104,6 +105,14 @@ class RealRunUiTest {
 
     private static List<Path> spectra;
 
+    /**
+     * An empty, readable file named {@code .file}: it passes the pre-run check, and Comet 2026.03.0
+     * refuses it, exit 1, "Error, expecting sqlite .db or Thermo .raw file for the spectral
+     * library." Measured on the pinned binary: the same empty file with no extension, or named
+     * {@code .msp}, is searched with exit 0, so the extension is load-bearing.
+     */
+    private static Path emptyLibrary;
+
     @BeforeAll
     static void launch() throws IOException {
         Path root = scratch.toRealPath();
@@ -111,6 +120,7 @@ class RealRunUiTest {
         Path inputs = Files.createDirectories(root.resolve("inputs"));
         spectra = RealSearch.spectra(inputs);
         Path subset = RealSearch.subset(inputs.resolve("subset.fasta"));
+        emptyLibrary = Files.createFile(inputs.resolve("empty-library.file"));
         project = root.resolve("project");
         launches = new LaunchRecorder(new ProcessService(Clock.systemUTC()));
         console = new BoundedMessageLog();
@@ -353,10 +363,23 @@ class RealRunUiTest {
     @Test
     @Order(5)
     @DisplayName("a run Comet refuses: the failure is stated with its step, never swallowed")
-    void aFailureIsStated() {
+    void aFailureIsStated() throws IOException {
+        // The release's placeholder spectral library is refused before Comet (unit 7b), on screen.
         spectralLibrary("/some/path/speclib.file");
         driver.clickOn("nav-run");
+        assertEquals(
+                "The workflow engine cannot start this search:\nspectral_library_name (Spectral"
+                        + " library file) = /some/path/speclib.file does not exist or cannot be"
+                        + " read; clear it to search without one, or choose the file",
+                RunSection.awaitEngineAnswer(driver));
+        assertTrue(RunSection.isDisabled(driver, "run-start"), "the placeholder disables Run");
+        int launched = cometLaunches().size();
+
+        // An empty, readable file passes the check, and Comet itself refuses it.
+        spectralLibrary(emptyLibrary.toString());
+        driver.clickOn("nav-run");
         assertEquals(ENGINE_CAN_RUN, RunSection.awaitEngineAnswer(driver));
+        assertEquals(launched, cometLaunches().size(), "the refused placeholder launched nothing");
         driver.clickOn("run-start");
         String outcome =
                 RunSection.awaitText(
@@ -384,6 +407,14 @@ class RealRunUiTest {
                                                 + ".")
                         .toList();
         assertTrue(expected.contains(outcome), () -> outcome + "\nis none of " + expected);
+        String position =
+                outcome.substring(outcome.indexOf("invocation comet-") + 17).substring(0, 2);
+        assertTrue(
+                Files.readString(run.resolve("logs/comet-" + position + ".log"))
+                        .contains(
+                                "Error, expecting sqlite .db or Thermo .raw file for the spectral"
+                                        + " library."),
+                "the failure is Comet's own refusal of the library, in its stage log");
         assertEquals("Failed", driver.textOf("stage-comet-state"));
         assertEquals(
                 ENGINE_CAN_RUN,
