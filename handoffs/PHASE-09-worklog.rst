@@ -382,7 +382,34 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
        settings defaults and ranges; ``testFDR``/``trainFDR`` separate from
        the display filters; advisory rendering. Expected values hand-typed.
      - R-PERC-02, 03, 04, 05, 10, 11; gates 3, 4 (logic); AC-RES-05
-     -
+     - **Signed off 2026-10-07** (``aca45ea``). Diff read: 25 files, all in
+       ``cometgui-params-percolator``; the POM gains only the module's own
+       ``cometgui.mutation.skip=false`` and a corrected comment.
+       ``PercolatorSettings`` (testFDR/trainFDR as their own ``BigDecimal``
+       types, seed 1, maxiter 10, threads 3 -- Percolator's own defaults;
+       ranges measured on all three binaries), ``PercolatorSetting`` mapping
+       each to one capability, ``EffectiveSeed``; ``resolution``:
+       ``DownstreamStage`` (Limelight needs ``XML_OUTPUT``),
+       ``PercolatorResolver``, ``ResolutionChange``, ``ResolutionMessages``
+       (all text in one place), ``AdvisoryRendering``. **Deviation accepted:**
+       a managed ``INSTALLING`` offer is a candidate (the same build as the
+       ``NOT_INSTALLED`` one; excluding it would make the default jump during
+       an install). The brief's PIT command with ``-am`` fails on domain
+       ("No mutations found"); run without ``-am`` after installing domain.
+       ``mvn -pl cometgui-params-percolator -am install`` with tests rc 0: 54
+       tests, 0 failures, 0 ``BugInstance``; JaCoCo line 409/409, branch
+       169/171; census 17 compiled = 17 in ``jacoco.csv``. PIT, the module's
+       full configured run: **145/145 KILLED** over 17 classes. My
+       injections, landed and restored by ``sha256sum -c``: (1)
+       **version-blind**: a stage available iff a candidate's version is
+       below 3.09 -- 2 failures, ``PercolatorResolverTest.macosInferred`` and
+       ``ResolutionChangeTest.switchedOnButUnavailable``; (2) the preference
+       order not reversed (oldest first) -- 13 failures, e.g.
+       ``futureWithXmlWins expected <3.10> but was <3.07.1>``. Note: the
+       real Linux set (3.07.1 vs 3.09) cannot distinguish a version rule from
+       a capability rule; only the future-version and inferred cases do, and
+       they exist. ``--only quality`` PASS 42. No file read outside the
+       module.
 
    * - 3
      - **Command builder and pre-launch PIN check** (``tools.percolator``).
