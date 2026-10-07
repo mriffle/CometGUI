@@ -73,7 +73,7 @@ public final class ScriptedEngine implements RunEnginePort {
 
     private final AtomicInteger cancels = new AtomicInteger();
 
-    private RuntimeException cancelFailure;
+    private IllegalStateException cancelFailure;
 
     private final Queue background = new Queue("background");
 
@@ -113,7 +113,7 @@ public final class ScriptedEngine implements RunEnginePort {
      *
      * @param failure what it throws
      */
-    public void failCancellations(RuntimeException failure) {
+    public void failCancellations(IllegalStateException failure) {
         this.cancelFailure = Objects.requireNonNull(failure, "failure");
     }
 
