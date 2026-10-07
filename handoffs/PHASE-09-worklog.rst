@@ -327,7 +327,47 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
        3.05 through 3.09 and future-looking strings (``3.10``, ``4.0``,
        ``3.09.1``).
      - R-PERC-02, R-PERC-06 (evidence half), R-TOOL-06..08; gates 2, 3
-     -
+     - **Signed off 2026-10-07** (``62848df``; my integration repair
+       ``c20f900``). Diff read: 24 files -- three new capabilities
+       (``TEST_FDR_OPTION``, ``TRAIN_FDR_OPTION``, ``MAX_ITERATIONS_OPTION``);
+       the one probe now makes eleven runs over the 64+64 fixture, one per
+       capability, each judged on its own file or on a completed run
+       (``ProbeArtefacts``: header by name, exact row count, target/decoy by
+       the protein prefix); ``PercolatorOption`` maps each of 12 proved
+       spellings to one capability; the completion marker records
+       ``capabilityProbeGeneration`` 2 and an older marker verifies as
+       ``CAPABILITIES_FROM_AN_EARLIER_PROBE`` (not installed: the next install
+       re-probes, at the cost of a re-download). **Found by the agent and
+       repaired by me:** ``cometgui-app``'s ``ToolManagerInstallUiTest`` and
+       ``UpstreamInstallUiTest`` pinned the old two-capability row, so
+       ``--only install`` was red on ``62848df``; updated to the eleven
+       capabilities and twelve runs (``c20f900``). ``mvn -pl
+       cometgui-install,cometgui-tools -am install`` with tests, rc 0, fresh
+       XML: domain 1157, provenance 672 (2 skipped, pre-existing), process
+       274, tools **509** (was 429), install **1038**, 0 failures, 0
+       ``BugInstance`` in all five. App: ``ToolManagerInstallUiTest`` 3/3,
+       ``UpstreamInstallUiTest`` 1 run + 1 network-gated skip. Real binaries
+       (agent's output, re-run in my tools suite): 3.07.1 and 3.06.5 probe to
+       all eleven; 3.09 (rpm binary + Boost 1.66, registered local) to the
+       nine non-XML ones; about 5.5-5.9 s per probe. My PIT over
+       ``PercolatorCapabilityProbe*``, ``ProbeArtefacts*``,
+       ``PercolatorOption*``: **74/74 KILLED**. My injections, each landed
+       (anchor gone), restored by ``sha256sum -c``: (1) **version-blind**:
+       ``DECOY_OUTPUT`` granted only when ``version.isAtLeast(3.07)`` -- 2
+       failures, ``PercolatorRealBinaryTest.theOldestManagedBinary:242
+       ... expected <[..., DECOY_OUTPUT, ...]> but was <[...]>`` (3.06.5) and
+       ``theOtherRealBinary:400``; (2) the target/decoy check in
+       ``ProbeArtefacts.isResultTable`` disabled -- 5 failures, e.g.
+       ``PercolatorCapabilityProbeTest.aDamagedPsmTable:769 a decoy among the
+       targets``. ``--only install`` **PASS 95 controls in 306 s** on
+       ``c20f900``; ``--only quality`` PASS. **Tests read outside their
+       module** (all under ``scratch/``, which the ``tests`` sandbox links
+       whole): ``scratch/percolator/3.09/run-percolator-3.09.sh``, its rpm
+       binary and two Boost libraries, besides the existing
+       ``scratch/phase05/artefacts`` zips and the 3.09 ``.deb`` payload.
+       Limits noted: the fixture cannot tell a PSM table from a peptide table
+       (all 128 peptides distinct); PIT reports in domain, tools and install
+       are now partial and must be regenerated before ``--only tests``.
 
    * - 2
      - **Settings, resolution and advisories** (``params.percolator``).
