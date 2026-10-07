@@ -685,6 +685,65 @@ class RealPercolatorRunTest {
 
     @Test
     @DisplayName(
+            "the rerun preview after the real 3.07.1 run: nothing for the same configuration;"
+                    + " Percolator alone (Comet reused) for a changed seed or another build")
+    void rerunPreviewAfterARealPercolatorRun() throws IOException {
+        Set<DownstreamStage> limelight = EnumSet.of(DownstreamStage.LIMELIGHT_CONVERSION);
+        PercolatorChoice same = choice(offer3071, limelight);
+        SearchRequest unchanged = search(RealComet.NEWER, fasta, comet).withPercolator(same);
+        int launches = project.runner().launches().size();
+        org.cometgui.workflow.engine.ReuseCheck nothing =
+                project.workflow()
+                        .preview(project.engine(), withLimelight3071.prepared(), unchanged);
+        assertTrue(nothing.accepted(), nothing::message);
+        assertEquals(Set.of(), nothing.preview().executed());
+        assertEquals(
+                Set.of(
+                        EngineStep.SERIALISE_COMET_PARAMS,
+                        EngineStep.RUN_COMET,
+                        EngineStep.VALIDATE_COMET_OUTPUTS,
+                        EngineStep.MERGE_PIN,
+                        EngineStep.RUN_PERCOLATOR,
+                        EngineStep.PARSE_PERCOLATOR,
+                        EngineStep.FINALISE_PROVENANCE),
+                nothing.preview().reused());
+
+        PercolatorChoice reseeded =
+                new PercolatorChoice(
+                        same.selection(),
+                        same.settings().withRandomSeed(2),
+                        same.enabledStages(),
+                        same.resolution());
+        for (PercolatorChoice changed : List.of(reseeded, choice(offer309, limelight))) {
+            org.cometgui.workflow.state.RerunPreview preview =
+                    project.workflow()
+                            .preview(
+                                    project.engine(),
+                                    withLimelight3071.prepared(),
+                                    search(RealComet.NEWER, fasta, comet).withPercolator(changed))
+                            .preview();
+            assertEquals(
+                    Set.of(EngineStep.RUN_PERCOLATOR, EngineStep.PARSE_PERCOLATOR),
+                    preview.reExecuted());
+            assertEquals(
+                    Set.of(EngineStep.VALIDATE_CONFIGURATION, EngineStep.RESOLVE_PERCOLATOR),
+                    preview.prepared());
+            // finalise-provenance is reused: without Phase 10's finalise-results in the plan, no
+            // planned edge carries a Percolator change into it.
+            assertEquals(
+                    Set.of(
+                            EngineStep.SERIALISE_COMET_PARAMS,
+                            EngineStep.RUN_COMET,
+                            EngineStep.VALIDATE_COMET_OUTPUTS,
+                            EngineStep.MERGE_PIN,
+                            EngineStep.FINALISE_PROVENANCE),
+                    preview.reused());
+        }
+        assertEquals(launches, project.runner().launches().size(), "a preview launches nothing");
+    }
+
+    @Test
+    @DisplayName(
             "gate 5: the REAL zero-decoy PIN (Comet 2026.02.2, fragment-ion index): the full run"
                     + " stops at Comet validation; driven past it, run-percolator refuses the"
                     + " merged PIN naming the decoy configuration; zero Percolator launches;"

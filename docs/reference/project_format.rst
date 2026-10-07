@@ -36,14 +36,20 @@ A project holds mutable user intent and immutable run records
                 run.json             the run's identity and attempts
                 parameters/
                     comet.params     the canonical parameter file (written once)
+                    percolator-settings.json
+                                     the Percolator settings (written once; a run
+                                     with Percolator only -- see below)
                 inputs/
                     pin/merged.pin   the merged PIN Percolator reads
                 outputs/
                     comet/<base>.pep.xml
                     comet/<base>.pin
+                    percolator/      Percolator's raw outputs, read-only once it
+                                     succeeded (a run with Percolator only)
                 logs/
                     comet-01.log     one log per Comet invocation (see below)
                     comet-02.log
+                    percolator.log   the Percolator invocation's log
                 provenance/
                     provenance.json  the provenance manifest
                     provenance.rst   the provenance report
@@ -117,6 +123,84 @@ file's 1-based position with at least two digits:
 ``stageId`` member of each spectrum entry). The divergence is design decision
 P8-3 of the Phase 08 work log, escalated there as a proposed specification
 amendment; until that amendment is made, this paragraph is the record of it.
+
+Percolator's files
+------------------
+
+A run whose request carries a Percolator half (``SearchRequest.percolator``,
+Phase 09) adds three things to its directory; a Comet-only run has none of
+them.
+
+``parameters/percolator-settings.json`` -- the Percolator scientific
+settings the run executes with (``R-RUN-06``). It is written once, when the run
+is prepared, by the one JSON writer through the one atomic writer; a second
+write is refused with the file untouched, and ``run-percolator`` re-hashes it
+before Percolator starts and refuses a file whose SHA-256 or size differs from
+what was written, naming the file and both digests. It is canonical -- the same
+settings always give the same bytes -- and its SHA-256 is the run's
+``percolator-settings`` fingerprint input, so a changed setting reruns
+Percolator and nothing upstream of it::
+
+    {
+      "schemaVersion": 1,
+      "settings": {
+        "test-fdr": "0.01",
+        "train-fdr": "0.01",
+        "random-seed": "1",
+        "maximum-iterations": "10",
+        "thread-count": "3"
+      },
+      "downstreamStages": [
+        "limelight-conversion"
+      ]
+    }
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 76
+
+   * - Member
+     - Meaning
+
+   * - ``schemaVersion``
+     - ``1``, the first member. The same policy as ``run.json``'s applies to a
+       change of format.
+   * - ``settings``
+     - One member per Percolator setting, in this fixed order, named by the
+       setting's identifier: ``test-fdr`` and ``train-fdr`` (Percolator's
+       learning thresholds, **not** the result display filters), the
+       configured ``random-seed``, ``maximum-iterations`` and
+       ``thread-count``. Each value is a string holding exactly the text that
+       goes on Percolator's command line when the build accepts the option:
+       plain decimal, the same in every locale. A setting the build cannot
+       accept is still recorded here -- the file is the configuration, not the
+       command -- and provenance says it was not passed and why.
+   * - ``downstreamStages``
+     - The identifiers of the enabled downstream stages, in declaration order;
+       today only ``limelight-conversion``, or ``[]``. It is here because an
+       enabled stage that needs pout XML changes the command (``-X``).
+
+The document ends with one newline. Nothing else is in it: the build that runs
+is a separate fingerprint input (its version and SHA-256), and what the build
+was observed to accept is recorded in provenance, not here.
+
+``outputs/percolator/`` -- the raw artefacts, with fixed names:
+``psms.tsv``, ``peptides.tsv``, ``decoy-psms.tsv``, ``decoy-peptides.tsv``,
+``weights.txt`` and ``pout.xml``, each present exactly when the command asked
+for it (the decoy tables with ``DECOY_OUTPUT``, the weights with
+``WEIGHTS_OUTPUT``, the pout XML only when the build has ``XML_OUTPUT`` *and* an
+enabled stage needs it). Percolator runs with this directory as its working
+directory. After it exits 0, every requested file must exist and hold bytes,
+and **no other file may be in the directory** -- so a run that requested no
+pout XML fails rather than keeping an ``.xml`` it did not ask for. Then every
+file is made read-only (``R-PERC-07``): on a POSIX file system every write
+permission bit is removed; elsewhere the DOS read-only attribute is set, which
+has not run on Windows. Nothing derived is ever written here.
+
+``logs/percolator.log`` -- the one stream-tagged log of the Percolator
+invocation, whose stage identifier is ``percolator``; a retried invocation's is
+``percolator.1.log``. This is the same divergence from the specification's
+``percolator.{stdout,stderr}.log`` as Comet's logs above (design decision P9-9).
 
 The index cache
 ---------------
@@ -546,8 +630,8 @@ An update that breaks any of these is refused, naming the member, and the file
 is left byte-for-byte as it was.
 
 Everything under ``parameters/`` is written once as well: the canonical
-``comet.params`` is created by a write that refuses an existing file, and it is
-hashed as it lies on disk.
+``comet.params`` and ``percolator-settings.json`` are each created by a write
+that refuses an existing file, and each is hashed as it lies on disk.
 
 A ``running`` attempt found in a project that nobody had locked was
 interrupted: the process that wrote it died. Ending it as ``failed`` is a
@@ -662,7 +746,8 @@ The models are pure and live in ``org.cometgui.domain.project``
 Reading and writing them is ``org.cometgui.workflow.storage``
 (``ProjectJson``, ``RunJson``, ``ProjectStore``, ``RunStore``,
 ``ProjectLock``). The index cache is ``org.cometgui.workflow.steps``
-(``IndexCacheKey``, ``IndexCacheEntry``). The tests that hold the writers to
+(``IndexCacheKey``, ``IndexCacheEntry``), and so are the Percolator files
+(``PercolatorSettingsFile``, ``PercolatorDeclarations``). The tests that hold the writers to
 hand-typed documents byte for byte are ``RunJsonTest`` and ``ProjectJsonTest`` (the examples on this page
 are abridged from them); the readers' tests parse hand-typed documents and
 never ones the writer produced.

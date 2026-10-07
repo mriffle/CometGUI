@@ -445,6 +445,81 @@ One key is pinned by this format:
        two runs that differ only in this number produce different q-values, and
        a run whose seed is not recorded cannot be reproduced (``AC-PRV-10``).
 
+.. _ref-provenance-format-percolator-settings:
+
+Keys a run with Percolator records
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A run whose plan includes Percolator (Phase 09) records these keys, all held in
+one place in the code (``PercolatorProvenance`` in
+``org.cometgui.workflow.steps``). **Every one is fixed when the run is
+prepared** -- the selection, the settings and the command built from the
+build's probed capabilities decide them before anything runs -- so they are in
+the document however the attempt ends: a run whose Percolator step failed, or
+was refused before Percolator was launched, records its seed like any other.
+Lists inside a value are separated by single spaces.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Key
+     - Value
+
+   * - ``percolator.seed``
+     - The seed passed with ``--seed``, in decimal; or ``not-passed`` when the
+       build has no observed ``SEED_OPTION`` and ran with its own default.
+   * - ``percolator.seed-explanation``
+     - The sentence saying which of the two, and the configured seed.
+   * - ``percolator.version``, ``percolator.origin``,
+       ``percolator.binary-sha256``
+     - The build that runs: its version, ``managed`` or ``local``, and the
+       executable's SHA-256 when it was selected.
+   * - ``percolator.capabilities``
+     - The build's observed (probed) capabilities, sorted -- the set the
+       command was built from.
+   * - ``percolator.downstream-stages``
+     - The enabled downstream stages (``limelight-conversion``), or ``none``.
+   * - ``percolator.selection``
+     - ``resolved-default`` when the build that runs is *latest compatible*
+       resolution's choice, ``user-choice`` when the scientist chose another.
+   * - ``percolator.resolved-default``
+     - Resolution's choice as ``<version> <origin>``, or ``none``.
+   * - ``percolator.selection-reason``
+     - Resolution's reason for its choice (``R-PERC-10``): each newer version
+       it passed over, named with the capability it lacks.
+   * - ``percolator.skipped.<nn>.version``, ``.missing``, ``.reason``
+     - One group per newer version resolution passed over, newest first,
+       ``nn`` from ``01``: the version and origin, the missing capabilities,
+       and the sentence.
+   * - ``percolator.advisory.<id>``
+     - Each advisory of the build that runs, as shown at selection
+       (``R-PERC-11``), keyed by the manifest's advisory identifier.
+   * - ``percolator.not-emitted.<nn>.option``, ``.reason``
+     - Each option the run asked for and the command does not pass, because the
+       build was not observed to accept it (``R-PERC-06``), in command order:
+       the option's spelling and the reason, naming the missing capability.
+   * - ``percolator.pout-xml``
+     - Whether pout XML was requested: ``requested (-X <path>) ...`` with the
+       stage needing it, or ``not requested:`` and why -- no enabled stage needs
+       it, or the build lacks ``XML_OUTPUT``.
+   * - ``percolator.weights-warning``
+     - Present only when no weights file was requested: ``R-PERC-08``'s
+       provenance warning, with the reason. The same sentence is a warning on
+       the Percolator tool record.
+   * - ``percolator.settings-sha256``
+     - The SHA-256 of the run's ``parameters/percolator-settings.json``
+       (:doc:`project_format`).
+   * - ``percolator.decoy-prefix``
+     - The run's one decoy prefix, with which the merged PIN was checked before
+       launch (``R-DEC-03``, ``R-DEC-04``).
+   * - ``percolator.test-fdr``, ``percolator.train-fdr``,
+       ``percolator.random-seed``, ``percolator.maximum-iterations``,
+       ``percolator.thread-count``
+     - The configured settings, as the settings file holds them. The configured
+       seed is ``percolator.random-seed``; the one that ran is
+       ``percolator.seed``.
+
 ``tools[]``
 -----------
 
@@ -706,6 +781,18 @@ whole.
      - One of the :ref:`status values <ref-provenance-format-status>`.
        ``partial`` is the marking ``R-PROV-01`` requires for a file left behind
        by a stage that did not finish.
+
+**The roles a run with Percolator adds.** ``percolator-settings`` (the
+archived settings, read by ``run-percolator``); ``merged-pin`` as an input of
+``run-percolator``; and one role per raw artefact, each recorded as an output of
+``run-percolator`` and an input of ``parse-percolator``:
+``percolator-psms``, ``percolator-peptides``, ``percolator-decoy-psms``,
+``percolator-decoy-peptides``, ``percolator-weights`` and
+``percolator-pout-xml``. An artefact the command did not ask for has no
+record. The Percolator invocation is a ``tools[]`` element whose ``stageId`` is
+``percolator``, with its own argument array, the build's probed capabilities,
+and as warnings its advisories and, without a weights file, ``R-PERC-08``'s
+warning.
 
 The size and the modification timestamp sit beside the digests because they are
 what the input-hash cache is keyed on. Keeping them in the manifest lets a

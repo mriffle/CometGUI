@@ -22,7 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -180,7 +179,10 @@ final class FakePercolator {
             Set<ToolCapability> capabilities,
             List<ToolAdvisory> advisories) {
         List<DeclaredCapability> declared = new ArrayList<>();
-        for (ToolCapability capability : EnumSet.copyOf(capabilities)) {
+        for (ToolCapability capability : ToolCapability.values()) {
+            if (!capabilities.contains(capability)) {
+                continue;
+            }
             declared.add(
                     new DeclaredCapability(
                             capability,
