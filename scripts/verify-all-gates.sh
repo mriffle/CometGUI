@@ -132,7 +132,9 @@ declare -a COVERED=()
 #                checks and control H's H8-H10.  paramui: 66 on 2026-10-05,
 #                phase 07 unit 8's first shipping count; 70 on 2026-10-05,
 #                when phase 07 unit 9 made control 8v also grade the item-8
-#                GUI test on both releases (four checks).)
+#                GUI test on both releases (four checks); 87 on 2026-10-07,
+#                when phase 08 unit 7 added H7, the engine-only injection
+#                graded where the engine is ready (three checks).)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -301,7 +303,7 @@ gate_spec() {
                 "Four controls were version-blind (2v, 4v, 7v and 8v)"
                 "bytecode as a HARNESS ERROR, not as a pass"
             )
-            GATE_FLOOR=84
+            GATE_FLOOR=87
             GATE_UNIT="controls"
             ;;
         *)
