@@ -2,8 +2,8 @@
 Decisions
 =========
 
-:Updated: 2026-10-05 (D-011 raised and OPEN: Comet publishes no Intel macOS
-   build; D-010 decided 2026-10-04)
+:Updated: 2026-10-07 (D-012 decided: a new configuration starts with no
+   spectral library; D-011 still OPEN)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -940,3 +940,41 @@ D. **Ask upstream** (UWPR/Comet) for an x86-64 macOS asset; combinable with A.
 
 **Recommendation.** A, plus D. It costs one manifest row and one diagnostic,
 and the 2026.02.2 row is false whatever is chosen.
+
+----
+
+D-012 -- Comet's placeholder spectral library in a new configuration
+====================================================================
+
+:Status: **DECIDED 2026-10-07**
+:Raised: 2026-10-07, by Phase 08 (escalation 3), confirmed by tier 1 from the
+   real ``comet -q`` output of both releases
+:Blocks: nothing further; a tier-1 repair implements it before Phase 09
+:Owner: Project owner
+
+**Question.** Comet's own generated parameter file, in 2026.02.2 and
+2026.03.0 alike, sets ``spectral_library_name = /some/path/speclib.file`` --
+a placeholder that exists nowhere -- and Comet fails a run that names a
+missing library. CometGUI starts a new configuration from Comet's generated
+defaults, so every new search was blocked (by Phase 08 unit 7b, before Comet
+could fail) until the scientist cleared the field. Should CometGUI's starting
+configuration differ from Comet's default here?
+
+**Why it is the owner's.** It is a deliberate departure from the search
+engine's own defaults in a scientific configuration, which the project
+otherwise inherits verbatim.
+
+**DECISION (2026-10-07).** The owner directed: *"Make the spectral library
+change."* -- tier 1's recommendation: a new configuration starts with
+``spectral_library_name`` empty (no spectral-library search), recorded as a
+deliberate, per-release difference from Comet's generated default; the
+field's help text is corrected for each release.
+
+**What this does not change.** The bundled ``comet -q`` files stay byte-for-
+byte the real binaries' output; the difference is a recorded override applied
+when a configuration is created, visible as such. A file the scientist
+imports keeps whatever it names. The pre-run block on a library path that does
+not exist stays: it now fires only when someone has named one. Whether an
+empty value disables spectral-library search is established by running both
+real binaries, not assumed.
+
