@@ -14,7 +14,9 @@
 # phase has already met three that would not: unit 6's accessibility test
 # accepted Phase 02's generated fallback names, unit 7's Expert test started
 # from the defaults a reset reproduces, and unit 6's "Run disabled only by the
-# engine reason" is equivalent until Phase 08.  So this script injects, one at
+# engine reason" was equivalent until Phase 08 (it still is in the item-6 test,
+# whose application has no Comet installed; control H shows both halves).  So
+# this script injects, one at
 # a time, a defect each item exists to catch -- into PRODUCTION code of
 # cometgui-ui, the views, controls and view-models the tests drive -- requires
 # the gate test class that asserts the item to fail WITH THAT DEFECT'S OWN
@@ -127,10 +129,18 @@
 #       matches nothing, an injection that reaches the source but not the
 #       bytecode, a green run graded as a red, and a red without the expected
 #       diagnostic must each be reported as a HARNESS ERROR or FAILURE, never as
-#       a pass; and unit 6's EQUIVALENT injection -- Run disabled only by the
-#       engine's reason, which until Phase 08 always disables Run -- is made for
-#       real and must be reported as "HARNESS FAILURE -- the check PASSED with
-#       the defect present", never as a control that bit
+#       a pass; and unit 6's injection -- Run disabled only by the engine's
+#       reasons -- made for real twice.  H6: graded on the item-6 test, whose
+#       application has no Comet installed, so the engine always has a reason
+#       there and the injection is EQUIVALENT: it must be reported as "HARNESS
+#       FAILURE -- the check PASSED with the defect present", never as a control
+#       that bit.  H7 [NEW, phase 08 unit 7]: graded on RunReadinessUiTest,
+#       whose engine is READY (a registered Comet, real files, the pre-run check
+#       answering), so the same injection must go RED where a parameter error
+#       alone disables Run -- and the decoy-block method, where the engine
+#       itself disables Run, must STAY GREEN.  Phase 08 made the injection a
+#       real control there; H6 stays to prove the harness still refuses to
+#       count an equivalent one.
 #
 # WHAT IT DOES NOT COVER, said plainly:
 #
@@ -290,6 +300,9 @@ readonly T4="ExpertRawEditUiTest"
 readonly T5="WorkflowOutputsLockedUiTest"
 readonly T6="CrossParameterValidationUiTest"
 readonly T6M="MigrationReviewBlocksRunUiTest"
+# Phase 08 unit 7: Run readiness with the workflow engine's half READY, so the
+# parameters' half can be seen alone (control H7).
+readonly T6R="RunReadinessUiTest"
 readonly T7="ParameterControlsAccessibilityUiTest"
 readonly T7N="AccessibleNameEnumerationUiTest"
 readonly T8="ParameterSearchUiTest"
@@ -933,8 +946,9 @@ readonly SEL_8V="${T8V}"
 # share one run: 8v makes two, on the same injection.
 readonly SEL_8VG="${T8}"
 # Control H: H3 needs a cheap run (its bytecode check refuses it whatever the
-# tests say); H6 must run the class unit 6's equivalent injection was graded on.
-readonly SEL_H="${T8V},${T6}"
+# tests say); H6 must run the class unit 6's equivalent injection was graded on;
+# H7 the class where, since phase 08, the same injection is not equivalent.
+readonly SEL_H="${T8V},${T6},${T6R}"
 
 control_selectors() {
     case "$1" in
@@ -1540,25 +1554,53 @@ control_H() {
     # H6, the equivalent injection, for real.  Unit 6's injection 6b -- Run
     # disabled only by the workflow engine's reason -- left
     # CrossParameterValidationUiTest green, and rightly: until Phase 08 the
-    # engine's reason is always present, so the injected Run control behaves
-    # exactly like the real one.  It is NOT a control of item 6 (6b above is),
-    # and a harness that counted it as one would be lying.  It reaches the
-    # bytecode, it runs, it is green -- and the grading must call that a
-    # HARNESS FAILURE, which is what this sub-control requires.
+    # engine's reason was always present.  Since Phase 08 unit 7 the engine's
+    # half is real, but that test's application has no Comet installed (its
+    # Tool Manager reads an application data directory holding none), so the
+    # engine still always has a reason THERE and the injected Run control
+    # behaves exactly like the real one.  It is NOT a control of item 6 there
+    # (6b above is), and a harness that counted it as one would be lying.  It
+    # reaches the bytecode, it runs, it is green -- and the grading must call
+    # that a HARNESS FAILURE, which is what this sub-control requires.
+    local -r engine_only='        run.setDisable(!readiness.engineReasons().isEmpty());'
     save_pristine "${RUN_CONTROL}"
-    replace_once "H6" "${RUN_CONTROL}" "${H_ANCHOR}" \
-        '        run.setDisable(readiness.engineReason().isPresent());'
+    replace_once "H6" "${RUN_CONTROL}" "${H_ANCHOR}" "${engine_only}"
     assert_modified "H6" "${RUN_CONTROL}"
     log="${LOGS}/H6-equivalent.log"
     printf '   %s\n' "$(gate_command "${T6}")"
     dirty_run "H6" "${RUN_CONTROL}" "${T6}" "${log}"
-    expect_recorded_failure "H6 an EQUIVALENT injection (Run disabled only by the engine's reason) is reported as a HARNESS FAILURE, not as a control that bit" \
+    expect_recorded_failure "H6 an EQUIVALENT injection (Run disabled only by the engine's reasons, in a test whose engine always has one) is reported as a HARNESS FAILURE, not as a control that bit" \
         "HARNESS FAILURE -- the check PASSED with the defect present" \
         grade_red fixed "H6 (the equivalent injection, graded as item 6)" "${DIRTY_RC}" "${log}" \
         'Run is disabled ==> expected: <true> but was: <false>'
     if [ "${DIRTY_RC}" -ne 0 ]; then
-        record_fail "H6's premise is stale: the equivalent injection went RED (exit ${DIRTY_RC}). Either Phase 08's engine has arrived and this injection is no longer equivalent -- then make it a real item-6 control -- or something else broke; see $(rel "${log}")"
+        record_fail "H6's premise is stale: the equivalent injection went RED in ${T6} (exit ${DIRTY_RC}). Either that test's application now has a Comet installed -- then the injection is a real control there too, as H7 is -- or something else broke; see $(rel "${log}")"
     fi
+    restore_pristine "${RUN_CONTROL}"
+
+    # H7 [NEW, phase 08 unit 7]: the SAME injection where it is not equivalent.
+    # RunReadinessUiTest's application has a Comet registered with its Tool
+    # Manager and real files chosen, so the pre-run check answers "the
+    # workflow engine can run this search"; a reversed precursor window is
+    # then the ONLY reason against Run.  With Run disabled only by the
+    # engine's reasons, Run is enabled over a parameter error -- the defect
+    # Phase 07's gate-6 note said could not be seen before Phase 08.  The
+    # decoy-block method, where the ENGINE disables Run, must stay green: the
+    # injection changes nothing there, and a red there would mean the test is
+    # failing for another reason.
+    save_pristine "${RUN_CONTROL}"
+    replace_once "H7" "${RUN_CONTROL}" "${H_ANCHOR}" "${engine_only}"
+    assert_modified "H7" "${RUN_CONTROL}"
+    log="${LOGS}/H7-engine-ready.log"
+    printf '   %s\n' "$(gate_command "${T6R}")"
+    dirty_run "H7" "${RUN_CONTROL}" "${T6R}" "${log}"
+    grade_red fixed "H7 Run disabled only by the engine's reasons, where the engine is ready (item 6 with the engine's half real)" \
+        "${DIRTY_RC}" "${log}" \
+        'Run is disabled by the parameters alone ==> expected: <true> but was: <false>'
+    assert_testcase "H7 the parameters-alone method is the one that failed" failed \
+        "${T6R}" theParametersAloneDisableRun
+    assert_testcase "H7 the decoy-block method, where the engine itself disables Run, stays green" passed \
+        "${T6R}" theDecoyBlockOnScreen
     restore_pristine "${RUN_CONTROL}"
 
     USED_SELECTORS+=("${SEL_H}")
