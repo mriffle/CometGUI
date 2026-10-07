@@ -425,9 +425,11 @@ exist, and Comet stops with an error on it. So CometGUI starts the
 **Spectral library file** setting (``spectral_library_name``) empty -- no
 spectral-library search -- and shows it as *CometGUI default*, not Comet's.
 This is the one place a new configuration differs from Comet's own defaults.
-A parameter file you import keeps the library it names; if that file does not
-exist, CometGUI refuses to start until the setting is cleared or names a real
-file, and the message says so::
+A parameter file you import, or migrate from an older Comet, that has no
+``spectral_library_name`` line also has no spectral library -- which is how
+Comet itself reads such a file. A file that names a library keeps it; if that
+file does not exist, CometGUI refuses to start until the setting is cleared or
+names a real file, and the message says so::
 
     spectral_library_name (Spectral library file) = /some/path/speclib.file
     does not exist or cannot be read; clear it to search without one, or

@@ -110,7 +110,8 @@ class RealMigrationTest {
 
         @Test
         @DisplayName(
-                "carried values keep their text and origin; added ones take 2026.02.2's default")
+                "carried values keep their text and origin; added ones take 2026.02.2's default,"
+                        + " or CometGUI's starting value")
         void valuesAndOrigins() {
             CometParameters source = result.source();
             CometParameters migrated = result.model();
@@ -123,14 +124,28 @@ class RealMigrationTest {
                 assertEquals(source.value(name), migrated.value(name), name);
             }
             for (String name : Sets.NEW_IN_2026) {
+                MigrationEntry entry = result.report().entry(name).orElseThrow();
+                assertEquals(MigrationEntry.Outcome.ADDED, entry.outcome(), name);
+                assertEquals(Optional.empty(), entry.sourceText());
+                assertEquals(migrated.text(name), entry.targetText());
+                if ("spectral_library_name".equals(name)) {
+                    // D-012: absent from the 2024.01.0 file, so no library -- as Comet reads a
+                    // file without the line -- and said so in the report, not Comet's placeholder
+                    assertEquals(ValueOrigin.COMETGUI_DEFAULT, migrated.origin(name), name);
+                    assertEquals("", migrated.text(name));
+                    assertEquals(
+                            "spectral_library_name is new in Comet 2026.02.2 (Comet 2024.01.0 has"
+                                    + " no such parameter) and takes CometGUI's starting value,"
+                                    + " empty, not Comet's default /some/path/speclib.file: a file"
+                                    + " without the line is read so by Comet 2026.02.2 too",
+                            entry.explanation());
+                    continue;
+                }
                 assertEquals(ValueOrigin.COMET_DEFAULT, migrated.origin(name), name);
                 assertEquals(
                         Sets.METADATA.parameter(name, Sets.NEWER).orElseThrow().defaultValue(),
                         migrated.text(name),
                         name);
-                MigrationEntry entry = result.report().entry(name).orElseThrow();
-                assertEquals(Optional.empty(), entry.sourceText());
-                assertEquals(migrated.text(name), entry.targetText());
             }
             assertEquals(
                     "100",

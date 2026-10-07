@@ -191,12 +191,22 @@ class CometParamsParserTest {
     }
 
     @Test
-    @DisplayName("the real -p output: 96 IMPORTED, the 22 -q-only parameters at COMET_DEFAULT")
+    @DisplayName(
+            "the real -p output: 96 IMPORTED, the 22 -q-only parameters at COMET_DEFAULT, but"
+                    + " spectral_library_name at CometGUI's empty starting value")
     void realDefaultsFile() {
         CometParameters model = parsed(ParamsFiles.defaults());
         CometParameters complete = parsed(ParamsFiles.complete());
         Set<String> defaulted = new TreeSet<>();
         for (ParameterEntry entry : model.entries()) {
+            if ("spectral_library_name".equals(entry.name())) {
+                // -p leaves the line out; Comet reads that as no library (D-012), and so does this
+                assertEquals(ValueOrigin.COMETGUI_DEFAULT, entry.origin());
+                assertEquals("", model.text(entry.name()));
+                assertEquals("/some/path/speclib.file", complete.text(entry.name()));
+                defaulted.add(entry.name());
+                continue;
+            }
             if (entry.origin() == ValueOrigin.COMET_DEFAULT) {
                 defaulted.add(entry.name());
             } else {
@@ -245,7 +255,9 @@ class CometParamsParserTest {
     }
 
     @Test
-    @DisplayName("CONSTRUCTED: a parameter absent from the file takes the schema default")
+    @DisplayName(
+            "CONSTRUCTED: a parameter absent from the file takes the schema default, or CometGUI's"
+                    + " starting value")
     void absentTakesTheDefault() {
         String text =
                 "# comet_version 2026.02 rev. 2 (6edec91)\n"
@@ -259,10 +271,13 @@ class CometParamsParserTest {
         assertEquals(new ParameterValue.Text("DECOY_"), model.value("decoy_prefix"));
         assertEquals(ValueOrigin.COMET_DEFAULT, model.origin("decoy_prefix"));
         assertEquals(
-                117,
+                116,
                 model.entries().stream()
                         .filter(e -> e.origin() == ValueOrigin.COMET_DEFAULT)
                         .count());
+        // the one parameter CometGUI starts elsewhere: absent means no library, as Comet reads it
+        assertEquals(new ParameterValue.Text(""), model.value("spectral_library_name"));
+        assertEquals(ValueOrigin.COMETGUI_DEFAULT, model.origin("spectral_library_name"));
         assertEquals(2, model.enzymeTable().rows().size());
     }
 

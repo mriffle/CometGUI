@@ -190,6 +190,31 @@ class MigrationTo202603Test {
     @DisplayName("the real files, migrated")
     class RealFiles {
 
+        @Test
+        @DisplayName(
+                "a 2024.01.0 file gains spectral_library_name empty, as Comet reads a file"
+                        + " without it, and the report says so (D-012)")
+        void theLibraryIsAddedEmptyAndReported() {
+            for (CometFixtures.Mode mode : CometFixtures.Mode.values()) {
+                MigrationResult result = new Source(V2024_01, mode).migrate();
+                assertEquals("", result.model().text("spectral_library_name"), mode.fileName());
+                assertEquals(
+                        ValueOrigin.COMETGUI_DEFAULT,
+                        result.model().origin("spectral_library_name"),
+                        mode.fileName());
+                MigrationEntry entry = result.report().entry("spectral_library_name").orElseThrow();
+                assertEquals(MigrationEntry.Outcome.ADDED, entry.outcome());
+                assertTrue(entry.outcome().isChange(), "listed for review");
+                assertEquals("", entry.targetText());
+                assertEquals(
+                        "spectral_library_name is new in Comet 2026.03.0 (Comet 2024.01.0 has no"
+                                + " such parameter) and takes CometGUI's starting value, empty,"
+                                + " not Comet's default /some/path/speclib.file: a file without"
+                                + " the line is read so by Comet 2026.03.0 too",
+                        entry.explanation());
+            }
+        }
+
         @ParameterizedTest
         @MethodSource("org.cometgui.params.comet.migration.MigrationTo202603Test#sources")
         @DisplayName("every parameter has one entry, and the outcomes are the dumps' differences")
@@ -658,14 +683,34 @@ class MigrationTo202603Test {
                     1,
                     text.lines().filter(l -> l.startsWith("index_search_type = -1 ")).count(),
                     "every migrated file writes index_search_type = -1");
-            assertTrue(
-                    java.util.Arrays.equals(
-                            produced,
+            // A -p dump omits only parameters at their defaults, so its migrated file is its -q
+            // file's -- but for spectral_library_name: -q names the placeholder, which is kept,
+            // and -p leaves the line out, which reads as no library (D-012), as Comet reads it.
+            String complete =
+                    new String(
                             written(
                                     new Source(source.version(), CometFixtures.Mode.COMPLETE)
-                                            .migrate())),
-                    "a release's -p dump omits only parameters at its defaults, so its migrated"
-                            + " file is its -q file's");
+                                            .migrate()),
+                            StandardCharsets.UTF_8);
+            assertEquals(
+                    complete.replace(
+                            "\nspectral_library_name = /some/path/speclib.file\n",
+                            "\nspectral_library_name =\n"),
+                    text.replace(
+                            "\nspectral_library_name = /some/path/speclib.file\n",
+                            "\nspectral_library_name =\n"),
+                    "a release's -p dump omits only parameters at its defaults");
+            boolean names =
+                    source.mode() == CometFixtures.Mode.COMPLETE
+                            && "2026.02.2".equals(source.version().text());
+            assertTrue(
+                    text.contains(
+                            names
+                                    ? "\nspectral_library_name = /some/path/speclib.file\n"
+                                    : "\nspectral_library_name =\n"),
+                    names
+                            ? "a file naming the placeholder keeps it"
+                            : "a file without the line migrates to no library");
             assertFalse(text.contains("\nindex_search_type = 1"), text);
         }
 

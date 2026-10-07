@@ -68,9 +68,12 @@ import org.cometgui.params.comet.value.ValueSyntaxException;
  * is kept with its value and comments as an {@link UnknownParameter} and written back.
  *
  * <p>A modelled parameter the file declares takes its value from the file, with origin {@link
- * ValueOrigin#IMPORTED}; one it does not declare takes the schema default, with origin {@link
- * ValueOrigin#COMET_DEFAULT}. An empty value is a value: {@code peff_obo =} imports the empty text,
- * not the default.
+ * ValueOrigin#IMPORTED} -- whatever it names, Comet's own placeholder included. One it does not
+ * declare takes the value nothing-named gives ({@link CometParameters#startingEntry}): the schema
+ * default, origin {@link ValueOrigin#COMET_DEFAULT}, or, where the metadata records CometGUI's
+ * starting value, that value, origin {@link ValueOrigin#COMETGUI_DEFAULT} -- a file without a
+ * {@code spectral_library_name} line has no spectral library, as Comet itself reads it (D-012). An
+ * empty value is a value: {@code peff_obo =} imports the empty text, not the default.
  *
  * <p>The file's comment structure is preserved on {@link ParseResult#comments()} ({@code
  * R-PARAM-05}): the marker line, each modelled parameter's block comment, inline comment and
@@ -180,10 +183,8 @@ public final class CometParamsParser {
                 ParameterValue value = values.get(definition.name());
                 entries.add(
                         value == null
-                                ? new ParameterEntry(
-                                        definition,
-                                        codec.parse(definition, definition.defaultValue()),
-                                        ValueOrigin.COMET_DEFAULT)
+                                ? CometParameters.startingEntry(
+                                        metadata, selected, codec, definition)
                                 : new ParameterEntry(definition, value, ValueOrigin.IMPORTED));
             }
             CometParameters model =

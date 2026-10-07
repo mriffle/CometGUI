@@ -64,7 +64,10 @@ import org.cometgui.params.comet.value.ValueSyntaxException;
  *       MigrationEntry.Outcome#NEEDS_ATTENTION} when the target cannot hold it: the target's
  *       default is used and the source value is reported, never silently lost or guessed at;
  *   <li>new in the target ({@link MigrationEntry.Outcome#ADDED}): the target's default, origin
- *       {@link ValueOrigin#COMET_DEFAULT};
+ *       {@link ValueOrigin#COMET_DEFAULT} -- or, where the metadata records CometGUI's starting
+ *       value for the target, that value, origin {@link ValueOrigin#COMETGUI_DEFAULT}, as the
+ *       report entry says ({@link CometParameters#startingEntry}; {@code spectral_library_name},
+ *       D-012);
  *   <li>not in the target ({@link MigrationEntry.Outcome#REMOVED_KEPT_AS_UNKNOWN}): kept as an
  *       unknown parameter with its value text and curated inline comment, and reported -- never
  *       dropped ({@code R-PARAM-07}); validation then blocks it until the user removes it;
@@ -152,19 +155,34 @@ public final class SchemaMigration {
                 UnknownParameter unknown = sourceUnknowns.remove(name);
                 adopt(codec, definition, unknown, from, target, entries, report);
             } else {
-                entries.add(defaultEntry(codec, definition));
+                ParameterEntry added =
+                        CometParameters.startingEntry(metadata, target, codec, definition);
+                entries.add(added);
+                String addedText = codec.format(definition, added.value());
                 report.add(
                         new MigrationEntry(
                                 name,
                                 MigrationEntry.Outcome.ADDED,
                                 Optional.empty(),
-                                definition.defaultValue(),
+                                addedText,
                                 name
                                         + " is new in Comet "
                                         + target.text()
                                         + " (Comet "
                                         + from.text()
-                                        + " has no such parameter) and takes its default"));
+                                        + " has no such parameter) and takes "
+                                        + (added.origin() == ValueOrigin.COMETGUI_DEFAULT
+                                                ? "CometGUI's starting value"
+                                                        + (addedText.isEmpty()
+                                                                ? ", empty"
+                                                                : " " + addedText)
+                                                        + ", not Comet's default "
+                                                        + definition.defaultValue()
+                                                        + ": a file without the line is read"
+                                                        + " so by Comet "
+                                                        + target.text()
+                                                        + " too"
+                                                : "its default")));
             }
         }
 

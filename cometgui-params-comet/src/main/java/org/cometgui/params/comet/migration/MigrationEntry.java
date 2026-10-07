@@ -65,7 +65,9 @@ public record MigrationEntry(
         NOTED,
 
         /**
-         * New in the target version: it takes the target's default, origin {@code COMET_DEFAULT}.
+         * New in the target version: it takes the target's default, origin {@code COMET_DEFAULT},
+         * or CometGUI's starting value for the target where the metadata records one, origin {@code
+         * COMETGUI_DEFAULT} (D-012), which the explanation says.
          */
         ADDED,
 

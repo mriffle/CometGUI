@@ -453,12 +453,41 @@ public final class CometParameters {
      */
     public CometParameters resetToDefault(String name) {
         ParameterDefinition definition = require(name).definition();
-        Optional<String> starting = metadata.startingValue(name, version);
-        if (starting.isPresent()) {
-            return withText(name, starting.get(), ValueOrigin.COMETGUI_DEFAULT);
-        }
-        ParameterEntry reset = defaultEntry(codec, definition);
+        ParameterEntry reset = startingEntry(metadata, version, codec, definition);
         return withValue(name, reset.value(), reset.origin());
+    }
+
+    /**
+     * The entry a parameter takes when nothing names a value for it -- a new configuration, a
+     * reset, a parameter a parsed file leaves out, or one that is new in a migration's target:
+     * CometGUI's starting value for the version where the metadata records one ({@link
+     * CuratedMetadata#startingValue}), origin {@link ValueOrigin#COMETGUI_DEFAULT}; otherwise the
+     * schema default, what {@code comet -q} writes, origin {@link ValueOrigin#COMET_DEFAULT}.
+     *
+     * <p>For a parameter a file leaves out this is what Comet itself does: run on both offered
+     * releases, a file without the {@code spectral_library_name} line searches exactly as one with
+     * it empty, while {@code -q}'s placeholder value stops the search (D-012). A value a file
+     * <em>names</em> never comes through here.
+     *
+     * @param metadata the curated metadata
+     * @param version the Comet version
+     * @param codec the version's codec
+     * @param definition the parameter's definition as the version has it
+     * @return the entry
+     */
+    public static ParameterEntry startingEntry(
+            CuratedMetadata metadata,
+            ToolVersion version,
+            ParameterValueCodec codec,
+            ParameterDefinition definition) {
+        Optional<String> starting = metadata.startingValue(definition.name(), version);
+        if (starting.isPresent()) {
+            return new ParameterEntry(
+                    definition,
+                    codec.parse(definition, starting.get()),
+                    ValueOrigin.COMETGUI_DEFAULT);
+        }
+        return defaultEntry(codec, definition);
     }
 
     /**

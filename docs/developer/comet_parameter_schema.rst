@@ -624,21 +624,37 @@ release's definition (``ParameterOverride.applyTo`` leaves it out), so drift
 detection, the generated reference's *Default* line and the editor's
 "Comet 2026.03.0 default: ..." tooltip line still say what ``-q`` writes, and
 the bundled ``comet-q.params`` files are untouched. It is read in one place,
-``CuratedMetadata.startingValue(name, version)``, and applied in two:
+``CuratedMetadata.startingValue(name, version)``, and applied wherever
+**nothing names a value** for the parameter:
 
 * ``CometParameters.withStartingValues()``, which ``ReleaseDefaults.load``
   calls -- so a **new** configuration (and *Reset all*) carries it;
-* ``CometParameters.resetToDefault(name)``, so resetting the field agrees
-  with starting again (and the editor's *changed from default* filter does not
-  list a fresh configuration's library).
+* ``CometParameters.startingEntry(...)``, the entry of a parameter nothing
+  names, used by ``resetToDefault(name)`` (so resetting the field agrees with
+  starting again, and the editor's *changed from default* filter does not list
+  a fresh configuration's library), by the parser for a parameter a file
+  **leaves out**, and by schema migration for a parameter **new in the
+  target** (``ADDED``).
 
-Either way the value's origin is ``COMETGUI_DEFAULT``, shown in the editor as
+The value's origin is then ``COMETGUI_DEFAULT``, shown in the editor as
 "CometGUI default (Comet 2026.03.0's own default differs)", never as Comet's.
-A file that is **parsed** -- imported, or Comet's own ``-q`` file read as an
-import -- never passes through either: it keeps whatever library it names,
-origin ``IMPORTED``, and the pre-run check (:doc:`workflow_engine`) still
-refuses a named library that does not exist. A parameter a file leaves out
-still takes Comet's default, as before.
+For a file without the line this is not a further departure but what Comet
+itself does: run on both releases, a file without ``spectral_library_name``
+searches exactly as one with it empty (the table below). So an imported
+file without the line, and a 2024.01.0 file migrated to either release (which
+gains the parameter), have no spectral library; the migration report lists
+it as ``ADDED`` with that explanation: "spectral_library_name is new in Comet
+2026.03.0 (Comet 2024.01.0 has no such parameter) and takes CometGUI's
+starting value, empty, not Comet's default /some/path/speclib.file: a file
+without the line is read so by Comet 2026.03.0 too".
+
+A value a file **names** never comes through here: it is kept, origin
+``IMPORTED`` (or carried by migration with its origin), Comet's own
+placeholder included, and the pre-run check (:doc:`workflow_engine`) still
+refuses a named library that does not exist. That is why the 2026.02.2
+``-q`` and ``-p`` dumps, otherwise one configuration, now migrate to files
+that differ in this line alone: ``-q`` names the placeholder, ``-p`` leaves
+the line out.
 
 What ``MetadataLoader`` and ``scripts/cometparams.py`` refuse: a
 ``startingValue`` without its ``decision`` or the other way round; a decision
@@ -1848,12 +1864,16 @@ Values, defaults and comments
 
 A modelled parameter the file declares takes its value from the file, origin
 ``IMPORTED``; one it does not declare takes the curated default, origin
-``COMET_DEFAULT``. An **empty value is a value**: ``peff_obo =`` imports the
+``COMET_DEFAULT`` -- or CometGUI's recorded starting value, origin
+``COMETGUI_DEFAULT``, where there is one: ``spectral_library_name`` left out
+is empty, as Comet reads it (:ref:`dev-comet-parameter-starting-values`). An
+**empty value is a value**: ``peff_obo =`` imports the
 empty text, and ``decoy_prefix =`` imports the empty text rather than the
 default ``DECOY_`` -- whether that is sensible is validation's question.
-Parsing the real ``-p`` fixture gives 96 ``IMPORTED`` entries and exactly the
-22 ``-q``-only parameters at ``COMET_DEFAULT``, every value equal to the
-``-q`` model's.
+Parsing the real ``-p`` fixture gives 96 ``IMPORTED`` entries and the 22
+``-q``-only parameters left: 21 at ``COMET_DEFAULT``, every value equal to the
+``-q`` model's, and ``spectral_library_name`` empty at ``COMETGUI_DEFAULT``
+where ``-q`` names the placeholder.
 
 The comment structure (``R-PARAM-05``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3723,7 +3743,9 @@ migrated. The rules, per parameter:
        the notice and its source.
    * - ``ADDED``
      - New in the target: the target version's default, origin
-       ``COMET_DEFAULT``.
+       ``COMET_DEFAULT`` -- or CometGUI's starting value for the target,
+       origin ``COMETGUI_DEFAULT``, which the explanation names
+       (``spectral_library_name``, empty, ``D-012``).
    * - ``REMOVED_KEPT_AS_UNKNOWN``
      - Not a parameter of the target: kept as an unknown parameter with its
        value text and curated inline comment -- never dropped
@@ -3883,7 +3905,8 @@ from the two real dumps **and** typed by hand (each checking the other):
   ``protein_modslist_file``, ``print_ascorepro_score``,
   ``pinfile_protein_delimiter``, ``min_precursor_charge`` and
   ``percentage_base_peak``, each at 2026.02.2's default with origin
-  ``COMET_DEFAULT``; nothing is removed; the 109 others are ``CARRIED`` with
+  ``COMET_DEFAULT`` but ``spectral_library_name``, empty with origin
+  ``COMETGUI_DEFAULT`` (``D-012``); nothing is removed; the 109 others are ``CARRIED`` with
   their text and origin (so ``fragindex_num_spectrumpeaks`` stays the file's
   ``100``); every tuple is the same typed value, and a CONSTRUCTED old-form
   edit (``79.966331 STY 0 2,4 -1 0 -1 97.976896``) is carried into the new
@@ -4074,7 +4097,9 @@ checking the other:
        added, removed, reshaped, noted or needing attention
    * - 2024.01.0 ``-q``, 2024.01.0 ``-p``
      - ``ADDED`` 9 (the nine parameters 2024.01.0 lacks, each at 2026.03.0's
-       default, ``index_search_type`` at ``-1``), ``CARRIED`` 109
+       default, ``index_search_type`` at ``-1``, but
+       ``spectral_library_name`` empty, CometGUI's starting value),
+       ``CARRIED`` 109
 
 The one change of a 2026.02.2 file, as ``MigrationReport.describe()`` writes
 it::
@@ -4113,7 +4138,14 @@ The four migrated canonical files are checked in, CometGUI's own output, at
 the writer to produce exactly those bytes -- and writes what they produce to
 ``target/`` when they differ, for review -- and that each release's ``-p``
 file migrates to the same bytes as its ``-q`` file (``-p`` omits only
-parameters at their defaults). ``MigratedFileRealBinaryTest`` (Linux) runs
+parameters at their defaults) but for the ``spectral_library_name`` line:
+2026.02.2's ``-q`` names the placeholder and keeps it, while a file without
+the line migrates to it empty (``D-012``,
+:ref:`dev-comet-parameter-starting-values`). The three files without the
+line were re-pinned on 2026-10-07 from migration's own output, each checked to
+differ from its previous bytes in that line alone, and each searched by the
+real 2026.03.0 binary with only ``database_name`` changed (exit 0, 3637
+search hits on the K562_3 fixture). ``MigratedFileRealBinaryTest`` (Linux) runs
 the pinned 2026.03.0 binary on those bytes through ``ProcessService`` and
 **runs no production class of this module**, so PIT never maps a mutant to
 its searches (the reason is in :ref:`dev-comet-parameter-validation-corpus`);
@@ -4127,12 +4159,12 @@ the byte-equality test is what ties the bytes it runs to production code.
   the test and stated there: ``database_name`` the proteome subset,
   ``spectral_library_name`` empty, ``scan_range = 11188 11192``,
   ``num_threads = 4``, ``output_txtfile = 1``. The migrated files hold the
-  placeholders ``/some/path/db.fasta`` and ``/some/path/speclib.file``,
-  because Comet's own ``-q`` writes them and migration carries what the file
-  says (2024.01.0 has no library parameter, and migration adds 2026.03.0's
-  default, the same placeholder); a search with either stops before it
-  starts, and choosing the database and the library is the workflow's job,
-  not migration's. Every file: exit 0, **no Warning or Error line**, and the
+  placeholder ``/some/path/db.fasta``, because Comet's own ``-q`` writes it
+  and migration carries what the file says; the file migrated from
+  2026.02.2's ``-q`` also carries its ``/some/path/speclib.file``, while the
+  others, whose source has no such line, hold the library empty. A search
+  with either placeholder stops before it starts, and choosing the database
+  and the library is the workflow's job, not migration's. Every file: exit 0, **no Warning or Error line**, and the
   same 26 result lines as 2026.03.0's own ``-q`` file with the same edits.
 * **The negative control**: the migrated 2026.02.2 file with the one
   migrated line put back, ``index_search_type = 1``, exits 0 with the same

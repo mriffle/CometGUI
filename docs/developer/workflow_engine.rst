@@ -629,8 +629,9 @@ refuses it before Comet starts::
 A new configuration no longer starts from that default: by ``D-012`` it
 starts with the field empty, CometGUI's recorded starting value
 (:ref:`dev-comet-parameter-starting-values`), and empty means no
-spectral-library search in both releases. The check now fires only when a
-file or the scientist names a library.
+spectral-library search in both releases; a file without the line, imported
+or migrated, is read the same way, as Comet reads it. The check now fires
+only when a file or the scientist names a library.
 
 The search, one invocation per file
 -----------------------------------

@@ -182,6 +182,22 @@ class ReleaseDefaultsTest {
         assertEquals(ValueOrigin.IMPORTED, imported.origin(LIBRARY));
     }
 
+    @ParameterizedTest(
+            name = "Comet {0}: a file without the line has no library, as Comet reads it")
+    @CsvSource({"2026.03.0", "2026.02.2"})
+    void aFileWithoutTheLineHasNoLibrary(String version) {
+        ToolVersion release = ToolVersion.parse(version);
+        String without =
+                new String(ReleaseDefaults.bundledFile(release), StandardCharsets.UTF_8)
+                        .replace("spectral_library_name = " + PLACEHOLDER + "\n", "");
+        assertFalse(without.contains("spectral_library_name"), "the line is removed");
+        CometParameters imported =
+                new CometParamsParser(METADATA, release).parse(without).model().orElseThrow();
+        assertEquals("", imported.text(LIBRARY));
+        assertEquals(ValueOrigin.COMETGUI_DEFAULT, imported.origin(LIBRARY));
+        assertEquals(ValueOrigin.IMPORTED, imported.origin("num_threads"));
+    }
+
     @ParameterizedTest(name = "Comet {0}: reset puts the library back to CometGUI's empty start")
     @CsvSource({"2026.03.0", "2026.02.2"})
     void resetAgreesWithTheStartingSet(String version) {

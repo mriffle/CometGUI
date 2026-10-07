@@ -81,12 +81,13 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       the first 1000 records of the UniProt human proteome, {@code spectral_library_name} empty,
  *       {@code scan_range = 11188 11192} and {@code num_threads = 4} -- and {@code output_txtfile =
  *       1}, so that the results can be compared with the control's. Every migrated file holds
- *       {@code /some/path/db.fasta} and {@code /some/path/speclib.file}, the placeholders Comet's
- *       own {@code -q} writes and migration carries (2024.01.0 has no library parameter; migration
- *       adds 2026.03.0's default, the same placeholder), and a search with either placeholder stops
- *       before it starts. Choosing the database and the library is the workflow's job, not
- *       migration's. The search must exit 0 with <strong>no Warning or Error line</strong> -- in
- *       particular none about {@code index_search_type} -- and give the control's results.
+ *       {@code /some/path/db.fasta}, the placeholder Comet's own {@code -q} writes and migration
+ *       carries; the one migrated from 2026.02.2's {@code -q} also carries its {@code
+ *       spectral_library_name = /some/path/speclib.file}, while the others, whose source has no
+ *       such line, hold it empty, CometGUI's starting value (D-012). A search with either
+ *       placeholder stops before it starts. Choosing the database and the library is the workflow's
+ *       job, not migration's. The search must exit 0 with <strong>no Warning or Error line</strong>
+ *       -- in particular none about {@code index_search_type} -- and give the control's results.
  * </ul>
  *
  * <p>Then the same search with the one migrated line put back as it was in 2026.02.2, {@code
@@ -275,7 +276,8 @@ class MigratedFileRealBinaryTest {
     /** The text with the one line declaring {@code name} replaced; its inline comment dropped. */
     private static String replace(String text, String name, String value) {
         Pattern line =
-                Pattern.compile("^" + Pattern.quote(name) + " = [^\\n]*$", Pattern.MULTILINE);
+                // "name =" alone is an empty value, as the writer writes it (D-012's library)
+                Pattern.compile("^" + Pattern.quote(name) + " =( [^\\n]*)?$", Pattern.MULTILINE);
         Matcher matcher = line.matcher(text);
         assertTrue(matcher.find(), name + " is not declared");
         int start = matcher.start();
