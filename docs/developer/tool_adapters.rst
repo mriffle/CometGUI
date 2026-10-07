@@ -7,9 +7,11 @@ Tool adapters
 .. note::
 
    **The process-service section below is written and current** (Phase 03).
-   The per-tool adapter sections -- Comet, Percolator, the Limelight converter
-   and PDV -- are still owned by phases 08, 09, 11 and 12 and are not written
-   yet. Everything a tool adapter does with a subprocess, it does through the
+   The Comet adapter (Phase 08) -- its command builder, output validation and
+   PIN merge, and how the workflow engine runs it -- is described on
+   :doc:`workflow_engine`. The Percolator, Limelight converter and PDV
+   adapters are owned by phases 09, 11 and 12 and are not written yet.
+   Everything a tool adapter does with a subprocess, it does through the
    service described here.
 
 .. contents:: Contents

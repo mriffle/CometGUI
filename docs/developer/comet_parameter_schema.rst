@@ -2095,7 +2095,8 @@ What validation checks is the **model**. It reads no file: whether the
 database and spectra exist and are readable, output paths are writable, the
 FASTA holds decoys (``R-DEC-02``) or the PIN holds targets and decoys
 (``R-DEC-04``) needs the file system or data and is the workflow's check before
-a run (Phase 08). Paths are checked for **form** only.
+a run, built in Phase 08 (:ref:`dev-workflow-engine`). Paths are checked for
+**form** only.
 
 Every validator id is implemented
 ---------------------------------
@@ -2528,10 +2529,12 @@ The specification's *Comet validation* list
    * - Item
      - Where
    * - Database exists and is readable
-     - Phase 08 (file system). Here: ``database_name`` present, no NUL, fits
-       Comet's buffer.
+     - Phase 08's pre-run check (``PreRunChecks``, file system). Here:
+       ``database_name`` present, no NUL, fits Comet's buffer.
    * - Spectra exist and use a supported format
-     - Phase 08: spectra are run inputs, not parameters.
+     - Phase 08's pre-run check: spectra are run inputs, not parameters; each
+       must exist, be readable and carry a spectrum extension Comet reads on
+       this platform.
    * - Precursor tolerance values and units are valid
      - Here: the pair rule, ``choice`` on ``peptide_mass_units`` and
        ``precursor_tolerance_type``.
@@ -2548,22 +2551,24 @@ The specification's *Comet validation* list
        ``R-PARAM-10`` rules and the bounds; the fifteen slots are the
        metadata's.
    * - ``output_pepxmlfile`` and ``output_percolatorfile`` are enabled
-     - Here, at model level; locking the controls is Phase 07's, blocking a
-       run Phase 08's.
+     - Here, at model level; locking the controls is Phase 07's; the pre-run
+       check refuses a model without them (Phase 08).
    * - Selected index and search options are compatible
      - **Partly here**: ``index_search_type`` against the text of
        ``database_name`` (``index_search_type.ignored_without_idx``, 2026.03.0).
        The rest depends on whether ``database_name`` names an existing
        ``.idx`` and which type that file records (Comet reads only the first
        five variable modifications for a fragment-ion index [K77]_), so it needs the
-       file system: Phase 08. Not yet assigned in any phase document;
-       reported upward.
+       file system: assigned to Phase 08 by tier 1 on 2026-10-06 and built
+       there as the index rules of :ref:`dev-comet-parameter-prerun-facts`.
    * - Decoy configuration satisfies *Target/decoy strategy*
-     - Here: the decoy source (``R-DEC-01``) and the prefix. Phase 08: the
-       FASTA scan (``R-DEC-02``), the PIN check (``R-DEC-04``) and carrying the
-       prefix to Percolator and Limelight (``R-DEC-03``).
+     - Here: the decoy source (``R-DEC-01``) and the prefix. Phase 08 built
+       the FASTA scan and its two blocks (``R-DEC-02``) and the PIN check
+       (``R-DEC-04``); carrying the prefix to Percolator and the Limelight
+       converter (``R-DEC-03``) arrives with those steps.
    * - Output paths are writable
-     - Phase 08 (file system).
+     - Phase 08's pre-run check: the project's ``runs/`` directory must exist
+       and be writable; every output is written inside the run directory.
    * - Imported unknown parameters are surfaced
      - Here (``unknown_parameter.imported``) and in the parse result (unit 4).
    * - Parameters unavailable in the selected version are blocked
@@ -3226,7 +3231,8 @@ Cases the binaries cannot settle here
   build the index and exit 0 silently, and the validator is clean. With an
   existing ``.idx``, 2026.03.0 warns when the value disagrees with the file's
   own type (``is a peptide index and its own IndexSearchType: header line
-  decides``); that needs the file and is Phase 08's. The text-only rule fires
+  decides``); that needs the file, and Phase 08's index rules make the
+  contradiction an error (``index.contradicts_search``). The text-only rule fires
   only for a name that does not end in ``.idx``, which is exactly Comet's own
   test [V26S]_.
 * **The merge when an index is built.** When Comet builds a fragment-ion

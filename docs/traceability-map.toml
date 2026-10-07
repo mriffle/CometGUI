@@ -321,25 +321,136 @@ note = "Phase 06. Every structured-value codec writes the same text under comma-
 # --- AC-WF ------------------------------------------------------------------
 
 [[ac."AC-WF-01".evidence]]
-kind = "planned"
-phase = "08"
+kind = "test"
+class = "org.cometgui.workflow.steps.RealCometRunTest"
+method = "gate1TwoFilesFromAReadOnlyDirectory"
+note = "Phase 08. Two K562 mzML files through the engine: exactly two Comet launches, each argv asserted element by element (-P, -N into the run, one input), two pepXML and two PIN files, each validated. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-01".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealCometRunTest"
+method = "gate3MergedPinHasOneHeaderAndTheSummedRows"
+note = "Phase 08. The merged real PIN has one header and 3554 + 2918 = 6472 data rows, and the merge (inputs, row counts, output SHA-256) is recorded in its stage.finished event. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-01".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealMergeMismatchTest"
+method = "gate3FeatureColumnMismatchFailsTheStage"
+note = "Phase 08. A feature-column mismatch between real PINs fails merge-pin with a message naming both files. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-01".evidence]]
+kind = "test"
+class = "org.cometgui.tools.comet.PinMergerTest"
+method = "swappedColumns"
+note = "Phase 08. Feature columns are compared in order, not as sets: two swapped columns fail naming both files."
+
+[[ac."AC-WF-01".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.RealRunUiTest"
+method = "aRealRunThroughTheInterface"
+note = "Phase 08. The same two-file search started from the Run section of the running application, with the stepper, outputs and outcome asserted. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
 
 [[ac."AC-WF-02".evidence]]
-kind = "planned"
-phase = "08"
+kind = "test"
+class = "org.cometgui.workflow.steps.RealCometRunTest"
+method = "gate1TwoFilesFromAReadOnlyDirectory"
+note = "Phase 08. The run succeeds with its input directory read-only, proven first by a refused write (the test fails rather than skips if the write succeeds), and the input directory still lists only its three files. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-02".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealCometRunTest"
+method = "gate2NothingWrittenOutsideTheRunDirectory"
+note = "Phase 08. The whole scratch tree snapshotted before and after: the input tree is identical, and the only change outside the run directory is the runs/ directory's own modification time. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-02".evidence]]
+kind = "test"
+class = "org.cometgui.tools.comet.CometSearchCommandsTest"
+method = "twoInputsAreInexpressible"
+note = "Phase 08. No public member of the command builder can put two inputs on one Comet command line, where Comet silently ignores -N and writes beside the inputs."
 
 [[ac."AC-WF-03".evidence]]
-kind = "planned"
-phase = "08"
+kind = "test"
+class = "org.cometgui.workflow.steps.RealDecoyBlockTest"
+method = "gate4NoDecoysAnywhereBlocksBeforeCometStarts"
+note = "Phase 08. A target-only FASTA with decoy_search = 0 is refused by readiness and by prepare with the decoy.none_anywhere message typed out; no launch, no run directory. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-03".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealDecoyBlockTest"
+method = "gate5DoubleDecoysBlockBeforeCometStarts"
+note = "Phase 08. A target-decoy FASTA with decoy_search = 1 and with 2 is refused with the decoy.double_decoys message typed out; no launch, no run directory. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-03".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealDecoyBlockTest"
+method = "theRunsOwnValidateStepBlocksBeforeComet"
+note = "Phase 08. A FASTA that gains a decoy after the run was prepared fails the run's own validate-configuration step in VALIDATING, and Comet is not started. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-03".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.RunReadinessUiTest"
+method = "theDecoyBlockOnScreen"
+note = "Phase 08. In the running application the decoy block is shown in words as the engine's reason, Run is disabled, and the reason is in Run's accessible help."
 
 [[ac."AC-WF-04".evidence]]
-kind = "planned"
-phase = "08"
+kind = "test"
+class = "org.cometgui.workflow.state.RerunPreviewTest"
+method = "displayFiltersExecuteNothing"
+note = "Phase 08. Scenario (a): changing only the PSM and peptide display filters executes nothing at all; the expected sets are hand-typed."
+
+[[ac."AC-WF-04".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.state.RerunPreviewTest"
+method = "percolatorParametersRerunPercolatorAndDownstream"
+note = "Phase 08. Scenario (b): Percolator parameters re-execute Percolator and downstream, never Comet, with hand-typed sets. Computed over the declared graph; the Percolator and Limelight steps are not yet implemented (phases 09-12)."
+
+[[ac."AC-WF-04".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.state.RerunPreviewTest"
+method = "xmlCapablePercolatorRerunsFromThePreservedMergedPin"
+note = "Phase 08. Scenario (c): an XML-capable Percolator re-runs Percolator from the preserved merged PIN, then conversion; Comet and the merge are reused. Computed over the declared graph; the Percolator and Limelight steps are not yet implemented (phases 09-12)."
+
+[[ac."AC-WF-04".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.state.RerunPreviewTest"
+method = "cometParametersRerunEverything"
+note = "Phase 08. Scenario (d): changed Comet parameters re-execute Comet and every step downstream, with hand-typed sets."
+
+[[ac."AC-WF-04".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.state.RerunPreviewTest"
+method = "limelightCutoffRerunsConversionAndUpload"
+note = "Phase 08. Scenario (e): changing only the Limelight q cutoff re-executes conversion and upload (and the provenance append), nothing else. Computed over the declared graph; the Percolator and Limelight steps are not yet implemented (phases 09-12)."
+
+[[ac."AC-WF-04".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealCometRunTest"
+method = "gate6RerunPreviewAfterARealRun"
+note = "Phase 08. Against a real recorded run: unchanged executes nothing, changed parameters re-execute Comet and downstream, a changed spectrum file reuses the parameter file. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-04".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.RealRunUiTest"
+method = "previewAfterAParameterChange"
+note = "Phase 08. The preview is shown in the running application before Run, naming each step and why, and launches nothing. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
 
 [[ac."AC-WF-05".evidence]]
-kind = "planned"
-phase = "08"
-note = "Foundations are laid earlier, in phase 03."
+kind = "test"
+class = "org.cometgui.workflow.engine.CancellationTest"
+method = "cancellingARunningStepKillsItsToolAndTheToolsChildAndLeavesAWholeRecord"
+note = "Phase 08. A fake tool that starts a child: cancelling the step kills both processes, asserted on the process tree, and leaves parsable logs and provenance."
+
+[[ac."AC-WF-05".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealCancellationTest"
+method = "gate7CancelTheRealCometMidSearch"
+note = "Phase 08. The real Comet cancelled mid-search: it and every descendant dead by pid, the stage log and event log parse, provenance.json finalised cancelled with the outputs partial. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-WF-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.RealCancelUiTest"
+method = "cancelARealSearch"
+note = "Phase 08. Cancel pressed in the running application during a real search: Comet dead by pid, the stepper and the outcome say cancelled, the stage log is kept. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
 
 # --- AC-RES -----------------------------------------------------------------
 
@@ -458,14 +569,38 @@ kind = "planned"
 phase = "13"
 
 [[ac."AC-PRV-03".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealCometRunTest"
+method = "gate9ArgvPerFileAndArchivedParamsHash"
+note = "Phase 08. provenance.json read back after a real two-file run: one Comet tool record per spectrum file (comet-01, comet-02), each with its own argument array, differing only in -N and the input. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-PRV-03".evidence]]
+kind = "test"
+class = "org.cometgui.tools.comet.CometSearchCommandsTest"
+method = "differOnlyInInputAndBase"
+note = "Phase 08. Two commands of one run differ only in the -N base and the input (R-CMT-04)."
+
+[[ac."AC-PRV-03".evidence]]
 kind = "planned"
 phase = "13"
-note = "Foundations are laid earlier, in phase 08."
+note = "Foundations are laid earlier, in phase 08. Phase 08 proves the recorded argument arrays of a real run; showing and copying each command in the Provenance tab is phase 13's."
+
+[[ac."AC-PRV-04".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealCometRunTest"
+method = "gate9ArgvPerFileAndArchivedParamsHash"
+note = "Phase 08. The -P path both invocations executed is the archived parameters/comet.params, and its SHA-256 recomputed independently equals provenance.json's file record, writeOnce's hash, run.json's and the comet.params-sha256 setting. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
+
+[[ac."AC-PRV-04".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealStepTest"
+method = "finaliseRefusesAParameterFileChangedDuringTheRun"
+note = "Phase 08. A parameter file changed after Comet ran fails finalise-provenance, so a run cannot record a hash of a file other than the one executed. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
 
 [[ac."AC-PRV-04".evidence]]
 kind = "planned"
 phase = "13"
-note = "Foundations are laid earlier, in phase 08."
+note = "Foundations are laid earlier, in phase 08. Phase 08 proves the archive, its hash and that it is the executed file; presenting and exporting it in the Provenance tab is phase 13's."
 
 [[ac."AC-PRV-05".evidence]]
 kind = "test"

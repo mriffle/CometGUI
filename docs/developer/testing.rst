@@ -616,11 +616,17 @@ and the bytecode proof).
   that reaches the source but not the bytecode (a real Maven run), a green run
   graded as red, a red without its diagnostic -- and unit 6's **equivalent**
   injection, run for real: Run disabled only by the workflow engine's reason
-  leaves ``CrossParameterValidationUiTest`` green, because until Phase 08 the
-  engine's reason always disables Run. The harness must report that as
-  ``HARNESS FAILURE -- the check PASSED with the defect present``, never as a
-  control that bit; if the injection ever goes red (Phase 08's engine has
-  arrived), control ``H`` fails and says the premise is stale.
+  leaves ``CrossParameterValidationUiTest`` green, because that test's
+  application has no Comet installed, so the engine always has a reason
+  against Run there. The harness must report that as ``HARNESS FAILURE -- the
+  check PASSED with the defect present``, never as a control that bit; if the
+  injection ever goes red there, control ``H`` fails and says the premise is
+  stale. That is ``H6``. Since Phase 08 the engine can be ready, so ``H7``
+  makes the same injection where it is not equivalent -- graded on
+  ``RunReadinessUiTest``, whose application has a Comet registered and real
+  files chosen: ``theParametersAloneDisableRun`` must go red, and
+  ``theDecoyBlockOnScreen``, where the engine itself disables Run, must stay
+  green.
 
 ``--self-test`` runs control ``H`` alone (with the baseline it needs);
 ``--only 1b,4v`` runs named controls plus the baseline and the final clean run.
@@ -829,6 +835,13 @@ to stay green) and ``7c`` (a table mass field unnamed). Controls ``3a`` and
 run now cover thirteen graded classes. Measured: 84 controls passed in 1680 s
 (28 m 00 s), the baseline 366 s and the clean run 353 s; the floor was raised
 from 70 to 84.
+
+Phase 08 unit 7 (2026-10-07) put the workflow engine behind the Run section and
+split control ``H``'s engine injection into ``H6`` (kept, still equivalent where
+no Comet is installed) and ``H7`` (new, graded where the engine is ready), as
+described above; ``scripts/verify-param-ui-gates.sh`` says the same in its
+header. The floor was raised from 84 to 87, the count measured with ``H7``
+(``handoffs/PHASE-08-worklog.rst``, unit 7).
 
 Traps
 =====

@@ -96,8 +96,10 @@ The two refusals
 
 Each is an error of CometGUI's parameter check, attached to the **Internal decoy
 search** setting and to the database, and a configuration with an error is not
-run. The messages name the setting, its meaning, the prefix, the file and the
-count. With a FASTA of 1000
+run. The Run section shows the message as the reason the workflow cannot start
+the search, under ``The workflow engine cannot start this search:``, and Run
+stays disabled; no run is created and Comet is not started. The messages name the setting, its meaning, the prefix, the file and
+the count. With a FASTA of 1000
 target proteins at ``/data/subset.fasta``:
 
 **No decoys anywhere** (rule ``decoy.none_anywhere``)::
@@ -146,8 +148,24 @@ are on the developer page :doc:`developer/comet_parameter_schema`.
 After Comet runs
 ================
 
-Before Percolator starts, the workflow also checks the result file Comet wrote
-for Percolator (the PIN) for both target and decoy rows, and stops with a
-message naming the decoy configuration if it holds no decoys (``R-DEC-04``).
-That check belongs to the Comet run step, which is still being built; this
-page will give its message when it lands.
+Comet writes one result file for Percolator (a PIN file) per spectrum file.
+Before those are merged for Percolator, the workflow checks each one for both
+target and decoy rows (``R-DEC-04``). A PIN file with no decoy rows -- or with
+no target rows, or no rows at all -- stops the run at the step that validates
+Comet's outputs, with a message naming the decoy configuration rather than a
+Percolator error later. For example::
+
+    the PIN file <run>/outputs/comet/k562_3.pin holds 1807 target rows and no
+    decoy row (Label -1), so Percolator would have no negative examples; the
+    decoy configuration was decoy_search = 1 (Comet's internal decoys,
+    concatenated), decoy_prefix = "DECOY_"
+
+The checks before Comet starts make this rare, but not impossible: an index
+built by Comet 2026.02.2 in fragment-ion mode with ``decoy_search = 1`` was
+measured to search to no decoy rows at all, and it is this check that stops
+such a run. With ``decoy_search = 2`` Comet also writes a separate decoy
+pepXML file for each spectrum file; it is checked too, and the PIN file still
+holds both targets and decoys.
+
+How the run itself works is on the developer page
+:doc:`developer/workflow_engine`.

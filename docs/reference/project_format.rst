@@ -30,7 +30,7 @@ A project holds mutable user intent and immutable run records
         project.json                 the project's identity (written once)
         project.lock                 who has the project open (R-RUN-05)
         presets/                     parameter presets (a later phase)
-        index-cache/<key>/           cached Comet indexes (design decision P8-8)
+        index-cache/<key>/           cached Comet indexes (see `The index cache`_)
         runs/
             20260828T231500Z-run-0001/
                 run.json             the run's identity and attempts
@@ -48,6 +48,19 @@ A project holds mutable user intent and immutable run records
                     provenance.json  the provenance manifest
                     provenance.rst   the provenance report
                     events.log       the provenance event log
+
+**Where a project is.** In Phase 08 the application has exactly one project
+per session and no way to choose another: ``projects/default`` under the
+application data directory -- ``%APPDATA%\CometGUI`` on Windows (else
+``<home>\AppData\Roaming\CometGUI``), ``<home>/Library/Application
+Support/CometGUI`` on macOS, and ``$XDG_DATA_HOME/cometgui`` (else
+``<home>/.local/share/cometgui``) on Linux and anything else -- beside the
+Tool Manager's cache and never next to the scientist's own files. It is created
+(``project.json`` and ``runs/``) and locked the first time the Run section's
+pre-run check finds a Comet to run, not when the window opens, and the lock is
+held until the application stops (``ProjectSession`` in ``cometgui-app``). Only
+the Linux location has ever been created; the Windows and macOS ones are
+computed and tested as paths only.
 
 **A run directory's name** is the run's creation time in UTC to the second,
 ``yyyyMMdd'T'HHmmss'Z'``, a hyphen, and the run id: ``20260828T231500Z-run-0001``.
@@ -104,6 +117,53 @@ file's 1-based position with at least two digits:
 ``stageId`` member of each spectrum entry). The divergence is design decision
 P8-3 of the Phase 08 work log, escalated there as a proposed specification
 amendment; until that amendment is made, this paragraph is the record of it.
+
+The index cache
+---------------
+
+A search that builds a Comet index (``comet -i``, fragment-ion, or ``comet
+-j``, peptide) builds it into the **project**, not the run, so that later runs
+with the same database and options reuse it (``R-CMT-07``, design decision
+P8-8). Comet writes an index *beside the database it is given*, so the build is
+given a symbolic link to the FASTA inside the cache entry rather than the FASTA
+itself, and nothing is ever written beside the user's file. Each entry is one
+directory::
+
+    index-cache/<key>/
+        <fasta name>          a symbolic link to the FASTA; the build's -D names it
+        <fasta name>.idx      the index Comet wrote beside that link; the search's -D names it
+        index.complete        the completion marker, written last
+
+**The key** is 64 lower-case hexadecimal characters: the SHA-256 of an ASCII
+text, each line ending in ``\n``, that begins ``cometgui-index-key 1`` and then
+records the FASTA's SHA-256 and file name, the index mode, the Comet release,
+every search option the ``.idx`` header records, the ``fragindex_*`` options,
+``equal_I_and_L`` and the canonical enzyme table (``IndexCacheKey``). A changed
+FASTA or digestion setting therefore names a different entry.
+
+**The marker** is UTF-8 text of exactly three lines, each ending in ``\n``::
+
+    cometgui-index-cache 1
+    sha256 <the index's SHA-256, 64 lower-case hexadecimal characters>
+    size <the index's length in bytes>
+
+An entry is **complete** only when ``index.complete`` is exactly that text and
+the index exists. Comet writes an index's header before its body, so a build
+that was cancelled or failed leaves a header that reads as valid over a
+truncated body; the marker is therefore written -- atomically -- only after the
+build exited zero and the index's header was read and judged. An entry without
+a valid marker is incomplete, and a build into it first removes the index and
+marker an earlier build left (and nothing else). **Before an index is reused**
+it is re-hashed and must match the marker's SHA-256 and size, and its header is
+judged again against the search; a changed index is refused, naming both
+digests.
+
+A run that used the cache records the key in its provenance settings
+(``comet.index-cache-key``), ``databaseDelivery`` ``command-line`` in its
+``run.json``, and the index as an input file of role ``comet-index``. The
+application does not offer an index mode yet, so only the workflow's own tests
+create entries today. The engine side is described in
+:ref:`dev-workflow-engine`.
 
 .. _ref-project-format-versions:
 
@@ -601,7 +661,8 @@ The models are pure and live in ``org.cometgui.domain.project``
 ``OutputBaseNames``, ``RunDescriptor``, ``RunIdentity``, ``RunAttempt``).
 Reading and writing them is ``org.cometgui.workflow.storage``
 (``ProjectJson``, ``RunJson``, ``ProjectStore``, ``RunStore``,
-``ProjectLock``). The tests that hold the writers to hand-typed documents byte
-for byte are ``RunJsonTest`` and ``ProjectJsonTest`` (the examples on this page
+``ProjectLock``). The index cache is ``org.cometgui.workflow.steps``
+(``IndexCacheKey``, ``IndexCacheEntry``). The tests that hold the writers to
+hand-typed documents byte for byte are ``RunJsonTest`` and ``ProjectJsonTest`` (the examples on this page
 are abridged from them); the readers' tests parse hand-typed documents and
 never ones the writer produced.

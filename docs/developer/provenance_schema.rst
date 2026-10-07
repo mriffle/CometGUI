@@ -105,8 +105,11 @@ Four shape decisions are worth knowing before changing one.
 
 **Tool identity and one invocation are two records.** ``ToolRecord`` holds the
 facts about an installation; ``ExecutionRecord`` holds the facts about one
-launch of it. A later phase that runs the same tool twice records two
-executions of one identity rather than duplicating the checksums.
+launch of it. A ``ToolRecord`` carries exactly one ``ExecutionRecord``, so a
+tool run twice is two tool records with the same identity: Phase 08's Comet
+search writes one tool record per spectrum file, each with its own
+``stageId`` (``comet-01``, ``comet-02`` ...) and its own argument array, and
+the identity's checksums repeat in each (:ref:`dev-workflow-engine`).
 
 **The stage is a string, not a workflow type.** ``ToolRecord.stageId`` keeps
 the identifier a ``StageTag`` promises is suitable for a provenance record, and

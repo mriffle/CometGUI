@@ -20,11 +20,11 @@ The short version:
 
 .. note::
 
-   **This page describes the editor as it is built today.** No search can be
-   started yet: the part of CometGUI that runs Comet and Percolator is still to
-   come, and the Run section says so. What *is* finished is everything that
-   decides whether your parameters would block a run.
-   :ref:`user-comet-parameters-limits` lists what the editor does not do yet.
+   **This page describes the editor as it is built today.** The Run section
+   can now run Comet on the spectrum files you chose, once per file, and merge
+   its results for Percolator; Percolator itself, and the results it gives,
+   are still to come. :ref:`user-comet-parameters-limits` lists what the
+   editor does not do yet.
 
    Variable modifications have their own page, :doc:`variable_modifications`,
    and so do the instrument presets, :doc:`comet_parameter_presets`. Every
@@ -412,12 +412,27 @@ What the editor does not do yet
 
 Stated plainly, so that you do not have to find them by trying.
 
-**No search can be started.** The Run control is disabled and says why: the
-part of CometGUI that runs Comet and Percolator comes in a later phase. What
-the Run section shows today is whether *your parameters* would block a run.
+**A run stops after Comet.** Run searches each spectrum file with the
+installed Comet of the selected release and merges the results into one file
+for Percolator; Percolator and the results arrive later. The Run section lists
+every reason Run is disabled in words -- first the parameters', then the
+workflow's, such as the decoy checks on :doc:`decoys` or a file that cannot be
+read. Before a rerun it says which steps would execute again, and why.
 
-**There is no comparison with a previous run** in Expert, because there are no
-runs yet; the comparison with the last saved file is there.
+**Clear the spectral library before your first run.** Comet's own default
+names a placeholder file, ``/some/path/speclib.file``, which does not exist;
+Comet stops with an error on it, so CometGUI refuses to start until the
+**Spectral library file** setting (``spectral_library_name``) is cleared or
+names a real file. The message says so::
+
+    spectral_library_name (Spectral library file) = /some/path/speclib.file
+    does not exist or cannot be read; clear it to search without one, or
+    choose the file
+
+The same check applies to every setting that names a file.
+
+**There is no comparison with a previous run** in Expert; the comparison with
+the last saved file is there.
 
 **The outputs are always locked.** The pepXML and PIN outputs would be
 unlocked if the stage needing them were switched off, but no stage can be
@@ -426,9 +441,12 @@ switched off yet, so both are locked on in every configuration.
 **Presets are applied from Essentials only**, and there are no presets of your
 own yet; see :doc:`comet_parameter_presets`.
 
-**The spectrum and database files are only checked to exist and be readable.**
-Checking their formats, and counting the decoys already in the FASTA, belong to
-the workflow and arrive with it.
+**The editor checks only that the spectrum and database files exist and can
+be read.** The rest is checked when the Run section asks whether the search can
+start: each spectrum file's type, by its extension; that the FASTA begins as a
+FASTA does; and how many of its entries are decoys, which decides whether the
+decoy configuration can work (:doc:`decoys`). The spectrum files' contents are
+not checked before Comet reads them.
 
 **The file choosers themselves are not exercised by the automated tests**,
 which answer the "choose a file" question directly; everything after the

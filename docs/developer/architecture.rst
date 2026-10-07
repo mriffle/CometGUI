@@ -19,6 +19,10 @@ something is deferred, it names the phase that owns it.
    `What Phase 02 deliberately did not build`_ collects what a later phase must
    not assume exists.
 
+   **Amended after Phase 08** (2026-10-07): the module table's state column,
+   the Run readiness paragraph, and `The workflow engine as built`_. The
+   module edges were re-read from the POMs; Phase 08 changed none.
+
    Every measured number quoted below was produced by running the thing --
    either by the Phase 02 orchestrator at a work-unit sign-off, recorded in
    ``handoffs/PHASE-02-worklog.rst``, or, where it is marked as such, by the
@@ -43,41 +47,50 @@ deliberately does not.
    * - Module
      - Root package
      - Depends on (module scope)
-     - State after Phase 02
+     - State after Phase 08
 
    * - ``cometgui-domain``
      - ``org.cometgui.domain``
      - **nothing**
-     - Real: ``ports``, ``platform``, ``log``, ``run``, plus Phase 01's
-       ``build``. Its ``project``, ``params``, ``provenance``, ``results`` and
-       ``tools`` subpackages are empty.
+     - Real: ``ports``, ``platform``, ``log``, ``secrets``, ``tools``,
+       Phase 01's ``build``, and -- since Phase 08 -- ``run`` (the run layout,
+       ``-N`` base names, the run descriptor), ``project`` (the project
+       descriptor, lock owner, schema-version policy) and ``params`` (the
+       pre-run facts: ``FastaDecoyCensus``, ``CometIndexDescription``,
+       ``PreRunFacts``). ``provenance`` and ``results`` are empty.
 
    * - ``cometgui-process``
      - ``org.cometgui.tools.process``
      - ``domain``
-     - **Empty.** Phase 03 fills it with the process service.
+     - Real: the process service (Phase 03).
 
    * - ``cometgui-provenance``
      - ``org.cometgui.provenance``
      - ``domain``
-     - **Empty.** Phase 04.
+     - Real: hashing, the JSON reader and writer, the manifest, the event log
+       and the report (Phase 04).
 
    * - ``cometgui-tools``
      - ``org.cometgui.tools`` (minus ``.process``)
      - ``domain``, ``process``
-     - **Empty.** Phases 08, 09, 11 and 12 fill the adapter subpackages.
+     - Real: ``api`` and the capability probes (Phase 05), and ``comet`` --
+       the Comet adapter: search and index commands, pepXML and PIN
+       validation, the PIN merge, the FASTA decoy scanner and the ``.idx``
+       header reader (Phase 08). The Percolator, Limelight and PDV adapters
+       (Phases 09, 11, 12) are not built.
 
    * - ``cometgui-install``
      - ``org.cometgui.install``
-     - ``domain``, ``process``
-     - **Empty.** Phase 05.
+     - ``domain``, ``process``, ``provenance``
+     - Real: the tool registry and installer (Phase 05).
 
    * - ``cometgui-params-comet``
      - ``org.cometgui.params.comet``
      - ``domain``, ``provenance`` (for its one JSON reader); ``process`` at
        **test** scope only, to run the real Comet binary in fixture tests
-     - **Empty.** Phase 06. No main class yet; its tests and the real
-       ``comet -q``/``-p`` fixtures they check have landed.
+     - Real: the parameter model, parser, writer, validator, presets and
+       migration (Phase 06), and since Phase 08 the decoy blocks and the
+       index-compatibility rules.
 
    * - ``cometgui-params-percolator``
      - ``org.cometgui.params.percolator``
@@ -93,19 +106,26 @@ deliberately does not.
      - ``org.cometgui.workflow``
      - ``domain``, ``tools``, ``provenance``, ``results``,
        ``params-comet``, ``params-percolator``
-     - Partly real: ``state`` is built; ``engine`` and ``steps`` are empty and
-       belong to Phase 08.
+     - Real: ``state`` (the stepper's stages since Phase 02; the declared
+       seventeen-step graph, fingerprints and the rerun preview since Phase
+       08), ``engine``, ``steps`` (the Comet run) and ``storage`` (project and
+       run records, the project lock). See :doc:`workflow_engine`.
 
    * - ``cometgui-ui``
      - ``org.cometgui.ui``
      - ``domain``, ``workflow``, ``results``, ``provenance``,
        ``params-comet``, ``params-percolator``
-     - Real: ``viewmodel``, ``view``, ``controls``. ``dialogs`` is empty.
+     - Real: ``viewmodel``, ``view``, ``controls``. Since Phase 08 the Run
+       section is live (``RunViewModel``, the engine half of
+       ``RunReadinessViewModel``, ``RunControl``) behind the
+       ``RunEnginePort`` port. ``dialogs`` is empty.
 
    * - ``cometgui-app``
      - ``org.cometgui.app``
      - all ten above, plus ``io.github.mkpaz:atlantafx-base`` 2.1.0
-     - Real: ``bootstrap``, ``config``. The only module with a ``main``.
+     - Real: ``bootstrap``, ``config``. The only module with a ``main``. Since
+       Phase 08 ``config`` wires the engine to the Run section
+       (``RunWiring``, ``WorkflowRunPort``, ``ProjectSession``).
 
    * - ``cometgui-archtests``
      - ``org.cometgui.archtests``
@@ -491,9 +511,10 @@ raw-applied, preset-applied and migrated models all pass through
 
 **Run readiness.** ``RunReadinessViewModel`` gives the Run control its disabled
 state and its reasons in two halves: the parameters' (every error, every edit
-the model refused, every unresolved migration entry) and the workflow engine's,
-which until Phase 08 always says the engine is not built, so the Run button is
-never a control that pretends.
+the model refused, every unresolved migration entry) and the workflow engine's.
+Until Phase 08 the engine's half always said the engine was not built, so the
+Run button was never a control that pretended; Phase 08 replaced that reason
+with the engine's own (`The workflow engine as built`_).
 
 **The composition root.** ``cometgui-app``'s ``ParameterEditorWiring`` builds
 the session and the editor over three seams a GUI test fills: the build
@@ -541,6 +562,45 @@ model's flag (``FieldViewModel.setOn``). Unit 4's ``IonSeriesViewModel``
 duplicated exactly that and was never used by a view; unit 10 removed it.
 (A range is one ``FieldControl`` whose two text fields commit together through
 ``RangesViewModel``.)
+
+The workflow engine as built
+============================
+
+Phase 08 built the engine and the Comet run (:doc:`workflow_engine`) inside
+the existing module graph: no module gained or lost an edge, and no
+architecture rule was added or relaxed. Where its parts sit:
+
+* **The pure models** are in ``cometgui-domain`` (``run``, ``project``,
+  ``params``) and ``org.cometgui.workflow.state``: the declared step graph,
+  fingerprints and the rerun preview contain no file, process or thread.
+* **The Comet adapter** is ``org.cometgui.tools.comet``. It builds commands and
+  validates and merges files; it never starts a process itself.
+* **The engine** (``org.cometgui.workflow.engine``) is tool-agnostic and the
+  only place a run's state, provenance, cancellation and reuse are decided. A
+  step reaches the process service only through its ``StepContext``, which
+  goes through Phase 03's ``StageRunner``.
+* **The interface reaches the engine through one port.** ``RunEnginePort``
+  (``org.cometgui.ui.viewmodel.params``) offers the pre-run check and the start
+  of a run, and nothing else; the composition root implements it as
+  ``WorkflowRunPort`` (``org.cometgui.app.config``) over the one process
+  service, the one hasher, the Tool Manager's installed Comet and the
+  session's project. The interface layer never sees the process service, the
+  tool adapters or the installer. ``RunViewModel`` calls the port only from a
+  background executor and applies each answer on the JavaFX thread (the
+  composition root passes ``Platform::runLater``; a test passes an executor it
+  drains), and each check carries a generation number so an answer to an older
+  configuration is dropped.
+* **The composition** is ``RunWiring``: one ``CachingHashService`` shared by
+  the engine and the workflow, ``SecretRedactor.patternsOnly()``, the console's
+  append method as the output sink, and a per-file concurrency cap of 4. A
+  composition root built without a process service gets a port whose reason
+  says no process can be launched.
+* **The project** is ``ProjectSession``: ``projects/default`` under the
+  application data directory, created and locked lazily, held until the
+  application stops (:doc:`../reference/project_format`).
+
+``ENGINE_NOT_BUILT``, Phase 07's placeholder reason, is gone; the engine's
+half of Run readiness is now the engine's own reasons.
 
 The injection seams (``R-PROC-01``)
 ===================================
@@ -1256,7 +1316,8 @@ Stated plainly, so a later phase does not assume it exists.
      - ``org.cometgui.workflow.state`` models the **stepper's** eight stages,
        which is *not* the specification's seventeen-step canonical workflow
        DAG. The two must not be confused, and neither is derived from the other
-       here; Phase 08 declares the mapping.
+       here; Phase 08 declares the mapping. (Built in Phase 08:
+       :doc:`workflow_engine`.)
 
    * - File I/O beyond application settings, and settings persistence itself
      - later
