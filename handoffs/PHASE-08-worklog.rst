@@ -687,12 +687,42 @@ Recorded the day a unit lands, for ``--only tests``' sandbox.
 * Unit 7: ``RealRunUiTest`` and ``RealCancelUiTest`` (cometgui-app) read the
   2026.03.0 binary, both K562 mzML and the proteome. Already in the set.
 
+Phase-end checks (2026-10-07)
+=============================
+
+* ``bash scripts/verify-all-gates.sh --only docs --only traceability --only
+  quality``: 3 passed (docs 1, traceability 8, quality 42).
+* ``--only workflow``: 110 controls in 449 s (unit 9 sign-off).
+* ``--only tests``, **first run: FAIL**, 36 of 37 -- control 6 (``the mutation
+  gate rejects a suite that kills too few mutations: the gate exited 0 with
+  the defect present``). Its own sizing line read ``cometgui-domain generates
+  44 mutations``: the control sizes from the working tree's
+  ``cometgui-domain/target/pit-reports/mutations.xml``, which my unit 3
+  sign-off's ``-DtargetClasses=org.cometgui.domain.params.*`` run had
+  narrowed to 44 mutations; 24 survivors in a 678-mutation module left 96%.
+  **Repair** (root cause, nothing in the harness changed): the full report
+  regenerated exactly as ``build.sh`` writes it, ``mvn -B -o
+  -Dcometgui.pit.threads=16 -pl cometgui-domain test-compile
+  org.pitest:pitest-maven:mutationCoverage`` -- 653 mutations, 649 KILLED,
+  3 TIMED_OUT, 1 SURVIVED (``ToolVersion:214``, Phase 05 code).
+* ``--only tests``, **second run: PASS** -- ``SUMMARY: 37 assertion(s)
+  passed, 0 failed, in 5727 seconds``; control 6 sized ``653 mutations ...
+  S > 163`` and was rejected, exit 1.
+
 Deferred
 ========
 
-None yet.
+* Retry across an application restart; index mode in the interface; the
+  artefact identity of the selected Comet (unit 6, 7 sign-offs).
+* Grading the real-binary cancellation test in ``workflow`` (unit 9).
 
 Blockers escalated
 ==================
 
-None yet.
+No blocker. Escalated as recommendations in ``handoffs/PHASE-08-handoff.rst``:
+PIT ``targetClasses`` for ``org.cometgui.workflow.*``; the P8-3 log-naming
+amendment; the spectral-library default and its help text; a pre-run rule for
+2026.02.2 fragment-ion indexes with internal decoys; Phase 02's
+``KeyboardOnlyNavigationUiTest`` environment dependency; the flaky
+``VariableModificationEditorUiTest`` under ``paramui``; the ``tests`` harness's
+cost.
