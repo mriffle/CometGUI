@@ -635,7 +635,25 @@ once.
        index check; ``-N`` with several inputs; harness self-controls. Cost
        stated.
      - gates 1-9
-     -
+     - **Signed off 2026-10-07** (``42b368b``). My run of ``bash
+       scripts/verify-all-gates.sh --only workflow``: ``PASS workflow: 110
+       controls in 449s`` (floor 110), items ``08:1-9``; no live Comet or
+       ``EngineFake`` afterwards. Controls: 1a, 1b (the ``-N`` trap), 2, 3a,
+       3b, 4a, 4b, 5, 6a-6c, 7, 8a, 8b, 9a, 9b, Iv and Iw (**version-blind**
+       index formats, each half of the one two-release test), Ih, and H1-H7
+       (unchanged file, missing anchor, source-only change, zero-test
+       selection, green-graded-as-red, red without its words, a leftover
+       process) -- recorded injections reused, the rest marked NEW. My
+       damage: a copy of the harness with control 3b's expected words
+       changed (``<2>`` -> ``<3>``) run ``--only 3b`` -- rc 1, ``FAIL a header
+       written per input: failed, but without the expected diagnostic``
+       (my first attempt matched its anchor twice, injected nothing, and the
+       copy correctly passed; not counted). Accepted beyond the brief:
+       ``08`` added to ``verify-all-gates.sh``'s per-phase coverage loop,
+       ``--list`` and start banner, so Phase 08 is not silently absent from
+       the summary. Gap, stated: gate 7's real-binary test is not graded by
+       the harness (with cancellation broken, Comet searches the whole
+       proteome to the end); item 7 is graded on the fake-Comet test.
 
 Rejections and rework
 =====================
