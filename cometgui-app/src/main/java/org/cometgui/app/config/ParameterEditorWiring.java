@@ -21,7 +21,6 @@ import java.io.UncheckedIOException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
@@ -36,7 +35,6 @@ import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
-import org.cometgui.ui.viewmodel.params.RunReadinessViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.StageSwitches;
 
@@ -61,8 +59,8 @@ import org.cometgui.ui.viewmodel.params.StageSwitches;
  * hashed once, by the file on disk); the build identity and the file chooser are the caller's, so
  * that a GUI test can name the build in the header and answer the chooser itself. Every downstream
  * stage is enabled ({@link StageSwitches#ALL_ENABLED}): no stage can be switched off before Phases
- * 11 and 12. The Run control says the workflow engine is not built ({@link
- * RunReadinessViewModel#ENGINE_NOT_BUILT}) until Phase 08 wires one.
+ * 11 and 12. The Run control's engine half is not built here: {@link RunWiring} composes it and
+ * {@code RunViewModel} keeps it, over the readiness this editor holds.
  */
 public final class ParameterEditorWiring {
 
@@ -91,8 +89,8 @@ public final class ParameterEditorWiring {
     }
 
     /**
-     * The editor's state over a session: saving through a {@link StreamingHashService} of its own,
-     * and the Run control saying the workflow engine is not built.
+     * The editor's state over a session, saving through a {@link StreamingHashService} of its own.
+     * Its run readiness starts with the engine's half unchecked; {@code RunViewModel} fills it.
      *
      * @param session the session
      * @param inputs the spectrum inputs over the session
@@ -106,12 +104,7 @@ public final class ParameterEditorWiring {
             FileChooserPort chooser,
             BuildIdentity build) {
         return new ParameterEditorViewModel(
-                session,
-                inputs,
-                chooser,
-                build,
-                new StreamingHashService(),
-                Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT));
+                session, inputs, chooser, build, new StreamingHashService());
     }
 
     /**

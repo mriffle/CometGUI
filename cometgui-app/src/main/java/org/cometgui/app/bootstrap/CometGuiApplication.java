@@ -16,11 +16,15 @@
 
 package org.cometgui.app.bootstrap;
 
+import java.io.IOException;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.collections.ListChangeListener;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -28,8 +32,9 @@ import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.config.BuildIdentityResource;
 import org.cometgui.app.config.FxFileChooser;
 import org.cometgui.app.config.ParameterEditorWiring;
+import org.cometgui.app.config.ProjectSession;
+import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.config.ToolManagerUnavailableException;
-import org.cometgui.app.config.ToolManagerWiring;
 import org.cometgui.app.config.derived.AtlantaFxThemes;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
@@ -38,16 +43,19 @@ import org.cometgui.domain.log.MessageSeverity;
 import org.cometgui.domain.platform.GlibcVersion;
 import org.cometgui.domain.platform.HostBaselineReport;
 import org.cometgui.domain.platform.HostBaselineVerifier;
+import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.ui.view.ShellView;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
 import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.ToolRowViewModel;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.RunViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 
@@ -141,6 +149,14 @@ public final class CometGuiApplication extends Application {
 
     private final Function<Supplier<Window>, FileChooserPort> choosers;
 
+    private final RunWiring.Setup runSetup;
+
+    /** The session's project, locked while the application runs; set by {@link #start}. */
+    private ProjectSession project;
+
+    /** Where the Run section calls the engine; set by {@link #start}. */
+    private ExecutorService runThreads;
+
     /**
      * The constructor JavaFX itself calls: the real services for this host and a fresh run message
      * log.
@@ -193,10 +209,42 @@ public final class CometGuiApplication extends Application {
             BoundedMessageLog messageLog,
             Supplier<BuildIdentity> build,
             Function<Supplier<Window>, FileChooserPort> choosers) {
+        this(
+                services,
+                messageLog,
+                build,
+                choosers,
+                RunWiring.Setup.forThisApplication(Objects.requireNonNull(services, "services")));
+    }
+
+    /**
+     * The application over a given composition root, run message log, build identity, file chooser
+     * and run setup.
+     *
+     * <p>The Run section's seams (Phase 08): where the Tool Manager -- and so the selected Comet --
+     * comes from, and where the session's project lives. Production passes {@link
+     * RunWiring.Setup#forThisApplication}: this machine's Tool Manager and the default project
+     * under the application data directory. A GUI test passes a Tool Manager that offers a staged
+     * Comet and a project in a temporary directory.
+     *
+     * @param services the wiring to run with
+     * @param messageLog the bounded log the console shows, which tool output is appended to
+     * @param build the running build, asked for once when the window is built
+     * @param choosers makes the parameter editor's file chooser, given the window it is modal over
+     * @param runSetup the Tool Manager and the project the Run section uses
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public CometGuiApplication(
+            ApplicationServices services,
+            BoundedMessageLog messageLog,
+            Supplier<BuildIdentity> build,
+            Function<Supplier<Window>, FileChooserPort> choosers,
+            RunWiring.Setup runSetup) {
         this.services = Objects.requireNonNull(services, "services");
         this.messageLog = Objects.requireNonNull(messageLog, "messageLog");
         this.build = Objects.requireNonNull(build, "build");
         this.choosers = Objects.requireNonNull(choosers, "choosers");
+        this.runSetup = Objects.requireNonNull(runSetup, "runSetup");
     }
 
     /**
@@ -220,7 +268,17 @@ public final class CometGuiApplication extends Application {
         HostBaselineViewModel hostBaseline = new HostBaselineViewModel(baseline);
         recordBaseline(hostBaseline);
 
-        ToolManagerViewModel toolManager = toolManagerViewModel();
+        Optional<ToolManager> tools = Optional.empty();
+        String toolsUnavailable = "";
+        try {
+            tools = Optional.of(runSetup.tools().create());
+        } catch (ToolManagerUnavailableException unavailable) {
+            toolsUnavailable = unavailable.getMessage();
+        }
+        ToolManagerViewModel toolManager =
+                tools.isPresent()
+                        ? new ToolManagerViewModel(tools.get(), Platform::runLater)
+                        : ToolManagerViewModel.unavailable(toolsUnavailable, Platform::runLater);
 
         /*
          * The parameter editor's collaborators are made here and injected into the views, never
@@ -235,11 +293,33 @@ public final class CometGuiApplication extends Application {
         ParameterEditorViewModel parameterEditor =
                 ParameterEditorWiring.editor(parameterSession, spectrumInputs, chooser, running);
 
+        /*
+         * The Run section (phase 08): the workflow engine behind a port, over the one process
+         * service, the console's log (as a method reference), the Tool Manager and the session's
+         * project. The engine is called on daemon threads and every answer is applied on this
+         * thread; the stepper is the one the shell draws.
+         */
+        StageStepperViewModel stepper = new StageStepperViewModel();
+        project =
+                new ProjectSession(
+                        runSetup.projectDirectory(), services.clock(), services.runIds());
+        runThreads = RunWiring.backgroundThreads();
+        RunViewModel run =
+                new RunViewModel(
+                        parameterSession,
+                        spectrumInputs,
+                        parameterEditor.readiness(),
+                        stepper,
+                        RunWiring.port(
+                                services, messageLog, tools, toolsUnavailable, project, running),
+                        runThreads,
+                        Platform::runLater);
+
         ShellView shell =
                 new ShellView(
                         new NavigationViewModel(),
                         hostBaseline,
-                        new StageStepperViewModel(),
+                        stepper,
                         new ConsoleViewModel(messageLog),
                         toolManager,
                         parameterSession,
@@ -247,7 +327,8 @@ public final class CometGuiApplication extends Application {
                         spectrumInputs,
                         new VariableModsViewModel(parameterSession),
                         new ParameterSearchViewModel(parameterSession),
-                        ParameterEditorWiring.expert(parameterSession, parameterEditor, running));
+                        ParameterEditorWiring.expert(parameterSession, parameterEditor, running),
+                        run);
 
         /*
          * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds
@@ -259,36 +340,35 @@ public final class CometGuiApplication extends Application {
          */
         toolManager.refresh();
 
+        /*
+         * The pre-run check reads which Comet is installed, so it runs again whenever the Tool
+         * Manager's rows are read again -- after an install or a registration -- and once now.
+         */
+        toolManager
+                .rows()
+                .addListener((ListChangeListener<ToolRowViewModel>) change -> run.recheck());
+        run.recheck();
+
         primaryStage.setTitle(WINDOW_TITLE);
         primaryStage.setScene(new Scene(shell, INITIAL_WIDTH, INITIAL_HEIGHT));
         primaryStage.show();
     }
 
     /**
-     * The Tool Manager for this machine, or one that says why this machine has none.
+     * Releases the session's project lock and stops the Run section's threads.
      *
-     * <p>The composition is {@link ToolManagerWiring#forThisApplication}'s, over the services this
-     * application was built with; the reason for that route, and for the cache root being the
-     * application data directory, is written down there. A machine the product publishes no
-     * artefacts for, an artefact manifest that cannot be read, and a composition root with no
-     * process service all leave the Tool Manager section explaining itself rather than empty --
-     * <strong>and none of them stops the window appearing</strong>. A Tool Manager is one section
-     * of a window.
+     * <p>Called by JavaFX when the application ends. A run still in progress is not waited for: its
+     * threads are daemons, and its tools are the process service's to end.
      *
-     * <p>The reason is not also written to the message log. Startup narrates exactly one thing
-     * there, the host-baseline outcome, and a second line would make that contract two; the
-     * sentence belongs where a user goes looking for it, which is the section itself.
-     *
-     * @return the view-model the Tool Manager section is built over
+     * @throws IOException if the project lock cannot be released
      */
-    private ToolManagerViewModel toolManagerViewModel() {
-        try {
-            return new ToolManagerViewModel(
-                    ToolManagerWiring.forThisApplication(
-                            services, ToolManagerWiring.installThreads()),
-                    Platform::runLater);
-        } catch (ToolManagerUnavailableException unavailable) {
-            return ToolManagerViewModel.unavailable(unavailable.getMessage(), Platform::runLater);
+    @Override
+    public void stop() throws IOException {
+        if (runThreads != null) {
+            runThreads.shutdownNow();
+        }
+        if (project != null) {
+            project.close();
         }
     }
 

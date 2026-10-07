@@ -16,19 +16,28 @@
 
 package org.cometgui.app.testing;
 
+import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.config.ParameterEditorWiring;
 import org.cometgui.domain.build.BuildIdentity;
+import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.ui.view.ShellView;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
 import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.params.ActiveRun;
+import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.RunEnginePort;
+import org.cometgui.ui.viewmodel.params.RunNotStartedException;
+import org.cometgui.ui.viewmodel.params.RunObserver;
+import org.cometgui.ui.viewmodel.params.RunViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 
@@ -79,6 +88,32 @@ public final class TestEditors {
                 inputs,
                 new VariableModsViewModel(session),
                 new ParameterSearchViewModel(session),
-                ParameterEditorWiring.expert(session, editor, BUILD));
+                ParameterEditorWiring.expert(session, editor, BUILD),
+                new RunViewModel(
+                        session,
+                        inputs,
+                        editor.readiness(),
+                        stepper,
+                        new NoEngine(),
+                        Runnable::run,
+                        Runnable::run));
+    }
+
+    /** The engine port of a shell built for a test that runs nothing: it says so. */
+    private static final class NoEngine implements RunEnginePort {
+
+        /** The engine's reason in such a shell. */
+        static final String REASON = "This test shell has no workflow engine.";
+
+        @Override
+        public EngineCheck check(CometParameters model, List<Path> spectra) {
+            return EngineCheck.unavailable(REASON);
+        }
+
+        @Override
+        public ActiveRun start(CometParameters model, List<Path> spectra, RunObserver observer)
+                throws RunNotStartedException {
+            throw new RunNotStartedException(REASON, null);
+        }
     }
 }

@@ -469,8 +469,9 @@ class ParameterEditorViewModelTest {
                     () -> assertEquals(Optional.empty(), editor.files().lastWritten()),
                     () ->
                             assertEquals(
-                                    Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT),
-                                    editor.readiness().engineReason()));
+                                    List.of(RunReadinessViewModel.ENGINE_NOT_CHECKED),
+                                    editor.readiness().engineReasons(),
+                                    "the engine's half is unchecked until RunViewModel checks"));
             session.edit("allowed_missed_cleavage", "many");
             assertTrue(editor.readiness().parametersBlockRun());
             assertEquals(1, editor.summary().notAppliedCount());

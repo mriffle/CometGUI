@@ -44,6 +44,7 @@ import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
 import org.cometgui.ui.testing.Editors;
 import org.cometgui.ui.testing.FxToolkit;
+import org.cometgui.ui.testing.ScriptedEngine;
 import org.cometgui.ui.testing.ScriptedToolManager;
 import org.cometgui.ui.testing.ToolOffers;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
@@ -52,6 +53,7 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
@@ -125,7 +127,16 @@ class ShellViewTest {
                                     inputs,
                                     new VariableModsViewModel(session),
                                     new ParameterSearchViewModel(session),
-                                    Editors.expert(session, editor));
+                                    Editors.expert(session, editor),
+                                    Editors.run(
+                                            session,
+                                            inputs,
+                                            editor,
+                                            stepper,
+                                            new ScriptedEngine(
+                                                    model ->
+                                                            EngineCheck.unavailable(
+                                                                    "no engine in this test"))));
                     scene = new Scene(shell, 1280, 800);
                     scene.getRoot().applyCss();
                     scene.getRoot().layout();
@@ -378,6 +389,24 @@ class ShellViewTest {
     }
 
     @Test
+    @DisplayName(
+            "the Run entry's accessible help is the section's description, then why Run is"
+                    + " disabled; the other entries keep their description")
+    void theRunEntryCarriesTheReasons() throws InterruptedException {
+        assertEquals(
+                "Inputs, workflow summary, selected tool versions, high-level parameter summary,"
+                        + " validation, and Run and Cancel controls. The pre-run check has not run"
+                        + " yet, so the workflow engine has not said whether it can run this"
+                        + " search.",
+                FxToolkit.callOnFxThread(
+                        () -> shell.navigationEntryFor(SectionId.RUN).getAccessibleHelp()));
+        assertEquals(
+                SectionId.RESULTS.description(),
+                FxToolkit.callOnFxThread(
+                        () -> shell.navigationEntryFor(SectionId.RESULTS).getAccessibleHelp()));
+    }
+
+    @Test
     @DisplayName("a blocking host baseline shows the banner, with the severity in words")
     void aBlockingHostBaselineShowsTheBanner() throws InterruptedException {
         HostBaselineViewModel blocked =
@@ -389,6 +418,7 @@ class ShellViewTest {
         Editors.ScriptedChooser chooser = new Editors.ScriptedChooser();
         SpectrumInputsViewModel inputs = Editors.inputs(session, chooser, new Editors.KnownFiles());
         ParameterEditorViewModel editor = Editors.editor(session, inputs, chooser);
+        StageStepperViewModel otherStepper = new StageStepperViewModel();
         Scene other =
                 FxToolkit.callOnFxThread(
                         () ->
@@ -396,7 +426,7 @@ class ShellViewTest {
                                         new ShellView(
                                                 new NavigationViewModel(),
                                                 blocked,
-                                                new StageStepperViewModel(),
+                                                otherStepper,
                                                 new ConsoleViewModel(new BoundedMessageLog(8)),
                                                 new ToolManagerViewModel(
                                                         new ScriptedToolManager(), Runnable::run),
@@ -405,7 +435,16 @@ class ShellViewTest {
                                                 inputs,
                                                 new VariableModsViewModel(session),
                                                 new ParameterSearchViewModel(session),
-                                                Editors.expert(session, editor)),
+                                                Editors.expert(session, editor),
+                                                Editors.run(
+                                                        session,
+                                                        inputs,
+                                                        editor,
+                                                        otherStepper,
+                                                        new ScriptedEngine(
+                                                                model ->
+                                                                        EngineCheck.unavailable(
+                                                                                "no engine")))),
                                         800,
                                         600));
         Label banner = (Label) other.lookup("#" + UiIds.HOST_BASELINE_BANNER);

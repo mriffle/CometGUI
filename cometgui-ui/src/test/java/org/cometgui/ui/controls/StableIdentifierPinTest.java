@@ -149,8 +149,11 @@ class StableIdentifierPinTest {
      * constants (the fragment preview's container, made-for, problems, three actions and status); 3
      * identifiers built from a position (one per new fragment-row method); the table's container on
      * both surfaces (2); and a row's name cell on both surfaces (2).
+     *
+     * <p>Raised from 396 to 399 by phase 08 unit 7, which made the Run section run the workflow
+     * engine: 3 constants (Cancel, the outcome and the rerun preview).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 396;
+    private static final int PINNED_IDENTIFIER_COUNT = 399;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -264,7 +267,10 @@ class StableIdentifierPinTest {
                     Map.entry("FRAGMENT_STATUS", "ess-fragment-status"),
                     Map.entry("RUN_START", "run-start"),
                     Map.entry("RUN_PARAMETERS", "run-parameters"),
-                    Map.entry("RUN_ENGINE", "run-engine"));
+                    Map.entry("RUN_ENGINE", "run-engine"),
+                    Map.entry("RUN_CANCEL", "run-cancel"),
+                    Map.entry("RUN_OUTCOME", "run-outcome"),
+                    Map.entry("RUN_PREVIEW", "run-preview"));
 
     // -----------------------------------------------------------------------------------------
     // The parameter editor (Phase 07). A parameter's identifiers are built from its own name, so

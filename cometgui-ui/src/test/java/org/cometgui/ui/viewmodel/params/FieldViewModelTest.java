@@ -158,7 +158,8 @@ class FieldViewModelTest {
     @CsvSource({"2026.03.0, ERROR, Error, true", "2026.02.2, WARNING, Warning, false"})
     void distanceBelowMinusTwo(String release, FieldState state, String prefix, boolean blocks) {
         ParameterSession session = startingIn(ToolVersion.parse(release));
-        RunReadinessViewModel readiness = new RunReadinessViewModel(session, Optional.empty());
+        RunReadinessViewModel readiness = new RunReadinessViewModel(session);
+        readiness.showEngineReasons(List.of());
         assertTrue(readiness.runEnabled());
 
         // CONSTRUCTED value: distance -3

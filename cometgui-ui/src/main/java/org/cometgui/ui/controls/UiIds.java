@@ -386,6 +386,15 @@ public final class UiIds {
     /** Why the workflow engine cannot run, or that it can. */
     public static final String RUN_ENGINE = "run-engine";
 
+    /** The Run section's Cancel control, enabled only while a run can be cancelled. */
+    public static final String RUN_CANCEL = "run-cancel";
+
+    /** The last run's outcome, or what the current run is doing, in words. */
+    public static final String RUN_OUTCOME = "run-outcome";
+
+    /** The rerun preview: which steps the next Run executes and which it reuses, and why. */
+    public static final String RUN_PREVIEW = "run-preview";
+
     /**
      * The two surfaces a parameter's control appears on. A parameter shown in Essentials is shown
      * in Advanced too, so the surface is part of every parameter identifier and the two controls

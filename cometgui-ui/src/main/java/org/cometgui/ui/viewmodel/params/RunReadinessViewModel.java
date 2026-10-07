@@ -19,7 +19,6 @@ package org.cometgui.ui.viewmodel.params;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
@@ -27,7 +26,7 @@ import org.cometgui.params.comet.validation.ValidationReport;
 import org.cometgui.ui.viewmodel.NonNullProperty;
 
 /**
- * Whether a run may start, and why not, for the Run section's Run control (decision P7-6).
+ * Whether a run may start, and why not, for the Run section's Run control (decisions P7-6, P8-16).
  *
  * <p>Two independent halves, both stated in text:
  *
@@ -37,51 +36,49 @@ import org.cometgui.ui.viewmodel.NonNullProperty;
  *       would be searched, which is view-model state, not a scientific rule -- or when the
  *       session's one report holds an error, including an unresolved entry of a migration under
  *       review, which that report carries as an error ({@code R-PARAM-13}). Each error is a
- *       blocking reason (exit gate item 6 asserts this half).
- *   <li><strong>The workflow engine.</strong> Phase 08 builds the engine that runs Comet and
- *       Percolator. Until the composition root says otherwise, a separate reason is always present,
- *       so the Run control never pretends it could start a run.
+ *       blocking reason (Phase 07 exit gate item 6 asserts this half).
+ *   <li><strong>The workflow engine.</strong> Phase 08's engine says why it cannot run the
+ *       configuration: no Comet of the release installed, the pre-run check's problems with the
+ *       files and the validator's errors over the file-system facts (the decoy blocks of {@code
+ *       R-DEC-02} and the index refusal among them), that the check is still running, that a run is
+ *       in progress, or that nothing would run. {@link RunViewModel} works those out off the JavaFX
+ *       thread and puts them here with {@link #showEngineReasons}; until it first has, the engine's
+ *       half says the check has not run, so Run is never enabled on an answer nobody computed.
  * </ul>
  *
  * <p>The Run control is enabled only when neither half has a reason.
  */
 public final class RunReadinessViewModel {
 
-    /** The reason no run can start before the workflow engine exists. */
-    public static final String ENGINE_NOT_BUILT =
-            "No run can start yet: the workflow engine that runs Comet and Percolator arrives in"
-                    + " Phase 08.";
+    /** The engine's reason before the first pre-run check has answered. */
+    public static final String ENGINE_NOT_CHECKED =
+            "The pre-run check has not run yet, so the workflow engine has not said whether it"
+                    + " can run this search.";
 
     private final ParameterSession session;
-
-    private final Optional<String> engineUnavailable;
 
     private final ReadOnlyBooleanWrapper parametersBlockRun;
 
     private final NonNullProperty<List<String>> blockingReasons;
+
+    private final NonNullProperty<List<String>> engineReasons;
 
     private final ReadOnlyBooleanWrapper runEnabled;
 
     private final NonNullProperty<String> reasonsText;
 
     /**
-     * Run readiness following a session's report.
+     * Run readiness following a session's report, with the engine's half saying the pre-run check
+     * has not run yet ({@link #ENGINE_NOT_CHECKED}).
      *
      * @param session the session
-     * @param engineUnavailable why the workflow engine cannot run anything, or empty when it can;
-     *     the composition root passes {@link #ENGINE_NOT_BUILT} until Phase 08
-     * @throws IllegalArgumentException if the engine's reason is blank
      */
-    public RunReadinessViewModel(ParameterSession session, Optional<String> engineUnavailable) {
+    public RunReadinessViewModel(ParameterSession session) {
         this.session = Objects.requireNonNull(session, "session");
-        this.engineUnavailable = Objects.requireNonNull(engineUnavailable, "engineUnavailable");
-        if (engineUnavailable.filter(String::isBlank).isPresent()) {
-            throw new IllegalArgumentException(
-                    "a workflow engine that cannot run has to say why: a blank reason leaves the"
-                            + " Run control disabled with no explanation");
-        }
         this.parametersBlockRun = new ReadOnlyBooleanWrapper(this, "parametersBlockRun", false);
         this.blockingReasons = new NonNullProperty<>(this, "blockingReasons", List.of());
+        this.engineReasons =
+                new NonNullProperty<>(this, "engineReasons", List.of(ENGINE_NOT_CHECKED));
         this.runEnabled = new ReadOnlyBooleanWrapper(this, "runEnabled", false);
         this.reasonsText = new NonNullProperty<>(this, "reasonsText", "");
         show(session.report());
@@ -129,16 +126,48 @@ public final class RunReadinessViewModel {
     }
 
     /**
-     * Why the workflow engine cannot run anything.
+     * Why the workflow engine cannot run this configuration now, one sentence each.
      *
-     * @return the reason, or empty when it can
+     * @return the read-only property; an empty list when it can
      */
-    public Optional<String> engineReason() {
-        return engineUnavailable;
+    public ReadOnlyObjectProperty<List<String>> engineReasonsProperty() {
+        return engineReasons.getReadOnlyProperty();
     }
 
     /**
-     * Whether the Run control is enabled: no parameter error and an engine that can run.
+     * Why the workflow engine cannot run this configuration now.
+     *
+     * @return the reasons, empty when it can
+     */
+    public List<String> engineReasons() {
+        return engineReasons.get();
+    }
+
+    /**
+     * Replaces the engine's half. Called by {@link RunViewModel}, on the interface thread, with
+     * what the engine said.
+     *
+     * @param reasons why the engine cannot run the configuration; empty when it can
+     * @throws NullPointerException if the list or a reason is {@code null}
+     * @throws IllegalArgumentException if a reason is blank: the Run control would be disabled with
+     *     no explanation
+     */
+    public void showEngineReasons(List<String> reasons) {
+        List<String> copy = List.copyOf(reasons);
+        for (String reason : copy) {
+            if (reason.isBlank()) {
+                throw new IllegalArgumentException(
+                        "a workflow engine that cannot run has to say why: a blank reason leaves"
+                                + " the Run control disabled with no explanation");
+            }
+        }
+        engineReasons.set(copy);
+        show(session.report());
+    }
+
+    /**
+     * Whether the Run control is enabled: no parameter error and nothing against it from the
+     * engine.
      *
      * @return the read-only property
      */
@@ -183,9 +212,10 @@ public final class RunReadinessViewModel {
         boolean blocked = !reasons.isEmpty();
         parametersBlockRun.set(blocked);
         blockingReasons.set(List.copyOf(reasons));
-        runEnabled.set(!blocked && engineUnavailable.isEmpty());
+        List<String> engine = engineReasons.get();
         List<String> all = new ArrayList<>(reasons);
-        engineUnavailable.ifPresent(all::add);
+        all.addAll(engine);
         reasonsText.set(all.isEmpty() ? "Ready to run." : String.join("\n", all));
+        runEnabled.set(!blocked && engine.isEmpty());
     }
 }

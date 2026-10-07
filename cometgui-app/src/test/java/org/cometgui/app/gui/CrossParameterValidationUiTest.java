@@ -51,8 +51,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  * disabled with the reason in text, the error is stated at the field, the summary lists it, and
  * from the summary entry the keyboard alone -- Tab to reach it, Enter to activate it -- moves the
  * focus to the field. Fixing it re-enables the parameters' half of the Run control; the engine's
- * half stays, because no workflow engine exists before Phase 08. Both drivers; every text typed
- * out.
+ * half stays, because this application's Tool Manager has no Comet installed. (With the engine
+ * ready, {@code RunReadinessUiTest} proves the parameters' half alone disables Run.) Both drivers;
+ * every text typed out.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class CrossParameterValidationUiTest {
@@ -60,9 +61,16 @@ class CrossParameterValidationUiTest {
     private static final BuildIdentity BUILD =
             BuildIdentity.of("0.0.0-guitest", "unknown", Instant.parse("2026-10-05T00:00:00Z"));
 
+    /**
+     * The engine's half in this application: its Tool Manager has no Comet installed (the test's
+     * application data directory holds none), so the workflow engine cannot run anything -- and the
+     * parameters' half is what this class proves. Phase 08 replaced Phase 07's "the engine is not
+     * built" with this, the engine's own reason.
+     */
     private static final String ENGINE =
-            "No run can start yet: the workflow engine that runs Comet and Percolator arrives in"
-                    + " Phase 08.";
+            "The workflow engine cannot start this search:\nComet 2026.03.0 is not installed, and"
+                    + " the parameters are for that release: install it in the Tool Manager"
+                    + " section, or register a Comet 2026.03.0 already on this computer there.";
 
     private static final String READY = "The parameters do not block a run.";
 
@@ -146,7 +154,7 @@ class CrossParameterValidationUiTest {
                         assertTrue(
                                 driver.textOf("run-parameters")
                                         .startsWith("The parameters block a run:\n")),
-                () -> assertEquals(ENGINE, driver.textOf("run-engine")));
+                () -> assertEquals(ENGINE, RunSection.awaitEngineAnswer(driver)));
 
         // Fixed: upper first (10 to 10 is a window, not a reversed one), then lower.
         ParameterEditorApp.openEditor(driver);
@@ -236,7 +244,7 @@ class CrossParameterValidationUiTest {
         assertAll(
                 "the Run control with nothing wrong in the parameters",
                 () -> assertEquals(READY, driver.textOf("run-parameters")),
-                () -> assertEquals(ENGINE, driver.textOf("run-engine")),
+                () -> assertEquals(ENGINE, RunSection.awaitEngineAnswer(driver)),
                 () -> assertTrue(isDisabled(driver, "run-start"), "still no engine"));
     }
 

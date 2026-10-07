@@ -37,12 +37,14 @@ import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 import org.cometgui.app.bootstrap.CometGuiApplication;
 import org.cometgui.app.config.ApplicationServices;
+import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.testing.ScriptedChooser;
 import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.RunningApplication;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.ports.FileSystemAccess;
+import org.cometgui.domain.ports.ProcessRunner;
 import org.testfx.api.FxToolkit;
 
 /**
@@ -80,6 +82,33 @@ final class ParameterEditorApp {
      * @return the running application
      */
     static ParameterEditorApp launch(BuildIdentity build, Path... present) {
+        ApplicationServices real = ApplicationServices.forThisHost();
+        return launch(
+                build,
+                real.processRunner().orElse(null),
+                new BoundedMessageLog(),
+                RunWiring.Setup.forThisApplication(real),
+                present);
+    }
+
+    /**
+     * Starts the application as {@link #launch(BuildIdentity, Path...)} does, with the Run
+     * section's seams chosen by the test: the process runner the engine launches through, the
+     * console's log, and where the Tool Manager and the project come from.
+     *
+     * @param build the build a saved file's header names
+     * @param processes the process runner; {@code null} for none
+     * @param log the console's log
+     * @param runSetup the Tool Manager and the project directory
+     * @param present the paths to report as readable files
+     * @return the running application
+     */
+    static ParameterEditorApp launch(
+            BuildIdentity build,
+            ProcessRunner processes,
+            BoundedMessageLog log,
+            RunWiring.Setup runSetup,
+            Path... present) {
         ScriptedChooser chooser = new ScriptedChooser();
         ApplicationServices real = ApplicationServices.forThisHost();
         ApplicationServices services =
@@ -89,7 +118,7 @@ final class ParameterEditorApp {
                         new PresentFiles(real.fileSystem(), Set.of(present)),
                         real.runIds(),
                         real.glibcVersions(),
-                        real.processRunner().orElse(null),
+                        processes,
                         null,
                         null);
         try {
@@ -97,10 +126,7 @@ final class ParameterEditorApp {
             FxToolkit.setupApplication(
                     () ->
                             new CometGuiApplication(
-                                    services,
-                                    new BoundedMessageLog(),
-                                    () -> build,
-                                    owner -> chooser));
+                                    services, log, () -> build, owner -> chooser, runSetup));
             return new ParameterEditorApp(chooser, RunningApplication.showing(primary));
         } catch (TimeoutException timedOut) {
             return fail("the application did not start", timedOut);

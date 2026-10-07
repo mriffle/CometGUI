@@ -160,32 +160,63 @@ class SummaryAndReadinessTest {
     class Readiness {
 
         @Test
-        @DisplayName("before Phase 08 the engine's reason is always there and Run is disabled")
-        void engineNotBuilt() {
-            RunReadinessViewModel readiness =
-                    new RunReadinessViewModel(
-                            startingIn(C03), Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT));
+        @DisplayName(
+                "until the pre-run check has answered, the engine's half says so and Run is"
+                        + " disabled")
+        void engineNotChecked() {
+            RunReadinessViewModel readiness = new RunReadinessViewModel(startingIn(C03));
             assertFalse(readiness.parametersBlockRun());
             assertEquals(List.of(), readiness.blockingReasons());
             assertFalse(readiness.runEnabled());
             assertFalse(readiness.runEnabledProperty().get());
             assertEquals(
-                    Optional.of(
-                            "No run can start yet: the workflow engine that runs Comet and"
-                                    + " Percolator arrives in Phase 08."),
-                    readiness.engineReason());
-            assertEquals(RunReadinessViewModel.ENGINE_NOT_BUILT, readiness.reasonsText());
+                    List.of(
+                            "The pre-run check has not run yet, so the workflow engine has not"
+                                    + " said whether it can run this search."),
+                    readiness.engineReasons());
+            assertEquals(RunReadinessViewModel.ENGINE_NOT_CHECKED, readiness.reasonsText());
+        }
+
+        @Test
+        @DisplayName(
+                "the engine's reasons follow the parameters' in the text, and only no reason"
+                        + " from either half enables Run")
+        void engineReasonsJoinTheParameters() {
+            ParameterSession session = startingIn(C03);
+            RunReadinessViewModel readiness = new RunReadinessViewModel(session);
+            readiness.showEngineReasons(List.of("no Comet", "no spectra"));
+            assertFalse(readiness.runEnabled());
+            assertEquals(List.of("no Comet", "no spectra"), readiness.engineReasons());
+            assertEquals(
+                    List.of("no Comet", "no spectra"), readiness.engineReasonsProperty().get());
+            assertEquals("no Comet\nno spectra", readiness.reasonsText());
+
+            session.edit("peptide_mass_tolerance_lower", "30.0");
+            String reason =
+                    "Error -- Precursor tolerance, lower bound (peptide_mass_tolerance_lower),"
+                            + " Precursor mass and isotope handling: "
+                            + session.report().errors().get(0).message();
+            assertEquals(reason + "\nno Comet\nno spectra", readiness.reasonsText());
+
+            readiness.showEngineReasons(List.of());
+            assertFalse(readiness.runEnabled(), "the parameters still block");
+            assertEquals(reason, readiness.reasonsText());
+
+            session.edit("peptide_mass_tolerance_lower", "-20.0");
+            assertTrue(readiness.runEnabled());
+            assertEquals("Ready to run.", readiness.reasonsText());
+
+            readiness.showEngineReasons(List.of("a run is in progress"));
+            assertFalse(readiness.runEnabled(), "the engine alone blocks");
+            assertFalse(readiness.parametersBlockRun());
         }
 
         @Test
         @DisplayName("an error blocks Run with its reason in text; fixing it unblocks")
         void errorBlocks() {
             ParameterSession session = startingIn(C03);
-            RunReadinessViewModel readiness =
-                    new RunReadinessViewModel(
-                            session, Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT));
-            RunReadinessViewModel engineReady =
-                    new RunReadinessViewModel(session, Optional.empty());
+            RunReadinessViewModel readiness = new RunReadinessViewModel(session);
+            RunReadinessViewModel engineReady = engineReady(session);
             assertTrue(engineReady.runEnabled());
             assertEquals("Ready to run.", engineReady.reasonsText());
 
@@ -202,7 +233,7 @@ class SummaryAndReadinessTest {
             assertEquals(List.of(reason), readiness.blockingReasons());
             assertEquals(List.of(reason), readiness.blockingReasonsProperty().get());
             assertEquals(
-                    reason + "\n" + RunReadinessViewModel.ENGINE_NOT_BUILT,
+                    reason + "\n" + RunReadinessViewModel.ENGINE_NOT_CHECKED,
                     readiness.reasonsText());
             assertEquals(readiness.reasonsText(), readiness.reasonsTextProperty().get());
             assertFalse(engineReady.runEnabled());
@@ -217,7 +248,7 @@ class SummaryAndReadinessTest {
         @DisplayName("a warning alone does not block Run")
         void warningDoesNotBlock() {
             ParameterSession session = startingIn(C02);
-            RunReadinessViewModel readiness = new RunReadinessViewModel(session, Optional.empty());
+            RunReadinessViewModel readiness = engineReady(session);
             session.edit("peptide_mass_tolerance_lower", "5.0");
             assertFalse(session.report().warnings().isEmpty());
             assertFalse(readiness.parametersBlockRun());
@@ -228,7 +259,7 @@ class SummaryAndReadinessTest {
         @DisplayName("an unresolved migration entry blocks Run until resolved")
         void migrationBlocks() {
             ParameterSession session = startingIn(C02);
-            RunReadinessViewModel readiness = new RunReadinessViewModel(session, Optional.empty());
+            RunReadinessViewModel readiness = engineReady(session);
             session.edit("variable_mod01", "15.9949 M 0 3 2 4 0 0.0");
             session.selectRelease(C03);
             assertTrue(readiness.parametersBlockRun());
@@ -256,7 +287,9 @@ class SummaryAndReadinessTest {
                             + " Run control disabled with no explanation",
                     assertThrows(
                                     IllegalArgumentException.class,
-                                    () -> new RunReadinessViewModel(session, Optional.of(" ")))
+                                    () ->
+                                            new RunReadinessViewModel(session)
+                                                    .showEngineReasons(List.of("fine", " ")))
                             .getMessage());
         }
     }
@@ -276,8 +309,7 @@ class SummaryAndReadinessTest {
 
         private final ParameterSession session = startingIn(C03);
 
-        private final RunReadinessViewModel readiness =
-                new RunReadinessViewModel(session, Optional.empty());
+        private final RunReadinessViewModel readiness = engineReady(session);
 
         private final ValidationSummaryViewModel summary = new ValidationSummaryViewModel(session);
 
@@ -399,5 +431,12 @@ class SummaryAndReadinessTest {
             assertTrue(SummaryEntry.Kind.ERROR.blocksRun());
             assertFalse(SummaryEntry.Kind.WARNING.blocksRun());
         }
+    }
+
+    /** Readiness over a session whose engine half has nothing against a run. */
+    private static RunReadinessViewModel engineReady(ParameterSession session) {
+        RunReadinessViewModel readiness = new RunReadinessViewModel(session);
+        readiness.showEngineReasons(List.of());
+        return readiness;
     }
 }

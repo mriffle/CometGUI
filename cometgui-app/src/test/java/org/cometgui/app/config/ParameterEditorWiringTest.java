@@ -150,8 +150,9 @@ class ParameterEditorWiringTest {
                                 session.offeredReleases().stream().map(ToolVersion::text).toList()),
                 () ->
                         assertEquals(
-                                Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT),
-                                editor.readiness().engineReason()),
+                                List.of(RunReadinessViewModel.ENGINE_NOT_CHECKED),
+                                editor.readiness().engineReasons(),
+                                "the engine's half waits for the Run section's first check"),
                 () -> assertEquals("1", session.model().text("output_percolatorfile")));
     }
 

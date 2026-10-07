@@ -83,21 +83,18 @@ public final class ParameterEditorViewModel {
      * @param chooser the file chooser, for file parameters other than the database and for saving
      * @param build the running build, which a saved file's header names
      * @param hashService the hash port a saved file is hashed through
-     * @param engineUnavailable why no run can start, until the workflow engine exists (see {@link
-     *     RunReadinessViewModel})
      */
     public ParameterEditorViewModel(
             ParameterSession session,
             SpectrumInputsViewModel inputs,
             FileChooserPort chooser,
             BuildIdentity build,
-            HashService hashService,
-            Optional<String> engineUnavailable) {
+            HashService hashService) {
         this.session = Objects.requireNonNull(session, "session");
         this.inputs = Objects.requireNonNull(inputs, "inputs");
         this.chooser = Objects.requireNonNull(chooser, "chooser");
         this.summary = new ValidationSummaryViewModel(session);
-        this.readiness = new RunReadinessViewModel(session, engineUnavailable);
+        this.readiness = new RunReadinessViewModel(session);
         this.files = new ParameterFilesViewModel(session, build, hashService);
         this.migrationReview = new MigrationReviewViewModel(session);
         this.presets = new PresetsViewModel(session, List.of());

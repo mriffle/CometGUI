@@ -68,11 +68,16 @@ final class SectionArrivals {
         Map<SectionId, String> notes = new EnumMap<>(SectionId.class);
         notes.put(
                 SectionId.RUN,
-                "This section arrives in phase 08 (Workflow Engine and Comet Adapter): the inputs,"
-                        + " the validation summary and the Run and Cancel controls. The stage"
-                        + " stepper below is already live and has no engine behind it yet, and"
-                        + " the Run control below it says, in words, every reason it cannot"
-                        + " start a run: the parameters' (phase 07) and the missing engine's.");
+                "This section is live for Comet: phase 08 (Workflow Engine and Comet Adapter)"
+                        + " put the workflow engine behind it. Run searches the spectrum files"
+                        + " chosen in Comet Parameters with the installed Comet of the selected"
+                        + " release, once per file, and merges the PIN files; Cancel stops it;"
+                        + " the stage stepper follows the run; and before a rerun the preview"
+                        + " below says which steps execute again. Every reason Run is disabled is"
+                        + " stated in words: the parameters' (phase 07) and the engine's. Not yet"
+                        + " live: Percolator and the results arrive in phase 09 and phase 10, so"
+                        + " a run ends with the merged PIN and its provenance; index modes are"
+                        + " not offered here.");
         notes.put(
                 SectionId.COMET_PARAMETERS,
                 "This section is being filled by phase 07 (Comet Parameter Editor UI), on the"

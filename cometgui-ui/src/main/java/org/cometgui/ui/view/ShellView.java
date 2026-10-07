@@ -21,6 +21,7 @@ import static org.cometgui.ui.controls.AccessibleControls.named;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
+import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
 import javafx.scene.AccessibleRole;
 import javafx.scene.control.Label;
@@ -49,6 +50,8 @@ import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.RunReadinessViewModel;
+import org.cometgui.ui.viewmodel.params.RunViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 
@@ -145,6 +148,8 @@ public final class ShellView extends BorderPane {
      * @param variableMods the variable-modification editor over that session
      * @param parameterSearch the global parameter search over that session
      * @param expertMode the Expert level's view-model over that session
+     * @param run the Run section's engine half: Run, Cancel, the outcome and the rerun preview,
+     *     over the same session and driving {@code stepper}
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
@@ -158,7 +163,8 @@ public final class ShellView extends BorderPane {
             SpectrumInputsViewModel spectrumInputs,
             VariableModsViewModel variableMods,
             ParameterSearchViewModel parameterSearch,
-            ExpertViewModel expertMode) {
+            ExpertViewModel expertMode,
+            RunViewModel run) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
@@ -177,7 +183,10 @@ public final class ShellView extends BorderPane {
         }
 
         panes.get(SectionId.RUN).addContent(new StageStepper(stepper));
-        panes.get(SectionId.RUN).addContent(new RunControl(parameterEditor.readiness()));
+        panes.get(SectionId.RUN)
+                .addContent(
+                        new RunControl(
+                                parameterEditor.readiness(), Objects.requireNonNull(run, "run")));
 
         /*
          * The Comet parameter editor (phase 07) shares one session with the Run control above:
@@ -217,6 +226,22 @@ public final class ShellView extends BorderPane {
         setTop(buildHeader(hostBaseline));
         setLeft(buildNavigation());
         setCenter(content);
+
+        /*
+         * WHY RUN IS DISABLED, FOR THE KEYBOARD.  A disabled Run button cannot take the focus, and
+         * the Run section deliberately adds no tab stop of its own: the navigation entry is the
+         * window's first and, until a control in the shown section is enabled, only tab stop
+         * (KeyboardOnlyNavigationUiTest). So the Run entry's accessible help carries the section's
+         * description and then every reason a run cannot start -- what a screen reader announces
+         * when Tab reaches the entry -- and follows the readiness as it changes.
+         */
+        RunReadinessViewModel readiness = parameterEditor.readiness();
+        entries.get(SectionId.RUN)
+                .accessibleHelpProperty()
+                .bind(
+                        Bindings.createStringBinding(
+                                () -> SectionId.RUN.description() + " " + readiness.reasonsText(),
+                                readiness.reasonsTextProperty()));
 
         navigation.selectedSectionProperty().addListener((property, was, now) -> showSelection());
         showSelection();

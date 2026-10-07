@@ -30,11 +30,12 @@ import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.MetadataLoader;
 import org.cometgui.provenance.hashing.StreamingHashService;
+import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
-import org.cometgui.ui.viewmodel.params.RunReadinessViewModel;
+import org.cometgui.ui.viewmodel.params.RunViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.StageSwitches;
 
@@ -81,8 +82,8 @@ public final class Editors {
     }
 
     /**
-     * The editor's state over a session, its inputs and its chooser, with this class's build, a
-     * streaming hash service and the engine's reason.
+     * The editor's state over a session, its inputs and its chooser, with this class's build and a
+     * streaming hash service. Its readiness's engine half says the check has not run.
      *
      * @param session the session
      * @param inputs the inputs over the session
@@ -92,12 +93,34 @@ public final class Editors {
     public static ParameterEditorViewModel editor(
             ParameterSession session, SpectrumInputsViewModel inputs, ScriptedChooser chooser) {
         return new ParameterEditorViewModel(
+                session, inputs, chooser, BUILD, new StreamingHashService());
+    }
+
+    /**
+     * The Run section's engine half over a session, driving a stepper, calling a scripted engine on
+     * its own queues.
+     *
+     * @param session the session
+     * @param inputs the inputs over the session
+     * @param editor the editor whose readiness the run keeps
+     * @param stepper the stepper the run drives
+     * @param engine the scripted engine
+     * @return the view-model
+     */
+    public static RunViewModel run(
+            ParameterSession session,
+            SpectrumInputsViewModel inputs,
+            ParameterEditorViewModel editor,
+            StageStepperViewModel stepper,
+            ScriptedEngine engine) {
+        return new RunViewModel(
                 session,
                 inputs,
-                chooser,
-                BUILD,
-                new StreamingHashService(),
-                Optional.of(RunReadinessViewModel.ENGINE_NOT_BUILT));
+                editor.readiness(),
+                stepper,
+                engine,
+                engine.background(),
+                engine.ui());
     }
 
     /**
