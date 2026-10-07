@@ -1,0 +1,82 @@
+REAL PERCOLATOR OUTPUT -- provenance of every file under this directory
+=======================================================================
+
+These files were written by the real Percolator binaries, once, by hand,
+outside the build, on 2026-10-07 (21:41 UTC) by the phase 09 unit 4 agent.
+Nothing in the build regenerates them; the tests pin each file's SHA-256 so a
+silent edit fails.
+
+Input (D-006 / P9-13: CometGUI's OWN synthetic PIN, no K562 or UniProt data)
+  org.cometgui.tools.percolator.SyntheticPin.forCapabilityProbe() at commit
+  b25e4ba: 64 target + 64 decoy rows, seed SyntheticPin.PROBE_SEED = 3071,
+  129 lines including the header, written as probe.pin.
+  probe.pin SHA-256 a6ab63363a634d43da157f237c405908f96cdb067a5d918471b129ad75f806d9
+  (not checked in: SyntheticPin regenerates it byte for byte)
+
+Binaries
+  3.07.1  scratch/phase05/artefacts/rel-3-07-01__percolator-noxml-ubuntu-portable.zip
+          member "percolator", SHA-256
+          1ba38acf09520cc89d5ed907ed0382c4d23876a7e20ec3e91cbbaa2ed431237c
+          (the manifest's memberSha256); banner
+          "Percolator version 3.07.1, Build Date Jun 20 2024 13:20:18"
+  3.06.5  scratch/phase05/artefacts/rel-3-06-05__percolator-noxml-linux-portable.zip
+          member "percolator", SHA-256
+          1f1034b4f265e0b45efe93f55eb4fdc09c698f1b916dde910889f9057a9cb76e
+  3.09    scratch/percolator/3.09/run-percolator-3.09.sh (SHA-256
+          fe1b018a3afb0f97d6ff79e18264e282924f274d1ae7c71ff64d3825538f3e90)
+          running the upstream .rpm binary (SHA-256
+          c31f613929f06ef0f519623ed7ffd39253ce23d3681cc4cd825791c15e49ba26)
+          with Boost 1.66; banner
+          "Percolator version 3.09.0, Build Date May 21 2026 17:16:38"
+
+Command, identical for all three, run in an empty output directory under an
+empty environment except LANG (as PercolatorCommands.ENVIRONMENT does):
+  env -i LANG=C.UTF-8 <binary> --results-psms psms.tsv
+      --results-peptides peptides.tsv --decoy-results-psms decoy-psms.tsv
+      --decoy-results-peptides decoy-peptides.tsv --weights weights.txt
+      --seed 1 ../probe.pin
+  Every run exited 0. A second run of each binary produced byte-identical
+  files.
+
+Independent counts (wc -l and awk at generation time, not the parser)
+  Every .tsv here: 65 lines = 1 header + 64 rows; every row 6 fields.
+  weights.txt: 12 lines = 3 comment lines + 3 splits x 3 lines.
+  Target PSM rows with q-value <= cutoff (awk -F'\t' 'NR>1 && $3+0<=c'):
+              0   0.01  0.0588235  0.1  0.166667  0.5   1
+    3.07.1    0   0     17         17   27        48    64
+    3.06.5    0   0     0          0    6         57    64
+    3.09      0   0     17         17   27        48    64
+  Decoy PSM rows, same cutoffs:
+    3.07.1    0   0     0          0    3         23    64
+    3.06.5    0   0     0          0    0         27    64
+    3.09      0   0     0          0    3         23    64
+
+Version differences found
+  Headers are identical in all three versions and all four tables:
+  PSMId score q-value posterior_error_prob peptide proteinIds.
+  3.07.1 against 3.09: every column but posterior_error_prob is identical;
+  3.09 estimates PEP with I-splines (its log says "Performing isotonic
+  regression using I-Splines"), so only PEP values differ, and with them the
+  byte size. weights.txt is byte-identical between 3.07.1 and 3.09.
+  3.06.5 learns different weights over the same input, so its scores and
+  q-values differ; the format does not.
+  In every version psms.tsv == peptides.tsv and decoy-psms.tsv ==
+  decoy-peptides.tsv byte for byte, because every synthetic peptide is
+  distinct.
+
+SHA-256 of every file
+  6e782dd7bbba9f16bce1c6556bc86032e7a9804b6494694db61573d88340ed53  percolator-3.07.1/psms.tsv
+  6e782dd7bbba9f16bce1c6556bc86032e7a9804b6494694db61573d88340ed53  percolator-3.07.1/peptides.tsv
+  3f9557b82119a4f9900e5964c762dd9ce504de508afdb5be67dfdcca465259e4  percolator-3.07.1/decoy-psms.tsv
+  3f9557b82119a4f9900e5964c762dd9ce504de508afdb5be67dfdcca465259e4  percolator-3.07.1/decoy-peptides.tsv
+  5370f2375d3ea1f13236f6208624c69f81fa8fb190e936e863488cfda4e7a434  percolator-3.07.1/weights.txt
+  848e26e570a2c5f736be9e00377adef43db1677796b9efa9dfc2221bb9430852  percolator-3.06.5/psms.tsv
+  848e26e570a2c5f736be9e00377adef43db1677796b9efa9dfc2221bb9430852  percolator-3.06.5/peptides.tsv
+  2f60bf17a274b6e9f95860a8c635540938bd17fcf492e159fedd13722b52ec43  percolator-3.06.5/decoy-psms.tsv
+  2f60bf17a274b6e9f95860a8c635540938bd17fcf492e159fedd13722b52ec43  percolator-3.06.5/decoy-peptides.tsv
+  d24988bd722b0937a1ffa207ad7dbb6e22ef35885adacbfe21ee0ba4cbdff8c3  percolator-3.06.5/weights.txt
+  44aa04692c21aa47742f406d3da23adfc032d5fba363d07aecc9aa1f2379d07b  percolator-3.09/psms.tsv
+  44aa04692c21aa47742f406d3da23adfc032d5fba363d07aecc9aa1f2379d07b  percolator-3.09/peptides.tsv
+  9074109fa81a2ea2362de7d69894f0b660a0204baefc9f0f13172fac29d0b36c  percolator-3.09/decoy-psms.tsv
+  9074109fa81a2ea2362de7d69894f0b660a0204baefc9f0f13172fac29d0b36c  percolator-3.09/decoy-peptides.tsv
+  5370f2375d3ea1f13236f6208624c69f81fa8fb190e936e863488cfda4e7a434  percolator-3.09/weights.txt

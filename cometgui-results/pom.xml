@@ -16,6 +16,16 @@
   <description>Percolator output parsing, independent PSM and peptide filtering, and export.</description>
 
   <!--
+    PIT (R-TEST-02): org.cometgui.results.parser.* and org.cometgui.results.filtering.* are in the
+    parent POM's critical target list, and this module compiles real classes there from phase 09
+    unit 4 on, so its own switch is turned on; scripts/build.sh requires it once such a class
+    exists.  Nothing else about PIT changes here.
+  -->
+  <properties>
+    <cometgui.mutation.skip>false</cometgui.mutation.skip>
+  </properties>
+
+  <!--
     Only the edges the specification's layering permits are declared here.
     Adding one is an architectural change: say so in the phase handoff, and
     expect the ArchUnit rules in cometgui-archtests to have an opinion.

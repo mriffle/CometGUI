@@ -1,0 +1,26 @@
+CONSTRUCTED FIXTURES -- written by hand, NOT produced by Percolator
+===================================================================
+
+Written on 2026-10-07 by the phase 09 unit 4 agent for the edge cases that
+real Percolator output over CometGUI's synthetic PIN cannot reach (P9-13: a
+synthetic or constructed fixture only where a gate names an edge case, and
+recorded as constructed). The tests pin each file's SHA-256.
+
+weights-two-splits.txt   two cross-validation splits, five features ending
+                         in m0. Percolator always writes three; this proves
+                         the split count is read from the file (R-PERC-09,
+                         phase 09 gate item 8).
+weights-four-splits.txt  four splits, three features ending in m0; values
+                         spelt 0, 0.000, -0.0000, 1e-3 and 2E+1.
+psms-unknown-q.tsv       the real PSM table header; 15 rows. Multi-protein
+                         rows (c01: 3 proteins, c03: 2, c09: 2) and q-values
+                         that are known (0.001, 0.01, 0.0100001, 0, 1, 1e-3,
+                         0.010: 7 rows) or not (NaN, empty, inf, 0,005, 1.5,
+                         -0.01, Infinity, nan: 8 rows) -- R-RES-02.
+                         Hand count at cutoff 0.01: passing 5 (c01 c02 c08
+                         c12 c13), failing 2 (c03 c09), unknown 8.
+
+SHA-256
+  ea58b3b63f9031bf53b5675d117b1e7203137a0ebd2399c9def824334267b6c7  psms-unknown-q.tsv
+  2345706956b918d713a93fe5e523fbd31b7aceb095c68cfffbb9ff508969e276  weights-four-splits.txt
+  44042567136e69e5854085952cf6a2a3a9e14221761bfcc3c4cb04782177016f  weights-two-splits.txt

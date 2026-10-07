@@ -14,14 +14,20 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
-/**
- * Parsers for the Percolator PSM, peptide and weights outputs, including the missing-value and NaN
- * q-value policy and malformed-file handling.
- *
- * <p>The one home of Percolator output parsing (phase 09, design decision P9-3): {@link
- * org.cometgui.results.parser.ResultTableReader} for the target and decoy PSM and peptide tables,
- * {@link org.cometgui.results.parser.WeightsReader} for the learned weights. Phase 10's store,
- * tables and weights view build on these rather than on a second set. The pout XML document is not
- * read here; {@code org.cometgui.tools.percolator.PoutDocument} is its one reader.
- */
-package org.cometgui.results.parser;
+package org.cometgui.results.filtering;
+
+/** Where a row falls under a display q-value filter. */
+public enum Visibility {
+
+    /** The q-value is known and at or below the cutoff: the row is shown. */
+    PASSES,
+
+    /** The q-value is known and above the cutoff. */
+    FAILS,
+
+    /**
+     * The q-value is missing, unparsable or out of range ({@code R-RES-02}): neither passing nor
+     * failing, counted and shown as its own category, never silently dropped or included.
+     */
+    UNKNOWN_Q_VALUE
+}

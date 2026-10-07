@@ -18,6 +18,10 @@
  * q-value filtering with independent PSM and peptide thresholds. The boundary at exactly 0.01 is
  * inclusive; a mutation that turns the comparison into a strict one must fail a test.
  *
- * <p>Filled by phase 10 (results model and UI).
+ * <p>Phase 09 put here only the display filter values and their predicate ({@link
+ * org.cometgui.results.filtering.PsmQValueFilter}, {@link
+ * org.cometgui.results.filtering.PeptideQValueFilter}, {@link
+ * org.cometgui.results.filtering.DisplayFilters}); phase 10 adds the store, the counts view and
+ * export over them. These are never Percolator's {@code --testFDR}/{@code --trainFDR}.
  */
 package org.cometgui.results.filtering;
