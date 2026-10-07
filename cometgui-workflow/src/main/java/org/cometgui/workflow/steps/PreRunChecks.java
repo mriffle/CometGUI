@@ -41,6 +41,8 @@ import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.tools.comet.CometIndexCommand;
 import org.cometgui.tools.comet.CometIndexHeaderReader;
 import org.cometgui.tools.comet.FastaDecoyScanner;
+import org.cometgui.tools.percolator.PercolatorCommands;
+import org.cometgui.tools.percolator.PercolatorRefusedException;
 
 /**
  * The pre-run check: everything about a search that needs the file system, gathered into one {@link
@@ -149,8 +151,32 @@ final class PreRunChecks {
             List<Path> spectra,
             CometSelection comet,
             IndexMode mode) {
+        return check(project, model, spectra, comet, mode, Optional.empty());
+    }
+
+    /**
+     * Checks a search, with its Percolator half when it has one: the selected Percolator exists, is
+     * executable and still has the SHA-256 it was selected at, and its probed capabilities let the
+     * command builder build the run's command (the target tables are the run's purpose).
+     *
+     * @param project the project the run would belong to
+     * @param model the parameters
+     * @param spectra the spectrum files, in order
+     * @param comet the selected Comet
+     * @param mode the index mode
+     * @param percolator the Percolator half, or empty
+     * @return the verdict
+     */
+    Outcome check(
+            ProjectLayout project,
+            CometParameters model,
+            List<Path> spectra,
+            CometSelection comet,
+            IndexMode mode,
+            Optional<PercolatorChoice> percolator) {
         List<String> problems = new ArrayList<>();
         checkComet(model, comet, problems);
+        percolator.ifPresent(choice -> checkPercolator(project, choice, problems));
         checkSpectra(spectra, problems);
         PreRunFacts facts = PreRunFacts.none();
         Optional<IndexCacheEntry> entry = Optional.empty();
@@ -247,6 +273,48 @@ final class PreRunChecks {
                 new PreRunFacts(
                         Optional.of(FastaDecoyScanner.scan(fasta, prefixOf(model))),
                         Optional.of(CometIndexHeaderReader.read(index))));
+    }
+
+    private void checkPercolator(
+            ProjectLayout project, PercolatorChoice choice, List<String> problems) {
+        PercolatorSelection selection = choice.selection();
+        Path executable = selection.executable();
+        if (!Files.isRegularFile(executable) || !Files.isExecutable(executable)) {
+            problems.add(
+                    "the selected Percolator executable "
+                            + executable
+                            + " does not exist or cannot be executed");
+            return;
+        }
+        try {
+            String now = hashes.hash(executable).sha256();
+            if (!now.equals(selection.sha256())) {
+                problems.add(
+                        "the Percolator executable "
+                                + executable
+                                + " has SHA-256 "
+                                + now
+                                + ", but Percolator "
+                                + selection.version().text()
+                                + " was selected at "
+                                + selection.sha256()
+                                + "; it has changed since it was selected");
+            }
+        } catch (IOException unreadable) {
+            problems.add(
+                    "the selected Percolator executable "
+                            + executable
+                            + " cannot be read: "
+                            + unreadable.getMessage());
+        }
+        // The builder's own refusal, over stand-in paths: the run's are not known until it exists.
+        Path runs = project.runsDirectory().toAbsolutePath();
+        try {
+            PercolatorCommands.build(
+                    PercolatorRun.request(executable, runs.resolve("merged.pin"), runs, choice));
+        } catch (PercolatorRefusedException refused) {
+            problems.add(refused.getMessage());
+        }
     }
 
     private void checkComet(CometParameters model, CometSelection comet, List<String> problems) {

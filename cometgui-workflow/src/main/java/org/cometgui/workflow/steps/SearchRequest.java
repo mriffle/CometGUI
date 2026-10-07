@@ -19,6 +19,7 @@ package org.cometgui.workflow.steps;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.params.comet.model.CometParameters;
 
@@ -36,9 +37,15 @@ import org.cometgui.params.comet.model.CometParameters;
  *     position, its {@code -N} base name and its place in the merged PIN
  * @param comet the selected Comet
  * @param indexMode whether the search builds (or reuses) a Comet index first, and which kind
+ * @param percolator the Percolator half, when the run rescores the merged PIN with Percolator;
+ *     empty for a Comet-only run, which ends with the merged PIN as Phase 08's did
  */
 public record SearchRequest(
-        CometParameters model, List<Path> spectra, CometSelection comet, IndexMode indexMode) {
+        CometParameters model,
+        List<Path> spectra,
+        CometSelection comet,
+        IndexMode indexMode,
+        Optional<PercolatorChoice> percolator) {
 
     /**
      * Requires every component and copies the list.
@@ -54,6 +61,32 @@ public record SearchRequest(
         spectra = List.copyOf(spectra);
         Objects.requireNonNull(comet, "comet");
         Objects.requireNonNull(indexMode, "indexMode");
+        Objects.requireNonNull(percolator, "percolator");
+    }
+
+    /**
+     * A Comet-only search: no Percolator step is planned.
+     *
+     * @param model the Comet parameters
+     * @param spectra the spectrum files, in order
+     * @param comet the selected Comet
+     * @param indexMode the index mode
+     * @throws NullPointerException naming a component or a spectrum file that is {@code null}
+     */
+    public SearchRequest(
+            CometParameters model, List<Path> spectra, CometSelection comet, IndexMode indexMode) {
+        this(model, spectra, comet, indexMode, Optional.empty());
+    }
+
+    /**
+     * This search with Percolator after Comet.
+     *
+     * @param choice the Percolator half
+     * @return a new request; this one is unchanged
+     */
+    public SearchRequest withPercolator(PercolatorChoice choice) {
+        return new SearchRequest(
+                model, spectra, comet, indexMode, Optional.of(Objects.requireNonNull(choice)));
     }
 
     @Override

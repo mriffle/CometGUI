@@ -31,8 +31,9 @@ import org.cometgui.workflow.state.InputValue;
 import org.cometgui.workflow.state.StepInputs;
 
 /**
- * The input values a Comet run's step fingerprints are computed from (design decision P8-10): every
- * input kind the Phase 08 plan declares, and no other.
+ * The input values a run's step fingerprints are computed from (design decision P8-10): every input
+ * kind the Comet steps declare, and -- for a run that plans Percolator -- the two the Percolator
+ * steps declare ({@link #withPercolator}).
  *
  * <p>Pure. A recorded run's values come from its {@code run.json} identity -- the hashes taken when
  * it was created -- so a retry of the run is fingerprinted from what it recorded, and a file that
@@ -79,6 +80,23 @@ final class RunInputs {
         values.put(InputKind.COMET_INDEX_MODE, InputValue.text(mode.wireName()));
         values.put(InputKind.COMET_TOOL, InputValue.tool(release, cometSha256));
         return StepInputs.of(values);
+    }
+
+    /**
+     * Inputs with the Percolator steps' values added: the archived settings document, whose digest
+     * is the SHA-256 of {@code percolator-settings.json}'s bytes, and the selected build's version
+     * and SHA-256.
+     *
+     * @param inputs the Comet inputs
+     * @param settingsText the canonical {@code percolator-settings.json} text
+     * @param version the Percolator version
+     * @param percolatorSha256 the Percolator executable's SHA-256
+     * @return the inputs with both Percolator kinds set
+     */
+    static StepInputs withPercolator(
+            StepInputs inputs, String settingsText, String version, String percolatorSha256) {
+        return inputs.with(InputKind.PERCOLATOR_SETTINGS, InputValue.text(settingsText))
+                .with(InputKind.PERCOLATOR_TOOL, InputValue.tool(version, percolatorSha256));
     }
 
     /**

@@ -19,6 +19,7 @@ package org.cometgui.workflow.steps;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,9 +38,9 @@ import org.cometgui.workflow.storage.ProjectLock;
 import org.cometgui.workflow.storage.RunStore;
 
 /**
- * A recorded Comet run, ready for the engine: its directory exists, its {@code comet.params} is
- * archived and hashed, its {@code run.json} identity is written, and every planned step has its
- * action.
+ * A recorded run, ready for the engine: its directory exists, its {@code comet.params} (and, with a
+ * Percolator half, its {@code percolator-settings.json}) is archived and hashed, its {@code
+ * run.json} identity is written, and every planned step has its action.
  *
  * <p>{@link #request()} is an attempt of this run, for {@code WorkflowEngine.start} -- the first,
  * or a retry: each call fingerprints the plan from the run's <em>recorded</em> inputs, so a retry
@@ -61,6 +62,8 @@ public final class PreparedRun {
 
     private final Map<String, String> settings;
 
+    private final Optional<PercolatorRun> percolator;
+
     PreparedRun(
             CometRun run,
             WrittenParams parameters,
@@ -68,7 +71,16 @@ public final class PreparedRun {
             RunStore store,
             ProjectLock lock,
             ApplicationRecord application,
-            Map<String, String> settings) {
+            Map<String, String> settings,
+            Optional<PercolatorRun> percolator) {
+        this.percolator = Objects.requireNonNull(percolator, "percolator");
+        if (percolator.isPresent() != plan.contains(EngineStep.RUN_PERCOLATOR)) {
+            throw new IllegalArgumentException(
+                    "a run plans run-percolator exactly when it has a Percolator half; plan "
+                            + plan
+                            + ", Percolator "
+                            + (percolator.isPresent() ? "present" : "absent"));
+        }
         this.run = Objects.requireNonNull(run, "run");
         this.parameters = Objects.requireNonNull(parameters, "parameters");
         this.plan = Objects.requireNonNull(plan, "plan");
@@ -110,7 +122,7 @@ public final class PreparedRun {
      * The steps this run executes.
      *
      * @return the plan: up to {@code finalise-provenance}, with {@code build-comet-index} when an
-     *     index mode is set
+     *     index mode is set, and the three Percolator steps when the run has a Percolator half
      */
     public Plan plan() {
         return plan;
@@ -135,6 +147,34 @@ public final class PreparedRun {
     }
 
     /**
+     * What the run's Percolator half archived, when it has one.
+     *
+     * @return {@code parameters/percolator-settings.json}'s path, or empty for a Comet-only run
+     */
+    public Optional<Path> percolatorSettingsFile() {
+        return percolator.map(half -> PercolatorDeclarations.settingsFile(half.layout()));
+    }
+
+    /**
+     * The directory of the raw Percolator outputs, when the run has a Percolator half.
+     *
+     * @return {@code outputs/percolator}, or empty for a Comet-only run
+     */
+    public Optional<Path> percolatorOutputDirectory() {
+        return percolator.map(PercolatorRun::outputDirectory);
+    }
+
+    /**
+     * The Percolator argument array the run executes, when it has a Percolator half: built once,
+     * when the run was prepared, from the selection's probed capabilities.
+     *
+     * @return the argv, or empty for a Comet-only run
+     */
+    public Optional<List<String>> percolatorArgv() {
+        return percolator.map(half -> half.command().command().argv());
+    }
+
+    /**
      * The settings provenance records for the run (each key a {@code ProvenanceSchema} settings
      * key).
      *
@@ -150,7 +190,16 @@ public final class PreparedRun {
      * @return the inputs the plan is fingerprinted from
      */
     public StepInputs inputs() {
-        return RunInputs.recorded(run.identity(), run.tool().hashes().sha256());
+        StepInputs comet = RunInputs.recorded(run.identity(), run.tool().hashes().sha256());
+        if (percolator.isEmpty()) {
+            return comet;
+        }
+        PercolatorRun half = percolator.get();
+        return RunInputs.withPercolator(
+                comet,
+                half.settings().text(),
+                half.tool().version(),
+                half.choice().selection().sha256());
     }
 
     /**
@@ -161,7 +210,9 @@ public final class PreparedRun {
     public Map<EngineStep, StepAction> actions() {
         Map<EngineStep, StepAction> actions = new EnumMap<>(EngineStep.class);
         actions.put(
-                EngineStep.VALIDATE_CONFIGURATION, new PreparationSteps.ValidateConfiguration(run));
+                EngineStep.VALIDATE_CONFIGURATION,
+                new PreparationSteps.ValidateConfiguration(
+                        run, percolator.map(PercolatorRun::choice)));
         actions.put(EngineStep.RESOLVE_COMET, new PreparationSteps.ResolveComet(run));
         actions.put(EngineStep.SERIALISE_COMET_PARAMS, new PreparationSteps.SerialiseParams(run));
         actions.put(EngineStep.HASH_INPUTS, new PreparationSteps.HashInputs(run));
@@ -172,6 +223,15 @@ public final class PreparedRun {
         actions.put(EngineStep.VALIDATE_COMET_OUTPUTS, new SearchSteps.ValidateOutputs(run));
         actions.put(EngineStep.MERGE_PIN, new SearchSteps.MergePin(run));
         actions.put(EngineStep.FINALISE_PROVENANCE, new SearchSteps.FinaliseProvenance(run));
+        percolator.ifPresent(
+                half -> {
+                    actions.put(
+                            EngineStep.RESOLVE_PERCOLATOR,
+                            new PercolatorSteps.ResolvePercolator(half));
+                    actions.put(EngineStep.RUN_PERCOLATOR, new PercolatorSteps.RunPercolator(half));
+                    actions.put(
+                            EngineStep.PARSE_PERCOLATOR, new PercolatorSteps.ParsePercolator(half));
+                });
         return Collections.unmodifiableMap(actions);
     }
 

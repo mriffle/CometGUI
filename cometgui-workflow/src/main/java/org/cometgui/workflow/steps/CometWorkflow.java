@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.project.ProjectLayout;
@@ -36,12 +37,17 @@ import org.cometgui.domain.run.IndexMode;
 import org.cometgui.domain.run.RecordedInput;
 import org.cometgui.domain.run.RunIdentity;
 import org.cometgui.domain.run.RunLayout;
+import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ParameterValue;
 import org.cometgui.params.comet.writer.CanonicalParamsWriter;
 import org.cometgui.params.comet.writer.WrittenParams;
+import org.cometgui.params.percolator.resolution.AdvisoryRendering;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
+import org.cometgui.tools.percolator.PercolatorCommand;
+import org.cometgui.tools.percolator.PercolatorCommands;
+import org.cometgui.tools.percolator.PercolatorRefusedException;
 import org.cometgui.workflow.engine.ReuseCheck;
 import org.cometgui.workflow.engine.ReuseRefusedException;
 import org.cometgui.workflow.engine.RunHandle;
@@ -58,8 +64,9 @@ import org.cometgui.workflow.storage.ReservedRun;
 import org.cometgui.workflow.storage.RunStore;
 
 /**
- * The Phase 08 Comet run, end to end, through the one workflow engine: the entry point the user
- * interface (and every test of a real run) uses.
+ * A run, end to end, through the one workflow engine -- the Comet search, and with a {@link
+ * PercolatorChoice} in the request Percolator after it: the entry point the user interface (and
+ * every test of a real run) uses.
  *
  * <h2>The life of a run</h2>
  *
@@ -74,12 +81,17 @@ import org.cometgui.workflow.storage.RunStore;
  *       {@code -P}), the inputs are hashed by the one hasher, and {@code run.json} records the
  *       identity: the release, every spectrum file with its position and {@code -N} base, the
  *       database, the archived parameter file and its hashes, the index mode and how the database
- *       reaches Comet ({@code R-CMT-04}).
+ *       reaches Comet ({@code R-CMT-04}). With Percolator, {@code
+ *       parameters/percolator-settings.json} is written once too, the command is built from the
+ *       selection's probed capabilities, and the run's provenance settings ({@link
+ *       PercolatorProvenance}) are fixed.
  *   <li>{@link #start} -- an attempt through {@code WorkflowEngine.start}. The plan is {@code
  *       validate-configuration}, {@code resolve-comet}, {@code serialise-comet-params}, {@code
  *       hash-inputs}, [{@code build-comet-index}], {@code run-comet}, {@code
  *       validate-comet-outputs}, {@code merge-pin} and {@code finalise-provenance} ({@link
- *       #planFor}); a retry is simply another {@link #start} of the same {@link PreparedRun}.
+ *       #planFor}), with Percolator also {@code resolve-percolator}, {@code run-percolator} and
+ *       {@code parse-percolator}; a retry is simply another {@link #start} of the same {@link
+ *       PreparedRun}.
  *   <li>{@link #preview} -- the rerun preview of a changed configuration against a recorded run
  *       ({@code R-RUN-01}), with every result it would reuse re-hashed.
  * </ol>
@@ -110,6 +122,9 @@ public final class CometWorkflow {
 
     /** The logical tool name provenance records for Comet. */
     public static final String TOOL_NAME = "comet";
+
+    /** The logical tool name provenance records for Percolator. */
+    public static final String PERCOLATOR_TOOL_NAME = "percolator";
 
     private final CachingHashService hashes;
 
@@ -142,10 +157,30 @@ public final class CometWorkflow {
      *     index mode is set
      */
     public static Plan planFor(IndexMode mode) {
+        return planFor(mode, false);
+    }
+
+    /**
+     * The steps a run executes, with or without Percolator.
+     *
+     * <p>With Percolator the plan also wants {@code parse-percolator}, which requires {@code
+     * run-percolator}, which requires {@code merge-pin} and {@code resolve-percolator}. {@code
+     * finalise-results} (Phase 10) is not wanted and nothing planned requires it; its edge into
+     * {@code finalise-provenance} is an if-planned one, so the plan does not pull it in.
+     *
+     * @param mode the index mode
+     * @param percolator whether the run rescores the merged PIN with Percolator
+     * @return everything up to {@code finalise-provenance}, with {@code build-comet-index} when an
+     *     index mode is set and the three Percolator steps when {@code percolator} is set
+     */
+    public static Plan planFor(IndexMode mode, boolean percolator) {
         Objects.requireNonNull(mode, "mode");
         Set<EngineStep> wanted = EnumSet.of(EngineStep.FINALISE_PROVENANCE);
         if (mode != IndexMode.NONE) {
             wanted.add(EngineStep.BUILD_COMET_INDEX);
+        }
+        if (percolator) {
+            wanted.add(EngineStep.PARSE_PERCOLATOR);
         }
         return Plan.covering(wanted);
     }
@@ -165,7 +200,8 @@ public final class CometWorkflow {
                         request.model(),
                         request.spectra(),
                         request.comet(),
-                        request.indexMode())
+                        request.indexMode(),
+                        request.percolator())
                 .report();
     }
 
@@ -194,7 +230,8 @@ public final class CometWorkflow {
                         request.model(),
                         request.spectra(),
                         request.comet(),
-                        request.indexMode());
+                        request.indexMode(),
+                        request.percolator());
         if (checked.report().blocked()) {
             throw new RunBlockedException(checked.report());
         }
@@ -258,7 +295,74 @@ public final class CometWorkflow {
                         settings.put(
                                 INDEX_KEY_SETTING,
                                 String.valueOf(cached.directory().getFileName())));
-        return new PreparedRun(run, written, planFor(mode), store, lock, application, settings);
+        Optional<PercolatorRun> percolator = Optional.empty();
+        if (request.percolator().isPresent()) {
+            PercolatorRun half = preparePercolator(run, request.percolator().get());
+            settings.putAll(
+                    PercolatorProvenance.settings(
+                            half.choice(),
+                            half.command(),
+                            half.settings().hashes().sha256(),
+                            half.decoys().prefix()));
+            percolator = Optional.of(half);
+        }
+        return new PreparedRun(
+                run,
+                written,
+                planFor(mode, percolator.isPresent()),
+                store,
+                lock,
+                application,
+                settings,
+                percolator);
+    }
+
+    /**
+     * The Percolator half of a run being prepared: {@code parameters/percolator-settings.json}
+     * written once and hashed, the command built from the selection's probed capabilities, and the
+     * tool as provenance records it -- its observed capabilities, and as warnings its advisories
+     * and, without a weights file, {@code R-PERC-08}'s.
+     */
+    private PercolatorRun preparePercolator(CometRun comet, PercolatorChoice choice)
+            throws IOException {
+        RunLayout layout = comet.layout();
+        PercolatorSettingsFile.Archived archived =
+                PercolatorSettingsFile.writeOnce(
+                        PercolatorDeclarations.settingsFile(layout),
+                        PercolatorSettingsFile.render(choice.settings(), choice.enabledStages()),
+                        hashes);
+        PercolatorSelection selection = choice.selection();
+        PercolatorCommand command;
+        try {
+            command =
+                    PercolatorCommands.build(
+                            PercolatorRun.request(
+                                    selection.executable(),
+                                    layout.mergedPinFile(),
+                                    PercolatorDeclarations.outputDirectory(layout),
+                                    choice));
+        } catch (PercolatorRefusedException refused) {
+            // The pre-run check built the same command from the same capabilities and passed.
+            throw new IllegalStateException(refused.getMessage(), refused);
+        }
+        List<String> warnings = new ArrayList<>(AdvisoryRendering.forSelection(selection.offer()));
+        PercolatorProvenance.weightsWarning(command).ifPresent(warnings::add);
+        Set<String> capabilities = new TreeSet<>();
+        for (ToolCapability capability : selection.capabilities()) {
+            capabilities.add(capability.id());
+        }
+        ToolIdentity tool =
+                new ToolIdentity(
+                        PERCOLATOR_TOOL_NAME,
+                        selection.version().text(),
+                        Optional.empty(),
+                        selection.executable(),
+                        hashes.hash(selection.executable()),
+                        selection.managed(),
+                        Optional.empty(),
+                        capabilities,
+                        warnings);
+        return new PercolatorRun(comet, choice, tool, command, archived);
     }
 
     /**
@@ -313,13 +417,23 @@ public final class CometWorkflow {
             spectra.add(RunInputs.named(real, hashes.hash(real)));
         }
         Path database = Path.of(databaseName(candidate.model())).toRealPath();
-        return RunInputs.of(
-                spectra,
-                RunInputs.named(database, hashes.hash(database)),
-                InputValue.bytes(writer.bytes(candidate.model())).sha256(),
-                candidate.indexMode(),
-                candidate.comet().release().text(),
-                candidate.comet().sha256());
+        StepInputs inputs =
+                RunInputs.of(
+                        spectra,
+                        RunInputs.named(database, hashes.hash(database)),
+                        InputValue.bytes(writer.bytes(candidate.model())).sha256(),
+                        candidate.indexMode(),
+                        candidate.comet().release().text(),
+                        candidate.comet().sha256());
+        if (candidate.percolator().isEmpty()) {
+            return inputs;
+        }
+        PercolatorChoice choice = candidate.percolator().get();
+        return RunInputs.withPercolator(
+                inputs,
+                PercolatorSettingsFile.render(choice.settings(), choice.enabledStages()),
+                choice.selection().version().text(),
+                choice.selection().sha256());
     }
 
     private static String databaseName(CometParameters model) {

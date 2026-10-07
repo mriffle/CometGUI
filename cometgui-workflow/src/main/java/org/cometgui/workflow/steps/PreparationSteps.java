@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.run.RecordedInput;
 import org.cometgui.domain.run.SpectrumInput;
@@ -42,14 +43,18 @@ final class PreparationSteps {
 
     /**
      * {@code validate-configuration}: the pre-run check again, in {@code VALIDATING}, so a blocked
-     * configuration fails before anything is launched.
+     * configuration fails before anything is launched -- with the Percolator half, when the run has
+     * one.
      */
     static final class ValidateConfiguration implements StepAction {
 
         private final CometRun run;
 
-        ValidateConfiguration(CometRun run) {
+        private final Optional<PercolatorChoice> percolator;
+
+        ValidateConfiguration(CometRun run, Optional<PercolatorChoice> percolator) {
             this.run = Objects.requireNonNull(run, "run");
+            this.percolator = Objects.requireNonNull(percolator, "percolator");
         }
 
         @Override
@@ -71,7 +76,8 @@ final class PreparationSteps {
                                     run.model(),
                                     run.spectra(),
                                     run.comet(),
-                                    run.identity().indexMode())
+                                    run.identity().indexMode(),
+                                    percolator)
                             .report();
             if (report.blocked()) {
                 throw new StepFailedException(report.message());
