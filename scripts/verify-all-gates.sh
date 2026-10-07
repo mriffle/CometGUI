@@ -87,6 +87,7 @@ readonly -a ALL_GATES=(
     install
     params
     paramui
+    workflow
 )
 
 PASSED=0
@@ -134,7 +135,8 @@ declare -a COVERED=()
 #                when phase 07 unit 9 made control 8v also grade the item-8
 #                GUI test on both releases (four checks); 87 on 2026-10-07,
 #                when phase 08 unit 7 added H7, the engine-only injection
-#                graded where the engine is ready (three checks).)
+#                graded where the engine is ready (three checks).  workflow:
+#                110 on 2026-10-07, phase 08 unit 9's first shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -306,6 +308,21 @@ gate_spec() {
             GATE_FLOOR=87
             GATE_UNIT="controls"
             ;;
+        workflow)
+            GATE_PHASE="08"
+            GATE_ITEMS="1,2,3,4,5,6,7,8,9"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-08-worklog.rst (and new ones, each marked so), each into production code of cometgui-tools, cometgui-params-comet or cometgui-workflow in a git-archive sandbox, each proved to have reached the compiled classes and graded on the failing assertion's own words in the named testcase, most against the real pinned Comet binaries: -N dropped from the per-file command, and (NEW) every spectrum file on one Comet command line -- each refused by the file system in the real search from the read-only input directory; (NEW) the -N base put beside the run in runs/, caught by the before/after snapshot; PIN feature columns compared as sets (a renamed column required to stay refused), and (NEW) a header written per input in the real merged PIN; 'no decoys anywhere' judged only for an empty FASTA, (NEW) the FASTA decoy census not consulted before launch, and (NEW) the double-decoy block applied to decoy_search = 1 only (decoy_search = 2 red, 1 green); the merge-pin -> run-percolator edge dropped, run-percolator not declaring the Percolator settings, and the Comet-parameter fingerprint taken from the binary's digest so the preview after a real run names nothing; cancellation no longer delivered to running steps, bounded by the test's own wait and followed by a check that no process started from the sandbox is alive; every re-hash treated as equal (the real changed-input test red), and (NEW) revalidation served from the hash cache (red only where the cache is stale); (NEW) the recorded comet.params hash taken from the binary, and (NEW) one argv recorded for both invocations while the launched argvs stay right; the index check VERSION-BLIND twice -- formats judged < 4 for every release, and (NEW) the first release's formats for every release -- each red in the one real test of both releases on opposite halves; an existing .idx header left out of the pre-run facts; and, as controls on the harness itself, an unchanged file, a missing anchor, an injection that reached the source but not the bytecode, a selection that ran zero tests, a green run graded as red, a red without its diagnostic, and a process left alive"
+            GATE_SCRIPT="scripts/verify-workflow-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-08 exit gate items 1 to 9 and the index-compatibility check were proved"
+                "Two index controls were version-blind (Iv and Iw)"
+                "bytecode as a HARNESS ERROR, not as a pass, and a selection that ran zero"
+            )
+            GATE_FLOOR=110
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -344,6 +361,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         paramui)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        workflow)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -351,8 +370,8 @@ gate_count() {
 usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
-that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06 and PHASE-07 gate
-still fails on the defect it exists to catch.
+that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07 and
+PHASE-08 gate still fails on the defect it exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -428,7 +447,7 @@ list_gates() {
     done
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
     printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06, 07:n of\n'
-    printf '  PHASE-07.\n'
+    printf '  PHASE-07, 08:n of PHASE-08.\n'
     printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
@@ -465,11 +484,20 @@ list_gates() {
     printf '  reason; 6 a cross-parameter error blocking Run, at the field, in the\n'
     printf '  summary, by keyboard; 7 every parameter control named, validation in\n'
     printf '  text; 8 search by name, display name, help text and alias.\n'
+    printf '  PHASE-08 items: 1 a real two-file Comet run with distinct -N bases from a\n'
+    printf '  read-only input directory; 2 nothing written outside the run directory;\n'
+    printf '  3 one merged PIN header, the summed rows, a feature-column mismatch naming\n'
+    printf '  the files; 4 no decoys and decoy_search = 0 blocked before Comet; 5 decoys\n'
+    printf '  in the FASTA and decoy_search != 0 blocked; 6 the rerun preview per\n'
+    printf '  scenario; 7 cancellation killing Comet and its descendants, records\n'
+    printf '  parsable; 8 a changed input refusing reuse, naming the file; 9 one argv per\n'
+    printf '  spectrum file and the archived comet.params hash of the executed file.  The\n'
+    printf '  same control also proves the index-compatibility check tier 1 assigned.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
-    printf '  phases/PHASE-05-tool-registry.rst, phases/PHASE-06-comet-param-model.rst and\n'
-    printf '  phases/PHASE-07-comet-param-ui.rst.\n\n'
+    printf '  phases/PHASE-05-tool-registry.rst, phases/PHASE-06-comet-param-model.rst,\n'
+    printf '  phases/PHASE-07-comet-param-ui.rst and phases/PHASE-08-workflow-comet.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -631,7 +659,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06 and PHASE-07 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07 and PHASE-08 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -669,7 +697,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05 06 07; do
+    for phase in 01 02 04 05 06 07 08; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"

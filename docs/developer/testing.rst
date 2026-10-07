@@ -55,20 +55,21 @@ Commands
 
    * - ``bash scripts/verify-all-gates.sh``
      - **Prove every gate still fails on the defect it exists to catch.** Runs
-       all fourteen falsifiability controls and exits non-zero if any control
+       all fifteen falsifiability controls and exits non-zero if any control
        stops biting. About an hour since Phases 05 and 06 (3875 s recorded in
-       ``scripts/dev-verify.sh``), and Phase 07's ``paramui`` adds about
-       twenty minutes. Run it before signing off a phase.
+       ``scripts/dev-verify.sh``), Phase 07's ``paramui`` adds about
+       twenty minutes and Phase 08's ``workflow`` about eight. Run it before
+       signing off a phase.
 
    * - ``bash scripts/verify-all-gates.sh --list``
-     - The fourteen controls, what each injects, and the command that proves
+     - The fifteen controls, what each injects, and the command that proves
        it.
 
    * - ``bash scripts/verify-all-gates.sh --only NAME``
      - One control. Names: ``license``, ``workflows``, ``docs``,
        ``traceability``, ``sbom``, ``depscan``, ``pipeline``, ``quality``,
        ``shell``, ``tests``, ``provenance``, ``install``, ``params``,
-       ``paramui``. Repeatable, or comma-separated.
+       ``paramui``, ``workflow``. Repeatable, or comma-separated.
 
    * - ``bash scripts/ci/docs-build.sh``
      - The documentation gate on its own: both strict Sphinx builds. About 6 s.
@@ -551,6 +552,16 @@ pass is worse than no aggregator at all.
        and unit 6's equivalent injection reported
        as ``HARNESS FAILURE -- the check PASSED with the defect present``.
 
+   * - Workflow engine and Comet adapter (Phase 08, ``workflow``)
+     - ``scripts/verify-workflow-gates.sh``: nineteen injections into
+       ``cometgui-tools``, ``cometgui-params-comet`` and ``cometgui-workflow``
+       -- at least one per exit gate item and three on the index-compatibility
+       check, two of them version-blind -- most graded against the real pinned
+       Comet binaries. See :ref:`dev-workflow-falsifiability`.
+     - Each failing assertion's own words, or the real binary's: e.g. Comet's
+       ``Error - cannot write to file ".../read-only inputs/k562_3.pep.xml"``
+       when every spectrum file is put on one command line.
+
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs
 from the pristine state -- and reports a control whose defect was *not*
@@ -842,6 +853,184 @@ no Comet is installed) and ``H7`` (new, graded where the engine is ready), as
 described above; ``scripts/verify-param-ui-gates.sh`` says the same in its
 header. The floor was raised from 84 to 87, the count measured with ``H7``
 (``handoffs/PHASE-08-worklog.rst``, unit 7).
+
+.. _dev-workflow-falsifiability:
+
+The workflow engine's harness (Phase 08, ``workflow``)
+-------------------------------------------------------
+
+``bash scripts/verify-workflow-gates.sh`` proves that each of Phase 08's nine
+exit gate items, and the index-compatibility check tier 1 assigned to the
+phase, fails on a defect it exists to catch. It is registered in
+``scripts/verify-all-gates.sh`` as ``workflow`` and takes its shape from
+``paramui`` and ``install``; the differences are these.
+
+* Three modules are damaged and graded -- ``cometgui-tools``,
+  ``cometgui-params-comet`` and ``cometgui-workflow`` -- so every module
+  ``cometgui-workflow`` depends on *except* those three is built once into a
+  private overlay (``_build/workflow-gate-m2``), and every run builds the
+  three alone. The overlay is checked to hold none of them.
+* ``scratch/`` (the pinned Comet binaries and the ``D-006`` inputs) is
+  symlinked into the sandbox: the real-binary gate tests stage copies from it
+  and fail rather than skip without it.
+* **Red is read from surefire's XML, not from Maven's exit code.** A control
+  may grade a rule test in ``cometgui-params-comet`` and a real test in
+  ``cometgui-workflow`` on the same injection, and a failing upstream module
+  would stop the reactor first; so every run passes
+  ``-Dmaven.test.failure.ignore=true``, a non-zero Maven exit is a harness
+  error, and every failing testcase's message is copied, unescaped, from the
+  XML into the run's log, where the expected words are matched. A real test
+  whose search runs in ``@BeforeAll`` fails as a class-level testcase with an
+  empty name, and is graded as that.
+* Engine steps are compared as **sets**: JUnit prints a ``Set.of`` in an order
+  that changes from one JVM to the next, so for the rerun-preview controls the
+  harness parses ``expected: <[...]> but was: <[...]>`` and requires the
+  difference to be exactly the steps the defect loses.
+* Every test JVM's ``java.io.tmpdir`` is inside the sandbox (through
+  ``cometgui.surefire.extraArgLine``, which none of the three modules sets), so
+  a Comet a test staged, and every ``EngineFake``, runs from a path naming the
+  sandbox. After each control that starts processes, nothing so named may be
+  alive; anything that is is killed and the control fails.
+
+.. list-table:: The controls ("recorded" names the unit of ``handoffs/PHASE-08-worklog.rst`` whose sign-off made the injection)
+   :header-rows: 1
+   :widths: 6 6 42 46
+
+   * - Control
+     - Item
+     - Injected defect
+     - Diagnostic required
+   * - 1a
+     - 1
+     - Recorded (unit 4): ``-N`` dropped from the per-file command.
+     - The real search's ``@BeforeAll`` in ``CometAdapterRealBinaryTest``:
+       Comet's own ``Error - cannot write to file ".../read-only
+       inputs/k562_3.pep.xml"``; and ``CometSearchCommandsTest``'s argv
+       comparison.
+   * - 1b
+     - 1
+     - New: every spectrum file on one Comet command line, ``-N`` kept.
+     - The same Comet refusal, from a command shown to carry ``-N`` into the
+       run *and* both inputs (Comet ignores ``-N`` then);
+       ``oneInputPerCommand``: ``expected: <[/data/K562 3.mzML]> but was:
+       <[/data/K562 3.mzML, /data/fractions/k562_4.MZXML]>``.
+   * - 2
+     - 2
+     - New: the ``-N`` base put in ``runs/`` beside the run. The search
+       succeeds; only the snapshot can see it.
+     - ``RealCometRunTest#gate2...``: ``expected: <[project/runs]> but was:
+       <[project/runs, project/runs/k562_3.pep.xml, ...``.
+   * - 3a
+     - 3
+     - Recorded (unit 4): PIN feature columns compared as sets.
+     - ``Expected ...CometOutputException to be thrown, but nothing was
+       thrown`` in ``swappedColumns`` and ``swappedRealColumns``; the
+       renamed-column tests stay green.
+   * - 3b
+     - 3
+     - New: a header line written for every merged input.
+     - ``RealCometRunTest#gate3...``: ``expected: <1> but was: <2>``; gate 1
+       stays green.
+   * - 4a
+     - 4
+     - Recorded (unit 3): "no decoys anywhere" judged only for an empty FASTA.
+     - ``expected exactly one finding: ValidationReport[findings=[]]``; the
+       real gate-4 test's ``the decoy configuration did not block the run``;
+       the real gate-5 test stays green.
+   * - 4b
+     - 4
+     - New: the FASTA decoy census taken but not added to the pre-run facts.
+     - ``the decoy configuration did not block the run`` in both real decoy
+       tests; the rule test, fed a census directly, stays green.
+   * - 5
+     - 5
+     - New: the double-decoy block applied to ``decoy_search = 1`` only.
+     - The real gate-5 test and ``doubleDecoysSeparate`` red;
+       ``doubleDecoysConcatenated``, gate 4 and the engine's own validate
+       step green.
+   * - 6a
+     - 6
+     - Recorded (unit 1): the ``merge-pin -> run-percolator`` edge dropped.
+     - Scenario (d)'s ``re-executed`` set short of exactly ``RUN_PERCOLATOR``
+       and the five steps downstream of it alone.
+   * - 6b
+     - 6
+     - Recorded (unit 1): ``run-percolator`` no longer declaring the
+       Percolator settings.
+     - Scenario (b)'s ``re-executed`` set empty where eight steps were
+       expected; scenario (d) green.
+   * - 6c
+     - 6
+     - Recorded (unit 6): the Comet-parameter fingerprint taken from the
+       binary's digest.
+     - After the real run, the preview of changed parameters names none of
+       the five steps expected; gate 1 green.
+   * - 7
+     - 7
+     - Recorded (unit 5): ``RunExecution.cancel`` no longer reaching running
+       steps.
+     - ``java.util.concurrent.TimeoutException`` at the test's own 60-second
+       wait for the fake Comet's child (``CancellationTest.java:98``); then
+       no process started from the sandbox alive.
+   * - 8a
+     - 8
+     - Recorded (unit 5): every re-hash treated as equal to its record.
+     - ``expected: <false> but was: <true>``; both ``RealChangedInputTest``
+       methods red.
+   * - 8b
+     - 8
+     - New: revalidation served from the hash cache.
+     - ``revalidation asked the cache for nothing it could serve``; the plain
+       changed-input test stays green.
+   * - 9a
+     - 9
+     - New: the recorded ``comet.params`` SHA-256 taken from the Comet binary.
+     - ``but was: <ad93b4cf...>`` (the binary's hash) in gate 9; gate 1 green.
+   * - 9b
+     - 9
+     - New: every Comet tool record given the first invocation's argv; the
+       launched commands stay right.
+     - ``the argvs differ only in -N and the input ==> expected: <[2, 3]> but
+       was: <[]>``; gate 1, which asserts the launched argvs, green.
+   * - Iv
+     - index
+     - **Version-blind**, recorded (unit 3): the readable index formats judged
+       ``< 4`` for every release.
+     - ``expected: <INDEX_FORMAT_UNREADABLE> but was:
+       <INDEX_OPTION_UNRECORDED>``; ``RealIndexTest``'s one test of both
+       releases red on its 2026.03.0 half (``RunBlockedException`` not
+       thrown).
+   * - Iw
+     - index
+     - **Version-blind**, new: the first release record's formats (2026.03.0's)
+       for every release.
+     - The same real test red on its *other* half: ``and Comet 2026.02.2 reads
+       index format v5``; its 2026.03.0 half held.
+   * - Ih
+     - index
+     - Recorded (unit 6): an existing ``.idx`` header left out of the pre-run
+       facts.
+     - ``RunBlockedException`` not thrown in ``RealIndexTest``; the rule test,
+       fed the header directly, green.
+   * - H
+     - --
+     - The harness itself.
+     - An unchanged file, a missing anchor, a comment-only injection (a real
+       Maven run) and a selection naming a method that does not exist (a real
+       run of zero tests) are each a ``HARNESS ERROR``; a green run graded as
+       red, a red without its diagnostic and a process left alive from the
+       sandbox are each a recorded failure.
+
+What it does not cover: the GUI half of Run (``paramui``'s ``H7``); the
+real-binary cancellation test, because with cancellation broken the real Comet
+searches the whole proteome to its end, a duration no timeout of that test
+bounds (item 7 is graded on the fake-Comet process-tree test, which is
+bounded); and storage and unit 7b's path checks, which are not exit gate items.
+
+Measured on 2026-10-07: 110 controls passed in 449 s (7 m 29 s) -- the
+baseline, with the overlay build, 64 s; the final clean run 49 s; control 7
+70 s, almost all of it the test's own 60-second bound; every other control
+between 7 s and 27 s. The floor in ``verify-all-gates.sh`` is 110.
 
 Traps
 =====
