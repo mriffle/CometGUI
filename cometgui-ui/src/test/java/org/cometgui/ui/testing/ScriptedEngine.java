@@ -73,6 +73,8 @@ public final class ScriptedEngine implements RunEnginePort {
 
     private final AtomicInteger cancels = new AtomicInteger();
 
+    private RuntimeException cancelFailure;
+
     private final Queue background = new Queue("background");
 
     private final Queue ui = new Queue("ui");
@@ -107,6 +109,15 @@ public final class ScriptedEngine implements RunEnginePort {
     }
 
     /**
+     * Makes every cancellation of a started run throw.
+     *
+     * @param failure what it throws
+     */
+    public void failCancellations(RuntimeException failure) {
+        this.cancelFailure = Objects.requireNonNull(failure, "failure");
+    }
+
+    /**
      * Makes the next start refuse.
      *
      * @param refusal what it throws
@@ -137,6 +148,9 @@ public final class ScriptedEngine implements RunEnginePort {
         return () -> {
             callers.add("cancel:" + background.draining);
             cancels.incrementAndGet();
+            if (cancelFailure != null) {
+                throw cancelFailure;
+            }
         };
     }
 
@@ -228,6 +242,24 @@ public final class ScriptedEngine implements RunEnginePort {
          */
         public int pending() {
             return tasks.size();
+        }
+
+        /**
+         * Runs the oldest waiting task alone.
+         *
+         * @throws IllegalStateException if none waits
+         */
+        public void runOne() {
+            Runnable next = tasks.pollFirst();
+            if (next == null) {
+                throw new IllegalStateException(name + " has no task waiting");
+            }
+            draining = true;
+            try {
+                next.run();
+            } finally {
+                draining = false;
+            }
         }
 
         /** Runs every waiting task, including those added while draining. */

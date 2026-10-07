@@ -178,15 +178,6 @@ public final class RunViewModel {
     /**
      * Whether a run is starting or running.
      *
-     * @return the read-only property
-     */
-    public ReadOnlyBooleanProperty runningProperty() {
-        return running.getReadOnlyProperty();
-    }
-
-    /**
-     * Whether a run is starting or running.
-     *
      * @return {@code true} from Run until the outcome is known
      */
     public boolean running() {
@@ -296,7 +287,6 @@ public final class RunViewModel {
         attempt = mine;
         active = null;
         running.set(true);
-        cancelEnabled.set(false);
         readiness.showEngineReasons(List.of(RUN_ACTIVE));
         preview.set(PREVIEW_RUNNING);
         outcome.set("Starting the run: recording it and writing its parameter file.");
@@ -487,10 +477,14 @@ public final class RunViewModel {
         for (EngineStep step : planned.steps()) {
             stepStates.put(step, StepState.NOT_STARTED);
         }
+        /*
+         * Every stage starts again from "not started" -- the planned ones and those this run does
+         * not plan (Percolator before phase 09), so nothing an earlier run left is shown as this
+         * run's. The projection of an all-pending plan is "not started" too, so it needs no call.
+         */
         for (WorkflowStage stage : WorkflowStage.values()) {
             stepper.setState(stage, StepState.NOT_STARTED);
         }
-        project();
         outcome.set("Starting: " + described + ".");
     }
 

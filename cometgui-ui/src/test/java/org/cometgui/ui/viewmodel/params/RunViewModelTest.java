@@ -178,10 +178,15 @@ class RunViewModelTest {
         @DisplayName("choosing spectrum files checks again")
         void spectraCheckAgain() {
             ready();
+            assertEquals(RunViewModel.PREVIEW_FIRST_RUN, run.preview());
             int before = engine.checks();
             chooser.spectra(Path.of("run1.mzML").toAbsolutePath());
             inputs.chooseSpectra();
             assertEquals(List.of(RunViewModel.CHECKING), readiness.engineReasons());
+            assertEquals(
+                    RunViewModel.PREVIEW_CHECKING,
+                    run.preview(),
+                    "the preview of the earlier answer is withdrawn while checking again");
             engine.settle();
             assertEquals(before + 1, engine.checks());
         }
@@ -358,6 +363,72 @@ class RunViewModelTest {
             engine.settle();
             assertEquals(checks + 1, engine.checks(), "the check after the run");
             assertTrue(readiness.runEnabled());
+            assertAll(
+                    "the published properties are the values",
+                    () -> assertEquals(run.outcome(), run.outcomeProperty().get()),
+                    () -> assertEquals(run.preview(), run.previewProperty().get()),
+                    () -> assertFalse(run.cancelEnabledProperty().get()));
+        }
+
+        @Test
+        @DisplayName(
+                "the plan arrives first: the outcome says the run is starting, and every stage --"
+                        + " planned or not -- starts again from not started")
+        void plannedResetsTheStepper() {
+            stepper.setState(WorkflowStage.PERCOLATOR, StepState.FAILED);
+            stepper.setState(WorkflowStage.COMET, StepState.SUCCEEDED);
+            ready();
+            run.start();
+            engine.background().drain();
+            assertEquals(2, engine.ui().pending(), "the plan, then the started run");
+            engine.ui().runOne();
+            assertAll(
+                    "planned, not yet started",
+                    () ->
+                            assertEquals(
+                                    "Starting: run run-1 in /projects/p/runs/run-1.",
+                                    run.outcome()),
+                    () -> assertFalse(run.cancelEnabled()),
+                    () -> assertEquals(StepState.NOT_STARTED, stepper.stateOf(WorkflowStage.COMET)),
+                    () ->
+                            assertEquals(
+                                    StepState.NOT_STARTED,
+                                    stepper.stateOf(WorkflowStage.PERCOLATOR),
+                                    "a stage this run does not plan is not left showing an"
+                                            + " earlier state"));
+            engine.ui().runOne();
+            assertTrue(run.cancelEnabled());
+        }
+
+        @Test
+        @DisplayName("a failed run with no failing step named still says it failed, and where")
+        void failureWithoutAStep() {
+            ready();
+            run.start();
+            engine.settle();
+            Map<EngineStep, StepState> states = allSucceeded();
+            states.put(EngineStep.FINALISE_PROVENANCE, StepState.FAILED);
+            engine.started()
+                    .get(0)
+                    .observer()
+                    .onRunFinished(result(AttemptOutcome.FAILED, states, Map.of()));
+            engine.ui().drain();
+            assertEquals("The run failed: run run-1 in /projects/p/runs/run-1.", run.outcome());
+        }
+
+        @Test
+        @DisplayName("a cancellation the engine could not take is stated in words, not swallowed")
+        void cancellationThatThrows() {
+            engine.failCancellations(new IllegalStateException("the process service has stopped"));
+            ready();
+            run.start();
+            engine.settle();
+            assertTrue(run.cancel());
+            engine.settle();
+            assertEquals(
+                    "The cancellation could not be sent: java.lang.IllegalStateException: the"
+                            + " process service has stopped",
+                    run.outcome());
         }
 
         @Test
