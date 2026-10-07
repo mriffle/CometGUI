@@ -366,6 +366,7 @@ class CacheValuesTest {
                 "bin/percolator",
                 1,
                 List.of(ToolCapability.XML_OUTPUT),
+                InstallationMarker.CAPABILITY_PROBE_GENERATION,
                 List.of(new RecordedFile("bin/percolator", 2538632, HASHES)));
     }
 }

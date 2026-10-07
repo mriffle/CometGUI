@@ -96,6 +96,69 @@ class PercolatorBannerTest {
                 Optional.of(ToolVersion.parse(expected)), PercolatorBanner.readFrom(List.of(line)));
     }
 
+    @ParameterizedTest(name = "[{index}] \"{0}\" -> {1} {2}")
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "Percolator version 3.05, Build Date Jan  1 2021 00:00:00 | 3.05 | 3 5",
+                "Percolator version 3.05.0, Build Date Jan  1 2021 00:00:00 | 3.05.0 | 3 5",
+                "Percolator version 3.06.5, Build Date Feb  8 2024 10:00:35 | 3.06.5 | 3 6 5",
+                "Percolator version 3.07.1, Build Date Jun 20 2024 13:20:18 | 3.07.1 | 3 7 1",
+                "Percolator version 3.08.0, Build Date Mar  1 2025 00:00:00 | 3.08.0 | 3 8",
+                "Percolator version 3.08.1, Build Date Jul  8 2025 00:00:00 | 3.08.1 | 3 8 1",
+                "Percolator version 3.09.0, Build Date May 21 2026 17:16:38 | 3.09.0 | 3 9",
+                "Exception caught: Percolator version 3.09.0, Build Date May 21 2026 17:16:38"
+                        + " | 3.09.0 | 3 9",
+                "Percolator version 3.09.1, Build Date Jan  1 2027 00:00:00 | 3.09.1 | 3 9 1",
+                "Percolator version 3.10, Build Date Jan  1 2027 00:00:00 | 3.10 | 3 10",
+                "Percolator version 3.10.0, Build Date Jan  1 2027 00:00:00 | 3.10.0 | 3 10",
+                "Percolator version 4.0, Build Date Jan  1 2030 00:00:00 | 4.0 | 4 0",
+                "Percolator version 4.0.2, Build Date Jan  1 2030 00:00:00 | 4.0.2 | 4 0 2"
+            })
+    @DisplayName("every release line from 3.05 to 3.09, and the ones that do not exist yet")
+    void releasesFrom305ToTheFuture(String line, String text, String components) {
+        ToolVersion read = PercolatorBanner.readFrom(List.of(line)).orElseThrow();
+
+        assertAll(
+                () -> assertEquals(text, read.text(), "the version as upstream spelled it"),
+                () ->
+                        assertEquals(
+                                Arrays.stream(components.split(" ")).map(Integer::valueOf).toList(),
+                                read.components(),
+                                "and its numeric components, trailing zeros dropped"),
+                () -> assertTrue(PercolatorBanner.isPresentIn(List.of(line))));
+    }
+
+    @Test
+    @DisplayName("future releases order above 3.09 numerically, and are above the 3.05 floor")
+    void futureReleasesOrderNumerically() {
+        ToolVersion v309 = read("Percolator version 3.09.0, Build Date x");
+        ToolVersion v3091 = read("Percolator version 3.09.1, Build Date x");
+        ToolVersion v310 = read("Percolator version 3.10.0, Build Date x");
+        ToolVersion v40 = read("Percolator version 4.0, Build Date x");
+
+        assertAll(
+                () -> assertTrue(v3091.compareTo(v309) > 0, "3.09.1 after 3.09"),
+                () ->
+                        assertTrue(
+                                v310.compareTo(v3091) > 0,
+                                "3.10 after 3.09.1, which a comparison of text gets wrong"),
+                () -> assertTrue(v40.compareTo(v310) > 0, "4.0 after 3.10"),
+                () -> assertEquals(ToolVersion.parse("3.09"), v309, "3.09.0 IS 3.09"),
+                () -> assertEquals(ToolVersion.parse("3.10"), v310, "and 3.10.0 is 3.10"),
+                () ->
+                        assertTrue(
+                                v310.isAtLeast(LocalPercolatorRegistration.MINIMUM_VERSION)
+                                        && v40.isAtLeast(
+                                                LocalPercolatorRegistration.MINIMUM_VERSION),
+                                "a future release clears the registration floor with no code"
+                                        + " change"));
+    }
+
+    private static ToolVersion read(String line) {
+        return PercolatorBanner.readFrom(List.of(line)).orElseThrow();
+    }
+
     @ParameterizedTest(name = "[{index}] \"{0}\"")
     @ValueSource(
             strings = {

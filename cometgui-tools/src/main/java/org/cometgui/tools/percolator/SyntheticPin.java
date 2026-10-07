@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -87,6 +88,18 @@ public final class SyntheticPin {
     /** The tab-separated header row, exactly as Percolator expects to read it. */
     public static final String HEADER =
             "SpecId\tLabel\tScanNr\tExpMass\tCalcMass\tfeat1\tfeat2\tfeat3\tPeptide\tProteins";
+
+    /**
+     * The fixture's feature columns, as {@link #HEADER} names them; a weights file learned from the
+     * fixture names every one of them.
+     */
+    public static final List<String> FEATURE_NAMES = List.of("feat1", "feat2", "feat3");
+
+    /**
+     * What every decoy row's protein begins with, and no target row's does; how the probe tells a
+     * decoy row in a result table from a target one.
+     */
+    public static final String DECOY_PROTEIN_PREFIX = "decoy_";
 
     private static final String AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY";
     private static final int PEPTIDE_LENGTH = 9;

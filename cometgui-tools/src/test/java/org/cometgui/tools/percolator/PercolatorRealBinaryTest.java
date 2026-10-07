@@ -26,20 +26,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.Set;
+import org.cometgui.domain.ports.FileHashes;
+import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.ports.ToolCommand;
+import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolName;
+import org.cometgui.domain.tools.ToolOffer;
+import org.cometgui.domain.tools.ToolOrigin;
+import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.tools.api.ToolRunOutcome;
 import org.cometgui.tools.api.ToolRunner;
@@ -62,8 +72,8 @@ import org.junit.jupiter.api.io.TempDir;
  * <h2>The negative control, and why 64 is the number</h2>
  *
  * <p>{@link #theFixtureSizeIsTheOnlyDifference} runs <em>this same probe against this same
- * binary</em> at 8 target rows and at 64, and watches the verdict change from nothing to both
- * capabilities. That is what makes 64 a measurement rather than a magic number, and it is why the
+ * binary</em> at 8 target rows and at 64, and watches the verdict change from nothing to every
+ * capability. That is what makes 64 a measurement rather than a magic number, and it is why the
  * over-small fixture is called a false negative: the binary is fully capable in both runs.
  *
  * <p>The size is not the only thing that matters, and this is worth stating because the phase's own
@@ -107,6 +117,44 @@ class PercolatorRealBinaryTest {
 
     private static final HostPlatform HOST =
             new HostPlatform(HostOperatingSystem.LINUX, HostArchitecture.X86_64);
+
+    /*
+     * PERCOLATOR 3.09 ON LINUX, AS AN UNMANAGED BINARY.  There is no manifest row for it (D-003:
+     * absent is honest) -- its .deb needs GLIBC_2.38 and its .rpm needs Boost libraries it does not
+     * ship -- so this project runs it the way a user would have to: the upstream .rpm's executable
+     * with Boost 1.66 beside it, launched through a wrapper that sets LD_LIBRARY_PATH, registered
+     * as a local binary.  Every digest below was measured on 2026-10-07 and is hand-typed.
+     */
+    private static final String DIR_309 = "scratch/percolator/3.09";
+    private static final String WRAPPER_309 = DIR_309 + "/run-percolator-3.09.sh";
+    private static final String SHA256_WRAPPER_309 =
+            "fe1b018a3afb0f97d6ff79e18264e282924f274d1ae7c71ff64d3825538f3e90";
+    private static final String BINARY_309 = DIR_309 + "/linux-x86_64-from-rpm/usr/bin/percolator";
+    private static final String SHA256_BINARY_309 =
+            "c31f613929f06ef0f519623ed7ffd39253ce23d3681cc4cd825791c15e49ba26";
+    private static final String BOOST_FILESYSTEM_309 =
+            DIR_309 + "/deps/usr/lib64/libboost_filesystem.so.1.66.0";
+    private static final String SHA256_BOOST_FILESYSTEM_309 =
+            "18f3934a0ecb5d465fb369914626254400799e9302813dfe630e763ee437a3bd";
+    private static final String BOOST_SYSTEM_309 =
+            DIR_309 + "/deps/usr/lib64/libboost_system.so.1.66.0";
+    private static final String SHA256_BOOST_SYSTEM_309 =
+            "ded43dd2101680377021387e8bf7c4c8db07912deac657c53b1e62337691b06c";
+
+    /** Every Percolator capability, hand-typed: what a fully capable build probes to. */
+    private static final Set<ToolCapability> EVERY_CAPABILITY =
+            Set.of(
+                    ToolCapability.XML_OUTPUT,
+                    ToolCapability.XML_DECOY_OUTPUT,
+                    ToolCapability.PSM_TSV_OUTPUT,
+                    ToolCapability.PEPTIDE_TSV_OUTPUT,
+                    ToolCapability.DECOY_OUTPUT,
+                    ToolCapability.WEIGHTS_OUTPUT,
+                    ToolCapability.THREAD_OPTION,
+                    ToolCapability.SEED_OPTION,
+                    ToolCapability.TEST_FDR_OPTION,
+                    ToolCapability.TRAIN_FDR_OPTION,
+                    ToolCapability.MAX_ITERATIONS_OPTION);
 
     private static final ToolVersion V3071 = ToolVersion.parse("3.07.1");
     private static final ToolVersion V3065 = ToolVersion.parse("3.06.5");
@@ -152,21 +200,147 @@ class PercolatorRealBinaryTest {
         return runner().run(new ToolCommand(argv, workspace, Map.of()));
     }
 
-    @Test
-    @DisplayName("the probe returns both XML capabilities for the real 3.07.1 portable binary")
-    void theRealBinaryIsXmlCapable(@TempDir Path directory) throws IOException {
-        Path binary = stage(directory, ZIP_3071, SHA256_3071);
-
+    /* Probes once, and prints what was found and how long it took, for the record. */
+    private static Set<ToolCapability> probeAndReport(
+            String label, ToolVersion version, Path binary) throws IOException {
+        long started = System.nanoTime();
         Set<ToolCapability> observed =
                 new PercolatorCapabilityProbe(runner())
-                        .probe(ToolName.PERCOLATOR, V3071, HOST, binary);
+                        .probe(ToolName.PERCOLATOR, version, HOST, binary);
+        long elapsed = System.nanoTime() - started;
+        System.out.printf(
+                Locale.ROOT,
+                "PROBED %s in %.2f s: %s%n",
+                label,
+                elapsed / 1.0e9,
+                observed.stream().map(ToolCapability::id).sorted().toList());
+        return observed;
+    }
+
+    @Test
+    @DisplayName(
+            "the real 3.07.1 portable binary probes to EVERY capability, XML and tabular alike")
+    void theRealBinaryIsFullyCapable(@TempDir Path directory) throws IOException {
+        Path binary = stage(directory, ZIP_3071, SHA256_3071);
+
+        Set<ToolCapability> observed = probeAndReport("3.07.1 linux portable", V3071, binary);
 
         assertEquals(
-                Set.of(ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
+                EVERY_CAPABILITY,
                 observed,
                 "this is the exact binary scripts/feasibility/probe_xml_capability.py gets wrong:"
                         + " the noxml build, whose help text is byte-identical to the"
-                        + " XML_SUPPORT=ON twin's and which writes pout XML anyway");
+                        + " XML_SUPPORT=ON twin's and which writes pout XML anyway -- and it writes"
+                        + " every tab-separated artefact and accepts every option too");
+    }
+
+    @Test
+    @DisplayName("the real 3.06.5 portable binary probes to every capability too, measured")
+    void theOldestManagedBinary(@TempDir Path directory) throws IOException {
+        Path binary = stage(directory, ZIP_3065, SHA256_3065);
+
+        assertEquals(
+                EVERY_CAPABILITY,
+                probeAndReport("3.06.5 linux portable", V3065, binary),
+                "measured on 2026-10-07, then pinned: 3.06.5 accepted every option and wrote every"
+                        + " artefact the probe asks for");
+    }
+
+    private static Path fixture309(String relative, String expectedSha256) throws IOException {
+        Path file = UpstreamArtefacts.repositoryRoot().resolve(relative);
+        if (!Files.isRegularFile(file)) {
+            throw new AssertionError(
+                    "the Percolator 3.09 Linux fixture file "
+                            + file
+                            + " is missing. It is gitignored scratch, rebuilt by hand: extract"
+                            + " usr/bin/percolator from upstream's"
+                            + " percolator-v3-09-linux-x86_64.rpm (scratch/percolator/archives,"
+                            + " sha256 45f08388...), and"
+                            + " libboost_filesystem.so.1.66.0 and libboost_system.so.1.66.0 from"
+                            + " CentOS 8.5's boost-filesystem and boost-system 1.66.0-10.el8"
+                            + " packages, with scripts/feasibility/extract_rpm.py -- nothing is"
+                            + " installed on the host; the wrapper's own header records the recipe."
+                            + " This test fails rather than skips, because the 3.09 verdict is the"
+                            + " one the whole phase turns on.");
+        }
+        assertEquals(
+                expectedSha256,
+                UpstreamArtefacts.sha256(file),
+                () -> file + " is not the bytes this test was measured against");
+        return file;
+    }
+
+    private static HashService hashes() {
+        return file -> new FileHashes(digest(file, "MD5"), UpstreamArtefacts.sha256(file));
+    }
+
+    private static String digest(Path file, String algorithm) throws IOException {
+        try {
+            return HexFormat.of()
+                    .formatHex(
+                            MessageDigest.getInstance(algorithm).digest(Files.readAllBytes(file)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new AssertionError(impossible);
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "3.09, REGISTERED AS A LOCAL BINARY: every tabular capability, and NEITHER XML one")
+    void percolator309HasNoXml() throws IOException, ToolRegistrationException {
+        Path wrapper = fixture309(WRAPPER_309, SHA256_WRAPPER_309);
+        fixture309(BINARY_309, SHA256_BINARY_309);
+        fixture309(BOOST_FILESYSTEM_309, SHA256_BOOST_FILESYSTEM_309);
+        fixture309(BOOST_SYSTEM_309, SHA256_BOOST_SYSTEM_309);
+        ToolRunner runner = runner();
+
+        long started = System.nanoTime();
+        RegisteredLocalBinary registered =
+                new LocalPercolatorRegistration(
+                                runner, new PercolatorCapabilityProbe(runner), hashes(), HOST)
+                        .register(wrapper);
+        long elapsed = System.nanoTime() - started;
+        ToolOffer offer = registered.offer();
+        List<ToolCapability> observed =
+                offer.capabilities().stream().map(DeclaredCapability::capability).toList();
+        System.out.printf(
+                Locale.ROOT,
+                "PROBED 3.09 linux rpm (registered local) in %.2f s, registration included: %s%n",
+                elapsed / 1.0e9,
+                observed.stream().map(ToolCapability::id).sorted().toList());
+
+        assertAll(
+                () -> assertEquals("3.09.0", offer.version().text(), "read from its own banner"),
+                () -> assertEquals(V309, offer.version()),
+                () -> assertEquals(ToolOrigin.LOCAL, offer.origin()),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        ToolCapability.PSM_TSV_OUTPUT,
+                                        ToolCapability.PEPTIDE_TSV_OUTPUT,
+                                        ToolCapability.DECOY_OUTPUT,
+                                        ToolCapability.WEIGHTS_OUTPUT,
+                                        ToolCapability.THREAD_OPTION,
+                                        ToolCapability.SEED_OPTION,
+                                        ToolCapability.TEST_FDR_OPTION,
+                                        ToolCapability.TRAIN_FDR_OPTION,
+                                        ToolCapability.MAX_ITERATIONS_OPTION),
+                                observed),
+                () ->
+                        assertFalse(
+                                observed.contains(ToolCapability.XML_OUTPUT),
+                                "XML_OUTPUT absent for 3.09: it removed XML I/O"),
+                () ->
+                        assertFalse(
+                                observed.contains(ToolCapability.XML_DECOY_OUTPUT),
+                                "and XML_DECOY_OUTPUT with it"),
+                () ->
+                        assertEquals(
+                                SHA256_WRAPPER_309,
+                                registered.checksums().sha256(),
+                                "the registered file is the wrapper, and its checksum is the"
+                                        + " wrapper's: the ELF and the two libraries it loads are"
+                                        + " pinned above, not by the registration"));
     }
 
     @Test
@@ -226,10 +400,7 @@ class PercolatorRealBinaryTest {
         assertAll(
                 () -> assertEquals(OBSERVED_NAMESPACE, document.namespace()),
                 () -> assertEquals(64, document.psmCount()),
-                () ->
-                        assertEquals(
-                                Set.of(ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
-                                observed));
+                () -> assertEquals(EVERY_CAPABILITY, observed));
     }
 
     @Test
@@ -278,11 +449,13 @@ class PercolatorRealBinaryTest {
                         assertEquals(
                                 Set.of(),
                                 atEight,
-                                "a fully capable binary reported as having no XML capability at"
-                                        + " all: the false negative R-PERC-02 warns about"),
+                                "a fully capable binary reported as having no capability at"
+                                        + " all: the false negative R-PERC-02 warns about, which"
+                                        + " reaches every capability because every run is over the"
+                                        + " same fixture"),
                 () ->
                         assertEquals(
-                                Set.of(ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
+                                EVERY_CAPABILITY,
                                 atSixtyFour,
                                 "same probe, same binary, 64 rows instead of 8: the fixture size is"
                                         + " the only difference between these two verdicts"),

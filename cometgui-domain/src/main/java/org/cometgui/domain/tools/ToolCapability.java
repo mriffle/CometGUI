@@ -84,6 +84,28 @@ public enum ToolCapability {
     /** Percolator accepts a random seed, without which a rerun is not reproducible. */
     SEED_OPTION("SEED_OPTION", ToolName.PERCOLATOR),
 
+    /**
+     * Percolator accepts {@code --testFDR}, the FDR threshold for selecting the best
+     * cross-validation result and for the final reported results ({@code R-PERC-04}).
+     *
+     * <p><strong>Its own capability, and not one shared with {@link #TRAIN_FDR_OPTION}.</strong>
+     * The settings model exposes the two thresholds as two settings, and phase 09's rule is that
+     * every option the command builder can emit maps to exactly one capability the probe
+     * established. One constant for the pair would let a build that dropped either option lose both
+     * -- the non-monotonic change {@link #XML_DECOY_OUTPUT} already guards against for XML.
+     * Unrelated to the result display filters, which change what is shown and never what is run.
+     */
+    TEST_FDR_OPTION("TEST_FDR_OPTION", ToolName.PERCOLATOR),
+
+    /**
+     * Percolator accepts {@code --trainFDR}, the FDR threshold for defining positive training
+     * examples. Separate from {@link #TEST_FDR_OPTION} for the reason given there.
+     */
+    TRAIN_FDR_OPTION("TRAIN_FDR_OPTION", ToolName.PERCOLATOR),
+
+    /** Percolator accepts {@code --maxiter}, the maximum number of SVM training iterations. */
+    MAX_ITERATIONS_OPTION("MAX_ITERATIONS_OPTION", ToolName.PERCOLATOR),
+
     /** Comet writes pepXML. */
     PEPXML_OUTPUT("PEPXML_OUTPUT", ToolName.COMET),
 
@@ -225,8 +247,9 @@ public enum ToolCapability {
                         + id
                         + "\"; expected one of [XML_OUTPUT, XML_DECOY_OUTPUT, PSM_TSV_OUTPUT,"
                         + " PEPTIDE_TSV_OUTPUT, DECOY_OUTPUT, WEIGHTS_OUTPUT, THREAD_OPTION,"
-                        + " SEED_OPTION, PEPXML_OUTPUT, PIN_OUTPUT, COMPLETE_PARAMS_QUERY,"
-                        + " THERMO_RAW_WINDOWS, FRAGMENT_ION_INDEX, PEPTIDE_INDEX, SCAN_RANGE,"
-                        + " OUTPUT_BASENAME]");
+                        + " SEED_OPTION, TEST_FDR_OPTION, TRAIN_FDR_OPTION,"
+                        + " MAX_ITERATIONS_OPTION, PEPXML_OUTPUT, PIN_OUTPUT,"
+                        + " COMPLETE_PARAMS_QUERY, THERMO_RAW_WINDOWS, FRAGMENT_ION_INDEX,"
+                        + " PEPTIDE_INDEX, SCAN_RANGE, OUTPUT_BASENAME]");
     }
 }

@@ -38,9 +38,11 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Tests for {@link ToolCapability}.
  *
  * <p>The two capability lists are hand-typed from the specification's <em>Capability and runtime
- * probing</em> section. The owning tool is asserted for every constant, because the guard this type
- * provides -- that a manifest cannot claim {@code THERMO_RAW_WINDOWS} for Percolator -- is only as
- * good as the ownership table behind it.
+ * probing</em> section, plus the three option capabilities phase 09 added for {@code --testFDR},
+ * {@code --trainFDR} and {@code --maxiter} (design decision P9-7: every option the command builder
+ * can emit maps to exactly one probed capability). The owning tool is asserted for every constant,
+ * because the guard this type provides -- that a manifest cannot claim {@code THERMO_RAW_WINDOWS}
+ * for Percolator -- is only as good as the ownership table behind it.
  */
 class ToolCapabilityTest {
 
@@ -53,7 +55,10 @@ class ToolCapabilityTest {
                     "DECOY_OUTPUT",
                     "WEIGHTS_OUTPUT",
                     "THREAD_OPTION",
-                    "SEED_OPTION");
+                    "SEED_OPTION",
+                    "TEST_FDR_OPTION",
+                    "TRAIN_FDR_OPTION",
+                    "MAX_ITERATIONS_OPTION");
 
     private static final List<String> COMET_CAPABILITIES =
             List.of(
@@ -75,7 +80,7 @@ class ToolCapabilityTest {
     }
 
     @Test
-    @DisplayName("the sixteen capabilities the specification names are the sixteen that exist")
+    @DisplayName("the specification's sixteen capabilities and phase 09's three are all that exist")
     void theCapabilitiesArePinned() {
         List<String> names = new ArrayList<>();
         for (ToolCapability capability : ToolCapability.values()) {
@@ -271,7 +276,10 @@ class ToolCapabilityTest {
         "XML_OUTPUT, XML_OUTPUT",
         "XML_DECOY_OUTPUT, XML_DECOY_OUTPUT",
         "THERMO_RAW_WINDOWS, THERMO_RAW_WINDOWS",
-        "COMPLETE_PARAMS_QUERY, COMPLETE_PARAMS_QUERY"
+        "COMPLETE_PARAMS_QUERY, COMPLETE_PARAMS_QUERY",
+        "TEST_FDR_OPTION, TEST_FDR_OPTION",
+        "TRAIN_FDR_OPTION, TRAIN_FDR_OPTION",
+        "MAX_ITERATIONS_OPTION, MAX_ITERATIONS_OPTION"
     })
     @DisplayName("the identifier is the token the specification uses")
     void identifiersArePinned(String constant, String expectedId) {

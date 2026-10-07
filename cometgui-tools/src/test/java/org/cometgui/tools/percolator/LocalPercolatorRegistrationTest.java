@@ -166,10 +166,23 @@ class LocalPercolatorRegistrationTest {
                                         + " download length to show for it"),
                 () ->
                         assertEquals(
-                                List.of(ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
+                                List.of(
+                                        ToolCapability.XML_OUTPUT,
+                                        ToolCapability.XML_DECOY_OUTPUT,
+                                        ToolCapability.PSM_TSV_OUTPUT,
+                                        ToolCapability.PEPTIDE_TSV_OUTPUT,
+                                        ToolCapability.DECOY_OUTPUT,
+                                        ToolCapability.WEIGHTS_OUTPUT,
+                                        ToolCapability.THREAD_OPTION,
+                                        ToolCapability.SEED_OPTION,
+                                        ToolCapability.TEST_FDR_OPTION,
+                                        ToolCapability.TRAIN_FDR_OPTION,
+                                        ToolCapability.MAX_ITERATIONS_OPTION),
                                 offer.capabilities().stream()
                                         .map(DeclaredCapability::capability)
-                                        .toList()),
+                                        .toList(),
+                                "every capability the extended probe establishes, in the order"
+                                        + " the specification lists them"),
                 () ->
                         assertTrue(
                                 offer.capabilities().stream()
@@ -197,8 +210,8 @@ class LocalPercolatorRegistrationTest {
                 "probed by execution on linux-x86-64 when "
                         + binary
                         + " was registered as a local binary: the functional probe ran this build"
-                        + " over a 64 target plus 64 decoy synthetic PIN and read the document it"
-                        + " wrote",
+                        + " over a 64 target plus 64 decoy synthetic PIN, one run per capability,"
+                        + " and read what each run wrote",
                 registered.offer().capabilities().get(0).note());
     }
 
@@ -258,20 +271,15 @@ class LocalPercolatorRegistrationTest {
     void exactlyTheMinimum(@TempDir Path directory) throws IOException, ToolRegistrationException {
         Path binary = Files.writeString(directory.resolve("percolator"), "not really");
         Path targets = directory.resolve("t.xml");
-        ScriptedRunner runner =
-                new ScriptedRunner()
-                        .thenPrints(
-                                0,
-                                List.of("Percolator version 3.05, Build Date Jan  1 2020 00:00:00"),
-                                List.of())
-                        .thenPrints(
-                                0,
-                                List.of("Percolator version 3.05, Build Date Jan  1 2020 00:00:00"),
-                                List.of())
-                        .thenPrints(
-                                0,
-                                List.of("Percolator version 3.05, Build Date Jan  1 2020 00:00:00"),
-                                List.of());
+        ScriptedRunner runner = new ScriptedRunner();
+        /* The identifying --help, then the probe's eleven runs: each prints the banner and exits
+         * 0, and writes nothing -- no file and no table on standard output. */
+        for (int run = 0; run < 12; run++) {
+            runner.thenPrints(
+                    0,
+                    List.of("Percolator version 3.05, Build Date Jan  1 2020 00:00:00"),
+                    List.of());
+        }
 
         RegisteredLocalBinary registered = scriptedRegistrar(runner).register(binary);
 
@@ -281,8 +289,9 @@ class LocalPercolatorRegistrationTest {
                         assertEquals(
                                 List.of(),
                                 registered.offer().capabilities(),
-                                "it printed its banner and wrote no document, so the absence of"
+                                "it printed its banner and wrote nothing, so the absence of"
                                         + " every capability really was observed"),
+                () -> assertEquals(12, runner.played(), "--help and the eleven probe runs"),
                 () -> assertTrue(targets.getFileName() != null));
     }
 

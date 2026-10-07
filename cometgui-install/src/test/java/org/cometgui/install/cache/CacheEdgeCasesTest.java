@@ -298,6 +298,7 @@ class CacheEdgeCasesTest {
                                                 "bin/percolator",
                                                 1,
                                                 List.of(ToolCapability.XML_OUTPUT),
+                                                InstallationMarker.CAPABILITY_PROBE_GENERATION,
                                                 List.of(
                                                         new RecordedFile(
                                                                 "bin/percolator", 1, hashes()))))
@@ -326,6 +327,7 @@ class CacheEdgeCasesTest {
                                                 "bin/percolator",
                                                 entryCount,
                                                 List.of(ToolCapability.XML_OUTPUT),
+                                                InstallationMarker.CAPABILITY_PROBE_GENERATION,
                                                 List.of(
                                                         new RecordedFile(
                                                                 "bin/percolator", 1, hashes()))))
@@ -345,6 +347,7 @@ class CacheEdgeCasesTest {
                                 "bin/percolator",
                                 1,
                                 List.of(),
+                                InstallationMarker.CAPABILITY_PROBE_GENERATION,
                                 List.of(new RecordedFile("bin/percolator", 1, hashes())))
                         .payloadEntryCount(),
                 "one artefact of one byte placing one file is the smallest legal install");

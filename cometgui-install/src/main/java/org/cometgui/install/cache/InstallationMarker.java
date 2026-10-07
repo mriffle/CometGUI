@@ -62,6 +62,19 @@ import org.cometgui.provenance.json.JsonWriter;
  * executable makes the whole entry {@link InstallationState#CHECKSUM_MISMATCH} and the capabilities
  * go with it. The re-probe itself belongs to the units that own probing.
  *
+ * <h2>Which probe recorded them</h2>
+ *
+ * <p>The capability list is only as complete as the probe that wrote it. Markers written before
+ * phase 09 carry what the first Percolator probe could establish -- {@code XML_OUTPUT} and {@code
+ * XML_DECOY_OUTPUT} and nothing else -- and read naively such a marker would tell the Tool Manager
+ * that an installed 3.07.1 cannot write its tab-separated results, which it can. So the marker
+ * records {@link #capabilityProbeGeneration()}, and {@link ToolCache#verify} reports a marker from
+ * an older generation as {@link InstallationState#CAPABILITIES_FROM_AN_EARLIER_PROBE}: not
+ * installed, so the next install re-runs step 6 and records what the current probe establishes. The
+ * rule names no tool and no version: a generation is a property of this CometGUI's probes, and
+ * bumping {@link #CAPABILITY_PROBE_GENERATION} is how a later probe that establishes more makes
+ * every earlier record be re-confirmed rather than believed.
+ *
  * @param schemaVersion the marker format, so a future CometGUI can refuse one it cannot read
  * @param tool which tool this directory holds
  * @param version which release of it
@@ -76,6 +89,8 @@ import org.cometgui.provenance.json.JsonWriter;
  * @param payloadEntryCount how many files the extraction placed in this directory, excluding the
  *     marker itself
  * @param capabilities what the probe confirmed the installed build can do, in enum order
+ * @param capabilityProbeGeneration which generation of this product's capability probes recorded
+ *     {@code capabilities}; {@code 1} for every marker written before the field existed
  * @param files every file the manifest names, with its length and digests
  */
 public record InstallationMarker(
@@ -91,10 +106,31 @@ public record InstallationMarker(
         String executablePath,
         int payloadEntryCount,
         List<ToolCapability> capabilities,
+        int capabilityProbeGeneration,
         List<RecordedFile> files) {
 
     /** The marker format this version of CometGUI writes and reads. */
     public static final int SCHEMA_VERSION = 1;
+
+    /**
+     * The generation of capability probes this CometGUI runs at install step 6.
+     *
+     * <p>Generation 1 is every marker written before phase 09: its Percolator probe established
+     * only the two XML capabilities. Generation 2 is phase 09's probe, which also establishes the
+     * tab-separated PSM, peptide and decoy tables, the weights file, and the seed, thread, {@code
+     * testFDR}, {@code trainFDR} and {@code maxiter} options. A marker from an earlier generation
+     * is not installed until it is re-probed; see {@link ToolCache#verify}.
+     */
+    public static final int CAPABILITY_PROBE_GENERATION = 2;
+
+    /*
+     * WHAT A MARKER WITH NO "capabilityProbeGeneration" MEANS.  The field was added within schema
+     * version 1, so a marker without it is not malformed -- it is a marker written before the field
+     * existed, which is generation 1 by definition.  Reading it as 1 can never make an entry report
+     * itself installed, because 1 is older than CAPABILITY_PROBE_GENERATION; it makes the entry be
+     * re-probed, which is the point.
+     */
+    private static final int GENERATION_BEFORE_THE_FIELD = 1;
 
     /**
      * The marker's file name inside a tool directory.
@@ -109,10 +145,10 @@ public record InstallationMarker(
      * Validates the marker and takes defensive, immutable copies of its two lists.
      *
      * @throws NullPointerException if any component is {@code null}
-     * @throws IllegalArgumentException if the schema version, the artefact size or the entry count
-     *     is not positive, the release tag, timestamp or executable path is blank, a capability
-     *     appears twice, a file path appears twice, or the executable path is not among the
-     *     recorded files -- naming the field
+     * @throws IllegalArgumentException if the schema version, the artefact size, the entry count or
+     *     the capability probe generation is not positive, the release tag, timestamp or executable
+     *     path is blank, a capability appears twice, a file path appears twice, or the executable
+     *     path is not among the recorded files -- naming the field
      */
     public InstallationMarker {
         if (schemaVersion <= 0) {
@@ -138,6 +174,11 @@ public record InstallationMarker(
                     "payloadEntryCount must be positive, but was: " + payloadEntryCount);
         }
         capabilities = checkedCapabilities(capabilities);
+        if (capabilityProbeGeneration <= 0) {
+            throw new IllegalArgumentException(
+                    "capabilityProbeGeneration must be positive, but was: "
+                            + capabilityProbeGeneration);
+        }
         files = checkedFiles(files, executablePath);
     }
 
@@ -222,6 +263,16 @@ public record InstallationMarker(
     }
 
     /**
+     * Whether the capabilities were recorded by a probe older than the one this CometGUI runs.
+     *
+     * @return {@code true} when {@link #capabilityProbeGeneration()} is below {@link
+     *     #CAPABILITY_PROBE_GENERATION}
+     */
+    public boolean capabilitiesFromAnEarlierProbe() {
+        return capabilityProbeGeneration < CAPABILITY_PROBE_GENERATION;
+    }
+
+    /**
      * Whether this marker describes the tool, version and platform of a given directory.
      *
      * @param expectedTool the tool the directory's path says it holds
@@ -291,7 +342,11 @@ public record InstallationMarker(
         for (ToolCapability capability : capabilities) {
             writer.value(capability.id());
         }
-        writer.endArray().name("files").beginArray();
+        writer.endArray()
+                .name("capabilityProbeGeneration")
+                .value(capabilityProbeGeneration)
+                .name("files")
+                .beginArray();
         for (RecordedFile file : files) {
             writer.beginObject()
                     .name("path")
@@ -355,6 +410,7 @@ public record InstallationMarker(
                     text(object, "executablePath"),
                     (int) number(object, "payloadEntryCount"),
                     capabilitiesOf(object),
+                    generationOf(object),
                     filesOf(object));
         } catch (IllegalArgumentException rejected) {
             throw new MarkerFormatException(
@@ -374,6 +430,20 @@ public record InstallationMarker(
             capabilities.add(ToolCapability.fromId(name.value()));
         }
         return capabilities;
+    }
+
+    private static int generationOf(JsonValue.JsonObject object) {
+        if (object.member("capabilityProbeGeneration").isEmpty()) {
+            return GENERATION_BEFORE_THE_FIELD;
+        }
+        long generation = number(object, "capabilityProbeGeneration");
+        if (generation > Integer.MAX_VALUE) {
+            throw new MarkerFormatException(
+                    "the completion marker's \"capabilityProbeGeneration\" is "
+                            + generation
+                            + ", which no CometGUI has written");
+        }
+        return (int) generation;
     }
 
     private static List<RecordedFile> filesOf(JsonValue.JsonObject object) {

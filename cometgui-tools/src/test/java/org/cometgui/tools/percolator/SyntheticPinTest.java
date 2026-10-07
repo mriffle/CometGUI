@@ -59,6 +59,37 @@ class SyntheticPinTest {
     private static final String SHA256_8 =
             "e9df3d2b4df63f510167e831edb654563454662b20f1f06c9820d990bf42e361";
 
+    @Test
+    @DisplayName("the feature names and the decoy prefix the probe judges artefacts by")
+    void whatTheProbeJudgesArtefactsBy() {
+        List<String> rows = SyntheticPin.forCapabilityProbe().lines().skip(1).toList();
+        long decoyProteins =
+                rows.stream()
+                        .filter(row -> row.split("\t")[9].startsWith("decoy_"))
+                        .filter(row -> row.split("\t")[1].equals("-1"))
+                        .count();
+        long distinctPeptides = rows.stream().map(row -> row.split("\t")[8]).distinct().count();
+
+        assertAll(
+                () -> assertEquals(List.of("feat1", "feat2", "feat3"), SyntheticPin.FEATURE_NAMES),
+                () ->
+                        assertTrue(
+                                SyntheticPin.HEADER.contains("\tfeat1\tfeat2\tfeat3\t"),
+                                "the names are the header's own"),
+                () -> assertEquals("decoy_", SyntheticPin.DECOY_PROTEIN_PREFIX),
+                () ->
+                        assertEquals(
+                                64,
+                                decoyProteins,
+                                "every decoy row, and only the decoy rows, carries the prefix"),
+                () ->
+                        assertEquals(
+                                128,
+                                distinctPeptides,
+                                "all 128 peptides are distinct, which is why the PSM and peptide"
+                                        + " tables of the probe have the same 64 rows"));
+    }
+
     private static String sha256(String text) {
         try {
             return HexFormat.of()

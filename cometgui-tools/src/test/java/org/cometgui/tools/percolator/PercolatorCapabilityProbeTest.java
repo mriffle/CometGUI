@@ -27,9 +27,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.HostArchitecture;
@@ -39,12 +42,14 @@ import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.tools.api.ToolRunner;
+import org.cometgui.tools.testing.FakePercolator;
 import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.ScriptedRunner;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -89,6 +94,18 @@ class PercolatorCapabilityProbeTest {
         };
     }
 
+    /**
+     * The nine runs after the two XML runs, each refused as real Percolator refuses an option it
+     * does not know: these tests grade the XML verdicts, and every other capability is graded over
+     * {@link FakePercolator} below.
+     */
+    private static ScriptedRunner refusingTheRest(ScriptedRunner runner) {
+        for (int run = 0; run < 9; run++) {
+            runner.thenPrints(1, List.of("Exception caught: " + BANNER), List.of());
+        }
+        return runner;
+    }
+
     private static PercolatorCapabilityProbe probe(ScriptedRunner runner) {
         return new PercolatorCapabilityProbe(new ToolRunner(runner, Duration.ofSeconds(5)), 64);
     }
@@ -101,9 +118,10 @@ class PercolatorCapabilityProbeTest {
     @DisplayName("a run that writes both documents is observed to have both XML capabilities")
     void bothCapabilities(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
-                new ScriptedRunner()
-                        .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
-                        .thenWrites(writes(document(128, true)), 0, List.of(BANNER));
+                refusingTheRest(
+                        new ScriptedRunner()
+                                .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
+                                .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
 
         Set<ToolCapability> observed =
                 probe(runner).probe(ToolName.PERCOLATOR, V3071, LINUX, binary(directory));
@@ -113,16 +131,17 @@ class PercolatorCapabilityProbeTest {
                         assertEquals(
                                 Set.of(ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
                                 observed),
-                () -> assertEquals(2, runner.played(), "each capability gets its own run"));
+                () -> assertEquals(11, runner.played(), "each capability gets its own run"));
     }
 
     @Test
     @DisplayName("the two runs are -X and -X -Z, in that order, over one fixture")
     void theArgumentArrays(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
-                new ScriptedRunner()
-                        .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
-                        .thenWrites(writes(document(128, true)), 0, List.of(BANNER));
+                refusingTheRest(
+                        new ScriptedRunner()
+                                .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
+                                .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
         Path executable = binary(directory);
 
         probe(runner).probe(ToolName.PERCOLATOR, V3071, LINUX, executable);
@@ -146,9 +165,10 @@ class PercolatorCapabilityProbeTest {
     @DisplayName("a ZERO-BYTE output file is not success, even when the run exits 0")
     void aZeroByteFileIsNotSuccess(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
-                new ScriptedRunner()
-                        .thenWrites(writes(""), 0, List.of(BANNER))
-                        .thenWrites(writes(""), 0, List.of(BANNER));
+                refusingTheRest(
+                        new ScriptedRunner()
+                                .thenWrites(writes(""), 0, List.of(BANNER))
+                                .thenWrites(writes(""), 0, List.of(BANNER)));
 
         Set<ToolCapability> observed =
                 probe(runner).probe(ToolName.PERCOLATOR, V3071, LINUX, binary(directory));
@@ -160,9 +180,10 @@ class PercolatorCapabilityProbeTest {
     @DisplayName("a run that wrote nothing at all claims nothing")
     void nothingWrittenIsNothingClaimed(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
-                new ScriptedRunner()
-                        .thenPrints(1, List.of(BANNER, "-X is not supported"), List.of())
-                        .thenPrints(1, List.of(BANNER, "-X is not supported"), List.of());
+                refusingTheRest(
+                        new ScriptedRunner()
+                                .thenPrints(1, List.of(BANNER, "-X is not supported"), List.of())
+                                .thenPrints(1, List.of(BANNER, "-X is not supported"), List.of()));
 
         assertEquals(
                 Set.of(),
@@ -176,9 +197,10 @@ class PercolatorCapabilityProbeTest {
     @DisplayName("a document with the wrong psm count is not the fixture's output")
     void theWrongPsmCount(int psms, @TempDir Path directory) throws IOException {
         ScriptedRunner runner =
-                new ScriptedRunner()
-                        .thenWrites(writes(document(psms, false)), 0, List.of(BANNER))
-                        .thenWrites(writes(document(128, true)), 0, List.of(BANNER));
+                refusingTheRest(
+                        new ScriptedRunner()
+                                .thenWrites(writes(document(psms, false)), 0, List.of(BANNER))
+                                .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
 
         assertEquals(
                 Set.of(ToolCapability.XML_DECOY_OUTPUT),
@@ -194,9 +216,10 @@ class PercolatorCapabilityProbeTest {
     void theWrongNamespace(@TempDir Path directory) throws IOException {
         String wrong = document(64, false).replace("percolator_out/15", "percolator_out/");
         ScriptedRunner runner =
-                new ScriptedRunner()
-                        .thenWrites(writes(wrong), 0, List.of(BANNER))
-                        .thenWrites(writes(wrong), 0, List.of(BANNER));
+                refusingTheRest(
+                        new ScriptedRunner()
+                                .thenWrites(writes(wrong), 0, List.of(BANNER))
+                                .thenWrites(writes(wrong), 0, List.of(BANNER)));
 
         assertEquals(
                 Set.of(),
@@ -207,9 +230,10 @@ class PercolatorCapabilityProbeTest {
     @DisplayName("XML_DECOY_OUTPUT needs both decoy values, not merely 128 rows")
     void decoysNeedBothValues(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
-                new ScriptedRunner()
-                        .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
-                        .thenWrites(writes(document(128, false)), 0, List.of(BANNER));
+                refusingTheRest(
+                        new ScriptedRunner()
+                                .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
+                                .thenWrites(writes(document(128, false)), 0, List.of(BANNER)));
 
         assertEquals(
                 Set.of(ToolCapability.XML_OUTPUT),
@@ -222,9 +246,10 @@ class PercolatorCapabilityProbeTest {
     @DisplayName("the two capabilities are independent: decoys without targets is possible here")
     void theCapabilitiesAreIndependent(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
-                new ScriptedRunner()
-                        .thenWrites(writes(""), 0, List.of(BANNER))
-                        .thenWrites(writes(document(128, true)), 0, List.of(BANNER));
+                refusingTheRest(
+                        new ScriptedRunner()
+                                .thenWrites(writes(""), 0, List.of(BANNER))
+                                .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
 
         assertEquals(
                 Set.of(ToolCapability.XML_DECOY_OUTPUT),
@@ -439,9 +464,10 @@ class PercolatorCapabilityProbeTest {
         Path temporary = Path.of(System.getProperty("java.io.tmpdir"));
         long before = countProbeWorkspaces(temporary);
         ScriptedRunner good =
-                new ScriptedRunner()
-                        .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
-                        .thenWrites(writes(document(128, true)), 0, List.of(BANNER));
+                refusingTheRest(
+                        new ScriptedRunner()
+                                .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
+                                .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
         probe(good).probe(ToolName.PERCOLATOR, V3071, LINUX, binary(directory));
         ScriptedRunner bad = new ScriptedRunner().thenPrints(127, List.of("no banner"), List.of());
         assertThrows(
@@ -449,6 +475,478 @@ class PercolatorCapabilityProbeTest {
                 () -> probe(bad).probe(ToolName.PERCOLATOR, V3071, LINUX, binary(directory)));
 
         assertEquals(before, countProbeWorkspaces(temporary));
+    }
+
+    // ------------------------------------------------------ every capability, over a fake --
+
+    /** Every Percolator capability there is, hand-typed: what a fully capable build probes to. */
+    private static final Set<ToolCapability> EVERY_CAPABILITY =
+            Set.of(
+                    ToolCapability.XML_OUTPUT,
+                    ToolCapability.XML_DECOY_OUTPUT,
+                    ToolCapability.PSM_TSV_OUTPUT,
+                    ToolCapability.PEPTIDE_TSV_OUTPUT,
+                    ToolCapability.DECOY_OUTPUT,
+                    ToolCapability.WEIGHTS_OUTPUT,
+                    ToolCapability.THREAD_OPTION,
+                    ToolCapability.SEED_OPTION,
+                    ToolCapability.TEST_FDR_OPTION,
+                    ToolCapability.TRAIN_FDR_OPTION,
+                    ToolCapability.MAX_ITERATIONS_OPTION);
+
+    /** The five whose observable is a completed run's standard output, hand-typed. */
+    private static final Set<ToolCapability> OPTION_CAPABILITIES =
+            Set.of(
+                    ToolCapability.THREAD_OPTION,
+                    ToolCapability.SEED_OPTION,
+                    ToolCapability.TEST_FDR_OPTION,
+                    ToolCapability.TRAIN_FDR_OPTION,
+                    ToolCapability.MAX_ITERATIONS_OPTION);
+
+    private static Set<ToolCapability> probeOver(FakePercolator fake, Path directory)
+            throws IOException {
+        return new PercolatorCapabilityProbe(new ToolRunner(fake, Duration.ofSeconds(5)), 64)
+                .probe(ToolName.PERCOLATOR, V3071, LINUX, binary(directory));
+    }
+
+    private static Set<ToolCapability> without(
+            Set<ToolCapability> all, Set<ToolCapability> removed) {
+        Set<ToolCapability> remaining = EnumSet.noneOf(ToolCapability.class);
+        remaining.addAll(all);
+        remaining.removeAll(removed);
+        return remaining;
+    }
+
+    private static UnaryOperator<List<String>> dropLast() {
+        return lines -> lines.subList(0, lines.size() - 1);
+    }
+
+    private static UnaryOperator<List<String>> appendLine(String line) {
+        return lines -> {
+            List<String> longer = new ArrayList<>(lines);
+            longer.add(line);
+            return longer;
+        };
+    }
+
+    private static UnaryOperator<List<String>> replaceIn(int index, String from, String to) {
+        return lines -> {
+            List<String> changed = new ArrayList<>(lines);
+            int at = index < 0 ? changed.size() + index : index;
+            String original = changed.get(at);
+            String replaced = original.replace(from, to);
+            if (replaced.equals(original)) {
+                throw new AssertionError("\"" + from + "\" is not in line " + at + ": " + original);
+            }
+            changed.set(at, replaced);
+            return changed;
+        };
+    }
+
+    private static UnaryOperator<List<String>> becomes(List<String> replacement) {
+        return lines -> replacement;
+    }
+
+    @Test
+    @DisplayName("a build that does everything the real ones do probes to every capability")
+    void aFullyCapableBuild(@TempDir Path directory) throws IOException {
+        FakePercolator fake = new FakePercolator();
+
+        assertAll(
+                () -> assertEquals(EVERY_CAPABILITY, probeOver(fake, directory)),
+                () -> assertEquals(11, fake.commands().size(), "one run per capability"));
+    }
+
+    @Test
+    @DisplayName("the eleven argument arrays, in order: one option under test each, the PIN last")
+    void everyArgumentArray(@TempDir Path directory) throws IOException {
+        FakePercolator fake = new FakePercolator();
+        Path executable = binary(directory);
+
+        new PercolatorCapabilityProbe(new ToolRunner(fake, Duration.ofSeconds(5)), 64)
+                .probe(ToolName.PERCOLATOR, V3071, LINUX, executable);
+
+        List<ToolCommand> commands = fake.commands();
+        Path workspace = commands.get(0).workingDirectory();
+        String pin = workspace.resolve("probe.pin").toString();
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(
+                                        List.of(
+                                                "-X",
+                                                workspace.resolve("targets.pout.xml").toString(),
+                                                pin),
+                                        List.of(
+                                                "-X",
+                                                workspace.resolve("decoys.pout.xml").toString(),
+                                                "-Z",
+                                                pin),
+                                        List.of(
+                                                "--results-psms",
+                                                workspace.resolve("psms.tsv").toString(),
+                                                pin),
+                                        List.of(
+                                                "--results-peptides",
+                                                workspace.resolve("peptides.tsv").toString(),
+                                                pin),
+                                        List.of(
+                                                "--decoy-results-psms",
+                                                workspace.resolve("decoy-psms.tsv").toString(),
+                                                "--decoy-results-peptides",
+                                                workspace.resolve("decoy-peptides.tsv").toString(),
+                                                pin),
+                                        List.of(
+                                                "--weights",
+                                                workspace.resolve("weights.txt").toString(),
+                                                pin),
+                                        List.of("--seed", "1", pin),
+                                        List.of("--num-threads", "3", pin),
+                                        List.of("--testFDR", "0.01", pin),
+                                        List.of("--trainFDR", "0.01", pin),
+                                        List.of("--maxiter", "10", pin)),
+                                commands.stream()
+                                        .map(
+                                                command ->
+                                                        command.argv()
+                                                                .subList(1, command.argv().size()))
+                                        .toList()),
+                () ->
+                        assertTrue(
+                                commands.stream()
+                                        .allMatch(
+                                                command ->
+                                                        command.argv()
+                                                                        .get(0)
+                                                                        .equals(
+                                                                                executable
+                                                                                        .toString())
+                                                                && command.workingDirectory()
+                                                                        .equals(workspace)
+                                                                && command.environment().isEmpty()),
+                                "every run is of the binary given, in one workspace, with a"
+                                        + " constructed and empty environment"),
+                () ->
+                        assertTrue(
+                                String.valueOf(workspace.getFileName())
+                                        .startsWith("cometgui-percolator-probe-"),
+                                workspace::toString));
+    }
+
+    @ParameterizedTest(name = "[{index}] rejecting {0} loses exactly {1}")
+    @CsvSource({
+        "-X, XML_OUTPUT XML_DECOY_OUTPUT",
+        "-Z, XML_DECOY_OUTPUT",
+        "--results-psms, PSM_TSV_OUTPUT",
+        "--results-peptides, PEPTIDE_TSV_OUTPUT",
+        "--decoy-results-psms, DECOY_OUTPUT",
+        "--decoy-results-peptides, DECOY_OUTPUT",
+        "--weights, WEIGHTS_OUTPUT",
+        "--seed, SEED_OPTION",
+        "--num-threads, THREAD_OPTION",
+        "--testFDR, TEST_FDR_OPTION",
+        "--trainFDR, TRAIN_FDR_OPTION",
+        "--maxiter, MAX_ITERATIONS_OPTION"
+    })
+    @DisplayName("a build rejecting one option loses exactly that capability and keeps the rest")
+    void oneRejectedOptionLosesExactlyItsCapability(
+            String option, String lost, @TempDir Path directory) throws IOException {
+        Set<ToolCapability> removed = EnumSet.noneOf(ToolCapability.class);
+        for (String id : lost.split(" ")) {
+            removed.add(ToolCapability.fromId(id));
+        }
+
+        assertEquals(
+                without(EVERY_CAPABILITY, removed),
+                probeOver(new FakePercolator().rejecting(option), directory),
+                "-X is in both XML runs, so it is the one option whose rejection costs two");
+    }
+
+    @Test
+    @DisplayName("3.09's shape -- -X and -Z refused -- keeps every tab-separated capability")
+    void theShapeOfPercolator309(@TempDir Path directory) throws IOException {
+        assertEquals(
+                Set.of(
+                        ToolCapability.PSM_TSV_OUTPUT,
+                        ToolCapability.PEPTIDE_TSV_OUTPUT,
+                        ToolCapability.DECOY_OUTPUT,
+                        ToolCapability.WEIGHTS_OUTPUT,
+                        ToolCapability.THREAD_OPTION,
+                        ToolCapability.SEED_OPTION,
+                        ToolCapability.TEST_FDR_OPTION,
+                        ToolCapability.TRAIN_FDR_OPTION,
+                        ToolCapability.MAX_ITERATIONS_OPTION),
+                probeOver(new FakePercolator().rejecting("-X").rejecting("-Z"), directory));
+    }
+
+    @Test
+    @DisplayName("a build that never prints its banner throws: no answer is not an empty set")
+    void aBuildThatNeverRunsThrows(@TempDir Path directory) throws IOException {
+        Path executable = binary(directory);
+        FakePercolator fake = new FakePercolator().withoutBanner();
+
+        IOException refused =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                new PercolatorCapabilityProbe(
+                                                new ToolRunner(fake, Duration.ofSeconds(5)), 64)
+                                        .probe(ToolName.PERCOLATOR, V3071, LINUX, executable));
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                "Percolator 3.07.1 at "
+                                        + executable
+                                        + " never printed its version banner, so it did not run"
+                                        + " far enough to be asked what it can do; this is a"
+                                        + " loadability failure and must not be reported as a"
+                                        + " missing capability. It exited 127 saying: percolator:"
+                                        + " error while loading shared libraries",
+                                refused.getMessage()),
+                () -> assertEquals(1, fake.commands().size(), "it stopped at the first run"));
+    }
+
+    @Test
+    @DisplayName(
+            "a banner missing from a LATER run still throws, rather than costing one capability")
+    void aLaterRunWithNoBannerThrows(@TempDir Path directory) throws IOException {
+        Path executable = binary(directory);
+        ScriptedRunner runner =
+                new ScriptedRunner()
+                        .thenPrints(1, List.of("Exception caught: " + BANNER), List.of())
+                        .thenPrints(1, List.of("Exception caught: " + BANNER), List.of())
+                        .thenPrints(139, List.of("Segmentation fault"), List.of());
+
+        IOException refused =
+                assertThrows(
+                        IOException.class,
+                        () -> probe(runner).probe(ToolName.PERCOLATOR, V3071, LINUX, executable));
+
+        assertTrue(
+                refused.getMessage().endsWith("It exited 139 saying: Segmentation fault"),
+                refused.getMessage());
+    }
+
+    @Test
+    @DisplayName("a run that times out after the XML runs still throws")
+    void aLaterTimeoutThrows(@TempDir Path directory) throws IOException {
+        Path executable = binary(directory);
+        ScriptedRunner runner =
+                new ScriptedRunner()
+                        .thenPrints(1, List.of("Exception caught: " + BANNER), List.of())
+                        .thenPrints(1, List.of("Exception caught: " + BANNER), List.of())
+                        .thenPrints(1, List.of("Exception caught: " + BANNER), List.of())
+                        .thenNeverFinishes();
+        PercolatorCapabilityProbe probe =
+                new PercolatorCapabilityProbe(new ToolRunner(runner, Duration.ofMillis(50)), 64);
+
+        assertTrue(
+                assertThrows(
+                                IOException.class,
+                                () -> probe.probe(ToolName.PERCOLATOR, V3071, LINUX, executable))
+                        .getMessage()
+                        .contains("did not finish within PT0.05S"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "one row fewer | dropLast",
+                "one row more | appendTarget",
+                "no q-value column | noQValue",
+                "a decoy among the targets | decoyRow",
+                "a row short of a field | shortRow",
+                "nothing at all | empty",
+                "a header only | headerOnly"
+            })
+    @DisplayName(
+            "a PSM table that is not the fixture's targets costs PSM_TSV_OUTPUT and nothing else")
+    void aDamagedPsmTable(String what, String damage, @TempDir Path directory) throws IOException {
+        FakePercolator fake = new FakePercolator().altering("--results-psms", damageNamed(damage));
+
+        assertEquals(
+                without(EVERY_CAPABILITY, Set.of(ToolCapability.PSM_TSV_OUTPUT)),
+                probeOver(fake, directory),
+                what);
+    }
+
+    private static UnaryOperator<List<String>> damageNamed(String damage) {
+        return switch (damage) {
+            case "dropLast" -> dropLast();
+            case "appendTarget" ->
+                    appendLine("psm999\t0.5\t0.01\t0.02\tK.AAAAAAAAA.R\tsp|P99999|TEST");
+            case "noQValue" -> replaceIn(0, "q-value", "qvalue");
+            case "decoyRow" -> replaceIn(-1, "\tsp|", "\tdecoy_sp|");
+            case "shortRow" ->
+                    lines -> {
+                        List<String> changed = new ArrayList<>(lines);
+                        String last = changed.get(changed.size() - 1);
+                        changed.set(changed.size() - 1, last.substring(0, last.lastIndexOf('\t')));
+                        return changed;
+                    };
+            case "empty" -> becomes(List.of());
+            case "headerOnly" -> becomes(List.of(FakePercolator.TABLE_HEADER));
+            default -> throw new AssertionError("no damage named " + damage);
+        };
+    }
+
+    @Test
+    @DisplayName("an extra column is not a damaged table: the columns are found by name")
+    void anExtraColumnIsAccepted(@TempDir Path directory) throws IOException {
+        UnaryOperator<List<String>> widened =
+                lines -> lines.stream().map(line -> "extra\t" + line).toList();
+        FakePercolator fake = new FakePercolator().altering("--results-psms", widened);
+
+        assertEquals(EVERY_CAPABILITY, probeOver(fake, directory));
+    }
+
+    @Test
+    @DisplayName("a peptide table one row short costs PEPTIDE_TSV_OUTPUT and nothing else")
+    void aDamagedPeptideTable(@TempDir Path directory) throws IOException {
+        FakePercolator fake = new FakePercolator().altering("--results-peptides", dropLast());
+
+        assertEquals(
+                without(EVERY_CAPABILITY, Set.of(ToolCapability.PEPTIDE_TSV_OUTPUT)),
+                probeOver(fake, directory));
+    }
+
+    @Test
+    @DisplayName(
+            "a decoy table holding a target, or a missing second decoy table, costs DECOY_OUTPUT")
+    void damagedDecoyTables(@TempDir Path directory) throws IOException {
+        FakePercolator targetAmongDecoys =
+                new FakePercolator()
+                        .altering("--decoy-results-psms", replaceIn(-1, "\tdecoy_sp|", "\tsp|"));
+        FakePercolator noDecoyPeptides =
+                new FakePercolator().altering("--decoy-results-peptides", becomes(List.of()));
+        Set<ToolCapability> expected =
+                without(EVERY_CAPABILITY, Set.of(ToolCapability.DECOY_OUTPUT));
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                expected,
+                                probeOver(
+                                        targetAmongDecoys,
+                                        Files.createDirectory(directory.resolve("a"))),
+                                "a decoy PSM table with a target in it"),
+                () ->
+                        assertEquals(
+                                expected,
+                                probeOver(
+                                        noDecoyPeptides,
+                                        Files.createDirectory(directory.resolve("b"))),
+                                "the decoy PSMs alone are half of one capability"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "a bin that does not name feat3 | noFeature",
+                "a weight that is not a number | notANumber",
+                "a weight that is NaN | nan",
+                "a weight that is infinite | infinite",
+                "a row narrower than its header | narrow",
+                "a row wider than its header | wide",
+                "a bin missing its raw row | dropLast",
+                "comments and nothing else | commentsOnly",
+                "nothing at all | empty"
+            })
+    @DisplayName("weights that are not the fixture's cost WEIGHTS_OUTPUT and nothing else")
+    void damagedWeights(String what, String damage, @TempDir Path directory) throws IOException {
+        UnaryOperator<List<String>> alteration =
+                switch (damage) {
+                    case "noFeature" -> replaceIn(-3, "feat3", "feat4");
+                    case "notANumber" -> replaceIn(-1, "-0.4876", "heavy");
+                    case "nan" -> replaceIn(-2, "-0.2914", "NaN");
+                    case "infinite" -> replaceIn(-1, "-0.4876", "Infinity");
+                    case "narrow" -> replaceIn(-1, "\t-0.4876", "");
+                    case "wide" -> replaceIn(-2, "-0.2914", "-0.2914\t1.0");
+                    case "dropLast" -> dropLast();
+                    case "commentsOnly" -> lines -> lines.subList(0, 3);
+                    case "empty" -> becomes(List.of());
+                    default -> throw new AssertionError("no damage named " + damage);
+                };
+        FakePercolator fake = new FakePercolator().altering("--weights", alteration);
+
+        assertEquals(
+                without(EVERY_CAPABILITY, Set.of(ToolCapability.WEIGHTS_OUTPUT)),
+                probeOver(fake, directory),
+                what);
+    }
+
+    @Test
+    @DisplayName(
+            "weights with no comment lines are still weights: the comments are not the evidence")
+    void weightsWithoutComments(@TempDir Path directory) throws IOException {
+        FakePercolator fake =
+                new FakePercolator().altering("--weights", lines -> lines.subList(3, lines.size()));
+
+        assertEquals(EVERY_CAPABILITY, probeOver(fake, directory));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "no table on standard output | empty",
+                "one row fewer | dropLast",
+                "a decoy among the targets | decoyRow"
+            })
+    @DisplayName("an option run whose standard output is not the table costs the five options only")
+    void anIncompleteStandardOutput(String what, String damage, @TempDir Path directory)
+            throws IOException {
+        FakePercolator fake =
+                new FakePercolator().altering(FakePercolator.STANDARD_OUTPUT, damageNamed(damage));
+
+        assertEquals(
+                without(EVERY_CAPABILITY, OPTION_CAPABILITIES), probeOver(fake, directory), what);
+    }
+
+    @Test
+    @DisplayName("an option run that exits 1 with a whole table is not a completed run")
+    void anOptionRunMustExitZero(@TempDir Path directory) throws IOException {
+        FakePercolator fake = new FakePercolator().exitingWith("--maxiter", 1);
+
+        assertEquals(
+                without(EVERY_CAPABILITY, Set.of(ToolCapability.MAX_ITERATIONS_OPTION)),
+                probeOver(fake, directory));
+    }
+
+    @Test
+    @DisplayName(
+            "a WRITTEN table is the verdict whatever the exit code, as the document is for XML")
+    void aWrittenTableIsTheVerdict(@TempDir Path directory) throws IOException {
+        FakePercolator fake =
+                new FakePercolator()
+                        .exitingWith("--results-psms", 1)
+                        .exitingWith("--weights", 2)
+                        .exitingWith("--decoy-results-psms", 1);
+
+        assertEquals(EVERY_CAPABILITY, probeOver(fake, directory));
+    }
+
+    @Test
+    @DisplayName("the product's probe passes Percolator's own defaults, so only the option differs")
+    void theOptionValuesAreTheDefaults(@TempDir Path directory) throws IOException {
+        FakePercolator fake = new FakePercolator();
+        probeOver(fake, directory);
+
+        List<List<String>> optionRuns =
+                fake.commands().subList(6, 11).stream()
+                        .map(command -> command.argv().subList(1, 3))
+                        .toList();
+        assertEquals(
+                List.of(
+                        List.of("--seed", "1"),
+                        List.of("--num-threads", "3"),
+                        List.of("--testFDR", "0.01"),
+                        List.of("--trainFDR", "0.01"),
+                        List.of("--maxiter", "10")),
+                optionRuns);
     }
 
     private static long countProbeWorkspaces(Path temporary) throws IOException {

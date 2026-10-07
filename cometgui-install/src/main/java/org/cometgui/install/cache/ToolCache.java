@@ -74,9 +74,12 @@ import org.cometgui.install.registry.ArtefactRecord;
  *
  * <p>Nothing else in the product decides whether a tool is installed. {@link #verify} answers both
  * halves of the rule -- marker present, recorded checksums match -- by hashing the files the marker
- * names, every time it is asked. That is deliberate: a cached answer is a second place the truth
- * can live, and the digests are over the executable and its companions rather than over every one
- * of a 222-entry archive, so the cost is a few megabytes and not a hundred.
+ * names, every time it is asked. It adds one condition of its own, last: a marker whose
+ * capabilities came from an earlier generation of the capability probe is not installed until it is
+ * probed again (see {@link InstallationMarker#CAPABILITY_PROBE_GENERATION}). That is deliberate: a
+ * cached answer is a second place the truth can live, and the digests are over the executable and
+ * its companions rather than over every one of a 222-entry archive, so the cost is a few megabytes
+ * and not a hundred.
  */
 public final class ToolCache {
 
@@ -366,6 +369,20 @@ public final class ToolCache {
                                 + ", so the entry is not the one that was installed (R-TOOL-04)",
                         Optional.of(marker));
             }
+        }
+        if (marker.capabilitiesFromAnEarlierProbe()) {
+            return new InstallationCheck(
+                    InstallationState.CAPABILITIES_FROM_AN_EARLIER_PROBE,
+                    directory,
+                    "the marker in "
+                            + directory
+                            + " records capabilities from capability probe generation "
+                            + marker.capabilityProbeGeneration()
+                            + ", and this CometGUI runs generation "
+                            + InstallationMarker.CAPABILITY_PROBE_GENERATION
+                            + "; the entry must be probed again before its capabilities are"
+                            + " believed (R-TOOL-07)",
+                    Optional.of(marker));
         }
         return new InstallationCheck(
                 InstallationState.INSTALLED,

@@ -73,15 +73,45 @@ import org.cometgui.tools.api.ToolRunner;
  * the exact defect {@code phases/PHASE-05-tool-registry.rst} names, produced by a probe that never
  * got as far as looking.
  *
- * <h2>What this probe deliberately does not establish</h2>
+ * <h2>Every other capability is established by a run of its own, too</h2>
  *
- * <p>Only the two XML capabilities. {@code PSM_TSV_OUTPUT}, {@code PEPTIDE_TSV_OUTPUT}, {@code
- * DECOY_OUTPUT}, {@code WEIGHTS_OUTPUT}, {@code THREAD_OPTION} and {@code SEED_OPTION} are
- * <strong>not probed and are therefore absent</strong>, which is {@code R-TOOL-08} applied rather
- * than an oversight: the manifest claims only the two XML capabilities for Percolator, and a
- * capability this project has not watched a binary demonstrate is not one it may advertise. Adding
- * one is a probe run plus a manifest row, and the phase 05 report records it as residue for the
- * phases that need the tab-separated results.
+ * <p>Phase 09 (design decision P9-4) extended this probe -- this one, rather than a second one --
+ * to the capabilities a real rescoring run needs. <strong>One run per capability</strong>, each
+ * over the same fixture, each carrying exactly the option or options under test and nothing else,
+ * and each judged on its own observable:
+ *
+ * <ul>
+ *   <li>{@code PSM_TSV_OUTPUT}: {@code --results-psms} writes a table of the fixture's targets;
+ *   <li>{@code PEPTIDE_TSV_OUTPUT}: {@code --results-peptides} writes one too;
+ *   <li>{@code DECOY_OUTPUT}: {@code --decoy-results-psms} and {@code --decoy-results-peptides} in
+ *       one run write two tables of the fixture's decoys -- one capability, so both are required;
+ *   <li>{@code WEIGHTS_OUTPUT}: {@code --weights} writes the learned weights of the fixture's
+ *       features;
+ *   <li>{@code SEED_OPTION}, {@code THREAD_OPTION}, {@code TEST_FDR_OPTION}, {@code
+ *       TRAIN_FDR_OPTION} and {@code MAX_ITERATIONS_OPTION}: the option is <em>accepted on a run
+ *       that completed</em> -- exit 0 and the full peptide table of the fixture's targets on
+ *       standard output, which is where Percolator writes it when no file is named. Each is passed
+ *       at Percolator's own documented default ({@code --seed 1}, {@code --num-threads 3}, {@code
+ *       --testFDR 0.01}, {@code --trainFDR 0.01}, {@code --maxiter 10}), so the run computes
+ *       exactly what the default run computes and the option is the only thing that differs.
+ * </ul>
+ *
+ * <p>The spellings are {@link PercolatorOption}'s, so the options a command builder emits are the
+ * ones this probe watched being accepted. <strong>Why not one combined run:</strong> real
+ * Percolator refuses an unknown option outright -- banner, {@code Exception caught}, exit 1, no
+ * output at all -- so one unsupported option in a combined run would take every other capability
+ * down with it, and one capability would hide another. Separate runs make a build that rejects one
+ * option lose exactly that capability and keep the rest.
+ *
+ * <p><strong>What it costs.</strong> Eleven runs. Measured on this project's host on 2026-10-07
+ * over the 64 plus 64 fixture: about half a second each, 5.3 s for 3.06.5, 5.8 s for 3.07.1 and 3.8
+ * s for 3.09, whose two XML runs refuse at once. That is paid once per install or registration (and
+ * again when the executable's checksum changes, {@code R-TOOL-07}), not per search.
+ *
+ * <p><strong>What none of this is.</strong> It is not {@code --help} parsing: help text is evidence
+ * of a name, never of a capability ({@code R-PERC-02}). And it is not a results parser: {@link
+ * ProbeArtefacts} reads only enough of each table to say it was written with the expected header
+ * and rows; the parsers are {@code org.cometgui.results.parser}'s.
  */
 public final class PercolatorCapabilityProbe {
 
@@ -90,6 +120,24 @@ public final class PercolatorCapabilityProbe {
 
     private static final String TARGETS_FILE = "targets.pout.xml";
     private static final String DECOYS_FILE = "decoys.pout.xml";
+    private static final String PSMS_FILE = "psms.tsv";
+    private static final String PEPTIDES_FILE = "peptides.tsv";
+    private static final String DECOY_PSMS_FILE = "decoy-psms.tsv";
+    private static final String DECOY_PEPTIDES_FILE = "decoy-peptides.tsv";
+    private static final String WEIGHTS_FILE = "weights.txt";
+
+    /*
+     * Each option-only capability is exercised at Percolator's own documented default, so the run
+     * computes what the default run computes and the option is the only difference: --help of
+     * 3.07.1 and 3.09 alike says "Default = 1" for --seed, "Default (one thread per CV fold) = 3"
+     * for --num-threads, "Default = 0.01" for --testFDR and --trainFDR, and "Default = 10" for
+     * --maxiter.  A non-default value could change the run's outcome and make the option's verdict
+     * depend on the fixture rather than on whether the option is accepted.
+     */
+    private static final String DEFAULT_SEED = "1";
+    private static final String DEFAULT_THREADS = "3";
+    private static final String DEFAULT_FDR = "0.01";
+    private static final String DEFAULT_MAX_ITERATIONS = "10";
 
     private final ToolRunner runner;
     private final int targetRows;
@@ -181,22 +229,111 @@ public final class PercolatorCapabilityProbe {
     private Set<ToolCapability> probeIn(Path workspace, ToolVersion version, Path executable)
             throws IOException {
         Path pin = SyntheticPin.write(workspace, targetRows, SyntheticPin.PROBE_SEED);
+        Run run = new Run(executable, workspace, version, pin);
         Set<ToolCapability> observed = EnumSet.noneOf(ToolCapability.class);
         Path targets = workspace.resolve(TARGETS_FILE);
-        exercise(executable, workspace, version, List.of("-X", targets.toString(), pin.toString()));
+        run.with(PercolatorOption.XML_OUTPUT.spelling(), targets.toString());
         if (writesDocument(targets, targetRows, false)) {
             observed.add(ToolCapability.XML_OUTPUT);
         }
         Path decoys = workspace.resolve(DECOYS_FILE);
-        exercise(
-                executable,
-                workspace,
-                version,
-                List.of("-X", decoys.toString(), "-Z", pin.toString()));
+        run.with(
+                PercolatorOption.XML_OUTPUT.spelling(),
+                decoys.toString(),
+                PercolatorOption.XML_DECOY_OUTPUT.spelling());
         if (writesDocument(decoys, targetRows * 2, true)) {
             observed.add(ToolCapability.XML_DECOY_OUTPUT);
         }
+        probeTables(run, workspace, observed);
+        probeOptions(run, observed);
         return Collections.unmodifiableSet(observed);
+    }
+
+    /*
+     * THE TABLE IS THE VERDICT, AS THE DOCUMENT IS FOR XML, AND FOR THE SAME REASON: what decides
+     * the capability is whether the artefact the option names was written, with the fixture's rows,
+     * not what the process exited with.
+     */
+    private void probeTables(Run run, Path workspace, Set<ToolCapability> observed)
+            throws IOException {
+        Path psms = workspace.resolve(PSMS_FILE);
+        run.with(PercolatorOption.RESULTS_PSMS.spelling(), psms.toString());
+        if (ProbeArtefacts.isResultFile(psms, targetRows, false)) {
+            observed.add(ToolCapability.PSM_TSV_OUTPUT);
+        }
+        Path peptides = workspace.resolve(PEPTIDES_FILE);
+        run.with(PercolatorOption.RESULTS_PEPTIDES.spelling(), peptides.toString());
+        if (ProbeArtefacts.isResultFile(peptides, targetRows, false)) {
+            observed.add(ToolCapability.PEPTIDE_TSV_OUTPUT);
+        }
+        Path decoyPsms = workspace.resolve(DECOY_PSMS_FILE);
+        Path decoyPeptides = workspace.resolve(DECOY_PEPTIDES_FILE);
+        run.with(
+                PercolatorOption.DECOY_RESULTS_PSMS.spelling(),
+                decoyPsms.toString(),
+                PercolatorOption.DECOY_RESULTS_PEPTIDES.spelling(),
+                decoyPeptides.toString());
+        if (ProbeArtefacts.isResultFile(decoyPsms, targetRows, true)
+                && ProbeArtefacts.isResultFile(decoyPeptides, targetRows, true)) {
+            observed.add(ToolCapability.DECOY_OUTPUT);
+        }
+        Path weights = workspace.resolve(WEIGHTS_FILE);
+        run.with(PercolatorOption.WEIGHTS.spelling(), weights.toString());
+        if (ProbeArtefacts.isWeightsFile(weights)) {
+            observed.add(ToolCapability.WEIGHTS_OUTPUT);
+        }
+    }
+
+    private void probeOptions(Run run, Set<ToolCapability> observed) throws IOException {
+        acceptedOn(run, PercolatorOption.SEED, DEFAULT_SEED, observed);
+        acceptedOn(run, PercolatorOption.NUM_THREADS, DEFAULT_THREADS, observed);
+        acceptedOn(run, PercolatorOption.TEST_FDR, DEFAULT_FDR, observed);
+        acceptedOn(run, PercolatorOption.TRAIN_FDR, DEFAULT_FDR, observed);
+        acceptedOn(run, PercolatorOption.MAX_ITERATIONS, DEFAULT_MAX_ITERATIONS, observed);
+    }
+
+    /*
+     * AN OPTION WITH NO ARTEFACT OF ITS OWN IS ACCEPTED WHEN THE RUN CARRYING IT COMPLETED: exit 0
+     * AND the whole peptide table of the fixture's targets on standard output.  Both, because each
+     * alone has been seen to lie in this project -- comet.linux.exe exits 1 from a correct -h, and
+     * an exit code says nothing about whether the run got as far as scoring anything.  Real
+     * Percolator refuses an option it does not know with exit 1 and nothing on standard output, so
+     * either half fails for it.
+     */
+    private void acceptedOn(
+            Run run, PercolatorOption option, String value, Set<ToolCapability> observed)
+            throws IOException {
+        ToolRunOutcome outcome = run.with(option.spelling(), value);
+        if (outcome.exitedZero()
+                && ProbeArtefacts.isResultTable(outcome.standardOutput(), targetRows, false)) {
+            observed.add(option.capability());
+        }
+    }
+
+    /** One probe's invocations: the same binary, workspace and fixture, with different options. */
+    private final class Run {
+
+        private final Path executable;
+        private final Path workspace;
+        private final ToolVersion version;
+        private final Path pin;
+
+        Run(Path executable, Path workspace, ToolVersion version, Path pin) {
+            this.executable = executable;
+            this.workspace = workspace;
+            this.version = version;
+            this.pin = pin;
+        }
+
+        /*
+         * The fixture is always the last argument, after the options under test, which is the
+         * shape Percolator's usage line gives: "percolator [other options] pin.tsv".
+         */
+        ToolRunOutcome with(String... options) throws IOException {
+            List<String> arguments = new ArrayList<>(List.of(options));
+            arguments.add(pin.toString());
+            return exercise(executable, workspace, version, arguments);
+        }
     }
 
     /*
@@ -205,7 +342,7 @@ public final class PercolatorCapabilityProbe {
      * treating that as "this build cannot write XML" is the specific defect this phase exists to
      * avoid.
      */
-    private void exercise(
+    private ToolRunOutcome exercise(
             Path executable, Path workspace, ToolVersion version, List<String> arguments)
             throws IOException {
         List<String> argv = new ArrayList<>();
@@ -236,6 +373,7 @@ public final class PercolatorCapabilityProbe {
                             + " saying: "
                             + outcome.joinedOutput());
         }
+        return outcome;
     }
 
     /*

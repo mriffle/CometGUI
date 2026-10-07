@@ -67,6 +67,7 @@ class InstallationMarkerTest {
                 "bin/percolator",
                 2,
                 List.of(ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
+                InstallationMarker.CAPABILITY_PROBE_GENERATION,
                 List.of(
                         new RecordedFile("bin/percolator", 2538632, BINARY),
                         new RecordedFile("share/xml/percolator_out.xsd", 10388, ARTEFACT)));
@@ -143,6 +144,7 @@ class InstallationMarkerTest {
                                         "bin/percolator",
                                         1,
                                         List.of(),
+                                        InstallationMarker.CAPABILITY_PROBE_GENERATION,
                                         List.of(new RecordedFile("share/other", 1, ARTEFACT))));
 
         assertTrue(
@@ -175,6 +177,7 @@ class InstallationMarkerTest {
                                         "bin/percolator",
                                         1,
                                         List.of(),
+                                        InstallationMarker.CAPABILITY_PROBE_GENERATION,
                                         List.of(new RecordedFile("bin/percolator", 1, ARTEFACT))));
         assertTrue(refused.getMessage().startsWith(expected), refused::getMessage);
     }
@@ -405,6 +408,7 @@ class InstallationMarkerTest {
                                 "bin/percolator",
                                 1,
                                 List.of(),
+                                InstallationMarker.CAPABILITY_PROBE_GENERATION,
                                 List.of(new RecordedFile("bin/percolator", 1, ARTEFACT))));
         assertThrows(
                 NullPointerException.class, () -> InstallationMarker.parse(Nulls.of(String.class)));
@@ -501,6 +505,7 @@ class InstallationMarkerTest {
                 executablePath == null ? base.executablePath() : executablePath,
                 entryCount,
                 capabilities == null ? base.capabilities() : capabilities,
+                InstallationMarker.CAPABILITY_PROBE_GENERATION,
                 files == null ? base.files() : files);
     }
 }

@@ -79,6 +79,20 @@ public enum InstallationState {
      */
     CHECKSUM_MISMATCH,
 
+    /**
+     * Every file is present with the digest its marker records, and the marker's capabilities were
+     * recorded by an earlier generation of this product's capability probe.
+     *
+     * <p>Not installed, and that is deliberate. The first Percolator probe established only the two
+     * XML capabilities, so a marker it wrote says nothing about tab-separated output, weights or
+     * the seed -- and believing it would make an installed build silently lose capabilities it has.
+     * Reported last, after every checksum has matched, so that a corrupted or swapped entry is
+     * still reported as what it is; and like every other state but {@link #INSTALLED} and {@link
+     * #NOT_PRESENT} it means the next install discards the directory and rebuilds it, which re-runs
+     * the probe ({@code R-TOOL-07}: the probe wins).
+     */
+    CAPABILITIES_FROM_AN_EARLIER_PROBE,
+
     /** The marker is present, and every file it records is present with the digest it records. */
     INSTALLED;
 

@@ -410,6 +410,7 @@ class ToolCacheTest {
                 "bin/percolator",
                 entryCount,
                 List.of(ToolCapability.XML_OUTPUT),
+                InstallationMarker.CAPABILITY_PROBE_GENERATION,
                 List.of(
                         recorded("bin/percolator", binary),
                         recorded("share/xml/schema.xsd", schema)));

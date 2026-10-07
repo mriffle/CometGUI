@@ -263,8 +263,8 @@ public final class LocalPercolatorRegistration {
                                     + " when "
                                     + binary
                                     + " was registered as a local binary: the functional probe ran"
-                                    + " this build over a 64 target plus 64 decoy synthetic PIN and"
-                                    + " read the document it wrote"));
+                                    + " this build over a 64 target plus 64 decoy synthetic PIN,"
+                                    + " one run per capability, and read what each run wrote"));
         }
         return new ToolOffer(
                 ToolName.PERCOLATOR,

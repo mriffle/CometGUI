@@ -734,6 +734,7 @@ public final class InstallPipeline implements AutoCloseable {
                         record.executablePath(),
                         payloadEntryCount,
                         new ArrayList<>(new TreeSet<>(capabilities)),
+                        InstallationMarker.CAPABILITY_PROBE_GENERATION,
                         List.copyOf(recordedFiles));
         ToolCache.writeMarker(destination, marker);
         installation =
