@@ -524,6 +524,53 @@ once.
        disabled; Run enabled when ready; a run through the interface with a
        fake Comet moving the stepper; ``--only paramui`` green.
      - R-RUN-01 (UI), AC-WF-03 (UI)
+     - **Signed off 2026-10-07** (``6eba9c8``, ``963980d``, ``5848d86``,
+       ``f83d7c5``; I raised the ``paramui`` floor 84 -> 87 at the next
+       commit). ``mvn -pl cometgui-app -am install -Dtest='org.cometgui.ui.**,org.cometgui.app.**'
+       -Dcometgui.coverage.core.skip=true``: rc 0 in 895 s; Maven summary
+       ui **876** (was 822), app **190** (was 176), 1 pre-existing skip, 0
+       failures; 0 ``BugInstance``; no live Comet afterwards (992 ``Z``
+       entries predate the unit, under a PID 1 that does not reap). Built:
+       ``RunEnginePort`` (view-model port, implemented in the app by
+       ``WorkflowRunPort``), ``RunViewModel`` (check off the FX thread with a
+       generation number, Run/Cancel, stepper through ``StageProjection``,
+       outcomes in words), ``RunReadinessViewModel``'s engine half,
+       ``RunControl`` (ids ``run-cancel``, ``run-outcome``, ``run-preview``
+       pinned), ``RunWiring``/``ProjectSession`` (default project
+       ``<app data>/projects/default``, created and locked lazily).
+       ``ENGINE_NOT_BUILT`` removed. GUI tests: ``RunReadinessUiTest``
+       (decoy block on screen, Run disabled, reason in Run's accessible help),
+       ``RealRunUiTest`` (real two-file run through the interface; nothing
+       to run; preview; gate 8's refusal on screen), ``RealCancelUiTest``.
+       Control H: H6 kept (still equivalent where no Comet is installed), H7
+       new -- the same injection graded where the engine is ready; floor
+       84 -> 87. Agent's harnesses: quality 42, shell 30, paramui 87. My
+       injections, landed and restored: (1) Run enabled whatever the engine
+       says (``runEnabled.set(!blocked)``) -- ``RunViewModelTest.checkThatThrows
+       expected: <false> but was: <true>``, ``nothingToRun`` and others; (2)
+       the stepper not driven -- ``RunViewModelTest.runSucceeds expected:
+       <RUNNING> but was: <NOT_STARTED>``, ``failureStated``. (A first form
+       of (2) failed Spotless; reported ``CLASS UNCHANGED``; not counted.)
+       ``org.cometgui.ui``/``app`` are not PIT targets; the agent ran PIT on
+       the new view-models by ``-DtargetClasses``: 155/157, two
+       ``generation++`` equivalents. **Found by the unit, acted on:** the
+       release ``-q`` default ``spectral_library_name = /some/path/speclib.file``
+       makes every real run fail at Comet (exit 1) and no pre-run check
+       catches it -- unit 7b. Residue: Phase 02's
+       ``KeyboardOnlyNavigationUiTest`` assumes no tab stop but navigation, so
+       it would fail on a machine whose application-data folder has a Comet
+       installed (Run becomes a tab stop); the reasons are therefore reached
+       through the Run entry's accessible help, not as tab stops.
+
+   * - 7b
+     - **Added 2026-10-07 from unit 7's finding.** Every path-valued
+       parameter that is set (``spectral_library_name``, ``peff_obo``,
+       ``compoundmods_file``, ``protein_modslist_file``, ...) must name a
+       readable file before Comet starts; the release default placeholder
+       ``/some/path/speclib.file`` is refused with a message naming the
+       parameter. Acceptance: a real-binary test proving Comet itself fails on
+       the placeholder, and the pre-run check refusing it with no launch.
+     - Comet validation ("database exists and is readable" and its kin)
      -
 
    * - 8
@@ -574,6 +621,8 @@ Recorded the day a unit lands, for ``--only tests``' sandbox.
 * Unit 6: both pinned Comet binaries in ``scratch/phase05/artefacts``, both
   K562 mzML and the proteome in ``scratch/fixture``, ``manifests/tools.json``.
   Already in the sandbox's precondition set.
+* Unit 7: ``RealRunUiTest`` and ``RealCancelUiTest`` (cometgui-app) read the
+  2026.03.0 binary, both K562 mzML and the proteome. Already in the set.
 
 Deferred
 ========
