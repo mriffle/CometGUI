@@ -3,7 +3,7 @@ PHASE-08: Workflow Engine and Comet Adapter
 ===========================================
 
 :Phase: 08
-:Status: IN PROGRESS (dispatched 2026-10-06)
+:Status: PARTIAL (signed off 2026-10-07)
 :Depends on: 03, 04, 05, 06
 :Blocked by decisions: none
 :Delivers: R-CMT-01..08, R-DEC-01..04, R-RUN-01..06

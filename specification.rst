@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 13
-:Revision date: 2026-10-05
-:Supersedes: Revision 12, 2026-10-04
+:Revision: 14
+:Revision date: 2026-10-07
+:Supersedes: Revision 13, 2026-10-05
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,14 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 14
+     - 2026-10-07
+     - The run layout's Comet logs, from Phase 08: one stream-tagged
+       ``logs/comet-<nn>.log`` per invocation, written by the process service
+       (Phase 03's design), replaces separate ``comet.<spectrum-basename>``
+       stdout and stderr files. Every line keeps its stream tag, so nothing the
+       process service's independent streaming preserves is lost; ``run.json``
+       and the provenance record map ``nn`` to the spectrum file.
    * - 13
      - 2026-10-05
      - **Comet 2026.03.0 facts, established by executing the binaries** in the
@@ -2164,7 +2172,7 @@ A project contains mutable user intent and one or more immutable run records::
                     percolator/
                     limelight/
                 logs/
-                    comet.<spectrum-basename>.{stdout,stderr}.log
+                    comet-<nn>.log            (one per spectrum file; revision 14)
                     percolator.{stdout,stderr}.log
                     limelight-converter.log
                     limelight-upload.log

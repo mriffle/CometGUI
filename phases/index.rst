@@ -61,7 +61,7 @@ authoritative for its own scope and exit gate.
      - Workflow Engine and Comet Adapter
      - 03, 04, 05, 06
      - --
-     - IN PROGRESS (dispatched 2026-10-06)
+     - PARTIAL (signed off 2026-10-07; POSIX/Linux only)
    * - `09 <PHASE-09-percolator.rst>`_
      - Percolator Adapter and Version Capabilities
      - 05, 08

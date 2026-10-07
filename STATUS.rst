@@ -3,20 +3,20 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-06
-:Updated by: Main orchestrator, session 10 (**Phase 07 signed off PASSED** --
-   :ref:`status-p07-signed`)
-:Current phase: **Phase 08 -- Workflow Engine and Comet Adapter**,
-   dispatched 2026-10-06 with ``handoffs/PHASE-08-BRIEF.rst`` on the owner's
-   instruction ("Push and start phase 08"); ``main`` pushed at ``6bb9ce6``.
-   Tier 1 assigned the unowned "selected index is compatible" validation to
-   this phase.
-:Overall: Eight phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04
-   and 05 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
+:Updated: 2026-10-07
+:Updated by: Main orchestrator, session 10 (**Phase 08 signed off PARTIAL** --
+   :ref:`status-p08-signed`; specification revision 14)
+:Current phase: **none -- waiting for the owner.** Phase 08 is signed off and
+   committed, **not pushed**. Phase 09 (Percolator adapter) is ready and not
+   dispatched. One product question waits on the owner: the placeholder
+   spectral library that blocks every new search (:ref:`status-p08-signed`).
+:Overall: Nine phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
+   05 and 08 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (about 2.5 hours since Phase 07 -- longer
-   than one background job may run, so the two are run separately) runs once
+   ``scripts/verify-all-gates.sh`` (about 3.7 hours since Phase 08 -- build
+   40 min, ``tests`` 95, the other fourteen 91 -- run as three separate jobs,
+   since one background job is capped at two hours) runs once
    per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
    :ref:`status-p06-signed`); ``D-011``, what an Intel Mac gets now that
@@ -243,9 +243,11 @@ Phase board
        three injections of its own (:ref:`status-p07-signed`).
    * - 08
      - Workflow engine and Comet adapter
-     - IN PROGRESS
-     - Dispatched 2026-10-06 (``handoffs/PHASE-08-BRIEF.rst``); also owns the
-       index-compatibility check, assigned by tier 1.
+     - PARTIAL
+     - **Signed off 2026-10-07** at ``796bac6``: build 11/11, gates 15/15
+       (new ``workflow``, 110 controls), three tier-1 injections
+       (:ref:`status-p08-signed`). PARTIAL on platform alone: items 1, 2 and 7
+       have run only on Linux/POSIX.
    * - 09
      - Percolator adapter and version capabilities
      - NOT STARTED
@@ -3261,6 +3263,87 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-p08-signed:
+
+Phase 08 signed off PARTIAL (2026-10-07)
+========================================
+
+Ten units (1-9 and 7b, added mid-phase), all accepted by the phase
+orchestrator; unit 3 sent back once, unit 7 needed one fixture repair. Record:
+``handoffs/PHASE-08-worklog.rst`` and ``handoffs/PHASE-08-handoff.rst``.
+
+**What exists.** A real Comet search: the declared step graph and derived run
+state; one Comet invocation per spectrum file with its own ``-N`` into the run
+directory, bounded in concurrency; pepXML and PIN validation and the PIN merge;
+the decoy blocks before Comet starts; the rerun preview; cancellation through
+the process service; prerequisite re-hashing; immutable run storage with
+versioned ``run.json`` and a project lock; the index step, building into the
+project cache, and the index-compatibility check tier 1 assigned (a v4 index is
+refused for 2026.03.0 and accepted for 2026.02.2). The editor's Run control is
+now real. New harness ``scripts/verify-workflow-gates.sh`` (``workflow``, 110
+controls, two version-blind), floor 110; ``paramui`` floor 84 to 87.
+
+**Tier 1's exit-gate run**, at ``796bac6`` on a quiet tree, in three jobs
+because the whole no longer fits one two-hour background job:
+``scripts/build.sh`` 11/11 stages in 2388 s; ``--only tests`` 37 assertions in
+5679 s; the other fourteen controls passed in 5457 s (``pipeline`` 24 steps,
+``paramui`` 87, ``workflow`` 110, ``params`` 109, ``install`` 95). **15 of 15.**
+
+**Nothing weakened, checked rather than assumed:** no POM changed; no test
+deleted or disabled; ``verify-all-gates.sh`` changed additively and its floors
+only rose.
+
+**Tier 1's own injections**, over ``cometgui-tools`` and
+``cometgui-workflow`` (1030-1040 tests), modules installed fresh first and
+tests counted, each restored and verified with ``sha256sum -c``:
+
+* ``-N`` dropped from the Comet argument array -- 25 failures, including
+  ``CometAdapterRealBinaryTest`` (real binary) and
+  ``CometSearchCommandsTest.overrideCommands``;
+* the PIN merge's feature-column check bypassed -- 7 failures, e.g.
+  ``CometAdapterRealBinaryTest.renamedRealColumn`` and ``swappedRealColumns``;
+* the FASTA decoy census discarded -- 8 failures, e.g.
+  ``PreRunChecksTest.aGoodSearchIsNotBlocked``: expected the census
+  ``records=2, decoyRecords=0`` but was ``Optional.empty``.
+
+**Grade: PARTIAL**, on platform alone, as for Phases 03-05: gate items 1
+(read-only input), 2 (nothing written outside the run directory) and 7
+(descendants terminated) carry no platform qualifier and have run only on
+Linux/POSIX. Every item is met there.
+
+**Specification revision 14** adopts the Comet log layout as built: one
+stream-tagged ``logs/comet-<nn>.log`` per invocation instead of separate
+stdout/stderr files per spectrum (escalation P8-3).
+
+**For the owner -- a product default (escalation 3):** Comet's own default
+parameter file, in both releases, names a spectral library that does not
+exist (``spectral_library_name = /some/path/speclib.file``), and Comet fails a
+run that names a missing library. CometGUI starts from Comet's defaults, so
+**every new search is blocked** until the scientist clears that field (unit 7b
+blocks it before Comet starts, rather than letting Comet fail). The field's
+help text is also wrong for 2026.03.0. Recommendation: CometGUI's starting
+configuration leaves it empty, recorded as a deliberate difference from Comet's
+default, with the help text corrected.
+
+**Residue carried forward:**
+
+* Add ``org.cometgui.workflow.*`` to the POM's PIT targets; under
+  ``build.sh``'s killed-only scoring the engine reads about 82% because of
+  timeouts -- part of the owner's ``TIMED_OUT`` question.
+* A 2026.02.2 fragment-ion index built with internal decoys searches to zero
+  decoy rows; the PIN check catches it, but only after the search (Phase 09
+  must not take it as input).
+* Phase 02's ``KeyboardOnlyNavigationUiTest`` fails on a machine with Comet
+  installed in the application-data folder: a test-isolation defect, tier 1's
+  to route.
+* Phase 07's ``VariableModificationEditorUiTest`` failed once and passed on
+  rerun under ``paramui``: a suspected flaky test.
+* ``workflow`` grades cancellation on a fake tool; the real-binary cancel test
+  exists but is not a harness control.
+* No retry after an application restart; index mode is not offered in the
+  interface.
+* ``tests`` now takes 95 minutes (66 at Phase 07).
+
 .. _status-p07-signed:
 
 Phase 07 signed off PASSED (2026-10-06)
@@ -3784,6 +3867,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-07
+     - 08
+     - **Phase 08 signed off PARTIAL** at ``796bac6`` (build 11/11, gates 15/15
+       in three jobs, three tier-1 injections; platform residue only).
+       Specification revision 14. Committed, not pushed. See
+       :ref:`status-p08-signed`.
    * - 2026-10-06
      - 08
      - ``main`` pushed at ``6bb9ce6``; **Phase 08 dispatched** on the owner's
