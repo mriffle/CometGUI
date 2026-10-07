@@ -31,7 +31,9 @@ import org.cometgui.domain.project.ProjectLayout;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.domain.run.OutputBaseNames;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.comet.model.ParameterEntry;
 import org.cometgui.params.comet.model.ParameterValue;
+import org.cometgui.params.comet.schema.ValidatorId;
 import org.cometgui.params.comet.validation.CometValidator;
 import org.cometgui.params.comet.validation.ValidationReport;
 import org.cometgui.params.comet.writer.CanonicalParamsWriter;
@@ -63,6 +65,15 @@ import org.cometgui.tools.comet.FastaDecoyScanner;
  *       cannot be found is refused, because its decoy configuration could not be checked.
  *   <li>With an index mode, the cache entry for the search's key is looked up; if it is complete,
  *       its header is read, so that the validator judges the index the search would reuse.
+ *   <li>Every other parameter the release's metadata gives the validator {@code path} -- in the
+ *       bundled metadata {@code peff_obo}, {@code compoundmods_file}, {@code spectral_library_name}
+ *       and {@code protein_modslist_file} -- is either empty or an absolute path to a readable
+ *       file. Measured on Comet 2026.03.0: {@code -q}'s placeholder {@code spectral_library_name =
+ *       /some/path/speclib.file}, a missing {@code compoundmods_file} and a missing {@code
+ *       protein_modslist_file} each stop Comet with exit 1; a missing {@code peff_obo} is ignored
+ *       when {@code peff_format} is 0 and only warned about otherwise, so the search would run
+ *       without the modifications the user asked for. The set is read from the model's metadata,
+ *       never listed here.
  *   <li>The project's {@code runs/} directory exists and is writable.
  *   <li>The validator judges the model with every fact gathered: the decoy blocks and the index
  *       compatibility rules are its own, so there is no second rule here.
@@ -180,6 +191,7 @@ final class PreRunChecks {
                 }
             }
         }
+        checkPathParameters(model, problems);
         if (!Files.isDirectory(project.runsDirectory())
                 || !Files.isWritable(project.runsDirectory())) {
             problems.add(
@@ -353,6 +365,49 @@ final class PreRunChecks {
         } catch (IOException unresolvable) {
             problems.add("the database " + file + " cannot be resolved: " + unresolvable);
             return Optional.empty();
+        }
+    }
+
+    /**
+     * Every set parameter the model's metadata gives the validator {@code path}, except {@code
+     * database_name}, which {@link #database} checks: it must name a readable file by its absolute
+     * path. An empty value -- where the metadata allows one, the validator's {@code path.empty}
+     * judges -- means no file and is not checked here.
+     */
+    static void checkPathParameters(CometParameters model, List<String> problems) {
+        for (ParameterEntry entry : model.entries()) {
+            String name = entry.name();
+            if (DATABASE.equals(name)
+                    || !entry.definition().validators().contains(ValidatorId.PATH)) {
+                continue;
+            }
+            String text = ((ParameterValue.Text) entry.value()).text();
+            if (!text.isEmpty()) {
+                checkPathParameter(name, entry.definition().displayName(), text, problems);
+            }
+        }
+    }
+
+    private static void checkPathParameter(
+            String name, String label, String text, List<String> problems) {
+        String what = name + " (" + label + ") = " + text;
+        Path file;
+        try {
+            file = Path.of(text);
+        } catch (InvalidPathException unusable) {
+            problems.add(what + " is not a path: " + unusable.getMessage());
+            return;
+        }
+        if (!file.isAbsolute()) {
+            problems.add(
+                    what
+                            + " must name the file by its absolute path; Comet runs in the run"
+                            + " directory, where a relative path would name another file");
+        } else if (!Files.isRegularFile(file) || !Files.isReadable(file)) {
+            problems.add(
+                    what
+                            + " does not exist or cannot be read; clear it to search without one,"
+                            + " or choose the file");
         }
     }
 
