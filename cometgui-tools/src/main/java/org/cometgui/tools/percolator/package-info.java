@@ -21,7 +21,15 @@
  *
  * <p><strong>Phase 05 unit 7 landed the functional capability probe</strong> {@code R-PERC-02}
  * requires -- {@code SyntheticPin}, {@code PoutDocument} and {@code PercolatorCapabilityProbe} --
- * together with {@code R-TOOL-08}'s local binary registration. Command building for a real
- * rescoring run, and the version advisories, are still phase 09's.
+ * together with {@code R-TOOL-08}'s local binary registration.
+ *
+ * <p><strong>Phase 09</strong> extended the probe to every capability a rescoring run uses (unit
+ * 1), and added the command of a real run (unit 3): {@code PercolatorCommands} builds it from a
+ * {@code PercolatorRequest} -- the probed capabilities, whether an enabled stage needs XML, the
+ * valued options' text -- into a {@code PercolatorCommand} holding the argument array, the
+ * artefacts it will write ({@code PercolatorArtefact}, the one place the file names live) and what
+ * was requested and left out ({@code NotEmitted}); and {@code PercolatorPinCheck} checks the merged
+ * PIN before launch, through {@code tools.comet}'s one PIN reader. Either refuses with a {@code
+ * PercolatorRefusedException}. The version advisories are {@code org.cometgui.params.percolator}'s.
  */
 package org.cometgui.tools.percolator;

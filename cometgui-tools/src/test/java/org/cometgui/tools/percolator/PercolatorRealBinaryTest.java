@@ -100,11 +100,11 @@ class PercolatorRealBinaryTest {
             "Exception caught: Error: median decoy score <= score at 1% FDR. Cannot rescale scores"
                     + " to merge cross validation bins, try lowering --trainFDR.";
 
-    private static final String ZIP_3071 = "rel-3-07-01__percolator-noxml-ubuntu-portable.zip";
+    static final String ZIP_3071 = "rel-3-07-01__percolator-noxml-ubuntu-portable.zip";
     private static final String ZIP_3065 = "rel-3-06-05__percolator-noxml-linux-portable.zip";
 
     /** The manifest's {@code memberSha256} for the 3.07.1 Linux portable zip, hand-typed. */
-    private static final String SHA256_3071 =
+    static final String SHA256_3071 =
             "1ba38acf09520cc89d5ed907ed0382c4d23876a7e20ec3e91cbbaa2ed431237c";
 
     /** The manifest's {@code memberSha256} for the 3.06.5 Linux portable zip, hand-typed. */
@@ -115,7 +115,7 @@ class PercolatorRealBinaryTest {
     private static final String SHA256_309_PAYLOAD =
             "1f067b5d438a3a88be8a88f636844baea824e239fd2c5c053462ae56fd0e7c15";
 
-    private static final HostPlatform HOST =
+    static final HostPlatform HOST =
             new HostPlatform(HostOperatingSystem.LINUX, HostArchitecture.X86_64);
 
     /*
@@ -125,24 +125,23 @@ class PercolatorRealBinaryTest {
      * with Boost 1.66 beside it, launched through a wrapper that sets LD_LIBRARY_PATH, registered
      * as a local binary.  Every digest below was measured on 2026-10-07 and is hand-typed.
      */
-    private static final String DIR_309 = "scratch/percolator/3.09";
-    private static final String WRAPPER_309 = DIR_309 + "/run-percolator-3.09.sh";
-    private static final String SHA256_WRAPPER_309 =
+    static final String DIR_309 = "scratch/percolator/3.09";
+    static final String WRAPPER_309 = DIR_309 + "/run-percolator-3.09.sh";
+    static final String SHA256_WRAPPER_309 =
             "fe1b018a3afb0f97d6ff79e18264e282924f274d1ae7c71ff64d3825538f3e90";
-    private static final String BINARY_309 = DIR_309 + "/linux-x86_64-from-rpm/usr/bin/percolator";
-    private static final String SHA256_BINARY_309 =
+    static final String BINARY_309 = DIR_309 + "/linux-x86_64-from-rpm/usr/bin/percolator";
+    static final String SHA256_BINARY_309 =
             "c31f613929f06ef0f519623ed7ffd39253ce23d3681cc4cd825791c15e49ba26";
-    private static final String BOOST_FILESYSTEM_309 =
+    static final String BOOST_FILESYSTEM_309 =
             DIR_309 + "/deps/usr/lib64/libboost_filesystem.so.1.66.0";
-    private static final String SHA256_BOOST_FILESYSTEM_309 =
+    static final String SHA256_BOOST_FILESYSTEM_309 =
             "18f3934a0ecb5d465fb369914626254400799e9302813dfe630e763ee437a3bd";
-    private static final String BOOST_SYSTEM_309 =
-            DIR_309 + "/deps/usr/lib64/libboost_system.so.1.66.0";
-    private static final String SHA256_BOOST_SYSTEM_309 =
+    static final String BOOST_SYSTEM_309 = DIR_309 + "/deps/usr/lib64/libboost_system.so.1.66.0";
+    static final String SHA256_BOOST_SYSTEM_309 =
             "ded43dd2101680377021387e8bf7c4c8db07912deac657c53b1e62337691b06c";
 
     /** Every Percolator capability, hand-typed: what a fully capable build probes to. */
-    private static final Set<ToolCapability> EVERY_CAPABILITY =
+    static final Set<ToolCapability> EVERY_CAPABILITY =
             Set.of(
                     ToolCapability.XML_OUTPUT,
                     ToolCapability.XML_DECOY_OUTPUT,
@@ -156,16 +155,15 @@ class PercolatorRealBinaryTest {
                     ToolCapability.TRAIN_FDR_OPTION,
                     ToolCapability.MAX_ITERATIONS_OPTION);
 
-    private static final ToolVersion V3071 = ToolVersion.parse("3.07.1");
+    static final ToolVersion V3071 = ToolVersion.parse("3.07.1");
     private static final ToolVersion V3065 = ToolVersion.parse("3.06.5");
-    private static final ToolVersion V309 = ToolVersion.parse("3.09");
+    static final ToolVersion V309 = ToolVersion.parse("3.09");
 
-    private static ToolRunner runner() {
+    static ToolRunner runner() {
         return new ToolRunner(new ProcessService(Clock.systemUTC()), Duration.ofSeconds(120));
     }
 
-    private static Path stage(Path directory, String archive, String expectedSha256)
-            throws IOException {
+    static Path stage(Path directory, String archive, String expectedSha256) throws IOException {
         Path binary =
                 UpstreamArtefacts.executableMember(
                         archive, "percolator", directory.resolve("bin").resolve("percolator"));
@@ -246,7 +244,7 @@ class PercolatorRealBinaryTest {
                         + " artefact the probe asks for");
     }
 
-    private static Path fixture309(String relative, String expectedSha256) throws IOException {
+    static Path fixture309(String relative, String expectedSha256) throws IOException {
         Path file = UpstreamArtefacts.repositoryRoot().resolve(relative);
         if (!Files.isRegularFile(file)) {
             throw new AssertionError(

@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -56,6 +57,15 @@ import java.util.regex.Pattern;
  * SpecId} is not empty; {@code Label} is {@code 1} (target) or {@code -1} (decoy); {@code ScanNr}
  * is a non-negative integer; every feature is a finite decimal ({@link #DECIMAL}; every feature
  * value of the real files matches it); {@code Peptide} and every protein field are not empty.
+ *
+ * <h2>The decoy prefix, when one is given</h2>
+ *
+ * <p>Opened with a decoy prefix ({@link #open(Path, String)}), the reader also counts, as it checks
+ * each row's protein fields, the decoy rows that name <em>at least one</em> protein beginning with
+ * the prefix ({@link #decoysCarryingPrefix()}) and the target rows <em>every</em> protein of which
+ * begins with it ({@link #targetsOnlyPrefixed()}). It judges nothing by them: what is inconsistent
+ * is {@link CometPinValidator#validateBeforePercolator}'s to say. Opened without one, both stay
+ * zero.
  */
 final class PinReader implements Closeable {
 
@@ -85,15 +95,25 @@ final class PinReader implements Closeable {
 
     private final ByteArrayOutputStream buffer = new ByteArrayOutputStream(512);
 
+    /** The decoy prefix the protein fields are counted against, or {@code null} for none. */
+    private final String decoyPrefix;
+
+    private long decoysCarryingPrefix;
+
+    private long targetsOnlyPrefixed;
+
+    private long firstTargetOnlyPrefixedLine;
+
     private long lineNumber;
 
     private long targets;
 
     private long decoys;
 
-    private PinReader(Path file, InputStream in) throws CometOutputException {
+    private PinReader(Path file, InputStream in, String decoyPrefix) throws CometOutputException {
         this.file = file;
         this.in = in;
+        this.decoyPrefix = decoyPrefix;
         String first = readLine();
         if (first == null) {
             throw problem("is empty: Comet wrote no header", null);
@@ -114,6 +134,31 @@ final class PinReader implements Closeable {
      *     truncated within its header, or its header breaks the column rule
      */
     static PinReader open(Path file) throws CometOutputException {
+        return openCounting(file, null);
+    }
+
+    /**
+     * Opens a PIN file and reads its header, counting each row's proteins against a decoy prefix
+     * (see the class documentation).
+     *
+     * @param file the file
+     * @param decoyPrefix the decoy prefix; not empty
+     * @return a reader positioned at the first data row
+     * @throws CometOutputException as {@link #open(Path)}
+     * @throws NullPointerException if {@code decoyPrefix} is {@code null}
+     * @throws IllegalArgumentException if {@code decoyPrefix} is empty, which every protein would
+     *     begin with
+     */
+    static PinReader open(Path file, String decoyPrefix) throws CometOutputException {
+        if (Objects.requireNonNull(decoyPrefix, "decoyPrefix").isEmpty()) {
+            throw new IllegalArgumentException(
+                    "an empty decoy prefix begins every protein name, so it marks nothing");
+        }
+        return openCounting(file, decoyPrefix);
+    }
+
+    private static PinReader openCounting(Path file, String decoyPrefix)
+            throws CometOutputException {
         if (Files.isDirectory(file)) {
             throw new CometOutputException(
                     file, "the PIN file " + file + " is a directory, not a file", null);
@@ -133,7 +178,7 @@ final class PinReader implements Closeable {
                     unreadable);
         }
         try {
-            return new PinReader(file, in);
+            return new PinReader(file, in, decoyPrefix);
         } catch (CometOutputException refused) {
             throw closedAfter(in, refused);
         }
@@ -206,6 +251,33 @@ final class PinReader implements Closeable {
         return decoys;
     }
 
+    /**
+     * The decoy rows read so far that name at least one protein beginning with the decoy prefix.
+     *
+     * @return the count; zero when the reader was opened without a prefix
+     */
+    long decoysCarryingPrefix() {
+        return decoysCarryingPrefix;
+    }
+
+    /**
+     * The target rows read so far every protein of which begins with the decoy prefix.
+     *
+     * @return the count; zero when the reader was opened without a prefix
+     */
+    long targetsOnlyPrefixed() {
+        return targetsOnlyPrefixed;
+    }
+
+    /**
+     * The line of the first target row every protein of which begins with the decoy prefix.
+     *
+     * @return the line number, counting the header as line 1; zero when there is none
+     */
+    long firstTargetOnlyPrefixedLine() {
+        return firstTargetOnlyPrefixedLine;
+    }
+
     private void check(String row) throws CometOutputException {
         String[] fields = row.split("\t", -1);
         int columns = header.columns().size();
@@ -221,7 +293,8 @@ final class PinReader implements Closeable {
         if (fields[0].isEmpty()) {
             throw rowProblem("has an empty SpecId");
         }
-        if (TARGET.equals(fields[1])) {
+        boolean target = TARGET.equals(fields[1]);
+        if (target) {
             targets++;
         } else if (DECOY.equals(fields[1])) {
             decoys++;
@@ -246,10 +319,28 @@ final class PinReader implements Closeable {
             throw rowProblem("has an empty Peptide");
         }
         // Proteins: the header's last column and every field beyond it.
+        int prefixed = 0;
         for (int index = columns - 1; index < fields.length; index++) {
             if (fields[index].isEmpty()) {
                 throw rowProblem("has an empty protein in field " + (index + 1));
             }
+            if (decoyPrefix != null && fields[index].startsWith(decoyPrefix)) {
+                prefixed++;
+            }
+        }
+        countPrefixed(target, prefixed, fields.length - (columns - 1));
+    }
+
+    private void countPrefixed(boolean target, int prefixed, int proteins) {
+        if (target) {
+            if (prefixed == proteins) {
+                targetsOnlyPrefixed++;
+                if (firstTargetOnlyPrefixedLine == 0) {
+                    firstTargetOnlyPrefixedLine = lineNumber;
+                }
+            }
+        } else if (prefixed > 0) {
+            decoysCarryingPrefix++;
         }
     }
 
