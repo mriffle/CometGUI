@@ -49,10 +49,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit 7b against the real Comet 2026.03.0 and the real inputs: {@code comet -q}'s placeholder
- * {@code spectral_library_name = /some/path/speclib.file} makes Comet itself exit 1, and the
- * pre-run check refuses the same parameters BEFORE COMET STARTS -- no launch through the project's
- * counting process service, no run directory -- with a message naming the parameter, its value and
- * what to do. A readable library file is accepted by the check.
+ * {@code spectral_library_name = /some/path/speclib.file}, named as a file imported from {@code -q}
+ * names it (a new configuration starts empty, D-012), makes Comet itself exit 1, and the pre-run
+ * check refuses the same parameters BEFORE COMET STARTS -- no launch through the project's counting
+ * process service, no run directory -- with a message naming the parameter, its value and what to
+ * do. A readable library file is accepted by the check.
  */
 @EnabledOnOs(
         value = OS.LINUX,
@@ -89,10 +90,22 @@ class RealPathParameterTest {
         }
     }
 
-    /** The tests' starting parameters with the release's own default spectral library put back. */
+    /** The tests' starting parameters, as CometGUI starts them: no spectral library (D-012). */
+    private static CometParameters starting() {
+        return RealComet.model(
+                RealComet.NEWER, targets, DecoySource.COMET_INTERNAL_CONCATENATED, 4);
+    }
+
+    /**
+     * The tests' starting parameters with Comet's own default spectral library, -q's placeholder,
+     * named -- as a file imported from {@code comet -q} names it.
+     */
     private static CometParameters withReleaseDefaultLibrary() {
-        return RealComet.model(RealComet.NEWER, targets, DecoySource.COMET_INTERNAL_CONCATENATED, 4)
-                .resetToDefault("spectral_library_name");
+        return starting()
+                .withText(
+                        "spectral_library_name",
+                        PathParameterChecksTest.PLACEHOLDER,
+                        ValueOrigin.IMPORTED);
     }
 
     private static SearchRequest request(CometParameters model) {
@@ -153,6 +166,15 @@ class RealPathParameterTest {
         assertEquals(expected, blocked.getMessage());
         assertEquals(List.of(), project.runDirectories(), "a blocked run leaves no directory");
         assertEquals(List.of(), project.runner().launches(), "a blocked run launches nothing");
+    }
+
+    @Test
+    @DisplayName("the starting set's empty spectral library (D-012) is accepted by the check")
+    void theStartingLibraryIsAccepted() throws IOException {
+        assertEquals("", starting().text("spectral_library_name"));
+        PreRunReport readiness = project.workflow().check(project.project(), request(starting()));
+        assertFalse(readiness.blocked(), readiness::message);
+        assertEquals(List.of(), readiness.problems());
     }
 
     @Test

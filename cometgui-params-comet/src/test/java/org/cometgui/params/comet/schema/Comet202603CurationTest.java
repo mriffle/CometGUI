@@ -114,7 +114,8 @@ class Comet202603CurationTest {
                                 "decoy_search",
                                 "index_search_type",
                                 "output_txtfile",
-                                "spectral_library_ms_level"));
+                                "spectral_library_ms_level",
+                                "spectral_library_name"));
         for (int slot = 1; slot <= 15; slot++) {
             overridden.add(String.format(java.util.Locale.ROOT, "variable_mod%02d", slot));
         }

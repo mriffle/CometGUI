@@ -91,12 +91,14 @@ class WorkflowRunPortTest {
                 BUILD);
     }
 
-    /** The release's starting parameters with a database and no spectral library. */
+    /**
+     * The release's starting parameters with a database; no spectral library, as every new
+     * configuration starts (D-012).
+     */
     private static CometParameters model(Path database) {
         return ParameterEditorWiring.newSession()
                 .model()
-                .withText("database_name", database.toString(), ValueOrigin.USER)
-                .withText("spectral_library_name", "", ValueOrigin.USER);
+                .withText("database_name", database.toString(), ValueOrigin.USER);
     }
 
     private Path fasta(Path root) throws IOException {

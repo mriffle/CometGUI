@@ -75,7 +75,9 @@ class ParameterFilesViewModelTest {
     class Saving {
 
         @ParameterizedTest(name = "Comet {0}")
-        @CsvSource({"2026.03.0, 10725", "2026.02.2, 10656"})
+        // ExpertViewModelTest.canonical: 24 characters shorter than Comet's -q values would write,
+        // spectral_library_name being empty (D-012)
+        @CsvSource({"2026.03.0, 10701", "2026.02.2, 10632"})
         @DisplayName("writes the canonical file once and hashes what is on disk")
         void saves(String release, long size, @TempDir Path directory)
                 throws IOException, NoSuchAlgorithmException {

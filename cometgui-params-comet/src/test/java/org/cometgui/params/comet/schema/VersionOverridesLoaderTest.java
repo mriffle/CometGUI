@@ -210,6 +210,132 @@ class VersionOverridesLoaderTest {
     }
 
     @Nested
+    @DisplayName("CometGUI's starting value (D-012): recorded per release, never Comet's default")
+    class StartingValues {
+
+        @Test
+        @DisplayName("loads for its release only, and leaves the release's definition Comet's")
+        void loadsForItsReleaseOnly() {
+            CuratedMetadata metadata =
+                    withNewerVersion(
+                                    override(
+                                            "peff_obo",
+                                            "startingValue",
+                                            "/data/unimod.obo",
+                                            "decision",
+                                            "D-012"))
+                            .load();
+            assertEquals(
+                    Optional.of("/data/unimod.obo"), metadata.startingValue("peff_obo", NEWER));
+            assertEquals(Optional.empty(), metadata.startingValue("peff_obo", OLDER));
+            assertEquals(Optional.empty(), metadata.startingValue("isotope_error", NEWER));
+            assertEquals(
+                    metadata.parameter("peff_obo").orElseThrow(),
+                    metadata.parameter("peff_obo", NEWER).orElseThrow(),
+                    "a starting value is not part of the release's definition");
+            assertEquals("", metadata.parameter("peff_obo", NEWER).orElseThrow().defaultValue());
+            assertEquals(Map.of(), metadata.version(NEWER).orElseThrow().defaults());
+            ParameterOverride override =
+                    metadata.version(NEWER).orElseThrow().override("peff_obo").orElseThrow();
+            assertEquals(Optional.of("D-012"), override.decision());
+            assertEquals(List.of(), override.replacedFields());
+        }
+
+        @Test
+        @DisplayName("an empty starting value loads where the parameter may be empty")
+        void anEmptyStartingValue() {
+            ConstructedMetadata doc =
+                    withNewerVersion(
+                            override("peff_obo", "startingValue", "", "decision", "D-012"));
+            doc.parameter("peff_obo").put("default", "/some/path/placeholder.obo");
+            CuratedMetadata metadata = doc.load();
+            assertEquals(Optional.of(""), metadata.startingValue("peff_obo", NEWER));
+            assertEquals(
+                    "/some/path/placeholder.obo",
+                    metadata.parameter("peff_obo", NEWER).orElseThrow().defaultValue());
+        }
+
+        @Test
+        @DisplayName("a starting value without its decision, or a decision without a value")
+        void comesWithItsDecision() {
+            rejected(
+                    withNewerVersion(override("peff_obo", "startingValue", "/data/unimod.obo")),
+                    WHERE + "\"peff_obo\"",
+                    "decision",
+                    "is missing");
+            rejected(
+                    withNewerVersion(override("peff_obo", "decision", "D-012")),
+                    WHERE + "\"peff_obo\"",
+                    "startingValue",
+                    "is missing");
+        }
+
+        @Test
+        @DisplayName("a decision not named D- and three digits")
+        void aMisnamedDecision() {
+            rejected(
+                    withNewerVersion(
+                            override(
+                                    "peff_obo",
+                                    "startingValue",
+                                    "/data/unimod.obo",
+                                    "decision",
+                                    "D12")),
+                    WHERE + "\"peff_obo\"",
+                    "decision",
+                    "names the decision \"D12\", which is not D- and three digits");
+        }
+
+        @Test
+        @DisplayName("a starting value that repeats the release's own default")
+        void repeatsTheDefault() {
+            rejected(
+                    withNewerVersion(
+                            override("peff_obo", "startingValue", "", "decision", "D-012")),
+                    WHERE + "\"peff_obo\"",
+                    "startingValue",
+                    "repeats the release's own default \"\"; a starting value records only a"
+                            + " departure from it");
+            rejected(
+                    withNewerVersion(
+                            override(
+                                    "isotope_error",
+                                    "default",
+                                    "1",
+                                    "startingValue",
+                                    "1",
+                                    "decision",
+                                    "D-012")),
+                    WHERE + "\"isotope_error\"",
+                    "startingValue",
+                    "repeats the release's own default \"1\"");
+        }
+
+        @Test
+        @DisplayName("a starting value that does not fit the parameter as a default must")
+        void doesNotFit() {
+            rejected(
+                    withNewerVersion(
+                            override("isotope_error", "startingValue", "7", "decision", "D-012")),
+                    WHERE + "\"isotope_error\"",
+                    "startingValue",
+                    "\"7\" is not one of its choices");
+            rejected(
+                    withNewerVersion(
+                            override("isotope_error", "startingValue", "", "decision", "D-012")),
+                    WHERE + "\"isotope_error\"",
+                    "startingValue",
+                    "is empty, and serialization");
+            rejected(
+                    withNewerVersion(
+                            override("peff_obo", "startingValue", " x", "decision", "D-012")),
+                    WHERE + "\"peff_obo\"",
+                    "startingValue",
+                    "has surrounding white space");
+        }
+    }
+
+    @Nested
     @DisplayName("what the loader refuses")
     class Refused {
 
@@ -220,7 +346,7 @@ class VersionOverridesLoaderTest {
                     WHERE + "\"isotope_error\"",
                     "name",
                     "replaces no field; an override names at least one of [default, choices,"
-                            + " inlineComment, shortHelp, helpUrl]");
+                            + " inlineComment, shortHelp, helpUrl] or a startingValue");
         }
 
         @Test
@@ -231,7 +357,8 @@ class VersionOverridesLoaderTest {
                     "versions[1]",
                     "displayName",
                     "is not a field this format has; expected only [name, source, default,"
-                            + " choices, inlineComment, shortHelp, helpUrl]");
+                            + " choices, inlineComment, shortHelp, helpUrl, startingValue,"
+                            + " decision]");
             rejected(
                     withNewerVersion(override("isotope_error", "kind", "INTEGER")),
                     "versions[1]",

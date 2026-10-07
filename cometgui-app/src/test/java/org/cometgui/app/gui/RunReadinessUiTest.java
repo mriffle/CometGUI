@@ -113,13 +113,9 @@ class RunReadinessUiTest {
         driver.clickOn("ess-spectra-add");
         app.chooser().database(fasta);
         driver.clickOn("ess-database_name-choose");
-        // The release's starting set names a placeholder spectral library, which the pre-run
-        // check refuses; this test's configuration searches without one, as a scientist sets it.
+        // A new configuration searches without a spectral library (D-012): nothing to clear.
         driver.clickOn("param-mode-advanced");
         ParameterEditorApp.showCategory(driver, "adv-category-ms1_realtime-toggle");
-        driver.typeInto("adv-spectral_library_name", "");
-        driver.press(KeyCode.BACK_SPACE);
-        driver.press(KeyCode.ENTER);
         assertEquals("", driver.textOf("adv-spectral_library_name"));
         driver.clickOn("param-mode-essentials");
     }

@@ -626,9 +626,11 @@ refuses it before Comet starts::
       does not exist or cannot be read; clear it to search without one, or
       choose the file
 
-A new configuration starts from that default, so the scientist must clear the
-field before a first run; whether the default should be empty is an open
-product question, escalated by unit 7b.
+A new configuration no longer starts from that default: by ``D-012`` it
+starts with the field empty, CometGUI's recorded starting value
+(:ref:`dev-comet-parameter-starting-values`), and empty means no
+spectral-library search in both releases. The check now fires only when a
+file or the scientist names a library.
 
 The search, one invocation per file
 -----------------------------------

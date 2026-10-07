@@ -106,6 +106,56 @@ class ParameterOverrideTest {
         assertEquals(Optional.empty(), override.applyTo(commented).inlineComment());
     }
 
+    private static ParameterOverride starting(
+            Optional<String> startingValue, Optional<String> decision) {
+        return new ParameterOverride(
+                "isotope_error",
+                SOURCE,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                false,
+                Optional.empty(),
+                startingValue,
+                decision);
+    }
+
+    @Test
+    @DisplayName("a starting value alone is an override, and leaves the definition Comet's")
+    void aStartingValueAlone() {
+        ParameterOverride override = starting(Optional.of("1"), Optional.of("D-012"));
+        assertEquals(List.of(), override.replacedFields());
+        assertEquals(curated("isotope_error"), override.applyTo(curated("isotope_error")));
+        assertEquals(Optional.of("1"), override.startingValue());
+        assertEquals(Optional.of("D-012"), override.decision());
+    }
+
+    @Test
+    @DisplayName("a starting value comes with its decision, named D- and three digits")
+    void aStartingValueNeedsItsDecision() {
+        IllegalArgumentException noDecision =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> starting(Optional.of("1"), Optional.empty()));
+        assertTrue(
+                noDecision.getMessage().contains("only by a recorded decision"),
+                noDecision.getMessage());
+        IllegalArgumentException noValue =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> starting(Optional.empty(), Optional.of("D-012")));
+        assertTrue(
+                noValue.getMessage().contains("only by a recorded decision"), noValue.getMessage());
+        IllegalArgumentException misnamed =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> starting(Optional.of("1"), Optional.of("D-12")));
+        assertTrue(
+                misnamed.getMessage().contains("which is not D- and three digits"),
+                misnamed.getMessage());
+    }
+
     @Test
     @DisplayName("the default alone: every other field is the curated one")
     void aDefaultOnly() {

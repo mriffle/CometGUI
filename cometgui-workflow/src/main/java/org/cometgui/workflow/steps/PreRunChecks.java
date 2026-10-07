@@ -72,8 +72,10 @@ import org.cometgui.tools.comet.FastaDecoyScanner;
  *       /some/path/speclib.file}, a missing {@code compoundmods_file} and a missing {@code
  *       protein_modslist_file} each stop Comet with exit 1; a missing {@code peff_obo} is ignored
  *       when {@code peff_format} is 0 and only warned about otherwise, so the search would run
- *       without the modifications the user asked for. The set is read from the model's metadata,
- *       never listed here.
+ *       without the modifications the user asked for. A new configuration starts with {@code
+ *       spectral_library_name} empty (D-012, the metadata's starting value), so this fires only
+ *       when a file or the user names a library. The set is read from the model's metadata, never
+ *       listed here.
  *   <li>The project's {@code runs/} directory exists and is writable.
  *   <li>The validator judges the model with every fact gathered: the decoy blocks and the index
  *       compatibility rules are its own, so there is no second rule here.

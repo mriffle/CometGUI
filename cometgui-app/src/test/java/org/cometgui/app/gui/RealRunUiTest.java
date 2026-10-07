@@ -144,7 +144,12 @@ class RealRunUiTest {
                 "ess-decoy_search",
                 "Concatenated: targets and decoys compete, one result per spectrum");
         enter(driver, "ess-num_threads", "4");
-        spectralLibrary("");
+        // A new configuration searches without a spectral library (D-012): nothing to clear, and
+        // every real search below runs with the starting set's empty value.
+        driver.clickOn("param-mode-advanced");
+        ParameterEditorApp.showCategory(driver, "adv-category-ms1_realtime-toggle");
+        assertEquals("", driver.textOf("adv-spectral_library_name"));
+        driver.clickOn("param-mode-essentials");
     }
 
     @AfterAll
@@ -158,15 +163,12 @@ class RealRunUiTest {
         }
     }
 
-    /** Sets the spectral library in Advanced: empty, or a path. */
+    /** Names a spectral library in Advanced. */
     private static void spectralLibrary(String path) {
         ParameterEditorApp.openEditor(driver);
         driver.clickOn("param-mode-advanced");
         ParameterEditorApp.showCategory(driver, "adv-category-ms1_realtime-toggle");
         driver.typeInto("adv-spectral_library_name", path);
-        if (path.isEmpty()) {
-            driver.press(KeyCode.BACK_SPACE);
-        }
         driver.press(KeyCode.ENTER);
         assertEquals(path, driver.textOf("adv-spectral_library_name"));
         driver.clickOn("param-mode-essentials");
@@ -364,7 +366,8 @@ class RealRunUiTest {
     @Order(5)
     @DisplayName("a run Comet refuses: the failure is stated with its step, never swallowed")
     void aFailureIsStated() throws IOException {
-        // The release's placeholder spectral library is refused before Comet (unit 7b), on screen.
+        // Comet's own placeholder spectral library, NAMED (a new configuration starts empty), is
+        // still refused before Comet (unit 7b), on screen.
         spectralLibrary("/some/path/speclib.file");
         driver.clickOn("nav-run");
         assertEquals(

@@ -18,12 +18,22 @@ package org.cometgui.params.comet.model;
 
 /**
  * Where a parameter's current value came from -- the five origins the specification names after its
- * <em>Parameter definition model</em>, which the editor shows beside each value.
+ * <em>Parameter definition model</em>, which the editor shows beside each value, and {@link
+ * #COMETGUI_DEFAULT}, which keeps a deliberate departure from Comet's default from being shown as
+ * Comet's.
  */
 public enum ValueOrigin {
 
     /** The schema default for the version: what {@code comet -q} writes. */
     COMET_DEFAULT,
+
+    /**
+     * CometGUI's starting value for the version, recorded in the metadata where it departs from
+     * what {@code comet -q} writes ({@link
+     * org.cometgui.params.comet.schema.CuratedMetadata#startingValue}): {@code D-012}'s empty
+     * {@code spectral_library_name} in place of Comet's placeholder path.
+     */
+    COMETGUI_DEFAULT,
 
     /** Set by an application preset. */
     PRESET,

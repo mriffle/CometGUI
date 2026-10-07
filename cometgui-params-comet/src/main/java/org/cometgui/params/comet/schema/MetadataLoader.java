@@ -59,10 +59,13 @@ import org.cometgui.provenance.json.JsonValue;
  * help reference. Each override must name a parameter whose range claims the version, once, with an
  * {@code https://} source; it must replace at least one field, and nothing but those five; every
  * field it replaces must pass the rule the curated field passes and must differ from the curated
- * field; and the version's resulting default must be one of the version's resulting choices. A
- * parameter named as Comet names a tuple slot ({@code variable_mod} and two digits) must be of kind
- * {@link ValueKind#VARIABLE_MOD_TUPLE} and the other way round; and a tuple default must hold as
- * many fields as the layout of every version it claims, and residues that version's {@link
+ * field; and the version's resulting default must be one of the version's resulting choices. An
+ * override may instead, or as well, record CometGUI's {@code startingValue} for the release: it
+ * comes with the {@code decision} that made it ({@code D-} and three digits), must fit the
+ * parameter as a default must, and must differ from the release's own default. A parameter named as
+ * Comet names a tuple slot ({@code variable_mod} and two digits) must be of kind {@link
+ * ValueKind#VARIABLE_MOD_TUPLE} and the other way round; and a tuple default must hold as many
+ * fields as the layout of every version it claims, and residues that version's {@link
  * ResidueAlphabet} accepts. The alphabet ({@code variableModTuple.residueAlphabet}: {@code
  * characters} and an {@code https://} {@code source}) is checked by {@link ResidueAlphabet}'s own
  * rules.
@@ -116,6 +119,12 @@ public final class MetadataLoader {
                     "indexFormats");
 
     private static final List<String> OVERRIDE_REQUIRED = List.of("name", "source");
+
+    private static final List<String> OVERRIDE_OPTIONAL =
+            java.util.stream.Stream.concat(
+                            ParameterOverride.FIELDS.stream(),
+                            ParameterOverride.STARTING_FIELDS.stream())
+                    .toList();
 
     private static final List<String> RULE_SEVERITY_FIELDS = List.of("rule", "severity", "source");
 
@@ -266,7 +275,7 @@ public final class MetadataLoader {
         Map<String, ParameterOverride> overrides = new LinkedHashMap<>();
         for (int index = 0; index < array.size(); index++) {
             Node entry = Node.of(array.get(index), version.where(), "overrides[" + index + "]");
-            entry.onlyFields(OVERRIDE_REQUIRED, ParameterOverride.FIELDS);
+            entry.onlyFields(OVERRIDE_REQUIRED, OVERRIDE_OPTIONAL);
             String name = entry.text("name");
             Node named = entry.renamed(version.where() + " override for \"" + name + "\"");
             ParameterDefinition definition =
@@ -286,11 +295,13 @@ public final class MetadataLoader {
                 throw named.failure("name", "is overridden twice");
             }
             String source = named.url("source");
-            if (ParameterOverride.FIELDS.stream().noneMatch(named::has)) {
+            if (ParameterOverride.FIELDS.stream().noneMatch(named::has)
+                    && ParameterOverride.STARTING_FIELDS.stream().noneMatch(named::has)) {
                 throw named.failure(
                         "name",
                         "replaces no field; an override names at least one of "
-                                + ParameterOverride.FIELDS);
+                                + ParameterOverride.FIELDS
+                                + " or a startingValue");
             }
             overrides.put(name, override(named, definition, source));
         }
@@ -350,15 +361,44 @@ public final class MetadataLoader {
                 throw unchanged(named, "helpUrl", "help reference");
             }
         }
-        return new ParameterOverride(
-                definition.name(),
-                source,
-                defaultValue,
-                choices,
-                shortHelp,
-                helpUrl,
-                replacesComment,
-                inlineComment);
+        Optional<String> startingValue = Optional.empty();
+        Optional<String> decision = Optional.empty();
+        if (named.has("startingValue") || named.has("decision")) {
+            startingValue = Optional.of(named.string("startingValue"));
+            decision = Optional.of(named.text("decision"));
+            String releaseDefault = defaultValue.orElse(definition.defaultValue());
+            if (startingValue.get().equals(releaseDefault)) {
+                throw named.failure(
+                        "startingValue",
+                        "repeats the release's own default \""
+                                + releaseDefault
+                                + "\"; a starting value records only a departure from it");
+            }
+            checkDefault(
+                    named,
+                    "startingValue",
+                    definition.kind(),
+                    definition.serialization(),
+                    startingValue.get(),
+                    definition.minimum(),
+                    definition.maximum(),
+                    versionChoices);
+        }
+        try {
+            return new ParameterOverride(
+                    definition.name(),
+                    source,
+                    defaultValue,
+                    choices,
+                    shortHelp,
+                    helpUrl,
+                    replacesComment,
+                    inlineComment,
+                    startingValue,
+                    decision);
+        } catch (IllegalArgumentException refused) {
+            throw named.failure("decision", refused.getMessage());
+        }
     }
 
     private static InvalidMetadataException unchanged(Node named, String field, String what) {
@@ -998,30 +1038,42 @@ public final class MetadataLoader {
             Optional<String> minimum,
             Optional<String> maximum,
             List<Choice> choices) {
+        checkDefault(node, "default", kind, serialization, value, minimum, maximum, choices);
+    }
+
+    private static void checkDefault(
+            Node node,
+            String field,
+            ValueKind kind,
+            SerializationRule serialization,
+            String value,
+            Optional<String> minimum,
+            Optional<String> maximum,
+            List<Choice> choices) {
         if (!value.equals(value.strip())) {
-            throw node.failure("default", "has surrounding white space, which Comet never writes");
+            throw node.failure(field, "has surrounding white space, which Comet never writes");
         }
         if (value.isEmpty()) {
             if (!serialization.allowsEmpty()) {
                 throw node.failure(
-                        "default", "is empty, and serialization " + serialization + " is not");
+                        field, "is empty, and serialization " + serialization + " is not");
             }
             return;
         }
         switch (kind) {
             case INTEGER_ENUM, STRING_ENUM -> {
                 if (choices.stream().noneMatch(choice -> choice.value().equals(value))) {
-                    throw node.failure("default", "\"" + value + "\" is not one of its choices");
+                    throw node.failure(field, "\"" + value + "\" is not one of its choices");
                 }
             }
             case BOOLEAN_FLAG, ION_SERIES_FLAG -> {
                 if (!"0".equals(value) && !"1".equals(value)) {
-                    throw node.failure("default", "\"" + value + "\" is not 0 or 1");
+                    throw node.failure(field, "\"" + value + "\" is not 0 or 1");
                 }
             }
             case ENZYME_REFERENCE -> {
                 if (!NON_NEGATIVE_WHOLE.matcher(value).matches()) {
-                    throw node.failure("default", "\"" + value + "\" is not an enzyme number");
+                    throw node.failure(field, "\"" + value + "\" is not an enzyme number");
                 }
             }
             case INTEGER,
@@ -1030,7 +1082,7 @@ public final class MetadataLoader {
                     INTEGER_RANGE,
                     DECIMAL_RANGE,
                     DECIMAL_LIST ->
-                    checkNumbers(node, kind, serialization, value, minimum, maximum);
+                    checkNumbers(node, field, kind, serialization, value, minimum, maximum);
             default -> {
                 // STRING, FILE_PATH and VARIABLE_MOD_TUPLE: free text here; the tuple's layout is
                 // the structured value types' to check.
@@ -1040,6 +1092,7 @@ public final class MetadataLoader {
 
     private static void checkNumbers(
             Node node,
+            String field,
             ValueKind kind,
             SerializationRule serialization,
             String value,
@@ -1052,16 +1105,15 @@ public final class MetadataLoader {
                         : serialization == SerializationRule.SINGLE_VALUE ? 1 : tokens.length;
         if (tokens.length != expected) {
             throw node.failure(
-                    "default",
-                    "\"" + value + "\" holds " + tokens.length + " values, not " + expected);
+                    field, "\"" + value + "\" holds " + tokens.length + " values, not " + expected);
         }
         for (String token : tokens) {
-            BigDecimal number = requireNumber(node, "default", token, kind.isWholeNumbers());
+            BigDecimal number = requireNumber(node, field, token, kind.isWholeNumbers());
             if (minimum.isPresent() && number.compareTo(new BigDecimal(minimum.get())) < 0) {
-                throw node.failure("default", token + " is below its own min " + minimum.get());
+                throw node.failure(field, token + " is below its own min " + minimum.get());
             }
             if (maximum.isPresent() && number.compareTo(new BigDecimal(maximum.get())) > 0) {
-                throw node.failure("default", token + " is above its own max " + maximum.get());
+                throw node.failure(field, token + " is above its own max " + maximum.get());
             }
         }
     }

@@ -513,7 +513,9 @@ public final class ParameterSession {
     }
 
     /**
-     * Puts one parameter back to the selected release's default, origin {@code COMET_DEFAULT}.
+     * Puts one parameter back to the selected release's default ({@link
+     * CometParameters#resetToDefault}): CometGUI's starting value where the metadata records one,
+     * else Comet's.
      *
      * @param name the parameter name
      * @return whether it was reset, or why not (a locked field is refused with its reason)

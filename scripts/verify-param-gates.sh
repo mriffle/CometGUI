@@ -297,9 +297,10 @@ readonly CORPUS="${MODULE}/src/test/resources/fixtures/comet-validation/corpus.j
 # counts it printed when last recorded; fewer means cases were lost.  27 when
 # unit 7 shipped it; 55 on 2026-10-04 (COMET-2026-03 unit 6), measured after
 # COMET-2026-03 units 1, 3 and 4 added 13 override, 8 alphabet and 7
-# severity cases.
+# severity cases; 71 on 2026-10-07 (the D-012 repair), measured: 64 before it
+# and its 7 starting-value cases.
 readonly PARAMS_SELFTEST="scripts/cometparams_selftest.py"
-readonly SELFTEST_GENERATOR_FLOOR=55
+readonly SELFTEST_GENERATOR_FLOOR=71
 readonly SELFTEST_HOOK_FLOOR=4
 
 # Control 9: the packages item 9 names, and the threshold, R-TEST-02's.

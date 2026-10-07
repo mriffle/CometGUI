@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * What one Comet release says differently about one parameter: the fields of the curated {@link
@@ -38,6 +39,15 @@ import java.util.Optional;
  * curated definition. The inline comment alone may be replaced by <em>none</em> (JSON {@code
  * null}), which is why it carries its own {@code replacesInlineComment} flag.
  *
+ * <p>An override can also record where <em>CometGUI</em>, not Comet, differs for the release: a
+ * {@linkplain #startingValue() starting value}, the value a new configuration of the release starts
+ * with in place of Comet's default, always with the {@linkplain #decision() decision} that made it
+ * ({@code D-012}: {@code spectral_library_name} starts empty rather than at {@code -q}'s
+ * placeholder). It is not part of the release's definition -- {@link #applyTo} leaves the default
+ * Comet's -- and is read through {@link CuratedMetadata#startingValue}, never by asking which
+ * version it is. A configuration that took it carries {@link
+ * org.cometgui.params.comet.model.ValueOrigin#COMETGUI_DEFAULT}, so it is never shown as Comet's.
+ *
  * @param name the parameter the override is for
  * @param source the {@code https://} reference to where the release shows the difference
  * @param defaultValue the release's default, if it differs
@@ -46,6 +56,10 @@ import java.util.Optional;
  * @param helpUrl the release's help reference, if it differs
  * @param replacesInlineComment whether the release has its own inline comment (or none)
  * @param inlineComment that comment; empty for none, and always empty when not replaced
+ * @param startingValue CometGUI's starting value for a new configuration of the release, if it
+ *     departs from the release's default
+ * @param decision the recorded decision ({@code D-} and three digits) behind the starting value;
+ *     present exactly when the starting value is
  */
 public record ParameterOverride(
         String name,
@@ -55,11 +69,27 @@ public record ParameterOverride(
         Optional<String> shortHelp,
         Optional<String> helpUrl,
         boolean replacesInlineComment,
-        Optional<String> inlineComment) {
+        Optional<String> inlineComment,
+        Optional<String> startingValue,
+        Optional<String> decision) {
 
-    /** The JSON field names an override may carry besides {@code name} and {@code source}. */
+    /**
+     * The JSON names of the definition fields an override may replace: what the release itself says
+     * differently.
+     */
     public static final List<String> FIELDS =
             List.of("default", "choices", "inlineComment", "shortHelp", "helpUrl");
+
+    /**
+     * The JSON names of what an override may record about CometGUI rather than Comet: a starting
+     * value and the decision behind it, always together.
+     */
+    public static final List<String> STARTING_FIELDS = List.of("startingValue", "decision");
+
+    /**
+     * How a decision is named: {@code D-} and three digits, as {@code DECISIONS.rst} numbers them.
+     */
+    private static final Pattern DECISION = Pattern.compile("D-[0-9]{3}");
 
     /**
      * Validates the components and takes an immutable copy of the choices.
@@ -76,6 +106,24 @@ public record ParameterOverride(
         Objects.requireNonNull(shortHelp, "shortHelp");
         Objects.requireNonNull(helpUrl, "helpUrl");
         Objects.requireNonNull(inlineComment, "inlineComment");
+        Objects.requireNonNull(startingValue, "startingValue");
+        Objects.requireNonNull(decision, "decision");
+        if (startingValue.isPresent() != decision.isPresent()) {
+            throw new IllegalArgumentException(
+                    "the override for "
+                            + name
+                            + " has a starting value without its decision, or a decision without"
+                            + " a starting value; CometGUI departs from Comet's default only by a"
+                            + " recorded decision");
+        }
+        if (decision.isPresent() && !DECISION.matcher(decision.get()).matches()) {
+            throw new IllegalArgumentException(
+                    "the override for "
+                            + name
+                            + " names the decision \""
+                            + decision.get()
+                            + "\", which is not D- and three digits");
+        }
         if (!replacesInlineComment && inlineComment.isPresent()) {
             throw new IllegalArgumentException(
                     "the override for " + name + " carries an inline comment it does not replace");
@@ -84,13 +132,49 @@ public record ParameterOverride(
                 && choices.isEmpty()
                 && shortHelp.isEmpty()
                 && helpUrl.isEmpty()
-                && !replacesInlineComment) {
+                && !replacesInlineComment
+                && startingValue.isEmpty()) {
             throw new IllegalArgumentException(
                     "the override for "
                             + name
                             + " replaces no field; it names at least one of "
-                            + FIELDS);
+                            + FIELDS
+                            + " or a startingValue");
         }
+    }
+
+    /**
+     * An override of the release's definition alone, recording no starting value.
+     *
+     * @param name the parameter the override is for
+     * @param source where the release shows the difference
+     * @param defaultValue the release's default, if it differs
+     * @param choices the release's choices, if they differ
+     * @param shortHelp the release's short help, if it differs
+     * @param helpUrl the release's help reference, if it differs
+     * @param replacesInlineComment whether the release has its own inline comment (or none)
+     * @param inlineComment that comment; empty for none, and always empty when not replaced
+     */
+    public ParameterOverride(
+            String name,
+            String source,
+            Optional<String> defaultValue,
+            Optional<List<Choice>> choices,
+            Optional<String> shortHelp,
+            Optional<String> helpUrl,
+            boolean replacesInlineComment,
+            Optional<String> inlineComment) {
+        this(
+                name,
+                source,
+                defaultValue,
+                choices,
+                shortHelp,
+                helpUrl,
+                replacesInlineComment,
+                inlineComment,
+                Optional.empty(),
+                Optional.empty());
     }
 
     /**
@@ -132,6 +216,7 @@ public record ParameterOverride(
 
     /**
      * The definition as the release has it: the curated one with this override's fields replaced.
+     * The starting value is not one of them: the definition's default stays the release's own.
      *
      * @param curated the curated definition of the same parameter
      * @return the release's definition

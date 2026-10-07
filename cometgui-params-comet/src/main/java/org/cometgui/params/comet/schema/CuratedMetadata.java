@@ -123,6 +123,25 @@ public record CuratedMetadata(
                 .toList();
     }
 
+    /**
+     * CometGUI's starting value for one parameter in one version, where it departs from that
+     * version's default: what a new configuration of the release holds instead of what {@code comet
+     * -q} writes, by a recorded decision ({@link ParameterOverride#startingValue()}). This is the
+     * only place the departure is read; a parameter without one starts at the release's default.
+     *
+     * @param name the parameter name
+     * @param version the Comet version
+     * @return the starting value text, or empty if the parameter starts at the release's default
+     *     (or is not modelled for the version)
+     */
+    public Optional<String> startingValue(String name, ToolVersion version) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(version, "version");
+        return version(version)
+                .flatMap(record -> record.override(name))
+                .flatMap(ParameterOverride::startingValue);
+    }
+
     private ParameterDefinition forVersion(ParameterDefinition definition, ToolVersion version) {
         return version(version)
                 .flatMap(record -> record.override(definition.name()))

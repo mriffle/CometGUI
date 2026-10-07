@@ -12,7 +12,10 @@ Comet's own documentation, the exact ``name = value`` line written to
 ``comet.params`` for each release, which Comet releases declare it, related
 parameters, and what each built-in preset sets it to (``R-DOC-04``). Where two
 releases differ about a parameter, its allowed values and description are given
-once per release.
+once per release. The default is Comet's own; where a new CometGUI
+configuration starts from another value by a recorded decision -- only
+``spectral_library_name``, which starts empty (``D-012``) -- the entry also
+gives that *CometGUI starting value*.
 
 Everything below the introduction is **generated during the documentation
 build** by ``scripts/cometparams.py`` from the same metadata file the

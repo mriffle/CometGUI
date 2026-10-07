@@ -178,6 +178,16 @@ def _override_revalue_choice(value, replacement):
     return damage
 
 
+#: The parameter whose overrides record CometGUI's starting value (D-012).
+STARTED = "spectral_library_name"
+
+
+def _override_pop(field, name):
+    def damage(document):
+        _override(document, name).pop(field)
+    return damage
+
+
 def _override_strip(document):
     override = _override(document)
     for field in cometparams.OVERRIDE_FIELDS:
@@ -331,6 +341,25 @@ def generator_cases():
         ("override-blank-help", "metadata", _override_set("shortHelp", "  "),
          f'{over}[2] ("{OVERRIDDEN}") has "shortHelp" = '),
     ]
+    cases += [
+        ("starting-value-without-decision", "metadata", _override_pop("decision", STARTED),
+         f'("{STARTED}") has "startingValue" without "decision"'),
+        ("starting-decision-without-value", "metadata", _override_pop("startingValue", STARTED),
+         f'("{STARTED}") has "decision" without "startingValue"'),
+        ("starting-decision-misnamed", "metadata", _override_set("decision", "D12", STARTED),
+         f'("{STARTED}") has "decision" = \'D12\'; it is D- and three digits'),
+        ("starting-value-padded", "metadata", _override_set("startingValue", " x", STARTED),
+         f'("{STARTED}") has "startingValue" = \' x\'; it is text without surrounding'),
+        ("starting-value-repeats-default", "metadata",
+         _override_set("startingValue", "/some/path/speclib.file", STARTED),
+         "has the starting value '/some/path/speclib.file', the release's own default"),
+        ("starting-value-not-a-choice", "metadata",
+         lambda document: _override(document).update(startingValue="7", decision="D-012"),
+         f"starts {OVERRIDDEN} at '7', which is not one of the release's choices"),
+        ("starting-value-empty-not-allowed", "metadata",
+         lambda document: _override(document).update(startingValue="", decision="D-012"),
+         f"starts {OVERRIDDEN} empty, and serialization SINGLE_VALUE is not"),
+    ]
     alphabet = f"versions[0] ({OVERRIDING_RELEASE}) variableModTuple.residueAlphabet"
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     cases += [
@@ -464,6 +493,24 @@ def per_release_control(root: Path, clean: Path, files: dict) -> None:
         )
     print(f"    control   rendered for {', '.join(summary['releases'])}: {OVERRIDDEN} carries "
           f"each release's own default, choices and comment")
+
+    # CometGUI's starting value (D-012) is per release, and shown beside Comet's default.
+    start = text.index(f"{cometparams.ENTRY_LABEL_PREFIX}{STARTED}:")
+    started_entry = text[start:text.index(cometparams.ENTRY_LABEL_PREFIX, start + 1)]
+    expected = [
+        ":Default, Comet 2026.02.2: ``/some/path/speclib.file``",
+        f":Default, Comet {OVERRIDING_RELEASE}: ``/some/path/speclib.file``",
+        ":CometGUI starting value, Comet 2026.02.2: (empty) -- a new CometGUI configuration",
+        f":CometGUI starting value, Comet {OVERRIDING_RELEASE}: (empty) -- a new CometGUI",
+        "by decision D-012",
+    ]
+    missing = [needle for needle in expected if needle not in started_entry]
+    if missing:
+        raise HarnessError(
+            f"per-release control: the {STARTED} entry does not show CometGUI's starting value "
+            f"beside Comet's default; missing {missing}:\n{started_entry}"
+        )
+    print(f"    control   {STARTED} shows Comet's default and CometGUI's starting value per release")
 
     # The residue alphabet is per release too: ^ and $ for 2026.03.0, never for 2026.02.2.
     start = text.index(f"{cometparams.ENTRY_LABEL_PREFIX}variable_mod01:")

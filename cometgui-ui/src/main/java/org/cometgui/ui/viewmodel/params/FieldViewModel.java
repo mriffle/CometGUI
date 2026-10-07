@@ -263,11 +263,14 @@ public final class FieldViewModel {
     /**
      * Where the value came from, in words.
      *
-     * @return for example {@code Comet 2026.03.0 default} or {@code Required by CometGUI workflow}
+     * @return for example {@code Comet 2026.03.0 default}, {@code CometGUI default (Comet
+     *     2026.03.0's own default differs)} or {@code Required by CometGUI workflow}
      */
     public String originText() {
         return switch (origin.get()) {
             case COMET_DEFAULT -> "Comet " + release.text() + " default";
+            case COMETGUI_DEFAULT ->
+                    "CometGUI default (Comet " + release.text() + "'s own default differs)";
             case PRESET -> "Set by a preset";
             case USER -> "Set by you";
             case IMPORTED -> "Imported from a parameter file";

@@ -419,11 +419,15 @@ every reason Run is disabled in words -- first the parameters', then the
 workflow's, such as the decoy checks on :doc:`decoys` or a file that cannot be
 read. Before a rerun it says which steps would execute again, and why.
 
-**Clear the spectral library before your first run.** Comet's own default
-names a placeholder file, ``/some/path/speclib.file``, which does not exist;
-Comet stops with an error on it, so CometGUI refuses to start until the
-**Spectral library file** setting (``spectral_library_name``) is cleared or
-names a real file. The message says so::
+**A new configuration searches without a spectral library.** Comet's own
+default names a placeholder file, ``/some/path/speclib.file``, which does not
+exist, and Comet stops with an error on it. So CometGUI starts the
+**Spectral library file** setting (``spectral_library_name``) empty -- no
+spectral-library search -- and shows it as *CometGUI default*, not Comet's.
+This is the one place a new configuration differs from Comet's own defaults.
+A parameter file you import keeps the library it names; if that file does not
+exist, CometGUI refuses to start until the setting is cleared or names a real
+file, and the message says so::
 
     spectral_library_name (Spectral library file) = /some/path/speclib.file
     does not exist or cannot be read; clear it to search without one, or

@@ -87,9 +87,11 @@ class ExpertViewModelTest {
     class CanonicalAndDraft {
 
         @ParameterizedTest(name = "Comet {0}")
+        // 24 characters shorter than Comet's starting set would write (10725, 10656): D-012's
+        // "spectral_library_name =" in place of "spectral_library_name = /some/path/speclib.file"
         @CsvSource({
-            "2026.03.0, 10725, # comet_version 2026.03 rev. 0 (fa08489)",
-            "2026.02.2, 10656, # comet_version 2026.02 rev. 2 (6edec91)"
+            "2026.03.0, 10701, # comet_version 2026.03 rev. 0 (fa08489)",
+            "2026.02.2, 10632, # comet_version 2026.02 rev. 2 (6edec91)"
         })
         @DisplayName("the canonical text is the writer's, for the selected release")
         void canonical(String release, int length, String marker) {
@@ -110,6 +112,7 @@ class ExpertViewModelTest {
                             + " specify num threads directly (max 128)",
                     lines.get(7));
             assertTrue(text.contains("\noutput_percolatorfile = 1 "), "outputs enforced");
+            assertTrue(text.contains("\nspectral_library_name =\n"), "no spectral library (D-012)");
             assertEquals(Optional.empty(), expert.canonicalRefusal());
             assertEquals(text, expert.draft());
             assertFalse(expert.isDraftEdited());
@@ -635,6 +638,8 @@ class ExpertViewModelTest {
         assertTrue(expert.canonicalText().contains("\nmy_custom_option = 7 "));
         assertEquals(
                 List.of(
+                        // the imported file keeps the library it names; CometGUI's default is none
+                        "Spectral library file (spectral_library_name): /some/path/speclib.file | ",
                         "Write Percolator input (PIN) (output_percolatorfile): 1 | 0",
                         "my_custom_option: 7 | (not present)"),
                 expert.againstDefaults().rows().stream()

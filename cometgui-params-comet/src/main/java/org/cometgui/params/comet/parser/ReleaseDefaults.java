@@ -39,9 +39,13 @@ import org.cometgui.params.comet.schema.CuratedMetadata;
  * needs the table the release itself writes. The bundled file is that release's real output, byte
  * for byte the checked-in fixture its {@code SHA256SUMS} pins, and Comet's own Apache-2.0 text.
  *
- * <p>The set it gives is the parse of that file with every value at Comet's default, so every
- * origin is {@link ValueOrigin#COMET_DEFAULT} (the parser marks a declared value {@link
- * ValueOrigin#IMPORTED}; nothing was imported here). A bundled file that does not parse for its own
+ * <p>The set it gives is the parse of that file with every value at Comet's default, origin {@link
+ * ValueOrigin#COMET_DEFAULT} (the parser marks a declared value {@link ValueOrigin#IMPORTED};
+ * nothing was imported here) -- except where the metadata records CometGUI's own starting value for
+ * the release ({@link CometParameters#withStartingValues()}), origin {@link
+ * ValueOrigin#COMETGUI_DEFAULT}: {@code spectral_library_name} starts empty, not at the placeholder
+ * path {@code -q} writes, by decision {@code D-012}. The bundled file itself is never edited for
+ * that; it stays Comet's output byte for byte. A bundled file that does not parse for its own
  * release without a single diagnostic -- a marker naming another release, a parameter the metadata
  * does not model -- is refused: the starting set of a release cannot carry a warning.
  *
@@ -105,12 +109,13 @@ public final class ReleaseDefaults {
 
     /**
      * The starting set of a release: its bundled {@code comet -q} file, parsed for that release,
-     * every value at Comet's default.
+     * every value at Comet's default but for CometGUI's recorded starting values.
      *
      * @param metadata the curated metadata
      * @param release the Comet release
-     * @return the parameter set, origin {@link ValueOrigin#COMET_DEFAULT} throughout, with no
-     *     unknown parameter and no diagnostic
+     * @return the parameter set, origin {@link ValueOrigin#COMET_DEFAULT} throughout but {@link
+     *     ValueOrigin#COMETGUI_DEFAULT} where a starting value was applied, with no unknown
+     *     parameter and no diagnostic
      * @throws IllegalArgumentException naming the release, if it has no bundled file or the
      *     metadata was not curated against it
      * @throws IllegalStateException naming the release and what was found, if the bundled file does
@@ -134,7 +139,7 @@ public final class ReleaseDefaults {
         for (ParameterEntry entry : model.entries()) {
             model = model.withOrigin(entry.name(), ValueOrigin.COMET_DEFAULT);
         }
-        return model;
+        return model.withStartingValues();
     }
 
     private static void requireBundled(ToolVersion release) {

@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
-import javafx.scene.input.KeyCode;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.testing.InstalledComet;
 import org.cometgui.app.testing.RealSearch;
@@ -113,11 +112,9 @@ class RealCancelUiTest {
                 "ess-decoy_search",
                 "Concatenated: targets and decoys compete, one result per spectrum");
         enter(driver, "ess-num_threads", "1");
+        // A new configuration searches without a spectral library (D-012): nothing to clear.
         driver.clickOn("param-mode-advanced");
         ParameterEditorApp.showCategory(driver, "adv-category-ms1_realtime-toggle");
-        driver.typeInto("adv-spectral_library_name", "");
-        driver.press(KeyCode.BACK_SPACE);
-        driver.press(KeyCode.ENTER);
         assertEquals("", driver.textOf("adv-spectral_library_name"));
     }
 

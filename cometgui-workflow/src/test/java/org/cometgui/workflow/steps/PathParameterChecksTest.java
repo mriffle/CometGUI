@@ -98,13 +98,28 @@ class PathParameterChecksTest {
 
     @Test
     @DisplayName(
-            "the release default spectral_library_name, -q's placeholder, blocks the run with the"
-                    + " parameter, its value and what to do")
+            "a new configuration's spectral library is empty (D-012) and does not block the run;"
+                    + " nor does resetting it")
+    void theStartingLibraryDoesNotBlock() throws IOException {
+        assertEquals("", model().text("spectral_library_name"));
+        assertEquals(ValueOrigin.COMETGUI_DEFAULT, model().origin("spectral_library_name"));
+        assertEquals(List.of(), problems(model()));
+        CometParameters reset =
+                model().withText("spectral_library_name", PLACEHOLDER, ValueOrigin.IMPORTED)
+                        .resetToDefault("spectral_library_name");
+        assertEquals("", reset.text("spectral_library_name"));
+        assertEquals(List.of(), problems(reset));
+    }
+
+    @Test
+    @DisplayName(
+            "a file naming -q's placeholder spectral library -- Comet's own default, imported --"
+                    + " blocks the run with the parameter, its value and what to do")
     void thePlaceholderBlocks() throws IOException {
-        CometParameters defaulted = model().resetToDefault("spectral_library_name");
-        assertEquals(PLACEHOLDER, defaulted.text("spectral_library_name"));
+        CometParameters imported =
+                model().withText("spectral_library_name", PLACEHOLDER, ValueOrigin.IMPORTED);
         PreRunReport report =
-                checks.check(project, defaulted, fake.spectra(), fake.selection(), IndexMode.NONE)
+                checks.check(project, imported, fake.spectra(), fake.selection(), IndexMode.NONE)
                         .report();
         assertEquals(
                 List.of(
@@ -290,8 +305,12 @@ class PathParameterChecksTest {
 
     /** Replaces the first validators list matching a pattern after a parameter's name. */
     private static String setValidators(String json, String name, String pattern, String id) {
-        int at = json.indexOf("\"name\": \"" + name + "\"");
-        assertTrue(at >= 0, name + " in the bundled metadata");
+        // The parameter's own entry, the one with a display name: a version record's override
+        // of the parameter (spectral_library_name has one per release) also carries its name.
+        Matcher entry =
+                Pattern.compile("\"name\": \"" + name + "\",\\s*\"displayName\"").matcher(json);
+        assertTrue(entry.find(), name + " in the bundled metadata");
+        int at = entry.start();
         Matcher matcher = Pattern.compile(pattern).matcher(json);
         assertTrue(matcher.find(at), name + "'s validators in the bundled metadata");
         String replacement =

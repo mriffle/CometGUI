@@ -27,8 +27,10 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.fixtures.CometFixtures;
 import org.cometgui.params.comet.fixtures.ParamsFiles;
@@ -45,9 +47,17 @@ import org.junit.jupiter.params.provider.CsvSource;
 /**
  * The starting set of each offered release is Comet's own {@code -q} output, bundled with the
  * module: the bytes are the checked-in fixture's (SHA-256 typed in from its {@code SHA256SUMS}),
- * the parse is clean, and every value is the fixture model's.
+ * the parse is clean, and every value is the fixture model's -- but for {@code
+ * spectral_library_name}, which a new configuration starts empty by decision D-012, shown as
+ * CometGUI's default and never Comet's.
  */
 class ReleaseDefaultsTest {
+
+    /** The parameter D-012 starts empty. */
+    private static final String LIBRARY = "spectral_library_name";
+
+    /** What both releases' {@code comet -q} writes for it, typed in from the fixtures. */
+    private static final String PLACEHOLDER = "/some/path/speclib.file";
 
     private static final CuratedMetadata METADATA = ParamsFiles.metadata();
 
@@ -104,12 +114,88 @@ class ReleaseDefaultsTest {
         assertEquals(118, defaults.entries().size());
         assertEquals(fixture.enzymeTable(), defaults.enzymeTable());
         for (ParameterEntry entry : defaults.entries()) {
+            if (entry.name().equals(LIBRARY)) {
+                continue;
+            }
             assertEquals(ValueOrigin.COMET_DEFAULT, entry.origin(), entry.name());
             assertEquals(fixture.value(entry.name()), entry.value(), entry.name());
             assertEquals(fixture.text(entry.name()), defaults.text(entry.name()), entry.name());
         }
+        // D-012, the one departure: Comet writes a placeholder path, CometGUI starts empty
+        assertEquals(PLACEHOLDER, fixture.text(LIBRARY));
+        assertEquals("", defaults.text(LIBRARY));
+        assertEquals(ValueOrigin.COMETGUI_DEFAULT, defaults.origin(LIBRARY));
         // and the curated defaults agree with Comet's own file, with Comet's own enzyme table
-        assertEquals(CometParameters.defaults(METADATA, release, fixture.enzymeTable()), defaults);
+        CometParameters curated =
+                CometParameters.defaults(METADATA, release, fixture.enzymeTable());
+        assertEquals(PLACEHOLDER, curated.text(LIBRARY));
+        assertEquals(ValueOrigin.COMET_DEFAULT, curated.origin(LIBRARY));
+        assertEquals(curated.withStartingValues(), defaults);
+    }
+
+    @ParameterizedTest(name = "Comet {0}: spectral_library_name is the only starting value")
+    @CsvSource({"2026.03.0", "2026.02.2"})
+    void theOnlyStartingValue(String version) {
+        ToolVersion release = ToolVersion.parse(version);
+        CometParameters defaults = ReleaseDefaults.load(METADATA, release);
+        List<String> departures = new ArrayList<>();
+        for (ParameterEntry entry : defaults.entries()) {
+            if (entry.origin() != ValueOrigin.COMET_DEFAULT) {
+                departures.add(entry.name() + "=" + defaults.text(entry.name()));
+            }
+            assertEquals(
+                    entry.origin() == ValueOrigin.COMETGUI_DEFAULT,
+                    METADATA.startingValue(entry.name(), release).isPresent(),
+                    entry.name());
+        }
+        assertEquals(List.of(LIBRARY + "="), departures);
+        assertEquals(Optional.of(""), METADATA.startingValue(LIBRARY, release));
+        assertEquals(
+                Optional.of("D-012"),
+                METADATA.version(release).orElseThrow().override(LIBRARY).orElseThrow().decision());
+    }
+
+    @ParameterizedTest(name = "Comet {0}: a file read in keeps the library it names")
+    @CsvSource({"2026.03.0", "2026.02.2"})
+    void anImportedFileKeepsItsLibrary(String version) {
+        ToolVersion release = ToolVersion.parse(version);
+        // Comet's own -q file, read as a file the scientist imports: its placeholder is kept
+        CometParameters comets =
+                new CometParamsParser(METADATA, release)
+                        .parse(
+                                new String(
+                                        ReleaseDefaults.bundledFile(release),
+                                        StandardCharsets.UTF_8))
+                        .model()
+                        .orElseThrow();
+        assertEquals(PLACEHOLDER, comets.text(LIBRARY));
+        assertEquals(ValueOrigin.IMPORTED, comets.origin(LIBRARY));
+        // and a file naming a real library keeps that library
+        String named =
+                new String(ReleaseDefaults.bundledFile(release), StandardCharsets.UTF_8)
+                        .replace(
+                                "spectral_library_name = " + PLACEHOLDER,
+                                "spectral_library_name = /data/human.msp");
+        CometParameters imported =
+                new CometParamsParser(METADATA, release).parse(named).model().orElseThrow();
+        assertEquals("/data/human.msp", imported.text(LIBRARY));
+        assertEquals(ValueOrigin.IMPORTED, imported.origin(LIBRARY));
+    }
+
+    @ParameterizedTest(name = "Comet {0}: reset puts the library back to CometGUI's empty start")
+    @CsvSource({"2026.03.0", "2026.02.2"})
+    void resetAgreesWithTheStartingSet(String version) {
+        ToolVersion release = ToolVersion.parse(version);
+        CometParameters start = ReleaseDefaults.load(METADATA, release);
+        CometParameters named = start.withText(LIBRARY, "/data/human.msp", ValueOrigin.USER);
+        CometParameters reset = named.resetToDefault(LIBRARY);
+        assertEquals("", reset.text(LIBRARY));
+        assertEquals(ValueOrigin.COMETGUI_DEFAULT, reset.origin(LIBRARY));
+        assertEquals(start, reset);
+        CometParameters threads =
+                start.withText("num_threads", "8", ValueOrigin.USER).resetToDefault("num_threads");
+        assertEquals(ValueOrigin.COMET_DEFAULT, threads.origin("num_threads"));
+        assertEquals(start, threads);
     }
 
     @Test

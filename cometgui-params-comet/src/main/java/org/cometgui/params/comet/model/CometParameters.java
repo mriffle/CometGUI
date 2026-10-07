@@ -441,8 +441,11 @@ public final class CometParameters {
     }
 
     /**
-     * This model with one parameter back at its schema default, origin {@link
-     * ValueOrigin#COMET_DEFAULT}.
+     * This model with one parameter back at its default: CometGUI's starting value for the version
+     * where the metadata records one ({@link CuratedMetadata#startingValue}), origin {@link
+     * ValueOrigin#COMETGUI_DEFAULT}; otherwise the schema default, what {@code comet -q} writes,
+     * origin {@link ValueOrigin#COMET_DEFAULT}. It is the value a new configuration starts with
+     * ({@link #withStartingValues()}), so resetting a field and starting again agree.
      *
      * @param name the parameter name
      * @return a new model
@@ -450,8 +453,34 @@ public final class CometParameters {
      */
     public CometParameters resetToDefault(String name) {
         ParameterDefinition definition = require(name).definition();
+        Optional<String> starting = metadata.startingValue(name, version);
+        if (starting.isPresent()) {
+            return withText(name, starting.get(), ValueOrigin.COMETGUI_DEFAULT);
+        }
         ParameterEntry reset = defaultEntry(codec, definition);
         return withValue(name, reset.value(), reset.origin());
+    }
+
+    /**
+     * This model with every parameter for which the metadata records CometGUI's starting value for
+     * the version set to it, origin {@link ValueOrigin#COMETGUI_DEFAULT}; every other parameter as
+     * it was. This is how a <em>new</em> configuration departs from Comet's own {@code -q} output
+     * ({@code D-012}); a parsed or imported file is never passed through it, so a file keeps
+     * whatever it names.
+     *
+     * @return a new model
+     */
+    public CometParameters withStartingValues() {
+        CometParameters started = this;
+        for (ParameterEntry entry : entries.values()) {
+            Optional<String> starting = metadata.startingValue(entry.name(), version);
+            if (starting.isPresent()) {
+                started =
+                        started.withText(
+                                entry.name(), starting.get(), ValueOrigin.COMETGUI_DEFAULT);
+            }
+        }
+        return started;
     }
 
     /**

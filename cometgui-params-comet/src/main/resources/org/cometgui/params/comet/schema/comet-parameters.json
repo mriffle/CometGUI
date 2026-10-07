@@ -74,6 +74,14 @@
           "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSpecLib.cpp#L195-L215"
         },
         {
+          "name": "spectral_library_name",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L962",
+          "shortHelp": "Path to a spectral library to search. Not described on Comet's 2026.03 parameter pages. Empty means no spectral-library search, and a new CometGUI configuration starts with it empty: the value -q writes, /some/path/speclib.file, is a placeholder that names no file. A library Comet 2026.03.0 cannot read stops the whole search with an error, so a run that names a file that does not exist is refused before Comet starts.",
+          "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L2229-L2232",
+          "startingValue": "",
+          "decision": "D-012"
+        },
+        {
           "name": "variable_mod01",
           "source": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003",
           "shortHelp": "One variable modification as eight fields: mass difference, residues (letters A-Z; n and c for any peptide N- or C-terminus; ^ and $, new in Comet 2026.03.0, for the protein N- or C-terminus only), binary group, maximum or min,max count per peptide, distance from a terminus (-1 none, -2 not the peptide C-terminal residue, or 0 and above; Comet 2026.03.0 refuses any other value), which terminus (0 protein N, 1 protein C, 2 peptide N, 3 peptide C), required/exclusive, and zero, one or two fragment neutral losses. A mass of 0.0 leaves the slot unused.",
@@ -256,7 +264,14 @@
           "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1380-L1396"
         }
       },
-      "overrides": [],
+      "overrides": [
+        {
+          "name": "spectral_library_name",
+          "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L937",
+          "startingValue": "",
+          "decision": "D-012"
+        }
+      ],
       "ruleSeverities": [
         {
           "rule": "index_search_type.ignored_without_idx",
@@ -689,9 +704,9 @@
       "min": null,
       "max": null,
       "choices": [],
-      "shortHelp": "Path to a spectral library. Not described on Comet's 2026.02 parameter pages; the value -q writes is a placeholder. Empty, or a file Comet cannot read, means no spectral-library search.",
+      "shortHelp": "Path to a spectral library to search. Not described on Comet's 2026.02 parameter pages. Empty means no spectral-library search, and a new CometGUI configuration starts with it empty: the value -q writes, /some/path/speclib.file, is a placeholder that names no file. A library Comet 2026.02.2 cannot read stops the whole search with an error, so a run that names a file that does not exist is refused before Comet starts.",
       "inlineComment": null,
-      "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L937",
+      "helpUrl": "https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1967-L1970",
       "versions": {
         "from": "2026.02.2",
         "through": null

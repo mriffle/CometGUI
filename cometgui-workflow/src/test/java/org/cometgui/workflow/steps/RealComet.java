@@ -317,12 +317,13 @@ final class RealComet {
 
     /**
      * The release's starting parameters, as a search in these tests uses them: the given database,
-     * no spectral library, the given decoy source and threads, and the workflow's required outputs.
+     * the given decoy source and threads, and the workflow's required outputs. The spectral library
+     * is the starting set's own -- none (D-012) -- not set here: every real search these tests run
+     * proves that the empty starting value is one Comet searches with.
      */
     static CometParameters model(String release, Path database, DecoySource decoys, int threads) {
         return ReleaseDefaults.load(MetadataLoader.loadBundled(), ToolVersion.parse(release))
                 .withText("database_name", database.toString(), ValueOrigin.USER)
-                .withText("spectral_library_name", "", ValueOrigin.USER)
                 .withText("num_threads", Integer.toString(threads), ValueOrigin.USER)
                 .withDecoySource(decoys, ValueOrigin.USER)
                 .withWorkflowEnforcedOutputs();

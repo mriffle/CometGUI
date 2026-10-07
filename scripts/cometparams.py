@@ -190,6 +190,15 @@ _NUMERIC_KINDS = ("INTEGER", "DECIMAL", "INTEGER_RANGE", "DECIMAL_RANGE", "DECIM
 #: entry also carries ``name`` and ``source``; any other field is refused.
 OVERRIDE_FIELDS = ("default", "choices", "inlineComment", "shortHelp", "helpUrl")
 
+#: What an ``overrides`` entry may record about CometGUI rather than Comet
+#: (``ParameterOverride.STARTING_FIELDS``): the value a new configuration of the
+#: release starts with in place of Comet's default, and the decision behind it
+#: (``D-`` and three digits), always together. Not part of the release's
+#: definition: its ``default`` stays what ``comet -q`` writes.
+STARTING_FIELDS = ("startingValue", "decision")
+
+_DECISION = re.compile(r"D-[0-9]{3}")
+
 #: A version record's ``ruleSeverities`` entry (``org.cometgui.params.comet.schema
 #: .RuleSeverity``): the rule's stable identifier, what a finding of it is for that
 #: release, and the ``https://`` reference to the behaviour that level encodes.
@@ -813,11 +822,12 @@ def _validate_overrides(path: Path, index: int, record: dict, by_name: dict) -> 
         name = override.get("name")
         if isinstance(name, str):
             where += f" (\"{name}\")"
-        unknown = sorted(set(override) - {"name", "source", *OVERRIDE_FIELDS})
+        unknown = sorted(set(override) - {"name", "source", *OVERRIDE_FIELDS, *STARTING_FIELDS})
         if unknown:
             raise CometParamsError(
                 f"{path}: {where} has the field \"{unknown[0]}\", which an override does not "
-                f"have; it carries \"name\", \"source\" and any of {', '.join(OVERRIDE_FIELDS)}"
+                f"have; it carries \"name\", \"source\" and any of "
+                f"{', '.join(OVERRIDE_FIELDS + STARTING_FIELDS)}"
             )
         if name not in by_name:
             raise CometParamsError(
@@ -841,10 +851,10 @@ def _validate_overrides(path: Path, index: int, record: dict, by_name: dict) -> 
                 "release shows the difference by https:// reference"
             )
         replaced = [field for field in OVERRIDE_FIELDS if field in override]
-        if not replaced:
+        if not replaced and not any(field in override for field in STARTING_FIELDS):
             raise CometParamsError(
                 f"{path}: {where} replaces no field; it names at least one of "
-                f"{', '.join(OVERRIDE_FIELDS)}"
+                f"{', '.join(OVERRIDE_FIELDS)} or a startingValue"
             )
         if "default" in override and not isinstance(override["default"], str):
             raise CometParamsError(f"{path}: {where} has a \"default\" that is not text")
@@ -896,6 +906,7 @@ def _validate_overrides(path: Path, index: int, record: dict, by_name: dict) -> 
                     "records only a difference"
                 )
         definition = definition_for_record(parameter, override)
+        _validate_starting_value(path, where, override, definition)
         if definition["kind"].endswith("_ENUM") and definition["default"] != "" and \
                 definition["default"] not in [choice["value"] for choice in definition["choices"]]:
             raise CometParamsError(
@@ -903,6 +914,62 @@ def _validate_overrides(path: Path, index: int, record: dict, by_name: dict) -> 
                 f"{definition['default']!r}, which is not one of that release's choices "
                 f"({', '.join(choice['value'] for choice in definition['choices'])})"
             )
+
+
+def _validate_starting_value(path: Path, where: str, override: dict, definition: dict) -> None:
+    """Refuse a starting value ``MetadataLoader`` would refuse: one without its decision
+    (or the other way round), a decision not named ``D-`` and three digits, a value
+    that is not text, is padded, is empty where the parameter cannot be, is not one of
+    an enumerated parameter's choices, or repeats the release's own default."""
+    present = [field for field in STARTING_FIELDS if field in override]
+    if not present:
+        return
+    if len(present) != len(STARTING_FIELDS):
+        raise CometParamsError(
+            f"{path}: {where} has \"{present[0]}\" without "
+            f"\"{[f for f in STARTING_FIELDS if f not in present][0]}\"; CometGUI departs from "
+            "Comet's default only by a recorded decision, and the two come together"
+        )
+    decision = override["decision"]
+    if not isinstance(decision, str) or not _DECISION.fullmatch(decision):
+        raise CometParamsError(
+            f"{path}: {where} has \"decision\" = {decision!r}; it is D- and three digits, as "
+            "DECISIONS.rst numbers them"
+        )
+    value = override["startingValue"]
+    if not isinstance(value, str) or value != value.strip():
+        raise CometParamsError(
+            f"{path}: {where} has \"startingValue\" = {value!r}; it is text without surrounding "
+            "white space"
+        )
+    if value == "" and definition["serialization"] != "EMPTY_ALLOWED":
+        raise CometParamsError(
+            f"{path}: {where} starts {definition['name']} empty, and serialization "
+            f"{definition['serialization']} is not"
+        )
+    if value != "" and definition["kind"].endswith("_ENUM") and \
+            value not in [choice["value"] for choice in definition["choices"]]:
+        raise CometParamsError(
+            f"{path}: {where} starts {definition['name']} at {value!r}, which is not one of "
+            "the release's choices"
+        )
+    if value == definition["default"]:
+        raise CometParamsError(
+            f"{path}: {where} has the starting value {value!r}, the release's own default; a "
+            "starting value records only a departure from it"
+        )
+
+
+def starting_value_for(metadata: dict, parameter: dict, version: str):
+    """CometGUI's starting value for a parameter in one release, where the release's
+    override records one -- the same rule as ``CuratedMetadata.startingValue`` -- else
+    ``None``. Returns ``(value, decision)``."""
+    for record in metadata["versions"]:
+        if record["version"] == version:
+            for override in record["overrides"]:
+                if override["name"] == parameter["name"] and "startingValue" in override:
+                    return override["startingValue"], override["decision"]
+    return None
 
 
 def definition_for_record(parameter: dict, override) -> dict:
@@ -1127,6 +1194,17 @@ def render_entry(metadata: dict, presets: dict, parameter: dict, releases, categ
         if _available(parameter, version):
             out += _field(f"Default, Comet {version}",
                           _literal(default_for(metadata, parameter, version)))
+    for version in releases:
+        starting = starting_value_for(metadata, parameter, version) \
+            if _available(parameter, version) else None
+        if starting is not None:
+            value, decision = starting
+            out += _field(
+                f"CometGUI starting value, Comet {version}",
+                f"{_literal(value)} -- a new CometGUI configuration starts here, not at Comet's "
+                f"default above, by decision {decision}. A file you import keeps the value it "
+                "names.",
+            )
     out += _per_release("Allowed values", metadata, parameter, releases,
                         lambda d: _allowed(metadata, d, releases))
     out += _per_release(

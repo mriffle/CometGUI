@@ -64,10 +64,11 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>{@code essentials-tryptic-dda-2026.03.0.params}, checked in beside this class and
  * hand-reviewed: it is Comet 2026.03.0's own {@code comet -q} file in CometGUI's canonical form,
  * with exactly the lines this search sets changed, {@code output_percolatorfile} on (the workflow
- * requires it) and a header naming the build. The build is this test's own, injected through the
- * application's constructor ({@code 0.0.0-guitest}), so the header line is compared like every
- * other line -- nothing in the file is substituted before comparing. The comparison is byte for
- * byte.
+ * requires it), {@code spectral_library_name} empty (CometGUI's starting value, D-012, in place of
+ * {@code -q}'s placeholder path) and a header naming the build. The build is this test's own,
+ * injected through the application's constructor ({@code 0.0.0-guitest}), so the header line is
+ * compared like every other line -- nothing in the file is substituted before comparing. The
+ * comparison is byte for byte.
  */
 class EssentialsTrypticSearchUiTest {
 

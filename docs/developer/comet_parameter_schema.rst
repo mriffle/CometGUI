@@ -364,7 +364,9 @@ Top level::
                                                "residueAlphabet": { "characters", "source" } },
                          "overrides": [ { "name", "source", ...any of "default",
                                           "choices", "inlineComment",
-                                          "shortHelp", "helpUrl" } ],
+                                          "shortHelp", "helpUrl",
+                                          and "startingValue" with
+                                          "decision" } ],
                          "ruleSeverities": [ { "rule", "severity", "source" } ] } ],
       "categories":  [ { "id", "displayName" } ],         // exactly the fourteen
       "enzymeTable": { "header", "helpUrl", "rowFormat",
@@ -388,8 +390,10 @@ reference to where the release shows them -- see
 :ref:`dev-comet-parameter-residue-alphabet`.
 
 ``overrides`` lists what **that release** says differently about a parameter
-(:ref:`dev-comet-parameter-overrides`); it is empty for a release that agrees
-with every curated definition. ``ruleSeverities`` states, for each
+(:ref:`dev-comet-parameter-overrides`), and where CometGUI's starting value
+for that release departs from Comet's default
+(:ref:`dev-comet-parameter-starting-values`); it is empty for a release that
+agrees with every curated definition and has no starting value. ``ruleSeverities`` states, for each
 version-scoped validation rule, what that release's binary does with what the
 rule checks (:ref:`dev-comet-parameter-rule-severities`). Three records exist
 (:ref:`dev-comet-parameter-202603`, :ref:`dev-comet-parameter-older-release`):
@@ -407,7 +411,8 @@ rule checks (:ref:`dev-comet-parameter-rule-severities`). Three records exist
        (``D-010``). The same tuple layout as 2026.02.2, read by
        ``Comet.cpp`` lines 556-625 at ``v2026.03.0`` [V26T]_; its residue
        alphabet adds ``^`` and ``$`` to ``A``-``Z``, ``n`` and ``c``
-       [V26A]_ (:ref:`dev-comet-parameter-202603-termini`). Twenty overrides:
+       [V26A]_ (:ref:`dev-comet-parameter-202603-termini`). Twenty-one
+       overrides:
        ``index_search_type`` (default ``-1``, choices ``-1``/``0``/``1``,
        Comet's own 2026.03.0 inline comment, help and help page),
        ``decoy_search`` (Comet's own 2026.03.0 inline comment),
@@ -415,14 +420,20 @@ rule checks (:ref:`dev-comet-parameter-rule-severities`). Three records exist
        comment, help and help reference: what 2026.03.0 really does with each),
        ``output_txtfile`` (inline comment and help naming 2026.03.0) and
        ``variable_mod01`` to ``variable_mod15`` (help naming ``^`` and ``$``,
-       and the 2026.03 page) -- :ref:`dev-comet-parameter-202603-help`. Rule
+       and the 2026.03 page) -- :ref:`dev-comet-parameter-202603-help` -- and
+       ``spectral_library_name`` (help naming 2026.03.0, its help reference,
+       and CometGUI's starting value, empty, ``D-012`` --
+       :ref:`dev-comet-parameter-starting-values`). Rule
        severities: a distance below -2 an **error**, ``index_search_type``
        without an ``.idx`` a **warning**.
    * - ``2026.02.2``
      - ``2026.02 rev. 2 (6edec91)``
      - Neutral loss and count both take a comma pair; residue alphabet
-       ``A``-``Z``, ``n``, ``c`` [M1380]_. ``overrides`` empty: every curated
-       definition is 2026.02.2's own. Rule severities: a distance below -2 a
+       ``A``-``Z``, ``n``, ``c`` [M1380]_. Every curated definition is
+       2026.02.2's own; its one override records CometGUI's starting value
+       for ``spectral_library_name``, empty (``D-012``,
+       :ref:`dev-comet-parameter-starting-values`). Rule severities: a
+       distance below -2 a
        **warning**, ``index_search_type`` without an ``.idx`` **off**.
    * - ``2024.01.0``
      - ``2024.01 rev. 0 (f00df0c)``
@@ -583,6 +594,102 @@ short help; and an ``overrides`` member that is not an array of objects.
 ``VersionOverridesLoaderTest`` proves each on constructed metadata, and
 ``VersionDefaultsLoaderTest`` the default-only cases that predate the other
 four fields.
+
+.. _dev-comet-parameter-starting-values:
+
+CometGUI's starting values (``D-012``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A new configuration starts from the release's own ``comet -q`` output
+(:ref:`dev-comet-parameter-release-defaults`) **except** where an override
+records a ``startingValue``: a deliberate, owner-decided departure from
+Comet's default, never a fact about Comet. It comes with the ``decision``
+that made it::
+
+    {
+      "name": "spectral_library_name",
+      "source": "https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L937",
+      "startingValue": "",
+      "decision": "D-012"
+    }
+
+There is exactly one today, in both offered releases: ``spectral_library_name``
+starts **empty**. Both releases' ``-q`` writes ``spectral_library_name =
+/some/path/speclib.file`` [SQ22]_ [SQ26]_, a placeholder that names no file,
+and both stop a search that names a library they cannot read; so every new
+search used to be blocked until the scientist cleared the field.
+
+The ``default`` stays Comet's: the starting value is **not** part of the
+release's definition (``ParameterOverride.applyTo`` leaves it out), so drift
+detection, the generated reference's *Default* line and the editor's
+"Comet 2026.03.0 default: ..." tooltip line still say what ``-q`` writes, and
+the bundled ``comet-q.params`` files are untouched. It is read in one place,
+``CuratedMetadata.startingValue(name, version)``, and applied in two:
+
+* ``CometParameters.withStartingValues()``, which ``ReleaseDefaults.load``
+  calls -- so a **new** configuration (and *Reset all*) carries it;
+* ``CometParameters.resetToDefault(name)``, so resetting the field agrees
+  with starting again (and the editor's *changed from default* filter does not
+  list a fresh configuration's library).
+
+Either way the value's origin is ``COMETGUI_DEFAULT``, shown in the editor as
+"CometGUI default (Comet 2026.03.0's own default differs)", never as Comet's.
+A file that is **parsed** -- imported, or Comet's own ``-q`` file read as an
+import -- never passes through either: it keeps whatever library it names,
+origin ``IMPORTED``, and the pre-run check (:doc:`workflow_engine`) still
+refuses a named library that does not exist. A parameter a file leaves out
+still takes Comet's default, as before.
+
+What ``MetadataLoader`` and ``scripts/cometparams.py`` refuse: a
+``startingValue`` without its ``decision`` or the other way round; a decision
+not named ``D-`` and three digits; a starting value that is padded, empty
+where the parameter's serialisation does not allow empty, not one of an
+enumerated parameter's choices, or outside its bounds; and one equal to the
+release's own default (it records only a departure). ``VersionOverridesLoaderTest``
+(``StartingValues``), ``ParameterOverrideTest`` and the
+``starting-*`` cases of ``scripts/cometparams_selftest.py`` prove each;
+``ReleaseDefaultsTest`` proves that ``spectral_library_name`` is the only
+value of either starting set that is not Comet's, that it is empty with origin
+``COMETGUI_DEFAULT``, that a parsed file keeps its library, and that reset
+agrees with the starting set.
+
+**What empty does, established by running both real binaries** (2026-10-07,
+the pinned linux x86-64 binaries ``ad93b4cf...`` and ``af515b6e...``; each
+release's own bundled ``comet-q.params`` with ``database_name`` pointed at the
+fixture proteome ``UP000005640_9606.fasta`` and only ``spectral_library_name``
+varied; spectra the LF-repaired ``20100614_Velos1_TaGe_SA_K562_3.mzML``,
+``a562f6e6...``; ``comet -P<file> -N<name> spec.mzML``):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - ``spectral_library_name``
+     - Comet 2026.03.0
+     - Comet 2026.02.2
+   * - ``/some/path/speclib.file`` (``-q``'s)
+     - exit 1: ``Error (5) - cannot read spectral library file
+       "/some/path/speclib.file".``
+     - exit 1, the same message
+   * - empty (``spectral_library_name =``)
+     - exit 0: 728 spectra, 3637 search hits
+     - exit 0: 728 spectra, 3637 search hits
+   * - the line removed
+     - exit 0; pepXML identical to the empty run's but for the echoed
+       ``<parameter name="spectral_library_name" value=""/>``
+     - the same
+
+So empty means **no spectral-library search** in both releases, exactly as
+if the parameter were absent. The source agrees: both search managers set
+``g_bPerformSpecLibSearch = false`` when the name is empty, and otherwise
+fail the search on a file they cannot open [SL22]_ [SL26]_. Each release's
+help text says this, naming the release; 2026.03.0's is an override because
+the curated text is 2026.02.2's.
+
+.. [SQ22] https://github.com/UWPR/Comet/blob/v2026.02.2/Comet.cpp#L937
+.. [SQ26] https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L962
+.. [SL22] https://github.com/UWPR/Comet/blob/v2026.02.2/CometSearch/CometSearchManager.cpp#L1967-L1970
+.. [SL26] https://github.com/UWPR/Comet/blob/v2026.03.0/CometSearch/CometSearchManager.cpp#L2229-L2232
 
 The format kept ``schemaVersion`` 1. A saved preset records the metadata
 schema version it was made against, and bumping it would have orphaned every
@@ -1661,7 +1768,10 @@ Origins
 
 ``ValueOrigin`` is the specification's five: ``COMET_DEFAULT`` (the curated
 default, what ``-q`` writes), ``PRESET``, ``USER``, ``IMPORTED`` and
-``WORKFLOW_ENFORCED`` (``R-CMT-01``: the outputs the workflow forces on). The
+``WORKFLOW_ENFORCED`` (``R-CMT-01``: the outputs the workflow forces on) --
+and ``COMETGUI_DEFAULT``, a starting value CometGUI chose instead of Comet's
+default (``D-012``, :ref:`dev-comet-parameter-starting-values`), so that a
+departure from Comet is never shown as Comet's. The
 origin is carried, compared by model equality, and never written: two models
 that differ only in origins write the same bytes.
 
@@ -1862,7 +1972,10 @@ files would be copied into the jar, since the directory is a resource root).
    * - ``load(metadata, release)``
      - The file parsed for that release by ``CometParamsParser``, with every
        origin ``COMET_DEFAULT`` (the parser marks a declared value
-       ``IMPORTED``; nothing was imported here): 118 entries, Comet's own
+       ``IMPORTED``; nothing was imported here), then CometGUI's starting
+       values applied (``withStartingValues``; origin ``COMETGUI_DEFAULT``):
+       ``spectral_library_name`` empty, ``D-012``,
+       :ref:`dev-comet-parameter-starting-values`. 118 entries, Comet's own
        twelve enzyme rows, no unknown parameter and no diagnostic.
 
 What it refuses: a release with no bundled file, with an

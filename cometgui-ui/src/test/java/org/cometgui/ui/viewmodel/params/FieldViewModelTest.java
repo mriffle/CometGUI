@@ -154,6 +154,24 @@ class FieldViewModelTest {
                 words, startingIn(ToolVersion.parse(release)).field("num_threads").originText());
     }
 
+    @ParameterizedTest(name = "Comet {0}: the spectral library starts empty, as CometGUI's default")
+    @CsvSource({"2026.03.0", "2026.02.2"})
+    void spectralLibraryStartsEmptyAsCometGuisDefault(String release) {
+        ParameterSession session = startingIn(ToolVersion.parse(release));
+        FieldViewModel library = session.field("spectral_library_name");
+        assertEquals("", library.text());
+        assertEquals(ValueOrigin.COMETGUI_DEFAULT, library.origin());
+        assertEquals(
+                "CometGUI default (Comet " + release + "'s own default differs)",
+                library.originText());
+        assertEquals("/some/path/speclib.file", library.defaultText(), "Comet's own, still shown");
+        assertTrue(library.setText("/data/human.msp").accepted());
+        assertEquals(ValueOrigin.USER, library.origin());
+        assertTrue(library.reset().accepted());
+        assertEquals("", library.text());
+        assertEquals(ValueOrigin.COMETGUI_DEFAULT, library.origin());
+    }
+
     @ParameterizedTest(name = "Comet {0}: a terminal distance below -2 is {1}")
     @CsvSource({"2026.03.0, ERROR, Error, true", "2026.02.2, WARNING, Warning, false"})
     void distanceBelowMinusTwo(String release, FieldState state, String prefix, boolean blocks) {
