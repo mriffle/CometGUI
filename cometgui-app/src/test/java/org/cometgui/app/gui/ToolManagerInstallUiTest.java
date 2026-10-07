@@ -544,7 +544,12 @@ class ToolManagerInstallUiTest {
     /** What Percolator's functional probe established, in the order the row renders it. */
     private static String capabilitiesOfPercolator() {
         return "Capabilities: XML_OUTPUT (observed-by-execution), XML_DECOY_OUTPUT"
-                + " (observed-by-execution)";
+                + " (observed-by-execution), PSM_TSV_OUTPUT (observed-by-execution),"
+                + " PEPTIDE_TSV_OUTPUT (observed-by-execution), DECOY_OUTPUT"
+                + " (observed-by-execution), WEIGHTS_OUTPUT (observed-by-execution),"
+                + " THREAD_OPTION (observed-by-execution), SEED_OPTION (observed-by-execution),"
+                + " TEST_FDR_OPTION (observed-by-execution), TRAIN_FDR_OPTION"
+                + " (observed-by-execution), MAX_ITERATIONS_OPTION (observed-by-execution)";
     }
 
     private void assertRowIsInstalled(ShownToolManager ui, Path cacheRoot, String row)
@@ -671,11 +676,13 @@ class ToolManagerInstallUiTest {
      * The first run here is the banner, and the capability verdict comes from two further runs that
      * write documents -- {@code -X} for targets and {@code -X -Z} for decoys, over one synthetic
      * PIN. {@link #assertPercolatorReallyWritesTheXmlItsRowClaims} then reads such a document.
+     * Since phase 09 unit 1 the probe makes nine more runs over the same PIN, one per remaining
+     * capability, each led by the option it tests.
      */
     private static void assertPercolatorWasProbedFunctionally(RecordingProcessRunner processes) {
         List<List<String>> runs = runsOf(processes, "percolator");
         assertTrue(
-                runs.size() >= 3, () -> "percolator was run " + runs.size() + " time(s): " + runs);
+                runs.size() >= 12, () -> "percolator was run " + runs.size() + " time(s): " + runs);
         List<String> targets = runs.get(1);
         List<String> decoys = runs.get(2);
         assertAll(
@@ -713,8 +720,22 @@ class ToolManagerInstallUiTest {
                                 "and neither capability verdict came from the help text"),
                 () ->
                         assertEquals(
+                                List.of(
+                                        "--results-psms",
+                                        "--results-peptides",
+                                        "--decoy-results-psms",
+                                        "--weights",
+                                        "--seed",
+                                        "--num-threads",
+                                        "--testFDR",
+                                        "--trainFDR",
+                                        "--maxiter"),
+                                runs.subList(3, 12).stream().map(argv -> argv.get(1)).toList(),
+                                "one further run per remaining capability, each over the same PIN"),
+                () ->
+                        assertEquals(
                                 List.of(),
-                                runs.subList(3, runs.size()).stream()
+                                runs.subList(12, runs.size()).stream()
                                         .filter(
                                                 argv ->
                                                         !argv.equals(
