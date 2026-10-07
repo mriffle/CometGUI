@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 14
+:Revision: 15
 :Revision date: 2026-10-07
-:Supersedes: Revision 13, 2026-10-05
+:Supersedes: Revision 14, 2026-10-07
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,14 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 15
+     - 2026-10-07
+     - ``D-012``: CometGUI's starting configuration departs from Comet's
+       generated defaults in one recorded place -- ``spectral_library_name``
+       starts empty, because Comet's own default names a file that does not
+       exist and Comet refuses to run with it. Both real binaries confirmed
+       that empty, and an absent line, mean no spectral-library search. The
+       value-origin list gains *CometGUI default*.
    * - 14
      - 2026-10-07
      - The run layout's Comet logs, from Phase 08: one stream-tagged
@@ -1576,8 +1584,16 @@ A parameter definition should contain fields equivalent to:
     ) {}
 
 A parameter value in a project or run shall also remember its origin -- Comet
-default, application preset, user changed, imported from file, or
-workflow-enforced -- and the UI shall be able to show it.
+default, CometGUI default (a listed departure from Comet's default), application
+preset, user changed, imported from file, or workflow-enforced -- and the UI
+shall be able to show it.
+
+CometGUI's starting configuration for a Comet release is that release's own
+``comet -q`` output, except where the metadata lists a recorded departure for
+that release (revision 15). The only one is ``spectral_library_name``, which
+starts empty -- no spectral-library search (``D-012``). The same value applies
+to a parameter file that does not declare it, because Comet itself reads such
+a file as having no spectral library. A file that names a library keeps it.
 
 Structured parameter kinds
 --------------------------

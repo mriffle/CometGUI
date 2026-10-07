@@ -66,7 +66,7 @@ authoritative for its own scope and exit gate.
      - Percolator Adapter and Version Capabilities
      - 05, 08
      - none open; D-002 and D-003 both DECIDED
-     - NOT STARTED
+     - IN PROGRESS (dispatched 2026-10-07)
    * - `10 <PHASE-10-results.rst>`_
      - Results Model and UI
      - 09

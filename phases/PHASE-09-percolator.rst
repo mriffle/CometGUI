@@ -3,7 +3,7 @@ PHASE-09: Percolator Adapter and Version Capabilities
 =====================================================
 
 :Phase: 09
-:Status: NOT STARTED
+:Status: IN PROGRESS (dispatched 2026-10-07)
 :Depends on: 05, 08
 :Blocked by decisions: none -- D-002 and D-003 both DECIDED
 :Delivers: R-PERC-01..12

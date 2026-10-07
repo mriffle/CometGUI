@@ -4,12 +4,15 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-10-07
-:Updated by: Main orchestrator, session 10 (**Phase 08 signed off PARTIAL** --
-   :ref:`status-p08-signed`; specification revision 14)
-:Current phase: **none -- waiting for the owner.** Phase 08 is signed off and
-   committed, **not pushed**. Phase 09 (Percolator adapter) is ready and not
-   dispatched. One product question waits on the owner: the placeholder
-   spectral library that blocks every new search (:ref:`status-p08-signed`).
+:Updated by: Main orchestrator, session 10 (**D-012 repair signed off** --
+   :ref:`status-d012-signed`; specification revision 15; **Phase 09
+   dispatched**. Earlier: Phase 08 signed off PARTIAL --
+   :ref:`status-p08-signed`)
+:Current phase: **Phase 09 -- Percolator Adapter and Version Capabilities**,
+   dispatched 2026-10-07 with ``handoffs/PHASE-09-BRIEF.rst``, after the
+   ``D-012`` repair was signed off (:ref:`status-d012-signed`). ``main`` is
+   **not pushed** since ``6bb9ce6``: the owner has not asked for a push since
+   Phase 07.
 :Overall: Nine phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
    05 and 08 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
@@ -250,8 +253,8 @@ Phase board
        have run only on Linux/POSIX.
    * - 09
      - Percolator adapter and version capabilities
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-10-07 (``handoffs/PHASE-09-BRIEF.rst``).
    * - 10
      - Results model and UI
      - NOT STARTED
@@ -3263,6 +3266,37 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-d012-signed:
+
+``D-012`` repair signed off (2026-10-07)
+========================================
+
+The owner directed: *"Make the spectral library change."* One tier-1 fix
+agent, two commits: ``12c4814`` (a new configuration and Reset start with
+``spectral_library_name`` empty, origin *CometGUI default*) and ``d6d23a9``
+(tier 1's follow-up: a file that does not declare the parameter gets the same
+empty value, because the agent showed Comet reads an absent line exactly as an
+empty one; a migration lists it as a visible ``ADDED`` entry). The bundled
+``comet -q`` files and every Comet fixture are untouched; three migrated
+fixtures (product output) were re-pinned, each differing in the library line
+alone and each searched by the real 2026.03.0 binary.
+
+**Evidence by execution**, both real binaries: Comet's placeholder exits 1
+(``Error (5) - cannot read spectral library file``); empty, and the line
+absent, exit 0 with 728 spectra and 3637 hits, identical pepXML. Comet's source
+agrees (an empty name disables spectral-library search).
+
+**Tier 1's sign-off:** diff read (no POM, no test deleted or disabled, one
+floor raised 55 to 71, real Comet files untouched, all seven fixture
+``SHA256SUMS`` verify); ``--only docs traceability params paramui workflow``
+**5 of 5 passed** (2779 s); tier 1's own injection -- the single starting-value
+read point switched off -- **17 of 2116** ``cometgui-params-comet`` tests
+failed, e.g. ``CometParamsParserTest.realDefaultsFile``: expected
+``COMETGUI_DEFAULT`` but was ``COMET_DEFAULT``; restored and verified. The full
+build and gate run happens at Phase 09's exit and covers this repair too.
+
+**Specification revision 15** records the departure and the new value origin.
+
 .. _status-p08-signed:
 
 Phase 08 signed off PARTIAL (2026-10-07)
@@ -3867,6 +3901,11 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-07
+     - 08+, 09
+     - ``D-012`` decided and its repair signed off (5/5 affected gates, a
+       tier-1 injection); specification revision 15; **Phase 09 dispatched**.
+       See :ref:`status-d012-signed`.
    * - 2026-10-07
      - 08
      - **Phase 08 signed off PARTIAL** at ``796bac6`` (build 11/11, gates 15/15
