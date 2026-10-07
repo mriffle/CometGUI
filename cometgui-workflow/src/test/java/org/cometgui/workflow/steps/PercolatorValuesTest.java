@@ -532,4 +532,49 @@ class PercolatorValuesTest {
                     key);
         }
     }
+
+    @Test
+    @DisplayName(
+            "a prepared run plans run-percolator exactly when it has a Percolator half; the"
+                    + " refusal names the plan")
+    void aPreparedRunsPlanMatchesItsHalf() {
+        IllegalArgumentException refused =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                new PreparedRun(
+                                        null,
+                                        null,
+                                        CometWorkflow.planFor(IndexMode.NONE, true),
+                                        null,
+                                        null,
+                                        null,
+                                        Map.of(),
+                                        Optional.empty()));
+        assertEquals(
+                "a run plans run-percolator exactly when it has a Percolator half; plan"
+                        + " Plan[validate-configuration, resolve-comet, resolve-percolator,"
+                        + " serialise-comet-params, hash-inputs, run-comet, validate-comet-outputs,"
+                        + " merge-pin, run-percolator, parse-percolator, finalise-provenance],"
+                        + " Percolator absent",
+                refused.getMessage());
+    }
+
+    @Test
+    @DisplayName(
+            "a raw output on a file system with neither POSIX permissions nor a DOS attribute"
+                    + " cannot be made read-only, and says so")
+    void readOnlyNeedsAnAttributeView(@TempDir Path directory) throws IOException {
+        Path zip = directory.resolve("outputs.zip");
+        try (java.nio.file.FileSystem zipfs =
+                java.nio.file.FileSystems.newFileSystem(zip, Map.of("create", "true"))) {
+            Path file = Files.writeString(zipfs.getPath("psms.tsv"), "x\n");
+            IOException refused =
+                    assertThrows(IOException.class, () -> PercolatorSteps.makeReadOnly(file));
+            assertEquals(
+                    "the raw Percolator output psms.tsv cannot be made read-only: its file system"
+                            + " offers neither POSIX permissions nor a DOS read-only attribute",
+                    refused.getMessage());
+        }
+    }
 }
