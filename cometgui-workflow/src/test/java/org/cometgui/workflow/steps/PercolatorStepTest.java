@@ -644,7 +644,8 @@ class PercolatorStepTest {
 
     @Test
     @DisplayName("an artefact the command asked for and Percolator did not write fails the step")
-    void aMissingArtefactFails(@TempDir Path directory) throws Exception {
+    void aMissingArtefactFails(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         RunResult result =
                 failing(
                         directory,
@@ -661,7 +662,8 @@ class PercolatorStepTest {
 
     @Test
     @DisplayName("an artefact Percolator wrote empty fails the step")
-    void anEmptyArtefactFails(@TempDir Path directory) throws Exception {
+    void anEmptyArtefactFails(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         RunResult result =
                 failing(
                         directory,
@@ -677,7 +679,8 @@ class PercolatorStepTest {
     @Test
     @DisplayName(
             "a file the command did not ask for -- XML when none was requested -- fails the step")
-    void anUnexpectedXmlFails(@TempDir Path directory) throws Exception {
+    void anUnexpectedXmlFails(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         RunResult result =
                 failing(
                         directory,
@@ -694,7 +697,8 @@ class PercolatorStepTest {
 
     @Test
     @DisplayName("an unexpected file beside a requested pout XML fails without the no-XML clause")
-    void anUnexpectedFileBesideXmlFails(@TempDir Path directory) throws Exception {
+    void anUnexpectedFileBesideXmlFails(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         RunResult result =
                 failing(
                         directory,
@@ -710,7 +714,8 @@ class PercolatorStepTest {
 
     @Test
     @DisplayName("Percolator exiting non-zero fails the step, its outputs recorded partial")
-    void aNonZeroExitFails(@TempDir Path directory) throws Exception {
+    void aNonZeroExitFails(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Staged staged = stage(directory, FakePercolator.Behaviour.normal().exiting(3));
         try (RealProject project = staged.project()) {
             PreparedRun prepared =
@@ -741,7 +746,8 @@ class PercolatorStepTest {
 
     @Test
     @DisplayName("a table the parser refuses fails parse-percolator with the parser's message")
-    void aMalformedTableFailsParsing(@TempDir Path directory) throws Exception {
+    void aMalformedTableFailsParsing(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Staged staged =
                 stage(
                         directory,
@@ -769,7 +775,8 @@ class PercolatorStepTest {
             "a build without WEIGHTS_OUTPUT, SEED_OPTION and XML_OUTPUT, Limelight enabled: none"
                     + " is passed, each omission and R-PERC-08's warning are recorded, the seed is"
                     + " recorded as not passed, and the run succeeds")
-    void omissionsAreRecorded(@TempDir Path directory) throws Exception {
+    void omissionsAreRecorded(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Staged staged = stage(directory, FakePercolator.Behaviour.normal());
         Set<ToolCapability> lacking = EnumSet.copyOf(FakePercolator.EVERY);
         lacking.removeAll(
@@ -847,7 +854,8 @@ class PercolatorStepTest {
     @DisplayName(
             "prepare refuses, with no run directory, a Percolator that cannot write the target"
                     + " tables, or whose executable changed since it was selected")
-    void prepareRefusesAnUnusablePercolator(@TempDir Path directory) throws Exception {
+    void prepareRefusesAnUnusablePercolator(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Staged staged = stage(directory, FakePercolator.Behaviour.normal());
         Set<ToolCapability> noTables = EnumSet.copyOf(FakePercolator.EVERY);
         noTables.remove(ToolCapability.PSM_TSV_OUTPUT);

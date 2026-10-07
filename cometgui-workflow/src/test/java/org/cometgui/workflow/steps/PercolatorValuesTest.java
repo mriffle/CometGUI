@@ -57,6 +57,7 @@ import org.cometgui.tools.percolator.PercolatorOption;
 import org.cometgui.tools.percolator.PercolatorRefusedException;
 import org.cometgui.workflow.engine.StepFailedException;
 import org.cometgui.workflow.state.EngineStep;
+import org.cometgui.workflow.testing.TestPaths;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -68,7 +69,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class PercolatorValuesTest {
 
-    private static final Path EXE = Path.of("/opt/percolator/bin/percolator");
+    private static final Path EXE = TestPaths.absolute("opt/percolator/bin/percolator");
 
     private static final String SHA = "ab".repeat(32);
 
@@ -92,7 +93,7 @@ class PercolatorValuesTest {
         PercolatorSelection selection =
                 new PercolatorSelection(
                         installed,
-                        Path.of("/opt/percolator/bin/../bin/percolator"),
+                        TestPaths.absolute("opt/percolator/bin/../bin/percolator"),
                         "AB".repeat(32));
         assertEquals(EXE, selection.executable());
         assertEquals(SHA, selection.sha256());
@@ -154,7 +155,9 @@ class PercolatorValuesTest {
                                 IllegalArgumentException.class,
                                 () ->
                                         new PercolatorSelection(
-                                                installed, Path.of("/elsewhere/percolator"), SHA))
+                                                installed,
+                                                TestPaths.absolute("elsewhere/percolator"),
+                                                SHA))
                         .getMessage());
         assertEquals(
                 "a SHA-256 is 64 hexadecimal characters, not \"abc\"",
@@ -206,7 +209,11 @@ class PercolatorValuesTest {
     void choiceRules() {
         ToolOffer full = offer(EXE, "3.07.1", ToolOrigin.MANAGED, FakePercolator.EVERY);
         ToolOffer other =
-                offer(Path.of("/opt/other/percolator"), "3.09", ToolOrigin.LOCAL, Set.of());
+                offer(
+                        TestPaths.absolute("opt/other/percolator"),
+                        "3.09",
+                        ToolOrigin.LOCAL,
+                        Set.of());
         PercolatorChoice limelight = choice(full, EnumSet.of(DownstreamStage.LIMELIGHT_CONVERSION));
         assertTrue(limelight.xmlNeeded());
         assertTrue(limelight.isResolvedDefault());
@@ -219,7 +226,8 @@ class PercolatorValuesTest {
 
         PercolatorChoice notTheDefault =
                 new PercolatorChoice(
-                        new PercolatorSelection(other, Path.of("/opt/other/percolator"), SHA),
+                        new PercolatorSelection(
+                                other, TestPaths.absolute("opt/other/percolator"), SHA),
                         PercolatorSettings.defaults(),
                         Set.of(),
                         PercolatorResolver.resolve(List.of(full), Set.of()));
@@ -423,15 +431,15 @@ class PercolatorValuesTest {
                         PercolatorArtefact.WEIGHTS, "percolator-weights",
                         PercolatorArtefact.POUT_XML, "percolator-pout-xml"),
                 roles);
-        RunLayout layout = new RunLayout(Path.of("/p/runs/r1"));
+        RunLayout layout = new RunLayout(TestPaths.absolute("p/runs/r1"));
         assertEquals(
-                Path.of("/p/runs/r1/parameters/percolator-settings.json"),
+                TestPaths.absolute("p/runs/r1/parameters/percolator-settings.json"),
                 PercolatorDeclarations.settingsFile(layout));
         assertEquals(
                 "parameters/percolator-settings.json",
                 PercolatorDeclarations.settingsRelativePath());
         assertEquals(
-                Path.of("/p/runs/r1/outputs/percolator"),
+                TestPaths.absolute("p/runs/r1/outputs/percolator"),
                 PercolatorDeclarations.outputDirectory(layout));
     }
 
@@ -452,7 +460,10 @@ class PercolatorValuesTest {
         PercolatorCommand command =
                 PercolatorCommands.build(
                         PercolatorRun.request(
-                                EXE, Path.of("/r/merged.pin"), Path.of("/r/out"), choice));
+                                EXE,
+                                TestPaths.absolute("r/merged.pin"),
+                                TestPaths.absolute("r/out"),
+                                choice));
         Map<String, String> settings =
                 PercolatorProvenance.settings(choice, command, "cd".repeat(32), "DECOY_");
         assertEquals("none", settings.get(PercolatorProvenance.RESOLVED_DEFAULT));
@@ -505,8 +516,8 @@ class PercolatorValuesTest {
                         PercolatorCommands.build(
                                 PercolatorRun.request(
                                         EXE,
-                                        Path.of("/r/merged.pin"),
-                                        Path.of("/r/out"),
+                                        TestPaths.absolute("r/merged.pin"),
+                                        TestPaths.absolute("r/out"),
                                         choice(
                                                 offer(
                                                         EXE,
