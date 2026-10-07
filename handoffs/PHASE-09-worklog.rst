@@ -423,7 +423,38 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
        the built command on a real merged PIN write exactly the expected
        artefacts (and 3.09 no XML).
      - R-PERC-06, R-DEC-04; gates 2, 5 (adapter half)
-     -
+     - **Signed off 2026-10-07** (``f255fd9``). Diff read: 17 files in
+       ``cometgui-tools``. ``PercolatorCommands.build(PercolatorRequest)``
+       emits every option through one check (its capability in the probed
+       set), never sees a version, refuses without ``PSM_TSV_OUTPUT`` or
+       ``PEPTIDE_TSV_OUTPUT``, requests ``-X`` only when capable *and* needed,
+       never ``-Z`` (Phase 00: the converter fails on ``-X -Z`` without
+       ``--import-decoys``, which Comet's internal decoys cannot use -- Phase
+       12 to confirm), reports each requested option not emitted with its
+       reason; fixed artefact names (``psms.tsv``, ``peptides.tsv``,
+       ``decoy-psms.tsv``, ``decoy-peptides.tsv``, ``weights.txt``,
+       ``pout.xml``); environment ``LANG=C.UTF-8`` only.
+       ``PercolatorPinCheck`` reuses ``CometPinValidator`` (new
+       ``validateBeforePercolator``: ``validate``'s rules plus two narrow,
+       measured prefix rules) -- no second PIN parser. Real runs on a merged
+       PIN made by the real Comet 2026.03.0 path (6472 rows, 3285 targets,
+       3187 decoys): 3.07.1 with XML 1.5 s, ``pout.xml`` 3285 psm; 3.09 0.6 s,
+       no XML option, no ``.xml``; the real zero-decoy PIN (2026.02.2
+       fragment index, ``decoy_search = 1``: 198 targets, 0 decoys)
+       reproduced and refused. ``mvn -pl cometgui-tools -am install`` with
+       tests rc 0, fresh XML: domain 1157, process 274, tools **581**, 0
+       failures, 0 ``BugInstance``. My PIT over every ``tools.percolator``
+       class plus ``CometPinValidator``/``PinReader``: **166 KILLED, 3
+       TIMED_OUT** (row-reading loops), 0 survived. My injections, landed
+       and restored by ``sha256sum -c``: (1) valued options emitted without
+       their capability -- 7 failures, ``PercolatorCommandsTest.eachRemovedInTurn``;
+       (2) ``pout.xml`` requested whether or not a stage needs it -- 3
+       failures incl. the real ``PercolatorCommandRealBinaryTest.percolator3071WithoutLimelight``.
+       ``--only workflow`` **110** (455 s) and ``--only quality`` 42, both
+       PASS. **Tests read outside the module** (all under ``scratch/``):
+       ``phase05/artefacts`` Comet 2026.03.0 and 2026.02.2 and the 3.07.1
+       zip, ``fixture`` K562 mzML x2 and the UniProt FASTA,
+       ``percolator/3.09/`` wrapper, binary and Boost libraries.
 
    * - 4
      - **Output parsers and display filter values** (``results.parser``,
