@@ -153,10 +153,38 @@ public abstract sealed class QValueFilter permits PsmQValueFilter, PeptideQValue
      *     Visibility#FAILS} when known and above it, otherwise {@link Visibility#UNKNOWN_Q_VALUE}
      */
     public Visibility classify(QValue qValue) {
-        if (!qValue.isKnown()) {
+        return qValue.isKnown()
+                ? classify(QValue.Status.KNOWN, qValue.value())
+                : classify(qValue.status(), Double.NaN);
+    }
+
+    /**
+     * Where a q-value falls, given as its status and value rather than as a {@link QValue} -- as a
+     * store that keeps q-values in an index holds them ({@code R-RES-03}). This is the one
+     * comparison of a q-value with a cutoff (design decision P10-1); {@link #classify(QValue)}
+     * comes here too.
+     *
+     * @param status the q-value's status, as {@link QValue#status()} gives it
+     * @param value its value, as {@link QValue#value()} gives it, when {@code status} is {@link
+     *     QValue.Status#KNOWN}; ignored otherwise
+     * @return {@link Visibility#PASSES} when known and at or below the cutoff, {@link
+     *     Visibility#FAILS} when known and above it, otherwise {@link Visibility#UNKNOWN_Q_VALUE}
+     * @throws IllegalArgumentException if {@code status} is {@link QValue.Status#KNOWN} but {@code
+     *     value} is not within {@code [0, 1]}: no known q-value has such a value, so the pair did
+     *     not come from a {@link QValue}, and classifying it would silently include or exclude a
+     *     row
+     * @throws NullPointerException if {@code status} is {@code null}
+     */
+    public Visibility classify(QValue.Status status, double value) {
+        Objects.requireNonNull(status, "status");
+        if (status != QValue.Status.KNOWN) {
             return Visibility.UNKNOWN_Q_VALUE;
         }
-        return qValue.value() <= comparable ? Visibility.PASSES : Visibility.FAILS;
+        if (!(value >= 0.0 && value <= 1.0)) {
+            throw new IllegalArgumentException(
+                    "a known q-value is within [0, 1], but the value given was " + value);
+        }
+        return value <= comparable ? Visibility.PASSES : Visibility.FAILS;
     }
 
     /**

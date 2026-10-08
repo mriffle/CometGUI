@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 import org.cometgui.results.filtering.FilterCounts;
 import org.cometgui.results.filtering.QValueFilter;
@@ -161,6 +162,26 @@ final class InMemoryResultStore implements ResultStore {
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public OptionalLong positionOf(RowKey key, ResultQuery query) {
+        open();
+        Objects.requireNonNull(key, "key");
+        QValueFilter filter = kind.check(query.filter());
+        int[] order = orders.computeIfAbsent(query.sort(), this::order);
+        long matching = 0;
+        for (int index : order) {
+            ResultRow row = rows.get(index);
+            if (query.category().includes(filter.classify(row))
+                    && TextFilter.matches(query.text(), row)) {
+                if (row.line() == key.line()) {
+                    return OptionalLong.of(matching);
+                }
+                matching++;
+            }
+        }
+        return OptionalLong.empty();
     }
 
     @Override

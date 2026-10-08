@@ -20,6 +20,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.OptionalLong;
 import org.cometgui.results.filtering.FilterCounts;
 import org.cometgui.results.filtering.QValueFilter;
 import org.cometgui.results.parser.ResultRow;
@@ -43,6 +44,8 @@ import org.cometgui.results.parser.ResultTableHeader;
  *   <li>The raw file is never written, moved or locked: it is byte-identical after opening, any
  *       number of queries, and closing.
  *   <li>Once open, the store answers queries from any number of threads at once.
+ *   <li>A row's {@linkplain #positionOf position} under a query is its index in the concatenation
+ *       of that query's pages.
  *   <li>After {@link #close}, every other method throws {@link IllegalStateException}; closing
  *       twice is harmless.
  * </ul>
@@ -106,4 +109,18 @@ public interface ResultStore extends Closeable {
      * @throws IOException if the store cannot read what it holds
      */
     Optional<ResultRow> row(RowKey key) throws IOException;
+
+    /**
+     * Where a row stands among a query's matching rows, so that a view can keep a selected row in
+     * sight after its filter, category, text or sort changes (design decision P10-9): the page
+     * holding it starts at {@code position - position % pageSize}.
+     *
+     * @param key the row
+     * @param query the query; its offset and limit are ignored
+     * @return the row's position among the rows the query matches, in the query's order, from 0;
+     *     empty if the query does not match it or the table has no row on that line
+     * @throws IllegalArgumentException if the query's filter is the other table kind's
+     * @throws IOException if the store cannot read what it holds
+     */
+    OptionalLong positionOf(RowKey key, ResultQuery query) throws IOException;
 }

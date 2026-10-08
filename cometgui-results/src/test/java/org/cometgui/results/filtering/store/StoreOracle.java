@@ -136,6 +136,47 @@ final class StoreOracle {
                 .toList();
     }
 
+    /**
+     * The first lines a query should match, in its order, without sorting every row: a bounded
+     * selection, for the large fixture.
+     *
+     * @param cutoff the q-value cutoff's text
+     * @param category {@code PASSING}, {@code FAILING}, {@code UNKNOWN_Q_VALUE} or {@code ALL}
+     * @param text the text filter, as typed
+     * @param column a sort column's name
+     * @param descending the direction
+     * @param count how many
+     * @param fromTheEnd the last {@code count} instead of the first, still in the query's order
+     * @return the lines
+     */
+    List<Long> expectEnd(
+            String cutoff,
+            String category,
+            String text,
+            String column,
+            boolean descending,
+            int count,
+            boolean fromTheEnd) {
+        BigDecimal limit = new BigDecimal(cutoff);
+        String needle = text.strip().toLowerCase(Locale.ROOT);
+        Comparator<Row> order = order(column, descending);
+        Comparator<Row> kept = fromTheEnd ? order : order.reversed();
+        java.util.PriorityQueue<Row> worst = new java.util.PriorityQueue<>(count + 1, kept);
+        for (Row row : rows) {
+            if (inCategory(row, limit, category) && matches(row, needle)) {
+                if (worst.size() < count) {
+                    worst.add(row);
+                } else if (kept.compare(row, worst.peek()) > 0) {
+                    worst.poll();
+                    worst.add(row);
+                }
+            }
+        }
+        List<Row> selected = new ArrayList<>(worst);
+        selected.sort(order);
+        return selected.stream().map(Row::line).toList();
+    }
+
     static String visibility(Row row, BigDecimal limit) {
         if (row.q() == null) {
             return "UNKNOWN_Q_VALUE";

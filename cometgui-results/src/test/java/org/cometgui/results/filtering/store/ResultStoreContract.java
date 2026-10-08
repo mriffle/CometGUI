@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
@@ -79,6 +80,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  * <p>Gate items served at the model level: 1 (inclusive at exactly the cutoff), 3 (counts equal to
  * independent counts at 0, 0.005, 0.01 and 1), 4 (raw files byte-identical) and 8 (every unknown
  * q-value in its own category, never passing or failing).
+ *
+ * <p>Phase 10 unit 3 added {@link ResultStore#positionOf} and its two tests, for a view that keeps
+ * a selected row in sight across filter and sort changes; nothing else here changed.
  */
 abstract class ResultStoreContract {
 
@@ -922,6 +926,123 @@ abstract class ResultStoreContract {
         }
     }
 
+    /* ---------------------------------------------------------------- positions */
+
+    static Stream<Arguments> positionCases() {
+        List<Arguments> all = new ArrayList<>();
+        for (Fixture fixture :
+                List.of(shuffled(), unknownQ(), k562(RealK562.Table.V3071_TARGET_PSMS))) {
+            for (ResultSort.Column column : ResultSort.Column.values()) {
+                for (ResultSort.Direction direction : ResultSort.Direction.values()) {
+                    all.add(Arguments.of(fixture, new ResultSort(column, direction)));
+                }
+            }
+        }
+        return all.stream();
+    }
+
+    @ParameterizedTest(name = "{0} by {1}")
+    @MethodSource("positionCases")
+    @DisplayName(
+            "positionOf: a row's position is its index in the oracle's order of the query's"
+                    + " matching rows, in every category and with a text, empty when it does not"
+                    + " match; the page at that offset holds it")
+    void positionOfEveryRow(Fixture fixture, ResultSort sort) throws IOException {
+        StoreOracle oracle = StoreOracle.read(fixture.path().get());
+        boolean descending = sort.direction() == ResultSort.Direction.DESCENDING;
+        boolean large = oracle.rows().size() > 100;
+        String text = large ? "K562_3" : "sample";
+        try (ResultStore store = open(fixture)) {
+            for (Category category : Category.values()) {
+                for (String typed : List.of("", text)) {
+                    List<Long> expected =
+                            oracle.expect(
+                                    "0.01",
+                                    category.name(),
+                                    typed,
+                                    sort.column().name(),
+                                    descending);
+                    ResultQuery query =
+                            ResultQuery.firstPage(fixture.filter("0.01"))
+                                    .withCategory(category)
+                                    .withText(typed)
+                                    .withSort(sort)
+                                    .withPage(17, 3);
+                    int checked = 0;
+                    for (StoreOracle.Row row : oracle.rows()) {
+                        if (large && row.line() % 97 != 0 && row.line() != 2) {
+                            continue;
+                        }
+                        int index = expected.indexOf(row.line());
+                        OptionalLong position = store.positionOf(new RowKey(row.line()), query);
+                        String where = category + " '" + typed + "' line " + row.line();
+                        if (index < 0) {
+                            assertEquals(OptionalLong.empty(), position, where);
+                        } else {
+                            assertEquals(OptionalLong.of(index), position, where);
+                            ResultPage page = store.query(query.withPage(position.getAsLong(), 1));
+                            assertEquals(row.line(), page.rows().get(0).line(), where);
+                        }
+                        checked++;
+                    }
+                    assertTrue(checked >= Math.min(20, oracle.rows().size()), "checked " + checked);
+                }
+            }
+            assertEquals(
+                    OptionalLong.empty(),
+                    store.positionOf(
+                            new RowKey(oracle.rows().size() + 2L),
+                            all(fixture.filter("1")).withSort(sort)),
+                    "the line after the last row");
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "positionOf by hand on the shuffled table: passing rows in file and q-value order,"
+                    + " the unknown category, a text, and rows the query does not match")
+    void positionOfByHand() throws IOException {
+        try (ResultStore store = open(shuffled())) {
+            ResultQuery passing = ResultQuery.firstPage(PsmQValueFilter.DEFAULT);
+            // Passing at 0.01, file order: lines 3, 4, 5, 8, 11, 13, 14, 20, 21.
+            assertEquals(OptionalLong.of(0), store.positionOf(new RowKey(3), passing));
+            assertEquals(OptionalLong.of(6), store.positionOf(new RowKey(14), passing));
+            assertEquals(OptionalLong.of(8), store.positionOf(new RowKey(21), passing));
+            assertEquals(OptionalLong.empty(), store.positionOf(new RowKey(2), passing), "q 0.5");
+            assertEquals(OptionalLong.empty(), store.positionOf(new RowKey(9), passing), "q NaN");
+            // By q-value ascending: 3, 21, 13, 20, 5, 11, 8, 4, 14; descending 4, 14, 8, 5, 11, 20,
+            // 13, 3, 21 -- ties in file order both ways.
+            ResultSort qUp = ResultSort.ascending(ResultSort.Column.Q_VALUE);
+            ResultSort qDown = ResultSort.descending(ResultSort.Column.Q_VALUE);
+            assertEquals(
+                    OptionalLong.of(6), store.positionOf(new RowKey(8), passing.withSort(qUp)));
+            assertEquals(
+                    OptionalLong.of(1), store.positionOf(new RowKey(21), passing.withSort(qUp)));
+            assertEquals(
+                    OptionalLong.of(7), store.positionOf(new RowKey(3), passing.withSort(qDown)));
+            assertEquals(
+                    OptionalLong.of(1), store.positionOf(new RowKey(14), passing.withSort(qDown)));
+            // Unknown, file order: 9, 10, 12, 15, 17, 19, 23.
+            ResultQuery unknown = passing.withCategory(Category.UNKNOWN_Q_VALUE);
+            assertEquals(OptionalLong.of(6), store.positionOf(new RowKey(23), unknown));
+            assertEquals(OptionalLong.empty(), store.positionOf(new RowKey(3), unknown));
+            // Text "peptidek" finds lines 4 and 23.
+            ResultQuery text = all(PsmQValueFilter.DEFAULT).withText("peptidek");
+            assertEquals(OptionalLong.of(0), store.positionOf(new RowKey(4), text));
+            assertEquals(OptionalLong.of(1), store.positionOf(new RowKey(23), text));
+            assertEquals(OptionalLong.empty(), store.positionOf(new RowKey(5), text));
+            assertEquals(
+                    OptionalLong.empty(),
+                    store.positionOf(new RowKey(23), text.withCategory(Category.PASSING)));
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            store.positionOf(
+                                    new RowKey(3),
+                                    ResultQuery.firstPage(PeptideQValueFilter.DEFAULT)));
+        }
+    }
+
     /* ---------------------------------------------------------------- lifecycle */
 
     @Test
@@ -951,6 +1072,11 @@ abstract class ResultStoreContract {
         assertThrows(
                 IllegalStateException.class,
                 () -> store.query(ResultQuery.firstPage(PsmQValueFilter.DEFAULT)));
+        assertThrows(
+                IllegalStateException.class,
+                () ->
+                        store.positionOf(
+                                new RowKey(2), ResultQuery.firstPage(PsmQValueFilter.DEFAULT)));
         IllegalStateException refused =
                 assertThrows(IllegalStateException.class, () -> store.row(new RowKey(2)));
         assertTrue(refused.getMessage().contains("closed"), refused.getMessage());

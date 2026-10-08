@@ -31,18 +31,20 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.cometgui.results.testing.Fixtures;
+import org.cometgui.results.testing.TestHasher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
  * The store contract ({@link ResultStoreContract}) run on the in-memory store, opened through the
- * factory; and the checks that only this store needs.
+ * factory -- every contract table is at or below {@link ResultStores#IN_MEMORY_ROW_LIMIT}, so the
+ * factory chooses memory -- and the checks that only this store needs.
  */
 class InMemoryResultStoreTest extends ResultStoreContract {
 
     @Override
     protected ResultStore open(Path table, TableKind kind, Path workDirectory) throws IOException {
-        ResultStore store = ResultStores.open(table, kind);
+        ResultStore store = ResultStores.open(table, kind, workDirectory, new TestHasher());
         assertTrue(store instanceof InMemoryResultStore, "the factory opens the in-memory store");
         return store;
     }
@@ -68,9 +70,24 @@ class InMemoryResultStoreTest extends ResultStoreContract {
     @DisplayName("the factory refuses a null file or kind")
     void factoryRefusesNull() {
         Path table = Fixtures.verified(SHUFFLED, SHUFFLED_SHA256);
+        TestHasher hasher = new TestHasher();
+        Path index = work();
         assertThrows(
-                NullPointerException.class, () -> ResultStores.open(null, TableKind.TARGET_PSMS));
+                NullPointerException.class,
+                () -> ResultStores.open(null, TableKind.TARGET_PSMS, index, hasher));
+        assertThrows(
+                NullPointerException.class, () -> ResultStores.open(table, null, index, hasher));
+        assertThrows(
+                NullPointerException.class,
+                () -> ResultStores.open(table, TableKind.TARGET_PSMS, null, hasher));
+        assertThrows(
+                NullPointerException.class,
+                () -> ResultStores.open(table, TableKind.TARGET_PSMS, index, null));
         assertThrows(NullPointerException.class, () -> ResultStores.inMemory(table, null));
+        assertThrows(
+                NullPointerException.class,
+                () -> ResultStores.inMemory(null, TableKind.DECOY_PSMS));
+        assertEquals(0, hasher.calls(), "a table held in memory is not hashed");
     }
 
     @Test

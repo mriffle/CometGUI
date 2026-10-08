@@ -28,6 +28,13 @@
  * whole query matches, and the filter's counts over the whole table. A row is held by its {@link
  * org.cometgui.results.filtering.store.RowKey}, its line in the raw file.
  *
+ * <p>Two implementations keep one contract: the in-memory store, at or below {@link
+ * org.cometgui.results.filtering.store.ResultStores#IN_MEMORY_ROW_LIMIT} rows, and above it the
+ * disk-backed store, which keeps a checked, memory-mapped index and sort files in an index
+ * directory, reads a page's rows back from the raw table by offset, and holds no object per row
+ * ({@code R-RES-03}). An index that cannot be trusted is rebuilt, for a named {@link
+ * org.cometgui.results.filtering.store.IndexProblem}.
+ *
  * <p>Design decisions P10-1, P10-4 and P10-5 ({@code handoffs/PHASE-10-worklog.rst}): every row is
  * read through the one {@code ResultTableReader}, and every row is classified by the one predicate,
  * {@code QValueFilter.classify}; nothing here compares a q-value with a cutoff. The raw file is
