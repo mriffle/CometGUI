@@ -398,7 +398,21 @@ brief's *Build economy* section verbatim.
        computed independently (recorded how) for the real three-split files
        and the constructed two- and four-split files.
      - R-PERC-09, AC-RES-08/09; gate 7
-     -
+     - **Signed off 2026-10-08** (``7498a83``). Diff read: three new classes
+       in ``results.parser`` (``WeightsSummary``, ``FeatureWeights``,
+       ``SignConsistency``), no existing class changed; tests and the
+       recorded independent computation ``WEIGHTS-SUMMARY.txt`` (Python
+       ``Fraction``/``decimal``, script and command in the file; K562
+       statistics only, no per-split data). Zeros mixed with one sign are
+       ``MIXED`` (the agent's documented reading of "zero is neither
+       sign"). My own Python (``statistics.pstdev``) over the K562 3.07.1
+       weights: lnrSp rank 1, mean -0.336333, SD 0.079189; lnExpect 2;
+       Xcorr 0.1139 -- equal to the pins. ``-pl cometgui-results verify``:
+       **1232 tests, 0 failures**, 0 SpotBugs. My injections, restored by
+       ``sha256sum -c``: (a) mean absolute summing signed values -- 11 of
+       39 red; (b) ranks counting equal values as greater (ties broken) --
+       8 red. Agent's PIT: 63/63 killed. ``--only quality`` by the agent
+       (42); ``percolator`` not needed (no existing class changed).
 
    * - 5
      - **``finalise-results`` and the run's derived files** (P10-6):
