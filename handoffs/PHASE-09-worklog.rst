@@ -704,7 +704,30 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
      - **Falsifiability harness** ``scripts/verify-percolator-gates.sh``
        (P9-14), registered as ``percolator``.
      - all nine items
-     -
+     - **Signed off 2026-10-08** (``ce420f4``; my repairs ``05abc88``,
+       ``d701453``). Diff read: ``scripts/verify-percolator-gates.sh``
+       (new), ``scripts/verify-all-gates.sh`` (additive: the ``percolator``
+       entry, floor 94, ``--list``, banner, phase loop -- the removed lines
+       are only the enumerations that gained 09), ``docs/developer/testing.rst``
+       and ``version_capabilities.rst``. Eighteen production injections over
+       all nine items plus the probe, three of them version-blind (3v, 3w,
+       3u: each requires the real 3.07.1/3.09 pair to stay green and the
+       future-version/inferred-claim tests to go red), and control H on the
+       harness itself (unchanged file, missing anchor, source-only change,
+       zero tests, green graded red, red without its diagnostic). **Finding
+       acted on:** the agent reported that ``RealPercolatorRunTest.gate4TheSkippedVersionIsRecorded``
+       only required the reason to contain ``3.09`` and ``XML_OUTPUT``; I made
+       it assert the resolver's sentence word for word (``05abc88``) -- which
+       then turned control 4 **red** on my first ``--only percolator``
+       (93/94: its expected diagnostic was the old assertion's message),
+       seen and repaired by pointing control 4 at the stronger assertion's
+       own message (``d701453``). Final: ``--only percolator`` **PASS 94
+       controls in 631 s**, ``--only workflow`` 110, ``--only docs``,
+       ``--only traceability`` 8 -- all PASS. **Cost:** about 10.5 minutes
+       added to the full gate run. **Limits (agent):** a merged-PIN re-hash
+       skipped in ``RerunSource`` alone is masked by the copy's re-hash, so
+       item 6 is graded on 6a-6c; the probe's real-binary class is not in the
+       harness (cost), the probe is graded on its fake-binary tests.
 
 Rejections and rework
 =====================
