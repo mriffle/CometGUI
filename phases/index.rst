@@ -66,12 +66,12 @@ authoritative for its own scope and exit gate.
      - Percolator Adapter and Version Capabilities
      - 05, 08
      - none open; D-002 and D-003 both DECIDED
-     - IN PROGRESS (dispatched 2026-10-07)
+     - PARTIAL (signed off 2026-10-08; Linux only, export half to 10)
    * - `10 <PHASE-10-results.rst>`_
      - Results Model and UI
      - 09
      - --
-     - NOT STARTED
+     - IN PROGRESS (dispatched 2026-10-08)
    * - `11 <PHASE-11-pdv.rst>`_
      - PDV Integration and mzTab Export
      - 05, 10

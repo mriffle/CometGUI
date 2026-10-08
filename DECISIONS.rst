@@ -2,8 +2,8 @@
 Decisions
 =========
 
-:Updated: 2026-10-07 (D-012 decided: a new configuration starts with no
-   spectral library; D-011 still OPEN)
+:Updated: 2026-10-08 (D-013 raised and OPEN: Percolator's usage analytics;
+   D-011 still OPEN)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -977,4 +977,37 @@ imports keeps whatever it names. The pre-run block on a library path that does
 not exist stays: it now fires only when someone has named one. Whether an
 empty value disables spectral-library search is established by running both
 real binaries, not assumed.
+
+----
+
+D-013 -- Percolator's usage analytics
+=====================================
+
+:Status: **OPEN** -- raised 2026-10-08
+:Raised: 2026-10-08, by Phase 09, confirmed by tier 1 in the binaries
+:Blocks: nothing in the build; it decides what every user's machine sends
+   to a third party
+:Owner: Project owner
+
+**Question.** Percolator posts usage analytics to Google by default
+(``GoogleAnalytics::postToAnalytics``; the string
+``http://www.google-analytics.com/`` is in every Percolator binary the project
+has extracted, 3.07.1 and 3.09 alike). Every Percolator run CometGUI starts --
+its capability probes, a scientist's searches, and this project's own tests --
+may therefore contact Google Analytics. Both versions accept
+``--no-analytics``. Should CometGUI pass it?
+
+**Why it is the owner's.** It decides what the product sends from a
+scientist's computer to a third party, and nothing in the specification
+addresses telemetry at all.
+
+**Options.** A. Always pass ``--no-analytics`` where the probe observes it
+(one capability, one probe observation, one command-builder line, by Phase
+09's estimate). B. Pass it, with a setting to allow analytics. C. Leave
+Percolator's default and say so in the documentation.
+
+**Recommendation.** A. A desktop tool that installs other tools for the
+scientist should not, by default, report on their use to a third party they
+never chose; and the project's own test runs should not either. It is cheap,
+capability-gated, and reversible.
 

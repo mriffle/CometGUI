@@ -3,23 +3,21 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-07
-:Updated by: Main orchestrator, session 10 (**D-012 repair signed off** --
-   :ref:`status-d012-signed`; specification revision 15; **Phase 09
-   dispatched**. Earlier: Phase 08 signed off PARTIAL --
-   :ref:`status-p08-signed`)
-:Current phase: **Phase 09 -- Percolator Adapter and Version Capabilities**,
-   dispatched 2026-10-07 with ``handoffs/PHASE-09-BRIEF.rst``, after the
-   ``D-012`` repair was signed off (:ref:`status-d012-signed`). ``main`` is
-   **not pushed** since ``6bb9ce6``: the owner has not asked for a push since
-   Phase 07.
-:Overall: Nine phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
-   05 and 08 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
+:Updated: 2026-10-08
+:Updated by: Main orchestrator, session 10 (**Phase 09 signed off PARTIAL** --
+   :ref:`status-p09-signed`; specification revision 16; ``D-013`` raised;
+   ``main`` pushed; **Phase 10 dispatched**)
+:Current phase: **Phase 10 -- Results Model and UI**, dispatched 2026-10-08
+   with ``handoffs/PHASE-10-BRIEF.rst``. Standing owner instruction
+   (2026-10-08): *"When all is green with the current phase, push, then move
+   on to the next phase."*
+:Overall: Ten phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
+   05, 08 and 09 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (about 3.7 hours since Phase 08 -- build
-   40 min, ``tests`` 95, the other fourteen 91 -- run as three separate jobs,
-   since one background job is capped at two hours) runs once
+   ``scripts/verify-all-gates.sh`` (about 4.7 hours since Phase 09 -- build
+   53 min, ``tests`` 123, the other fifteen about 100 -- run as three jobs,
+   ``tests`` detached, since one background job is capped at two hours) runs once
    per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
    :ref:`status-p06-signed`); ``D-011``, what an Intel Mac gets now that
@@ -253,12 +251,15 @@ Phase board
        have run only on Linux/POSIX.
    * - 09
      - Percolator adapter and version capabilities
-     - IN PROGRESS
-     - Dispatched 2026-10-07 (``handoffs/PHASE-09-BRIEF.rst``).
+     - PARTIAL
+     - **Signed off 2026-10-08** at ``6bc3d98``: build 11/11, gates 16/16 (new
+       ``percolator``, 94 controls), three tier-1 injections
+       (:ref:`status-p09-signed`). PARTIAL: Linux only, and item 9's export
+       half waits for Phase 10.
    * - 10
      - Results model and UI
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-10-08 (``handoffs/PHASE-10-BRIEF.rst``).
    * - 11
      - PDV integration
      - NOT STARTED
@@ -3266,6 +3267,71 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-p09-signed:
+
+Phase 09 signed off PARTIAL (2026-10-08)
+========================================
+
+Nine units, all accepted by the phase orchestrator, plus four of its own
+repairs; it ran without stalling. Record: ``handoffs/PHASE-09-worklog.rst``
+and ``handoffs/PHASE-09-handoff.rst``.
+
+**What exists.** Percolator, chosen by probed capability: the probe extended to
+every Percolator capability; latest-compatible resolution (newest XML-capable
+build with Limelight enabled, newest overall without), re-evaluated when the
+stage is toggled, with the skipped version and missing capability named on
+screen and in provenance; command construction that emits only observed
+options (3.07.1 gets ``-X`` only when Limelight is on; 3.09 never does); a
+pre-launch PIN check that refuses zero decoys; output parsers and display
+q-value filters (in ``org.cometgui.results``, for Phase 10 to build on); the
+Percolator workflow steps and provenance; the compatible-version rerun as a
+derived run; the Percolator UI section. New harness
+``scripts/verify-percolator-gates.sh`` (``percolator``, 94 controls), floor 94.
+
+**Tier 1's exit-gate run**, at ``6bc3d98`` on a quiet tree, in three jobs:
+``scripts/build.sh`` 11/11 stages in 3162 s; ``--only tests`` (run detached:
+it now outlasts a two-hour job) 37 assertions in 7395 s; the other fifteen
+controls passed (``percolator`` 94 in 628 s, ``workflow`` 110, ``paramui`` 87,
+``params`` 109, ``install`` 95, ``pipeline`` 24). **16 of 16.**
+
+**Nothing weakened:** no test deleted or disabled; floors only added or
+raised. Two POMs gained only their own module's ``cometgui.mutation.skip=false``
+-- switching mutation testing **on** for the two new modules, the documented
+mechanism ``build.sh`` requires; accepted as strengthening.
+
+**Tier 1's own injections**, modules installed fresh first, tests counted,
+each restored and verified with ``sha256sum -c``, clean modules reinstalled
+afterwards:
+
+* a PIN with zero decoy rows let through to Percolator -- 9 failures, e.g.
+  ``CometAdapterRealBinaryTest.realPinWithoutDecoys`` and
+  ``CometPinValidatorBeforePercolatorTest.zeroDecoysFirst``;
+* unobserved capability claims counted by the resolver -- 6 failures, e.g.
+  ``PercolatorResolverTest.onlyObserved`` (and the module's coverage check
+  refused the build);
+* the probe claiming ``XML_OUTPUT`` for every build -- 19 failures, e.g.
+  ``PercolatorCapabilityProbeTest.oneRejectedOptionLosesExactlyItsCapability``.
+
+**Grade: PARTIAL.** Items 1-8 met on Linux; item 9 met for parsing, filtering,
+provenance and rerun, its export half waits for Phase 10, which re-proves it.
+Every item has run only on Linux.
+
+**Specification revision 16** adopts one stream-tagged ``logs/percolator.log``.
+
+**Raised for the owner:** ``D-013`` -- Percolator posts usage analytics to
+Google by default, confirmed by tier 1 in the binaries; recommendation: always
+pass ``--no-analytics``.
+
+**Residue carried forward:**
+
+* ``.gitattributes`` has no rule for the SHA-256-pinned fixtures, so a Windows
+  checkout with line-ending conversion would fail their checks (Phase 15).
+* PIT ``TIMED_OUT`` mutants in ``cometgui-workflow`` became KILLED when PIT ran
+  only the fast tests: evidence for the owner's ``TIMED_OUT`` question.
+* A Mac before 3.07.1 is installed shows Limelight unavailable; the stdout
+  weights fallback; no duplicate guard on the rerun action.
+* ``tests`` now takes about 123 minutes.
+
 .. _status-d012-signed:
 
 ``D-012`` repair signed off (2026-10-07)
@@ -3901,6 +3967,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-08
+     - 09, 10
+     - **Phase 09 signed off PARTIAL** at ``6bc3d98`` (build 11/11, gates
+       16/16, three tier-1 injections). Specification revision 16; ``D-013``
+       raised. ``main`` pushed; **Phase 10 dispatched** on the owner's
+       standing instruction. See :ref:`status-p09-signed`.
    * - 2026-10-07
      - 08+, 09
      - ``D-012`` decided and its repair signed off (5/5 affected gates, a
