@@ -357,7 +357,40 @@ brief's *Build economy* section verbatim.
        its ``OutOfMemoryError`` negative control; index rebuilt when the raw
        file's size or SHA-256 differs from the index's record.
      - R-RES-03; gates 3, 6, 8
-     -
+     - **Signed off 2026-10-08** (``c4a0acc``, ``028b6de``). Diff read: 27
+       files -- ``DiskResultStore`` with ``DiskIndex`` (96-byte header:
+       magic, version, kind, the raw table's size, mtime and SHA-256 through
+       the injected ``HashService``, row count, CRC-32C of header and body;
+       56 bytes a row), ``SortFile`` (external merge sort, permutation
+       checked on load), ``RawIdentity``, ``IndexProblem`` (14 reasons),
+       mapped off-heap through an FFM ``Arena``; rows read back by position
+       and checked against their index record; ``ResultTableReader`` on a
+       new strict ``Utf8Lines`` with byte offsets (its 30 tests unchanged);
+       ``QValueFilter.classify(Status, double)`` now the one comparison;
+       ``ResultStore.positionOf``; ``ResultStores.IN_MEMORY_ROW_LIMIT`` =
+       **100 000** (about 67 MB in memory). I ran ``-am install`` then
+       ``-pl cometgui-results verify``: **1215 tests, 0 failures**, 0
+       SpotBugs (contract: 444 on the disk store, 447 in memory;
+       ``DiskLargeFixtureTest`` 4 in 31 s; ``DiskStoreBudgetTest`` 2 in
+       12 s -- a child JVM at ``-Xmx64m`` opens the 1 000 000-row fixture
+       through the factory, counts at all eight cutoffs equal the manifest,
+       pages by score and peptide, a text filter, each within budget, and
+       ``readAll`` in the same 64 MB dies of ``OutOfMemoryError``). My
+       injections, restored and ``sha256sum -c`` OK: (a) the sort file's
+       every-row-once check removed -- ``DiskIndexInvalidationTest.sortFiles``
+       red ("a row twice"); (b) the disk count loop skipping the last row --
+       173 failures + 45 errors of 444, e.g. ``total=2359 ... but was
+       total=2358``; (c) the index's raw-mtime comparison made vacuous --
+       ``rawTimeChanged`` red, ``RAW_TIME_CHANGED`` expected, ``built=false``
+       found (Checkstyle and Spotless had to be skipped for the injected
+       form to compile, the tests ran). Agent's PIT: 646 mutations, 593
+       killed, 24 timed out, 22 survived (each argued equivalent or
+       performance-only), 7 no coverage; ``QValueFilter`` 33/33. I ran
+       ``--only percolator --only quality``: **109 (701 s), 42 (140 s)**.
+       New reads outside the module: ``/proc/self/{fd,maps}`` (Linux) and a
+       child JVM from ``java.home``. Residue: in-memory compares scans as
+       ``double``, disk as ``long`` (differ above 2^53 only); every disk
+       open hashes the raw table (0.5 s at 147 MB); Windows untested.
 
    * - 4
      - **Learned-feature-weights summary** (P10-8) in ``results.parser``,
