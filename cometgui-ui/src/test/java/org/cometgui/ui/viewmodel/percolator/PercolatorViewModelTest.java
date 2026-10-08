@@ -28,12 +28,16 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import org.cometgui.domain.tools.CapabilityEvidence;
 import org.cometgui.domain.tools.ToolCapability;
+import org.cometgui.domain.tools.ToolInstallState;
+import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolRegistrationException;
+import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.percolator.PercolatorSettings;
 import org.cometgui.params.percolator.schema.PercolatorSetting;
 import org.cometgui.params.percolator.validation.TestFdr;
@@ -143,6 +147,10 @@ class PercolatorViewModelTest {
         void nothingOnConstruction() {
             assertAll(
                     () -> assertEquals(0, port.reads()),
+                    () -> assertEquals(PercolatorViewModel.NOT_READ, selection()),
+                    () -> assertFalse(section.limelightEnabled()),
+                    () -> assertFalse(section.limelightEnabledProperty().get()),
+                    () -> assertEquals(section.request(), section.requestProperty().get()),
                     () -> assertEquals(PercolatorViewModel.NOT_READ, offersText()),
                     () ->
                             assertEquals(
@@ -505,6 +513,33 @@ class PercolatorViewModelTest {
         }
 
         @Test
+        @DisplayName("a managed build being installed is named as installable, not offered")
+        void installing() {
+            ToolOffer installing =
+                    new ToolOffer(
+                            ToolName.PERCOLATOR,
+                            ToolVersion.parse("3.06.5"),
+                            ToolOrigin.MANAGED,
+                            ToolInstallState.INSTALLING,
+                            List.of(),
+                            List.of(),
+                            Optional.empty(),
+                            Optional.empty(),
+                            OptionalLong.of(1000L));
+            readWith(installing, LOCAL_309);
+            assertEquals(
+                    "Not installed, so not offered for running -- install from the Tool Manager"
+                            + " section: Percolator 3.06.5.",
+                    section.installableProperty().get());
+            assertEquals(
+                    List.of(NAME_309 + " -- the resolved default"),
+                    labels(section.choicesProperty().get()));
+            assertEquals(
+                    NAME_309 + " -- the resolved default",
+                    section.choicesProperty().get().get(0).toString());
+        }
+
+        @Test
         @DisplayName("a claim that is not observed is shown as not counted on the badge")
         void unobservedOnTheBadge() {
             ToolOffer macos =
@@ -805,6 +840,10 @@ class PercolatorViewModelTest {
             assertEquals(
                     new PeptideQValueFilter(BigDecimal.ONE),
                     section.displayFiltersProperty().get().peptide());
+            assertEquals("1", section.peptideFilterTextProperty().get());
+            assertFalse(
+                    section.filtersStatusProperty().get().contains("peptide filter's text"),
+                    "an accepted value lifts the refusal");
         }
     }
 

@@ -139,6 +139,45 @@ class PercolatorRerunViewModelTest {
     }
 
     @Test
+    @DisplayName("a new check resets the preview and the action until it answers")
+    void recheckResets() {
+        offered();
+        request.set(PercolatorRequest.blocked(List.of("changed")));
+        assertAll(
+                () ->
+                        assertEquals(
+                                PercolatorRerunViewModel.CHECKING, rerun.previewProperty().get()),
+                () -> assertEquals("Rerun Percolator", rerun.actionTextProperty().get()),
+                () -> assertFalse(rerun.actionEnabledProperty().get()));
+    }
+
+    @Test
+    @DisplayName("the plan is shown before the start is acknowledged; no plan, no description")
+    void plannedThenStarted() {
+        offered();
+        rerun.start();
+        port.background().drain();
+        port.ui().runOne();
+        assertEquals(
+                "Rerunning Percolator: " + DESCRIPTION + ".",
+                rerun.outcomeProperty().get(),
+                "the plan's description, before the start is applied");
+        assertFalse(rerun.cancelEnabledProperty().get(), "not started yet");
+        port.settle();
+        assertTrue(rerun.cancelEnabledProperty().get());
+
+        ScriptedRerun silent = new ScriptedRerun(asked -> RerunCheck.possible("run-1", LINES));
+        PercolatorRerunViewModel quiet =
+                new PercolatorRerunViewModel(silent, request, silent.background(), silent.ui());
+        request.set(Percolators.ready());
+        quiet.refresh();
+        silent.settle();
+        assertTrue(quiet.start());
+        silent.settle();
+        assertEquals("Rerunning Percolator.", quiet.outcomeProperty().get());
+    }
+
+    @Test
     @DisplayName("a refusal is shown in the workflow's words, and the action stays off")
     void refused() {
         port.answer(
