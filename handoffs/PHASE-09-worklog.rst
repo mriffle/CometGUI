@@ -516,7 +516,51 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
        hashes equal before and after parsing and provenance finalisation.
      - R-PERC-05, 07, 08, 10, 11; gates 1, 2, 4 (provenance), 5, 7, 9;
        AC-RES-06, AC-RES-07, AC-PRV-10
-     -
+     - **Signed off 2026-10-08** (``88a5a8e``, ``2459a08``, ``3276e30``,
+       ``5579fa2``). Diff read: 20 files, ``cometgui-workflow`` plus
+       ``docs/reference/project_format.rst`` and ``provenance_format.rst``.
+       ``PercolatorSelection``/``PercolatorChoice`` (``xmlNeeded()`` read from
+       the stage table), ``SearchRequest.withPercolator``,
+       ``CometWorkflow.planFor(mode, percolator)``; the three steps in
+       ``PercolatorSteps`` (resolve re-hashes the binary; run checks the
+       settings file's hash, then ``PercolatorPinCheck``, then one
+       ``invoke`` with stage id ``percolator``, then every listed artefact
+       present and non-empty, nothing unlisted in ``outputs/percolator``,
+       outputs made read-only; parse through the one table, weights and pout
+       readers); ``percolator-settings.json`` written once through the one
+       JSON and atomic writer; settings keys in ``PercolatorProvenance``,
+       fixed at prepare time so a failed run carries them. ``mvn -pl
+       cometgui-workflow install`` with tests (upstream installed first):
+       **645** tests, 0 failures, 0 ``BugInstance``. App run tests green
+       (agent: RealRunUiTest 5, RealCancelUiTest 1, RunReadinessUiTest 2).
+       Real runs (agent's figures; the tests re-ran in my suite): 3.07.1 with
+       Limelight -- 3285 PSM rows = PIN targets, 3187 decoy PSM rows, 2482
+       peptides, 3 weight splits, pout 3285 psm, ``-X`` in the recorded
+       argv; 3.09 -- no ``-X`` in the recorded argv, no ``.xml``, and with
+       Limelight on, ``not-emitted.01.option=-X`` with the ``XML_OUTPUT``
+       reason; the real zero-decoy PIN refused by ``run-percolator`` with no
+       launch; ``percolator.seed`` in every run including both failed ones.
+       My PIT over ``org.cometgui.workflow.steps.Percolator*``: 99 = 55
+       KILLED + 43 TIMED_OUT, 0 SURVIVED, 1 NO_COVERAGE (the DOS read-only
+       branch, never run on Linux). My injections, landed and restored by
+       ``sha256sum -c``: (1) outputs never made read-only -- 2 failures incl.
+       ``RealPercolatorRunTest.gate9RawOutputsAreUnchangedAndReadOnly:677
+       decoy-peptides.tsv is writable``; (2) the pre-launch PIN check
+       bypassed -- 4 failures incl. ``RealPercolatorRunTest.gate5TheRealZeroDecoyPin``
+       (Percolator launched and exited 1 instead of the decoy-configuration
+       refusal). ``--only workflow`` **110** (464 s), ``--only quality`` 42,
+       ``--only docs``, ``--only traceability`` 8 -- all PASS. **Residue:**
+       ``finalise-provenance`` is ordered only after ``merge-pin`` when
+       ``finalise-results`` (Phase 10) is unplanned, so the rerun preview
+       reuses it after a Percolator change -- harmless today
+       (``provenance.json`` is written at attempt end), pinned by a test,
+       restored when Phase 10 plans ``finalise-results``; ``run.json`` does
+       not record the Percolator half (no retry across a restart, as for
+       Comet); 43 of 99 mutants in the steps time out rather than being
+       killed (the engine's waits) -- relevant to the owner's ``TIMED_OUT``
+       question, and ``workflow.steps`` is not a POM PIT target. **Tests read
+       outside the module:** ``scratch/phase05/artefacts`` (Comet x2, 3.07.1
+       zip), ``scratch/fixture`` (K562 x2, FASTA), ``scratch/percolator/3.09``.
 
    * - 6
      - **Compatible-version rerun** (``workflow.steps``, ``workflow.storage``,
