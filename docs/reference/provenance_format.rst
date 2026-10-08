@@ -499,6 +499,9 @@ Lists inside a value are separated by single spaces.
      - Each option the run asked for and the command does not pass, because the
        build was not observed to accept it (``R-PERC-06``), in command order:
        the option's spelling and the reason, naming the missing capability.
+       Every run asks for ``--no-analytics`` (``D-013``), so a build without
+       ``NO_ANALYTICS_OPTION`` has an entry for it, last, saying that the run
+       could not switch Percolator's usage analytics off.
    * - ``percolator.pout-xml``
      - Whether pout XML was requested: ``requested (-X <path>) ...`` with the
        stage needing it, or ``not requested:`` and why -- no enabled stage needs

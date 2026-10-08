@@ -40,6 +40,9 @@ import java.util.OptionalInt;
 import java.util.Set;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.ports.HashService;
+import org.cometgui.domain.ports.ProcessListener;
+import org.cometgui.domain.ports.ProcessRunner;
+import org.cometgui.domain.ports.RunningProcess;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.HostArchitecture;
@@ -153,7 +156,8 @@ class PercolatorRealBinaryTest {
                     ToolCapability.SEED_OPTION,
                     ToolCapability.TEST_FDR_OPTION,
                     ToolCapability.TRAIN_FDR_OPTION,
-                    ToolCapability.MAX_ITERATIONS_OPTION);
+                    ToolCapability.MAX_ITERATIONS_OPTION,
+                    ToolCapability.NO_ANALYTICS_OPTION);
 
     static final ToolVersion V3071 = ToolVersion.parse("3.07.1");
     private static final ToolVersion V3065 = ToolVersion.parse("3.06.5");
@@ -322,7 +326,8 @@ class PercolatorRealBinaryTest {
                                         ToolCapability.SEED_OPTION,
                                         ToolCapability.TEST_FDR_OPTION,
                                         ToolCapability.TRAIN_FDR_OPTION,
-                                        ToolCapability.MAX_ITERATIONS_OPTION),
+                                        ToolCapability.MAX_ITERATIONS_OPTION,
+                                        ToolCapability.NO_ANALYTICS_OPTION),
                                 observed),
                 () ->
                         assertFalse(
@@ -339,6 +344,93 @@ class PercolatorRealBinaryTest {
                                 "the registered file is the wrapper, and its checksum is the"
                                         + " wrapper's: the ELF and the two libraries it loads are"
                                         + " pinned above, not by the registration"));
+    }
+
+    /** The real process service, with every command it is asked to start written down first. */
+    private static final class Recording implements ProcessRunner {
+
+        private final ProcessRunner real = new ProcessService(Clock.systemUTC());
+        private final List<ToolCommand> started = new ArrayList<>();
+
+        @Override
+        public RunningProcess start(ToolCommand command, ProcessListener listener)
+                throws IOException {
+            started.add(command);
+            return real.start(command, listener);
+        }
+
+        List<List<String>> argvs() {
+            return started.stream().map(ToolCommand::argv).toList();
+        }
+    }
+
+    /*
+     * D-013, READ FROM THE LAUNCHES: the observation run is the first and is --no-analytics alone;
+     * every one of the probe's twelve launches carries --no-analytics exactly once.
+     */
+    private static void assertEveryLaunchWithoutAnalytics(
+            String label, Path executable, Set<ToolCapability> observed, Recording recording) {
+        List<List<String>> launched = recording.argvs();
+        assertAll(
+                () ->
+                        assertTrue(
+                                observed.contains(ToolCapability.NO_ANALYTICS_OPTION),
+                                label + " observed NO_ANALYTICS_OPTION: " + observed),
+                () -> assertEquals(12, launched.size(), label + ": twelve probe runs"),
+                () ->
+                        assertEquals(
+                                List.of(executable.toString(), "--no-analytics"),
+                                launched.get(0).subList(0, 2),
+                                label + ": the first launch observes --no-analytics"),
+                () -> assertEquals(3, launched.get(0).size(), () -> launched.get(0).toString()),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                launched.stream()
+                                        .filter(
+                                                argv ->
+                                                        argv.stream()
+                                                                        .filter(
+                                                                                "--no-analytics"
+                                                                                        ::equals)
+                                                                        .count()
+                                                                != 1)
+                                        .toList(),
+                                label + ": every launch carries --no-analytics exactly once"));
+    }
+
+    @Test
+    @DisplayName(
+            "D-013: the real 3.07.1 OBSERVES --no-analytics, and every one of its probe launches"
+                    + " carries it")
+    void noAnalyticsOnEveryLaunchOf3071(@TempDir Path directory) throws IOException {
+        Path binary = stage(directory, ZIP_3071, SHA256_3071);
+        Recording recording = new Recording();
+
+        Set<ToolCapability> observed =
+                new PercolatorCapabilityProbe(new ToolRunner(recording, Duration.ofSeconds(120)))
+                        .probe(ToolName.PERCOLATOR, V3071, HOST, binary);
+
+        assertEveryLaunchWithoutAnalytics("3.07.1", binary, observed, recording);
+        assertEquals(EVERY_CAPABILITY, observed);
+    }
+
+    @Test
+    @DisplayName(
+            "D-013: the real 3.09 (registered local) OBSERVES --no-analytics, and every one of its"
+                    + " probe launches carries it")
+    void noAnalyticsOnEveryLaunchOf309() throws IOException {
+        Path wrapper = fixture309(WRAPPER_309, SHA256_WRAPPER_309);
+        fixture309(BINARY_309, SHA256_BINARY_309);
+        fixture309(BOOST_FILESYSTEM_309, SHA256_BOOST_FILESYSTEM_309);
+        fixture309(BOOST_SYSTEM_309, SHA256_BOOST_SYSTEM_309);
+        Recording recording = new Recording();
+
+        Set<ToolCapability> observed =
+                new PercolatorCapabilityProbe(new ToolRunner(recording, Duration.ofSeconds(120)))
+                        .probe(ToolName.PERCOLATOR, V309, HOST, wrapper);
+
+        assertEveryLaunchWithoutAnalytics("3.09", wrapper, observed, recording);
     }
 
     @Test

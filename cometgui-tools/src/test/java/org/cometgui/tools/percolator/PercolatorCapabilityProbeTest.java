@@ -95,6 +95,17 @@ class PercolatorCapabilityProbeTest {
     }
 
     /**
+     * The first run, {@code --no-analytics}'s own, refused as real Percolator refuses an option it
+     * does not know: these tests grade the XML verdicts, so the later runs carry no {@code
+     * --no-analytics} and {@link #writes} finds the output path where it always was. {@code
+     * NO_ANALYTICS_OPTION} itself is graded over {@link FakePercolator} below.
+     */
+    private static ScriptedRunner refusingNoAnalytics() {
+        return new ScriptedRunner()
+                .thenPrints(1, List.of("Exception caught: " + BANNER), List.of());
+    }
+
+    /**
      * The nine runs after the two XML runs, each refused as real Percolator refuses an option it
      * does not know: these tests grade the XML verdicts, and every other capability is graded over
      * {@link FakePercolator} below.
@@ -119,7 +130,7 @@ class PercolatorCapabilityProbeTest {
     void bothCapabilities(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
                 refusingTheRest(
-                        new ScriptedRunner()
+                        refusingNoAnalytics()
                                 .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
                                 .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
 
@@ -131,23 +142,23 @@ class PercolatorCapabilityProbeTest {
                         assertEquals(
                                 Set.of(ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
                                 observed),
-                () -> assertEquals(11, runner.played(), "each capability gets its own run"));
+                () -> assertEquals(12, runner.played(), "each capability gets its own run"));
     }
 
     @Test
-    @DisplayName("the two runs are -X and -X -Z, in that order, over one fixture")
+    @DisplayName("the two XML runs are -X and -X -Z, in that order, over one fixture")
     void theArgumentArrays(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
                 refusingTheRest(
-                        new ScriptedRunner()
+                        refusingNoAnalytics()
                                 .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
                                 .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
         Path executable = binary(directory);
 
         probe(runner).probe(ToolName.PERCOLATOR, V3071, LINUX, executable);
 
-        List<String> targets = runner.commands().get(0).argv();
-        List<String> decoys = runner.commands().get(1).argv();
+        List<String> targets = runner.commands().get(1).argv();
+        List<String> decoys = runner.commands().get(2).argv();
         assertAll(
                 () -> assertEquals(executable.toString(), targets.get(0)),
                 () -> assertEquals("-X", targets.get(1)),
@@ -166,7 +177,7 @@ class PercolatorCapabilityProbeTest {
     void aZeroByteFileIsNotSuccess(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
                 refusingTheRest(
-                        new ScriptedRunner()
+                        refusingNoAnalytics()
                                 .thenWrites(writes(""), 0, List.of(BANNER))
                                 .thenWrites(writes(""), 0, List.of(BANNER)));
 
@@ -181,7 +192,7 @@ class PercolatorCapabilityProbeTest {
     void nothingWrittenIsNothingClaimed(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
                 refusingTheRest(
-                        new ScriptedRunner()
+                        refusingNoAnalytics()
                                 .thenPrints(1, List.of(BANNER, "-X is not supported"), List.of())
                                 .thenPrints(1, List.of(BANNER, "-X is not supported"), List.of()));
 
@@ -198,7 +209,7 @@ class PercolatorCapabilityProbeTest {
     void theWrongPsmCount(int psms, @TempDir Path directory) throws IOException {
         ScriptedRunner runner =
                 refusingTheRest(
-                        new ScriptedRunner()
+                        refusingNoAnalytics()
                                 .thenWrites(writes(document(psms, false)), 0, List.of(BANNER))
                                 .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
 
@@ -217,7 +228,7 @@ class PercolatorCapabilityProbeTest {
         String wrong = document(64, false).replace("percolator_out/15", "percolator_out/");
         ScriptedRunner runner =
                 refusingTheRest(
-                        new ScriptedRunner()
+                        refusingNoAnalytics()
                                 .thenWrites(writes(wrong), 0, List.of(BANNER))
                                 .thenWrites(writes(wrong), 0, List.of(BANNER)));
 
@@ -231,7 +242,7 @@ class PercolatorCapabilityProbeTest {
     void decoysNeedBothValues(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
                 refusingTheRest(
-                        new ScriptedRunner()
+                        refusingNoAnalytics()
                                 .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
                                 .thenWrites(writes(document(128, false)), 0, List.of(BANNER)));
 
@@ -247,7 +258,7 @@ class PercolatorCapabilityProbeTest {
     void theCapabilitiesAreIndependent(@TempDir Path directory) throws IOException {
         ScriptedRunner runner =
                 refusingTheRest(
-                        new ScriptedRunner()
+                        refusingNoAnalytics()
                                 .thenWrites(writes(""), 0, List.of(BANNER))
                                 .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
 
@@ -465,7 +476,7 @@ class PercolatorCapabilityProbeTest {
         long before = countProbeWorkspaces(temporary);
         ScriptedRunner good =
                 refusingTheRest(
-                        new ScriptedRunner()
+                        refusingNoAnalytics()
                                 .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
                                 .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
         probe(good).probe(ToolName.PERCOLATOR, V3071, LINUX, binary(directory));
@@ -492,16 +503,18 @@ class PercolatorCapabilityProbeTest {
                     ToolCapability.SEED_OPTION,
                     ToolCapability.TEST_FDR_OPTION,
                     ToolCapability.TRAIN_FDR_OPTION,
-                    ToolCapability.MAX_ITERATIONS_OPTION);
+                    ToolCapability.MAX_ITERATIONS_OPTION,
+                    ToolCapability.NO_ANALYTICS_OPTION);
 
-    /** The five whose observable is a completed run's standard output, hand-typed. */
+    /** The six whose observable is a completed run's standard output, hand-typed. */
     private static final Set<ToolCapability> OPTION_CAPABILITIES =
             Set.of(
                     ToolCapability.THREAD_OPTION,
                     ToolCapability.SEED_OPTION,
                     ToolCapability.TEST_FDR_OPTION,
                     ToolCapability.TRAIN_FDR_OPTION,
-                    ToolCapability.MAX_ITERATIONS_OPTION);
+                    ToolCapability.MAX_ITERATIONS_OPTION,
+                    ToolCapability.NO_ANALYTICS_OPTION);
 
     private static Set<ToolCapability> probeOver(FakePercolator fake, Path directory)
             throws IOException {
@@ -554,11 +567,13 @@ class PercolatorCapabilityProbeTest {
 
         assertAll(
                 () -> assertEquals(EVERY_CAPABILITY, probeOver(fake, directory)),
-                () -> assertEquals(11, fake.commands().size(), "one run per capability"));
+                () -> assertEquals(12, fake.commands().size(), "one run per capability"));
     }
 
     @Test
-    @DisplayName("the eleven argument arrays, in order: one option under test each, the PIN last")
+    @DisplayName(
+            "the twelve argument arrays, in order: --no-analytics first, then one option under test"
+                    + " each, --no-analytics after it, the PIN last")
     void everyArgumentArray(@TempDir Path directory) throws IOException {
         FakePercolator fake = new FakePercolator();
         Path executable = binary(directory);
@@ -573,38 +588,45 @@ class PercolatorCapabilityProbeTest {
                 () ->
                         assertEquals(
                                 List.of(
+                                        List.of("--no-analytics", pin),
                                         List.of(
                                                 "-X",
                                                 workspace.resolve("targets.pout.xml").toString(),
+                                                "--no-analytics",
                                                 pin),
                                         List.of(
                                                 "-X",
                                                 workspace.resolve("decoys.pout.xml").toString(),
                                                 "-Z",
+                                                "--no-analytics",
                                                 pin),
                                         List.of(
                                                 "--results-psms",
                                                 workspace.resolve("psms.tsv").toString(),
+                                                "--no-analytics",
                                                 pin),
                                         List.of(
                                                 "--results-peptides",
                                                 workspace.resolve("peptides.tsv").toString(),
+                                                "--no-analytics",
                                                 pin),
                                         List.of(
                                                 "--decoy-results-psms",
                                                 workspace.resolve("decoy-psms.tsv").toString(),
                                                 "--decoy-results-peptides",
                                                 workspace.resolve("decoy-peptides.tsv").toString(),
+                                                "--no-analytics",
                                                 pin),
                                         List.of(
                                                 "--weights",
                                                 workspace.resolve("weights.txt").toString(),
+                                                "--no-analytics",
                                                 pin),
-                                        List.of("--seed", "1", pin),
-                                        List.of("--num-threads", "3", pin),
-                                        List.of("--testFDR", "0.01", pin),
-                                        List.of("--trainFDR", "0.01", pin),
-                                        List.of("--maxiter", "10", pin)),
+                                        List.of("--seed", "1", "--no-analytics", pin),
+                                        List.of("--num-threads", "3", "--no-analytics", pin),
+                                        List.of("--testFDR", "0.01", "--no-analytics", pin),
+                                        List.of("--trainFDR", "0.01", "--no-analytics", pin),
+                                        List.of("--maxiter", "10", "--no-analytics", pin)),
                                 commands.stream()
                                         .map(
                                                 command ->
@@ -646,7 +668,8 @@ class PercolatorCapabilityProbeTest {
         "--num-threads, THREAD_OPTION",
         "--testFDR, TEST_FDR_OPTION",
         "--trainFDR, TRAIN_FDR_OPTION",
-        "--maxiter, MAX_ITERATIONS_OPTION"
+        "--maxiter, MAX_ITERATIONS_OPTION",
+        "--no-analytics, NO_ANALYTICS_OPTION"
     })
     @DisplayName("a build rejecting one option loses exactly that capability and keeps the rest")
     void oneRejectedOptionLosesExactlyItsCapability(
@@ -675,7 +698,8 @@ class PercolatorCapabilityProbeTest {
                         ToolCapability.SEED_OPTION,
                         ToolCapability.TEST_FDR_OPTION,
                         ToolCapability.TRAIN_FDR_OPTION,
-                        ToolCapability.MAX_ITERATIONS_OPTION),
+                        ToolCapability.MAX_ITERATIONS_OPTION,
+                        ToolCapability.NO_ANALYTICS_OPTION),
                 probeOver(new FakePercolator().rejecting("-X").rejecting("-Z"), directory));
     }
 
@@ -896,7 +920,7 @@ class PercolatorCapabilityProbeTest {
                 "one row fewer | dropLast",
                 "a decoy among the targets | decoyRow"
             })
-    @DisplayName("an option run whose standard output is not the table costs the five options only")
+    @DisplayName("an option run whose standard output is not the table costs the six options only")
     void anIncompleteStandardOutput(String what, String damage, @TempDir Path directory)
             throws IOException {
         FakePercolator fake =
@@ -936,7 +960,7 @@ class PercolatorCapabilityProbeTest {
         probeOver(fake, directory);
 
         List<List<String>> optionRuns =
-                fake.commands().subList(6, 11).stream()
+                fake.commands().subList(7, 12).stream()
                         .map(command -> command.argv().subList(1, 3))
                         .toList();
         assertEquals(
@@ -947,6 +971,108 @@ class PercolatorCapabilityProbeTest {
                         List.of("--trainFDR", "0.01"),
                         List.of("--maxiter", "10")),
                 optionRuns);
+    }
+
+    // ------------------------------------------------------------- --no-analytics (D-013) --
+
+    private static long occurrences(List<String> argv, String element) {
+        return argv.stream().filter(element::equals).count();
+    }
+
+    @Test
+    @DisplayName(
+            "D-013: the FIRST run is --no-analytics alone, and once observed EVERY later run of the"
+                    + " probe carries it exactly once, just before the PIN")
+    void noAnalyticsIsObservedFirstAndThenAlwaysPassed(@TempDir Path directory) throws IOException {
+        FakePercolator fake = new FakePercolator();
+        Path executable = binary(directory);
+
+        Set<ToolCapability> observed =
+                new PercolatorCapabilityProbe(new ToolRunner(fake, Duration.ofSeconds(5)), 64)
+                        .probe(ToolName.PERCOLATOR, V3071, LINUX, executable);
+
+        List<List<String>> launched = fake.commands().stream().map(ToolCommand::argv).toList();
+        String pin = fake.commands().get(0).workingDirectory().resolve("probe.pin").toString();
+        assertAll(
+                () -> assertTrue(observed.contains(ToolCapability.NO_ANALYTICS_OPTION)),
+                () ->
+                        assertEquals(
+                                List.of(executable.toString(), "--no-analytics", pin),
+                                launched.get(0),
+                                "the observation run is the first launch, and carries the switch"
+                                        + " it observes"),
+                () -> assertEquals(12, launched.size()),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                launched.stream()
+                                        .filter(argv -> occurrences(argv, "--no-analytics") != 1)
+                                        .toList(),
+                                "every launch of the probe carries --no-analytics exactly once"),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                launched.stream()
+                                        .filter(
+                                                argv ->
+                                                        !argv.get(argv.size() - 2)
+                                                                .equals("--no-analytics"))
+                                        .toList(),
+                                "as the last option, just before the PIN"));
+    }
+
+    @Test
+    @DisplayName(
+            "D-013: a build REFUSING --no-analytics loses that capability only, and no later run"
+                    + " is handed it")
+    void aBuildRefusingNoAnalytics(@TempDir Path directory) throws IOException {
+        FakePercolator fake = new FakePercolator().rejecting("--no-analytics");
+
+        Set<ToolCapability> observed = probeOver(fake, directory);
+
+        List<List<String>> launched = fake.commands().stream().map(ToolCommand::argv).toList();
+        assertAll(
+                () ->
+                        assertEquals(
+                                without(
+                                        EVERY_CAPABILITY,
+                                        Set.of(ToolCapability.NO_ANALYTICS_OPTION)),
+                                observed),
+                () -> assertEquals(12, launched.size(), "every other capability still probed"),
+                () -> assertEquals(1, occurrences(launched.get(0), "--no-analytics")),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                launched.subList(1, launched.size()).stream()
+                                        .filter(argv -> argv.contains("--no-analytics"))
+                                        .toList(),
+                                "a refused switch is not passed again"));
+    }
+
+    @Test
+    @DisplayName(
+            "D-013: a --no-analytics run that exits 1 with a whole table is not observed, and is"
+                    + " not passed on")
+    void aNoAnalyticsRunMustExitZero(@TempDir Path directory) throws IOException {
+        FakePercolator fake = new FakePercolator().exitingWith("--no-analytics", 1);
+
+        Set<ToolCapability> observed = probeOver(fake, directory);
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                without(
+                                        EVERY_CAPABILITY,
+                                        Set.of(ToolCapability.NO_ANALYTICS_OPTION)),
+                                observed),
+                () ->
+                        assertTrue(
+                                fake.commands().stream()
+                                        .skip(1)
+                                        .noneMatch(
+                                                command ->
+                                                        command.argv().contains("--no-analytics")),
+                                "only the observation run carried it"));
     }
 
     private static long countProbeWorkspaces(Path temporary) throws IOException {

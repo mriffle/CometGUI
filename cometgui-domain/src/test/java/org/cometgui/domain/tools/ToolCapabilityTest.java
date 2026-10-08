@@ -40,9 +40,10 @@ import org.junit.jupiter.params.provider.ValueSource;
  * <p>The two capability lists are hand-typed from the specification's <em>Capability and runtime
  * probing</em> section, plus the three option capabilities phase 09 added for {@code --testFDR},
  * {@code --trainFDR} and {@code --maxiter} (design decision P9-7: every option the command builder
- * can emit maps to exactly one probed capability). The owning tool is asserted for every constant,
- * because the guard this type provides -- that a manifest cannot claim {@code THERMO_RAW_WINDOWS}
- * for Percolator -- is only as good as the ownership table behind it.
+ * can emit maps to exactly one probed capability), and the one {@code D-013} added for {@code
+ * --no-analytics}. The owning tool is asserted for every constant, because the guard this type
+ * provides -- that a manifest cannot claim {@code THERMO_RAW_WINDOWS} for Percolator -- is only as
+ * good as the ownership table behind it.
  */
 class ToolCapabilityTest {
 
@@ -58,7 +59,8 @@ class ToolCapabilityTest {
                     "SEED_OPTION",
                     "TEST_FDR_OPTION",
                     "TRAIN_FDR_OPTION",
-                    "MAX_ITERATIONS_OPTION");
+                    "MAX_ITERATIONS_OPTION",
+                    "NO_ANALYTICS_OPTION");
 
     private static final List<String> COMET_CAPABILITIES =
             List.of(
@@ -80,7 +82,7 @@ class ToolCapabilityTest {
     }
 
     @Test
-    @DisplayName("the specification's sixteen capabilities and phase 09's three are all that exist")
+    @DisplayName("the specification's sixteen, phase 09's three and D-013's one are all there is")
     void theCapabilitiesArePinned() {
         List<String> names = new ArrayList<>();
         for (ToolCapability capability : ToolCapability.values()) {
@@ -279,7 +281,8 @@ class ToolCapabilityTest {
         "COMPLETE_PARAMS_QUERY, COMPLETE_PARAMS_QUERY",
         "TEST_FDR_OPTION, TEST_FDR_OPTION",
         "TRAIN_FDR_OPTION, TRAIN_FDR_OPTION",
-        "MAX_ITERATIONS_OPTION, MAX_ITERATIONS_OPTION"
+        "MAX_ITERATIONS_OPTION, MAX_ITERATIONS_OPTION",
+        "NO_ANALYTICS_OPTION, NO_ANALYTICS_OPTION"
     })
     @DisplayName("the identifier is the token the specification uses")
     void identifiersArePinned(String constant, String expectedId) {

@@ -297,7 +297,8 @@ class UpstreamInstallUiTest {
                                             + " SEED_OPTION (observed-by-execution),"
                                             + " TEST_FDR_OPTION (observed-by-execution),"
                                             + " TRAIN_FDR_OPTION (observed-by-execution),"
-                                            + " MAX_ITERATIONS_OPTION (observed-by-execution)",
+                                            + " MAX_ITERATIONS_OPTION (observed-by-execution),"
+                                            + " NO_ANALYTICS_OPTION (observed-by-execution)",
                                     ui.textOf(UiIds.toolRowCapabilities(PERCOLATOR_ROW)),
                                     "the binary GitHub is serving today is still the XML-capable"
                                             + " one, established by running it"),

@@ -163,10 +163,10 @@ class ToolManagerWiringTest {
                                         + " Percolator adapter never would"),
                 () ->
                         assertTrue(
-                                afterBoth.get(afterComet.size()).contains("-X"),
+                                afterBoth.get(afterComet.size()).contains("--no-analytics"),
                                 () ->
-                                        "the Percolator adapter asks for XML output over a"
-                                                + " synthetic PIN: "
+                                        "the Percolator adapter's first run is its own probe's"
+                                                + " --no-analytics run over a synthetic PIN: "
                                                 + afterBoth.get(afterComet.size())),
                 () ->
                         assertEquals(

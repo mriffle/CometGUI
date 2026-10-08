@@ -221,6 +221,16 @@ class PercolatorStepTest {
 
     private static List<String> expectedArgv(
             Path percolator, PreparedRun prepared, boolean xml, boolean weights, boolean seed) {
+        return expectedArgv(percolator, prepared, xml, weights, seed, true);
+    }
+
+    private static List<String> expectedArgv(
+            Path percolator,
+            PreparedRun prepared,
+            boolean xml,
+            boolean weights,
+            boolean seed,
+            boolean noAnalytics) {
         Path out = out(prepared);
         List<String> argv =
                 new ArrayList<>(
@@ -252,8 +262,11 @@ class PercolatorStepTest {
                         "--trainFDR",
                         "0.01",
                         "--maxiter",
-                        "10",
-                        prepared.layout().mergedPinFile().toString()));
+                        "10"));
+        if (noAnalytics) {
+            argv.add("--no-analytics");
+        }
+        argv.add(prepared.layout().mergedPinFile().toString());
         return argv;
     }
 
@@ -368,6 +381,7 @@ class PercolatorStepTest {
                             List.of(
                                     "DECOY_OUTPUT",
                                     "MAX_ITERATIONS_OPTION",
+                                    "NO_ANALYTICS_OPTION",
                                     "PEPTIDE_TSV_OUTPUT",
                                     "PSM_TSV_OUTPUT",
                                     "SEED_OPTION",
@@ -847,6 +861,46 @@ class PercolatorStepTest {
                             "percolator-decoy-peptides",
                             out(prepared).resolve("decoy-peptides.tsv") + " completed"),
                     filesByRole(manifest, FileDirection.OUTPUT));
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "D-013: a build whose probe did NOT observe --no-analytics -- a stand-in that refuses"
+                    + " it -- is run without it, succeeds, and provenance says analytics could not"
+                    + " be switched off")
+    void aBuildWithoutNoAnalyticsRunsAndSaysSo(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
+        Staged staged =
+                stage(directory, FakePercolator.Behaviour.normal().rejecting("--no-analytics"));
+        Set<ToolCapability> lacking = EnumSet.copyOf(FakePercolator.EVERY);
+        lacking.remove(ToolCapability.NO_ANALYTICS_OPTION);
+        try (RealProject project = staged.project()) {
+            PreparedRun prepared =
+                    project.prepare(
+                            request(
+                                    staged.search(),
+                                    choice(staged.percolator(), lacking, Set.of())));
+            RunResult result = run(project, prepared);
+
+            assertEquals(
+                    AttemptOutcome.SUCCEEDED, result.outcome(), () -> result.failures().toString());
+            List<String> argv =
+                    expectedArgv(staged.percolator(), prepared, false, true, true, false);
+            assertEquals(
+                    argv, project.runner().launchesOf(staged.percolator()).get(0).command().argv());
+            ProvenanceManifest manifest = RunEvidence.manifest(prepared.layout());
+            ToolRecord tool = RunEvidence.tools(manifest, "percolator").get(0);
+            assertEquals(argv, tool.execution().command().argv(), "recorded = launched");
+            Map<String, String> settings = manifest.settings();
+            assertEquals("--no-analytics", settings.get("percolator.not-emitted.01.option"));
+            assertEquals(
+                    "--no-analytics was not passed, so this Percolator may post usage analytics"
+                            + " while it runs: the build's probed capabilities do not include"
+                            + " NO_ANALYTICS_OPTION, and an option the build was not observed to"
+                            + " accept is never passed (R-PERC-06)",
+                    settings.get("percolator.not-emitted.01.reason"));
+            assertFalse(settings.containsKey("percolator.not-emitted.02.option"));
         }
     }
 

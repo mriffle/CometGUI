@@ -33,9 +33,9 @@ import org.cometgui.domain.tools.ToolCapability;
  * its argument arrays from these constants.
  *
  * <p>The spellings were run against the real 3.06.5 and 3.07.1 portable binaries and the 3.09
- * {@code .rpm} binary on 2026-10-07; every one was accepted by all three, except {@code -X} and
- * {@code -Z}, which 3.09 rejects. That is a record of what was observed, not a rule: what a given
- * build accepts is whatever the probe watched it accept.
+ * {@code .rpm} binary on 2026-10-07 ({@code --no-analytics} on 2026-10-08); every one was accepted
+ * by all three, except {@code -X} and {@code -Z}, which 3.09 rejects. That is a record of what was
+ * observed, not a rule: what a given build accepts is whatever the probe watched it accept.
  *
  * <p>{@link ToolCapability#DECOY_OUTPUT} is the one capability two options map to: the decoy PSM
  * and decoy peptide tables are one capability in the specification's list, and the probe proves
@@ -77,7 +77,13 @@ public enum PercolatorOption {
     TRAIN_FDR("--trainFDR", ToolCapability.TRAIN_FDR_OPTION),
 
     /** {@code --maxiter <value>}: the maximum number of training iterations. */
-    MAX_ITERATIONS("--maxiter", ToolCapability.MAX_ITERATIONS_OPTION);
+    MAX_ITERATIONS("--maxiter", ToolCapability.MAX_ITERATIONS_OPTION),
+
+    /**
+     * {@code --no-analytics}: post no usage analytics. Takes no value, is not a setting, and is
+     * passed on every run of a build that accepts it ({@code D-013}).
+     */
+    NO_ANALYTICS("--no-analytics", ToolCapability.NO_ANALYTICS_OPTION);
 
     private final String spelling;
     private final ToolCapability capability;

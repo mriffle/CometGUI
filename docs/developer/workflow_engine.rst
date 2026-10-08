@@ -871,8 +871,10 @@ directory, the one hasher, the run's one decoy configuration, the
 resolution behind them), and the command, **built once when the run is
 prepared** from the selection's probed capabilities -- so the files the steps
 declare, the files Percolator is asked to write and the options provenance
-says were not passed are one decision, made before anything runs. Which build
-is selected and what it is passed is :doc:`version_capabilities`.
+says were not passed are one decision, made before anything runs. That command
+carries ``--no-analytics`` whenever the build's probe observed it (``D-013``),
+so a search and a rerun pass it alike. Which build is selected and what it is
+passed is :doc:`version_capabilities`.
 
 * **Prepare.** ``parameters/percolator-settings.json`` is written once and
   hashed (:doc:`../reference/project_format`), and every ``percolator.*``

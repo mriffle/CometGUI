@@ -77,8 +77,8 @@ import org.cometgui.tools.api.ToolRunner;
  *
  * <p>Phase 09 (design decision P9-4) extended this probe -- this one, rather than a second one --
  * to the capabilities a real rescoring run needs. <strong>One run per capability</strong>, each
- * over the same fixture, each carrying exactly the option or options under test and nothing else,
- * and each judged on its own observable:
+ * over the same fixture, each carrying exactly the option or options under test and nothing else
+ * but {@code --no-analytics} once that was observed (below), and each judged on its own observable:
  *
  * <ul>
  *   <li>{@code PSM_TSV_OUTPUT}: {@code --results-psms} writes a table of the fixture's targets;
@@ -96,6 +96,21 @@ import org.cometgui.tools.api.ToolRunner;
  *       exactly what the default run computes and the option is the only thing that differs.
  * </ul>
  *
+ * <h2>{@code --no-analytics} first, and then on every run that follows</h2>
+ *
+ * <p>Percolator posts usage analytics to Google on every run unless it is given {@code
+ * --no-analytics}, and the owner decided ({@code D-013}, 2026-10-08) that CometGUI always passes it
+ * -- which includes the probe's own runs. So the <strong>first</strong> run is {@code
+ * NO_ANALYTICS_OPTION}'s own: {@code --no-analytics} and the fixture, judged exactly as the other
+ * option-only capabilities are (exit 0 and the full target peptide table on standard output). Once
+ * it is observed, every later run of this probe carries {@code --no-analytics} too, as its last
+ * option before the fixture; the observation run itself carries it by construction. A build that
+ * refuses it simply does not get it: it loses that capability and nothing else, because the later
+ * runs then go without it -- and the refused run itself cannot have posted anything, since real
+ * Percolator refuses an unknown option before it does any work. Passing {@code --no-analytics}
+ * alongside an option under test changes nothing the probe judges: it is not an output and not a
+ * scoring parameter.
+ *
  * <p>The spellings are {@link PercolatorOption}'s, so the options a command builder emits are the
  * ones this probe watched being accepted. <strong>Why not one combined run:</strong> real
  * Percolator refuses an unknown option outright -- banner, {@code Exception caught}, exit 1, no
@@ -103,10 +118,11 @@ import org.cometgui.tools.api.ToolRunner;
  * down with it, and one capability would hide another. Separate runs make a build that rejects one
  * option lose exactly that capability and keep the rest.
  *
- * <p><strong>What it costs.</strong> Eleven runs. Measured on this project's host on 2026-10-07
- * over the 64 plus 64 fixture: about half a second each, 5.3 s for 3.06.5, 5.8 s for 3.07.1 and 3.8
- * s for 3.09, whose two XML runs refuse at once. That is paid once per install or registration (and
- * again when the executable's checksum changes, {@code R-TOOL-07}), not per search.
+ * <p><strong>What it costs.</strong> Twelve runs. Measured on this project's host on 2026-10-07
+ * over the 64 plus 64 fixture, before the twelfth was added: about half a second each, 5.3 s for
+ * 3.06.5, 5.8 s for 3.07.1 and 3.8 s for 3.09, whose two XML runs refuse at once. That is paid once
+ * per install or registration (and again when the executable's checksum changes, {@code
+ * R-TOOL-07}), not per search.
  *
  * <p><strong>What none of this is.</strong> It is not {@code --help} parsing: help text is evidence
  * of a name, never of a capability ({@code R-PERC-02}). And it is not a results parser: {@link
@@ -231,6 +247,7 @@ public final class PercolatorCapabilityProbe {
         Path pin = SyntheticPin.write(workspace, targetRows, SyntheticPin.PROBE_SEED);
         Run run = new Run(executable, workspace, version, pin);
         Set<ToolCapability> observed = EnumSet.noneOf(ToolCapability.class);
+        probeNoAnalytics(run, observed);
         Path targets = workspace.resolve(TARGETS_FILE);
         run.with(PercolatorOption.XML_OUTPUT.spelling(), targets.toString());
         if (writesDocument(targets, targetRows, false)) {
@@ -284,6 +301,17 @@ public final class PercolatorCapabilityProbe {
         }
     }
 
+    /*
+     * FIRST, SO THAT EVERY LATER RUN CAN CARRY IT (D-013).  Judged as every option-only capability
+     * is; once observed, the Run appends it to every invocation that follows.
+     */
+    private void probeNoAnalytics(Run run, Set<ToolCapability> observed) throws IOException {
+        if (completed(run.with(PercolatorOption.NO_ANALYTICS.spelling()))) {
+            observed.add(PercolatorOption.NO_ANALYTICS.capability());
+            run.withoutAnalyticsFromNowOn();
+        }
+    }
+
     private void probeOptions(Run run, Set<ToolCapability> observed) throws IOException {
         acceptedOn(run, PercolatorOption.SEED, DEFAULT_SEED, observed);
         acceptedOn(run, PercolatorOption.NUM_THREADS, DEFAULT_THREADS, observed);
@@ -303,11 +331,14 @@ public final class PercolatorCapabilityProbe {
     private void acceptedOn(
             Run run, PercolatorOption option, String value, Set<ToolCapability> observed)
             throws IOException {
-        ToolRunOutcome outcome = run.with(option.spelling(), value);
-        if (outcome.exitedZero()
-                && ProbeArtefacts.isResultTable(outcome.standardOutput(), targetRows, false)) {
+        if (completed(run.with(option.spelling(), value))) {
             observed.add(option.capability());
         }
+    }
+
+    private boolean completed(ToolRunOutcome outcome) {
+        return outcome.exitedZero()
+                && ProbeArtefacts.isResultTable(outcome.standardOutput(), targetRows, false);
     }
 
     /** One probe's invocations: the same binary, workspace and fixture, with different options. */
@@ -317,6 +348,7 @@ public final class PercolatorCapabilityProbe {
         private final Path workspace;
         private final ToolVersion version;
         private final Path pin;
+        private boolean noAnalytics;
 
         Run(Path executable, Path workspace, ToolVersion version, Path pin) {
             this.executable = executable;
@@ -325,12 +357,21 @@ public final class PercolatorCapabilityProbe {
             this.pin = pin;
         }
 
+        /* Once the build was observed to accept --no-analytics, every later run carries it. */
+        void withoutAnalyticsFromNowOn() {
+            noAnalytics = true;
+        }
+
         /*
-         * The fixture is always the last argument, after the options under test, which is the
-         * shape Percolator's usage line gives: "percolator [other options] pin.tsv".
+         * The fixture is always the last argument, after the options under test and then
+         * --no-analytics when it was observed, which is the shape Percolator's usage line gives:
+         * "percolator [other options] pin.tsv".
          */
         ToolRunOutcome with(String... options) throws IOException {
             List<String> arguments = new ArrayList<>(List.of(options));
+            if (noAnalytics) {
+                arguments.add(PercolatorOption.NO_ANALYTICS.spelling());
+            }
             arguments.add(pin.toString());
             return exercise(executable, workspace, version, arguments);
         }

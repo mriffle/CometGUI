@@ -487,13 +487,14 @@ class PercolatorValuesTest {
                         "--num-threads",
                         "--testFDR",
                         "--trainFDR",
-                        "--maxiter");
+                        "--maxiter",
+                        "--no-analytics");
         for (int index = 0; index < omitted.size(); index++) {
             String prefix = "percolator.not-emitted.0" + (index + 1) + ".";
             assertEquals(omitted.get(index), settings.get(prefix + "option"), prefix);
             assertEquals(command.notEmitted().get(index).reason(), settings.get(prefix + "reason"));
         }
-        assertFalse(settings.containsKey("percolator.not-emitted.09.option"));
+        assertFalse(settings.containsKey("percolator.not-emitted.10.option"));
         assertTrue(
                 settings.get(PercolatorProvenance.WEIGHTS_WARNING)
                         .startsWith(

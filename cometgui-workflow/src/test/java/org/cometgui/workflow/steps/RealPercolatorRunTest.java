@@ -526,9 +526,9 @@ class RealPercolatorRunTest {
                 RealPercolator.ADVISORIES_3071.get(1).text(),
                 settings.get("percolator.advisory.percolator.3-07-1-predates-pep-above-one-fix"));
         assertEquals(
-                "DECOY_OUTPUT MAX_ITERATIONS_OPTION PEPTIDE_TSV_OUTPUT PSM_TSV_OUTPUT SEED_OPTION"
-                        + " TEST_FDR_OPTION THREAD_OPTION TRAIN_FDR_OPTION WEIGHTS_OUTPUT"
-                        + " XML_DECOY_OUTPUT XML_OUTPUT",
+                "DECOY_OUTPUT MAX_ITERATIONS_OPTION NO_ANALYTICS_OPTION PEPTIDE_TSV_OUTPUT"
+                        + " PSM_TSV_OUTPUT SEED_OPTION TEST_FDR_OPTION THREAD_OPTION"
+                        + " TRAIN_FDR_OPTION WEIGHTS_OUTPUT XML_DECOY_OUTPUT XML_OUTPUT",
                 settings.get(PercolatorProvenance.CAPABILITIES));
         assertEquals("limelight-conversion", settings.get(PercolatorProvenance.DOWNSTREAM_STAGES));
         assertEquals("DECOY_", settings.get(PercolatorProvenance.DECOY_PREFIX));
@@ -659,6 +659,41 @@ class RealPercolatorRunTest {
             assertEquals(Locale.getDefault(), manifest.application().locale());
             List<String> argv = ran.recordedArgv();
             assertEquals("1", argv.get(argv.indexOf("--seed") + 1), "the seed recorded is passed");
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "D-013: the argv recorded in provenance.json of every real run carries --no-analytics"
+                    + " exactly once, last before the merged PIN, and is the argv launched")
+    void everyRealRunPassesNoAnalytics() throws IOException {
+        for (Ran ran :
+                List.of(
+                        withLimelight3071,
+                        withoutLimelight309,
+                        chosen309WithLimelight,
+                        chosen3071WithoutLimelight)) {
+            List<String> argv = ran.recordedArgv();
+            assertEquals(
+                    1,
+                    argv.stream().filter("--no-analytics"::equals).count(),
+                    () -> "--no-analytics once in the recorded argv " + argv);
+            assertEquals(
+                    List.of("--no-analytics", ran.prepared().layout().mergedPinFile().toString()),
+                    argv.subList(argv.size() - 2, argv.size()),
+                    argv::toString);
+            List<RealProject.Launch> launches = percolatorLaunches(ran.prepared());
+            assertEquals(
+                    List.of(argv),
+                    launches.stream().map(launch -> launch.command().argv()).toList(),
+                    "recorded = launched");
+            Set<String> recorded = ran.percolatorTool().capabilities();
+            assertTrue(
+                    recorded.contains("NO_ANALYTICS_OPTION"),
+                    () -> "the real probe observed it: " + recorded);
+            assertFalse(
+                    ran.settings().containsValue("--no-analytics"),
+                    "and no not-emitted entry names it");
         }
     }
 

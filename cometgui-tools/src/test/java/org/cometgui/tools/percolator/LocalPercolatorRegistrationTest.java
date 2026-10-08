@@ -177,7 +177,8 @@ class LocalPercolatorRegistrationTest {
                                         ToolCapability.SEED_OPTION,
                                         ToolCapability.TEST_FDR_OPTION,
                                         ToolCapability.TRAIN_FDR_OPTION,
-                                        ToolCapability.MAX_ITERATIONS_OPTION),
+                                        ToolCapability.MAX_ITERATIONS_OPTION,
+                                        ToolCapability.NO_ANALYTICS_OPTION),
                                 offer.capabilities().stream()
                                         .map(DeclaredCapability::capability)
                                         .toList(),
@@ -272,9 +273,9 @@ class LocalPercolatorRegistrationTest {
         Path binary = Files.writeString(directory.resolve("percolator"), "not really");
         Path targets = directory.resolve("t.xml");
         ScriptedRunner runner = new ScriptedRunner();
-        /* The identifying --help, then the probe's eleven runs: each prints the banner and exits
+        /* The identifying --help, then the probe's twelve runs: each prints the banner and exits
          * 0, and writes nothing -- no file and no table on standard output. */
-        for (int run = 0; run < 12; run++) {
+        for (int run = 0; run < 13; run++) {
             runner.thenPrints(
                     0,
                     List.of("Percolator version 3.05, Build Date Jan  1 2020 00:00:00"),
@@ -291,7 +292,7 @@ class LocalPercolatorRegistrationTest {
                                 registered.offer().capabilities(),
                                 "it printed its banner and wrote nothing, so the absence of"
                                         + " every capability really was observed"),
-                () -> assertEquals(12, runner.played(), "--help and the eleven probe runs"),
+                () -> assertEquals(13, runner.played(), "--help and the twelve probe runs"),
                 () -> assertTrue(targets.getFileName() != null));
     }
 

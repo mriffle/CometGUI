@@ -64,7 +64,8 @@ class PercolatorCommandsTest {
                     ToolCapability.SEED_OPTION,
                     ToolCapability.TEST_FDR_OPTION,
                     ToolCapability.TRAIN_FDR_OPTION,
-                    ToolCapability.MAX_ITERATIONS_OPTION);
+                    ToolCapability.MAX_ITERATIONS_OPTION,
+                    ToolCapability.NO_ANALYTICS_OPTION);
 
     /** The product's defaults, as their text. */
     static final Map<PercolatorOption, String> VALUES = values();
@@ -137,6 +138,7 @@ class PercolatorCommandsTest {
                                         "0.02",
                                         "--maxiter",
                                         "10",
+                                        "--no-analytics",
                                         "/data/run 1/inputs/pin/merged.pin"),
                                 built.command().argv()),
                 () -> assertEquals(absolute(OUT), built.command().workingDirectory()),
@@ -195,6 +197,7 @@ class PercolatorCommandsTest {
                                         "0.02",
                                         "--maxiter",
                                         "10",
+                                        "--no-analytics",
                                         "/data/run 1/inputs/pin/merged.pin"),
                                 built.command().argv()),
                 () -> assertFalse(built.writesXml()),
@@ -240,6 +243,7 @@ class PercolatorCommandsTest {
                                         "0.02",
                                         "--maxiter",
                                         "10",
+                                        "--no-analytics",
                                         "/data/run 1/inputs/pin/merged.pin"),
                                 built.command().argv()),
                 () -> assertFalse(built.writesXml()),
@@ -294,6 +298,7 @@ class PercolatorCommandsTest {
                                 "0.02",
                                 "--maxiter",
                                 "10",
+                                "--no-analytics",
                                 "/data/run 1/inputs/pin/merged.pin"),
                         List.of(PercolatorOption.XML_OUTPUT)),
                 Arguments.of(
@@ -322,6 +327,7 @@ class PercolatorCommandsTest {
                                 "0.02",
                                 "--maxiter",
                                 "10",
+                                "--no-analytics",
                                 "/data/run 1/inputs/pin/merged.pin"),
                         List.of()),
                 Arguments.of(
@@ -346,6 +352,7 @@ class PercolatorCommandsTest {
                                 "0.02",
                                 "--maxiter",
                                 "10",
+                                "--no-analytics",
                                 "/data/run 1/inputs/pin/merged.pin"),
                         List.of(
                                 PercolatorOption.DECOY_RESULTS_PSMS,
@@ -374,6 +381,7 @@ class PercolatorCommandsTest {
                                 "0.02",
                                 "--maxiter",
                                 "10",
+                                "--no-analytics",
                                 "/data/run 1/inputs/pin/merged.pin"),
                         List.of(PercolatorOption.WEIGHTS)),
                 Arguments.of(
@@ -400,6 +408,7 @@ class PercolatorCommandsTest {
                                 "0.02",
                                 "--maxiter",
                                 "10",
+                                "--no-analytics",
                                 "/data/run 1/inputs/pin/merged.pin"),
                         List.of(PercolatorOption.SEED)),
                 Arguments.of(
@@ -426,6 +435,7 @@ class PercolatorCommandsTest {
                                 "0.02",
                                 "--maxiter",
                                 "10",
+                                "--no-analytics",
                                 "/data/run 1/inputs/pin/merged.pin"),
                         List.of(PercolatorOption.NUM_THREADS)),
                 Arguments.of(
@@ -452,6 +462,7 @@ class PercolatorCommandsTest {
                                 "0.02",
                                 "--maxiter",
                                 "10",
+                                "--no-analytics",
                                 "/data/run 1/inputs/pin/merged.pin"),
                         List.of(PercolatorOption.TEST_FDR)),
                 Arguments.of(
@@ -478,6 +489,7 @@ class PercolatorCommandsTest {
                                 "0.01",
                                 "--maxiter",
                                 "10",
+                                "--no-analytics",
                                 "/data/run 1/inputs/pin/merged.pin"),
                         List.of(PercolatorOption.TRAIN_FDR)),
                 Arguments.of(
@@ -504,8 +516,37 @@ class PercolatorCommandsTest {
                                 "0.01",
                                 "--trainFDR",
                                 "0.02",
+                                "--no-analytics",
                                 "/data/run 1/inputs/pin/merged.pin"),
-                        List.of(PercolatorOption.MAX_ITERATIONS)));
+                        List.of(PercolatorOption.MAX_ITERATIONS)),
+                Arguments.of(
+                        ToolCapability.NO_ANALYTICS_OPTION,
+                        List.of(
+                                "/opt/percolator 3/percolator",
+                                "--results-psms",
+                                "/data/run 1/outputs/percolator/psms.tsv",
+                                "--results-peptides",
+                                "/data/run 1/outputs/percolator/peptides.tsv",
+                                "--decoy-results-psms",
+                                "/data/run 1/outputs/percolator/decoy-psms.tsv",
+                                "--decoy-results-peptides",
+                                "/data/run 1/outputs/percolator/decoy-peptides.tsv",
+                                "--weights",
+                                "/data/run 1/outputs/percolator/weights.txt",
+                                "-X",
+                                "/data/run 1/outputs/percolator/pout.xml",
+                                "--seed",
+                                "1",
+                                "--num-threads",
+                                "3",
+                                "--testFDR",
+                                "0.01",
+                                "--trainFDR",
+                                "0.02",
+                                "--maxiter",
+                                "10",
+                                "/data/run 1/inputs/pin/merged.pin"),
+                        List.of(PercolatorOption.NO_ANALYTICS)));
     }
 
     @ParameterizedTest(name = "[{index}] without {0}")
@@ -597,6 +638,11 @@ class PercolatorCommandsTest {
                                                 + " Percolator uses its own default: the build's"
                                                 + " probed capabilities do not include"
                                                 + " MAX_ITERATIONS_OPTION"
+                                                + rule,
+                                        "--no-analytics was not passed, so this Percolator may"
+                                                + " post usage analytics while it runs: the build's"
+                                                + " probed capabilities do not include"
+                                                + " NO_ANALYTICS_OPTION"
                                                 + rule),
                                 built.notEmitted().stream().map(NotEmitted::reason).toList()),
                 () -> assertFalse(built.writesWeights()),
@@ -634,7 +680,8 @@ class PercolatorCommandsTest {
                                         PercolatorOption.DECOY_RESULTS_PSMS,
                                         PercolatorOption.DECOY_RESULTS_PEPTIDES,
                                         PercolatorOption.WEIGHTS,
-                                        PercolatorOption.SEED),
+                                        PercolatorOption.SEED,
+                                        PercolatorOption.NO_ANALYTICS),
                                 built.notEmitted().stream().map(NotEmitted::option).toList()),
                 () ->
                         assertEquals(
@@ -694,6 +741,94 @@ class PercolatorCommandsTest {
                         + " (--results-peptides). Choose a Percolator build whose probe observed"
                         + " both PSM_TSV_OUTPUT and PEPTIDE_TSV_OUTPUT",
                 assertThrows(PercolatorRefusedException.class, () -> build(Set.of(), true))
+                        .getMessage());
+    }
+
+    @Test
+    @DisplayName(
+            "D-013: --no-analytics is passed whenever the build has it -- with no setting asked"
+                    + " for, XML or not -- once, as the last option before the PIN")
+    void noAnalyticsWheneverProbed() throws PercolatorRefusedException {
+        PercolatorCommand bare =
+                PercolatorCommands.build(
+                        new PercolatorRequest(
+                                absolute(EXE),
+                                absolute(PIN),
+                                absolute(OUT),
+                                EnumSet.of(
+                                        ToolCapability.PSM_TSV_OUTPUT,
+                                        ToolCapability.PEPTIDE_TSV_OUTPUT,
+                                        ToolCapability.NO_ANALYTICS_OPTION),
+                                false,
+                                Map.of()));
+        List<String> full = build(FULL, false).command().argv();
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "/opt/percolator 3/percolator",
+                                        "--results-psms",
+                                        "/data/run 1/outputs/percolator/psms.tsv",
+                                        "--results-peptides",
+                                        "/data/run 1/outputs/percolator/peptides.tsv",
+                                        "--no-analytics",
+                                        "/data/run 1/inputs/pin/merged.pin"),
+                                bare.command().argv()),
+                () -> assertEquals(Optional.empty(), bare.omission(PercolatorOption.NO_ANALYTICS)),
+                () ->
+                        assertEquals(
+                                1,
+                                full.stream().filter("--no-analytics"::equals).count(),
+                                full::toString),
+                () -> assertEquals("--no-analytics", full.get(full.size() - 2)));
+    }
+
+    @Test
+    @DisplayName(
+            "D-013: a build WITHOUT NO_ANALYTICS_OPTION is not refused; the omission says"
+                    + " analytics could not be switched off")
+    void withoutNoAnalyticsTheRunIsNotRefused() throws PercolatorRefusedException {
+        PercolatorCommand built = build(without(ToolCapability.NO_ANALYTICS_OPTION), false);
+
+        assertAll(
+                () -> assertFalse(built.command().argv().contains("--no-analytics")),
+                () ->
+                        assertEquals(
+                                "/data/run 1/inputs/pin/merged.pin",
+                                built.command().argv().get(built.command().argv().size() - 1)),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        new NotEmitted(
+                                                PercolatorOption.NO_ANALYTICS,
+                                                "--no-analytics was not passed, so this Percolator"
+                                                        + " may post usage analytics while it"
+                                                        + " runs: the build's probed capabilities"
+                                                        + " do not include NO_ANALYTICS_OPTION,"
+                                                        + " and an option the build was not"
+                                                        + " observed to accept is never passed"
+                                                        + " (R-PERC-06)")),
+                                built.notEmitted()),
+                () -> assertTrue(built.writesWeights(), "everything else is still passed"));
+    }
+
+    @Test
+    @DisplayName("D-013: --no-analytics is not a setting -- a request cannot carry it as a value")
+    void noAnalyticsIsNotASetting() {
+        assertEquals(
+                "--no-analytics does not take a setting's value; the valued options are"
+                        + " [--seed, --num-threads, --testFDR, --trainFDR, --maxiter]",
+                assertThrows(
+                                IllegalArgumentException.class,
+                                () ->
+                                        new PercolatorRequest(
+                                                absolute(EXE),
+                                                absolute(PIN),
+                                                absolute(OUT),
+                                                FULL,
+                                                false,
+                                                Map.of(PercolatorOption.NO_ANALYTICS, "0")))
                         .getMessage());
     }
 

@@ -66,7 +66,7 @@ class CapabilityProbeGenerationTest {
                     "1ba38acf09520cc89d5ed907ed0382c4d23876a7e20ec3e91cbbaa2ed431237c");
 
     /** The line the current writer emits, hand-typed; removing it makes a pre-phase-09 marker. */
-    private static final String GENERATION_LINE = "  \"capabilityProbeGeneration\": 2,\n";
+    private static final String GENERATION_LINE = "  \"capabilityProbeGeneration\": 3,\n";
 
     @TempDir private Path temporary;
 
@@ -99,12 +99,12 @@ class CapabilityProbeGenerationTest {
     }
 
     @Test
-    @DisplayName("the current generation is 2, and a new marker writes it")
+    @DisplayName("the current generation is 3, and a new marker writes it")
     void theCurrentGenerationIsWritten() {
         String json = marker(InstallationMarker.CAPABILITY_PROBE_GENERATION).toJson();
 
         assertAll(
-                () -> assertEquals(2, InstallationMarker.CAPABILITY_PROBE_GENERATION),
+                () -> assertEquals(3, InstallationMarker.CAPABILITY_PROBE_GENERATION),
                 () -> assertTrue(json.contains(GENERATION_LINE), json),
                 () ->
                         assertTrue(
@@ -114,7 +114,7 @@ class CapabilityProbeGenerationTest {
                                 "beside the capabilities it qualifies: " + json),
                 () ->
                         assertEquals(
-                                2,
+                                3,
                                 InstallationMarker.parse(json).capabilityProbeGeneration(),
                                 "and reads back"));
     }
@@ -123,7 +123,7 @@ class CapabilityProbeGenerationTest {
     @DisplayName(
             "a marker with NO generation is one written before the field existed: generation 1")
     void aMarkerWithNoGenerationIsGenerationOne() {
-        String older = withoutTheGeneration(marker(2).toJson());
+        String older = withoutTheGeneration(marker(3).toJson());
 
         InstallationMarker read = InstallationMarker.parse(older);
 
@@ -144,10 +144,14 @@ class CapabilityProbeGenerationTest {
     void whichGenerationsAreEarlier() {
         assertAll(
                 () -> assertTrue(marker(1).capabilitiesFromAnEarlierProbe()),
-                () -> assertFalse(marker(2).capabilitiesFromAnEarlierProbe()),
+                () ->
+                        assertTrue(
+                                marker(2).capabilitiesFromAnEarlierProbe(),
+                                "phase 09's probe did not establish NO_ANALYTICS_OPTION (D-013)"),
+                () -> assertFalse(marker(3).capabilitiesFromAnEarlierProbe()),
                 () ->
                         assertFalse(
-                                marker(3).capabilitiesFromAnEarlierProbe(),
+                                marker(4).capabilitiesFromAnEarlierProbe(),
                                 "a later CometGUI's probe establishes at least as much; what it"
                                         + " recorded is no less believable"));
     }
@@ -157,7 +161,7 @@ class CapabilityProbeGenerationTest {
     @DisplayName("a generation that is not positive is refused, naming the field and the value")
     void aGenerationThatIsNotPositiveIsRefused(int generation) {
         String document =
-                marker(2)
+                marker(3)
                         .toJson()
                         .replace(
                                 GENERATION_LINE,
@@ -187,17 +191,17 @@ class CapabilityProbeGenerationTest {
     @DisplayName("a generation too large for any CometGUI to have written is refused")
     void anOverflowingGenerationIsRefused() {
         String document =
-                marker(2)
+                marker(3)
                         .toJson()
-                        .replace(GENERATION_LINE, "  \"capabilityProbeGeneration\": 4294967298,\n");
+                        .replace(GENERATION_LINE, "  \"capabilityProbeGeneration\": 4294967299,\n");
 
         assertEquals(
                 "the completion marker is not a valid one: the completion marker's"
-                        + " \"capabilityProbeGeneration\" is 4294967298, which no CometGUI has"
+                        + " \"capabilityProbeGeneration\" is 4294967299, which no CometGUI has"
                         + " written",
                 assertThrows(MarkerFormatException.class, () -> InstallationMarker.parse(document))
                         .getMessage(),
-                "4294967298 cast to int is 2, the current generation: a marker that said that"
+                "4294967299 cast to int is 3, the current generation: a marker that said that"
                         + " would otherwise be believed");
     }
 
@@ -205,7 +209,7 @@ class CapabilityProbeGenerationTest {
     @DisplayName("the largest generation an int can carry is read as itself, not refused")
     void theLargestGenerationIsRead() {
         String document =
-                marker(2)
+                marker(3)
                         .toJson()
                         .replace(GENERATION_LINE, "  \"capabilityProbeGeneration\": 2147483647,\n");
 
@@ -220,9 +224,9 @@ class CapabilityProbeGenerationTest {
     @DisplayName("a generation that is not a number is refused by the reader's own type check")
     void aGenerationOfTheWrongTypeIsRefused() {
         String document =
-                marker(2)
+                marker(3)
                         .toJson()
-                        .replace(GENERATION_LINE, "  \"capabilityProbeGeneration\": \"2\",\n");
+                        .replace(GENERATION_LINE, "  \"capabilityProbeGeneration\": \"3\",\n");
 
         assertEquals(
                 "the completion marker is not a valid one: the completion marker's"
@@ -266,6 +270,73 @@ class CapabilityProbeGenerationTest {
                 StandardCharsets.UTF_8);
     }
 
+    /* What a marker phase 09's probe wrote looks like: generation 2, field present. */
+    private static void downgradeToPhase09(InstallHarness harness, ArtefactRecord record)
+            throws IOException {
+        Path marker = harness.markerOf(record);
+        String current = Files.readString(marker, StandardCharsets.UTF_8);
+        String phase09 = current.replace(GENERATION_LINE, "  \"capabilityProbeGeneration\": 2,\n");
+        if (phase09.equals(current)) {
+            throw new AssertionError("the marker carries no generation line to change: " + current);
+        }
+        Files.writeString(marker, phase09, StandardCharsets.UTF_8);
+    }
+
+    @Test
+    @DisplayName("PHASE 09 MARKER (generation 2): re-probed, and gains NO_ANALYTICS_OPTION (D-013)")
+    void aPhase09MarkerIsReprobed() throws IOException, InterruptedException {
+        Path fixture = temporary.resolve("fixture");
+        CacheFixtures.writeSharedFixture(fixture);
+        ArtefactRecord record = CacheFixtures.sharedRecord(fixture);
+        Path root = temporary.resolve("cache");
+        InstallHarness earlier =
+                new InstallHarness(
+                        root,
+                        RecordingProbe.confirming(
+                                ToolCapability.PSM_TSV_OUTPUT, ToolCapability.WEIGHTS_OUTPUT),
+                        HostOperatingSystem.LINUX);
+        CacheFixtures.serveSharedFixture(earlier.fetcher(), record, fixture);
+        earlier.install(record);
+        downgradeToPhase09(earlier, record);
+        InstallationCheck before = earlier.verify(record);
+        InstallHarness current =
+                new InstallHarness(
+                        root,
+                        RecordingProbe.confirming(
+                                ToolCapability.PSM_TSV_OUTPUT,
+                                ToolCapability.WEIGHTS_OUTPUT,
+                                ToolCapability.NO_ANALYTICS_OPTION),
+                        HostOperatingSystem.LINUX);
+        CacheFixtures.serveSharedFixture(current.fetcher(), record, fixture);
+
+        Installation reprobed = current.install(record);
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                InstallationState.CAPABILITIES_FROM_AN_EARLIER_PROBE,
+                                before.state(),
+                                before::detail),
+                () ->
+                        assertTrue(
+                                before.detail()
+                                        .contains(
+                                                "capability probe generation 2, and this CometGUI"
+                                                        + " runs generation 3"),
+                                before::detail),
+                () -> assertFalse(reprobed.alreadyInstalled(), "the phase 09 entry was not reused"),
+                () -> assertEquals(1, current.probe().callCount(), "the probe ran again, once"),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        ToolCapability.PSM_TSV_OUTPUT,
+                                        ToolCapability.WEIGHTS_OUTPUT,
+                                        ToolCapability.NO_ANALYTICS_OPTION),
+                                reprobed.capabilities()),
+                () -> assertEquals(3, reprobed.marker().capabilityProbeGeneration()),
+                () -> assertEquals(InstallationState.INSTALLED, current.verify(record).state()));
+    }
+
     @Test
     @DisplayName("OLD MARKER: the cache reports it as needing a re-probe, and not as installed")
     void anOlderMarkerIsNotInstalled() throws IOException, InterruptedException {
@@ -292,7 +363,7 @@ class CapabilityProbeGenerationTest {
                                 "the marker in "
                                         + directory
                                         + " records capabilities from capability probe generation"
-                                        + " 1, and this CometGUI runs generation 2; the entry must"
+                                        + " 1, and this CometGUI runs generation 3; the entry must"
                                         + " be probed again before its capabilities are believed"
                                         + " (R-TOOL-07)",
                                 check.detail()));
@@ -363,7 +434,7 @@ class CapabilityProbeGenerationTest {
                                         ToolCapability.WEIGHTS_OUTPUT),
                                 reprobed.capabilities(),
                                 "the probe wins (R-TOOL-07): what it says now is what is recorded"),
-                () -> assertEquals(2, reprobed.marker().capabilityProbeGeneration()),
+                () -> assertEquals(3, reprobed.marker().capabilityProbeGeneration()),
                 () -> assertEquals(InstallationState.INSTALLED, after.state(), after::detail));
     }
 

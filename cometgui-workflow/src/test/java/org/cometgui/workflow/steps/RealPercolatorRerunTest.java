@@ -256,6 +256,7 @@ class RealPercolatorRerunTest {
                         "0.01",
                         "--maxiter",
                         "10",
+                        "--no-analytics",
                         layout.mergedPinFile().toString()));
         return argv;
     }
@@ -350,6 +351,18 @@ class RealPercolatorRerunTest {
         assertEquals(RealPercolator.SHA256_3071, after.hashes().sha256());
         assertEquals(argv(percolator309, original.layout(), false), firstArgv);
         assertEquals(argv(percolator3071, layout, true), secondArgv);
+        assertEquals(
+                1,
+                secondArgv.stream().filter("--no-analytics"::equals).count(),
+                () ->
+                        "D-013: the rerun's recorded argv carries --no-analytics once: "
+                                + secondArgv);
+        assertEquals(
+                1,
+                firstArgv.stream().filter("--no-analytics"::equals).count(),
+                () ->
+                        "D-013: the original's recorded argv carries --no-analytics once: "
+                                + firstArgv);
         assertFalse(firstArgv.contains("-X"));
         assertFalse(firstArgv.stream().anyMatch(element -> element.endsWith("pout.xml")));
         int x = secondArgv.indexOf("-X");

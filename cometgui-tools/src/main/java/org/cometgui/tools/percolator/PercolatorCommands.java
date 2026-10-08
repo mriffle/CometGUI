@@ -54,6 +54,7 @@ import org.cometgui.domain.tools.ToolCapability;
  *                                                         enabled stage needs XML
  *     --seed v  --num-threads v  --testFDR v  --trainFDR v  --maxiter v
  *                                                         each with its own capability
+ *     --no-analytics                                      with NO_ANALYTICS_OPTION, always
  *     {merged PIN}
  * </pre>
  *
@@ -96,8 +97,17 @@ import org.cometgui.domain.tools.ToolCapability;
  * path. Nothing else is added: no {@code PATH}, {@code HOME} or {@code TMPDIR} has been needed.
  * Windows and macOS have not been run.
  *
- * <p>{@code --no-analytics} is not passed: whether the product passes it is an escalated product
- * decision, and it would need a probed capability of its own.
+ * <h2>{@code --no-analytics} ({@code D-013})</h2>
+ *
+ * <p>Percolator posts usage analytics to Google on every run unless it is told not to, and the
+ * owner decided on 2026-10-08 that CometGUI always tells it not to. So {@code --no-analytics} is
+ * passed on <em>every</em> run of a build whose probe observed {@code NO_ANALYTICS_OPTION} -- it is
+ * not a setting and no request can turn it off -- as the last option, just before the merged PIN.
+ * Like every other option it goes through the one capability test, never a version number. A build
+ * whose probe did not observe it is <strong>not refused</strong>: analytics are not part of the
+ * scientific result, and refusing would leave such a build unusable for no gain. Instead the
+ * omission is recorded ({@link PercolatorCommand#notEmitted()}, and from there provenance) with a
+ * sentence saying that this run could not switch analytics off.
  */
 public final class PercolatorCommands {
 
@@ -145,6 +155,7 @@ public final class PercolatorCommands {
                 builder.value(option, value);
             }
         }
+        builder.noAnalytics();
         return builder.finish();
     }
 
@@ -234,6 +245,24 @@ public final class PercolatorCommands {
                                         + " was requested and not passed, so Percolator uses its"
                                         + " own default: the build's probed capabilities do not"
                                         + " include "
+                                        + option.capability().id()
+                                        + NEVER_PASSED));
+            }
+        }
+
+        /* D-013: always, when the build accepts it; said so when it does not, never refused. */
+        void noAnalytics() {
+            PercolatorOption option = PercolatorOption.NO_ANALYTICS;
+            if (accepts(option)) {
+                argv.add(option.spelling());
+            } else {
+                notEmitted.add(
+                        new NotEmitted(
+                                option,
+                                option.spelling()
+                                        + " was not passed, so this Percolator may post usage"
+                                        + " analytics while it runs: the build's probed"
+                                        + " capabilities do not include "
                                         + option.capability().id()
                                         + NEVER_PASSED));
             }

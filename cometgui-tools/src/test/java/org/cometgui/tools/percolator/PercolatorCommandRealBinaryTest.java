@@ -222,6 +222,7 @@ class PercolatorCommandRealBinaryTest {
                         "0.01",
                         "--maxiter",
                         "10",
+                        "--no-analytics",
                         search.run().mergedPinFile().toString()));
         return argv;
     }

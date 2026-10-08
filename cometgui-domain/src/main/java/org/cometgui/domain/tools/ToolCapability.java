@@ -106,6 +106,19 @@ public enum ToolCapability {
     /** Percolator accepts {@code --maxiter}, the maximum number of SVM training iterations. */
     MAX_ITERATIONS_OPTION("MAX_ITERATIONS_OPTION", ToolName.PERCOLATOR),
 
+    /**
+     * Percolator accepts {@code --no-analytics}, which stops it posting usage analytics.
+     *
+     * <p>Percolator 3.06.5, 3.07.1 and 3.09 post usage data to Google Analytics on every run unless
+     * told not to; the owner decided on 2026-10-08 ({@code D-013}) that CometGUI always tells them
+     * not to. It is a capability rather than a constant switch for the reason every other option
+     * is: {@code R-PERC-06} forbids passing an option the probed build was not observed to accept,
+     * and real Percolator refuses an option it does not know outright, so passing it blind to a
+     * build without it would stop the run. Not a setting: when the build has it, it is always
+     * passed.
+     */
+    NO_ANALYTICS_OPTION("NO_ANALYTICS_OPTION", ToolName.PERCOLATOR),
+
     /** Comet writes pepXML. */
     PEPXML_OUTPUT("PEPXML_OUTPUT", ToolName.COMET),
 
@@ -248,7 +261,7 @@ public enum ToolCapability {
                         + "\"; expected one of [XML_OUTPUT, XML_DECOY_OUTPUT, PSM_TSV_OUTPUT,"
                         + " PEPTIDE_TSV_OUTPUT, DECOY_OUTPUT, WEIGHTS_OUTPUT, THREAD_OPTION,"
                         + " SEED_OPTION, TEST_FDR_OPTION, TRAIN_FDR_OPTION,"
-                        + " MAX_ITERATIONS_OPTION, PEPXML_OUTPUT, PIN_OUTPUT,"
+                        + " MAX_ITERATIONS_OPTION, NO_ANALYTICS_OPTION, PEPXML_OUTPUT, PIN_OUTPUT,"
                         + " COMPLETE_PARAMS_QUERY, THERMO_RAW_WINDOWS, FRAGMENT_ION_INDEX,"
                         + " PEPTIDE_INDEX, SCAN_RANGE, OUTPUT_BASENAME]");
     }

@@ -118,10 +118,13 @@ public record InstallationMarker(
      * <p>Generation 1 is every marker written before phase 09: its Percolator probe established
      * only the two XML capabilities. Generation 2 is phase 09's probe, which also establishes the
      * tab-separated PSM, peptide and decoy tables, the weights file, and the seed, thread, {@code
-     * testFDR}, {@code trainFDR} and {@code maxiter} options. A marker from an earlier generation
-     * is not installed until it is re-probed; see {@link ToolCache#verify}.
+     * testFDR}, {@code trainFDR} and {@code maxiter} options. Generation 3 ({@code D-013}, phase
+     * 10) also establishes {@code NO_ANALYTICS_OPTION}, so that an installed build is passed {@code
+     * --no-analytics}; a generation-2 marker, believed, would leave every installed Percolator
+     * posting analytics. A marker from an earlier generation is not installed until it is
+     * re-probed; see {@link ToolCache#verify}.
      */
-    public static final int CAPABILITY_PROBE_GENERATION = 2;
+    public static final int CAPABILITY_PROBE_GENERATION = 3;
 
     /*
      * WHAT A MARKER WITH NO "capabilityProbeGeneration" MEANS.  The field was added within schema

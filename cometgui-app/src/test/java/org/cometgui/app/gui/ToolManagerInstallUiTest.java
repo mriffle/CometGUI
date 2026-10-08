@@ -549,7 +549,8 @@ class ToolManagerInstallUiTest {
                 + " (observed-by-execution), WEIGHTS_OUTPUT (observed-by-execution),"
                 + " THREAD_OPTION (observed-by-execution), SEED_OPTION (observed-by-execution),"
                 + " TEST_FDR_OPTION (observed-by-execution), TRAIN_FDR_OPTION"
-                + " (observed-by-execution), MAX_ITERATIONS_OPTION (observed-by-execution)";
+                + " (observed-by-execution), MAX_ITERATIONS_OPTION (observed-by-execution),"
+                + " NO_ANALYTICS_OPTION (observed-by-execution)";
     }
 
     private void assertRowIsInstalled(ShownToolManager ui, Path cacheRoot, String row)
@@ -677,14 +678,15 @@ class ToolManagerInstallUiTest {
      * write documents -- {@code -X} for targets and {@code -X -Z} for decoys, over one synthetic
      * PIN. {@link #assertPercolatorReallyWritesTheXmlItsRowClaims} then reads such a document.
      * Since phase 09 unit 1 the probe makes nine more runs over the same PIN, one per remaining
-     * capability, each led by the option it tests.
+     * capability, each led by the option it tests. Since phase 10 ({@code D-013}) the first
+     * capability run is {@code --no-analytics} alone, and every later probe run carries it.
      */
     private static void assertPercolatorWasProbedFunctionally(RecordingProcessRunner processes) {
         List<List<String>> runs = runsOf(processes, "percolator");
         assertTrue(
-                runs.size() >= 12, () -> "percolator was run " + runs.size() + " time(s): " + runs);
-        List<String> targets = runs.get(1);
-        List<String> decoys = runs.get(2);
+                runs.size() >= 13, () -> "percolator was run " + runs.size() + " time(s): " + runs);
+        List<String> targets = runs.get(2);
+        List<String> decoys = runs.get(3);
         assertAll(
                 () ->
                         assertEquals(
@@ -693,7 +695,26 @@ class ToolManagerInstallUiTest {
                                 "the version banner, which arrives on standard error"),
                 () ->
                         assertEquals(
-                                "-X", targets.get(1), () -> "the first capability run: " + targets),
+                                List.of("percolator", "--no-analytics"),
+                                runs.get(1).subList(0, 2),
+                                () ->
+                                        "the first capability run is --no-analytics's: "
+                                                + runs.get(1)),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                runs.subList(1, 13).stream()
+                                        .filter(
+                                                argv ->
+                                                        argv.stream()
+                                                                        .filter(
+                                                                                "--no-analytics"
+                                                                                        ::equals)
+                                                                        .count()
+                                                                != 1)
+                                        .toList(),
+                                "D-013: every capability run carries --no-analytics exactly once"),
+                () -> assertEquals("-X", targets.get(1), () -> "the first XML run: " + targets),
                 () ->
                         assertTrue(
                                 targets.get(2).endsWith(".pout.xml"),
@@ -730,12 +751,12 @@ class ToolManagerInstallUiTest {
                                         "--testFDR",
                                         "--trainFDR",
                                         "--maxiter"),
-                                runs.subList(3, 12).stream().map(argv -> argv.get(1)).toList(),
+                                runs.subList(4, 13).stream().map(argv -> argv.get(1)).toList(),
                                 "one further run per remaining capability, each over the same PIN"),
                 () ->
                         assertEquals(
                                 List.of(),
-                                runs.subList(12, runs.size()).stream()
+                                runs.subList(13, runs.size()).stream()
                                         .filter(
                                                 argv ->
                                                         !argv.equals(

@@ -176,7 +176,8 @@ class PercolatorRerunUiTest {
                         + wrapper309
                         + ". Observed capabilities: PSM_TSV_OUTPUT, PEPTIDE_TSV_OUTPUT,"
                         + " DECOY_OUTPUT, WEIGHTS_OUTPUT, THREAD_OPTION, SEED_OPTION,"
-                        + " TEST_FDR_OPTION, TRAIN_FDR_OPTION, MAX_ITERATIONS_OPTION.",
+                        + " TEST_FDR_OPTION, TRAIN_FDR_OPTION, MAX_ITERATIONS_OPTION,"
+                        + " NO_ANALYTICS_OPTION.",
                 RunSection.awaitText(
                         driver,
                         "percolator-register-status",

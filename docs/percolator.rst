@@ -205,18 +205,36 @@ What CometGUI checks before it trusts a build
 
 Every Percolator is checked by running it, once, when it is installed or
 registered -- never by reading its version number or its help text. The check
-runs the build eleven times on a small synthetic input of 64 target and 64
+runs the build twelve times on a small synthetic input of 64 target and 64
 decoy rows, once per capability, and keeps a capability only if the build
 visibly did it: the file it was asked to write exists with the expected rows,
 or the run with that one option completed and produced its results. One
 unsupported option therefore cannot hide another. It takes a few seconds per
 build.
 
-On Linux this check found that 3.06.5 and 3.07.1 can do all eleven things
+On Linux this check found that 3.06.5 and 3.07.1 can do all twelve things
 CometGUI asks of a Percolator, and that 3.09 can do all of them except the two
 XML ones. A build installed by an earlier version of CometGUI, whose check
 knew about fewer capabilities, is shown as not installed until it is installed
 again, so that it is checked again rather than believed.
+
+Usage analytics are switched off
+================================
+
+Left to itself, Percolator sends usage statistics to Google Analytics every
+time it runs. **CometGUI always tells it not to**, by passing
+``--no-analytics``: on every run of the check above (the very first run of
+the check is the one that finds out whether the build accepts the switch, and
+every run after it carries the switch), on every search, and on every rerun.
+This is not a setting; there is nothing to turn on or off.
+
+It is checked like every other option: a build is given ``--no-analytics``
+only if the check saw it accept it. All three versions CometGUI knows --
+3.06.5, 3.07.1 and 3.09 -- accept it. A build that does not is still used, but
+it cannot be stopped from sending its statistics, and the run's provenance
+record says so. The one other moment CometGUI starts Percolator, reading its
+version from its help text when it is installed or registered, happens before
+the check and so is not given the switch.
 
 The settings
 ============
@@ -326,7 +344,9 @@ The run's provenance record (:doc:`provenance`) holds, for Percolator:
 * whether it was the default or your choice, why the default was what it was,
   and each newer version passed over with what it lacked;
 * the advisories shown for it;
-* the exact command it ran, and anything requested but not passed, with why;
+* the exact command it ran -- including ``--no-analytics`` -- and anything
+  requested but not passed, with why (a build that could not be given
+  ``--no-analytics`` is recorded here);
 * the settings, including the seed that actually ran;
 * every output file with its MD5 and SHA-256.
 

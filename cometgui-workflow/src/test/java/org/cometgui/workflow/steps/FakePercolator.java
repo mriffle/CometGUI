@@ -64,7 +64,8 @@ final class FakePercolator {
                     ToolCapability.SEED_OPTION,
                     ToolCapability.TEST_FDR_OPTION,
                     ToolCapability.TRAIN_FDR_OPTION,
-                    ToolCapability.MAX_ITERATIONS_OPTION);
+                    ToolCapability.MAX_ITERATIONS_OPTION,
+                    ToolCapability.NO_ANALYTICS_OPTION);
 
     /** The table every table file gets: two rows, one known q-value and one unparsable. */
     static final String TABLE =
@@ -94,32 +95,44 @@ final class FakePercolator {
      * @param emptyOption an option whose file it writes empty, or empty
      * @param extraFile a file it also writes in its working directory, or empty
      * @param table the table text it writes, a printf format
+     * @param rejectedOption an option it refuses as real Percolator refuses one it does not know --
+     *     exit 1, nothing written -- or empty
      */
     record Behaviour(
-            int exitCode, String skipOption, String emptyOption, String extraFile, String table) {
+            int exitCode,
+            String skipOption,
+            String emptyOption,
+            String extraFile,
+            String table,
+            String rejectedOption) {
 
         static Behaviour normal() {
-            return new Behaviour(0, "", "", "", TABLE);
+            return new Behaviour(0, "", "", "", TABLE, "");
         }
 
         Behaviour exiting(int code) {
-            return new Behaviour(code, skipOption, emptyOption, extraFile, table);
+            return new Behaviour(code, skipOption, emptyOption, extraFile, table, rejectedOption);
         }
 
         Behaviour skipping(String option) {
-            return new Behaviour(exitCode, option, emptyOption, extraFile, table);
+            return new Behaviour(exitCode, option, emptyOption, extraFile, table, rejectedOption);
         }
 
         Behaviour emptying(String option) {
-            return new Behaviour(exitCode, skipOption, option, extraFile, table);
+            return new Behaviour(exitCode, skipOption, option, extraFile, table, rejectedOption);
         }
 
         Behaviour alsoWriting(String name) {
-            return new Behaviour(exitCode, skipOption, emptyOption, name, table);
+            return new Behaviour(exitCode, skipOption, emptyOption, name, table, rejectedOption);
         }
 
         Behaviour withTable(String text) {
-            return new Behaviour(exitCode, skipOption, emptyOption, extraFile, text);
+            return new Behaviour(
+                    exitCode, skipOption, emptyOption, extraFile, text, rejectedOption);
+        }
+
+        Behaviour rejecting(String option) {
+            return new Behaviour(exitCode, skipOption, emptyOption, extraFile, table, option);
         }
     }
 
@@ -136,8 +149,17 @@ final class FakePercolator {
         lines.add("table='" + behaviour.table() + "'");
         lines.add("weights='" + WEIGHTS + "'");
         lines.add("xml='" + XML + "'");
+        if (!behaviour.rejectedOption().isEmpty()) {
+            lines.add("for argument in \"$@\"; do");
+            lines.add("  if [ \"$argument\" = '" + behaviour.rejectedOption() + "' ]; then");
+            lines.add("    echo 'Exception caught: unknown option' >&2");
+            lines.add("    exit 1");
+            lines.add("  fi");
+            lines.add("done");
+        }
         lines.add("while [ $# -gt 1 ]; do");
         lines.add("  case \"$1\" in");
+        lines.add("    --no-analytics) shift; continue ;;");
         if (!behaviour.skipOption().isEmpty()) {
             lines.add("    " + behaviour.skipOption() + ") : ;;");
         }

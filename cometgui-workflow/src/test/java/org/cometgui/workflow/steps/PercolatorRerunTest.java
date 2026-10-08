@@ -542,6 +542,7 @@ class PercolatorRerunTest {
                             "0.01",
                             "--maxiter",
                             "10",
+                            "--no-analytics",
                             layout.mergedPinFile().toString()),
                     percolator.get(0).execution().command().argv());
             assertEquals(derived.percolatorArgv(), percolator.get(0).execution().command().argv());

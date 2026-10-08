@@ -96,6 +96,15 @@ The options CometGUI may pass
      - ``MAX_ITERATIONS_OPTION``
      - Always requested; passed when capable.
      - Advanced setting *Maximum iterations*. Default ``10``; 1 to 1000.
+   * - ``--no-analytics``
+     - ``NO_ANALYTICS_OPTION``
+     - On **every** run of a build that has the capability, as the last
+       option before the merged PIN (``D-013``: CometGUI always switches off
+       Percolator's usage analytics). It is not a setting and nothing can turn
+       it off. A build without the capability is **not refused**: the option
+       is left out and the run's provenance records that analytics could not
+       be switched off for that build.
+     - No value.
    * - *(the merged PIN)*
      - --
      - Always, as the last argument.
@@ -116,7 +125,7 @@ Order, working directory and environment
 The argument array is, in this order: the executable; the two target tables;
 the two decoy tables; the weights file; ``-X`` and its file; ``--seed``,
 ``--num-threads``, ``--testFDR``, ``--trainFDR``, ``--maxiter``, each with its
-value; the merged PIN. Each option and its value are two elements, and every
+value; ``--no-analytics``; the merged PIN. Each option and its value are two elements, and every
 path is absolute. With every capability present and Limelight conversion
 switched on, a run's array is::
 
@@ -128,6 +137,7 @@ switched on, a run's array is::
       --weights                <run>/outputs/percolator/weights.txt
       -X                       <run>/outputs/percolator/pout.xml
       --seed 1  --num-threads 3  --testFDR 0.01  --trainFDR 0.01  --maxiter 10
+      --no-analytics
       <run>/inputs/pin/merged.pin
 
 Percolator runs with ``outputs/percolator/`` as its working directory and an
@@ -141,8 +151,8 @@ What a user can influence
 
 The five Advanced settings (their values; whether each is passed is the
 build's capability), the Limelight conversion switch (whether ``-X`` is
-wanted), and which build runs. Nothing else: the file names, the order and the
-environment are fixed.
+wanted), and which build runs. Nothing else: the file names, the order, the
+environment and ``--no-analytics`` are fixed.
 
 The output files
 ================
@@ -202,12 +212,6 @@ What is never passed
        instead. The probe still establishes ``XML_DECOY_OUTPUT``, so if Phase 12
        finds a configuration that needs decoys in the XML, the option already
        has a capability to be checked against.
-   * - ``--no-analytics``
-     - Percolator posts usage analytics by default, and 3.07.1 and 3.09 both
-       offer this option. Whether CometGUI should pass it is a product
-       decision that has been **escalated, not decided** (Phase 09 work log,
-       *Blockers escalated*). Under ``R-PERC-06`` it would in any case need a
-       probed capability of its own first, and it has none today.
    * - ``--xml-in`` and the other XML *input* options (``--stdinput-xml``,
        ``--no-schema-validation``)
      - ``--xml-in`` is the pin-XML *reader*, which is what a ``noxml`` build
@@ -275,10 +279,18 @@ beside it, registered as a local binary (Linux has no installable 3.09;
      - accepted
      - accepted
      - as above
+   * - ``--no-analytics`` (``NO_ANALYTICS_OPTION``), measured 2026-10-08
+     - accepted
+     - accepted
+     - accepted
+     - as above, and ``noAnalyticsOnEveryLaunchOf3071``,
+       ``noAnalyticsOnEveryLaunchOf309``
 
 "Accepted" means the probe's own observable held, not that the option was
-listed in help text. The probe took about 5.3 s for 3.06.5, 5.8 s for 3.07.1
-and 3.8 s for 3.09, whose two XML runs fail at once.
+listed in help text. With eleven runs the probe took about 5.3 s for 3.06.5,
+5.8 s for 3.07.1 and 3.8 s for 3.09, whose two XML runs fail at once; with the
+twelfth, ``--no-analytics``'s own, 5.9 s, 6.4 s and 4.3 s (2026-10-08, the
+last including the registration's ``--help``), on a busy host.
 
 Further facts measured the same day, recorded for whoever touches the options
 next:

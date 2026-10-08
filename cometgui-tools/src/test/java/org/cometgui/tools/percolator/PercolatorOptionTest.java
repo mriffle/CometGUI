@@ -50,7 +50,8 @@ class PercolatorOptionTest {
         "NUM_THREADS, --num-threads, THREAD_OPTION",
         "TEST_FDR, --testFDR, TEST_FDR_OPTION",
         "TRAIN_FDR, --trainFDR, TRAIN_FDR_OPTION",
-        "MAX_ITERATIONS, --maxiter, MAX_ITERATIONS_OPTION"
+        "MAX_ITERATIONS, --maxiter, MAX_ITERATIONS_OPTION",
+        "NO_ANALYTICS, --no-analytics, NO_ANALYTICS_OPTION"
     })
     @DisplayName("every option's spelling and the capability that licenses it")
     void theTable(String constant, String spelling, String capability) {
@@ -62,7 +63,7 @@ class PercolatorOptionTest {
     }
 
     @Test
-    @DisplayName("twelve options, and every Percolator capability is licensed by at least one")
+    @DisplayName("thirteen options, and every Percolator capability is licensed by at least one")
     void everyCapabilityHasAnOption() {
         Set<ToolCapability> licensed = EnumSet.noneOf(ToolCapability.class);
         for (PercolatorOption option : PercolatorOption.values()) {
@@ -70,7 +71,7 @@ class PercolatorOptionTest {
         }
 
         assertAll(
-                () -> assertEquals(12, PercolatorOption.values().length),
+                () -> assertEquals(13, PercolatorOption.values().length),
                 () ->
                         assertEquals(
                                 ToolCapability.declarableFor(ToolName.PERCOLATOR),

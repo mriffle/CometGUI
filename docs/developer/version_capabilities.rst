@@ -17,7 +17,9 @@ observed capabilities; and a version number only orders, names and records.
    cited as ``P9-n`` are in ``handoffs/PHASE-09-worklog.rst``, with every work
    unit's sign-off. Every measured number below was produced on this
    project's Debian 12, x86-64 host; nothing in this page has run on Windows
-   or macOS (see `What has run, and where`_). ``specification.rst``
+   or macOS (see `What has run, and where`_). Amended in Phase 10 for
+   ``D-013`` (decided 2026-10-08: CometGUI always passes ``--no-analytics``
+   where the probe observes it). ``specification.rst``
    (*Percolator versions and artefact availability*, ``R-PERC-01``..\ ``12``)
    is the authority on what is required; where the build differs, this page
    says so.
@@ -42,7 +44,7 @@ Where the code is
      - What it holds
 
    * - ``org.cometgui.domain.tools`` (``cometgui-domain``)
-     - ``ToolCapability`` (eleven Percolator constants), ``CapabilityEvidence``
+     - ``ToolCapability`` (twelve Percolator constants), ``CapabilityEvidence``
        and ``DeclaredCapability`` (a claim with its evidence), ``ToolOffer``
        (what the Tool Manager offers, with its advisories), ``ToolVersion``.
 
@@ -95,7 +97,7 @@ Where the code is
 The capability model
 ====================
 
-Eleven Percolator capabilities
+Twelve Percolator capabilities
 ------------------------------
 
 Each capability is one thing a run may ask of a build, and each is
@@ -139,14 +141,35 @@ established by its own probe run with its own observable (P9-4):
        64-row target peptide table on standard output. Each value is
        Percolator's documented default, so the option is the only difference
        from a default run.
+   * - ``NO_ANALYTICS_OPTION``
+     - ``--no-analytics``, alone -- the probe's **first** run
+     - As for the five options above. Once observed, every later run of the
+       probe carries ``--no-analytics`` too (see below).
 
-**Why eleven runs, not one.** Real Percolator refuses an unknown option
+**Why twelve runs, not one.** Real Percolator refuses an unknown option
 outright -- banner, ``Exception caught``, exit 1, no output -- so in a combined
 run one unsupported option would take every other capability down with it.
 Separate runs make a build that rejects one option lose exactly that
 capability (``PercolatorCapabilityProbeTest`` drives fake binaries that reject
 one option each). The cost was measured at about 5.3 s for 3.06.5, 5.8 s for
-3.07.1 and 3.8 s for 3.09, paid once per install or registration.
+3.07.1 and 3.8 s for 3.09 with eleven runs (2026-10-07), and 5.9 s, 6.4 s and
+4.3 s with twelve (2026-10-08, the last including registration), paid once
+per install or registration.
+
+**No analytics, from the first run** (``D-013``). Percolator posts usage analytics to
+Google on every run unless it is given ``--no-analytics``, and CometGUI always
+gives it -- including on the probe's own runs. So the probe's first run is
+``NO_ANALYTICS_OPTION``'s, and once that is observed every later run carries
+``--no-analytics`` as its last option before the fixture
+(``PercolatorCapabilityProbeTest.noAnalyticsIsObservedFirstAndThenAlwaysPassed``;
+against the real 3.07.1 and 3.09, every launch is captured at the process
+seam: ``PercolatorRealBinaryTest.noAnalyticsOnEveryLaunchOf3071`` and
+``noAnalyticsOnEveryLaunchOf309``). A build that refuses it loses that one
+capability and nothing else, and its later runs go without it
+(``aBuildRefusingNoAnalytics``); the refused run cannot itself have posted
+anything, because Percolator refuses an unknown option before doing any work.
+It adds nothing the other runs' verdicts depend on: it is neither an output
+nor a scoring parameter.
 
 **The fixture** is ``SyntheticPin``: 64 target and 64 decoy rows, a fixed
 seed, numbers formatted under ``Locale.ROOT``, its bytes pinned by
@@ -201,8 +224,11 @@ The re-probe rule
 Completion markers written before Phase 09 hold only the two XML
 capabilities, and read naively they would make an installed 3.07.1 lose its
 tab-separated output. So the marker records ``capabilityProbeGeneration``
-(``InstallationMarker.CAPABILITY_PROBE_GENERATION``, now **2**; a marker
-without the field is generation 1), and ``ToolCache.verify`` reports a marker
+(``InstallationMarker.CAPABILITY_PROBE_GENERATION``, now **3**; a marker
+without the field is generation 1, Phase 09's probe wrote 2, and Phase 10
+bumped it to 3 because the probe now also establishes
+``NO_ANALYTICS_OPTION`` -- a believed generation-2 marker would leave every
+installed build posting analytics), and ``ToolCache.verify`` reports a marker
 from an older generation -- after every checksum has matched -- as
 ``CAPABILITIES_FROM_AN_EARLIER_PROBE``. That state is *not installed*: the
 build is offered as installable, and the next install rebuilds the directory
@@ -310,6 +336,11 @@ goes through one test -- is ``option.capability()`` in the probed set? -- in
   ``percolator.not-emitted.<nn>.*``; a missing weights file additionally
   produces the ``R-PERC-08`` warning;
 * ``-X`` only when ``xmlNeeded`` *and* ``XML_OUTPUT``; ``-Z`` never;
+* ``--no-analytics`` on every run whose build has ``NO_ANALYTICS_OPTION``,
+  as the last option before the merged PIN -- not a setting, never turned off
+  (``D-013``). A build without it is **not refused**: the option is left out
+  and its ``NotEmitted`` sentence, recorded in provenance, says analytics
+  could not be switched off for that build;
 * the environment is exactly ``LANG=C.UTF-8`` and the working directory is
   the output directory.
 
@@ -459,7 +490,7 @@ rather than skips when a fixture is missing, and checks each binary's SHA-256
 before use. What has executed:
 
 * **3.07.1 and 3.06.5**: the managed Linux portable ``noxml`` binaries,
-  probed to all eleven capabilities, and 3.07.1 run end to end on a merged PIN
+  probed to all twelve capabilities, and 3.07.1 run end to end on a merged PIN
   from the real Comet path (Comet 2026.03.0, the two ``D-006`` K562 mzML files,
   the proteome's first 1000 records: 3285 target and 3187 decoy PIN rows,
   3285 PSM rows, 2482 peptides, 3 weight splits of 22 features, a 3285-PSM pout
@@ -470,7 +501,7 @@ before use. What has executed:
   8.5 packages beside it, behind the wrapper
   ``scratch/percolator/3.09/run-percolator-3.09.sh`` (the registered file,
   and so the one whose SHA-256 provenance records). It prints ``Percolator
-  version 3.09.0`` under an empty environment, probes to the nine non-XML
+  version 3.09.0`` under an empty environment, probes to the ten non-XML
   capabilities, and rejects ``-X``. These fixtures are gitignored scratch; the
   tests that need them name how to rebuild them.
 * **No Windows or macOS Percolator was executed by this phase.** The DOS
@@ -482,8 +513,15 @@ before use. What has executed:
 
 Known limits, recorded rather than hidden:
 
-* ``--no-analytics`` is escalated, not decided: every probe and every run may
-  contact Percolator's usage analytics.
+* ``--no-analytics`` (``D-013``) is passed on every probe run after the first
+  -- and on the first, which is its own -- and on every search and rerun,
+  wherever the probe observed it; ``RealPercolatorRunTest.everyRealRunPassesNoAnalytics``
+  and ``RealPercolatorRerunTest`` read it back from ``provenance.json``. Two
+  Percolator invocations are outside that rule: the version read, which runs
+  ``--help`` before any probe can say whether the build accepts the option,
+  and the handful of direct runs inside ``PercolatorRealBinaryTest`` that test
+  the binary rather than the product. Whether ``--help`` posts analytics has
+  not been measured (the host has no system-call tracer).
 * The probe's fixture cannot distinguish a PSM table from a peptide table.
 * The PIT mutants in ``workflow.steps`` that time out (unit 5) appear to come
   from real-binary test setup exceeding PIT's per-test timeout rather than
