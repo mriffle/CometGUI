@@ -275,7 +275,35 @@ brief's *Build economy* section verbatim.
        go red; (6) ``--only percolator``, ``workflow``, ``install`` green,
        floors only rise.
      - D-013; R-PERC-06
-     -
+     - **Signed off 2026-10-08** (``47c55c4``, ``c5973fd``). Diff read: 28
+       files + harness -- ``ToolCapability.NO_ANALYTICS_OPTION``,
+       ``PercolatorOption.NO_ANALYTICS``; the probe's first run is
+       ``[exe, --no-analytics, pin]`` and, once observed, every later run
+       carries it (12 runs); ``Builder.noAnalytics()`` emits it last before
+       the PIN when the probed set holds it, else a ``NotEmitted`` sentence
+       (run not refused); ``CAPABILITY_PROBE_GENERATION`` 2 -> 3; docs on
+       five pages; ``percolator`` controls A1-A3, floor 94 -> 109. I ran:
+       ``mvn -o -pl cometgui-tools -am install -DskipTests``, then the four
+       Percolator test classes -- **115 tests, 0 failures** (incl. the real
+       3.07.1/3.09 ``PercolatorRealBinaryTest`` 11, 49 s);
+       ``-pl cometgui-params-percolator,cometgui-ui test`` -- 54 and 587, 0
+       failures (the domain enum grew). My injections, restored by
+       ``sha256sum -c``: (A) the probe passing ``--no-analytics`` on later
+       runs even when not observed -- 4 red (``aBuildRefusingNoAnalytics``,
+       ``aNoAnalyticsRunMustExitZero``, ``theArgumentArrays``,
+       ``oneRejectedOptionLosesExactlyItsCapability[13]``); (B) the
+       builder's gate for the switch keyed on ``XML_OUTPUT`` instead of its
+       own capability -- 5 red (``noAnalyticsWheneverProbed``,
+       ``withoutNoAnalyticsTheRunIsNotRefused``, ``neededButNotCapable``,
+       ``eachRemovedInTurn`` x2). Agent's PIT: 64/64 killed on the changed
+       classes. ``verify-all-gates.sh --only percolator --only workflow
+       --only install``: **3 passed** -- percolator 109 (699 s), workflow
+       110 (466 s), install 95 (315 s). **Residue, escalated:** the
+       ``--help`` launches (install identity stage, local registration) run
+       before the probe and carry no ``--no-analytics``; whether ``--help``
+       posts analytics is unmeasured (no strace on the host, nothing may be
+       installed). Hand-typed eleven-capability test inputs in ui, app and
+       params-percolator are unchanged (they run no Percolator).
 
    * - 2
      - **The store contract and the in-memory store.**
