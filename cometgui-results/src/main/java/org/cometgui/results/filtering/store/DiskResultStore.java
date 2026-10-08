@@ -203,15 +203,6 @@ final class DiskResultStore implements ResultStore {
         return Optional.ofNullable(sortReports.get(sort));
     }
 
-    /**
-     * The index directory.
-     *
-     * @return it
-     */
-    Path indexDirectory() {
-        return indexDirectory;
-    }
-
     @Override
     public Path file() {
         lock.readLock().lock();
@@ -621,7 +612,7 @@ final class DiskResultStore implements ResultStore {
             if (cached != null) {
                 return cached;
             }
-            long[] bits = new long[(int) ((rows + 63) >>> 6)];
+            long[] bits = new long[words(rows)];
             forEachRow(
                     (row, value) -> {
                         if (TextFilter.matches(text, value)) {
@@ -631,6 +622,16 @@ final class DiskResultStore implements ResultStore {
             textMatches.put(text, bits);
             return bits;
         }
+    }
+
+    /**
+     * How many {@code long}s hold one bit per row.
+     *
+     * @param rows the rows
+     * @return {@code ceil(rows / 64)}
+     */
+    static int words(long rows) {
+        return Math.toIntExact((rows + 63) >>> 6);
     }
 
     private static <K, V> Map<K, V> lru(int size) {

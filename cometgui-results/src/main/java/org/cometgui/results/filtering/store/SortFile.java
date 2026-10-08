@@ -139,6 +139,12 @@ final class SortFile implements Closeable {
             return new Key(row, false, 0, 0, texts);
         }
 
+        /**
+         * The heap this key is reckoned to take, for sizing a chunk: 64 bytes for the key, and for
+         * text 16 for the array, 8 a reference and 48 plus 2 a character for each string.
+         *
+         * @return the estimate
+         */
         long estimatedBytes() {
             long bytes = 64;
             if (texts != null) {
@@ -176,13 +182,13 @@ final class SortFile implements Closeable {
     }
 
     /**
-     * The order of {@link ResultSort}: missing last both ways, ties by row ascending both ways.
+     * The ascending order of {@link ResultSort}: missing last, values ascending, ties by row
+     * ascending. Descending is derived from it ({@link #build}).
      *
      * @param type the key type
-     * @param descending the direction
      * @return the comparator
      */
-    static Comparator<Key> order(KeyType type, boolean descending) {
+    static Comparator<Key> order(KeyType type) {
         return (a, b) -> {
             if (a.missing() || b.missing()) {
                 if (a.missing() && b.missing()) {
@@ -191,10 +197,7 @@ final class SortFile implements Closeable {
                 return a.missing() ? 1 : -1;
             }
             int byValue = compareValues(type, a, b);
-            if (byValue != 0) {
-                return descending ? -byValue : byValue;
-            }
-            return Integer.compare(a.row(), b.row());
+            return byValue != 0 ? byValue : Integer.compare(a.row(), b.row());
         };
     }
 
@@ -321,10 +324,11 @@ final class SortFile implements Closeable {
      * @param rows how many rows the keys must cover
      * @param raw the raw table's identity
      * @param keys every row's key, in file order
+     * @return how many runs were spilled to disk: 0 when the keys fit one chunk
      * @throws IOException if the keys cannot be read, do not cover every row exactly once in file
      *     order, or a file cannot be written
      */
-    static void build(
+    static int build(
             Path ascending,
             Path descending,
             TableKind kind,
@@ -334,7 +338,7 @@ final class SortFile implements Closeable {
             RawIdentity raw,
             KeySource keys)
             throws IOException {
-        build(ascending, descending, kind, column, type, rows, raw, keys, CHUNK_BYTES);
+        return build(ascending, descending, kind, column, type, rows, raw, keys, CHUNK_BYTES);
     }
 
     /**
@@ -342,8 +346,9 @@ final class SortFile implements Closeable {
      * KeySource)}, with another chunk size: for tests of the spill and merge.
      *
      * @param chunkBytes the most key bytes, estimated, one chunk holds before it is spilled
+     * @return how many runs were spilled to disk
      */
-    static void build(
+    static int build(
             Path ascending,
             Path descending,
             TableKind kind,
@@ -354,7 +359,7 @@ final class SortFile implements Closeable {
             KeySource keys,
             long chunkBytes)
             throws IOException {
-        Comparator<Key> order = order(type, false);
+        Comparator<Key> order = order(type);
         Path directory =
                 Objects.requireNonNull(
                         ascending.toAbsolutePath().getParent(), "the directory of " + ascending);
@@ -411,6 +416,7 @@ final class SortFile implements Closeable {
             }
         }
         writeDescending(ascending, descending, kind, column, rows, raw, written);
+        return runs.size();
     }
 
     private static ByteBuffer header(

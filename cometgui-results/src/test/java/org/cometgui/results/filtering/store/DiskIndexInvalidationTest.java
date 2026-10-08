@@ -27,17 +27,25 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.zip.CRC32C;
+import org.cometgui.domain.ports.HashService;
 import org.cometgui.results.filtering.FilterCounts;
 import org.cometgui.results.filtering.PsmQValueFilter;
 import org.cometgui.results.parser.PercolatorOutputException;
 import org.cometgui.results.testing.Fixtures;
+import org.cometgui.results.testing.OpenFiles;
 import org.cometgui.results.testing.ScratchFixtures;
 import org.cometgui.results.testing.TestHasher;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +66,9 @@ class DiskIndexInvalidationTest {
 
     /** The shuffled table at 0.01: 23 rows, 9 passing, 7 failing, 7 unknown (hand count). */
     private static final FilterCounts AT_ONE_PERCENT = new FilterCounts(23, 9, 7, 7);
+
+    /** A row appended to change the raw table. */
+    private static final String EXTRA_ROW = "x_1_2_1\t1\t0.001\t0\tK.A.R\tp\n";
 
     @TempDir private Path work;
 
@@ -233,6 +244,10 @@ class DiskIndexInvalidationTest {
                             () -> store.query(ResultQuery.firstPage(PsmQValueFilter.DEFAULT)));
             assertEquals(IndexProblem.RAW_CHANGED_SINCE_OPENED, refused.problem());
             assertTrue(refused.getMessage().contains(raw.toString()), refused.getMessage());
+            assertTrue(
+                    refused.getMessage()
+                            .contains("the raw table changed after its index was opened"),
+                    refused.getMessage());
             assertEquals(
                     IndexProblem.RAW_CHANGED_SINCE_OPENED,
                     assertThrows(ResultIndexException.class, () -> store.row(new RowKey(2)))
@@ -298,6 +313,34 @@ class DiskIndexInvalidationTest {
                     IndexProblem.RAW_CHANGED_SINCE_OPENED,
                     assertThrows(ResultIndexException.class, () -> store.row(new RowKey(2)))
                             .problem());
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "a forged index one record short (row count and checksums made consistent) is used,"
+                    + " but the first pass over the raw table finds a row it does not index and"
+                    + " refuses")
+    void forgedShortIndexCaughtOnStreaming() throws IOException {
+        buildOnce();
+        byte[] whole = Files.readAllBytes(indexFile);
+        ByteBuffer shorter = ByteBuffer.wrap(java.util.Arrays.copyOf(whole, whole.length - 56));
+        shorter.putLong(72, 22);
+        reseal(shorter, 96, 80);
+        Files.write(indexFile, shorter.array());
+        try (DiskResultStore store = open()) {
+            assertEquals(
+                    new DiskResultStore.IndexReport(false, Optional.empty()), store.indexReport());
+            assertEquals(22, store.rowCount());
+            ResultIndexException refused =
+                    assertThrows(
+                            ResultIndexException.class,
+                            () ->
+                                    store.query(
+                                            ResultQuery.firstPage(PsmQValueFilter.DEFAULT)
+                                                    .withText("human")));
+            assertEquals(IndexProblem.RAW_CHANGED_SINCE_OPENED, refused.problem());
+            assertTrue(refused.getMessage().contains("line 24"), refused.getMessage());
         }
     }
 
@@ -505,14 +548,18 @@ class DiskIndexInvalidationTest {
             }
         }
         byte[] whole = Files.readAllBytes(sortFile);
-        Files.write(sortFile, java.util.Arrays.copyOf(whole, whole.length - 4));
-        try (DiskResultStore store = open()) {
-            assertEquals(expected, ResultStoreContract.allLines(store, all.withSort(byPeptide), 5));
-            assertEquals(
-                    Optional.of(
-                            new DiskResultStore.IndexReport(
-                                    true, Optional.of(IndexProblem.TRUNCATED))),
-                    store.sortReport(byPeptide));
+        for (int length : new int[] {whole.length - 4, 10}) {
+            Files.write(sortFile, java.util.Arrays.copyOf(whole, length));
+            try (DiskResultStore store = open()) {
+                assertEquals(
+                        expected, ResultStoreContract.allLines(store, all.withSort(byPeptide), 5));
+                assertEquals(
+                        Optional.of(
+                                new DiskResultStore.IndexReport(
+                                        true, Optional.of(IndexProblem.TRUNCATED))),
+                        store.sortReport(byPeptide),
+                        "truncated to " + length);
+            }
         }
     }
 
@@ -590,31 +637,33 @@ class DiskIndexInvalidationTest {
         try (Stream<Path> files = Files.list(indexDirectory)) {
             assertEquals(List.of(), files.toList());
         }
+        assertFalse(
+                OpenFiles.descriptorTo(indexDirectory.toString()),
+                "the temporary index file is closed, not only deleted");
+        assertFalse(OpenFiles.descriptorTo(raw.toString()), "the raw table is closed");
     }
 
     @Test
     @DisplayName(
-            "close releases the mappings: the index and sort files can be deleted at once, and"
-                    + " (on Linux) the process maps them no more")
-    void closeReleasesMappings() throws IOException {
-        Path maps = Path.of("/proc/self/maps");
+            "close releases everything: the raw table's channel and every mapping -- the process"
+                    + " (on Linux) neither holds nor maps them after close -- and the index and"
+                    + " sort files can be deleted at once")
+    void closeReleasesEverything() throws IOException {
         DiskResultStore store = open();
         store.query(
                 ResultQuery.firstPage(PsmQValueFilter.DEFAULT)
                         .withSort(ResultSort.ascending(ResultSort.Column.SCORE)));
         Path sortFile = indexDirectory.resolve("target-psms.sort-score-ascending");
-        boolean linux = Files.isReadable(maps);
-        if (linux) {
-            String mapped = Files.readString(maps, StandardCharsets.UTF_8);
-            assertTrue(mapped.contains(indexFile.toString()), "the index is mapped while open");
-            assertTrue(mapped.contains(sortFile.toString()), "the sort file is mapped while open");
+        if (OpenFiles.available()) {
+            assertTrue(OpenFiles.descriptorTo(raw.toString()), "the raw table is open while open");
+            assertTrue(OpenFiles.mapped(indexFile.toString()), "the index is mapped while open");
+            assertTrue(OpenFiles.mapped(sortFile.toString()), "the sort file is mapped while open");
         }
         store.close();
-        if (linux) {
-            String mapped = Files.readString(maps, StandardCharsets.UTF_8);
-            assertFalse(mapped.contains(indexFile.toString()), "the index is unmapped");
-            assertFalse(mapped.contains(sortFile.toString()), "the sort file is unmapped");
-        }
+        assertFalse(OpenFiles.descriptorTo(raw.toString()), "the raw table's channel is closed");
+        assertFalse(OpenFiles.descriptorTo(indexDirectory.toString()), "no index file is open");
+        assertFalse(OpenFiles.mapped(indexFile.toString()), "the index is unmapped");
+        assertFalse(OpenFiles.mapped(sortFile.toString()), "the sort file is unmapped");
         try (Stream<Path> files = Files.list(indexDirectory)) {
             List<Path> all = files.toList();
             assertEquals(3, all.size(), "the index and the score column's two sort files");
@@ -624,5 +673,75 @@ class DiskIndexInvalidationTest {
         }
         Files.delete(indexDirectory);
         assertFalse(Files.exists(indexDirectory));
+    }
+
+    @Test
+    @DisplayName(
+            "a store closed on one thread refuses another thread's call at once, rather than"
+                    + " leaving it waiting")
+    void closedAcrossThreads() throws IOException {
+        DiskResultStore store = open();
+        store.close();
+        ExecutorService other = Executors.newSingleThreadExecutor();
+        try {
+            Future<Long> call = other.submit(store::rowCount);
+            ExecutionException refused =
+                    assertThrows(ExecutionException.class, () -> call.get(10, TimeUnit.SECONDS));
+            assertTrue(refused.getCause() instanceof IllegalStateException, refused.toString());
+        } finally {
+            other.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "the raw table changed while it was being indexed: refused with"
+                    + " RAW_CHANGED_WHILE_INDEXING, and no index is left to trust")
+    void changedWhileIndexing() throws IOException {
+        Files.createDirectories(indexDirectory);
+        RawIdentity before = RawIdentity.of(raw, hasher);
+        Files.writeString(raw, EXTRA_ROW, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+        ResultIndexException refused =
+                assertThrows(
+                        ResultIndexException.class,
+                        () -> DiskIndex.build(raw, TableKind.TARGET_PSMS, before, indexFile));
+        assertEquals(IndexProblem.RAW_CHANGED_WHILE_INDEXING, refused.problem());
+        assertTrue(
+                refused.getMessage()
+                        .contains(IndexProblem.RAW_CHANGED_WHILE_INDEXING.description()),
+                refused.getMessage());
+        try (Stream<Path> files = Files.list(indexDirectory)) {
+            assertEquals(List.of(), files.toList(), "no index, no temporary file");
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "the raw table changed while it was being hashed (a hasher that appends to it first):"
+                    + " opening refuses with RAW_CHANGED_WHILE_INDEXING")
+    void changedWhileHashing() {
+        HashService appending =
+                path -> {
+                    Files.writeString(
+                            path, EXTRA_ROW, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+                    return hasher.hash(path);
+                };
+        ResultIndexException refused =
+                assertThrows(
+                        ResultIndexException.class,
+                        () ->
+                                DiskResultStore.open(
+                                        raw, TableKind.TARGET_PSMS, indexDirectory, appending));
+        assertEquals(IndexProblem.RAW_CHANGED_WHILE_INDEXING, refused.problem());
+    }
+
+    @Test
+    @DisplayName("the text filter's bit set: one long per 64 rows, rounded up")
+    void bitSetWords() {
+        assertEquals(0, DiskResultStore.words(0));
+        assertEquals(1, DiskResultStore.words(1));
+        assertEquals(1, DiskResultStore.words(64));
+        assertEquals(2, DiskResultStore.words(65));
+        assertEquals(15_625, DiskResultStore.words(1_000_000));
     }
 }

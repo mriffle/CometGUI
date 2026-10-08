@@ -17,6 +17,7 @@
 package org.cometgui.results.filtering.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,6 +27,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+import org.cometgui.results.testing.OpenFiles;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -147,6 +149,8 @@ class SortFileTest {
         assertEquals(expected, build(type, keys, SortFile.CHUNK_BYTES), "one chunk");
         assertEquals(expected, build(type, keys, 1000), "spilled, about 10 a run");
         assertEquals(expected, build(type, keys, 1), "spilled, one key a run");
+        assertFalse(OpenFiles.descriptorTo(".run"), "every run file is closed, not only deleted");
+        assertFalse(OpenFiles.descriptorTo(work.toString()), "no sort file is left open");
         try (Stream<Path> files = Files.list(work)) {
             for (Path file : files.toList()) {
                 String name = String.valueOf(file.getFileName());
@@ -185,6 +189,43 @@ class SortFileTest {
         assertEquals(
                 List.of(List.of(2, 5, 0, 3, 1, 4), List.of(0, 3, 2, 5, 1, 4)),
                 build(SortFile.KeyType.WHOLE, mixed, 1));
+    }
+
+    @Test
+    @DisplayName(
+            "chunk accounting: each key's estimated heap, and how many runs a chunk budget spills"
+                    + " -- none when the keys fit one chunk, one per two 64-byte keys in 128 bytes")
+    void chunkAccounting() throws IOException {
+        assertEquals(64, SortFile.Key.missing(0).estimatedBytes());
+        assertEquals(64, SortFile.Key.whole(0, 7).estimatedBytes());
+        assertEquals(64, SortFile.Key.real(0, 0.5).estimatedBytes());
+        assertEquals(64 + 16 + 8 + 48 + 6, SortFile.Key.text(0, "abc").estimatedBytes());
+        assertEquals(64 + 16 + 16 + 52 + 50, SortFile.Key.text(0, "ab", "c").estimatedBytes());
+        List<SortFile.Key> keys = new ArrayList<>();
+        for (int row = 0; row < 300; row++) {
+            keys.add(SortFile.Key.whole(row, (row * 37) % 23));
+        }
+        assertEquals(0, spilled(keys, SortFile.CHUNK_BYTES), "fits one chunk");
+        assertEquals(150, spilled(keys, 128), "two keys a run");
+        assertEquals(100, spilled(keys, 129), "three keys a run");
+        assertEquals(300, spilled(keys, 1), "one key a run");
+    }
+
+    private int spilled(List<SortFile.Key> keys, long chunkBytes) throws IOException {
+        return SortFile.build(
+                work.resolve("count-up-" + chunkBytes),
+                work.resolve("count-down-" + chunkBytes),
+                TableKind.TARGET_PSMS,
+                ResultSort.Column.SCAN,
+                SortFile.KeyType.WHOLE,
+                keys.size(),
+                RAW,
+                sink -> {
+                    for (SortFile.Key key : keys) {
+                        sink.accept(key);
+                    }
+                },
+                chunkBytes);
     }
 
     @Test

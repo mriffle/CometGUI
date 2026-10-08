@@ -17,6 +17,7 @@
 package org.cometgui.results.parser;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,6 +35,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.cometgui.results.parser.PercolatorOutputException.Problem;
 import org.cometgui.results.testing.Fixtures;
+import org.cometgui.results.testing.OpenFiles;
 import org.cometgui.results.testing.RealK562;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -248,6 +250,39 @@ class ResultTableReaderOffsetsTest {
         assertThrows(
                 NullPointerException.class,
                 () -> ResultTableReader.row(file, null, 2, new byte[1]));
+    }
+
+    @Test
+    @DisplayName(
+            "closing releases the stream: the line splitter closes what it reads, and a table"
+                    + " refused at its header is closed before the refusal reaches the caller")
+    void closesWhatItOpens() throws IOException {
+        boolean[] closed = {false};
+        ByteArrayInputStream stream =
+                new ByteArrayInputStream("a\nb\n".getBytes(StandardCharsets.UTF_8)) {
+                    @Override
+                    public void close() throws IOException {
+                        closed[0] = true;
+                        super.close();
+                    }
+                };
+        Utf8Lines lines = new Utf8Lines(stream);
+        assertEquals("a", lines.next());
+        lines.close();
+        assertTrue(closed[0], "the stream is closed");
+        IOException afterClose = assertThrows(IOException.class, lines::next);
+        assertEquals("Stream closed", afterClose.getMessage());
+        Path noPeptide =
+                write(
+                        "no-peptide.tsv",
+                        "PSMId\tscore\tq-value\tposterior_error_prob\tproteinIds\n"
+                                .getBytes(StandardCharsets.UTF_8));
+        PercolatorOutputException refused =
+                assertThrows(
+                        PercolatorOutputException.class, () -> ResultTableReader.open(noPeptide));
+        assertEquals(Problem.MISSING_COLUMN, refused.problem());
+        assertFalse(
+                OpenFiles.descriptorTo(noPeptide.toString()), "the refused table is not left open");
     }
 
     private static String sha256Of(String relative) {

@@ -277,9 +277,15 @@ abstract class ResultStoreContract {
             throws IOException {
         List<Long> lines = new ArrayList<>();
         long offset = 0;
+        Long matching = null;
         while (true) {
             ResultPage page = store.query(query.withPage(offset, pageSize));
             assertEquals(offset, page.offset(), "the page says where it starts");
+            if (matching == null) {
+                matching = page.matching();
+            }
+            assertEquals(
+                    matching, page.matching(), "every page of a query counts the same matches");
             assertTrue(page.rows().size() <= pageSize, "a page never holds more than its limit");
             for (ResultRow row : page.rows()) {
                 lines.add(row.line());
@@ -1062,24 +1068,32 @@ abstract class ResultStoreContract {
                 store.header().columns());
         assertEquals(TableKind.TARGET_PSMS, store.kind());
         assertEquals(23, store.rowCount());
+        store.query(ResultQuery.firstPage(PsmQValueFilter.DEFAULT).withText("K"));
         store.close();
         store.close();
-        assertThrows(IllegalStateException.class, store::rowCount);
-        assertThrows(IllegalStateException.class, store::header);
-        assertThrows(IllegalStateException.class, store::kind);
-        assertThrows(IllegalStateException.class, store::file);
-        assertThrows(IllegalStateException.class, () -> store.counts(PsmQValueFilter.DEFAULT));
-        assertThrows(
-                IllegalStateException.class,
-                () -> store.query(ResultQuery.firstPage(PsmQValueFilter.DEFAULT)));
-        assertThrows(
-                IllegalStateException.class,
-                () ->
-                        store.positionOf(
-                                new RowKey(2), ResultQuery.firstPage(PsmQValueFilter.DEFAULT)));
-        IllegalStateException refused =
-                assertThrows(IllegalStateException.class, () -> store.row(new RowKey(2)));
-        assertTrue(refused.getMessage().contains("closed"), refused.getMessage());
+        String closed = "the result store for " + fixture.path().get() + " is closed";
+        List<org.junit.jupiter.api.function.Executable> calls =
+                List.of(
+                        store::rowCount,
+                        store::header,
+                        store::kind,
+                        store::file,
+                        () -> store.counts(PsmQValueFilter.DEFAULT),
+                        () -> store.counts(PsmQValueFilter.parse("0.5")),
+                        () -> store.query(ResultQuery.firstPage(PsmQValueFilter.DEFAULT)),
+                        () ->
+                                store.query(
+                                        ResultQuery.firstPage(PsmQValueFilter.DEFAULT)
+                                                .withText("K")),
+                        () ->
+                                store.positionOf(
+                                        new RowKey(2),
+                                        ResultQuery.firstPage(PsmQValueFilter.DEFAULT)),
+                        () -> store.row(new RowKey(2)));
+        for (org.junit.jupiter.api.function.Executable call : calls) {
+            IllegalStateException refused = assertThrows(IllegalStateException.class, call);
+            assertEquals(closed, refused.getMessage(), "the store names itself as closed");
+        }
     }
 
     @Test
