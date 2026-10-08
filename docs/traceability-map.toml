@@ -471,16 +471,46 @@ kind = "planned"
 phase = "10"
 
 [[ac."AC-RES-05".evidence]]
-kind = "planned"
-phase = "09"
+kind = "test"
+class = "org.cometgui.params.percolator.PercolatorSettingsTest"
+method = "separateTypes"
+note = "Phase 09 unit 2 (nested class Fdr). PercolatorSettings holds testFDR and trainFDR as fields of their own types, TestFdr and TrainFdr, neither of which is a results type, and the two are not equal at the same value. Unit test, no binary."
+
+[[ac."AC-RES-05".evidence]]
+kind = "test"
+class = "org.cometgui.results.filtering.QValueFilterTest"
+method = "ownTypes"
+note = "Phase 09 unit 4 (nested class NotLearningThresholds). The PSM and peptide display filters are their own types and mention nothing from org.cometgui.params. Unit test. Proves the representation only: the filters exist here as values (defaults 0.01 and 0.01, [0, 1], inclusive); applying them to result tables, counts and export is Phase 10's (AC-RES-01..04)."
+
+[[ac."AC-RES-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.PercolatorSectionUiTest"
+method = "advancedAndFilters"
+note = "Phase 09 unit 7. Through the launched application, over builds the test writes out (no binary is run): testFDR under Advanced shows its description saying it is not the PSM q-value result filter, and the PSM and peptide filters show 0.01 and 0.01, say they change display and export only and are not testFDR or trainFDR, and change independently."
 
 [[ac."AC-RES-06".evidence]]
-kind = "planned"
-phase = "09"
+kind = "test"
+class = "org.cometgui.workflow.steps.RealPercolatorRunTest"
+method = "gate1And2WithAnXmlCapableBuild"
+note = "Phase 09 unit 5. Linux only (@EnabledOnOs(LINUX)), real binaries: Comet 2026.03.0 on the two D-006 K562 mzML and the proteome's first 1000 records, then the real Percolator 3.07.1 with Limelight conversion enabled, through the real engine and process service. Asserts PSM, peptide, decoy, weights and pout XML written, each parsed and counted against the merged PIN (3285 PSM rows = PIN targets, 3 weight splits, pout XML 3285 psm in percolator_out/15), and -X with the pout.xml path in the recorded argv. Windows and macOS not run."
+
+[[ac."AC-RES-06".evidence]]
+kind = "test"
+class = "org.cometgui.tools.percolator.PercolatorCommandRealBinaryTest"
+method = "percolator3071WithXml"
+note = "Phase 09 unit 3. Linux only, real 3.07.1 on a merged PIN made by the real Comet path: the built command writes exactly the expected artefacts, pout XML included."
 
 [[ac."AC-RES-07".evidence]]
-kind = "planned"
-phase = "09"
+kind = "test"
+class = "org.cometgui.workflow.steps.RealPercolatorRunTest"
+method = "gate2ThreeNineWithoutLimelight"
+note = "Phase 09 unit 5. Linux only, real binaries. Percolator 3.09 runs as a registered local binary (the upstream .rpm's executable with Boost 1.66 libraries; Linux has no installable 3.09, D-003). The run succeeds and its tables and weights parse; the RECORDED argv holds no -X, -Z, --xmloutput or .xml path, and no .xml is written. Windows and macOS 3.09 not run."
+
+[[ac."AC-RES-07".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealPercolatorRunTest"
+method = "gate2ThreeNineChosenWithLimelight"
+note = "Phase 09 unit 5. Linux only, real binaries: 3.09 chosen by the user WITH Limelight enabled still gets no XML option in the recorded argv, writes no .xml and succeeds; provenance records -X as not passed for want of XML_OUTPUT."
 
 [[ac."AC-RES-08".evidence]]
 kind = "planned"
@@ -674,9 +704,22 @@ method = "theFactoryRecordsTheDefaultLocaleInEffect"
 note = "Phase 04. R-PROV-04: the JVM default locale in effect during the run is the one recorded."
 
 [[ac."AC-PRV-10".evidence]]
-kind = "planned"
-phase = "09"
-note = "Foundations are laid earlier, in phase 04. Phase 04 pins the key and proves the round trip; that the value written is the seed Percolator actually ran with is phase 09's."
+kind = "test"
+class = "org.cometgui.workflow.steps.RealPercolatorRunTest"
+method = "gate7TheSeedOfEveryRun"
+note = "Phase 09 unit 5, completing phase 04's foundation. Linux only, real binaries: in each of four real runs (3.07.1 and 3.09, Limelight on and off) provenance.json read back records percolator.seed = 1, equal to the --seed value in the recorded argv, and the JVM default locale."
+
+[[ac."AC-PRV-10".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealPercolatorRunTest"
+method = "gate5TheRealZeroDecoyPin"
+note = "Phase 09 unit 5. Linux only, real binaries: both runs that fail on the real zero-decoy PIN without Percolator ever being launched (one at validate-comet-outputs, one refused by run-percolator) still record percolator.seed in provenance.json; the second also asserts the JVM locale."
+
+[[ac."AC-PRV-10".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.PercolatorStepTest"
+method = "omissionsAreRecorded"
+note = "Phase 09 unit 5. Unit test with a fake binary: a build without SEED_OPTION is passed no seed, and provenance records percolator.seed = not-passed with the explanation, never a seed that was not used."
 
 # --- AC-TST -----------------------------------------------------------------
 

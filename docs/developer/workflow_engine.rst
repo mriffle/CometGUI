@@ -22,6 +22,15 @@ the authority on what is required; where the build differs, this page says so.
    ``handoffs/PHASE-08-worklog.rst`` or asserted by the test named beside it.
    Nothing here has run on Windows or macOS; see `What has never run`_.
 
+   **Amended after Phase 09** (2026-10-08): a run may now carry a Percolator
+   half, which plans and implements ``resolve-percolator``,
+   ``run-percolator`` and ``parse-percolator`` (`The Percolator steps`_), and
+   a derived run reruns Percolator alone
+   (`Derived runs: the compatible-version Percolator rerun`_). How a build's
+   capabilities are established and which build is selected is
+   :doc:`version_capabilities`. ``finalise-results`` and every later step
+   remain unimplemented (Phases 10 to 12).
+
 The on-disk formats this page refers to have their own references:
 :doc:`../reference/project_format` (the project, ``run.json``, the lock and the
 index cache) and :doc:`../reference/provenance_format` (``provenance.json`` and
@@ -226,9 +235,9 @@ step declares either.
 eight stages (``WorkflowStage``, Phase 02); each engine step is drawn under
 exactly one of them, as the table shows, and neither model is derived from the
 other. ``StageProjection`` combines the states of a stage's planned steps into
-one; a stage with **no** planned step gets no state at all, so in a Phase 08
-run the Percolator stage is drawn as not planned -- never as succeeded or
-skipped.
+one; a stage with **no** planned step gets no state at all, so in a run
+without a Percolator half the Percolator stage is drawn as not planned --
+never as succeeded or skipped.
 
 The edges
 ---------
@@ -280,8 +289,8 @@ the binary's location now. So (``StepKind``):
   establishes that a later result depends on (a tool identity, a file's hash)
   is declared as that later step's own input.
 
-Plans: what a Phase 08 run executes
------------------------------------
+Plans: what a run executes
+--------------------------
 
 A run executes a ``Plan``: the steps wanted, closed under required edges.
 ``CometWorkflow.planFor`` wants ``finalise-provenance``, plus
@@ -295,6 +304,14 @@ A run executes a ``Plan``: the steps wanted, closed under required edges.
 is derived over the planned steps only (``RunState.deriveFrom(Plan, ...)``),
 and a step outside the plan is reported as not planned. A planned step with no
 action is refused by name when the run starts.
+
+Since Phase 09, ``CometWorkflow.planFor(mode, percolator)`` with
+``percolator`` set also wants ``parse-percolator``, which pulls in
+``run-percolator`` and through it ``merge-pin`` and ``resolve-percolator``.
+``finalise-results`` (Phase 10) is still not wanted, and its edge into
+``finalise-provenance`` is an *if planned* one, so it is not pulled in. A
+request's Percolator half is ``SearchRequest.withPercolator``; a request
+without one plans exactly the Phase 08 steps above.
 
 Fingerprints and the rerun preview
 ==================================
@@ -844,6 +861,49 @@ directory is proved read-only first: a test creates a file in it and requires
 ``AccessDeniedException``; if the write succeeds (running as root, a file
 system ignoring modes) the test fails, naming why (decision P8-5).
 
+The Percolator steps
+====================
+
+Phase 09 implements the three Percolator steps in ``PercolatorSteps``
+(``org.cometgui.workflow.steps``), over a ``PercolatorRun``: the run
+directory, the one hasher, the run's one decoy configuration, the
+``PercolatorChoice`` (selection, settings, enabled downstream stages and the
+resolution behind them), and the command, **built once when the run is
+prepared** from the selection's probed capabilities -- so the files the steps
+declare, the files Percolator is asked to write and the options provenance
+says were not passed are one decision, made before anything runs. Which build
+is selected and what it is passed is :doc:`version_capabilities`.
+
+* **Prepare.** ``parameters/percolator-settings.json`` is written once and
+  hashed (:doc:`../reference/project_format`), and every ``percolator.*``
+  provenance setting is fixed then (``PercolatorProvenance``;
+  :ref:`ref-provenance-format-percolator-settings`), so a run that fails --
+  even before Percolator is launched -- still records its effective seed.
+* ``resolve-percolator`` (PREPARATION) re-hashes the selected executable and
+  refuses one whose SHA-256 differs from the one it was selected at, naming
+  both.
+* ``run-percolator`` (RESULT; inputs ``percolator-settings`` and
+  ``percolator-tool``) re-hashes the settings file and refuses a changed one;
+  then ``PercolatorPinCheck`` over the merged PIN with the run's decoy
+  configuration -- a PIN without decoy rows fails the step and **no process is
+  launched** (``R-DEC-04``); then exactly one ``StepContext.invoke`` with stage
+  identifier ``percolator`` (log ``logs/percolator.log``). After exit 0 every
+  requested artefact must exist and hold bytes, no unrequested file may be in
+  ``outputs/percolator/`` (so an unrequested ``.xml`` fails the run), and each
+  artefact is made read-only (``R-PERC-07``).
+* ``parse-percolator`` (RESULT) reads -- never writes -- the four tables
+  through the one ``ResultTableReader``, the weights through ``WeightsReader``
+  (split count from the file, ``R-PERC-09``) and the pout XML through
+  ``PoutDocument`` when it was written, and records the counts as details of
+  its ``stage.finished`` event.
+
+Known limits, recorded rather than hidden: ``finalise-provenance`` is ordered
+only after the planned steps it reads from, so until Phase 10 plans
+``finalise-results`` it can run alongside the Percolator steps (harmless today:
+``provenance.json`` is written when the attempt ends; pinned by a test); and
+``run.json`` does not record the Percolator half, so -- as for Comet -- a run
+with Percolator cannot be retried across an application restart.
+
 In the application
 ==================
 
@@ -870,6 +930,13 @@ an answer to an older configuration so Run is never enabled on a stale check.
   steps read has changed, so Run retries run ...") or a new run ("...
   changed, so Run starts a new run ... and every step executes in it"), with
   each step's decision and reasons.
+* **Which Percolator** (Phase 09): the Percolator section's request
+  (``PercolatorViewModel``), which ``WorkflowRunPort`` turns into
+  ``SearchRequest.withPercolator``. Its problems -- no build read yet, none
+  can run, the default not installed, a setting the model refused -- are
+  reasons in the engine's half of Run readiness. The compatible-version rerun
+  is a separate action in that section (``PercolatorRerunViewModel``, behind
+  ``PercolatorRerunPort``), over the session's last run.
 
 Which tests prove the exit gate
 ===============================
@@ -917,6 +984,45 @@ The same behaviour through the interface is driven by ``RealRunUiTest``,
 ``RealCancelUiTest`` and ``RunReadinessUiTest`` (``org.cometgui.app.gui``).
 The acceptance criteria's entries are in ``docs/traceability-map.toml``.
 
+The table above is Phase 08's exit gate. **Phase 09's** gate items for the
+Percolator steps are proved by these tests in ``org.cometgui.workflow.steps``
+(all real binaries, Linux only); the full table, with the unit and interface
+tests beside them, is in :doc:`version_capabilities`:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 8 46 46
+
+   * - Gate
+     - What
+     - Test
+
+   * - 1, 2
+     - A real run writes and parses PSM, peptide, weights and (3.07.1 with
+       Limelight) pout XML; 3.09 gets no XML option in the recorded argv
+     - ``RealPercolatorRunTest.gate1And2WithAnXmlCapableBuild``,
+       ``gate2ThreeNineWithoutLimelight``,
+       ``gate2ThreeNineChosenWithLimelight``
+   * - 4
+     - The skipped newer version and its missing capability in provenance
+     - ``RealPercolatorRunTest.gate4TheSkippedVersionIsRecorded``
+   * - 5
+     - The real zero-decoy PIN fails ``run-percolator`` with no launch
+     - ``RealPercolatorRunTest.gate5TheRealZeroDecoyPin``
+   * - 6
+     - The compatible-version rerun: another execution record, Comet not
+       launched, the source run byte-identical
+     - ``RealPercolatorRerunTest.gate6TheSecondExecutionRecord``,
+       ``gate9TheOriginalIsUntouched``
+   * - 7
+     - The effective seed in every run's provenance, failed ones included
+     - ``RealPercolatorRunTest.gate7TheSeedOfEveryRun``,
+       ``gate5TheRealZeroDecoyPin``
+   * - 9
+     - Raw outputs read-only and byte-identical through parsing and
+       provenance finalisation
+     - ``RealPercolatorRunTest.gate9RawOutputsAreUnchangedAndReadOnly``
+
 What has never run
 ==================
 
@@ -935,11 +1041,18 @@ and so unverified there:
 * the project lock's byte-range lock, designed around Windows' mandatory
   locks (:doc:`../reference/project_format`) but never taken there;
 * the default project location on Windows and macOS, which is computed from
-  the platform's application-data convention but never created there.
+  the platform's application-data convention but never created there;
+* any Percolator (Phase 09): only the Linux 3.07.1 and 3.06.5 portable
+  binaries and 3.09 as a registered local binary (the ``.rpm``'s executable
+  with Boost 1.66 libraries) have run; the DOS read-only attribute that
+  ``PercolatorSteps.makeReadOnly`` sets where there are no POSIX permissions
+  has never been set (:doc:`version_capabilities`).
 
 Known limits, recorded rather than hidden:
 
-* A Phase 08 run cannot be retried across an application restart.
+* A Phase 08 run cannot be retried across an application restart, and
+  neither can a run with Percolator (``run.json`` does not record the
+  Percolator half).
 * Comet 2026.02.2's fragment-ion (format 4) index built with
   ``decoy_search = 1`` searches to **zero decoy rows**; ``R-DEC-04`` catches
   it after the search (``RealStepTest.anOlderFragmentIndexSearchWithoutDecoysIsRefused``),

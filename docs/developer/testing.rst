@@ -286,7 +286,11 @@ Mutation -- PIT
    packages; it does not narrow the list.
 :Configured in: ``pom.xml`` (``pitest-maven`` 1.30.0 with
    ``pitest-junit5-plugin`` 1.2.3), the ``mutation`` profile, and
-   ``cometgui.mutation.skip=false`` in ``cometgui-domain``.
+   ``cometgui.mutation.skip=false`` in each module with critical-package
+   code: as of Phase 09, ``cometgui-domain``, ``cometgui-process``,
+   ``cometgui-provenance``, ``cometgui-tools``, ``cometgui-install``,
+   ``cometgui-params-comet``, ``cometgui-params-percolator``,
+   ``cometgui-results`` and ``cometgui-workflow``.
 :Runs with: ``bash scripts/build.sh --only gates``, which invokes the goal
    directly and then fails if the report has no real mutations in it.
 

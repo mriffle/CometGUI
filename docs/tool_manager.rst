@@ -252,10 +252,12 @@ yourself is checksummed, probed and shown as ``Your own binary``, and it is
 forgotten when the application exits. Persisting it needs a settings store that
 no phase has built yet.
 
-**There is no way to register one from the interface.** The Tool Manager shows
-a local binary correctly once something registers it, but there is no
-registration action and no file chooser on this screen yet, so in practice the
-local-binary row is reachable only from code.
+**Registering one is done from the Percolator section, not from here.** The
+Tool Manager shows a local binary correctly once it is registered, but this
+screen has no registration action of its own. Since Phase 09 the Percolator
+section has one -- **Register a local Percolator binary...**, with a file
+chooser (:doc:`percolator`) -- and the binary it registers appears here as
+``Your own binary: installed``.
 
 **There is no Refresh.** Rows are read when the section is built and again
 around an install. A tool installed or removed outside CometGUI while it is
@@ -270,8 +272,10 @@ inventing a reason for a download it did not watch.
 none.** Percolator 3.09 publishes nothing for Linux. The row is still there,
 reading ``not published for this platform`` -- but with no artefact record
 behind it on this machine it carries no advisories, so the advisory saying that
-3.09 cannot emit the XML the Limelight path needs is not shown on Linux. That
-sentence belongs at Percolator-selection time and is not in this section.
+3.09 cannot emit the XML the Limelight path needs is not shown on Linux. The
+Percolator section names a newer version it passed over, with the capability
+it lacks, only for a version that can run here -- a 3.09 you registered
+yourself, for example (:doc:`percolator`).
 
 **The long notes behind each capability are not shown.** Each capability in the
 registry carries a sentence recording who established it and what they saw.

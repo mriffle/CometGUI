@@ -167,5 +167,10 @@ such a run. With ``decoy_search = 2`` Comet also writes a separate decoy
 pepXML file for each spectrum file; it is checked too, and the PIN file still
 holds both targets and decoys.
 
+The merged PIN is checked once more immediately before Percolator starts --
+also when Percolator is rerun from an earlier run's merged PIN without
+searching again -- and a merged PIN with no decoy rows stops the run without
+starting Percolator (:doc:`percolator`).
+
 How the run itself works is on the developer page
 :doc:`developer/workflow_engine`.

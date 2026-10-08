@@ -23,6 +23,11 @@ something is deferred, it names the phase that owns it.
    the Run readiness paragraph, and `The workflow engine as built`_. The
    module edges were re-read from the POMs; Phase 08 changed none.
 
+   **Amended after Phase 09** (2026-10-08): the state column of the module
+   table, for the Percolator adapter, settings, parsers, steps and section
+   (:doc:`version_capabilities`). Phase 09 changed no module edge; its POM
+   changes are the two modules' own mutation switches.
+
    Every measured number quoted below was produced by running the thing --
    either by the Phase 02 orchestrator at a work-unit sign-off, recorded in
    ``handoffs/PHASE-02-worklog.rst``, or, where it is marked as such, by the
@@ -47,7 +52,7 @@ deliberately does not.
    * - Module
      - Root package
      - Depends on (module scope)
-     - State after Phase 08
+     - State after Phase 09
 
    * - ``cometgui-domain``
      - ``org.cometgui.domain``
@@ -76,8 +81,10 @@ deliberately does not.
      - Real: ``api`` and the capability probes (Phase 05), and ``comet`` --
        the Comet adapter: search and index commands, pepXML and PIN
        validation, the PIN merge, the FASTA decoy scanner and the ``.idx``
-       header reader (Phase 08). The Percolator, Limelight and PDV adapters
-       (Phases 09, 11, 12) are not built.
+       header reader (Phase 08), and ``percolator`` -- the capability probe,
+       local-binary registration, the command builder, the pre-launch PIN
+       check and the pout-XML reader (Phase 09). The Limelight and PDV
+       adapters (Phases 11, 12) are not built.
 
    * - ``cometgui-install``
      - ``org.cometgui.install``
@@ -95,12 +102,16 @@ deliberately does not.
    * - ``cometgui-params-percolator``
      - ``org.cometgui.params.percolator``
      - ``domain``
-     - **Empty.** Phase 09.
+     - Real (Phase 09): the Percolator settings and their validation, the
+       downstream-stage requirement table and the *latest compatible*
+       resolver. See :doc:`version_capabilities`.
 
    * - ``cometgui-results``
      - ``org.cometgui.results``
      - ``domain``
-     - **Empty.** Phase 10.
+     - Partly real (Phase 09): ``parser`` -- the Percolator PSM/peptide table
+       and weights readers -- and ``filtering`` -- the display q-value filter
+       values. The results store, tables and export are Phase 10's.
 
    * - ``cometgui-workflow``
      - ``org.cometgui.workflow``
@@ -108,8 +119,10 @@ deliberately does not.
        ``params-comet``, ``params-percolator``
      - Real: ``state`` (the stepper's stages since Phase 02; the declared
        seventeen-step graph, fingerprints and the rerun preview since Phase
-       08), ``engine``, ``steps`` (the Comet run) and ``storage`` (project and
-       run records, the project lock). See :doc:`workflow_engine`.
+       08), ``engine``, ``steps`` (the Comet run; since Phase 09 the
+       Percolator steps and the derived Percolator rerun) and ``storage``
+       (project and run records, the project lock). See
+       :doc:`workflow_engine`.
 
    * - ``cometgui-ui``
      - ``org.cometgui.ui``
@@ -118,14 +131,18 @@ deliberately does not.
      - Real: ``viewmodel``, ``view``, ``controls``. Since Phase 08 the Run
        section is live (``RunViewModel``, the engine half of
        ``RunReadinessViewModel``, ``RunControl``) behind the
-       ``RunEnginePort`` port. ``dialogs`` is empty.
+       ``RunEnginePort`` port, and since Phase 09 the Percolator section
+       (``viewmodel.percolator``, ``controls.percolator``) behind
+       ``PercolatorPort`` and ``PercolatorRerunPort``. ``dialogs`` is
+       empty.
 
    * - ``cometgui-app``
      - ``org.cometgui.app``
      - all ten above, plus ``io.github.mkpaz:atlantafx-base`` 2.1.0
      - Real: ``bootstrap``, ``config``. The only module with a ``main``. Since
        Phase 08 ``config`` wires the engine to the Run section
-       (``RunWiring``, ``WorkflowRunPort``, ``ProjectSession``).
+       (``RunWiring``, ``WorkflowRunPort``, ``ProjectSession``), and since
+       Phase 09 the Percolator section (``ToolManagerPercolatorPort``).
 
    * - ``cometgui-archtests``
      - ``org.cometgui.archtests``
