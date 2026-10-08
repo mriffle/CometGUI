@@ -1239,7 +1239,7 @@ control_4() {
     assert_testcase "on screen: the GUI's skip reason" failed "${T_SECTION}" gate4TheSkipReasonAndTheAdvisories
     assert_testcase "in provenance.json of the REAL run" failed "${T_RUN}" gate4TheSkippedVersionIsRecorded
     assert_log_matches "the real run's provenance reason, in that test's own words" "${DIRTY_LOG}" \
-        'message: Using Percolator 3\.07\.1 rather than 3\.09 \(registered local binary\) because 3\.09 \(registered local binary\) lacks a capability\. ==> expected: <true> but was: <false>'
+        'message: gate 4: the recorded reason names the skipped version and the capability it lacks, in the resolver.s own words ==> expected: <Using Percolator 3\.07\.1 rather than 3\.09 \(registered local binary\) because 3\.09 \(registered local binary\) lacks XML_OUTPUT, which Limelight conversion needs .*> but was: <Using Percolator 3\.07\.1 rather than 3\.09 \(registered local binary\) because 3\.09 \(registered local binary\) lacks a capability\.>'
     assert_testcase "a real run with nothing skipped stays green" passed "${T_RUN}" gate2ThreeNineWithoutLimelight
     restore_pristine "${MESSAGES}"
     end_control
