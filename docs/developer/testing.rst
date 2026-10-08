@@ -568,12 +568,13 @@ pass is worse than no aggregator at all.
        when every spectrum file is put on one command line.
 
    * - Percolator adapter and version capabilities (Phase 09, ``percolator``)
-     - ``scripts/verify-percolator-gates.sh``: eighteen injections into
+     - ``scripts/verify-percolator-gates.sh``: twenty-one injections into
        ``cometgui-params-percolator``, ``cometgui-results``,
        ``cometgui-tools``, ``cometgui-workflow`` and ``cometgui-ui`` -- at
        least one per exit gate item and one on the capability probe, three of
-       them version-blind -- items 1, 2, 4, 5, 7 and 9 graded against the real
-       Percolator 3.07.1 and 3.09. See :ref:`dev-percolator-falsifiability`.
+       them version-blind, three for ``--no-analytics`` (``D-013``, Phase 10)
+       -- items 1, 2, 4, 5, 7 and 9 graded against the real Percolator 3.07.1
+       and 3.09. See :ref:`dev-percolator-falsifiability`.
      - Each failing assertion's own words, or the real binary's run: e.g. the
        real 3.09 handed ``-X`` -- ``RUN_PERCOLATOR=invocation percolator
        exited with code 1 ... ==> expected: <SUCCEEDED> but was: <FAILED>``.
@@ -1091,6 +1092,26 @@ and takes its shape from ``workflow``; the differences are these.
        disabled -- a capability granted without its observable.
      - ``a decoy among the targets ==> expected: <[...]>`` (``PSM_TSV_OUTPUT``
        granted); ``damagedDecoyTables`` red; a fully capable build green.
+   * - A1
+     - ``D-013``
+     - New (Phase 10): the command builder no longer emits
+       ``--no-analytics``.
+     - The argv read back from ``provenance.json`` of every real run:
+       ``--no-analytics once in the recorded argv [...] ==> expected: <1> but
+       was: <0>``; the builder's two ``D-013`` tests red; the real 3.09 run's
+       XML test green.
+   * - A2
+     - ``D-013``
+     - New (Phase 10): the probe observes ``--no-analytics`` but no longer
+       passes it on its later runs.
+     - ``every launch of the probe carries --no-analytics exactly once ==>
+       expected: <[]> but was: <[...``; the typed-out argument arrays red; the
+       probed set and a build refusing the switch green.
+   * - A3
+     - ``D-013``
+     - New (Phase 10): the probe never grants ``NO_ANALYTICS_OPTION``.
+     - The fully capable build's set: ``expected: <[... NO_ANALYTICS_OPTION
+       ...]> but was: <[...]>``; a build refusing the switch green.
    * - 1a
      - 1
      - New: the table reader drops the first data row.
@@ -1219,7 +1240,10 @@ Measured on 2026-10-08: 94 controls passed in 633 s (10 m 33 s) -- the
 baseline 104 s, the final clean run 88 s; the six controls graded on
 ``RealPercolatorRunTest`` (four real Comet searches and Percolator runs in its
 ``@BeforeAll``) 43-44 s each, control 4 51 s, 6a 30 s, 3u 18 s, every other
-control between 5 s and 14 s. The floor in ``verify-all-gates.sh`` is 94.
+control between 5 s and 14 s. The floor in ``verify-all-gates.sh`` was 94.
+Phase 10's unit ``D-013`` added A1-A3: measured the same day, 109 controls
+passed in 697 s (11 m 37 s) -- A1 43 s (it is graded on
+``RealPercolatorRunTest``), A2 and A3 6 s each -- and the floor is 109.
 
 Traps
 =====

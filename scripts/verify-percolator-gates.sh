@@ -84,6 +84,16 @@
 #   9a  item 9 [recorded, unit 5]: raw outputs never made read-only
 #   9b  item 9 [NEW]: parsing writes to the raw file it parsed (the weights
 #       reader writes back what it read, with CRLF line ends)
+#   A1  D-013 [NEW, phase 10]: the command builder no longer emits
+#       --no-analytics -- red in the argv read back from provenance.json of
+#       every REAL run, and in the builder's own tests; the real 3.09 run's
+#       other assertions stay green
+#   A2  D-013 [NEW, phase 10]: the probe observes --no-analytics but no
+#       longer passes it on its later runs -- red where every launch's argv
+#       is read; a build refusing it, and the probed set, stay green
+#   A3  D-013 [NEW, phase 10]: the probe never grants NO_ANALYTICS_OPTION
+#       although the run carrying it completed -- red in the fully capable
+#       build's set; a build refusing the switch stays green
 #   H   the harness itself: an unchanged file, an anchor that matches nothing,
 #       an injection that reaches the source but not the bytecode, and a
 #       selection that runs zero tests must each be reported as a HARNESS
@@ -230,6 +240,7 @@ readonly TABLE_READER="${RP}/ResultTableReader.java"
 readonly WEIGHTS_READER="${RP}/WeightsReader.java"
 readonly TP="${TOOLS}/src/main/java/org/cometgui/tools/percolator"
 readonly PROBE_ARTEFACTS="${TP}/ProbeArtefacts.java"
+readonly PROBE="${TP}/PercolatorCapabilityProbe.java"
 readonly COMMANDS="${TP}/PercolatorCommands.java"
 readonly WF="${WORKFLOW}/src/main/java/org/cometgui/workflow"
 readonly STEPS="${WF}/steps/PercolatorSteps.java"
@@ -262,7 +273,7 @@ readonly -a QUIET=(
 )
 
 # Every control id, in the order they run: the cheap module sets first.
-readonly -a ALL_CONTROLS=(3v 3w 8a 8b 9b P 1a 1b 2a 2b 5 6a 6b 6c 7 9a 3u 4 H)
+readonly -a ALL_CONTROLS=(3v 3w 8a 8b 9b P A2 A3 1a 1b 2a 2b A1 5 6a 6b 6c 7 9a 3u 4 H)
 
 PASSED=0
 FAILED=0
@@ -880,6 +891,8 @@ readonly SEL_RESOLVER="${T_RESOLVER}\$LinuxSet#limelightOn+limelightOff,${T_RESO
 readonly SEL_WEIGHTS="${T_WEIGHTS}\$SplitCount#twoSplits+fourSplits+oneSplit,${T_WEIGHTS}\$Refusals#splitMismatch+splitOrderMismatch,${T_OUTPUT}#realWeights"
 readonly SEL_RAW="${T_FILTERING}#rawFilesUntouched"
 readonly SEL_PROBE="${T_PROBE}#aDamagedPsmTable+damagedDecoyTables+aFullyCapableBuild"
+readonly SEL_PROBE_NA="${T_PROBE}#noAnalyticsIsObservedFirstAndThenAlwaysPassed+aBuildRefusingNoAnalytics+aFullyCapableBuild+everyArgumentArray"
+readonly SEL_NA="${T_COMMANDS}#noAnalyticsWheneverProbed+withoutNoAnalyticsTheRunIsNotRefused+fullSetWithXml,${T_RUN}"
 readonly SEL_PARSE="${T_OUTPUT}#everyRealTableParses+realWeights,${T_RUN}"
 readonly SEL_STEP="${T_STEP}#aRunWritesParsesAndRecords+aMissingArtefactFails+anEmptyArtefactFails+aPinWithoutDecoysIsRefusedBeforeLaunch+aNonZeroExitFails"
 readonly SEL_XML="${T_COMMANDS}#fullSetWithXml+capableButNotNeeded+neededButNotCapable,${T_RUN}"
@@ -899,6 +912,8 @@ control_selectors() {
         8a|8b) printf '%s' "${SEL_WEIGHTS}" ;;
         9b) printf '%s' "${SEL_RAW}" ;;
         P) printf '%s' "${SEL_PROBE}" ;;
+        A2|A3) printf '%s' "${SEL_PROBE_NA}" ;;
+        A1) printf '%s' "${SEL_NA}" ;;
         1a) printf '%s' "${SEL_PARSE}" ;;
         1b) printf '%s' "${SEL_STEP}" ;;
         2a|2b) printf '%s' "${SEL_XML}" ;;
@@ -916,8 +931,8 @@ control_top() {
     case "$1" in
         3v|3w|H) printf '%s' "${PPERC}" ;;
         8a|8b|9b) printf '%s' "${RESULTS}" ;;
-        P) printf '%s' "${TOOLS}" ;;
-        1a|1b|2a|2b|5|6a|6b|6c|7|9a) printf '%s' "${WORKFLOW}" ;;
+        P|A2|A3) printf '%s' "${TOOLS}" ;;
+        1a|1b|2a|2b|A1|5|6a|6b|6c|7|9a) printf '%s' "${WORKFLOW}" ;;
         3u|4) printf '%s' "${APP}" ;;
         *) die "no control '$1'. Controls: ${ALL_CONTROLS[*]}" 2 ;;
     esac
@@ -1051,6 +1066,52 @@ control_P() {
         "${T_PROBE}" damagedDecoyTables
     assert_testcase "a fully capable build is still fully capable" passed "${T_PROBE}" aFullyCapableBuild
     restore_pristine "${PROBE_ARTEFACTS}"
+    end_control
+}
+
+control_A1() {
+    begin_control "A1" "D-013 [NEW, phase 10]: the command builder no longer emits --no-analytics"
+    inject_and_run "--no-analytics dropped from every command" "${COMMANDS}" "${WORKFLOW}" "${SEL_NA}" regex \
+        '--no-analytics once in the recorded argv \[[^]]*\] ==> expected: <1> but was: <0>' \
+        '        builder.noAnalytics();' \
+        '        /* D-013 injection: --no-analytics never considered */'
+    assert_testcase "the REAL runs: --no-analytics read back from provenance.json" failed \
+        "${T_RUN}" everyRealRunPassesNoAnalytics
+    assert_testcase "the builder test of a build that has the capability" failed \
+        "${T_COMMANDS}" noAnalyticsWheneverProbed
+    assert_testcase "the builder test of a build without it: the omission is no longer recorded" failed \
+        "${T_COMMANDS}" withoutNoAnalyticsTheRunIsNotRefused
+    assert_testcase "the REAL 3.09 run's XML assertions cannot see it (stay green)" passed \
+        "${T_RUN}" gate2ThreeNineWithoutLimelight
+    restore_pristine "${COMMANDS}"
+    end_control
+}
+
+control_A2() {
+    begin_control "A2" "D-013 [NEW, phase 10]: the probe no longer passes --no-analytics on its later runs"
+    inject_and_run "--no-analytics observed but not passed on" "${PROBE}" "${TOOLS}" "${SEL_PROBE_NA}" fixed \
+        'every launch of the probe carries --no-analytics exactly once ==> expected: <[]> but was: <[' \
+        '            run.withoutAnalyticsFromNowOn();' \
+        '            /* D-013 injection: not passed on */'
+    assert_testcase "every launch's argv, read from the fake's record" failed \
+        "${T_PROBE}" noAnalyticsIsObservedFirstAndThenAlwaysPassed
+    assert_testcase "the twelve argument arrays, typed out" failed "${T_PROBE}" everyArgumentArray
+    assert_testcase "the probed set itself cannot see it (stays green)" passed "${T_PROBE}" aFullyCapableBuild
+    assert_testcase "a build refusing the switch stays green" passed "${T_PROBE}" aBuildRefusingNoAnalytics
+    restore_pristine "${PROBE}"
+    end_control
+}
+
+control_A3() {
+    begin_control "A3" "D-013 [NEW, phase 10]: the probe never grants NO_ANALYTICS_OPTION"
+    inject_and_run "NO_ANALYTICS_OPTION withheld from a build that completed the run" "${PROBE}" "${TOOLS}" "${SEL_PROBE_NA}" regex \
+        'expected: <\[[^]]*NO_ANALYTICS_OPTION[^]]*\]> but was: <\[[^]]*\]>' \
+        '            observed.add(PercolatorOption.NO_ANALYTICS.capability());' \
+        '            /* D-013 injection: never granted */'
+    assert_testcase "the fully capable build's set" failed "${T_PROBE}" aFullyCapableBuild
+    assert_testcase "the observation test" failed "${T_PROBE}" noAnalyticsIsObservedFirstAndThenAlwaysPassed
+    assert_testcase "a build refusing the switch stays green" passed "${T_PROBE}" aBuildRefusingNoAnalytics
+    restore_pristine "${PROBE}"
     end_control
 }
 
@@ -1357,6 +1418,7 @@ run_control() {
         8a) control_8a ;; 8b) control_8b ;;
         9a) control_9a ;; 9b) control_9b ;;
         P) control_P ;;
+        A1) control_A1 ;; A2) control_A2 ;; A3) control_A3 ;;
         1a) control_1a ;; 1b) control_1b ;;
         2a) control_2a ;; 2b) control_2b ;;
         4) control_4 ;; 5) control_5 ;;
