@@ -729,15 +729,32 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
        item 6 is graded on 6a-6c; the probe's real-binary class is not in the
        harness (cost), the probe is graded on its fake-binary tests.
 
+End of phase: the deferred ``tests`` harness
+=============================================
+
+2026-10-08. Every module's PIT report regenerated first as ``build.sh`` does
+(the units' targeted runs had left partial ones). ``--only tests``: the first
+attempt was stopped by the two-hour background limit inside control 8 with
+every assertion so far passing; the second, run detached, **PASS 37 assertions
+in 7490 s**.
+
 Rejections and rework
 =====================
 
-None yet.
+No unit was sent back whole. Rework done by the orchestrator, each recorded in
+the unit's sign-off: ``c20f900`` (unit 1: two app install tests pinned the old
+probe's row), ``ec85a0a`` (unit 7: ``shell`` control 1b's focus diagnostic
+came only from leaked state; the keyboard walk now reports pane and focus
+together), ``05abc88`` and ``d701453`` (unit 9: the recorded skip reason
+asserted word for word, and control 4 graded on that assertion -- seen red
+first, 93/94).
 
 Deferred
 ========
 
-None yet.
+See ``handoffs/PHASE-09-handoff.rst``, *Incomplete, deferred, residue*:
+platform execution (Windows, macOS), gate item 9's export half (Phase 10), the
+R-PERC-08 stdout weights fallback, the extra Advanced settings.
 
 Blockers escalated
 ==================
