@@ -1,0 +1,143 @@
+LEARNED FEATURE WEIGHTS SUMMARY -- expected values computed independently
+=========================================================================
+
+Phase 10 unit 4, 2026-10-08. Gate item 7 (AC-RES-09) at the model level and
+design decision P10-3: the numbers WeightsSummaryIndependentTest pins were
+printed by the Python program below -- not by Java -- run once per file with
+Python 3.11.2 on 2026-10-08 from the repository root, and typed into the test
+mechanically from its output. The program shares nothing with
+org.cometgui.results.parser: it splits the file itself, reads every value as
+an exact fractions.Fraction, takes the mean, mean absolute value and
+population variance (divide by n) exactly, the square root in decimal at 60
+digits, counts signs by exact comparison with 0 (so -0.0000 is zero), ranks
+the non-m0 features by exact comparison of mean absolute value (competition
+ranking: 1 + the number strictly greater; m0 unranked), and prints each value
+as the double nearest the exact result (%.17g).
+
+Command, verbatim (FILE is the weights file):
+
+python3 - FILE <<'PY'
+import sys
+from decimal import Decimal, getcontext
+from fractions import Fraction
+
+getcontext().prec = 60
+data = [l.rstrip("\r\n") for l in open(sys.argv[1], encoding="utf-8")]
+data = [l for l in data if not l.startswith("#")]
+assert len(data) % 3 == 0 and data, "not whole splits"
+groups = [data[i:i + 3] for i in range(0, len(data), 3)]
+names = groups[0][0].split("\t")
+assert all(g[0].split("\t") == names for g in groups)
+norm = [[Fraction(v) for v in g[1].split("\t")] for g in groups]
+n = len(groups)
+print("splits", n)
+rows = []
+for j, name in enumerate(names):
+    w = [s[j] for s in norm]
+    mean = sum(w) / n
+    mabs = sum(abs(x) for x in w) / n
+    var = sum((x - mean) ** 2 for x in w) / n
+    sd = (Decimal(var.numerator) / Decimal(var.denominator)).sqrt()
+    pos = sum(1 for x in w if x > 0)
+    neg = sum(1 for x in w if x < 0)
+    zero = n - pos - neg
+    sign = ("ALL_POSITIVE" if pos == n else "ALL_NEGATIVE" if neg == n
+            else "ALL_ZERO" if zero == n else "MIXED")
+    rows.append([name, w, mean, mabs, sd, pos, neg, zero, sign])
+ranked = [r for r in rows if r[0] != "m0"]
+for r in rows:
+    rank = "-" if r[0] == "m0" else str(1 + sum(1 for o in ranked if o[3] > r[3]))
+    print("\t".join([r[0], rank, r[8], "%d/%d/%d" % (r[5], r[6], r[7]),
+                     "%.17g" % float(r[2]), "%.17g" % float(r[3]), "%.17g" % float(r[4]),
+                     ",".join("%.17g" % float(x) for x in r[1])]))
+PY
+
+Output columns: feature, rank ("-" = the bias m0, not ranked), sign verdict,
+positive/negative/zero split counts, mean signed, mean absolute, population
+standard deviation, then the normalised weight of each split. The test
+compares mean, mean absolute and deviation within 1e-12 absolute (the class
+comment says why) and everything else exactly.
+
+Checked-in files (all committed, so the full output is recorded)
+
+  constructed/weights-two-splits.txt
+    splits 2
+    lnrSp	3	ALL_POSITIVE	2/0/0	0.1275	0.1275	0.0025000000000000001	0.125,0.13
+    deltLCn	4	ALL_NEGATIVE	0/2/0	-0.0275	0.0275	0.0025000000000000001	-0.029999999999999999,-0.025000000000000001
+    Xcorr	1	ALL_POSITIVE	2/0/0	1.4750000000000001	1.4750000000000001	0.025000000000000001	1.5,1.45
+    Charge2	2	MIXED	1/1/0	0.050000000000000003	0.14999999999999999	0.14999999999999999	0.20000000000000001,-0.10000000000000001
+    m0	-	ALL_NEGATIVE	0/2/0	-2.4500000000000002	2.4500000000000002	0.050000000000000003	-2.5,-2.3999999999999999
+
+  constructed/weights-four-splits.txt
+    splits 4
+    feat_a	2	MIXED	2/0/2	0.3125	0.3125	0.3247595264191645	0,0.5,0,0.75
+    feat_b	1	MIXED	1/3/0	-0.875	0.9375	0.91429617739548708	-2.25,-0.25,0.125,-1.125
+    m0	-	MIXED	3/1/0	0.64087499999999997	1.1408750000000001	1.7037476476506137	3.5,0.001,-1,0.0625
+
+  real/percolator-3.06.5/weights.txt
+    splits 3
+    feat1	2	MIXED	1/0/2	0.22866666666666666	0.22866666666666666	0.32338350126264775	0.68600000000000005,0,0
+    feat2	1	MIXED	2/0/1	0.23219999999999999	0.23219999999999999	0.19894955809618342	0,0.2107,0.4859
+    feat3	3	ALL_ZERO	0/0/3	0	0	0	0,0,0
+    m0	-	ALL_NEGATIVE	0/3/0	-0.58413333333333328	0.58413333333333328	0.44512417992685543	-1.1747000000000001,-0.10009999999999999,-0.47760000000000002
+
+  real/percolator-3.07.1/weights.txt
+    splits 3
+    feat1	2	ALL_ZERO	0/0/3	0	0	0	0,0,0
+    feat2	1	ALL_POSITIVE	3/0/0	0.31793333333333335	0.31793333333333335	0.039832092030868217	0.33460000000000001,0.26300000000000001,0.35620000000000002
+    feat3	2	ALL_ZERO	0/0/3	0	0	0	0,0,0
+    m0	-	ALL_NEGATIVE	0/3/0	-1.0250333333333332	1.0250333333333332	0.1317222920474064	-0.85170000000000001,-1.1708000000000001,-1.0526
+
+  constructed/weights-ties.txt
+    splits 2
+    c	2	MIXED	1/1/0	0.25	0.5	0.5	0.75,-0.25
+    z	7	ALL_ZERO	0/0/2	0	0	0	0,0
+    a	2	ALL_POSITIVE	2/0/0	0.5	0.5	0	0.5,0.5
+    f	1	ALL_POSITIVE	2/0/0	1.5	1.5	0.5	2,1
+    d	5	MIXED	1/0/1	0.25	0.25	0.25	0,0.5
+    b	2	ALL_NEGATIVE	0/2/0	-0.5	0.5	0.25	-0.25,-0.75
+    e	6	ALL_POSITIVE	2/0/0	0.125	0.125	0	0.125,0.125
+    y	7	ALL_ZERO	0/0/2	0	0	0	0,0
+    m0	-	ALL_NEGATIVE	0/2/0	-2	2	1	-3,-1
+
+  constructed/weights-one-split.txt
+    splits 1
+    p	2	ALL_POSITIVE	1/0/0	0.5	0.5	0	0.5
+    n	1	ALL_NEGATIVE	0/1/0	-1.5	1.5	0	-1.5
+    zz	3	ALL_ZERO	0/0/1	0	0	0	0
+    m0	-	ALL_POSITIVE	1/0/0	0.25	0.25	0	0.25
+  (real/percolator-3.09/weights.txt is byte-identical to 3.07.1's.)
+  (weights-ties.txt and weights-one-split.txt were hand-computed first;
+  WeightsSummaryTest types the hand values, and this output agrees.)
+
+Real K562 weights -- D-006: NUMBERS ONLY, never the data
+  scratch/scientific-path/percolator-3.07.1/weights.txt (and percolator-3.09's,
+  byte-identical), SHA-256
+  1a92c0ac17efe38ffce7caf0855f273746310b1cddb9b1e409b435fb02692208, pinned by
+  org.cometgui.results.testing.RealK562.Weights (fails, never skips, when
+  absent). The per-split weights are the artefact's content and are NOT
+  recorded here or in the test; only the summary statistics are.
+
+    splits 3
+    lnrSp	1	ALL_NEGATIVE	0/3/0	-0.33633333333333332	0.33633333333333332	0.079188944233957864
+    deltLCn	18	ALL_ZERO	0/0/3	0	0	0
+    deltCn	7	ALL_POSITIVE	3/0/0	0.088066666666666668	0.088066666666666668	0.041435277508690853
+    lnExpect	2	ALL_NEGATIVE	0/3/0	-0.23543333333333333	0.23543333333333333	0.10420787984707405
+    Xcorr	3	ALL_POSITIVE	3/0/0	0.1139	0.1139	0.01969839248940549
+    Sp	9	MIXED	1/2/0	-0.040066666666666667	0.042466666666666666	0.031526954957446951
+    IonFrac	4	ALL_POSITIVE	3/0/0	0.094200000000000006	0.094200000000000006	0.032167996518278848
+    Mass	5	MIXED	2/1/0	0.08953333333333334	0.090399999999999994	0.074673705025411874
+    PepLen	15	MIXED	2/1/0	-0.0117	0.014500000000000001	0.019536802877304839
+    Charge1	18	ALL_ZERO	0/0/3	0	0	0
+    Charge2	14	MIXED	2/1/0	0.0076333333333333331	0.015166666666666667	0.014524997609485365
+    Charge3	13	MIXED	1/2/0	-0.0018	0.018133333333333335	0.01859910392106745
+    Charge4	12	MIXED	1/2/0	-0.017566666666666668	0.019166666666666665	0.0142712609424987
+    Charge5	17	ALL_POSITIVE	3/0/0	0.011066666666666667	0.011066666666666667	0.0093596058796416321
+    Charge6	18	ALL_ZERO	0/0/3	0	0	0
+    enzN	16	ALL_POSITIVE	3/0/0	0.014066666666666667	0.014066666666666667	0.0085888817018799878
+    enzC	18	ALL_ZERO	0/0/3	0	0	0
+    enzInt	11	MIXED	1/2/0	-0.019699999999999999	0.027166666666666665	0.036005647705140184
+    lnNumSP	10	MIXED	2/1/0	0.024533333333333334	0.033133333333333334	0.030216588527201781
+    dM	8	MIXED	2/1/0	0.053800000000000001	0.054333333333333331	0.067759919323053114
+    absdM	6	ALL_NEGATIVE	0/3/0	-0.088800000000000004	0.088800000000000004	0.075335560439056051
+    m0	-	ALL_NEGATIVE	0/3/0	-0.74250000000000005	0.74250000000000005	0.064065643418814322

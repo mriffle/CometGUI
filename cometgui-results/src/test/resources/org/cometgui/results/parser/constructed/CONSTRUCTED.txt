@@ -49,8 +49,30 @@ psms-shuffled.tsv        added 2026-10-08 by the phase 10 unit 2 agent for the
                                     c=0.05  23 12 4 7
                                     c=1     23 16 0 7
 
+weights-ties.txt         added 2026-10-08 by the phase 10 unit 4 agent for the
+                         learned feature weights summary (P10-8, gate 7). Two
+                         splits, nine features ending in m0, every value a
+                         multiple of 1/8 so every statistic is exact in
+                         binary. Ties on mean absolute weight: c, a, b at 0.5
+                         (rank 2 each, then d at 5) and the all-zero z, y at
+                         0 (rank 7 each; z spelt 0 and -0.0000). d is 0 then
+                         0.5 (a zero mixed with a positive: MIXED); c is 0.75
+                         then -0.25 (MIXED); m0 is -3 then -1, mean absolute
+                         2, larger than every feature, and unranked. Hand
+                         values (rank, mean, |mean|, population sd): f 1 1.5
+                         1.5 0.5; c 2 0.25 0.5 0.5; a 2 0.5 0.5 0; b 2 -0.5
+                         0.5 0.25; d 5 0.25 0.25 0.25; e 6 0.125 0.125 0;
+                         z, y 7 0 0 0; m0 - -2 2 1.
+weights-one-split.txt    added 2026-10-08 by the phase 10 unit 4 agent. ONE
+                         split, four features ending in m0: p 0.5, n -1.5,
+                         zz 0, m0 0.25. Population sd 0 for every feature
+                         (a sample sd would divide by zero); ranks n 1, p 2,
+                         zz 3; m0 unranked.
+
 SHA-256
   ea58b3b63f9031bf53b5675d117b1e7203137a0ebd2399c9def824334267b6c7  psms-unknown-q.tsv
   3754547ea1ca3ff35b67913a8249b98831e924c0a84029c2a9769fc581a6f5d4  psms-shuffled.tsv
   2345706956b918d713a93fe5e523fbd31b7aceb095c68cfffbb9ff508969e276  weights-four-splits.txt
   44042567136e69e5854085952cf6a2a3a9e14221761bfcc3c4cb04782177016f  weights-two-splits.txt
+  86466aa30c1d4f72915a45d50f7828284b5e36750ce3a022cb65880fb6b06c92  weights-ties.txt
+  28111d5c8d8052d8ffee6be61876e1311037b05bfdefc232efa014c379c8a571  weights-one-split.txt

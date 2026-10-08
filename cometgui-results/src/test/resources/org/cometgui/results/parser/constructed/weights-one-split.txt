@@ -1,0 +1,5 @@
+# CONSTRUCTED BY HAND for CometGUI tests (phase 10 unit 4, 2026-10-08). NOT Percolator output.
+# ONE split: the population standard deviation of one value is 0 (a sample deviation would divide by zero), and every sign verdict comes from one weight.
+p	n	zz	m0
+0.5	-1.5	0	0.25
+1	-3	0	0.5
