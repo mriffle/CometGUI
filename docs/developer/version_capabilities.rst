@@ -444,7 +444,12 @@ Which tests prove the exit gate
 
 The acceptance criteria's entries are in ``docs/traceability-map.toml`` and
 the generated :doc:`traceability`. The falsifiability harness for these items
-is ``scripts/verify-percolator-gates.sh`` (Phase 09 unit 9).
+is ``scripts/verify-percolator-gates.sh`` (Phase 09 unit 9; ``percolator`` in
+``scripts/verify-all-gates.sh``): it injects a defect per item into
+production code and requires the tests above to go red with their own words.
+Three of its controls are version-blind, and under each the real 3.07.1/3.09
+pair stays green -- the measurement that only the future-version and
+inferred-claim tests hold P9-2. See :ref:`dev-percolator-falsifiability`.
 
 What has run, and where
 =======================

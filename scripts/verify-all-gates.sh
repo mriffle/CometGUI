@@ -88,6 +88,7 @@ readonly -a ALL_GATES=(
     params
     paramui
     workflow
+    percolator
 )
 
 PASSED=0
@@ -136,7 +137,9 @@ declare -a COVERED=()
 #                GUI test on both releases (four checks); 87 on 2026-10-07,
 #                when phase 08 unit 7 added H7, the engine-only injection
 #                graded where the engine is ready (three checks).  workflow:
-#                110 on 2026-10-07, phase 08 unit 9's first shipping count.)
+#                110 on 2026-10-07, phase 08 unit 9's first shipping count.
+#                percolator: 94 on 2026-10-08, phase 09 unit 9's first
+#                shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -323,6 +326,21 @@ gate_spec() {
             GATE_FLOOR=110
             GATE_UNIT="controls"
             ;;
+        percolator)
+            GATE_PHASE="09"
+            GATE_ITEMS="1,2,3,4,5,6,7,8,9"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-09-worklog.rst (and new ones, each marked so), each into production code of cometgui-params-percolator, cometgui-results, cometgui-tools, cometgui-workflow or cometgui-ui in a git-archive sandbox, each built with its upstream modules in one reactor (-pl TOP -am, nothing installed), proved to have reached the compiled classes and graded on the failing assertion's own words in the named testcase, items 1, 2, 4, 5, 7 and 9 against the real Percolator 3.07.1 and 3.09 on a merged PIN the real Comet wrote: the probe's target/decoy judgement of a table disabled, so a capability is granted without its observable; (NEW) the table reader dropping the first data row (the real tables and the real run's independently counted rows), and (NEW) run-percolator no longer checking that an artefact exists (an empty one still refused); -X requested whenever the build is capable (red in the recorded argv of the real 3.07.1 run with Limelight off), and (NEW) whenever a stage needs it, capable or not (the real 3.09 handed -X and failing); VERSION-BLIND three times, each with the real 3.07.1/3.09 pair required to stay green -- Limelight available iff a candidate is older than 3.09, (NEW) the default chosen by that rule (the future 3.10 and the inferred macOS-like 3.07.1 red), and (NEW) the Percolator section saying Limelight can run whenever a build older than 3.09 is known (the view-model's and the GUI's inferred-claim tests red); (NEW) the skip reason no longer naming the missing capability, red in the resolver, the view-model, the GUI and the real run's provenance.json; the pre-launch PIN check bypassed, so the real zero-decoy PIN reaches the real Percolator; (NEW) the derived run no longer recording run-comet among the Comet results it reuses, and the rerun's 'every Comet result must be reused' and 'nothing changed' refusals disabled; (NEW) the effective seed dropped from provenance.json of every run that did not succeed (the real failed runs red, gate 7's successful runs green); (NEW) at most three weight splits read (the two- and four-split files red, the real three-split files green), and the same-features-per-split check disabled; raw outputs never made read-only, and (NEW) parsing writing back to the raw file it parsed; and, as controls on the harness itself, an unchanged file, a missing anchor, an injection that reached the source but not the bytecode, a selection that ran zero tests, a green run graded as red and a red without its diagnostic"
+            GATE_SCRIPT="scripts/verify-percolator-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-09 exit gate items 1 to 9 and the capability probe were proved here"
+                "Three controls were version-blind (3v, 3w and 3u)"
+                "bytecode as a HARNESS ERROR, not as a pass, and a selection that ran zero"
+            )
+            GATE_FLOOR=94
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -363,6 +381,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         workflow)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        percolator)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -370,8 +390,8 @@ gate_count() {
 usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
-that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07 and
-PHASE-08 gate still fails on the defect it exists to catch.
+that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07,
+PHASE-08 and PHASE-09 gate still fails on the defect it exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -447,7 +467,7 @@ list_gates() {
     done
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
     printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06, 07:n of\n'
-    printf '  PHASE-07, 08:n of PHASE-08.\n'
+    printf '  PHASE-07, 08:n of PHASE-08, 09:n of PHASE-09.\n'
     printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
@@ -493,11 +513,22 @@ list_gates() {
     printf '  parsable; 8 a changed input refusing reuse, naming the file; 9 one argv per\n'
     printf '  spectrum file and the archived comet.params hash of the executed file.  The\n'
     printf '  same control also proves the index-compatibility check tier 1 assigned.\n'
+    printf '  PHASE-09 items: 1 a real Percolator run on the merged PIN whose PSM,\n'
+    printf '  peptide and weights artefacts parse; 2 XML produced with an XML-capable\n'
+    printf '  build and no XML option for 3.09, asserted on the recorded argument array;\n'
+    printf '  3 the default resolved from observed capability, re-evaluated on toggling,\n'
+    printf '  a non-XML default and Limelight unavailable without an XML-capable build;\n'
+    printf '  4 a skipped newer version named with its missing capability in the UI and\n'
+    printf '  in provenance; 5 a zero-decoy PIN failing before Percolator is launched;\n'
+    printf '  6 the compatible-version rerun, Comet untouched; 7 the effective seed in\n'
+    printf '  provenance for every run; 8 the weights split count read from the\n'
+    printf '  artefact; 9 raw outputs byte-identical across parsing and filtering.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
     printf '  phases/PHASE-05-tool-registry.rst, phases/PHASE-06-comet-param-model.rst,\n'
-    printf '  phases/PHASE-07-comet-param-ui.rst and phases/PHASE-08-workflow-comet.rst.\n\n'
+    printf '  phases/PHASE-07-comet-param-ui.rst, phases/PHASE-08-workflow-comet.rst and\n'
+    printf '  phases/PHASE-09-percolator.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -659,7 +690,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07 and PHASE-08 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08 and PHASE-09 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -697,7 +728,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05 06 07 08; do
+    for phase in 01 02 04 05 06 07 08 09; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"

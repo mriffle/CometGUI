@@ -55,21 +55,22 @@ Commands
 
    * - ``bash scripts/verify-all-gates.sh``
      - **Prove every gate still fails on the defect it exists to catch.** Runs
-       all fifteen falsifiability controls and exits non-zero if any control
+       all sixteen falsifiability controls and exits non-zero if any control
        stops biting. About an hour since Phases 05 and 06 (3875 s recorded in
        ``scripts/dev-verify.sh``), Phase 07's ``paramui`` adds about
-       twenty minutes and Phase 08's ``workflow`` about eight. Run it before
-       signing off a phase.
+       twenty minutes, Phase 08's ``workflow`` about eight and Phase 09's
+       ``percolator`` about eleven. Run it before signing off a phase.
 
    * - ``bash scripts/verify-all-gates.sh --list``
-     - The fifteen controls, what each injects, and the command that proves
+     - The sixteen controls, what each injects, and the command that proves
        it.
 
    * - ``bash scripts/verify-all-gates.sh --only NAME``
      - One control. Names: ``license``, ``workflows``, ``docs``,
        ``traceability``, ``sbom``, ``depscan``, ``pipeline``, ``quality``,
        ``shell``, ``tests``, ``provenance``, ``install``, ``params``,
-       ``paramui``, ``workflow``. Repeatable, or comma-separated.
+       ``paramui``, ``workflow``, ``percolator``. Repeatable, or
+       comma-separated.
 
    * - ``bash scripts/ci/docs-build.sh``
      - The documentation gate on its own: both strict Sphinx builds. About 6 s.
@@ -391,7 +392,7 @@ catch, requires the narrowest command that should catch it to exit non-zero
 once the defect is removed. Every harness damages a copy under ``_build/``;
 the working tree is never touched.
 
-``bash scripts/verify-all-gates.sh`` runs all fourteen in one command. It injects
+``bash scripts/verify-all-gates.sh`` runs all sixteen in one command. It injects
 nothing itself -- it delegates -- and it fails if a sub-harness is missing or
 not executable rather than skipping it, because a skipped control counted as a
 pass is worse than no aggregator at all.
@@ -565,6 +566,17 @@ pass is worse than no aggregator at all.
      - Each failing assertion's own words, or the real binary's: e.g. Comet's
        ``Error - cannot write to file ".../read-only inputs/k562_3.pep.xml"``
        when every spectrum file is put on one command line.
+
+   * - Percolator adapter and version capabilities (Phase 09, ``percolator``)
+     - ``scripts/verify-percolator-gates.sh``: eighteen injections into
+       ``cometgui-params-percolator``, ``cometgui-results``,
+       ``cometgui-tools``, ``cometgui-workflow`` and ``cometgui-ui`` -- at
+       least one per exit gate item and one on the capability probe, three of
+       them version-blind -- items 1, 2, 4, 5, 7 and 9 graded against the real
+       Percolator 3.07.1 and 3.09. See :ref:`dev-percolator-falsifiability`.
+     - Each failing assertion's own words, or the real binary's run: e.g. the
+       real 3.09 handed ``-X`` -- ``RUN_PERCOLATOR=invocation percolator
+       exited with code 1 ... ==> expected: <SUCCEEDED> but was: <FAILED>``.
 
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs
@@ -1035,6 +1047,179 @@ Measured on 2026-10-07: 110 controls passed in 449 s (7 m 29 s) -- the
 baseline, with the overlay build, 64 s; the final clean run 49 s; control 7
 70 s, almost all of it the test's own 60-second bound; every other control
 between 7 s and 27 s. The floor in ``verify-all-gates.sh`` is 110.
+
+.. _dev-percolator-falsifiability:
+
+The Percolator harness (Phase 09, ``percolator``)
+-------------------------------------------------
+
+``bash scripts/verify-percolator-gates.sh`` proves that each of Phase 09's
+nine exit gate items, and the capability probe, fails on a defect it exists to
+catch. It is registered in ``scripts/verify-all-gates.sh`` as ``percolator``
+and takes its shape from ``workflow``; the differences are these.
+
+* **One closed module set per control, nothing installed.** Each control
+  names the top module of the narrowest set holding its damaged file and its
+  graded tests, and every run is ``mvn -o -pl TOP -am test``: the damaged
+  module and everything between it and the tests are compiled from the
+  sandbox in one reactor. There is no overlay repository; ``_build/m2repo`` is
+  only read, and its ``org/cometgui`` jars are digested before and after. The
+  bytecode comparison covers the modules the run built.
+* ``scratch/`` (the pinned Comet and Percolator binaries, the 3.09 wrapper and
+  its Boost libraries, the ``D-006`` inputs) and ``tools/`` (the font stack of
+  the headless GUI tests) are symlinked into the sandbox; the script refuses
+  to start, naming the file, when a fixture is missing.
+* ``cometgui-app``'s ``build-identity.properties`` carries a build timestamp
+  Maven rewrites on every run; it is digested without that one line, which is
+  required to be there, as ``paramui`` does.
+* The test JVMs' temporary directory is not moved (``cometgui-ui`` and
+  ``cometgui-app`` set ``cometgui.surefire.extraArgLine`` themselves), so
+  there is no live-process check; every real run here is synchronous and
+  bounded.
+
+.. list-table:: The controls ("recorded" names the unit of ``handoffs/PHASE-09-worklog.rst`` whose sign-off made the injection)
+   :header-rows: 1
+   :widths: 6 6 42 46
+
+   * - Control
+     - Item
+     - Injected defect
+     - Diagnostic required
+   * - P
+     - probe
+     - Recorded (unit 1): the target/decoy judgement of a probe table
+       disabled -- a capability granted without its observable.
+     - ``a decoy among the targets ==> expected: <[...]>`` (``PSM_TSV_OUTPUT``
+       granted); ``damagedDecoyTables`` red; a fully capable build green.
+   * - 1a
+     - 1
+     - New: the table reader drops the first data row.
+     - The real run's ``tables.percolator-psms.rows ... expected: <3285> but
+       was: <3284>``; the real 3.07.1/3.06.5/3.09 tables against awk's counts
+       red; the real weights green.
+   * - 1b
+     - 1
+     - New: ``run-percolator`` no longer checks that an artefact exists (an
+       empty one is still refused).
+     - ``aMissingArtefactFails``: the step fails later, naming a bare path,
+       ``.../weights.txt ==> expected: <true> but was: <false>``;
+       ``anEmptyArtefactFails`` green.
+   * - 2a
+     - 2
+     - Recorded (unit 3): ``-X`` whenever the build is capable, needed or not.
+     - The **recorded** argv of the real 3.07.1 run with Limelight off holds
+       ``-X, .../outputs/percolator/pout.xml``; both real 3.09 runs green.
+   * - 2b
+     - 2
+     - New: ``-X`` whenever a stage needs it, capable or not.
+     - The real 3.09 chosen with Limelight on is handed ``-X`` and fails:
+       ``invocation percolator exited with code 1``; 3.09 without Limelight
+       green.
+   * - 3v
+     - 3
+     - **Version-blind**, recorded (unit 2): a stage available iff a
+       candidate is older than 3.09.
+     - ``ResolutionChangeTest.switchedOnButUnavailable``'s notice and
+       ``macosInferred`` red; the real-pair tests ``limelightOn`` and
+       ``only309`` green.
+   * - 3w
+     - 3
+     - **Version-blind**, new: the default chosen by "Limelight needs a
+       version below 3.09".
+     - ``macosInferred``: ``expected: <3.09> but was: <3.07.1>``;
+       ``futureWithXmlWins`` red (3.10 skipped for no missing capability);
+       ``limelightOn`` and ``limelightOff`` green.
+   * - 3u
+     - 3
+     - **Version-blind**, new: the Percolator section says Limelight can run
+       whenever a build older than 3.09 is known.
+     - The view-model's and the GUI's inferred-claim tests:
+       ``... > but was: <Limelight conversion can run: ...``; the view-model's
+       real-pair tests green.
+   * - 4
+     - 4
+     - New: the skip reason no longer names the missing capability.
+     - Red in the resolver, the view-model, the GUI and the real run's
+       ``provenance.json``: ``... because 3.09 (registered local binary)
+       lacks a capability.``
+   * - 5
+     - 5
+     - Recorded (unit 5): the pre-launch PIN check bypassed.
+     - The real zero-decoy PIN: ``expected: <Percolator was not started: the
+       PIN file .../merged.pin holds 198 target rows and no decoy row ...> but
+       was: <invocation percolator exited with code 1 ...``.
+   * - 6a
+     - 6
+     - New: the derived run's plan no longer provides ``run-comet``.
+     - The plan test, and the real rerun's record: ``expected:
+       <serialise-comet-params run-comet validate-comet-outputs merge-pin> but
+       was: <serialise-comet-params validate-comet-outputs merge-pin>``.
+   * - 6b
+     - 6
+     - Recorded (unit 6): "every Comet result step must be reused" disabled.
+     - ``cometResultNotRecorded``: ``RerunRefusedException`` not thrown; the
+       rerun and the changed-merged-PIN refusal green.
+   * - 6c
+     - 6
+     - Recorded (unit 6): the "nothing changed" refusal disabled.
+     - ``nothingChanged``: ``RerunRefusedException`` not thrown; the rerun
+       green.
+   * - 7
+     - 7
+     - New: the effective seed dropped from ``provenance.json`` of every run
+       that did not succeed.
+     - The real failed runs: ``expected: <1> but was: <null>``; gate 7's own
+       test of the four successful real runs **green** -- only a failed run
+       can show it.
+   * - 8a
+     - 8
+     - New: at most three weight splits read.
+     - The constructed four-split file: ``expected: <4> but was: <3>``, the
+       two-split file red; the real three-split files green.
+   * - 8b
+     - 8
+     - Recorded (unit 4): the same-features-in-every-split check disabled.
+     - ``splitMismatch``: ``PercolatorOutputException`` not thrown.
+   * - 9a
+     - 9
+     - Recorded (unit 5): raw outputs never made read-only.
+     - ``decoy-peptides.tsv is writable`` over the four real runs.
+   * - 9b
+     - 9
+     - New: parsing writes back to the raw file it parsed.
+     - ``.../weights.txt changed ==> expected: <5370...> but was: <...>``.
+   * - H
+     - --
+     - The harness itself.
+     - An unchanged file, a missing anchor, a comment-only injection (a real
+       Maven run) and a selection naming a method that does not exist (a real
+       run of zero tests) are each a ``HARNESS ERROR``; a green run graded as
+       red and a red without its diagnostic are each a recorded failure.
+
+**Version-blind, plainly.** On the real Linux pair (3.07.1 with
+``XML_OUTPUT``, 3.09 without) a rule keyed on "version below 3.09" and a rule
+keyed on observed ``XML_OUTPUT`` agree, so no test over the real binaries can
+tell them apart. Controls 3v, 3w and 3u *require* the real-pair tests to stay
+green under the version rule; only the future-version (3.10) and
+inferred-claim tests catch them.
+
+What it does not cover: Windows and macOS; export (Phase 10); skipping the
+source merged PIN's re-hash in ``RerunSource`` alone, which the re-hash of the
+copy masks with the same sentence by design; the probe's version-blind
+injection (unit 1) and ``PercolatorRealBinaryTest``, left to unit 1's
+sign-off to save a 36 s real-binary class in three runs. One observation from
+building it: ``RealPercolatorRunTest.gate4TheSkippedVersionIsRecorded``
+checks the reason only for *containing* ``XML_OUTPUT``, which the stage's own
+explanation clause also contains; control 4 therefore removes the whole
+clause. A defect dropping only "lacks ``XML_OUTPUT``" would still be caught
+by the resolver's, the view-model's and the GUI's exact-text tests, but not
+by that provenance test.
+
+Measured on 2026-10-08: 94 controls passed in 633 s (10 m 33 s) -- the
+baseline 104 s, the final clean run 88 s; the six controls graded on
+``RealPercolatorRunTest`` (four real Comet searches and Percolator runs in its
+``@BeforeAll``) 43-44 s each, control 4 51 s, 6a 30 s, 3u 18 s, every other
+control between 5 s and 14 s. The floor in ``verify-all-gates.sh`` is 94.
 
 Traps
 =====
