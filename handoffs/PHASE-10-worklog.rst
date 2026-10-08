@@ -316,7 +316,37 @@ brief's *Build economy* section verbatim.
        the boundary, every unknown kind in its own category; raw files'
        SHA-256 unchanged. Any parser extension in place, its tests green.
      - R-RES-01, R-RES-02; gates 1, 3, 8
-     -
+     - **Signed off 2026-10-08** (``91b7ad9``; my repair ``a3e2992``). Diff
+       read: 24 files -- ``filtering.store``: ``ResultStore`` (file, kind,
+       header, rowCount, ``counts``, ``query``, ``row(RowKey)``), ``RowKey``
+       (line number), ``TableKind`` (refuses the other table's filter),
+       ``Category``, ``ResultSort`` (ten columns; missing last both ways;
+       ties by file order), ``ResultQuery`` (default page 200, maximum
+       5000), ``ResultPage``, ``TextFilter``, ``InMemoryResultStore``,
+       ``ResultStores``; ``parser.SpectrumReference`` (from the right);
+       ``QValue``: ``1e-400`` known and above 0 (fails cutoff 0),
+       ``1e400``/``-1e-400`` OUT_OF_RANGE. The store classifies only through
+       ``QValueFilter.classify``. I ran ``mvn -o -pl cometgui-results -am
+       install -DskipTests`` then ``-pl cometgui-results verify``: **652
+       tests, 0 failures** (``InMemoryResultStoreTest`` 386 via the abstract
+       ``ResultStoreContract`` over 22 tables incl. a constructed shuffled
+       one, ``StoreValuesTest`` 22, ``SpectrumReferenceTest`` 30,
+       ``QValueExtremesTest`` 14, ``InMemoryLargeFixtureTest`` 3), 0
+       SpotBugs, 0 Checkstyle. My injections, restored by ``sha256sum
+       -c``: (1) ``QValueFilter.classify`` ``<=`` -> ``<`` -- 96 of 408
+       red, e.g. ``categoriesPartition PASSING expected [2, 3, 4, 9, 10, 13,
+       14] but was [2, 3, 4, 9, 13, 14]``; (2) paging off by one
+       (``matching > offset``) -- **the suite hung for 29 minutes** (a
+       paging loop with no exit on an empty page); I killed it and
+       repaired the contract (``a3e2992``: an empty page before the end
+       fails); re-run: 231 of 408 red, "only the last page is short"; (3)
+       sort ties broken in reverse -- 62 red. Agent's PIT on the new and
+       changed classes: 214 mutations, 211 killed, 2 timed out, 1 survived
+       (equivalent: a loop bound in ``TextFilter.contains``). I ran
+       ``--only percolator --only quality``: **percolator 109 (698 s),
+       quality 42 (142 s)**. Large fixture in memory: open 1.9 s, about
+       670 MB heap -- the threshold belongs well below a million rows.
+       Files read outside the module: as unit 1.
 
    * - 3
      - **The disk-backed store and the threshold.** Off-heap index
@@ -403,7 +433,9 @@ brief's *Build economy* section verbatim.
 Rejections and rework
 =====================
 
-None yet.
+* **Unit 2** -- not sent back; one orchestrator repair (``a3e2992``): the
+  contract's paging loops had no exit when a page came back empty before the
+  end, so an injected off-by-one hung the suite instead of turning it red.
 
 Deferred
 ========
