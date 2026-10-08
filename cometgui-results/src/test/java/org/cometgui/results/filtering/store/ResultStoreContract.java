@@ -280,6 +280,9 @@ abstract class ResultStoreContract {
             for (ResultRow row : page.rows()) {
                 lines.add(row.line());
             }
+            assertFalse(
+                    page.rows().isEmpty() && offset < page.matching(),
+                    "a page before the end holds rows (offset " + offset + ")");
             offset += page.rows().size();
             if (offset >= page.matching()) {
                 assertEquals(page.matching(), lines.size(), "the pages hold every matching row");
@@ -1089,6 +1092,9 @@ abstract class ResultStoreContract {
                     assertEquals(expected.charge(), BigDecimal.valueOf(reference.charge()));
                     bases.add(reference.base());
                 }
+                assertFalse(
+                        page.rows().isEmpty() && offset < page.matching(),
+                        "a page before the end holds rows (offset " + offset + ")");
                 offset += page.rows().size();
                 if (offset >= page.matching()) {
                     break;
