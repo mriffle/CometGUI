@@ -572,7 +572,42 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
        a changed merged PIN refuses the rerun naming the file and both
        hashes; the original's raw Percolator outputs byte-identical.
      - R-RUN-02, R-RUN-06, the spec's *Stage reruns*; gates 6, 9
-     -
+     - **Signed off 2026-10-08** (``6ff6a00``). Diff read: 31 files --
+       ``workflow.steps`` (``PercolatorRerun``, ``PercolatorRerunPreview``,
+       ``DerivedRun``, ``DerivedSteps``, ``RerunSource``,
+       ``RerunProvenance``), ``Plan.covering(wanted, provided)``,
+       ``RunJson`` schema version 2 (= 1 plus a required ``derivedFrom``;
+       ordinary runs still written as version 1 byte for byte; 0 and 3+
+       refused untouched), ``domain.run.RunDerivation``; three docs. The two
+       storage tests that used version 2 as "newer" now use 3 -- a legitimate
+       shift, not a weakening. A derived run is a new run; eligibility is
+       read from the original's own rerun preview (every Comet result step
+       must be REUSE; "nothing changed" refused); the merged PIN and
+       ``comet.params`` are re-hashed against the original's record, copied
+       (not hard-linked) and re-hashed again; Comet is recorded by reference
+       under nine ``rerun.*`` keys. ``mvn -pl cometgui-domain,cometgui-workflow
+       install`` with tests (upstream installed): domain **1164**, workflow
+       **695**, 0 failures, 0 ``BugInstance``. Real test (agent's figures,
+       re-run in my suite): 3.09 run then rerun with 3.07.1 -- different
+       version, binary SHA-256 (``fe1b018a...`` vs ``1ba38acf...``) and argv
+       (``-X .../pout.xml`` added); Comet launches 2 before, 2 after; the
+       original's tree of 28 paths identical; its raw outputs unchanged and
+       read-only. My PIT (``Plan*``, ``PercolatorRerun*``, ``RerunSource*``,
+       ``Derived*``, ``RunJson*`` against the unit tests): **169/169
+       KILLED**. My injections, landed and restored by ``sha256sum -c``: (1)
+       the "every Comet result step must be reused" refusal disabled --
+       ``PercolatorRerunTest.cometResultNotRecorded:972`` red; (2) the
+       "nothing changed" refusal disabled -- ``PercolatorRerunTest.nothingChanged:943``
+       red. ``--only workflow`` **110**, ``--only quality`` 42, ``--only
+       docs``, ``--only traceability`` 8: all PASS. **Agent's observation for
+       tier 1:** the module's ``TIMED_OUT`` mutants (unit 5's 43) become
+       KILLED when PIT is restricted to the fast unit tests, which suggests
+       they come from real-binary test classes' setup exceeding PIT's
+       per-test timeout rather than from hangs -- bears on the owner's
+       ``TIMED_OUT`` question. **Residue:** a derived run cannot itself be
+       rerun (refused, naming its original); the original's spectra and
+       FASTA need not still exist. Tests read outside the module: the same
+       ``scratch/`` fixtures as unit 5.
 
    * - 7
      - **The Percolator section and wiring** (``cometgui-ui``,
