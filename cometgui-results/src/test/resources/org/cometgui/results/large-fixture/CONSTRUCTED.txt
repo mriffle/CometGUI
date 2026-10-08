@@ -1,0 +1,92 @@
+LARGE PERFORMANCE FIXTURE -- CONSTRUCTED, synthetic, NOT produced by Percolator
+==============================================================================
+
+Phase 10 unit 1, 2026-10-08; design decision P10-2 in
+handoffs/PHASE-10-worklog.rst; R-RES-03 ("a performance fixture large enough
+to cross the threshold shall exist before the results UI is built").
+
+What it is
+  A synthetic, Percolator-SHAPED target PSM table and target peptide table,
+  written by a deterministic, standard-library-only Python generator. No
+  spectrum, search or real dataset is involved: peptides are random sequences
+  over the twenty amino acids (some with M[15.9949]), flanked as Percolator
+  writes them (K.PEPTIDE.R); protein accessions are synthetic
+  (fx|FX0001234|SYN0001234_FIXTURE), deliberately not UniProt's form (D-006
+  spirit). The data is never committed: it is written to the gitignored
+  scratch/phase10/large/ and remade by the command below.
+
+Command (from the repository root)
+  python3 scripts/fixtures/large-results-fixture.py
+  python3 scripts/fixtures/large-results-fixture.py --self-check
+  Defaults: --psm-rows 1000000 --peptide-rows 400000 --seed 20261008
+  --out scratch/phase10/large. Generator version 1.0.0. Written with
+  Python 3.11.2 in 13.7 s; the self-check takes about 20 s.
+
+Shape
+  Header: PSMId score q-value posterior_error_prob peptide proteinIds.
+  Rows ordered by descending score; known q-values ascend with the row, as
+  Percolator's do; unknown ones sit at drawn positions among them.
+  proteinIds continues to the end of the row: psms.tsv 819857 rows with one
+  protein, 100106 with two, 50202 with three, 29835 with four.
+  PSMId is Comet's SpecId, <-N base>_<scan>_<charge>_<rank>, with four bases:
+    /fixture/runs/run-01/outputs/comet/sample_A
+    /fixture/runs/run-01/outputs/comet/sample_B
+    /fixture/runs/run-01/outputs/comet/2026_10_08_sample_C_2_1   (digits and
+        underscores of its own, so a PSMId must be split from the right)
+    /fixture/runs/run-01/outputs/comet/sample D                 (a space)
+  250000 psms.tsv rows and 100000 peptides.tsv rows each.
+  Q-values are written as Percolator writes them, C %g with six significant
+  digits (46290 psms.tsv q-values in exponent form, e.g. 9.27998e-07).
+
+Every q-value kind, in known numbers (psms.tsv / peptides.tsv rows)
+  known, exactly 0          5003 / 2003
+  known, exactly 0.005       307 /  103
+  known, exactly 0.01        401 /  211
+  known, exactly 1          1009 /  307
+  known, 0.00499999 / 0.00500001 / 0.00999999 / 0.0100001
+                            53 59 61 67 / 17 19 23 29
+  unknown, MISSING:      ""           211 / 41
+  unknown, UNPARSABLE:   NaN          113 / 43
+                         nan          127 / 47
+                         -nan         131 / 53
+                         inf          137 / 59
+                         -inf         139 / 61
+                         Infinity     149 / 67
+                         0,01         151 / 71   (comma decimal)
+  unknown, OUT_OF_RANGE: 1.5          157 / 73
+                         -0.1         163 / 79
+  The category is the generator's own reading of the specification's policy
+  (R-RES-02; empty -> MISSING, not a Locale.ROOT decimal -> UNPARSABLE, a
+  decimal outside [0, 1] -> OUT_OF_RANGE), recorded per kind in
+  manifest.json; it matches the categories of QValue.Status by intent, but
+  was not taken from the Java.
+
+Expected counts (manifest.json; Python decimal over what the generator
+assigned; inclusive, q <= cutoff; total / passing / failing / unknown)
+  psms.tsv
+    0      1000000 5003 993519 1478
+    0.001  1000000 104377 894145 1478
+    0.005  1000000 175162 823360 1478
+    0.01   1000000 219777 778745 1478
+    0.05   1000000 371857 626665 1478
+    0.1    1000000 467145 531377 1478
+    0.5    1000000 793312 205210 1478
+    1      1000000 998522 0 1478
+  peptides.tsv
+    0      400000 2003 397403 594
+    0.001  400000 41664 357742 594
+    0.005  400000 70182 329224 594
+    0.01   400000 88111 311295 594
+    0.05   400000 148791 250615 594
+    0.1    400000 186864 212542 594
+    0.5    400000 317539 81867 594
+    1      400000 399406 0 594
+  --self-check re-counts both files with a separate pass (split on tab,
+  decimal compare) and agrees with every number above; it also finds 0 rows
+  where a double comparison and the exact decimal comparison disagree, and a
+  second generation byte-identical to the first.
+
+SHA-256 (pinned in org.cometgui.results.testing.LargeFixture)
+  4f7aaecd0164bc22be51de1c60dfed3e70ddf65a4283f38a1912c76ece8cfcf4  psms.tsv       147155274 bytes
+  bdda5589063d55c9c210f8eba7cd64f1489b95e8fa51fe4a9dccea9255e01e44  peptides.tsv    58593259 bytes
+  4298cc2b05b3d86108a9dadf4ae832284a5aff1ca046f49b5c89d2a6ec832d85  manifest.json       8105 bytes

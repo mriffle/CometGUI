@@ -1,0 +1,79 @@
+REAL K562 PERCOLATOR OUTPUT -- provenance and numbers only, NOT the data
+=========================================================================
+
+D-006: CometGUI does not redistribute spectrum or FASTA data, so the
+Percolator output of a search over them is never committed either. The files
+this record describes stay in the gitignored scratch/ directory; this file
+holds only where they came from, their digests and counts taken from them.
+org.cometgui.results.testing.RealK562 pins the same digests and counts, and
+RealK562Test fails (never skips) when a file is missing or differs.
+
+Origin
+  Phase 00 unit 8's scripted end-to-end run, 2026-08-29 (files dated
+  2026-08-29 02:12 UTC): bash scripts/feasibility/run_scientific_path.sh, as
+  docs/feasibility/scientific-path.rst records. Comet 2026.02.2 over the two
+  Crux K562 mzML files (20100614_Velos1_TaGe_SA_K562_3.mzML and _4.mzML,
+  crux-toolkit commit fc6335cc817c8629aac07c27f2ab4584ba10930f) against the
+  UniProt human reference proteome UP000005640_9606 (20 652 records), then
+  Percolator over both PIN files at once:
+    percolator-3.07.1  the XML-capable 3.07.1 build, script step 4:
+        <percolator> -X percolator.pout.xml -m psms.target.txt
+            -M psms.decoy.txt -r peptides.target.txt -B peptides.decoy.txt
+            -w weights.txt <K562_3.pin> <K562_4.pin>
+    percolator-3.09    Percolator 3.09, the same options without -X.
+  The PSMId's -N base here is the bare file name
+  (20100614_Velos1_TaGe_SA_K562_3_<scan>_<charge>_<rank>), not an absolute
+  path: Phase 00 ran Comet by hand, not through CometGUI.
+
+Location (relative to the repository root)
+  scratch/scientific-path/percolator-3.07.1/
+  scratch/scientific-path/percolator-3.09/
+
+SHA-256 (sha256sum, 2026-10-08)
+  458b79b5a423f57406421d31ddd57b946eb8096ab6935447efd1e98e48f7fe9e  percolator-3.07.1/psms.target.txt
+  e1245d4f3fd128a5c7efcf89bc0b0ab0991d3f31bff437caa23bec3f437fc4c1  percolator-3.07.1/psms.decoy.txt
+  579bffd2ae250ae2934eb5695bdf86376677b45589e7dbdf02f00c712312c114  percolator-3.07.1/peptides.target.txt
+  fe1db32901b00196b7c8eae2ed3194215620af44975f475be16d8155112a3fd7  percolator-3.07.1/peptides.decoy.txt
+  1a92c0ac17efe38ffce7caf0855f273746310b1cddb9b1e409b435fb02692208  percolator-3.07.1/weights.txt
+  bc5909cd1fa06f5173d3bcbd93b16767ccb0a79f9158669bd39ae3366bc29414  percolator-3.09/psms.target.txt
+  364a583f7299a515b6452003adcdb77ddde07e461536c90741907a6d7f5ce22f  percolator-3.09/psms.decoy.txt
+  c5c7ed6763095d39228e02dec3b2f3924c0b370168144462aa344ba8be80036f  percolator-3.09/peptides.target.txt
+  5d05777f4c48f28493d5b184c8cead85b942eec0e55973cb77f633bbee738537  percolator-3.09/peptides.decoy.txt
+  1a92c0ac17efe38ffce7caf0855f273746310b1cddb9b1e409b435fb02692208  percolator-3.09/weights.txt
+  (weights.txt is byte-identical between the two versions.)
+
+Shape, checked with awk on 2026-10-08
+  Header of all eight tables: PSMId score q-value posterior_error_prob
+  peptide proteinIds, tab-separated, LF line endings, final newline.
+  Rows carry 6 to 16 fields (proteinIds continues to the end of the row):
+  psms.target 3596 rows of 6 fields, 301 of 7..16.
+  q-value column: every field is a plain decimal (none empty, none
+  non-numeric, none outside [0, 1], none in exponent form -- PEP has
+  exponent forms, q-value does not); none equals 0, 0.005, 0.01, 0.05 or 1
+  exactly. Minimum q: 0.00112905 (psms.target), 0.00198145 (psms.decoy),
+  0.00185428 (peptides.target), 0.00334231 (peptides.decoy); maximum 0.680615,
+  0.680788, 0.759875, 0.759875. 3.07.1 and 3.09 agree on every count below.
+
+Counts. Command (mawk 1.3.4 20200120), run once per file and cutoff c:
+
+  LC_ALL=C awk -F'\t' -v c="$c" 'NR>1 { t++; q=$3;
+    if (q !~ /^[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?$/ || q+0 < 0 || q+0 > 1) u++;
+    else if (q+0 <= c+0) p++; else f++ }
+    END { printf "%d %d %d %d\n", t, p, f, u }' "$file"
+
+  printing total, passing (q <= c, inclusive), failing, unknown. The regular
+  expression keeps awk honest: mawk's $3+0 reads "nan", "inf" and "0,005" as
+  numbers, so a bare 'NR>1 && $3+0<=0.01' over the constructed
+  parser/constructed/psms-unknown-q.tsv counts 10 passing rows where there are
+  5; this command gives 15 5 2 8 there, the hand count in CONSTRUCTED.txt.
+
+  file                   c=0          c=0.005         c=0.01          c=0.05          c=1
+  psms.target.txt        3897 0 3897 0  3897 982 2915 0  3897 1026 2871 0  3897 1171 2726 0  3897 3897 0 0
+  psms.decoy.txt         2773 0 2773 0  2773 4 2769 0    2773 9 2764 0     2773 57 2716 0    2773 2773 0 0
+  peptides.target.txt    2985 0 2985 0  2985 567 2418 0  2985 603 2382 0   2985 681 2304 0   2985 2985 0 0
+  peptides.decoy.txt     2359 0 2359 0  2359 2 2357 0    2359 5 2354 0     2359 33 2326 0    2359 2359 0 0
+  (identical for percolator-3.07.1 and percolator-3.09)
+
+  Phase 00's own summary (scratch/scientific-path/summary.txt) reports 3897
+  target PSMs with 1026 at q < 0.01 and 2985 target peptides with 603 at
+  q < 0.01; strict and inclusive agree because no q-value equals 0.01.
