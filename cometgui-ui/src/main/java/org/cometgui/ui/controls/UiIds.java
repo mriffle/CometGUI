@@ -23,6 +23,7 @@ import org.cometgui.domain.run.StageTag;
 import org.cometgui.params.comet.schema.ParameterCategory;
 import org.cometgui.params.comet.schema.TerminalCode;
 import org.cometgui.params.comet.value.VariableModPart;
+import org.cometgui.params.percolator.schema.PercolatorSetting;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.params.EssentialsSection;
 import org.cometgui.ui.viewmodel.params.SearchFilter;
@@ -395,6 +396,109 @@ public final class UiIds {
     /** The rerun preview: which steps the next Run executes and which it reuses, and why. */
     public static final String RUN_PREVIEW = "run-preview";
 
+    /** The Percolator section's content (Phase 09), a scroll pane. */
+    public static final String PERCOLATOR_PANE = "percolator-pane";
+
+    /** What is known about the Percolator builds on this computer. */
+    public static final String PERCOLATOR_OFFERS = "percolator-offers";
+
+    /** The Percolator version selector: the builds that can run, the resolved default marked. */
+    public static final String PERCOLATOR_VERSION = "percolator-version";
+
+    /** Follows the resolved default again after a choice of another build. */
+    public static final String PERCOLATOR_USE_DEFAULT = "percolator-use-default";
+
+    /** Which Percolator runs, and whether it is the default or the scientist's choice. */
+    public static final String PERCOLATOR_SELECTION = "percolator-selection";
+
+    /** The selected build's capability and status badge. */
+    public static final String PERCOLATOR_BADGE = "percolator-badge";
+
+    /** The managed builds that are not installed: install them from the Tool Manager. */
+    public static final String PERCOLATOR_INSTALLABLE = "percolator-installable";
+
+    /** The selected build's version advisories. */
+    public static final String PERCOLATOR_ADVISORIES = "percolator-advisories";
+
+    /** The Limelight-conversion switch, the enabled downstream stage resolution reads. */
+    public static final String PERCOLATOR_LIMELIGHT = "percolator-limelight";
+
+    /** Whether Limelight conversion can run, and the remedies when it cannot. */
+    public static final String PERCOLATOR_LIMELIGHT_STATUS = "percolator-limelight-status";
+
+    /** What the last switch or change of builds did to the default. */
+    public static final String PERCOLATOR_NOTICE = "percolator-notice";
+
+    /** Why the default is the default, in the resolution's words. */
+    public static final String PERCOLATOR_REASON = "percolator-reason";
+
+    /** Every newer version passed over, with the capability it lacks. */
+    public static final String PERCOLATOR_SKIPPED = "percolator-skipped";
+
+    /** Registers a local Percolator binary. */
+    public static final String PERCOLATOR_REGISTER = "percolator-register";
+
+    /** What local-binary registration is doing or did. */
+    public static final String PERCOLATOR_REGISTER_STATUS = "percolator-register-status";
+
+    /** The PSM q-value display filter's field. */
+    public static final String PERCOLATOR_PSM_FILTER = "percolator-psm-filter";
+
+    /** The peptide q-value display filter's field. */
+    public static final String PERCOLATOR_PEPTIDE_FILTER = "percolator-peptide-filter";
+
+    /** What the display filters do and do not do, and any refusal of their text. */
+    public static final String PERCOLATOR_FILTERS_STATUS = "percolator-filters-status";
+
+    /** Shows or hides the Advanced Percolator settings. */
+    public static final String PERCOLATOR_ADVANCED_TOGGLE = "percolator-advanced-toggle";
+
+    /** The Advanced Percolator settings' container. */
+    public static final String PERCOLATOR_ADVANCED = "percolator-advanced";
+
+    /** The testFDR setting's field. */
+    public static final String PERCOLATOR_TEST_FDR = "percolator-test-fdr";
+
+    /** The testFDR setting's description and state. */
+    public static final String PERCOLATOR_TEST_FDR_STATE = "percolator-test-fdr-state";
+
+    /** The trainFDR setting's field. */
+    public static final String PERCOLATOR_TRAIN_FDR = "percolator-train-fdr";
+
+    /** The trainFDR setting's description and state. */
+    public static final String PERCOLATOR_TRAIN_FDR_STATE = "percolator-train-fdr-state";
+
+    /** The random seed setting's field. */
+    public static final String PERCOLATOR_RANDOM_SEED = "percolator-random-seed";
+
+    /** The random seed setting's description and state. */
+    public static final String PERCOLATOR_RANDOM_SEED_STATE = "percolator-random-seed-state";
+
+    /** The maximum iterations setting's field. */
+    public static final String PERCOLATOR_MAXIMUM_ITERATIONS = "percolator-maximum-iterations";
+
+    /** The maximum iterations setting's description and state. */
+    public static final String PERCOLATOR_MAXIMUM_ITERATIONS_STATE =
+            "percolator-maximum-iterations-state";
+
+    /** The thread count setting's field. */
+    public static final String PERCOLATOR_THREAD_COUNT = "percolator-thread-count";
+
+    /** The thread count setting's description and state. */
+    public static final String PERCOLATOR_THREAD_COUNT_STATE = "percolator-thread-count-state";
+
+    /** The compatible-version rerun's preview, or why there is none. */
+    public static final String PERCOLATOR_RERUN_PREVIEW = "percolator-rerun-preview";
+
+    /** Starts the compatible-version Percolator rerun. */
+    public static final String PERCOLATOR_RERUN = "percolator-rerun";
+
+    /** Cancels a running Percolator rerun. */
+    public static final String PERCOLATOR_RERUN_CANCEL = "percolator-rerun-cancel";
+
+    /** What the Percolator rerun is doing, or how it ended. */
+    public static final String PERCOLATOR_RERUN_OUTCOME = "percolator-rerun-outcome";
+
     /**
      * The two surfaces a parameter's control appears on. A parameter shown in Essentials is shown
      * in Advanced too, so the surface is part of every parameter identifier and the two controls
@@ -425,6 +529,41 @@ public final class UiIds {
     }
 
     private UiIds() {}
+
+    /**
+     * The field of one Advanced Percolator setting: one of the {@code PERCOLATOR_...} constants.
+     *
+     * @param setting the setting
+     * @return for example {@link #PERCOLATOR_TEST_FDR}
+     * @throws NullPointerException if {@code setting} is {@code null}
+     */
+    public static String percolatorSetting(PercolatorSetting setting) {
+        return switch (Objects.requireNonNull(setting, "setting")) {
+            case TEST_FDR -> PERCOLATOR_TEST_FDR;
+            case TRAIN_FDR -> PERCOLATOR_TRAIN_FDR;
+            case RANDOM_SEED -> PERCOLATOR_RANDOM_SEED;
+            case MAXIMUM_ITERATIONS -> PERCOLATOR_MAXIMUM_ITERATIONS;
+            case THREAD_COUNT -> PERCOLATOR_THREAD_COUNT;
+        };
+    }
+
+    /**
+     * The description and state of one Advanced Percolator setting: one of the {@code
+     * PERCOLATOR_..._STATE} constants.
+     *
+     * @param setting the setting
+     * @return for example {@link #PERCOLATOR_TEST_FDR_STATE}
+     * @throws NullPointerException if {@code setting} is {@code null}
+     */
+    public static String percolatorSettingState(PercolatorSetting setting) {
+        return switch (Objects.requireNonNull(setting, "setting")) {
+            case TEST_FDR -> PERCOLATOR_TEST_FDR_STATE;
+            case TRAIN_FDR -> PERCOLATOR_TRAIN_FDR_STATE;
+            case RANDOM_SEED -> PERCOLATOR_RANDOM_SEED_STATE;
+            case MAXIMUM_ITERATIONS -> PERCOLATOR_MAXIMUM_ITERATIONS_STATE;
+            case THREAD_COUNT -> PERCOLATOR_THREAD_COUNT_STATE;
+        };
+    }
 
     /**
      * The identifier of one section's pane.

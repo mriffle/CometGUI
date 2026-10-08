@@ -19,8 +19,12 @@ package org.cometgui.app.testing;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import javafx.beans.property.SimpleObjectProperty;
 import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.config.ParameterEditorWiring;
+import org.cometgui.app.config.RunWiring;
+import org.cometgui.app.config.SessionEngine;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.ui.view.ShellView;
@@ -34,12 +38,15 @@ import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
-import org.cometgui.ui.viewmodel.params.RunEnginePort;
+import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.RunNotStartedException;
 import org.cometgui.ui.viewmodel.params.RunObserver;
 import org.cometgui.ui.viewmodel.params.RunViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
+import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
+import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
+import org.cometgui.ui.viewmodel.percolator.RerunCheck;
 
 /**
  * The shell for a GUI test that builds its own: the Comet parameter editor composed exactly as the
@@ -77,6 +84,14 @@ public final class TestEditors {
                         session, chooser, ApplicationServices.forThisHost().fileSystem());
         ParameterEditorViewModel editor =
                 ParameterEditorWiring.editor(session, inputs, chooser, BUILD);
+        NoEngine engine = new NoEngine();
+        PercolatorViewModel percolator =
+                new PercolatorViewModel(
+                        RunWiring.percolator(Optional.empty(), NoEngine.REASON),
+                        chooser,
+                        Runnable::run,
+                        Runnable::run,
+                        () -> {});
         return new ShellView(
                 navigation,
                 hostBaseline,
@@ -94,24 +109,45 @@ public final class TestEditors {
                         inputs,
                         editor.readiness(),
                         stepper,
-                        new NoEngine(),
+                        new SimpleObjectProperty<>(
+                                PercolatorRequest.blocked(List.of(NoEngine.REASON))),
+                        engine,
                         Runnable::run,
-                        Runnable::run));
+                        Runnable::run),
+                percolator,
+                new PercolatorRerunViewModel(
+                        engine, percolator.requestProperty(), Runnable::run, Runnable::run));
     }
 
     /** The engine port of a shell built for a test that runs nothing: it says so. */
-    private static final class NoEngine implements RunEnginePort {
+    private static final class NoEngine implements SessionEngine {
 
         /** The engine's reason in such a shell. */
         static final String REASON = "This test shell has no workflow engine.";
 
         @Override
-        public EngineCheck check(CometParameters model, List<Path> spectra) {
+        public EngineCheck check(
+                CometParameters model, List<Path> spectra, PercolatorRequest percolator) {
             return EngineCheck.unavailable(REASON);
         }
 
         @Override
-        public ActiveRun start(CometParameters model, List<Path> spectra, RunObserver observer)
+        public ActiveRun start(
+                CometParameters model,
+                List<Path> spectra,
+                PercolatorRequest percolator,
+                RunObserver observer)
+                throws RunNotStartedException {
+            throw new RunNotStartedException(REASON, null);
+        }
+
+        @Override
+        public RerunCheck check(PercolatorRequest percolator) {
+            return RerunCheck.refused(REASON);
+        }
+
+        @Override
+        public ActiveRun start(PercolatorRequest percolator, RunObserver observer)
                 throws RunNotStartedException {
             throw new RunNotStartedException(REASON, null);
         }

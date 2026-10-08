@@ -35,12 +35,15 @@ import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
-import org.cometgui.ui.viewmodel.params.RunEnginePort;
+import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.RunNotStartedException;
 import org.cometgui.ui.viewmodel.params.RunObserver;
+import org.cometgui.ui.viewmodel.percolator.PercolatorPort;
+import org.cometgui.ui.viewmodel.percolator.RerunCheck;
 import org.cometgui.workflow.engine.EngineServices;
 import org.cometgui.workflow.engine.WorkflowEngine;
 import org.cometgui.workflow.steps.CometWorkflow;
+import org.cometgui.workflow.steps.PercolatorRerun;
 
 /**
  * The Run section's composition (decision P8-16): the workflow engine and the Comet workflow over
@@ -137,7 +140,21 @@ public final class RunWiring {
     }
 
     /**
-     * The engine port over the composition root.
+     * The Percolator section's port over the Tool Manager: its Percolator builds and local-binary
+     * registration.
+     *
+     * @param tools the Tool Manager, or empty
+     * @param toolsUnavailable why there is no Tool Manager, when {@code tools} is empty
+     * @return the port
+     */
+    public static PercolatorPort percolator(Optional<ToolManager> tools, String toolsUnavailable) {
+        Objects.requireNonNull(tools, "tools");
+        return new ToolManagerPercolatorPort(() -> tools, toolsUnavailable);
+    }
+
+    /**
+     * The engine port over the composition root: the Run section's, and the Percolator section's
+     * rerun over the same session.
      *
      * @param services the composition root, whose process service and clock the engine uses
      * @param messageLog the console's log, which tool output is appended to
@@ -147,7 +164,7 @@ public final class RunWiring {
      * @param build the running build, named in every parameter file and provenance record
      * @return the port
      */
-    public static RunEnginePort port(
+    public static SessionEngine port(
             ApplicationServices services,
             BoundedMessageLog messageLog,
             Optional<ToolManager> tools,
@@ -183,6 +200,7 @@ public final class RunWiring {
                 hashes,
                 new CometWorkflow(hashes, build),
                 engine,
+                new PercolatorRerun(hashes),
                 application);
     }
 
@@ -203,15 +221,31 @@ public final class RunWiring {
     }
 
     /** A port that can do nothing, and says why. */
-    private record Unavailable(String reason) implements RunEnginePort {
+    private record Unavailable(String reason) implements SessionEngine {
 
         @Override
-        public EngineCheck check(CometParameters model, List<Path> spectra) {
+        public EngineCheck check(
+                CometParameters model, List<Path> spectra, PercolatorRequest percolator) {
             return EngineCheck.unavailable(reason);
         }
 
         @Override
-        public ActiveRun start(CometParameters model, List<Path> spectra, RunObserver observer)
+        public ActiveRun start(
+                CometParameters model,
+                List<Path> spectra,
+                PercolatorRequest percolator,
+                RunObserver observer)
+                throws RunNotStartedException {
+            throw new RunNotStartedException(reason, null);
+        }
+
+        @Override
+        public RerunCheck check(PercolatorRequest percolator) {
+            return RerunCheck.refused(reason);
+        }
+
+        @Override
+        public ActiveRun start(PercolatorRequest percolator, RunObserver observer)
                 throws RunNotStartedException {
             throw new RunNotStartedException(reason, null);
         }

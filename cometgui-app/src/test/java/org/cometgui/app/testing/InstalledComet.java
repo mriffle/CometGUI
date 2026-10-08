@@ -29,22 +29,74 @@ import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
+import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.domain.tools.ToolVersion;
 
 /**
- * A Tool Manager whose only offers are Comet builds registered at given paths, as {@link
+ * A Tool Manager whose offers are Comet builds registered at given paths, as {@link
  * ToolOrigin#LOCAL} and {@link ToolInstallState#INSTALLED} -- what the Tool Manager reports after
- * the scientist registers a Comet already on the computer. It installs nothing; it records which
- * threads asked for the offers.
+ * the scientist registers a Comet already on the computer -- and, since Phase 09, whatever
+ * Percolator builds a test adds ({@link #with}). It installs nothing; it records which threads
+ * asked for the offers; a registration is the {@link Registrar} a test gives it ({@link
+ * #registering}), and a registered build is offered from then on, as the real Tool Manager does.
  */
 public final class InstalledComet implements ToolManager {
 
+    /** What a registration does: typically the real local-Percolator registration. */
+    @FunctionalInterface
+    public interface Registrar {
+
+        /**
+         * Registers a binary.
+         *
+         * @param tool which tool it is claimed to be
+         * @param executable the file
+         * @return the registered build
+         * @throws ToolRegistrationException if it is refused
+         */
+        ToolOffer register(ToolName tool, Path executable) throws ToolRegistrationException;
+    }
+
     private final List<ToolOffer> offers;
+
+    private final Registrar registrar;
 
     private final List<String> askedOn = Collections.synchronizedList(new ArrayList<>());
 
+    private InstalledComet(List<ToolOffer> offers, Registrar registrar) {
+        this.offers = Collections.synchronizedList(new ArrayList<>(offers));
+        this.registrar = registrar;
+    }
+
     private InstalledComet(List<ToolOffer> offers) {
-        this.offers = List.copyOf(offers);
+        this(
+                offers,
+                (tool, executable) -> {
+                    throw new UnsupportedOperationException(
+                            "this test's Tool Manager registers nothing");
+                });
+    }
+
+    /**
+     * This manager with more offers after its own -- a Percolator a test staged, say.
+     *
+     * @param more the offers to add, in order
+     * @return a new manager
+     */
+    public InstalledComet with(ToolOffer... more) {
+        List<ToolOffer> all = new ArrayList<>(snapshot());
+        all.addAll(List.of(more));
+        return new InstalledComet(all, registrar);
+    }
+
+    /**
+     * This manager registering binaries through a registrar.
+     *
+     * @param registration what a registration does
+     * @return a new manager
+     */
+    public InstalledComet registering(Registrar registration) {
+        return new InstalledComet(snapshot(), registration);
     }
 
     /**
@@ -81,7 +133,13 @@ public final class InstalledComet implements ToolManager {
     @Override
     public List<ToolOffer> offers() {
         askedOn.add(Thread.currentThread().getName());
-        return offers;
+        return snapshot();
+    }
+
+    private List<ToolOffer> snapshot() {
+        synchronized (offers) {
+            return List.copyOf(offers);
+        }
     }
 
     /**
@@ -102,7 +160,10 @@ public final class InstalledComet implements ToolManager {
     }
 
     @Override
-    public ToolOffer registerLocalBinary(ToolName tool, Path executable) {
-        throw new UnsupportedOperationException("this test's Tool Manager registers nothing");
+    public ToolOffer registerLocalBinary(ToolName tool, Path executable)
+            throws ToolRegistrationException {
+        ToolOffer registered = registrar.register(tool, executable);
+        offers.add(registered);
+        return registered;
     }
 }

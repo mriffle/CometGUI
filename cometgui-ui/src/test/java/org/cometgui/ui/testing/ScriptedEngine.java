@@ -28,6 +28,7 @@ import java.util.function.Function;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
+import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.RunEnginePort;
 import org.cometgui.ui.viewmodel.params.RunNotStartedException;
 import org.cometgui.ui.viewmodel.params.RunObserver;
@@ -44,7 +45,11 @@ import org.cometgui.workflow.state.Plan;
 public final class ScriptedEngine implements RunEnginePort {
 
     /** A start that the test has seen and may drive. */
-    public record Started(CometParameters model, List<Path> spectra, RunObserver observer) {
+    public record Started(
+            CometParameters model,
+            List<Path> spectra,
+            PercolatorRequest percolator,
+            RunObserver observer) {
 
         /** Copies the files. */
         public Started {
@@ -68,6 +73,8 @@ public final class ScriptedEngine implements RunEnginePort {
     private final List<Started> started = new ArrayList<>();
 
     private final List<String> callers = new ArrayList<>();
+
+    private final List<PercolatorRequest> percolators = new ArrayList<>();
 
     private final AtomicInteger checks = new AtomicInteger();
 
@@ -127,21 +134,27 @@ public final class ScriptedEngine implements RunEnginePort {
     }
 
     @Override
-    public EngineCheck check(CometParameters model, List<Path> spectra) {
+    public EngineCheck check(
+            CometParameters model, List<Path> spectra, PercolatorRequest percolator) {
         callers.add(Thread.currentThread().getName() + ":" + background.draining);
+        percolators.add(percolator);
         checks.incrementAndGet();
         return answer.apply(model);
     }
 
     @Override
-    public ActiveRun start(CometParameters model, List<Path> spectra, RunObserver observer)
+    public ActiveRun start(
+            CometParameters model,
+            List<Path> spectra,
+            PercolatorRequest percolator,
+            RunObserver observer)
             throws RunNotStartedException {
         callers.add(Thread.currentThread().getName() + ":" + background.draining);
         RunNotStartedException refusal = refusals.pollFirst();
         if (refusal != null) {
             throw refusal;
         }
-        started.add(new Started(model, List.copyOf(spectra), observer));
+        started.add(new Started(model, List.copyOf(spectra), percolator, observer));
         if (plan != null) {
             observer.planned(plan, description);
         }
@@ -161,6 +174,15 @@ public final class ScriptedEngine implements RunEnginePort {
      */
     public int checks() {
         return checks.get();
+    }
+
+    /**
+     * The Percolator half of every check, oldest first.
+     *
+     * @return the requests the checks were given
+     */
+    public List<PercolatorRequest> percolatorsChecked() {
+        return List.copyOf(percolators);
     }
 
     /**
@@ -226,13 +248,27 @@ public final class ScriptedEngine implements RunEnginePort {
 
         private boolean draining;
 
-        Queue(String name) {
+        /**
+         * An empty queue.
+         *
+         * @param name what it is called in a failure message
+         */
+        public Queue(String name) {
             this.name = name;
         }
 
         @Override
         public void execute(Runnable task) {
             tasks.add(Objects.requireNonNull(task, "task"));
+        }
+
+        /**
+         * Whether a task of this queue is running now.
+         *
+         * @return {@code true} while draining
+         */
+        public boolean draining() {
+            return draining;
         }
 
         /**

@@ -42,8 +42,10 @@ import org.cometgui.ui.controls.StageStepper;
 import org.cometgui.ui.controls.ToolManagerPane;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
+import org.cometgui.ui.controls.percolator.PercolatorPane;
 import org.cometgui.ui.testing.Editors;
 import org.cometgui.ui.testing.FxToolkit;
+import org.cometgui.ui.testing.Percolators;
 import org.cometgui.ui.testing.ScriptedEngine;
 import org.cometgui.ui.testing.ScriptedToolManager;
 import org.cometgui.ui.testing.ToolOffers;
@@ -59,6 +61,7 @@ import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
+import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
 import org.cometgui.workflow.state.WorkflowStage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,6 +91,10 @@ class ShellViewTest {
 
     private ToolManagerViewModel toolManager;
 
+    private Percolators.Port percolatorPort;
+
+    private PercolatorViewModel percolatorSection;
+
     private ShellView shell;
 
     private Scene scene;
@@ -113,6 +120,8 @@ class ShellViewTest {
         Editors.ScriptedChooser chooser = new Editors.ScriptedChooser();
         SpectrumInputsViewModel inputs = Editors.inputs(session, chooser, new Editors.KnownFiles());
         ParameterEditorViewModel editor = Editors.editor(session, inputs, chooser);
+        percolatorPort = new Percolators.Port(ToolOffers.percolatorAvailable());
+        percolatorSection = Editors.percolator(percolatorPort);
         FxToolkit.onFxThread(
                 () -> {
                     shell =
@@ -136,7 +145,9 @@ class ShellViewTest {
                                             new ScriptedEngine(
                                                     model ->
                                                             EngineCheck.unavailable(
-                                                                    "no engine in this test"))));
+                                                                    "no engine in this test"))),
+                                    percolatorSection,
+                                    Editors.rerun(percolatorSection));
                     scene = new Scene(shell, 1280, 800);
                     scene.getRoot().applyCss();
                     scene.getRoot().layout();
@@ -335,6 +346,34 @@ class ShellViewTest {
     }
 
     @Test
+    @DisplayName(
+            "the Percolator pane fills its section, the note says so, and building the shell"
+                    + " reads no Percolator build")
+    void thePercolatorPaneFillsItsSection() {
+        Node percolatorPane = scene.lookup("#" + UiIds.PERCOLATOR_PANE);
+        Label note = (Label) scene.lookup("#" + UiIds.sectionNote(SectionId.PERCOLATOR));
+        assertAll(
+                () -> assertInstanceOf(PercolatorPane.class, percolatorPane),
+                () ->
+                        assertTrue(
+                                isDescendantOf(percolatorPane, shell.paneFor(SectionId.PERCOLATOR)),
+                                "the Percolator section's content belongs to its pane"),
+                () ->
+                        assertTrue(
+                                note.getText().startsWith("This section is live: phase 09"),
+                                note::getText),
+                () -> assertEquals(0, percolatorPort.reads(), "nothing was read"),
+                () ->
+                        assertEquals(
+                                "The Percolator builds on this computer have not been read yet.",
+                                ((Label) scene.lookup("#" + UiIds.PERCOLATOR_OFFERS)).getText()),
+                () ->
+                        assertNotNull(
+                                scene.lookup("#" + UiIds.PERCOLATOR_RERUN),
+                                "the rerun action is reachable from the shell's scene"));
+    }
+
+    @Test
     @DisplayName("the Tool Manager pane fills its section, and the arrival note is still there")
     void theToolManagerPaneFillsItsSection() throws InterruptedException {
         Node toolManagerPane = scene.lookup("#" + UiIds.TOOL_MANAGER_PANE);
@@ -444,7 +483,11 @@ class ShellViewTest {
                                                         new ScriptedEngine(
                                                                 model ->
                                                                         EngineCheck.unavailable(
-                                                                                "no engine")))),
+                                                                                "no engine"))),
+                                                Editors.percolator(new Percolators.Port()),
+                                                Editors.rerun(
+                                                        Editors.percolator(
+                                                                new Percolators.Port()))),
                                         800,
                                         600));
         Label banner = (Label) other.lookup("#" + UiIds.HOST_BASELINE_BANNER);

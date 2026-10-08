@@ -37,12 +37,14 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.testing.InstalledComet;
+import org.cometgui.app.testing.RealPercolators;
 import org.cometgui.app.testing.RealSearch;
 import org.cometgui.app.testing.RealSearch.LaunchRecorder;
 import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.TestFxUiDriver;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
+import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.tools.process.ProcessService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -60,7 +62,9 @@ import org.junit.jupiter.api.io.TempDir;
  * shows Comet cancelled, the outcome says so, and the rerun preview offers a retry from the
  * cancelled step.
  *
- * <p>Files read outside this module: see {@link RealSearch}.
+ * <p>Files read outside this module: see {@link RealSearch} and {@link RealPercolators} (a run
+ * includes Percolator since Phase 09, so the Tool Manager offers the staged, probed 3.07.1; this
+ * run is cancelled before Percolator is reached).
  */
 @EnabledOnOs(
         value = OS.LINUX,
@@ -87,6 +91,7 @@ class RealCancelUiTest {
     static void launch() throws IOException {
         Path root = scratch.toRealPath();
         comet = RealSearch.stageComet(root.resolve("bin/comet"));
+        ToolOffer percolator = RealPercolators.installed3071(root.resolve("bin/percolator"));
         Path inputs = Files.createDirectories(root.resolve("inputs"));
         Path spectrum = RealSearch.spectra(inputs).get(0);
         Path proteome = RealSearch.proteome(inputs.resolve("proteome.fasta"));
@@ -98,7 +103,8 @@ class RealCancelUiTest {
                         launches,
                         new BoundedMessageLog(),
                         new RunWiring.Setup(
-                                () -> InstalledComet.at(RealSearch.RELEASE, comet), project));
+                                () -> InstalledComet.at(RealSearch.RELEASE, comet).with(percolator),
+                                project));
         driver = new TestFxUiDriver(app.application());
 
         app.chooser().spectra(spectrum);
@@ -195,8 +201,10 @@ class RealCancelUiTest {
                         + id
                         + " and runs exactly the steps marked below.\n"
                         + "- validate-configuration: runs again, as a prerequisite (needed by"
-                        + " resolve-comet; needed by hash-inputs)\n"
+                        + " resolve-comet; needed by resolve-percolator; needed by hash-inputs)\n"
                         + "- resolve-comet: runs again, as a prerequisite (needed by run-comet)\n"
+                        + "- resolve-percolator: runs again, as a prerequisite (needed by"
+                        + " run-percolator)\n"
                         + "- serialise-comet-params: reused from run "
                         + id
                         + "\n- hash-inputs: runs again, as a prerequisite (needed by run-comet)\n"
@@ -206,6 +214,10 @@ class RealCancelUiTest {
                         + " is recorded; run-comet re-executes)\n"
                         + "- merge-pin: re-executes (no successful earlier execution is recorded;"
                         + " validate-comet-outputs re-executes)\n"
+                        + "- run-percolator: re-executes (no successful earlier execution is"
+                        + " recorded; merge-pin re-executes)\n"
+                        + "- parse-percolator: re-executes (no successful earlier execution is"
+                        + " recorded; run-percolator re-executes)\n"
                         + "- finalise-provenance: re-executes (no successful earlier execution is"
                         + " recorded; merge-pin re-executes)",
                 driver.textOf("run-preview"));

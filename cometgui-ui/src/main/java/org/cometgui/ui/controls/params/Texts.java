@@ -24,9 +24,10 @@ import javafx.scene.control.Label;
 
 /**
  * Labels and buttons whose accessible text follows their text: every piece of state the editor
- * states in words is also what a screen reader reads, and it is never blank.
+ * states in words is also what a screen reader reads, and it is never blank. Public since Phase 09,
+ * so that the Percolator section's controls share it rather than keep a second copy.
  */
-final class Texts {
+public final class Texts {
 
     private Texts() {}
 
@@ -39,7 +40,7 @@ final class Texts {
      * @param fallback what a screen reader reads while the text is blank
      * @return the label
      */
-    static Label label(String id, String text, String fallback) {
+    public static Label label(String id, String text, String fallback) {
         Label label = new Label(text);
         label.setId(id);
         label.setWrapText(true);
@@ -63,7 +64,7 @@ final class Texts {
      * @param accessibleText what a screen reader reads: the action and its object
      * @return the button
      */
-    static Button button(String id, String text, String accessibleText) {
+    public static Button button(String id, String text, String accessibleText) {
         Button button = new Button(text);
         button.setId(id);
         named(button, accessibleText);

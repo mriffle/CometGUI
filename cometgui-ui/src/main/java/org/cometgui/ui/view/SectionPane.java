@@ -30,17 +30,18 @@ import org.cometgui.ui.viewmodel.SectionId;
  * One navigation section's pane: a heading, the section's own description, and a note saying which
  * phase fills it.
  *
- * <p>Nine of these exist, one per {@link SectionId}, and six of them hold nothing else. That is the
- * phase's scope rather than an omission -- phase 02 is "the frame that later phases fill" -- and
- * each pane says so in text, so an empty section can be told apart from a broken one without
+ * <p>Nine of these exist, one per {@link SectionId}, and four of them hold nothing else. That is
+ * the phase's scope rather than an omission -- phase 02 is "the frame that later phases fill" --
+ * and each pane says so in text, so an empty section can be told apart from a broken one without
  * reading the source.
  *
- * <p>Four panes are given content by the shell: {@link SectionId#RUN} hosts the stage stepper and
+ * <p>Five panes are given content by the shell: {@link SectionId#RUN} hosts the stage stepper and
  * the Run control, {@link SectionId#COMET_PARAMETERS} hosts the parameter editor, {@link
- * SectionId#CONSOLE} hosts the console and {@link SectionId#TOOL_MANAGER} hosts the tool list. All
- * four arrive through {@link #addContent(Node)} rather than through a subclass, because a section
- * pane differs from another only in what it holds, and nine near-identical classes would be nine
- * places for the heading, the description and the note to drift apart.
+ * SectionId#PERCOLATOR} hosts the Percolator section (Phase 09), {@link SectionId#CONSOLE} hosts
+ * the console and {@link SectionId#TOOL_MANAGER} hosts the tool list. All five arrive through
+ * {@link #addContent(Node)} rather than through a subclass, because a section pane differs from
+ * another only in what it holds, and nine near-identical classes would be nine places for the
+ * heading, the description and the note to drift apart.
  *
  * <p>The heading and the description are the section's own {@link SectionId#title()} and {@link
  * SectionId#description()}: the specification's information architecture, read from the model

@@ -27,6 +27,7 @@ import java.util.concurrent.Executor;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.value.ObservableValue;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.validation.Finding;
 import org.cometgui.ui.viewmodel.NonNullProperty;
@@ -47,6 +48,11 @@ import org.cometgui.workflow.steps.PreRunReport;
 /**
  * The Run section's engine half: the pre-run check, Run, Cancel, the stage stepper following the
  * run, the outcome in words and the rerun preview (decision P8-16, {@code R-RUN-01}).
+ *
+ * <p>A run is Comet and then Percolator (Phase 09): the Percolator half is the Percolator section's
+ * {@link PercolatorRequest}, passed to the engine with the parameters and the spectrum files, and
+ * its problems -- no build can run, the default is not installed, a setting was refused -- are
+ * reasons in the engine's half of the one readiness, beside the engine's own.
  *
  * <h2>Two threads, and which does what</h2>
  *
@@ -77,8 +83,9 @@ public final class RunViewModel {
 
     /** The engine's reason while the pre-run check is running. */
     public static final String CHECKING =
-            "The pre-run check is running: the selected Comet, the spectrum files and the"
-                    + " database are being checked. Run is available when it has finished.";
+            "The pre-run check is running: the selected Comet and Percolator, the spectrum files"
+                    + " and the database are being checked. Run is available when it has"
+                    + " finished.";
 
     /** The engine's reason while a run is starting or running. */
     public static final String RUN_ACTIVE =
@@ -110,6 +117,8 @@ public final class RunViewModel {
     private final RunReadinessViewModel readiness;
 
     private final StageStepperViewModel stepper;
+
+    private final ObservableValue<PercolatorRequest> percolator;
 
     private final RunEnginePort port;
 
@@ -148,6 +157,7 @@ public final class RunViewModel {
      * @param inputs the spectrum files over the same session
      * @param readiness the one run readiness, whose engine half this class keeps
      * @param stepper the stage stepper the run drives
+     * @param percolator the Percolator half as the Percolator section has it; a change checks again
      * @param port the workflow engine
      * @param background where the engine is called: never the interface thread
      * @param ui where every answer is applied: the interface thread
@@ -157,6 +167,7 @@ public final class RunViewModel {
             SpectrumInputsViewModel inputs,
             RunReadinessViewModel readiness,
             StageStepperViewModel stepper,
+            ObservableValue<PercolatorRequest> percolator,
             RunEnginePort port,
             Executor background,
             Executor ui) {
@@ -164,6 +175,7 @@ public final class RunViewModel {
         this.inputs = Objects.requireNonNull(inputs, "inputs");
         this.readiness = Objects.requireNonNull(readiness, "readiness");
         this.stepper = Objects.requireNonNull(stepper, "stepper");
+        this.percolator = Objects.requireNonNull(percolator, "percolator");
         this.port = Objects.requireNonNull(port, "port");
         this.background = Objects.requireNonNull(background, "background");
         this.ui = Objects.requireNonNull(ui, "ui");
@@ -173,6 +185,7 @@ public final class RunViewModel {
         this.preview = new NonNullProperty<>(this, "preview", PREVIEW_CHECKING);
         session.modelProperty().addListener((observable, before, after) -> recheck());
         inputs.spectraProperty().addListener((observable, before, after) -> recheck());
+        percolator.addListener((observable, before, after) -> recheck());
     }
 
     /**
@@ -182,6 +195,16 @@ public final class RunViewModel {
      */
     public boolean running() {
         return running.get();
+    }
+
+    /**
+     * Whether a run is starting or running, observable: the composition root asks the Percolator
+     * rerun action again when a run ends.
+     *
+     * @return the read-only property
+     */
+    public ReadOnlyBooleanProperty runningProperty() {
+        return running.getReadOnlyProperty();
     }
 
     /**
@@ -240,10 +263,11 @@ public final class RunViewModel {
 
     /**
      * Starts a new pre-run check of the configuration as it is now, on the background executor.
-     * Until it answers, Run is disabled with {@link #CHECKING}. Called whenever the parameters or
-     * the spectrum files change, and by the composition root when the installed tools may have.
-     * While a run is in progress, nothing is checked: the check after the run ends sees the
-     * configuration as it is then.
+     * Until it answers, Run is disabled with {@link #CHECKING} -- and while the Percolator half is
+     * {@link PercolatorRequest#pending()}, no check is made at all until it changes. Called
+     * whenever the parameters, the spectrum files or the Percolator half change, and by the
+     * composition root when the installed tools may have. While a run is in progress, nothing is
+     * checked: the check after the run ends sees the configuration as it is then.
      */
     public void recheck() {
         generation++;
@@ -255,11 +279,20 @@ public final class RunViewModel {
         preview.set(PREVIEW_CHECKING);
         CometParameters model = session.model();
         List<Path> spectra = inputs.spectrumPaths();
+        PercolatorRequest half = Objects.requireNonNull(percolator.getValue(), "percolator");
+        if (half.pending()) {
+            /*
+             * The Percolator section has not read its builds yet: an answer now would be one that
+             * says "not read yet" for an instant and then changes. The check is made when the half
+             * changes, which is when it has been read.
+             */
+            return;
+        }
         background.execute(
                 () -> {
                     EngineCheck answer;
                     try {
-                        answer = port.check(model, spectra);
+                        answer = port.check(model, spectra, half);
                     } catch (RuntimeException failed) {
                         answer =
                                 EngineCheck.unavailable(
@@ -267,7 +300,7 @@ public final class RunViewModel {
                                                 + failed);
                     }
                     EngineCheck checked = answer;
-                    ui.execute(() -> applyCheck(mine, checked));
+                    ui.execute(() -> applyCheck(mine, checked, half));
                 });
     }
 
@@ -292,11 +325,12 @@ public final class RunViewModel {
         outcome.set("Starting the run: recording it and writing its parameter file.");
         CometParameters model = session.model();
         List<Path> spectra = inputs.spectrumPaths();
+        PercolatorRequest half = Objects.requireNonNull(percolator.getValue(), "percolator");
         RunObserver observer = new Marshalled(this, mine);
         background.execute(
                 () -> {
                     try {
-                        ActiveRun started = port.start(model, spectra, observer);
+                        ActiveRun started = port.start(model, spectra, half, observer);
                         ui.execute(() -> guarded(() -> started(mine, started)));
                     } catch (RunNotStartedException refused) {
                         ui.execute(
@@ -337,12 +371,12 @@ public final class RunViewModel {
         return true;
     }
 
-    private void applyCheck(long checked, EngineCheck answer) {
+    private void applyCheck(long checked, EngineCheck answer, PercolatorRequest half) {
         if (checked != generation || running.get()) {
             return;
         }
         try {
-            showCheck(answer);
+            showCheck(answer, half);
         } catch (RuntimeException unshown) {
             readiness.showEngineReasons(
                     List.of("The pre-run check's answer could not be shown: " + unshown));
@@ -350,9 +384,10 @@ public final class RunViewModel {
         }
     }
 
-    private void showCheck(EngineCheck answer) {
+    private void showCheck(EngineCheck answer, PercolatorRequest half) {
         List<String> reasons = new ArrayList<>(answer.reasons());
         answer.report().ifPresent(report -> reasons.addAll(reportReasons(report)));
+        reasons.addAll(half.problems());
         Optional<RerunOutlook> outlook = answer.outlook();
         if (outlook.isPresent() && nothingToRun(outlook.get())) {
             reasons.add(
@@ -479,8 +514,9 @@ public final class RunViewModel {
         }
         /*
          * Every stage starts again from "not started" -- the planned ones and those this run does
-         * not plan (Percolator before phase 09), so nothing an earlier run left is shown as this
-         * run's. The projection of an all-pending plan is "not started" too, so it needs no call.
+         * not plan (the results and the downstream stages before their phases), so nothing an
+         * earlier run left is shown as this run's. The projection of an all-pending plan is "not
+         * started" too, so it needs no call.
          */
         for (WorkflowStage stage : WorkflowStage.values()) {
             stepper.setState(stage, StepState.NOT_STARTED);

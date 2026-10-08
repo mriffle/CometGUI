@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import javafx.beans.property.SimpleObjectProperty;
 import org.cometgui.domain.params.PreRunFacts;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.run.AttemptOutcome;
@@ -46,6 +47,7 @@ import org.cometgui.provenance.manifest.RunRecord;
 import org.cometgui.ui.testing.Editors;
 import org.cometgui.ui.testing.Editors.KnownFiles;
 import org.cometgui.ui.testing.Editors.ScriptedChooser;
+import org.cometgui.ui.testing.Percolators;
 import org.cometgui.ui.testing.ScriptedEngine;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.workflow.engine.RunResult;
@@ -540,7 +542,8 @@ class RunViewModelTest {
                         @Override
                         public EngineCheck check(
                                 org.cometgui.params.comet.model.CometParameters model,
-                                List<Path> spectra) {
+                                List<Path> spectra,
+                                PercolatorRequest percolator) {
                             return clean();
                         }
 
@@ -548,6 +551,7 @@ class RunViewModelTest {
                         public ActiveRun start(
                                 org.cometgui.params.comet.model.CometParameters model,
                                 List<Path> spectra,
+                                PercolatorRequest percolator,
                                 RunObserver observer) {
                             throw new IllegalStateException("no process service");
                         }
@@ -558,6 +562,7 @@ class RunViewModelTest {
                             inputs,
                             readiness,
                             stepper,
+                            new SimpleObjectProperty<>(Percolators.ready()),
                             broken,
                             throwing.background(),
                             throwing.ui());
@@ -824,6 +829,117 @@ class RunViewModelTest {
             states.put(step, StepState.SUCCEEDED);
         }
         return states;
+    }
+
+    @Nested
+    @DisplayName("the Percolator half (Phase 09)")
+    class PercolatorHalf {
+
+        private final SimpleObjectProperty<PercolatorRequest> percolator =
+                new SimpleObjectProperty<>(Percolators.ready());
+
+        private final RunViewModel withPercolator =
+                Editors.run(session, inputs, editor, stepper, percolator, engine);
+
+        @Test
+        @DisplayName(
+                "its problems are reasons of the engine's half, after the engine's own, and"
+                        + " block Run with no preview")
+        void problemsAreEngineReasons() {
+            engine.answer(model -> EngineCheck.unavailable("Comet 2026.03.0 is not installed."));
+            percolator.set(
+                    PercolatorRequest.blocked(
+                            List.of(
+                                    "No Percolator can be used on this computer.",
+                                    "The Percolator setting testFDR is not valid: no.")));
+            engine.settle();
+            withPercolator.recheck();
+            engine.settle();
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    List.of(
+                                            "Comet 2026.03.0 is not installed.",
+                                            "No Percolator can be used on this computer.",
+                                            "The Percolator setting testFDR is not valid: no."),
+                                    readiness.engineReasons()),
+                    () -> assertFalse(readiness.runEnabled()),
+                    () -> assertEquals(RunViewModel.PREVIEW_BLOCKED, withPercolator.preview()),
+                    () -> assertFalse(withPercolator.start(), "Run does nothing"));
+            engine.answer(model -> clean());
+            percolator.set(Percolators.ready());
+            engine.settle();
+            assertAll(
+                    "the half became runnable: checked again by itself, and Run is enabled",
+                    () -> assertEquals(List.of(), readiness.engineReasons()),
+                    () -> assertTrue(readiness.runEnabled()),
+                    () -> assertEquals(RunViewModel.PREVIEW_FIRST_RUN, withPercolator.preview()));
+        }
+
+        @Test
+        @DisplayName(
+                "a half not read yet is waited for: no check is made and Run says the check is"
+                        + " running, until the half changes")
+        void pendingHalfIsWaitedFor() {
+            engine.settle();
+            int before = engine.checks();
+            percolator.set(PercolatorRequest.pending("The Percolator builds are being read."));
+            engine.settle();
+            assertAll(
+                    () -> assertEquals(before, engine.checks(), "no check on a pending half"),
+                    () -> assertEquals(List.of(RunViewModel.CHECKING), readiness.engineReasons()),
+                    () -> assertEquals(RunViewModel.PREVIEW_CHECKING, withPercolator.preview()),
+                    () -> assertFalse(withPercolator.start()));
+            percolator.set(Percolators.ready());
+            engine.settle();
+            assertEquals(before + 1, engine.checks());
+            assertTrue(readiness.runEnabled());
+        }
+
+        @Test
+        @DisplayName(
+                "the port is given the half as it was when the check was asked, and a change"
+                        + " asks again and drops the older answer")
+        void theHalfReachesThePort() {
+            engine.settle();
+            int before = engine.checks();
+            PercolatorRequest blocked = PercolatorRequest.blocked(List.of("Not read yet."));
+            percolator.set(blocked);
+            engine.background().drain();
+            assertEquals(before + 1, engine.checks(), "a change of the half checks again");
+            assertEquals(blocked, engine.percolatorsChecked().get(before));
+            PercolatorRequest ready = Percolators.ready();
+            percolator.set(ready);
+            engine.settle();
+            assertAll(
+                    () -> assertEquals(before + 2, engine.checks()),
+                    () -> assertEquals(ready, engine.percolatorsChecked().get(before + 1)),
+                    () ->
+                            assertEquals(
+                                    List.of(),
+                                    readiness.engineReasons(),
+                                    "the older, blocked answer was dropped"));
+        }
+
+        @Test
+        @DisplayName("Run starts with the half, and running is observable until the run ends")
+        void runCarriesTheHalf() {
+            engine.announce(PLAN, DESCRIPTION);
+            engine.settle();
+            withPercolator.recheck();
+            engine.settle();
+            assertFalse(withPercolator.runningProperty().get());
+            assertTrue(withPercolator.start());
+            assertTrue(withPercolator.runningProperty().get(), "running from the moment of Run");
+            engine.settle();
+            assertEquals(Percolators.ready(), engine.started().get(0).percolator());
+            engine.started()
+                    .get(0)
+                    .observer()
+                    .onRunFinished(result(AttemptOutcome.SUCCEEDED, allSucceeded(), Map.of()));
+            engine.settle();
+            assertFalse(withPercolator.runningProperty().get(), "not running once it ended");
+        }
     }
 
     private static RunResult result(

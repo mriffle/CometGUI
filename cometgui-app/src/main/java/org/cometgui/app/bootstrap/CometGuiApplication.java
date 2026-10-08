@@ -34,6 +34,7 @@ import org.cometgui.app.config.FxFileChooser;
 import org.cometgui.app.config.ParameterEditorWiring;
 import org.cometgui.app.config.ProjectSession;
 import org.cometgui.app.config.RunWiring;
+import org.cometgui.app.config.SessionEngine;
 import org.cometgui.app.config.ToolManagerUnavailableException;
 import org.cometgui.app.config.derived.AtlantaFxThemes;
 import org.cometgui.domain.build.BuildIdentity;
@@ -58,6 +59,8 @@ import org.cometgui.ui.viewmodel.params.ParameterSession;
 import org.cometgui.ui.viewmodel.params.RunViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
+import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
+import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
 
 /**
  * The running application: build the composition root, check the host, build the shell, show the
@@ -304,14 +307,34 @@ public final class CometGuiApplication extends Application {
                 new ProjectSession(
                         runSetup.projectDirectory(), services.clock(), services.runIds());
         runThreads = RunWiring.backgroundThreads();
+        SessionEngine engine =
+                RunWiring.port(services, messageLog, tools, toolsUnavailable, project, running);
+
+        /*
+         * The Percolator section (phase 09): the Tool Manager's Percolator builds behind a port,
+         * read on the Run section's daemon threads and applied on this one. Its request is the
+         * Percolator half every Run check and run carries, and its rerun action works over the
+         * same session engine -- the same project, hasher and last run. A registration refreshes
+         * the Tool Manager's own list too.
+         */
+        PercolatorViewModel percolator =
+                new PercolatorViewModel(
+                        RunWiring.percolator(tools, toolsUnavailable),
+                        chooser,
+                        runThreads,
+                        Platform::runLater,
+                        toolManager::refresh);
+        PercolatorRerunViewModel percolatorRerun =
+                new PercolatorRerunViewModel(
+                        engine, percolator.requestProperty(), runThreads, Platform::runLater);
         RunViewModel run =
                 new RunViewModel(
                         parameterSession,
                         spectrumInputs,
                         parameterEditor.readiness(),
                         stepper,
-                        RunWiring.port(
-                                services, messageLog, tools, toolsUnavailable, project, running),
+                        percolator.requestProperty(),
+                        engine,
                         runThreads,
                         Platform::runLater);
 
@@ -328,7 +351,9 @@ public final class CometGuiApplication extends Application {
                         new VariableModsViewModel(parameterSession),
                         new ParameterSearchViewModel(parameterSession),
                         ParameterEditorWiring.expert(parameterSession, parameterEditor, running),
-                        run);
+                        run,
+                        percolator,
+                        percolatorRerun);
 
         /*
          * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds
@@ -341,13 +366,30 @@ public final class CometGuiApplication extends Application {
         toolManager.refresh();
 
         /*
-         * The pre-run check reads which Comet is installed, so it runs again whenever the Tool
-         * Manager's rows are read again -- after an install or a registration -- and once now.
+         * The pre-run check reads which Comet is installed, and the Percolator section which
+         * Percolator builds there are, so both read again whenever the Tool Manager's rows are read
+         * again -- after an install or a registration -- and once now. A Percolator change checks
+         * Run again by itself. When a run ends, the rerun action asks again whether Percolator can
+         * be rerun from it.
          */
         toolManager
                 .rows()
-                .addListener((ListChangeListener<ToolRowViewModel>) change -> run.recheck());
+                .addListener(
+                        (ListChangeListener<ToolRowViewModel>)
+                                change -> {
+                                    run.recheck();
+                                    percolator.refresh();
+                                });
+        run.runningProperty()
+                .addListener(
+                        (observable, before, after) -> {
+                            if (!after) {
+                                percolatorRerun.refresh();
+                            }
+                        });
+        percolator.refresh();
         run.recheck();
+        percolatorRerun.refresh();
 
         primaryStage.setTitle(WINDOW_TITLE);
         primaryStage.setScene(new Scene(shell, INITIAL_WIDTH, INITIAL_HEIGHT));

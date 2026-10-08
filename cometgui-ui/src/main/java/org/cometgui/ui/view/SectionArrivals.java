@@ -68,16 +68,16 @@ final class SectionArrivals {
         Map<SectionId, String> notes = new EnumMap<>(SectionId.class);
         notes.put(
                 SectionId.RUN,
-                "This section is live for Comet: phase 08 (Workflow Engine and Comet Adapter)"
-                        + " put the workflow engine behind it. Run searches the spectrum files"
-                        + " chosen in Comet Parameters with the installed Comet of the selected"
-                        + " release, once per file, and merges the PIN files; Cancel stops it;"
-                        + " the stage stepper follows the run; and before a rerun the preview"
-                        + " below says which steps execute again. Every reason Run is disabled is"
-                        + " stated in words: the parameters' (phase 07) and the engine's. Not yet"
-                        + " live: Percolator and the results arrive in phase 09 and phase 10, so"
-                        + " a run ends with the merged PIN and its provenance; index modes are"
-                        + " not offered here.");
+                "This section is live: phase 08 (Workflow Engine and Comet Adapter) put the"
+                        + " workflow engine behind it, and phase 09 added Percolator. Run searches"
+                        + " the spectrum files chosen in Comet Parameters with the installed Comet"
+                        + " of the selected release, once per file, merges the PIN files and"
+                        + " rescores them with the Percolator chosen in the Percolator section;"
+                        + " Cancel stops it; the stage stepper follows the run; and before a rerun"
+                        + " the preview below says which steps execute again. Every reason Run is"
+                        + " disabled is stated in words: the parameters' (phase 07) and the"
+                        + " engine's, the Percolator section's among them. Not yet live: the"
+                        + " results arrive in phase 10; index modes are not offered here.");
         notes.put(
                 SectionId.COMET_PARAMETERS,
                 "This section is being filled by phase 07 (Comet Parameter Editor UI), on the"
@@ -86,7 +86,13 @@ final class SectionArrivals {
                         + " level and the search preset choice are still to come.");
         notes.put(
                 SectionId.PERCOLATOR,
-                "This section arrives in phase 09 (Percolator Adapter and Version Capabilities).");
+                "This section is live: phase 09 (Percolator Adapter and Version Capabilities)"
+                        + " filled it. Which Percolator the next run uses and why, what it can do,"
+                        + " the Limelight-conversion switch that decides whether it must write"
+                        + " Percolator XML, local-binary registration, the result filters, the"
+                        + " Advanced settings, and the rerun of Percolator alone from the last run"
+                        + " are below. The Limelight converter itself arrives in phase 12, and the"
+                        + " filters' effect on the result tables in phase 10.");
         notes.put(SectionId.RESULTS, "This section arrives in phase 10 (Results Model and UI).");
         notes.put(
                 SectionId.VISUALISATION,

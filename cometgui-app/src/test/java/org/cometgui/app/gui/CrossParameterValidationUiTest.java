@@ -65,12 +65,18 @@ class CrossParameterValidationUiTest {
      * The engine's half in this application: its Tool Manager has no Comet installed (the test's
      * application data directory holds none), so the workflow engine cannot run anything -- and the
      * parameters' half is what this class proves. Phase 08 replaced Phase 07's "the engine is not
-     * built" with this, the engine's own reason.
+     * built" with this, the engine's own reason; Phase 09 added the Percolator section's, since a
+     * run now includes Percolator and no Percolator is installed there either (the resolved
+     * default, the manifest's newest Linux build, is installable but not installed).
      */
     private static final String ENGINE =
             "The workflow engine cannot start this search:\nComet 2026.03.0 is not installed, and"
                     + " the parameters are for that release: install it in the Tool Manager"
-                    + " section, or register a Comet 2026.03.0 already on this computer there.";
+                    + " section, or register a Comet 2026.03.0 already on this computer there.\n"
+                    + "Percolator 3.07.1, the default Percolator for the enabled downstream stages,"
+                    + " is not installed: install it in the Tool Manager section, register a local"
+                    + " Percolator binary in the Percolator section, or choose an installed build"
+                    + " there.";
 
     private static final String READY = "The parameters do not block a run.";
 

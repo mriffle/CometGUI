@@ -88,7 +88,9 @@ class ViewModelIndependenceTest {
     }
 
     @Test
-    @DisplayName("the scan reads the package's classes and those of its params subpackage")
+    @DisplayName(
+            "the scan reads the package's classes and those of its params and percolator"
+                    + " subpackages")
     void theScanIsNotVacuous() {
         Map<String, String> sources = ViewModelSources.all();
         assertEquals(
@@ -132,6 +134,7 @@ class ViewModelIndependenceTest {
                         "params/ParameterFilesViewModel.java",
                         "params/ParameterSearchViewModel.java",
                         "params/ParameterSession.java",
+                        "params/PercolatorRequest.java",
                         "params/PresetPreview.java",
                         "params/PresetRowViewModel.java",
                         "params/PresetsViewModel.java",
@@ -158,15 +161,28 @@ class ViewModelIndependenceTest {
                         "params/VariableModPartView.java",
                         "params/VariableModSlotView.java",
                         "params/VariableModsViewModel.java",
-                        "params/package-info.java"),
+                        "params/package-info.java",
+                        "percolator/PercolatorOffers.java",
+                        "percolator/PercolatorPort.java",
+                        "percolator/PercolatorRerunPort.java",
+                        "percolator/PercolatorRerunViewModel.java",
+                        "percolator/PercolatorViewModel.java",
+                        "percolator/RerunCheck.java",
+                        "percolator/SettingState.java",
+                        "percolator/VersionChoice.java",
+                        "percolator/package-info.java"),
                 List.copyOf(sources.keySet()),
                 "a source scan that read the wrong or an empty directory, or stopped at the top"
                         + " directory, would pass over anything");
         for (Map.Entry<String, String> source : sources.entrySet()) {
-            String expected =
-                    source.getKey().startsWith("params/")
-                            ? "package org.cometgui.ui.viewmodel.params;"
-                            : "package org.cometgui.ui.viewmodel;";
+            String expected;
+            if (source.getKey().startsWith("params/")) {
+                expected = "package org.cometgui.ui.viewmodel.params;";
+            } else if (source.getKey().startsWith("percolator/")) {
+                expected = "package org.cometgui.ui.viewmodel.percolator;";
+            } else {
+                expected = "package org.cometgui.ui.viewmodel;";
+            }
             assertTrue(
                     source.getValue().contains(expected),
                     source.getKey() + " is not in the package its directory says: " + expected);

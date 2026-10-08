@@ -30,10 +30,12 @@ import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import javafx.scene.input.KeyCode;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.testing.InstalledComet;
+import org.cometgui.app.testing.RealPercolators;
 import org.cometgui.app.testing.RealSearch;
 import org.cometgui.app.testing.RealSearch.LaunchRecorder;
 import org.cometgui.app.uidriver.FxUiDriver;
@@ -41,6 +43,10 @@ import org.cometgui.app.uidriver.TestFxUiDriver;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.log.LogMessage;
+import org.cometgui.domain.tools.ToolOffer;
+import org.cometgui.provenance.manifest.ManifestReader;
+import org.cometgui.provenance.manifest.ProvenanceManifest;
+import org.cometgui.provenance.manifest.ToolRecord;
 import org.cometgui.tools.process.ProcessService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,7 +69,11 @@ import org.junit.jupiter.api.io.TempDir;
  *   <li>The run: launched off the JavaFX thread through the process service, the stepper moving to
  *       Comet succeeded, the outputs on disk (one {@code -N} base per file, the merged PIN with one
  *       header and 3554 + 2918 = 6472 rows, the numbers unit 4 recorded), the console carrying
- *       Comet's own output, the outcome stated, and no Comet left running.
+ *       Comet's own output, the outcome stated, and no Comet left running. Since Phase 09 a run
+ *       includes Percolator: the pinned 3.07.1, staged and probed and offered as an installed
+ *       managed build, is the only Percolator here and so the resolved default; it rescores the
+ *       merged PIN with no XML option (Limelight conversion is off), writes one PSM row per target
+ *       row, and provenance names it and why.
  *   <li>Nothing changed: Run is disabled because nothing would run, and the preview says every step
  *       is reused.
  *   <li>A parameter changed: the rerun preview names every step and why, before anything starts.
@@ -74,8 +84,9 @@ import org.junit.jupiter.api.io.TempDir;
  *       failure is stated with its step, never swallowed, and the stepper shows Comet failed.
  * </ol>
  *
- * <p>Files read outside this module: see {@link RealSearch}. Every expected text is typed out; a
- * run's identifier and directory, which a clock names, are read from the project.
+ * <p>Files read outside this module: see {@link RealSearch} and {@link RealPercolators}. Every
+ * expected text is typed out; a run's identifier and directory, which a clock names, are read from
+ * the project.
  */
 @EnabledOnOs(
         value = OS.LINUX,
@@ -101,6 +112,9 @@ class RealRunUiTest {
 
     private static Path comet;
 
+    /** The staged Percolator 3.07.1, the only Percolator the Tool Manager offers here. */
+    private static Path percolatorExecutable;
+
     private static Path project;
 
     private static List<Path> spectra;
@@ -117,6 +131,8 @@ class RealRunUiTest {
     static void launch() throws IOException {
         Path root = scratch.toRealPath();
         comet = RealSearch.stageComet(root.resolve("bin/comet"));
+        ToolOffer percolator = RealPercolators.installed3071(root.resolve("bin/percolator"));
+        percolatorExecutable = percolator.installedPath().orElseThrow();
         Path inputs = Files.createDirectories(root.resolve("inputs"));
         spectra = RealSearch.spectra(inputs);
         Path subset = RealSearch.subset(inputs.resolve("subset.fasta"));
@@ -130,7 +146,8 @@ class RealRunUiTest {
                         launches,
                         console,
                         new RunWiring.Setup(
-                                () -> InstalledComet.at(RealSearch.RELEASE, comet), project));
+                                () -> InstalledComet.at(RealSearch.RELEASE, comet).with(percolator),
+                                project));
         driver = new TestFxUiDriver(app.application());
 
         app.chooser().spectra(spectra.get(0), spectra.get(1));
@@ -204,9 +221,9 @@ class RealRunUiTest {
                 () -> assertEquals("Succeeded", driver.textOf("stage-comet-state")),
                 () ->
                         assertEquals(
-                                "Not started",
+                                "Succeeded",
                                 driver.textOf("stage-percolator-state"),
-                                "Percolator is phase 09's"),
+                                "Percolator rescored the merged PIN (phase 09)"),
                 () -> assertTrue(RunSection.isDisabled(driver, "run-cancel")));
 
         for (String output :
@@ -216,6 +233,12 @@ class RealRunUiTest {
                         "outputs/comet/k562_4.pep.xml",
                         "outputs/comet/k562_4.pin",
                         "parameters/comet.params",
+                        "parameters/percolator-settings.json",
+                        "outputs/percolator/psms.tsv",
+                        "outputs/percolator/peptides.tsv",
+                        "outputs/percolator/decoy-psms.tsv",
+                        "outputs/percolator/decoy-peptides.tsv",
+                        "outputs/percolator/weights.txt",
                         "provenance/provenance.json")) {
             assertTrue(Files.isRegularFile(run.resolve(output)), run.resolve(output) + " exists");
         }
@@ -227,6 +250,7 @@ class RealRunUiTest {
                 "one header");
         assertTrue(merged.get(0).startsWith("SpecId\t"), "the header first");
         assertEquals(6472, merged.size() - 1, "3554 + 2918 data rows");
+        assertPercolatorRescored(run, merged);
 
         List<LaunchRecorder.Launch> comets = cometLaunches();
         assertEquals(2, comets.size(), "one Comet per spectrum file");
@@ -266,6 +290,7 @@ class RealRunUiTest {
                         + " and runs exactly the steps marked below.\n"
                         + "- validate-configuration: not needed\n"
                         + "- resolve-comet: not needed\n"
+                        + "- resolve-percolator: not needed\n"
                         + "- serialise-comet-params: reused from run "
                         + id
                         + "\n- hash-inputs: not needed\n"
@@ -274,6 +299,10 @@ class RealRunUiTest {
                         + "\n- validate-comet-outputs: reused from run "
                         + id
                         + "\n- merge-pin: reused from run "
+                        + id
+                        + "\n- run-percolator: reused from run "
+                        + id
+                        + "\n- parse-percolator: reused from run "
                         + id
                         + "\n- finalise-provenance: reused from run "
                         + id,
@@ -296,15 +325,19 @@ class RealRunUiTest {
                         + " configuration never changes once it starts -- and every step executes"
                         + " in it.\n"
                         + "- validate-configuration: runs again, as a prerequisite (needed by"
-                        + " resolve-comet; needed by serialise-comet-params; needed by"
-                        + " hash-inputs)\n"
+                        + " resolve-comet; needed by resolve-percolator; needed by"
+                        + " serialise-comet-params; needed by hash-inputs)\n"
                         + "- resolve-comet: runs again, as a prerequisite (needed by run-comet)\n"
+                        + "- resolve-percolator: runs again, as a prerequisite (needed by"
+                        + " run-percolator)\n"
                         + "- serialise-comet-params: re-executes (comet-parameters changed)\n"
                         + "- hash-inputs: runs again, as a prerequisite (needed by run-comet)\n"
                         + "- run-comet: re-executes (comet-parameters changed;"
                         + " serialise-comet-params re-executes)\n"
                         + "- validate-comet-outputs: re-executes (run-comet re-executes)\n"
                         + "- merge-pin: re-executes (validate-comet-outputs re-executes)\n"
+                        + "- run-percolator: re-executes (merge-pin re-executes)\n"
+                        + "- parse-percolator: re-executes (run-percolator re-executes)\n"
                         + "- finalise-provenance: re-executes (merge-pin re-executes)",
                 driver.textOf("run-preview"));
         assertFalse(RunSection.isDisabled(driver, "run-start"), "and Run is offered");
@@ -338,8 +371,10 @@ class RealRunUiTest {
                         + " configuration never changes once it starts -- and every step executes"
                         + " in it.\n"
                         + "- validate-configuration: runs again, as a prerequisite (needed by"
-                        + " resolve-comet; needed by hash-inputs)\n"
+                        + " resolve-comet; needed by resolve-percolator; needed by hash-inputs)\n"
                         + "- resolve-comet: runs again, as a prerequisite (needed by run-comet)\n"
+                        + "- resolve-percolator: runs again, as a prerequisite (needed by"
+                        + " run-percolator)\n"
                         + "- serialise-comet-params: executes in the new run (unchanged since run "
                         + id
                         + ", but a new run records its own results)\n"
@@ -347,6 +382,8 @@ class RealRunUiTest {
                         + "- run-comet: re-executes (spectrum-files changed)\n"
                         + "- validate-comet-outputs: re-executes (run-comet re-executes)\n"
                         + "- merge-pin: re-executes (validate-comet-outputs re-executes)\n"
+                        + "- run-percolator: re-executes (merge-pin re-executes)\n"
+                        + "- parse-percolator: re-executes (run-percolator re-executes)\n"
                         + "- finalise-provenance: re-executes (merge-pin re-executes)\n"
                         + "Run "
                         + id
@@ -358,7 +395,7 @@ class RealRunUiTest {
                         + " 602aad75e18257feabdb94ece0fa82e19e5f17153eee4fb89875976920855c82, now "
                         + now
                         + "\nthese steps must run again: run-comet, validate-comet-outputs,"
-                        + " merge-pin, finalise-provenance",
+                        + " merge-pin, run-percolator, parse-percolator, finalise-provenance",
                 driver.textOf("run-preview"));
     }
 
@@ -434,6 +471,70 @@ class RealRunUiTest {
                                         + id),
                 () -> "a retry of the failed run: " + driver.textOf("run-preview"));
         assertNoCometAlive();
+    }
+
+    /**
+     * Percolator 3.07.1 -- the only build here, so the resolved default with Limelight conversion
+     * off -- rescored the merged PIN: launched once, off the JavaFX thread, with no XML option, one
+     * PSM row per target row of the merged PIN (3285, unit 5's figure, counted here from the PIN as
+     * well), no {@code pout.xml}, and provenance naming the build and why.
+     */
+    private static void assertPercolatorRescored(Path run, List<String> merged) throws IOException {
+        List<LaunchRecorder.Launch> percolators = percolatorLaunches();
+        assertEquals(1, percolators.size(), "one Percolator invocation");
+        LaunchRecorder.Launch launch = percolators.get(0);
+        assertFalse(launch.onFxThread(), "Percolator was launched on the JavaFX thread");
+        assertFalse(launch.argv().contains("-X"), () -> "no XML is asked for: " + launch.argv());
+        assertEquals(
+                run.resolve("inputs/pin/merged.pin").toString(),
+                launch.argv().get(launch.argv().size() - 1),
+                "Percolator reads the merged PIN");
+        long targets =
+                merged.stream().skip(1).filter(row -> row.split("\t", 3)[1].equals("1")).count();
+        assertEquals(3285, targets, "the merged PIN's target rows");
+        List<String> psms =
+                Files.readAllLines(
+                        run.resolve("outputs/percolator/psms.tsv"), StandardCharsets.UTF_8);
+        assertEquals(targets, psms.size() - 1, "one PSM row per target row");
+        assertFalse(Files.exists(run.resolve("outputs/percolator/pout.xml")), "no XML written");
+        ProvenanceManifest manifest =
+                ManifestReader.readFrom(run.resolve("provenance/provenance.json"));
+        Map<String, String> settings = manifest.settings();
+        assertAll(
+                "provenance",
+                () -> assertEquals("3.07.1", settings.get("percolator.version")),
+                () -> assertEquals("managed", settings.get("percolator.origin")),
+                () -> assertEquals("resolved-default", settings.get("percolator.selection")),
+                () -> assertEquals("none", settings.get("percolator.downstream-stages")),
+                () ->
+                        assertEquals(
+                                "Percolator 3.07.1 is the newest Percolator that can be used on"
+                                        + " this computer.",
+                                settings.get("percolator.selection-reason")),
+                () -> assertEquals("1", settings.get("percolator.seed")),
+                () ->
+                        assertEquals(
+                                RealPercolators.SHA256_3071,
+                                settings.get("percolator.binary-sha256")),
+                () ->
+                        assertEquals(
+                                RealPercolators.I_SPLINE_ADVISORY,
+                                settings.get(
+                                        "percolator.advisory.percolator.3-07-1-predates-i-spline"
+                                                + "-pep-regressor")),
+                () ->
+                        assertEquals(
+                                List.of(percolatorExecutable),
+                                manifest.tools().stream()
+                                        .filter(tool -> tool.name().equals("percolator"))
+                                        .map(ToolRecord::executablePath)
+                                        .toList()));
+    }
+
+    private static List<LaunchRecorder.Launch> percolatorLaunches() {
+        return launches.launches().stream()
+                .filter(launch -> launch.argv().get(0).equals(percolatorExecutable.toString()))
+                .toList();
     }
 
     /** The project's runs, oldest first; the one at a position. */

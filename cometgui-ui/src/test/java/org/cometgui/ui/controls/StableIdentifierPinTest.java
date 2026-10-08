@@ -36,6 +36,7 @@ import org.cometgui.params.comet.schema.ParameterCategory;
 import org.cometgui.params.comet.schema.TerminalCode;
 import org.cometgui.params.comet.schema.ValueKind;
 import org.cometgui.params.comet.value.VariableModPart;
+import org.cometgui.params.percolator.schema.PercolatorSetting;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.params.EssentialsSection;
 import org.cometgui.ui.viewmodel.params.SearchFilter;
@@ -152,8 +153,14 @@ class StableIdentifierPinTest {
      *
      * <p>Raised from 396 to 399 by phase 08 unit 7, which made the Run section run the workflow
      * engine: 3 constants (Cancel, the outcome and the rerun preview).
+     *
+     * <p>Raised from 399 to 433 by phase 09 unit 7, which filled the Percolator section: 34
+     * constants (the version selector and its default, the badge and the statements around it, the
+     * Limelight switch and its status, registration, the two display filters, the Advanced toggle,
+     * its container and each of its five settings' field and state, and the rerun's preview,
+     * action, cancel and outcome).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 399;
+    private static final int PINNED_IDENTIFIER_COUNT = 433;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -270,7 +277,43 @@ class StableIdentifierPinTest {
                     Map.entry("RUN_ENGINE", "run-engine"),
                     Map.entry("RUN_CANCEL", "run-cancel"),
                     Map.entry("RUN_OUTCOME", "run-outcome"),
-                    Map.entry("RUN_PREVIEW", "run-preview"));
+                    Map.entry("RUN_PREVIEW", "run-preview"),
+                    Map.entry("PERCOLATOR_PANE", "percolator-pane"),
+                    Map.entry("PERCOLATOR_OFFERS", "percolator-offers"),
+                    Map.entry("PERCOLATOR_VERSION", "percolator-version"),
+                    Map.entry("PERCOLATOR_USE_DEFAULT", "percolator-use-default"),
+                    Map.entry("PERCOLATOR_SELECTION", "percolator-selection"),
+                    Map.entry("PERCOLATOR_BADGE", "percolator-badge"),
+                    Map.entry("PERCOLATOR_INSTALLABLE", "percolator-installable"),
+                    Map.entry("PERCOLATOR_ADVISORIES", "percolator-advisories"),
+                    Map.entry("PERCOLATOR_LIMELIGHT", "percolator-limelight"),
+                    Map.entry("PERCOLATOR_LIMELIGHT_STATUS", "percolator-limelight-status"),
+                    Map.entry("PERCOLATOR_NOTICE", "percolator-notice"),
+                    Map.entry("PERCOLATOR_REASON", "percolator-reason"),
+                    Map.entry("PERCOLATOR_SKIPPED", "percolator-skipped"),
+                    Map.entry("PERCOLATOR_REGISTER", "percolator-register"),
+                    Map.entry("PERCOLATOR_REGISTER_STATUS", "percolator-register-status"),
+                    Map.entry("PERCOLATOR_PSM_FILTER", "percolator-psm-filter"),
+                    Map.entry("PERCOLATOR_PEPTIDE_FILTER", "percolator-peptide-filter"),
+                    Map.entry("PERCOLATOR_FILTERS_STATUS", "percolator-filters-status"),
+                    Map.entry("PERCOLATOR_ADVANCED_TOGGLE", "percolator-advanced-toggle"),
+                    Map.entry("PERCOLATOR_ADVANCED", "percolator-advanced"),
+                    Map.entry("PERCOLATOR_TEST_FDR", "percolator-test-fdr"),
+                    Map.entry("PERCOLATOR_TEST_FDR_STATE", "percolator-test-fdr-state"),
+                    Map.entry("PERCOLATOR_TRAIN_FDR", "percolator-train-fdr"),
+                    Map.entry("PERCOLATOR_TRAIN_FDR_STATE", "percolator-train-fdr-state"),
+                    Map.entry("PERCOLATOR_RANDOM_SEED", "percolator-random-seed"),
+                    Map.entry("PERCOLATOR_RANDOM_SEED_STATE", "percolator-random-seed-state"),
+                    Map.entry("PERCOLATOR_MAXIMUM_ITERATIONS", "percolator-maximum-iterations"),
+                    Map.entry(
+                            "PERCOLATOR_MAXIMUM_ITERATIONS_STATE",
+                            "percolator-maximum-iterations-state"),
+                    Map.entry("PERCOLATOR_THREAD_COUNT", "percolator-thread-count"),
+                    Map.entry("PERCOLATOR_THREAD_COUNT_STATE", "percolator-thread-count-state"),
+                    Map.entry("PERCOLATOR_RERUN_PREVIEW", "percolator-rerun-preview"),
+                    Map.entry("PERCOLATOR_RERUN", "percolator-rerun"),
+                    Map.entry("PERCOLATOR_RERUN_CANCEL", "percolator-rerun-cancel"),
+                    Map.entry("PERCOLATOR_RERUN_OUTCOME", "percolator-rerun-outcome"));
 
     // -----------------------------------------------------------------------------------------
     // The parameter editor (Phase 07). A parameter's identifiers are built from its own name, so
@@ -718,6 +761,8 @@ class StableIdentifierPinTest {
                     "summaryEntry",
                     "spectrum",
                     "spectrumRemove",
+                    "percolatorSetting",
+                    "percolatorSettingState",
                     "searchFilter",
                     "searchResult",
                     "presetRow",
@@ -1245,6 +1290,42 @@ class StableIdentifierPinTest {
                     BY_POSITION_OR_CHARACTER.get(entry.getKey()),
                     entry.getValue(),
                     "UiIds." + entry.getKey());
+        }
+    }
+
+    /**
+     * The Percolator section's per-setting methods hand out constants already pinned in {@link
+     * #CONSTANTS}; this pins which constant each setting gets, one literal per setting and method,
+     * and fails on a setting that has none. Not counted in {@link #PINNED_IDENTIFIER_COUNT}: the
+     * literals are the constants' own, so counting them would count one identifier twice.
+     */
+    @Test
+    @DisplayName("each Advanced Percolator setting has its own pinned field and state identifier")
+    void eachPercolatorSettingIsPinned() {
+        Map<PercolatorSetting, List<String>> pinned =
+                Map.of(
+                        PercolatorSetting.TEST_FDR,
+                        List.of("percolator-test-fdr", "percolator-test-fdr-state"),
+                        PercolatorSetting.TRAIN_FDR,
+                        List.of("percolator-train-fdr", "percolator-train-fdr-state"),
+                        PercolatorSetting.RANDOM_SEED,
+                        List.of("percolator-random-seed", "percolator-random-seed-state"),
+                        PercolatorSetting.MAXIMUM_ITERATIONS,
+                        List.of(
+                                "percolator-maximum-iterations",
+                                "percolator-maximum-iterations-state"),
+                        PercolatorSetting.THREAD_COUNT,
+                        List.of("percolator-thread-count", "percolator-thread-count-state"));
+        assertEquals(EnumSet.allOf(PercolatorSetting.class), EnumSet.copyOf(pinned.keySet()));
+        for (Map.Entry<PercolatorSetting, List<String>> entry : pinned.entrySet()) {
+            assertEquals(
+                    entry.getValue().get(0),
+                    UiIds.percolatorSetting(entry.getKey()),
+                    "UiIds.percolatorSetting(" + entry.getKey() + ")");
+            assertEquals(
+                    entry.getValue().get(1),
+                    UiIds.percolatorSettingState(entry.getKey()),
+                    "UiIds.percolatorSettingState(" + entry.getKey() + ")");
         }
     }
 

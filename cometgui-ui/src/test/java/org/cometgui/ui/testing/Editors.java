@@ -19,11 +19,14 @@ package org.cometgui.ui.testing;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.value.ObservableValue;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.ports.FileSystemAccess;
 import org.cometgui.domain.tools.ToolVersion;
@@ -35,9 +38,14 @@ import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.RunViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.StageSwitches;
+import org.cometgui.ui.viewmodel.percolator.PercolatorPort;
+import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
+import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
+import org.cometgui.ui.viewmodel.percolator.RerunCheck;
 
 /**
  * The parts of a Comet parameter editor for the view tests of this module: the bundled metadata,
@@ -113,14 +121,70 @@ public final class Editors {
             ParameterEditorViewModel editor,
             StageStepperViewModel stepper,
             ScriptedEngine engine) {
+        return run(
+                session,
+                inputs,
+                editor,
+                stepper,
+                new SimpleObjectProperty<>(Percolators.ready()),
+                engine);
+    }
+
+    /**
+     * The Run section's engine half as {@link #run(ParameterSession, SpectrumInputsViewModel,
+     * ParameterEditorViewModel, StageStepperViewModel, ScriptedEngine)} makes it, with the
+     * Percolator half a test controls.
+     *
+     * @param session the session
+     * @param inputs the inputs over the session
+     * @param editor the editor whose readiness the run keeps
+     * @param stepper the stepper the run drives
+     * @param percolator the Percolator half
+     * @param engine the scripted engine
+     * @return the view-model
+     */
+    public static RunViewModel run(
+            ParameterSession session,
+            SpectrumInputsViewModel inputs,
+            ParameterEditorViewModel editor,
+            StageStepperViewModel stepper,
+            ObservableValue<PercolatorRequest> percolator,
+            ScriptedEngine engine) {
         return new RunViewModel(
                 session,
                 inputs,
                 editor.readiness(),
                 stepper,
+                percolator,
                 engine,
                 engine.background(),
                 engine.ui());
+    }
+
+    /**
+     * The Percolator section over a port, every call made and applied at once on the caller's
+     * thread, registration choosing from an unscripted chooser (which cancels).
+     *
+     * @param port the port
+     * @return the section, not yet read
+     */
+    public static PercolatorViewModel percolator(PercolatorPort port) {
+        return new PercolatorViewModel(
+                port, new ScriptedChooser(), Runnable::run, Runnable::run, () -> {});
+    }
+
+    /**
+     * The rerun action of a section, over a port that refuses every rerun, called at once.
+     *
+     * @param section the section whose request it follows
+     * @return the action
+     */
+    public static PercolatorRerunViewModel rerun(PercolatorViewModel section) {
+        return new PercolatorRerunViewModel(
+                new ScriptedRerun(request -> RerunCheck.refused("No run in this test.")),
+                section.requestProperty(),
+                Runnable::run,
+                Runnable::run);
     }
 
     /**
@@ -145,6 +209,17 @@ public final class Editors {
         private final Deque<Path> targets = new ArrayDeque<>();
 
         private final Deque<Path> parameterFiles = new ArrayDeque<>();
+
+        private final List<String> asked = new ArrayList<>();
+
+        /**
+         * What a single-file choice was asked for, oldest first: {@code "file:" + what}.
+         *
+         * @return the questions
+         */
+        public List<String> asked() {
+            return List.copyOf(asked);
+        }
 
         /**
          * Scripts the next spectrum choice.
@@ -202,6 +277,7 @@ public final class Editors {
 
         @Override
         public Optional<Path> chooseFile(String what) {
+            asked.add("file:" + what);
             return Optional.ofNullable(files.pollFirst());
         }
 

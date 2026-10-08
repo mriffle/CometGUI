@@ -33,14 +33,16 @@ import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.percolator.resolution.PercolatorResolution;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
+import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.RerunOutlook;
-import org.cometgui.ui.viewmodel.params.RunEnginePort;
 import org.cometgui.ui.viewmodel.params.RunNotStartedException;
 import org.cometgui.ui.viewmodel.params.RunObserver;
+import org.cometgui.ui.viewmodel.percolator.RerunCheck;
 import org.cometgui.workflow.engine.ReuseCheck;
 import org.cometgui.workflow.engine.ReuseRefusedException;
 import org.cometgui.workflow.engine.RunHandle;
@@ -50,15 +52,22 @@ import org.cometgui.workflow.state.InputValue;
 import org.cometgui.workflow.state.StepInputs;
 import org.cometgui.workflow.steps.CometSelection;
 import org.cometgui.workflow.steps.CometWorkflow;
+import org.cometgui.workflow.steps.DerivedRun;
+import org.cometgui.workflow.steps.PercolatorChoice;
+import org.cometgui.workflow.steps.PercolatorRerun;
+import org.cometgui.workflow.steps.PercolatorRerunPreview;
+import org.cometgui.workflow.steps.PercolatorSelection;
 import org.cometgui.workflow.steps.PreRunReport;
 import org.cometgui.workflow.steps.PreparedRun;
+import org.cometgui.workflow.steps.RerunRefusedException;
 import org.cometgui.workflow.steps.RunBlockedException;
 import org.cometgui.workflow.steps.SearchRequest;
 import org.cometgui.workflow.storage.ProjectLock;
 
 /**
- * The Run section's engine port over the one workflow engine (decision P8-16): the selected Comet
- * from the Tool Manager, the session's project, {@link CometWorkflow} and {@link WorkflowEngine}.
+ * The Run section's engine port over the one workflow engine (decision P8-16; {@code
+ * org.cometgui.ui.viewmodel.params.RunEnginePort}): the selected Comet from the Tool Manager, the
+ * session's project, {@link CometWorkflow} and {@link WorkflowEngine}.
  *
  * <h2>Which Comet</h2>
  *
@@ -68,6 +77,23 @@ import org.cometgui.workflow.storage.ProjectLock;
  * SHA-256 is taken by hashing that file through the one hasher when it is selected, and the pre-run
  * check and the run's {@code resolve-comet} step re-hash it and refuse a mismatch. No index mode is
  * offered by the interface yet, so every search is {@link IndexMode#NONE}.
+ *
+ * <h2>Which Percolator</h2>
+ *
+ * <p>The Percolator section's {@link PercolatorRequest}: its build -- installed, with a path -- is
+ * hashed through the one hasher when the check or the run is made, as the Comet is, and with the
+ * settings and the resolution it was chosen against becomes the search's {@link PercolatorChoice}
+ * ({@link SearchRequest#withPercolator}); the pre-run check and the run's {@code
+ * resolve-percolator} step re-hash it. A request with problems is not run; its problems are the Run
+ * section's own reasons, so the check here then covers the Comet half alone and gives no preview.
+ *
+ * <h2>The compatible-version rerun</h2>
+ *
+ * <p>The same last run is the source of the Percolator section's rerun ({@link #check(
+ * PercolatorRequest)}, {@link #start(PercolatorRequest, RunObserver)}; design decision P9-11): a
+ * new, derived run with the Percolator half as it is now, reusing the last run's merged PIN through
+ * {@link PercolatorRerun}, executing no Comet. Whether it can be made, and what it executes, are
+ * the workflow's answers, shown as they are.
  *
  * <h2>Retry or new run</h2>
  *
@@ -80,7 +106,12 @@ import org.cometgui.workflow.storage.ProjectLock;
  *
  * <p>Every method may block on file I/O and is called off the JavaFX thread.
  */
-public final class WorkflowRunPort implements RunEnginePort {
+public final class WorkflowRunPort implements SessionEngine {
+
+    /** Why there is no Percolator rerun before a run of this session. */
+    public static final String NO_RUN_TO_RERUN =
+            "No run has been made in this session, so there is no merged PIN to rerun Percolator"
+                    + " from. Run a search first.";
 
     private final Supplier<Optional<ToolManager>> tools;
 
@@ -93,6 +124,8 @@ public final class WorkflowRunPort implements RunEnginePort {
     private final CometWorkflow workflow;
 
     private final WorkflowEngine engine;
+
+    private final PercolatorRerun rerun;
 
     private final Supplier<ApplicationRecord> application;
 
@@ -107,6 +140,7 @@ public final class WorkflowRunPort implements RunEnginePort {
      * @param hashes the one hasher, shared with {@code workflow} and {@code engine}
      * @param workflow the Comet workflow
      * @param engine the workflow engine
+     * @param rerun the compatible-version Percolator rerun, over the same hasher
      * @param application the application record each run's provenance starts from, captured when
      *     the run is prepared
      */
@@ -117,6 +151,7 @@ public final class WorkflowRunPort implements RunEnginePort {
             CachingHashService hashes,
             CometWorkflow workflow,
             WorkflowEngine engine,
+            PercolatorRerun rerun,
             Supplier<ApplicationRecord> application) {
         this.tools = Objects.requireNonNull(tools, "tools");
         this.toolsUnavailable = Objects.requireNonNull(toolsUnavailable, "toolsUnavailable");
@@ -124,13 +159,16 @@ public final class WorkflowRunPort implements RunEnginePort {
         this.hashes = Objects.requireNonNull(hashes, "hashes");
         this.workflow = Objects.requireNonNull(workflow, "workflow");
         this.engine = Objects.requireNonNull(engine, "engine");
+        this.rerun = Objects.requireNonNull(rerun, "rerun");
         this.application = Objects.requireNonNull(application, "application");
     }
 
     @Override
-    public EngineCheck check(CometParameters model, List<Path> spectra) {
+    public EngineCheck check(
+            CometParameters model, List<Path> spectra, PercolatorRequest percolator) {
         Objects.requireNonNull(model, "model");
         Objects.requireNonNull(spectra, "spectra");
+        Objects.requireNonNull(percolator, "percolator");
         Selected selected = select(model.version());
         if (selected.reason().isPresent()) {
             return EngineCheck.unavailable(selected.reason().get());
@@ -141,8 +179,19 @@ public final class WorkflowRunPort implements RunEnginePort {
         } catch (IOException unusable) {
             return EngineCheck.unavailable(projectRefusal(unusable));
         }
-        SearchRequest request =
+        SearchRequest comet =
                 new SearchRequest(model, spectra, selected.comet().orElseThrow(), IndexMode.NONE);
+        if (!percolator.runnable()) {
+            return EngineCheck.checked(workflow.check(lock.project(), comet), Optional.empty());
+        }
+        Chosen chosen = choiceOf(percolator);
+        if (chosen.reason().isPresent()) {
+            return new EngineCheck(
+                    List.of(chosen.reason().get()),
+                    Optional.of(workflow.check(lock.project(), comet)),
+                    Optional.empty());
+        }
+        SearchRequest request = comet.withPercolator(chosen.choice().orElseThrow());
         PreRunReport report = workflow.check(lock.project(), request);
         if (report.blocked()) {
             return EngineCheck.checked(report, Optional.empty());
@@ -163,17 +212,24 @@ public final class WorkflowRunPort implements RunEnginePort {
     }
 
     @Override
-    public ActiveRun start(CometParameters model, List<Path> spectra, RunObserver observer)
+    public ActiveRun start(
+            CometParameters model,
+            List<Path> spectra,
+            PercolatorRequest percolator,
+            RunObserver observer)
             throws RunNotStartedException {
         Objects.requireNonNull(model, "model");
         Objects.requireNonNull(spectra, "spectra");
+        Objects.requireNonNull(percolator, "percolator");
         Objects.requireNonNull(observer, "observer");
         Selected selected = select(model.version());
         if (selected.reason().isPresent()) {
             throw new RunNotStartedException(selected.reason().get(), null);
         }
+        PercolatorChoice choice = requireChoice(percolator);
         SearchRequest request =
-                new SearchRequest(model, spectra, selected.comet().orElseThrow(), IndexMode.NONE);
+                new SearchRequest(model, spectra, selected.comet().orElseThrow(), IndexMode.NONE)
+                        .withPercolator(choice);
         try {
             ProjectLock lock = project.lock();
             synchronized (this) {
@@ -195,6 +251,130 @@ public final class WorkflowRunPort implements RunEnginePort {
         } catch (IOException failed) {
             throw new RunNotStartedException(
                     "the run could not be created or started: " + failed.getMessage(), failed);
+        }
+    }
+
+    @Override
+    public RerunCheck check(PercolatorRequest percolator) {
+        Objects.requireNonNull(percolator, "percolator");
+        PreparedRun source = last;
+        if (source == null) {
+            return RerunCheck.refused(NO_RUN_TO_RERUN);
+        }
+        if (!percolator.runnable()) {
+            return RerunCheck.refused(
+                    "Percolator cannot be rerun from run "
+                            + source.identity().runId().value()
+                            + " until the Percolator section names a build that can run: "
+                            + String.join(" ", percolator.problems()));
+        }
+        Chosen chosen = choiceOf(percolator);
+        if (chosen.reason().isPresent()) {
+            return RerunCheck.refused(chosen.reason().get());
+        }
+        try {
+            ProjectLock lock = project.lock();
+            PercolatorRerunPreview preview =
+                    rerun.preview(
+                            project.store(),
+                            lock.project(),
+                            source.layout(),
+                            chosen.choice().orElseThrow());
+            return RerunCheck.possible(preview.source().value(), preview.lines());
+        } catch (RerunRefusedException refused) {
+            return RerunCheck.refused(refused.getMessage());
+        } catch (IOException unreadable) {
+            return RerunCheck.refused(
+                    "Whether Percolator can be rerun from run "
+                            + source.identity().runId().value()
+                            + " cannot be checked: "
+                            + unreadable.getMessage());
+        }
+    }
+
+    @Override
+    public ActiveRun start(PercolatorRequest percolator, RunObserver observer)
+            throws RunNotStartedException {
+        Objects.requireNonNull(percolator, "percolator");
+        Objects.requireNonNull(observer, "observer");
+        PreparedRun source = last;
+        if (source == null) {
+            throw new RunNotStartedException(NO_RUN_TO_RERUN, null);
+        }
+        PercolatorChoice choice = requireChoice(percolator);
+        try {
+            ProjectLock lock = project.lock();
+            synchronized (this) {
+                DerivedRun derived =
+                        rerun.prepare(
+                                project.store(), lock, source.layout(), choice, application.get());
+                observer.planned(
+                        derived.plan(),
+                        "run "
+                                + derived.identity().runId().value()
+                                + " in "
+                                + derived.layout().root()
+                                + ", rescoring the merged PIN of run "
+                                + derived.source().runId().value());
+                RunHandle handle = rerun.start(engine, derived, observer);
+                return handle::cancel;
+            }
+        } catch (RerunRefusedException refused) {
+            throw new RunNotStartedException(refused.getMessage(), refused);
+        } catch (ReuseRefusedException refused) {
+            throw new RunNotStartedException(refused.getMessage(), refused);
+        } catch (IOException failed) {
+            throw new RunNotStartedException(
+                    "the Percolator rerun could not be created or started: " + failed.getMessage(),
+                    failed);
+        }
+    }
+
+    /** The search's Percolator half, or the refusal that stops a run or a rerun starting. */
+    private PercolatorChoice requireChoice(PercolatorRequest percolator)
+            throws RunNotStartedException {
+        if (!percolator.runnable()) {
+            throw new RunNotStartedException(
+                    "the Percolator section names no build that can run: "
+                            + String.join(" ", percolator.problems()),
+                    null);
+        }
+        Chosen chosen = choiceOf(percolator);
+        if (chosen.reason().isPresent()) {
+            throw new RunNotStartedException(chosen.reason().get(), null);
+        }
+        return chosen.choice().orElseThrow();
+    }
+
+    /**
+     * The workflow's Percolator half of a runnable request: its build hashed now, through the one
+     * hasher, as a Comet is when it is selected.
+     */
+    private Chosen choiceOf(PercolatorRequest percolator) {
+        ToolOffer offer = percolator.build().orElseThrow();
+        Path executable = offer.installedPath().orElseThrow();
+        PercolatorResolution resolution = percolator.resolution().orElseThrow();
+        try {
+            PercolatorSelection selection =
+                    new PercolatorSelection(offer, executable, hashes.hash(executable).sha256());
+            return new Chosen(
+                    Optional.of(
+                            new PercolatorChoice(
+                                    selection,
+                                    percolator.settings().orElseThrow(),
+                                    resolution.enabledStages(),
+                                    resolution)),
+                    Optional.empty());
+        } catch (IOException | IllegalArgumentException unusable) {
+            return new Chosen(
+                    Optional.empty(),
+                    Optional.of(
+                            "The selected Percolator "
+                                    + offer.version().text()
+                                    + " at "
+                                    + executable
+                                    + " cannot be used: "
+                                    + unusable.getMessage()));
         }
     }
 
@@ -315,6 +495,9 @@ public final class WorkflowRunPort implements RunEnginePort {
                             + unreadable.getMessage());
         }
     }
+
+    /** A Percolator half for the workflow, or why there is none. */
+    private record Chosen(Optional<PercolatorChoice> choice, Optional<String> reason) {}
 
     /** A selected Comet, or why there is none. */
     private record Selected(Optional<CometSelection> comet, Optional<String> reason) {

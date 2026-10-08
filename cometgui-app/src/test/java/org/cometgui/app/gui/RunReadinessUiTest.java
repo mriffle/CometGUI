@@ -34,10 +34,12 @@ import java.util.stream.Stream;
 import javafx.scene.input.KeyCode;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.testing.InstalledComet;
+import org.cometgui.app.testing.RealPercolators;
 import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.TestFxUiDriver;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
+import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.tools.process.ProcessService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -64,7 +66,12 @@ import org.junit.jupiter.api.io.TempDir;
  * </ol>
  *
  * <p>No Comet is launched here, so the "Comet" is a file that is executable and never run, and the
- * spectrum files are named, not read. Every text is typed out.
+ * spectrum files are named, not read. A run includes Percolator since Phase 09, so the Tool Manager
+ * also offers the pinned Percolator 3.07.1, staged, held to its SHA-256 and probed ({@link
+ * RealPercolators}); the engine's half is ready only with a Percolator that can run. Every text is
+ * typed out.
+ *
+ * <p>Files read outside this module: those {@link RealPercolators} names for 3.07.1.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class RunReadinessUiTest {
@@ -90,6 +97,7 @@ class RunReadinessUiTest {
         Path comet = Files.createDirectories(root.resolve("bin")).resolve("comet");
         Files.writeString(comet, "#!/bin/sh\nexit 0\n", StandardCharsets.US_ASCII);
         Files.setPosixFilePermissions(comet, PosixFilePermissions.fromString("rwx------"));
+        ToolOffer percolator = RealPercolators.installed3071(root.resolve("bin/percolator"));
         Path inputs = Files.createDirectories(root.resolve("inputs"));
         Path first =
                 Files.writeString(inputs.resolve("a.mzML"), "spectra", StandardCharsets.US_ASCII);
@@ -106,7 +114,9 @@ class RunReadinessUiTest {
                         BUILD,
                         new ProcessService(Clock.systemUTC()),
                         new BoundedMessageLog(),
-                        new RunWiring.Setup(() -> InstalledComet.at("2026.03.0", comet), project));
+                        new RunWiring.Setup(
+                                () -> InstalledComet.at("2026.03.0", comet).with(percolator),
+                                project));
         driver = new TestFxUiDriver(app.application());
         app.chooser().spectra(first, second);
         ParameterEditorApp.openEditor(driver);

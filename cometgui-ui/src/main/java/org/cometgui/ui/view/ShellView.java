@@ -39,6 +39,7 @@ import org.cometgui.ui.controls.ToolManagerPane;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
 import org.cometgui.ui.controls.params.RunControl;
+import org.cometgui.ui.controls.percolator.PercolatorPane;
 import org.cometgui.ui.view.params.CometParametersView;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
@@ -54,6 +55,8 @@ import org.cometgui.ui.viewmodel.params.RunReadinessViewModel;
 import org.cometgui.ui.viewmodel.params.RunViewModel;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
+import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
+import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
 
 /**
  * The application shell: a header, a left navigation over every section, and a content area holding
@@ -150,6 +153,9 @@ public final class ShellView extends BorderPane {
      * @param expertMode the Expert level's view-model over that session
      * @param run the Run section's engine half: Run, Cancel, the outcome and the rerun preview,
      *     over the same session and driving {@code stepper}
+     * @param percolator the Percolator section: the build that runs, why, its settings and the
+     *     display filters -- the Percolator half {@code run} runs with
+     * @param percolatorRerun the Percolator section's compatible-version rerun of the last run
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
@@ -164,7 +170,9 @@ public final class ShellView extends BorderPane {
             VariableModsViewModel variableMods,
             ParameterSearchViewModel parameterSearch,
             ExpertViewModel expertMode,
-            RunViewModel run) {
+            RunViewModel run,
+            PercolatorViewModel percolator,
+            PercolatorRerunViewModel percolatorRerun) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
@@ -219,6 +227,13 @@ public final class ShellView extends BorderPane {
          * on construction -- ToolManagerViewModel.refresh() is what asks the port, and the
          * composition root calls it -- so building a shell verifies no checksums.
          */
+        PercolatorPane percolatorPane =
+                new PercolatorPane(
+                        Objects.requireNonNull(percolator, "percolator"),
+                        Objects.requireNonNull(percolatorRerun, "percolatorRerun"));
+        panes.get(SectionId.PERCOLATOR).addContent(percolatorPane);
+        VBox.setVgrow(percolatorPane, Priority.ALWAYS);
+
         ToolManagerPane toolManagerPane = new ToolManagerPane(toolManager);
         panes.get(SectionId.TOOL_MANAGER).addContent(toolManagerPane);
         VBox.setVgrow(toolManagerPane, Priority.ALWAYS);

@@ -31,18 +31,28 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.cometgui.app.testing.InstalledComet;
+import org.cometgui.app.testing.TestPercolators;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.project.ProjectId;
 import org.cometgui.domain.project.ProjectLayout;
+import org.cometgui.domain.tools.CapabilityEvidence;
+import org.cometgui.domain.tools.ToolCapability;
+import org.cometgui.domain.tools.ToolOffer;
+import org.cometgui.domain.tools.ToolOrigin;
+import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ValueOrigin;
 import org.cometgui.params.comet.validation.Finding;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
+import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.RunEnginePort;
 import org.cometgui.ui.viewmodel.params.RunNotStartedException;
 import org.cometgui.ui.viewmodel.params.RunObserver;
+import org.cometgui.ui.viewmodel.percolator.PercolatorOffers;
+import org.cometgui.ui.viewmodel.percolator.PercolatorPort;
 import org.cometgui.workflow.engine.StepTransition;
 import org.cometgui.workflow.state.Plan;
 import org.cometgui.workflow.storage.ProjectLock;
@@ -71,6 +81,11 @@ class WorkflowRunPortTest {
                 public void onTransition(StepTransition transition) {}
             };
 
+    /** A Percolator half that cannot run: the Comet half is what these tests are about. */
+    private static final PercolatorRequest BLOCKED =
+            PercolatorRequest.blocked(
+                    List.of("The Percolator builds on this computer have not been read yet."));
+
     @TempDir private Path scratch;
 
     private ProjectSession project(Path root) {
@@ -80,7 +95,7 @@ class WorkflowRunPortTest {
                 ApplicationServices.forThisHost().runIds());
     }
 
-    private static RunEnginePort port(
+    private static SessionEngine port(
             Optional<org.cometgui.domain.tools.ToolManager> tools, ProjectSession project) {
         return RunWiring.port(
                 ApplicationServices.forThisHost(),
@@ -108,6 +123,13 @@ class WorkflowRunPortTest {
                 StandardCharsets.US_ASCII);
     }
 
+    private Path fakePercolator(Path root) throws IOException {
+        Path percolator = Files.createDirectories(root.resolve("bin")).resolve("percolator");
+        Files.writeString(percolator, "#!/bin/sh\nexit 0\n", StandardCharsets.US_ASCII);
+        Files.setPosixFilePermissions(percolator, PosixFilePermissions.fromString("rwx------"));
+        return percolator;
+    }
+
     private Path fakeComet(Path root) throws IOException {
         Path comet = Files.createDirectories(root.resolve("bin")).resolve("comet");
         Files.writeString(comet, "#!/bin/sh\nexit 0\n", StandardCharsets.US_ASCII);
@@ -124,12 +146,12 @@ class WorkflowRunPortTest {
         String reason =
                 "No Comet can be selected, because this machine has no Tool Manager: the artefact"
                         + " manifest cannot be read";
-        assertEquals(List.of(reason), port.check(model(fasta(root)), List.of()).reasons());
+        assertEquals(List.of(reason), port.check(model(fasta(root)), List.of(), BLOCKED).reasons());
         assertEquals(
                 reason,
                 assertThrows(
                                 RunNotStartedException.class,
-                                () -> port.start(model(fasta(root)), List.of(), NOBODY))
+                                () -> port.start(model(fasta(root)), List.of(), BLOCKED, NOBODY))
                         .getMessage());
         assertFalse(Files.exists(project.directory()), "nothing written for a run that cannot be");
     }
@@ -141,7 +163,7 @@ class WorkflowRunPortTest {
         ProjectSession project = project(root);
         EngineCheck check =
                 port(Optional.of(InstalledComet.nothing()), project)
-                        .check(model(fasta(root)), List.of());
+                        .check(model(fasta(root)), List.of(), BLOCKED);
         assertEquals(
                 List.of(
                         "Comet 2026.03.0 is not installed, and the parameters are for that"
@@ -154,7 +176,7 @@ class WorkflowRunPortTest {
         assertEquals(
                 1,
                 port(Optional.of(older), project)
-                        .check(model(fasta(root)), List.of())
+                        .check(model(fasta(root)), List.of(), BLOCKED)
                         .reasons()
                         .size(),
                 "an installed Comet of another release is not selected");
@@ -187,10 +209,10 @@ class WorkflowRunPortTest {
                 List.of(
                         "No run can start: this application was composed without a process"
                                 + " service, so no tool can be launched."),
-                port.check(model(fasta(root)), List.of()).reasons());
+                port.check(model(fasta(root)), List.of(), BLOCKED).reasons());
         assertThrows(
                 RunNotStartedException.class,
-                () -> port.start(model(fasta(root)), List.of(), NOBODY));
+                () -> port.start(model(fasta(root)), List.of(), BLOCKED, NOBODY));
     }
 
     @Test
@@ -203,7 +225,15 @@ class WorkflowRunPortTest {
         Path fasta = fasta(root);
         RunEnginePort port =
                 port(Optional.of(InstalledComet.at("2026.03.0", fakeComet(root))), project);
-        EngineCheck check = port.check(model(fasta), List.of());
+        PercolatorRequest ready =
+                TestPercolators.ready(
+                        TestPercolators.installed(
+                                "3.07.1",
+                                ToolOrigin.MANAGED,
+                                fakePercolator(root),
+                                TestPercolators.ALL,
+                                List.of()));
+        EngineCheck check = port.check(model(fasta), List.of(), ready);
         assertAll(
                 () -> assertEquals(List.of(), check.reasons()),
                 () ->
@@ -229,7 +259,7 @@ class WorkflowRunPortTest {
         RunNotStartedException refused =
                 assertThrows(
                         RunNotStartedException.class,
-                        () -> port.start(model(fasta), List.of(), NOBODY));
+                        () -> port.start(model(fasta), List.of(), ready, NOBODY));
         assertTrue(
                 refused.getMessage()
                         .startsWith(
@@ -253,7 +283,7 @@ class WorkflowRunPortTest {
         try (ProjectLock held = ProjectLock.acquire(layout, Clock.systemUTC())) {
             List<String> reasons =
                     port(Optional.of(InstalledComet.at("2026.03.0", fakeComet(root))), project)
-                            .check(model(fasta(root)), List.of())
+                            .check(model(fasta(root)), List.of(), BLOCKED)
                             .reasons();
             assertEquals(1, reasons.size());
             assertTrue(
@@ -270,6 +300,178 @@ class WorkflowRunPortTest {
                     () -> "the owner's pid is named: " + reasons.get(0));
             assertFalse(project.isOpen());
         }
+    }
+
+    @Test
+    @DisplayName(
+            "a Percolator half that cannot run: the Comet half alone is checked, no preview, and"
+                    + " a run is refused naming the half's problems")
+    void blockedPercolatorHalf() throws IOException {
+        Path root = scratch.toRealPath();
+        ProjectSession project = project(root);
+        SessionEngine port =
+                port(Optional.of(InstalledComet.at("2026.03.0", fakeComet(root))), project);
+        Path fasta = fasta(root);
+        EngineCheck check = port.check(model(fasta), List.of(), BLOCKED);
+        assertAll(
+                () -> assertEquals(List.of(), check.reasons(), "the section states its own"),
+                () ->
+                        assertEquals(
+                                List.of("there is no spectrum file to search"),
+                                check.report().orElseThrow().problems(),
+                                "the Comet half was checked all the same"),
+                () -> assertEquals(Optional.empty(), check.outlook()));
+        assertEquals(
+                "the Percolator section names no build that can run: The Percolator builds on"
+                        + " this computer have not been read yet.",
+                assertThrows(
+                                RunNotStartedException.class,
+                                () -> port.start(model(fasta), List.of(), BLOCKED, NOBODY))
+                        .getMessage());
+    }
+
+    @Test
+    @DisplayName(
+            "a runnable half whose executable cannot be read: the reason names it, beside the"
+                    + " Comet half's report")
+    void unreadablePercolator() throws IOException {
+        Path root = scratch.toRealPath();
+        ProjectSession project = project(root);
+        SessionEngine port =
+                port(Optional.of(InstalledComet.at("2026.03.0", fakeComet(root))), project);
+        Path missing = root.resolve("bin/no-percolator");
+        PercolatorRequest gone =
+                TestPercolators.ready(
+                        TestPercolators.installed(
+                                "3.09", ToolOrigin.LOCAL, missing, TestPercolators.ALL, List.of()));
+        EngineCheck check = port.check(model(fasta(root)), List.of(), gone);
+        assertAll(
+                () -> assertEquals(1, check.reasons().size()),
+                () ->
+                        assertTrue(
+                                check.reasons()
+                                        .get(0)
+                                        .startsWith(
+                                                "The selected Percolator 3.09 at "
+                                                        + missing
+                                                        + " cannot be used: "),
+                                () -> check.reasons().get(0)),
+                () -> assertTrue(check.report().isPresent()),
+                () -> assertEquals(Optional.empty(), check.outlook()));
+        RunNotStartedException refused =
+                assertThrows(
+                        RunNotStartedException.class,
+                        () -> port.start(model(fasta(root)), List.of(), gone, NOBODY));
+        assertEquals(check.reasons().get(0), refused.getMessage());
+    }
+
+    @Test
+    @DisplayName(
+            "a runnable half whose capabilities cannot rescore: the pre-run check refuses it"
+                    + " before anything runs")
+    void percolatorRefusedByThePreRunCheck() throws IOException {
+        Path root = scratch.toRealPath();
+        ProjectSession project = project(root);
+        SessionEngine port =
+                port(Optional.of(InstalledComet.at("2026.03.0", fakeComet(root))), project);
+        PercolatorRequest noTables =
+                TestPercolators.ready(
+                        TestPercolators.installed(
+                                "3.10",
+                                ToolOrigin.LOCAL,
+                                fakePercolator(root),
+                                TestPercolators.allBut(ToolCapability.PSM_TSV_OUTPUT),
+                                List.of()));
+        EngineCheck check = port.check(model(fasta(root)), List.of(), noTables);
+        List<String> problems = check.report().orElseThrow().problems();
+        assertTrue(
+                problems.stream().anyMatch(problem -> problem.contains("PSM_TSV_OUTPUT")),
+                () -> "the builder's refusal is among the problems: " + problems);
+        assertTrue(check.report().orElseThrow().blocked());
+    }
+
+    @Test
+    @DisplayName("no run yet: there is no Percolator rerun, in words, and none can start")
+    void noRerunBeforeARun() throws IOException {
+        Path root = scratch.toRealPath();
+        SessionEngine port =
+                port(Optional.of(InstalledComet.at("2026.03.0", fakeComet(root))), project(root));
+        String none =
+                "No run has been made in this session, so there is no merged PIN to rerun"
+                        + " Percolator from. Run a search first.";
+        assertEquals(Optional.of(none), port.check(BLOCKED).refusal());
+        assertEquals(
+                none,
+                assertThrows(RunNotStartedException.class, () -> port.start(BLOCKED, NOBODY))
+                        .getMessage());
+    }
+
+    @Test
+    @DisplayName("no process service: the rerun is refused with the same words as Run")
+    void noProcessServiceNoRerun() throws IOException {
+        Path root = scratch.toRealPath();
+        ApplicationServices host = ApplicationServices.forThisHost();
+        SessionEngine port =
+                RunWiring.port(
+                        new ApplicationServices(
+                                host.clock(),
+                                host.environment(),
+                                host.fileSystem(),
+                                host.runIds(),
+                                host.glibcVersions(),
+                                null,
+                                null,
+                                null),
+                        new BoundedMessageLog(),
+                        Optional.empty(),
+                        "",
+                        project(root),
+                        BUILD);
+        assertEquals(Optional.of(RunWiring.NO_PROCESS_SERVICE), port.check(BLOCKED).refusal());
+        assertThrows(RunNotStartedException.class, () -> port.start(BLOCKED, NOBODY));
+    }
+
+    @Test
+    @DisplayName(
+            "the Percolator section's port: the Tool Manager's Percolator offers only, in its"
+                    + " order; registration delegated; no Tool Manager said in words")
+    void percolatorPort() throws IOException, ToolRegistrationException {
+        Path root = scratch.toRealPath();
+        ToolOffer local =
+                TestPercolators.installed(
+                        "3.09",
+                        ToolOrigin.LOCAL,
+                        fakePercolator(root),
+                        TestPercolators.allBut(
+                                ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
+                        List.of());
+        ToolOffer managed =
+                TestPercolators.notInstalled(
+                        "3.07.1",
+                        Set.of(ToolCapability.XML_OUTPUT),
+                        CapabilityEvidence.OBSERVED_BY_EXECUTION);
+        InstalledComet tools =
+                InstalledComet.at("2026.03.0", fakeComet(root))
+                        .with(managed)
+                        .registering((tool, executable) -> local);
+        PercolatorPort port = RunWiring.percolator(Optional.of(tools), "");
+        assertEquals(PercolatorOffers.of(List.of(managed)), port.offers());
+        assertEquals(local, port.register(local.installedPath().orElseThrow()));
+        assertEquals(
+                PercolatorOffers.of(List.of(managed, local)),
+                port.offers(),
+                "a registered build is offered from then on");
+
+        PercolatorPort none = RunWiring.percolator(Optional.empty(), "the manifest is unreadable");
+        assertEquals(PercolatorOffers.unavailable("the manifest is unreadable"), none.offers());
+        assertEquals(
+                "No Percolator can be registered, because this machine has no Tool Manager: the"
+                        + " manifest is unreadable",
+                assertThrows(ToolRegistrationException.class, () -> none.register(root))
+                        .getMessage());
+        assertEquals(
+                PercolatorOffers.unavailable("no reason was given"),
+                RunWiring.percolator(Optional.empty(), " ").offers());
     }
 
     @Test
