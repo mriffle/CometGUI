@@ -465,11 +465,45 @@ class RunStoreTest {
     }
 
     @Test
+    @DisplayName(
+            "a derived run is recorded at version 2, read back equal, and keeps version 2 as its"
+                    + " attempts are recorded")
+    void derivedRunRoundTrip() throws IOException {
+        reserveWithParameters();
+        ReservedRun second = store.reserve(lock);
+        assertEquals(new RunId("run-0002"), second.runId());
+        Files.write(second.layout().cometParamsFile(), new byte[12345]);
+
+        RunDescriptor recorded = store.record(lock, StorageFixtures.derivedIdentity());
+        String fresh =
+                StorageFixtures.DERIVED_RUN_JSON.substring(
+                                0, StorageFixtures.DERIVED_RUN_JSON.indexOf("  \"attempts\": ["))
+                        + "  \"attempts\": []\n}\n";
+        assertEquals(fresh, Files.readString(second.layout().runFile(), StandardCharsets.UTF_8));
+        assertEquals(RunDescriptor.of(StorageFixtures.derivedIdentity()), recorded);
+
+        RunDescriptor ended =
+                store.update(
+                        lock, recorded.withNewAttempt(Instant.parse("2026-08-28T23:15:01.000Z")));
+        ended =
+                store.update(
+                        lock,
+                        ended.withAttemptFinished(
+                                AttemptOutcome.SUCCEEDED,
+                                Instant.parse("2026-08-28T23:15:30.000Z")));
+        assertEquals(
+                StorageFixtures.DERIVED_RUN_JSON,
+                Files.readString(second.layout().runFile(), StandardCharsets.UTF_8));
+        assertEquals(StorageFixtures.derivedDescriptor(), store.read(second.layout()));
+        assertEquals(2, ended.schemaVersion());
+    }
+
+    @Test
     @DisplayName("a newer run.json is refused before anything else and left byte-identical")
     void newerRunJsonRefused() throws IOException, NoSuchAlgorithmException {
         RunLayout layout = reserveWithParameters();
         Files.writeString(
-                layout.runFile(), RUN_JSON.replace("\"schemaVersion\": 1", "\"schemaVersion\": 2"));
+                layout.runFile(), RUN_JSON.replace("\"schemaVersion\": 1", "\"schemaVersion\": 3"));
         String before = sha256(layout.runFile());
         UnsupportedSchemaVersionException thrown =
                 assertThrows(UnsupportedSchemaVersionException.class, () -> store.read(layout));

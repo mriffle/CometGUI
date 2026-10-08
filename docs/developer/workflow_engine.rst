@@ -59,7 +59,9 @@ Where the code is
      - The Comet run: ``CometWorkflow`` (check, prepare, start, preview),
        ``PreRunChecks``, the preparation and search step actions,
        ``RunDeclarations``, ``RunInputs``, ``IndexCacheKey`` and
-       ``IndexCacheEntry``.
+       ``IndexCacheEntry``; the Percolator steps; and the derived run
+       (``PercolatorRerun``, ``DerivedRun``; see
+       `Derived runs: the compatible-version Percolator rerun`_).
 
    * - ``org.cometgui.workflow.storage`` (``cometgui-workflow``)
      - ``project.json``, ``run.json`` and ``project.lock``; see
@@ -562,6 +564,70 @@ Within one application session the interface decides between the two
 and Comet digest exactly as the last run recorded them, Run retries that run;
 otherwise it prepares a new one. **A Phase 08 run cannot be retried across an
 application restart**: the prepared run is held in memory.
+
+.. _dev-workflow-engine-derived-runs:
+
+Derived runs: the compatible-version Percolator rerun
+-----------------------------------------------------
+
+Phase 09 (design decision P9-11) adds the one kind of new run that is not a
+fresh search: ``PercolatorRerun`` reruns Percolator -- another build, other
+settings or other downstream stages -- from the merged PIN an earlier run
+preserved, without running Comet (the specification's *Stage reruns*). It is a
+new run, because a different Percolator is a different configuration
+(``R-RUN-06``), and it stays inside the one graph, run store, engine, ledger and
+launcher:
+
+* **The plan.** ``PercolatorRerun.planFor(mode)`` is ``Plan.covering(wanted,
+  provided)``: it wants ``parse-percolator`` and ``finalise-provenance``, and
+  the Comet result steps of the source's search (``serialise-comet-params``,
+  [``build-comet-index``,] ``run-comet``, ``validate-comet-outputs``,
+  ``merge-pin``) are *provided*: the closure stops at them, so the plan is
+  ``validate-configuration``, ``resolve-percolator``, ``run-percolator``,
+  ``parse-percolator``, ``finalise-provenance``. A provided step is never
+  planned, gets no state and has no action, so no Comet can be launched.
+* **The check, before anything is created** (``preview`` and ``prepare``
+  alike). The source is read, never written: its ``run.json`` (it must have
+  ended; a derived run cannot be rerun again), its ``provenance.json``, the one
+  Comet executable its tool records name, and its merged PIN and
+  ``comet.params``, each re-hashed with ``CachingHashService.rehash`` and held to
+  the SHA-256 the source recorded; a mismatch refuses the rerun naming the file,
+  its role and both digests (``R-RUN-02``). The selected Percolator gets the same
+  check a search's Percolator half gets. Then the declared graph decides: over
+  the search-with-Percolator plan, against the source's recorded fingerprints,
+  every provided step must be one the source's own rerun preview would
+  **reuse** -- a source whose ``merge-pin`` never succeeded is refused there --
+  and ``run-percolator`` must **not** be: a source that already ran this exact
+  Percolator has nothing to rerun.
+* **The run.** The run directory is reserved; the source's ``comet.params`` and
+  merged PIN are copied in (a copy, not a hard link, so the source stays
+  byte-identical) and each copy re-hashed against the source's record; anything
+  that fails after the reservation removes the directory again.
+  ``run.json`` is schema version 2, with ``derivedFrom``
+  (:doc:`../reference/project_format`). Percolator's half is prepared by the
+  same code as a search's (``CometWorkflow.preparePercolator``), and the three
+  Percolator steps are the same ``PercolatorSteps`` -- ``PercolatorRun`` holds
+  the run directory, the hasher and the decoy configuration, not a Comet run.
+  The decoy configuration is read from the copied ``comet.params`` by the one
+  parameter parser.
+* **Provenance.** No Comet tool record and no ``comet.*`` setting: Comet is
+  recorded by reference, in the ``rerun.*`` settings
+  (:ref:`ref-provenance-format-rerun-settings`).
+* **The preview** the interface shows before starting is
+  ``PercolatorRerunPreview``: the new run's own ``RerunPreview`` (the Percolator
+  steps execute; ``validate-configuration`` and ``resolve-percolator`` are
+  prepared) and ``reusedFromSource()``, the provided steps, shown as "not
+  executed -- its result is reused from run ...".
+
+``finalise-provenance`` in a derived run re-hashes the two copies once more; like
+a search's (Phase 09 unit 5's residue), it is ordered only by planned steps it
+reads from, so it runs alongside Percolator until Phase 10 plans
+``finalise-results``. ``RealPercolatorRerunTest`` proves the scientist's case
+on real binaries: Comet 2026.03.0 and Percolator 3.09 with Limelight disabled,
+then the rerun with 3.07.1 and Limelight -- Comet launched zero times, a second
+execution record with another version, checksum and argument array (``-X`` and
+``pout.xml`` only in the second), the merged PIN equal, and the source run's
+whole tree (every path, size, SHA-256, time and mode) identical afterwards.
 
 The Comet run
 =============

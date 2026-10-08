@@ -150,6 +150,26 @@ final class DocumentFields {
     }
 
     /**
+     * Applies {@code R-RUN-04}'s policy to the root's {@code schemaVersion} for a format this build
+     * reads at every version from {@code oldest} to {@code current}, before any other member is
+     * looked at. A version above {@code current} is refused as newer; one below {@code oldest} as
+     * older, with no migration.
+     *
+     * @param root the root object
+     * @param oldest the oldest version this build reads
+     * @param current the newest version this build reads and writes
+     * @return the declared version, between {@code oldest} and {@code current}
+     * @throws org.cometgui.domain.project.UnsupportedSchemaVersionException for any other version
+     */
+    long requireVersionBetween(JsonValue.JsonObject root, int oldest, int current) {
+        long found = integer(member(root, ROOT, "schemaVersion"), "schemaVersion");
+        if (found < oldest || found > current) {
+            SchemaVersionPolicy.requireReadable(document, found, current);
+        }
+        return found;
+    }
+
+    /**
      * Requires an object to have no member outside the given names. Missing members are caught by
      * {@link #member}; this catches extra ones, which an update would otherwise silently drop.
      *

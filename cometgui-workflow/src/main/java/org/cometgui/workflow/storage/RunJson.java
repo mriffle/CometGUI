@@ -41,6 +41,7 @@ import org.cometgui.domain.run.OutputBaseNames;
 import org.cometgui.domain.run.RecordedFingerprint;
 import org.cometgui.domain.run.RecordedInput;
 import org.cometgui.domain.run.RunAttempt;
+import org.cometgui.domain.run.RunDerivation;
 import org.cometgui.domain.run.RunDescriptor;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunIdentity;
@@ -52,8 +53,19 @@ import org.cometgui.provenance.json.JsonValue;
 import org.cometgui.provenance.json.JsonWriter;
 
 /**
- * The {@code run.json} format, schema version 1: written by the one {@link JsonWriter}, read by the
- * one {@code JsonReader}.
+ * The {@code run.json} format, schema versions 1 and 2: written by the one {@link JsonWriter}, read
+ * by the one {@code JsonReader}.
+ *
+ * <h2>Two versions</h2>
+ *
+ * <p>Version 2 is version 1 plus one member, {@code derivedFrom}, between {@code databaseDelivery}
+ * and {@code attempts}: the run a derived run reuses the Comet results of ({@link RunDerivation}).
+ * A run is written at the lowest version that can express it ({@link
+ * RunDescriptor#schemaVersion()}): a run that executes its own search is version 1, byte for byte
+ * as Phase 08 wrote it, and a derived run is version 2. This reader reads both. A version-1
+ * document with a {@code derivedFrom} member, and a version-2 document without an object there, are
+ * refused like any other malformed document; anything below 1 or above 2 is refused by {@code
+ * R-RUN-04}'s policy before any other member is read.
  *
  * <p>The identity members come first, in the order of {@link RunIdentity}'s components, then {@code
  * attempts}. Every member is always present -- an absent optional is {@code null}, never omitted --
@@ -84,6 +96,26 @@ public final class RunJson {
                     "indexMode",
                     "databaseDelivery",
                     "attempts");
+
+    /** The root members of a derived run's document (version 2), in the order written. */
+    static final List<String> DERIVED_MEMBERS =
+            List.of(
+                    "schemaVersion",
+                    "runId",
+                    "projectId",
+                    "created",
+                    "cometRelease",
+                    "spectra",
+                    "fasta",
+                    "parameters",
+                    "indexMode",
+                    "databaseDelivery",
+                    "derivedFrom",
+                    "attempts");
+
+    /** The members of {@code derivedFrom}, in the order written. */
+    static final List<String> DERIVATION_MEMBERS =
+            List.of("runId", "created", "provenance", "mergedPin");
 
     /** A spectrum entry's members, in the order written. */
     static final List<String> SPECTRUM_MEMBERS =
@@ -120,7 +152,7 @@ public final class RunJson {
                 JsonWriter.redactingWith(SecretRedactor.patternsOnly())
                         .beginObject()
                         .name("schemaVersion")
-                        .value(RunDescriptor.SCHEMA_VERSION)
+                        .value(descriptor.schemaVersion())
                         .name("runId")
                         .value(identity.runId().value())
                         .name("projectId")
@@ -144,21 +176,27 @@ public final class RunJson {
         }
         json.endArray().name("fasta").beginObject();
         writeRecordedInput(json, identity.fasta());
-        json.endObject()
-                .name("parameters")
-                .beginObject()
-                .name("path")
-                .value(identity.parameters().path())
-                .name("size")
-                .value(identity.parameters().size());
-        writeHashes(json, identity.parameters().hashes());
-        json.endObject()
-                .name("indexMode")
+        json.endObject().name("parameters");
+        writeArchived(json, identity.parameters());
+        json.name("indexMode")
                 .value(identity.indexMode().wireName())
                 .name("databaseDelivery")
-                .value(identity.databaseDelivery().wireName())
-                .name("attempts")
-                .beginArray();
+                .value(identity.databaseDelivery().wireName());
+        if (identity.derivedFrom().isPresent()) {
+            RunDerivation derivation = identity.derivedFrom().get();
+            json.name("derivedFrom")
+                    .beginObject()
+                    .name("runId")
+                    .value(derivation.runId().value())
+                    .name("created")
+                    .value(CanonicalTimestamp.utcMillis(derivation.created()))
+                    .name("provenance");
+            writeArchived(json, derivation.provenance());
+            json.name("mergedPin");
+            writeArchived(json, derivation.mergedPin());
+            json.endObject();
+        }
+        json.name("attempts").beginArray();
         for (RunAttempt attempt : descriptor.attempts()) {
             writeAttempt(json, attempt);
         }
@@ -173,6 +211,12 @@ public final class RunJson {
                 .name("modified")
                 .value(CanonicalTimestamp.utcMillis(input.modified()));
         writeHashes(json, input.hashes());
+    }
+
+    private static void writeArchived(JsonWriter json, ArchivedFile file) {
+        json.beginObject().name("path").value(file.path()).name("size").value(file.size());
+        writeHashes(json, file.hashes());
+        json.endObject();
     }
 
     private static void writeHashes(JsonWriter json, FileHashes hashes) {
@@ -215,14 +259,20 @@ public final class RunJson {
      * @return the record
      * @throws org.cometgui.domain.project.UnsupportedSchemaVersionException if the document is of
      *     another schema version, before any other member is read
-     * @throws InvalidDocumentException if the document is not a version-1 {@code run.json}
+     * @throws InvalidDocumentException if the document is not a version-1 or version-2 {@code
+     *     run.json}
      */
     public static RunDescriptor parse(String text, String document) {
         Objects.requireNonNull(text, "text");
         DocumentFields fields = new DocumentFields(document);
         JsonValue.JsonObject root = fields.root(text);
-        fields.requireVersion(root, RunDescriptor.SCHEMA_VERSION);
-        fields.requireOnly(root, ROOT, MEMBERS);
+        boolean derived =
+                fields.requireVersionBetween(
+                                root,
+                                RunDescriptor.SCHEMA_VERSION,
+                                RunDescriptor.DERIVED_SCHEMA_VERSION)
+                        == RunDescriptor.DERIVED_SCHEMA_VERSION;
+        fields.requireOnly(root, ROOT, derived ? DERIVED_MEMBERS : MEMBERS);
 
         String runIdText = fields.string(fields.member(root, ROOT, "runId"), "runId");
         RunId runId = fields.rebuilt("runId", () -> new RunId(runIdText));
@@ -243,7 +293,13 @@ public final class RunJson {
         ArchivedFile parameters =
                 readArchived(
                         fields,
-                        fields.object(fields.member(root, ROOT, "parameters"), "parameters"));
+                        fields.object(fields.member(root, ROOT, "parameters"), "parameters"),
+                        "parameters");
+        if (!parameters.path().startsWith(RunLayout.PARAMETERS_DIRECTORY_NAME + "/")) {
+            throw fields.invalid(
+                    child("parameters", "path"),
+                    "must name a file under " + RunLayout.PARAMETERS_DIRECTORY_NAME + "/");
+        }
         IndexMode indexMode =
                 wire(
                         fields,
@@ -259,6 +315,15 @@ public final class RunJson {
                                 fields.member(root, ROOT, "databaseDelivery"), "databaseDelivery"),
                         DatabaseDelivery.values(),
                         DatabaseDelivery::wireName);
+        Optional<RunDerivation> derivedFrom =
+                derived
+                        ? Optional.of(
+                                readDerivation(
+                                        fields,
+                                        fields.object(
+                                                fields.member(root, ROOT, "derivedFrom"),
+                                                "derivedFrom")))
+                        : Optional.empty();
         RunIdentity identity =
                 fields.rebuilt(
                         ROOT,
@@ -272,7 +337,8 @@ public final class RunJson {
                                         fasta,
                                         parameters,
                                         indexMode,
-                                        delivery));
+                                        delivery,
+                                        derivedFrom));
 
         List<JsonValue> attemptElements =
                 fields.array(fields.member(root, ROOT, "attempts"), "attempts");
@@ -342,15 +408,33 @@ public final class RunJson {
         return fields.rebuilt(path, () -> new RecordedInput(file, size, modified, hashes));
     }
 
-    private static ArchivedFile readArchived(DocumentFields fields, JsonValue.JsonObject owner) {
-        String path = "parameters";
+    private static RunDerivation readDerivation(DocumentFields fields, JsonValue.JsonObject owner) {
+        String path = "derivedFrom";
+        fields.requireOnly(owner, path, DERIVATION_MEMBERS);
+        String runIdText = fields.string(fields.member(owner, path, "runId"), child(path, "runId"));
+        RunId runId = fields.rebuilt(child(path, "runId"), () -> new RunId(runIdText));
+        Instant created =
+                fields.timestamp(fields.member(owner, path, "created"), child(path, "created"));
+        ArchivedFile provenance =
+                readArchived(
+                        fields,
+                        fields.object(
+                                fields.member(owner, path, "provenance"),
+                                child(path, "provenance")),
+                        child(path, "provenance"));
+        ArchivedFile mergedPin =
+                readArchived(
+                        fields,
+                        fields.object(
+                                fields.member(owner, path, "mergedPin"), child(path, "mergedPin")),
+                        child(path, "mergedPin"));
+        return fields.rebuilt(path, () -> new RunDerivation(runId, created, provenance, mergedPin));
+    }
+
+    private static ArchivedFile readArchived(
+            DocumentFields fields, JsonValue.JsonObject owner, String path) {
         fields.requireOnly(owner, path, ARCHIVED_MEMBERS);
         String file = fields.string(fields.member(owner, path, "path"), child(path, "path"));
-        if (!file.startsWith(RunLayout.PARAMETERS_DIRECTORY_NAME + "/")) {
-            throw fields.invalid(
-                    child(path, "path"),
-                    "must name a file under " + RunLayout.PARAMETERS_DIRECTORY_NAME + "/");
-        }
         long size = fields.integer(fields.member(owner, path, "size"), child(path, "size"));
         FileHashes hashes = fields.hashes(owner, path);
         return fields.rebuilt(path, () -> new ArchivedFile(file, size, hashes));

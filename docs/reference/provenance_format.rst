@@ -520,6 +520,57 @@ Lists inside a value are separated by single spaces.
        seed is ``percolator.random-seed``; the one that ran is
        ``percolator.seed``.
 
+.. _ref-provenance-format-rerun-settings:
+
+Keys a derived run records
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A *derived* run -- the compatible-version Percolator rerun, which reruns
+Percolator from the merged PIN an earlier run preserved and runs no Comet
+(:doc:`project_format`, *A derived run*) -- records the ``percolator.*`` keys
+above for its own Percolator, and these, all held in one place in the code
+(``RerunProvenance`` in ``org.cometgui.workflow.steps``). **Comet is recorded by
+reference, never as executed**: a derived run's document has no Comet tool
+record and none of the ``comet.*`` keys a search records; these keys name the
+source run's records instead, each a value the source recorded and the derived
+run re-verified. Every one is fixed when the run is prepared, so they are in the
+document however the attempt ends.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Key
+     - Value
+
+   * - ``rerun.source-run-id``
+     - The source run's identifier.
+   * - ``rerun.source-run-directory``
+     - The source run's directory relative to the project,
+       ``runs/<yyyyMMdd'T'HHmmss'Z'>-<runId>``.
+   * - ``rerun.source-provenance-sha256``
+     - The SHA-256 of the source's ``provenance/provenance.json`` when the run
+       was made -- the record the rest of these values come from.
+   * - ``rerun.source-comet-release``
+     - The Comet release the source's search ran.
+   * - ``rerun.source-comet-binary-sha256``
+     - The SHA-256 of the Comet executable the source's search ran, as every
+       Comet tool record of the source names it.
+   * - ``rerun.source-comet-params-sha256``
+     - The SHA-256 of the source's archived ``comet.params``, equal to the
+       derived run's copy.
+   * - ``rerun.merged-pin-sha256``
+     - The SHA-256 the source recorded for its merged PIN, equal to the source's
+       file re-hashed and to the derived run's copy.
+   * - ``rerun.source-percolator-version``
+     - The Percolator version the source ran (its ``percolator.version``), or
+       ``none`` for a source that ran no Percolator.
+   * - ``rerun.reused-steps``
+     - The steps whose results come from the source and are not executed in the
+       derived run, space-separated in step order -- for a search without an
+       index ``serialise-comet-params run-comet validate-comet-outputs
+       merge-pin``.
+
 ``tools[]``
 -----------
 

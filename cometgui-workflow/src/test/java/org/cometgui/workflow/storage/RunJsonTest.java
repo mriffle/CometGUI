@@ -16,6 +16,7 @@
 
 package org.cometgui.workflow.storage;
 
+import static org.cometgui.workflow.storage.StorageFixtures.DERIVED_RUN_JSON;
 import static org.cometgui.workflow.storage.StorageFixtures.RUN_JSON;
 import static org.cometgui.workflow.testing.TestPaths.absolute;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -41,6 +42,7 @@ import org.cometgui.domain.run.DatabaseDelivery;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.domain.run.RecordedFingerprint;
 import org.cometgui.domain.run.RunAttempt;
+import org.cometgui.domain.run.RunDerivation;
 import org.cometgui.domain.run.RunDescriptor;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.SpectrumInput;
@@ -198,23 +200,24 @@ class RunJsonTest {
     @Test
     @DisplayName("a newer schema version is refused before any other member is read")
     void newerRefusedFirst() {
-        // Every other member is wrong too; only the version may be reported.
+        // Every other member is wrong too; only the version may be reported. Version 2 is a
+        // derived run's, which this build reads; 3 is the first it does not.
         String newer =
-                "{\"schemaVersion\": 2, \"runId\": 5, \"spectra\": \"x\", \"surprise\": true}\n";
+                "{\"schemaVersion\": 3, \"runId\": 5, \"spectra\": \"x\", \"surprise\": true}\n";
         UnsupportedSchemaVersionException thrown =
                 assertThrows(
                         UnsupportedSchemaVersionException.class, () -> RunJson.parse(newer, DOC));
         assertAll(
                 () -> assertEquals(SchemaVerdict.NEWER, thrown.verdict()),
-                () -> assertEquals(2, thrown.found()),
-                () -> assertEquals(1, thrown.current()),
+                () -> assertEquals(3, thrown.found()),
+                () -> assertEquals(2, thrown.current()),
                 () -> assertEquals("run.json", thrown.document()),
                 () ->
                         assertTrue(
                                 thrown.getMessage()
                                         .startsWith(
-                                                "run.json declares schema version 2, and this build"
-                                                        + " of CometGUI reads version 1."),
+                                                "run.json declares schema version 3, and this build"
+                                                        + " of CometGUI reads version 2."),
                                 thrown.getMessage()));
     }
 
@@ -236,8 +239,8 @@ class RunJsonTest {
                 () ->
                         assertEquals(
                                 "run.json declares schema version 0, and this build of CometGUI"
-                                        + " reads version 1. No migration from version 0 to version"
-                                        + " 1 exists, so it is refused; the file has not been"
+                                        + " reads version 2. No migration from version 0 to version"
+                                        + " 2 exists, so it is refused; the file has not been"
                                         + " changed.",
                                 thrown.getMessage()));
     }
@@ -694,6 +697,183 @@ class RunJsonTest {
         InvalidDocumentException thrown =
                 assertThrows(InvalidDocumentException.class, () -> RunJson.parse(twice, DOC));
         assertInstanceOf(JsonParseException.class, thrown.getCause());
+    }
+
+    @Test
+    @DisplayName("a run that executes its own search is still written at version 1")
+    void ownSearchStaysVersionOne() {
+        assertTrue(RUN_JSON.startsWith("{\n  \"schemaVersion\": 1,\n"));
+        assertEquals(1, RunJson.parse(RUN_JSON, DOC).schemaVersion());
+        assertFalse(RunJson.render(StorageFixtures.descriptor()).contains("derivedFrom"));
+    }
+
+    @Test
+    @DisplayName("a derived run is written exactly as the hand-typed version-2 document")
+    void writerPinsTheDerivedBytes() {
+        assertEquals(DERIVED_RUN_JSON, RunJson.render(StorageFixtures.derivedDescriptor()));
+    }
+
+    @Test
+    @DisplayName("the reader reads every value of the hand-typed version-2 document")
+    void readerReadsTheDerivation() {
+        RunDescriptor read = RunJson.parse(DERIVED_RUN_JSON, DOC);
+        RunDerivation from = read.identity().derivedFrom().orElseThrow();
+        assertAll(
+                () -> assertEquals(2, read.schemaVersion()),
+                () -> assertEquals(new RunId("run-0002"), read.identity().runId()),
+                () -> assertEquals(new RunId("run-0001"), from.runId()),
+                () -> assertEquals(Instant.parse("2026-08-28T22:00:00.125Z"), from.created()),
+                () -> assertEquals("20260828T220000Z-run-0001", from.directoryName()),
+                () -> assertEquals("provenance/provenance.json", from.provenance().path()),
+                () -> assertEquals(40960, from.provenance().size()),
+                () ->
+                        assertEquals(
+                                new FileHashes(
+                                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                                                + "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                                from.provenance().hashes()),
+                () -> assertEquals("inputs/pin/merged.pin", from.mergedPin().path()),
+                () -> assertEquals(1234567, from.mergedPin().size()),
+                () ->
+                        assertEquals(
+                                new FileHashes(
+                                        "88888888888888888888888888888888",
+                                        "99999999999999999999999999999999"
+                                                + "99999999999999999999999999999999"),
+                                from.mergedPin().hashes()),
+                () -> assertEquals(StorageFixtures.derivedDescriptor(), read));
+    }
+
+    static Stream<Arguments> derivedDamage() {
+        return Stream.of(
+                Arguments.of(
+                        "a version-1 document carrying derivedFrom",
+                        "\"schemaVersion\": 2",
+                        "\"schemaVersion\": 1",
+                        "",
+                        "the document has 1 member(s) this build does not know; its schema version"
+                                + " defines exactly [schemaVersion, runId, projectId, created,"
+                                + " cometRelease, spectra, fasta, parameters, indexMode,"
+                                + " databaseDelivery, attempts]"),
+                Arguments.of(
+                        "an unknown member beside derivedFrom",
+                        "\"derivedFrom\": {",
+                        "\"derivedFrom\": null, \"x\": {",
+                        "",
+                        "the document has 1 member(s) this build does not know; its schema version"
+                                + " defines exactly [schemaVersion, runId, projectId, created,"
+                                + " cometRelease, spectra, fasta, parameters, indexMode,"
+                                + " databaseDelivery, derivedFrom, attempts]"),
+                Arguments.of(
+                        "derivedFrom renamed away",
+                        "\"derivedFrom\": {",
+                        "\"derivedFrm\": {",
+                        "",
+                        "the document has 1 member(s) this build does not know; its schema version"
+                                + " defines exactly [schemaVersion, runId, projectId, created,"
+                                + " cometRelease, spectra, fasta, parameters, indexMode,"
+                                + " databaseDelivery, derivedFrom, attempts]"),
+                Arguments.of(
+                        "a derivation with an extra member",
+                        "\"runId\": \"run-0001\",\n    \"created\"",
+                        "\"runId\": \"run-0001\", \"why\": 1,\n    \"created\"",
+                        "derivedFrom",
+                        "\"derivedFrom\" has 1 member(s) this build does not know; its schema"
+                                + " version defines exactly [runId, created, provenance,"
+                                + " mergedPin]"),
+                Arguments.of(
+                        "a derivation without its merged PIN",
+                        "\"mergedPin\": {",
+                        "\"mergedPim\": {",
+                        "derivedFrom",
+                        "\"derivedFrom\" has 1 member(s) this build does not know; its schema"
+                                + " version defines exactly [runId, created, provenance,"
+                                + " mergedPin]"),
+                Arguments.of(
+                        "a source run id that is no run id",
+                        "\"runId\": \"run-0001\",\n    \"created\"",
+                        "\"runId\": \"../run-0001\",\n    \"created\"",
+                        "derivedFrom.runId",
+                        "\"derivedFrom.runId\" was refused by the model"
+                                + " (IllegalArgumentException); the model's own message is not"
+                                + " repeated, because it quotes the value it refused"),
+                Arguments.of(
+                        "a source creation time that is no timestamp",
+                        "\"created\": \"2026-08-28T22:00:00.125Z\"",
+                        "\"created\": \"yesterday\"",
+                        "derivedFrom.created",
+                        "\"derivedFrom.created\" must be a UTC timestamp of the form"
+                                + " uuuu-MM-dd'T'HH:mm:ss.SSS'Z'"),
+                Arguments.of(
+                        "the merged PIN recorded at another path",
+                        "\"path\": \"inputs/pin/merged.pin\"",
+                        "\"path\": \"inputs/pin/other.pin\"",
+                        "derivedFrom",
+                        "\"derivedFrom\" was refused by the model (IllegalArgumentException);"
+                                + " the model's own message is not repeated, because it quotes the"
+                                + " value it refused"),
+                Arguments.of(
+                        "the manifest with an extra member",
+                        "\"path\": \"provenance/provenance.json\",",
+                        "\"path\": \"provenance/provenance.json\", \"why\": 1,",
+                        "derivedFrom.provenance",
+                        "\"derivedFrom.provenance\" has 1 member(s) this build does not know;"
+                                + " its schema version defines exactly [path, size, md5, sha256]"),
+                Arguments.of(
+                        "the merged PIN's digest in upper case",
+                        "\"sha256\": \"99999",
+                        "\"sha256\": \"A9999",
+                        "derivedFrom.mergedPin",
+                        "\"derivedFrom.mergedPin\" must record its digests in lower-case"
+                                + " hexadecimal"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("derivedDamage")
+    @DisplayName("damaged version-2 documents are refused naming the member, quoting no value")
+    void derivedDamaged(String what, String from, String to, String member, String problem) {
+        String damaged = replaceOnce(DERIVED_RUN_JSON, from, to);
+        assertNotEquals(DERIVED_RUN_JSON, damaged, "the damage must change the document");
+        InvalidDocumentException thrown =
+                assertThrows(
+                        InvalidDocumentException.class, () -> RunJson.parse(damaged, DOC), what);
+        assertAll(
+                () -> assertEquals(PREFIX + problem, thrown.getMessage()),
+                () -> assertEquals(member, thrown.member()));
+    }
+
+    @Test
+    @DisplayName("derivedFrom as null in a version-2 document is refused: it must be an object")
+    void derivationNotAnObject() {
+        String damaged =
+                DERIVED_RUN_JSON.substring(0, DERIVED_RUN_JSON.indexOf("  \"derivedFrom\""))
+                        + "  \"derivedFrom\": null,\n"
+                        + DERIVED_RUN_JSON.substring(DERIVED_RUN_JSON.indexOf("  \"attempts\""));
+        InvalidDocumentException thrown =
+                assertThrows(InvalidDocumentException.class, () -> RunJson.parse(damaged, DOC));
+        assertAll(
+                () ->
+                        assertEquals(
+                                PREFIX + "\"derivedFrom\" must be a JSON object",
+                                thrown.getMessage()),
+                () -> assertEquals("derivedFrom", thrown.member()));
+    }
+
+    @Test
+    @DisplayName("a version-2 document with no derivedFrom is refused naming the member")
+    void derivationMissing() {
+        String damaged =
+                DERIVED_RUN_JSON.substring(0, DERIVED_RUN_JSON.indexOf("  \"derivedFrom\""))
+                        + DERIVED_RUN_JSON.substring(DERIVED_RUN_JSON.indexOf("  \"attempts\""));
+        InvalidDocumentException thrown =
+                assertThrows(InvalidDocumentException.class, () -> RunJson.parse(damaged, DOC));
+        assertAll(
+                () ->
+                        assertEquals(
+                                PREFIX + "the document has no member \"derivedFrom\"",
+                                thrown.getMessage()),
+                () -> assertEquals("", thrown.member()));
     }
 
     static String replaceOnce(String text, String from, String to) {

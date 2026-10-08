@@ -21,6 +21,7 @@ import static org.cometgui.workflow.testing.TestPaths.absolute;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.cometgui.domain.ports.FileHashes;
 import org.cometgui.domain.project.ProjectId;
 import org.cometgui.domain.run.ArchivedFile;
@@ -29,6 +30,7 @@ import org.cometgui.domain.run.DatabaseDelivery;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.domain.run.RecordedFingerprint;
 import org.cometgui.domain.run.RecordedInput;
+import org.cometgui.domain.run.RunDerivation;
 import org.cometgui.domain.run.RunDescriptor;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunIdentity;
@@ -97,6 +99,52 @@ final class StorageFixtures {
                         AttemptOutcome.FAILED, Instant.parse("2026-08-28T23:16:00.000Z"))
                 .withNewAttempt(Instant.parse("2026-08-28T23:17:00.000Z"));
     }
+
+    static final String MD5_M = "88888888888888888888888888888888";
+    static final String SHA_M = "9999999999999999999999999999999999999999999999999999999999999999";
+    static final String MD5_V = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    static final String SHA_V = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /**
+     * A derived run, run-0002, made from {@link #identity()}'s run-0001: the same Comet members,
+     * and its {@code derivedFrom}, as {@link #DERIVED_RUN_JSON} records it.
+     */
+    static RunIdentity derivedIdentity() {
+        RunIdentity source = identity();
+        return new RunIdentity(
+                new RunId("run-0002"),
+                source.projectId(),
+                CREATED,
+                source.cometRelease(),
+                source.spectra(),
+                source.fasta(),
+                source.parameters(),
+                source.indexMode(),
+                source.databaseDelivery(),
+                Optional.of(
+                        new RunDerivation(
+                                new RunId("run-0001"),
+                                Instant.parse("2026-08-28T22:00:00.125Z"),
+                                new ArchivedFile(
+                                        "provenance/provenance.json",
+                                        40960,
+                                        new FileHashes(MD5_V, SHA_V)),
+                                new ArchivedFile(
+                                        "inputs/pin/merged.pin",
+                                        1234567,
+                                        new FileHashes(MD5_M, SHA_M)))));
+    }
+
+    /** {@link #derivedIdentity()} with one attempt, ended. */
+    static RunDescriptor derivedDescriptor() {
+        return RunDescriptor.of(derivedIdentity())
+                .withNewAttempt(Instant.parse("2026-08-28T23:15:01.000Z"))
+                .withAttemptFinished(
+                        AttemptOutcome.SUCCEEDED, Instant.parse("2026-08-28T23:15:30.000Z"));
+    }
+
+    /** {@link #derivedDescriptor()}'s run.json, typed by hand from the format. */
+    static final String DERIVED_RUN_JSON = derivedRunJson();
 
     /** {@link #descriptor()}'s run.json, typed by hand from the format. */
     static final String RUN_JSON = runJson();
@@ -179,6 +227,80 @@ final class StorageFixtures {
                   "started": "2026-08-28T23:17:00.000Z",
                   "ended": null,
                   "outcome": "running",
+                  "succeededSteps": {}
+                }
+              ]
+            }
+            """;
+    }
+
+    private static String derivedRunJson() {
+        return """
+            {
+              "schemaVersion": 2,
+              "runId": "run-0002",
+              "projectId": "project-beta",
+              "created": "2026-08-28T23:15:00.250Z",
+              "cometRelease": "2026.03.0",
+              "spectra": [
+                {
+                  "position": 1,
+                  "stageId": "comet-01",
+                  "base": "k562_3",
+                  "path": "/data/in/k562_3.mzML",
+                  "size": 2602922,
+                  "modified": "2026-08-01T10:00:00.000Z",
+                  "md5": "0123456789abcdef0123456789abcdef",
+                  "sha256": "a562f6e6b4c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5"
+                },
+                {
+                  "position": 2,
+                  "stageId": "comet-02",
+                  "base": "k562_4",
+                  "path": "/data/in/k562_4.mzML",
+                  "size": 1195947,
+                  "modified": "2026-08-01T10:05:30.500Z",
+                  "md5": "fedcba9876543210fedcba9876543210",
+                  "sha256": "602aad75e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
+                }
+              ],
+              "fasta": {
+                "path": "/data/db/sub.fasta",
+                "size": 512000,
+                "modified": "2026-07-30T08:00:00.000Z",
+                "md5": "11111111111111111111111111111111",
+                "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "parameters": {
+                "path": "parameters/comet.params",
+                "size": 12345,
+                "md5": "33333333333333333333333333333333",
+                "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "indexMode": "none",
+              "databaseDelivery": "parameter-file",
+              "derivedFrom": {
+                "runId": "run-0001",
+                "created": "2026-08-28T22:00:00.125Z",
+                "provenance": {
+                  "path": "provenance/provenance.json",
+                  "size": 40960,
+                  "md5": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "mergedPin": {
+                  "path": "inputs/pin/merged.pin",
+                  "size": 1234567,
+                  "md5": "88888888888888888888888888888888",
+                  "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+                }
+              },
+              "attempts": [
+                {
+                  "number": 1,
+                  "started": "2026-08-28T23:15:01.000Z",
+                  "ended": "2026-08-28T23:15:30.000Z",
+                  "outcome": "succeeded",
                   "succeededSteps": {}
                 }
               ]

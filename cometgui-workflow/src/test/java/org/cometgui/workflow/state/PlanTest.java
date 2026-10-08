@@ -283,4 +283,108 @@ class PlanTest {
                                 () -> Scenario.phase08().stepsIn(Nulls.of(WorkflowStage.class)))
                         .getMessage());
     }
+
+    @Test
+    @DisplayName(
+            "a derived run's plan: the Percolator steps and what they need, the Comet results"
+                    + " provided and never planned")
+    void providedSteps() {
+        Plan plan =
+                Plan.covering(
+                        EnumSet.of(PARSE_PERCOLATOR, FINALISE_PROVENANCE),
+                        EnumSet.of(
+                                SERIALISE_COMET_PARAMS,
+                                RUN_COMET,
+                                VALIDATE_COMET_OUTPUTS,
+                                MERGE_PIN));
+
+        assertEquals(
+                List.of(
+                        VALIDATE_CONFIGURATION,
+                        RESOLVE_PERCOLATOR,
+                        RUN_PERCOLATOR,
+                        PARSE_PERCOLATOR,
+                        FINALISE_PROVENANCE),
+                plan.steps());
+        assertEquals(
+                List.of(SERIALISE_COMET_PARAMS, RUN_COMET, VALIDATE_COMET_OUTPUTS, MERGE_PIN),
+                new ArrayList<>(plan.provided()));
+        assertFalse(plan.contains(MERGE_PIN), "a provided step is never planned");
+        assertFalse(plan.contains(RESOLVE_COMET), "only a provided step required it");
+        assertFalse(plan.contains(HASH_INPUTS), "only a provided step required it");
+        assertEquals(List.of(RESOLVE_PERCOLATOR), plan.upstreamOf(RUN_PERCOLATOR));
+        assertEquals(List.of(), plan.upstreamOf(FINALISE_PROVENANCE));
+        assertEquals(
+                "Plan[validate-configuration, resolve-percolator, run-percolator,"
+                        + " parse-percolator, finalise-provenance] provided[serialise-comet-params,"
+                        + " run-comet, validate-comet-outputs, merge-pin]",
+                plan.toString());
+        assertThrows(UnsupportedOperationException.class, () -> plan.provided().add(RUN_COMET));
+    }
+
+    @Test
+    @DisplayName("a plan that executes everything it needs provides nothing")
+    void nothingProvided() {
+        assertEquals(Set.of(), Scenario.phase08().provided());
+        Plan same =
+                Plan.covering(EnumSet.of(FINALISE_PROVENANCE), EnumSet.noneOf(EngineStep.class));
+        assertEquals(Scenario.phase08().steps(), same.steps());
+        assertEquals(Scenario.phase08().toString(), same.toString());
+    }
+
+    @Test
+    @DisplayName("a step still required by a planned step is planned even if another is provided")
+    void providedStopsOnlyItsOwnBranch() {
+        Plan plan =
+                Plan.covering(EnumSet.of(FINALISE_PROVENANCE, RUN_COMET), EnumSet.of(MERGE_PIN));
+
+        assertEquals(
+                List.of(
+                        VALIDATE_CONFIGURATION,
+                        RESOLVE_COMET,
+                        SERIALISE_COMET_PARAMS,
+                        HASH_INPUTS,
+                        RUN_COMET,
+                        FINALISE_PROVENANCE),
+                plan.steps());
+        assertEquals(Set.of(MERGE_PIN), plan.provided());
+    }
+
+    @Test
+    @DisplayName("refuses a provided preparation step, a step both wanted and provided, and nulls")
+    void providedRefusals() {
+        Set<EngineStep> nullProvided = new HashSet<>();
+        nullProvided.add(null);
+        @SuppressWarnings("unchecked")
+        Set<EngineStep> noProvided = Nulls.of(Set.class);
+
+        assertEquals(
+                "step resolve-comet cannot be provided by another run: it is a preparation step,"
+                        + " which produces no result",
+                assertThrows(
+                                IllegalArgumentException.class,
+                                () ->
+                                        Plan.covering(
+                                                EnumSet.of(PARSE_PERCOLATOR),
+                                                EnumSet.of(RESOLVE_COMET)))
+                        .getMessage());
+        assertEquals(
+                "step merge-pin is both wanted and provided by another run",
+                assertThrows(
+                                IllegalArgumentException.class,
+                                () -> Plan.covering(EnumSet.of(MERGE_PIN), EnumSet.of(MERGE_PIN)))
+                        .getMessage());
+        assertEquals(
+                "provided contains null",
+                assertThrows(
+                                NullPointerException.class,
+                                () -> Plan.covering(EnumSet.of(PARSE_PERCOLATOR), nullProvided))
+                        .getMessage());
+        assertEquals(
+                "provided",
+                assertThrows(
+                                NullPointerException.class,
+                                () -> Plan.covering(EnumSet.of(PARSE_PERCOLATOR), noProvided))
+                        .getMessage());
+    }
 }

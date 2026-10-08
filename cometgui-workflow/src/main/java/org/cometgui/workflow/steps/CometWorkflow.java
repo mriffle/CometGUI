@@ -45,6 +45,7 @@ import org.cometgui.params.comet.writer.WrittenParams;
 import org.cometgui.params.percolator.resolution.AdvisoryRendering;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
+import org.cometgui.tools.comet.PinDecoyConfiguration;
 import org.cometgui.tools.percolator.PercolatorCommand;
 import org.cometgui.tools.percolator.PercolatorCommands;
 import org.cometgui.tools.percolator.PercolatorRefusedException;
@@ -297,7 +298,8 @@ public final class CometWorkflow {
                                 String.valueOf(cached.directory().getFileName())));
         Optional<PercolatorRun> percolator = Optional.empty();
         if (request.percolator().isPresent()) {
-            PercolatorRun half = preparePercolator(run, request.percolator().get());
+            PercolatorRun half =
+                    preparePercolator(layout, hashes, run.decoys(), request.percolator().get());
             settings.putAll(
                     PercolatorProvenance.settings(
                             half.choice(),
@@ -321,11 +323,22 @@ public final class CometWorkflow {
      * The Percolator half of a run being prepared: {@code parameters/percolator-settings.json}
      * written once and hashed, the command built from the selection's probed capabilities, and the
      * tool as provenance records it -- its observed capabilities, and as warnings its advisories
-     * and, without a weights file, {@code R-PERC-08}'s.
+     * and, without a weights file, {@code R-PERC-08}'s. A derived run ({@link PercolatorRerun})
+     * prepares its Percolator half here too, so the two cannot differ.
+     *
+     * @param layout the run's directory, already reserved
+     * @param hashes the one hasher
+     * @param decoys the decoy configuration the merged PIN is checked with
+     * @param choice the Percolator half of the search
+     * @return the Percolator half
+     * @throws IOException if the settings file cannot be written or the executable hashed
      */
-    private PercolatorRun preparePercolator(CometRun comet, PercolatorChoice choice)
+    static PercolatorRun preparePercolator(
+            RunLayout layout,
+            CachingHashService hashes,
+            PinDecoyConfiguration decoys,
+            PercolatorChoice choice)
             throws IOException {
-        RunLayout layout = comet.layout();
         PercolatorSettingsFile.Archived archived =
                 PercolatorSettingsFile.writeOnce(
                         PercolatorDeclarations.settingsFile(layout),
@@ -362,7 +375,7 @@ public final class CometWorkflow {
                         Optional.empty(),
                         capabilities,
                         warnings);
-        return new PercolatorRun(comet, choice, tool, command, archived);
+        return new PercolatorRun(layout, hashes, decoys, choice, tool, command, archived);
     }
 
     /**

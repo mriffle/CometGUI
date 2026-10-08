@@ -49,6 +49,16 @@ import java.util.Set;
  * reported as not planned -- never as succeeded or skipped (see {@link StageProjection} and {@link
  * RunState#deriveFrom(Plan, java.util.Map)}).
  *
+ * <h2>Steps provided by another run</h2>
+ *
+ * <p>A <em>derived</em> run -- Phase 09's compatible-version Percolator rerun -- takes the results
+ * of some {@link StepKind#RESULT} steps from an earlier run instead of executing them ({@link
+ * #covering(Set, Set)}). Those steps are <em>provided</em>: the closure stops at them, so a step
+ * that requires one is planned without it, and what only a provided step requires is not planned at
+ * all. A provided step is never planned; it is not in {@link #steps()}, gets no state and no
+ * fingerprint here, and {@link #provided()} names it so that a preview can say where its result
+ * comes from.
+ *
  * <h2>Within a plan</h2>
  *
  * <p>Every edge of the graph whose two ends are both planned applies -- it orders the two steps
@@ -62,9 +72,12 @@ public final class Plan {
 
     private final List<EngineStep> steps;
 
-    private Plan(StepGraph graph, List<EngineStep> steps) {
+    private final EnumSet<EngineStep> provided;
+
+    private Plan(StepGraph graph, List<EngineStep> steps, EnumSet<EngineStep> provided) {
         this.graph = graph;
         this.steps = steps;
+        this.provided = provided;
     }
 
     /**
@@ -91,8 +104,48 @@ public final class Plan {
      *     not declare, naming it
      */
     public static Plan covering(StepGraph graph, Set<EngineStep> wanted) {
+        return covering(graph, wanted, Set.of());
+    }
+
+    /**
+     * A plan over the {@link StepGraph#canonical() canonical graph} whose run takes some results
+     * from another run: the wanted steps and everything they transitively require, except that the
+     * closure does not enter a provided step.
+     *
+     * @param wanted the steps the run is asked to reach; not empty
+     * @param provided the {@link StepKind#RESULT} steps whose results another run supplies; none of
+     *     them wanted
+     * @return the plan
+     * @throws NullPointerException if an argument or an element of either set is {@code null}
+     * @throws IllegalArgumentException if {@code wanted} is empty, or a provided step is wanted or
+     *     is a {@link StepKind#PREPARATION} step (which produces nothing another run could supply),
+     *     naming it
+     */
+    public static Plan covering(Set<EngineStep> wanted, Set<EngineStep> provided) {
+        return covering(StepGraph.canonical(), wanted, provided);
+    }
+
+    private static Plan covering(
+            StepGraph graph, Set<EngineStep> wanted, Set<EngineStep> provided) {
         Objects.requireNonNull(graph, "graph");
         Objects.requireNonNull(wanted, "wanted");
+        Objects.requireNonNull(provided, "provided");
+        EnumSet<EngineStep> supplied = EnumSet.noneOf(EngineStep.class);
+        for (EngineStep step : provided) {
+            Objects.requireNonNull(step, "provided contains null");
+            if (step.kind() != StepKind.RESULT) {
+                throw new IllegalArgumentException(
+                        "step "
+                                + step.id()
+                                + " cannot be provided by another run: it is a preparation"
+                                + " step, which produces no result");
+            }
+            if (wanted.contains(step)) {
+                throw new IllegalArgumentException(
+                        "step " + step.id() + " is both wanted and provided by another run");
+            }
+            supplied.add(step);
+        }
         if (wanted.isEmpty()) {
             throw new IllegalArgumentException("a plan must want at least one step");
         }
@@ -108,7 +161,7 @@ public final class Plan {
         }
         while (!pending.isEmpty()) {
             EngineStep step = pending.remove();
-            if (planned.add(step)) {
+            if (!supplied.contains(step) && planned.add(step)) {
                 for (StepEdge edge : graph.edgesInto(step)) {
                     if (edge.required()) {
                         pending.add(edge.upstream());
@@ -122,7 +175,7 @@ public final class Plan {
                 ordered.add(step);
             }
         }
-        return new Plan(graph, List.copyOf(ordered));
+        return new Plan(graph, List.copyOf(ordered), supplied);
     }
 
     /**
@@ -141,6 +194,16 @@ public final class Plan {
      */
     public List<EngineStep> steps() {
         return List.copyOf(steps);
+    }
+
+    /**
+     * The steps whose results another run supplies: never planned, and empty for a run that
+     * executes everything it needs.
+     *
+     * @return an immutable set in {@link EngineStep} order
+     */
+    public Set<EngineStep> provided() {
+        return Collections.unmodifiableSet(EnumSet.copyOf(provided));
     }
 
     /**
@@ -238,6 +301,13 @@ public final class Plan {
         for (EngineStep step : steps) {
             ids.add(step.id());
         }
-        return "Plan" + ids;
+        if (provided.isEmpty()) {
+            return "Plan" + ids;
+        }
+        List<String> from = new ArrayList<>();
+        for (EngineStep step : provided) {
+            from.add(step.id());
+        }
+        return "Plan" + ids + " provided" + from;
     }
 }

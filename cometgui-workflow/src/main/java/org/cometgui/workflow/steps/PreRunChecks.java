@@ -176,7 +176,8 @@ final class PreRunChecks {
             Optional<PercolatorChoice> percolator) {
         List<String> problems = new ArrayList<>();
         checkComet(model, comet, problems);
-        percolator.ifPresent(choice -> checkPercolator(project, choice, problems));
+        percolator.ifPresent(
+                choice -> problems.addAll(percolatorProblems(hashes, project, choice)));
         checkSpectra(spectra, problems);
         PreRunFacts facts = PreRunFacts.none();
         Optional<IndexCacheEntry> entry = Optional.empty();
@@ -275,8 +276,20 @@ final class PreRunChecks {
                         Optional.of(CometIndexHeaderReader.read(index))));
     }
 
-    private void checkPercolator(
-            ProjectLayout project, PercolatorChoice choice, List<String> problems) {
+    /**
+     * The Percolator half's own problems: the selected executable exists, is executable and still
+     * has the SHA-256 it was selected at, and its probed capabilities let the command builder build
+     * the run's command. Shared by a search's pre-run check and the compatible-version rerun's
+     * ({@link PercolatorRerun}), so the two cannot disagree.
+     *
+     * @param hashes the one hasher
+     * @param project the project the run would belong to
+     * @param choice the Percolator half
+     * @return each problem, in check order; empty when the half may run
+     */
+    static List<String> percolatorProblems(
+            CachingHashService hashes, ProjectLayout project, PercolatorChoice choice) {
+        List<String> problems = new ArrayList<>();
         PercolatorSelection selection = choice.selection();
         Path executable = selection.executable();
         if (!Files.isRegularFile(executable) || !Files.isExecutable(executable)) {
@@ -284,7 +297,7 @@ final class PreRunChecks {
                     "the selected Percolator executable "
                             + executable
                             + " does not exist or cannot be executed");
-            return;
+            return problems;
         }
         try {
             String now = hashes.hash(executable).sha256();
@@ -315,6 +328,7 @@ final class PreRunChecks {
         } catch (PercolatorRefusedException refused) {
             problems.add(refused.getMessage());
         }
+        return problems;
     }
 
     private void checkComet(CometParameters model, CometSelection comet, List<String> problems) {

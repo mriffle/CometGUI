@@ -34,8 +34,12 @@ import org.cometgui.workflow.state.StepFingerprint;
  * this build does not know is <em>dropped</em>. A dropped step has no recorded fingerprint and so
  * re-executes; a fingerprint missing one of its inputs compares unequal and so re-executes. Nothing
  * unknown can make a step look reusable.
+ *
+ * <p>{@link #fromRecorded} is public so that a preview against <em>another</em> run's record -- the
+ * compatible-version Percolator rerun's check that the run it reuses really holds the results it
+ * reuses -- reads that record exactly as the engine reads a run's own.
  */
-final class RecordedFingerprints {
+public final class RecordedFingerprints {
 
     private RecordedFingerprints() {}
 
@@ -47,7 +51,15 @@ final class RecordedFingerprints {
         return new RecordedFingerprint(fingerprint.value(), digests);
     }
 
-    static Map<EngineStep, StepFingerprint> fromRecorded(Map<String, RecordedFingerprint> stored) {
+    /**
+     * The fingerprints a {@code run.json} records, as the workflow's types.
+     *
+     * @param stored the recorded fingerprints by step identifier, as {@code
+     *     RunDescriptor.succeededFingerprints()} returns them
+     * @return the fingerprints of the steps this build knows, by step; immutable
+     */
+    public static Map<EngineStep, StepFingerprint> fromRecorded(
+            Map<String, RecordedFingerprint> stored) {
         Map<EngineStep, StepFingerprint> fingerprints = new EnumMap<>(EngineStep.class);
         for (Map.Entry<String, RecordedFingerprint> entry : stored.entrySet()) {
             Optional<EngineStep> step = stepWithId(entry.getKey());

@@ -13,8 +13,10 @@ inputs, outputs and logs, and parse its records, without reading the Java.
 The provenance record inside each run has its own reference,
 :doc:`provenance_format`.
 
-**This page describes schema version 1** of ``project.json``, ``run.json`` and
-``project.lock``. See :ref:`ref-project-format-versions`.
+**This page describes schema version 1** of ``project.json`` and
+``project.lock``, and **schema versions 1 and 2** of ``run.json`` -- version 2
+is a *derived* run's (see `A derived run`_). See
+:ref:`ref-project-format-versions`.
 
 .. contents:: Contents
    :depth: 2
@@ -202,6 +204,43 @@ invocation, whose stage identifier is ``percolator``; a retried invocation's is
 ``percolator.1.log``. This is the same divergence from the specification's
 ``percolator.{stdout,stderr}.log`` as Comet's logs above (design decision P9-9).
 
+A derived run
+-------------
+
+A **derived run** is the compatible-version Percolator rerun (Phase 09, design
+decision P9-11; the specification's *Stage reruns*): a new run that reruns
+Percolator -- with another build, other settings or other downstream stages --
+from the merged PIN an earlier run of the same project preserved, and runs no
+Comet. It is always a new run, never an attempt of the earlier one, because a
+different Percolator is a different configuration (``R-RUN-06``). Its directory
+has the same layout as any run, with these differences:
+
+* ``inputs/pin/merged.pin`` is a **byte copy** of the source run's merged PIN,
+  taken only after the source's file was re-hashed and found equal to the
+  SHA-256 the source's ``provenance.json`` recorded for it (``R-RUN-02``). The
+  copy is re-hashed too, and must be equal again; otherwise the rerun is refused
+  and the run directory removed, so a refused rerun leaves nothing behind.
+* ``parameters/comet.params`` is a byte copy of the source's archived parameter
+  file, checked the same way against the source's ``run.json``. It is there so
+  that the run's ``parameters`` member names a file in the run, and its decoy
+  configuration is the one the merged PIN is checked with.
+* ``outputs/comet/`` is empty and ``logs/`` holds only ``percolator.log``: no
+  Comet runs in a derived run.
+
+**Why a copy, not a hard link.** A hard link would share the file's bytes and
+permissions between the two runs, so changing either would change the other
+and the source would no longer be provably untouched. A copy keeps the source's
+directory byte-identical (a test holds every path, size, SHA-256, time and mode
+of the source equal before and after a real rerun) and makes each run
+self-contained, to be moved, archived or deleted alone. The cost is one more
+file the size of the merged PIN.
+
+A derived run's ``run.json`` is schema version 2: version 1 plus the
+``derivedFrom`` member (`The derivation`_). Its Comet members -- ``cometRelease``,
+``spectra``, ``fasta``, ``parameters``, ``indexMode`` and ``databaseDelivery``
+-- are the source's, copied, because they describe the search whose merged PIN
+it rescored. A derived run cannot itself be rerun: rerun its source instead.
+
 The index cache
 ---------------
 
@@ -255,8 +294,9 @@ Schema versions
 ===============
 
 ``project.json``, ``run.json`` and ``project.lock`` each begin with a
-``schemaVersion`` member, and every document of this format declares ``1``.
-The policy for any other version (``R-RUN-04``) is the same for all three:
+``schemaVersion`` member. ``project.json`` and ``project.lock`` declare ``1``;
+``run.json`` declares ``1``, or ``2`` for a derived run. The policy for any
+other version (``R-RUN-04``) is the same for all three:
 
 .. list-table::
    :header-rows: 1
@@ -268,13 +308,16 @@ The policy for any other version (``R-RUN-04``) is the same for all three:
    * - ``1``
      - Reads the document.
 
+   * - ``2`` (``run.json`` only)
+     - Reads the document: a derived run's ``run.json``, version 1 plus the
+       ``derivedFrom`` member.
+
    * - Lower than ``1``
      - Refuses it, with a message naming both versions and saying that no
        migration exists. Version 1 is the first published format, so nothing
-       older was ever written; when version 2 exists, its migration from version
-       1 is registered and only versions below 1 stay refused.
+       older was ever written.
 
-   * - Higher than ``1``
+   * - Higher than the newest it reads (``1``; ``2`` for ``run.json``)
      - Refuses it **before any other member is read**, with a message naming
        both versions. A newer CometGUI may have changed what a member *means*,
        not only added one, so a document read "as far as this build understands
@@ -282,6 +325,20 @@ The policy for any other version (``R-RUN-04``) is the same for all three:
 
 In every case **the file is left byte-for-byte as it was**: refusal happens
 while reading, and nothing is written.
+
+**How version 2 of** ``run.json`` **relates to version 1.** A run is written at
+the *lowest* version that can express it, decided by its identity alone, so a
+run keeps its version for life. A run that executes its own search is version 1
+-- byte for byte what Phase 08 wrote -- so every build that reads version 1
+still reads every such run, and an older version-1 file needs no migration: it
+*is* a version-2 run with no ``derivedFrom``. A derived run is version 2, not a
+version-1 document with one more member, on purpose: a build that knows only
+version 1 would otherwise read it (or, being strict, refuse it only as an
+unknown member) as a Comet run whose Comet steps never ran, and a retry there
+would execute Comet in a run that must never run it. Such a build refuses
+version 2 before reading anything. The two versions are not mixed: a version-1
+document carrying ``derivedFrom``, or a version-2 document without an object
+there, is refused like any other malformed document.
 
 Conventions a reader may rely on
 ================================
@@ -361,7 +418,8 @@ schema-version bump with a migration from version 1.
 
 What a run *is*, written once when the run starts, and what has happened to it
 since, only ever added to (``R-RUN-06``). The identity members come first, then
-``attempts``.
+``attempts``. A derived run (schema version 2) has one more identity member,
+``derivedFrom``, just before ``attempts`` (`The derivation`_).
 
 .. code-block:: json
 
@@ -488,6 +546,11 @@ The root
        (``database_name`` in the parameter file) or ``command-line`` (``-D``,
        overriding it -- for example to search a cached index).
 
+   * - ``derivedFrom``
+     - object
+     - **Version 2 only**, and there required: the run whose Comet results
+       this derived run reuses. See `The derivation`_.
+
    * - ``attempts``
      - array
      - Every attempt to execute the run, oldest first; empty until the first
@@ -565,6 +628,66 @@ The parameter file
      - Its digests, computed over the file on disk after it was written -- the
        same values the provenance manifest carries.
 
+The derivation
+--------------
+
+A derived run's ``derivedFrom`` (schema version 2)::
+
+    "derivedFrom": {
+      "runId": "run-0001",
+      "created": "2026-08-28T22:00:00.125Z",
+      "provenance": {
+        "path": "provenance/provenance.json",
+        "size": 40960,
+        "md5": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "mergedPin": {
+        "path": "inputs/pin/merged.pin",
+        "size": 1234567,
+        "md5": "88888888888888888888888888888888",
+        "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      }
+    }
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 14 66
+
+   * - Member
+     - Type
+     - Meaning
+
+   * - ``runId``
+     - string
+     - The source run's identifier, constrained as ``runId`` is. Never this
+       run's own.
+
+   * - ``created``
+     - timestamp
+     - The source run's ``created``. With ``runId`` it names the source's
+       directory, ``runs/<yyyyMMdd'T'HHmmss'Z'>-<runId>/``.
+
+   * - ``provenance``
+     - object
+     - The source's ``provenance.json`` as it was when this run was made:
+       ``path`` (always ``provenance/provenance.json``, relative to the
+       **source** run's directory), ``size``, ``md5`` and ``sha256``. A reader
+       can tell from it whether the source has been retried since.
+
+   * - ``mergedPin``
+     - object
+     - **This** run's copy of the source's merged PIN: ``path`` (always
+       ``inputs/pin/merged.pin``, relative to this run's directory), ``size``,
+       ``md5`` and ``sha256``. Its SHA-256 equals the one the source recorded
+       for its merged PIN, because the copy is refused otherwise.
+
+``derivedFrom`` is part of the identity: written once, never changed, never
+added to or removed from a run afterwards. Every attempt of a derived run
+re-hashes its two copies against ``mergedPin`` and ``parameters`` in
+``validate-configuration``, before Percolator can start, and again in
+``finalise-provenance``.
+
 An attempt
 ----------
 
@@ -612,8 +735,8 @@ the latest attempt's winning where two recorded the same step.
 What may change, and what may not
 ---------------------------------
 
-``run.json``'s identity -- every root member except ``attempts`` -- is written
-once, when the run is recorded, and a second recording of the same run is
+``run.json``'s identity -- every root member except ``attempts``, ``derivedFrom``
+included -- is written once, when the run is recorded, and a second recording of the same run is
 refused with the file untouched. After that the file is only ever replaced,
 atomically (write a temporary file, force it to disk, rename it over the old
 one), by a *successor*, which CometGUI checks against the file on disk:
@@ -742,12 +865,15 @@ Where the code is
 The models are pure and live in ``org.cometgui.domain.project``
 (``ProjectDescriptor``, ``ProjectLayout``, ``LockOwner``,
 ``SchemaVersionPolicy``) and ``org.cometgui.domain.run`` (``RunLayout``,
-``OutputBaseNames``, ``RunDescriptor``, ``RunIdentity``, ``RunAttempt``).
+``OutputBaseNames``, ``RunDescriptor``, ``RunIdentity``, ``RunDerivation``,
+``RunAttempt``).
 Reading and writing them is ``org.cometgui.workflow.storage``
 (``ProjectJson``, ``RunJson``, ``ProjectStore``, ``RunStore``,
 ``ProjectLock``). The index cache is ``org.cometgui.workflow.steps``
 (``IndexCacheKey``, ``IndexCacheEntry``), and so are the Percolator files
-(``PercolatorSettingsFile``, ``PercolatorDeclarations``). The tests that hold the writers to
-hand-typed documents byte for byte are ``RunJsonTest`` and ``ProjectJsonTest`` (the examples on this page
+(``PercolatorSettingsFile``, ``PercolatorDeclarations``), and so is the derived
+run (``PercolatorRerun``, ``DerivedRun``, ``RerunSource``). The tests that hold the writers to
+hand-typed documents byte for byte are ``RunJsonTest`` and ``ProjectJsonTest``, the
+version-2 document included (the examples on this page
 are abridged from them); the readers' tests parse hand-typed documents and
 never ones the writer produced.

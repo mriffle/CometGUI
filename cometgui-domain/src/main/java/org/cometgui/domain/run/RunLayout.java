@@ -251,6 +251,16 @@ public record RunLayout(Path root) {
     }
 
     /**
+     * The merged PIN file's path relative to the run, as {@code run.json} records a derived run's
+     * copy of it.
+     *
+     * @return {@code inputs/pin/merged.pin}, with {@code /} on every platform
+     */
+    public static String mergedPinRelativePath() {
+        return INPUTS_DIRECTORY_NAME + "/" + PIN_DIRECTORY_NAME + "/" + MERGED_PIN_FILE_NAME;
+    }
+
+    /**
      * The outputs directory.
      *
      * @return {@code outputs/}
@@ -340,6 +350,16 @@ public record RunLayout(Path root) {
      */
     public Path provenanceJsonFile() {
         return provenanceDirectory().resolve(PROVENANCE_JSON_FILE_NAME);
+    }
+
+    /**
+     * The provenance manifest's path relative to the run, as {@code run.json} records the manifest
+     * of the run a derived run was made from.
+     *
+     * @return {@code provenance/provenance.json}, with {@code /} on every platform
+     */
+    public static String provenanceJsonRelativePath() {
+        return PROVENANCE_DIRECTORY_NAME + "/" + PROVENANCE_JSON_FILE_NAME;
     }
 
     /**

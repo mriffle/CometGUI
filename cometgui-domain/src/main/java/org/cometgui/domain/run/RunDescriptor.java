@@ -56,8 +56,20 @@ import java.util.TreeMap;
  */
 public record RunDescriptor(RunIdentity identity, List<RunAttempt> attempts) {
 
-    /** The {@code run.json} format this build reads and writes. */
+    /**
+     * The {@code run.json} format of a run that executes its own search: version 1, unchanged since
+     * Phase 08, so that every build that reads version 1 still reads every such run.
+     */
     public static final int SCHEMA_VERSION = 1;
+
+    /**
+     * The {@code run.json} format of a derived run ({@link RunIdentity#derivedFrom()}): version 1
+     * plus the one member {@code derivedFrom}. It is a version of its own because a build that
+     * knows only version 1 would read a derived run as a Comet run whose Comet steps never ran, and
+     * a retry there would execute Comet in it; such a build refuses version 2 before reading
+     * anything.
+     */
+    public static final int DERIVED_SCHEMA_VERSION = 2;
 
     /**
      * Validates and copies the descriptor.
@@ -96,6 +108,17 @@ public record RunDescriptor(RunIdentity identity, List<RunAttempt> attempts) {
      */
     public static RunDescriptor of(RunIdentity identity) {
         return new RunDescriptor(identity, List.of());
+    }
+
+    /**
+     * The schema version this record is written as: the lowest that can express it. It is decided
+     * by the identity alone, which never changes, so a run's {@code run.json} keeps its version for
+     * life.
+     *
+     * @return {@link #DERIVED_SCHEMA_VERSION} for a derived run, otherwise {@link #SCHEMA_VERSION}
+     */
+    public int schemaVersion() {
+        return identity.isDerived() ? DERIVED_SCHEMA_VERSION : SCHEMA_VERSION;
     }
 
     /**

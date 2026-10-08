@@ -82,6 +82,11 @@ class RunLayoutTest {
                 () -> assertEquals(absolute(r + "inputs"), RUN.inputsDirectory()),
                 () -> assertEquals(absolute(r + "inputs/pin"), RUN.pinInputsDirectory()),
                 () -> assertEquals(absolute(r + "inputs/pin/merged.pin"), RUN.mergedPinFile()),
+                () -> assertEquals("inputs/pin/merged.pin", RunLayout.mergedPinRelativePath()),
+                () ->
+                        assertEquals(
+                                "provenance/provenance.json",
+                                RunLayout.provenanceJsonRelativePath()),
                 () -> assertEquals(absolute(r + "outputs"), RUN.outputsDirectory()),
                 () -> assertEquals(absolute(r + "outputs/comet"), RUN.cometOutputDirectory()),
                 () ->

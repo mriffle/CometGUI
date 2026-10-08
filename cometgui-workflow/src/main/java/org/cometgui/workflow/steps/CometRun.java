@@ -138,6 +138,10 @@ record CometRun(
      *     validator refuses before a run is recorded
      */
     DecoySource decoySource() {
+        return decoySourceOf(model);
+    }
+
+    private static DecoySource decoySourceOf(CometParameters model) {
         return model.decoySource()
                 .orElseThrow(
                         () ->
@@ -153,7 +157,19 @@ record CometRun(
      * @return the configuration
      */
     PinDecoyConfiguration decoys() {
-        DecoySource source = decoySource();
+        return decoysOf(model);
+    }
+
+    /**
+     * The decoy configuration a set of parameters gives the PIN's decoy check: its {@code
+     * decoy_search} with that value's meaning, and its one {@code decoy_prefix}.
+     *
+     * @param model the parameters
+     * @return the configuration
+     * @throws IllegalStateException if {@code decoy_search} holds a value with no source
+     */
+    static PinDecoyConfiguration decoysOf(CometParameters model) {
+        DecoySource source = decoySourceOf(model);
         return new PinDecoyConfiguration(
                 source.decoySearch(),
                 source.meaning(),

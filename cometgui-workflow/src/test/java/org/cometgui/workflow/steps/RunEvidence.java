@@ -22,10 +22,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.cometgui.domain.run.RunLayout;
@@ -126,5 +129,40 @@ final class RunEvidence {
     /** Requires one event payload member. */
     static void assertDetail(Map<String, String> payload, String key, String expected) {
         assertEquals(expected, payload.get(key), () -> key + " in " + payload);
+    }
+
+    /**
+     * A tree hash: every path under a directory, the directory itself included, with its kind,
+     * size, SHA-256, last-modified time and POSIX permissions. Two equal snapshots mean nothing
+     * under the directory was added, removed, rewritten -- even with the same bytes -- or
+     * re-permissioned.
+     */
+    static Map<String, String> tree(Path root) throws IOException {
+        Map<String, String> tree = new TreeMap<>();
+        List<Path> paths;
+        try (Stream<Path> walked = Files.walk(root)) {
+            paths = walked.toList();
+        }
+        for (Path path : paths) {
+            String relative = root.relativize(path).toString();
+            String permissions =
+                    PosixFilePermissions.toString(
+                            Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS));
+            String modified = Files.getLastModifiedTime(path, LinkOption.NOFOLLOW_LINKS).toString();
+            if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+                tree.put(relative + "/", "directory " + modified + " " + permissions);
+            } else {
+                tree.put(
+                        relative,
+                        Files.size(path)
+                                + " "
+                                + RealComet.sha256(path)
+                                + " "
+                                + modified
+                                + " "
+                                + permissions);
+            }
+        }
+        return tree;
     }
 }

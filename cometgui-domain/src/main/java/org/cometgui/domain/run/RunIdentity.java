@@ -22,6 +22,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.cometgui.domain.project.ProjectId;
 
 /**
@@ -45,7 +46,18 @@ import org.cometgui.domain.project.ProjectId;
  *       once.
  *   <li>The Comet release is a non-blank string without control characters.
  *   <li>{@code created} is truncated to milliseconds, the precision {@code run.json} records.
+ *   <li>A run never derives from itself: a {@link RunDerivation} names another run.
  * </ul>
+ *
+ * <h2>Derived runs</h2>
+ *
+ * <p>A run with {@code derivedFrom} present is a <em>derived</em> run (Phase 09's
+ * compatible-version Percolator rerun): it reuses the Comet results of the run it names and
+ * executes only Percolator. Its Comet members -- the release, the spectra, the database, the
+ * archived parameter file, the index mode and the database mechanism -- are the source run's,
+ * copied, because they describe the search whose merged PIN it rescored; no Comet executes in it.
+ * Its {@code parameters/comet.params} is a byte copy of the source's, re-hashed against the
+ * source's record before it was taken.
  *
  * @param runId the run's identifier
  * @param projectId the project the run belongs to
@@ -56,6 +68,8 @@ import org.cometgui.domain.project.ProjectId;
  * @param parameters the canonical Comet parameter file, archived in the run
  * @param indexMode whether and how the search uses a prebuilt index
  * @param databaseDelivery how the database reached Comet
+ * @param derivedFrom the run whose Comet results this one reuses, for a derived run; empty for a
+ *     run that executes its own search
  */
 public record RunIdentity(
         RunId runId,
@@ -66,7 +80,8 @@ public record RunIdentity(
         RecordedInput fasta,
         ArchivedFile parameters,
         IndexMode indexMode,
-        DatabaseDelivery databaseDelivery) {
+        DatabaseDelivery databaseDelivery,
+        Optional<RunDerivation> derivedFrom) {
 
     /**
      * Validates and copies the identity.
@@ -102,6 +117,57 @@ public record RunIdentity(
         }
         Objects.requireNonNull(indexMode, "indexMode");
         Objects.requireNonNull(databaseDelivery, "databaseDelivery");
+        Objects.requireNonNull(derivedFrom, "derivedFrom");
+        if (derivedFrom.isPresent() && derivedFrom.get().runId().equals(runId)) {
+            throw new IllegalArgumentException("run " + runId + " cannot derive from itself");
+        }
+    }
+
+    /**
+     * The identity of a run that executes its own search: no {@code derivedFrom}.
+     *
+     * @param runId the run's identifier
+     * @param projectId the project the run belongs to
+     * @param created when the run was created
+     * @param cometRelease the Comet release that executes the run
+     * @param spectra the spectrum files, in input order
+     * @param fasta the protein database
+     * @param parameters the canonical Comet parameter file, archived in the run
+     * @param indexMode whether and how the search uses a prebuilt index
+     * @param databaseDelivery how the database reached Comet
+     * @throws NullPointerException naming a component or element that is {@code null}
+     * @throws IllegalArgumentException naming the member that breaks one of the rules above
+     */
+    public RunIdentity(
+            RunId runId,
+            ProjectId projectId,
+            Instant created,
+            String cometRelease,
+            List<SpectrumInput> spectra,
+            RecordedInput fasta,
+            ArchivedFile parameters,
+            IndexMode indexMode,
+            DatabaseDelivery databaseDelivery) {
+        this(
+                runId,
+                projectId,
+                created,
+                cometRelease,
+                spectra,
+                fasta,
+                parameters,
+                indexMode,
+                databaseDelivery,
+                Optional.empty());
+    }
+
+    /**
+     * Whether this run reuses another run's Comet results instead of executing its own search.
+     *
+     * @return {@code true} exactly when {@link #derivedFrom()} is present
+     */
+    public boolean isDerived() {
+        return derivedFrom.isPresent();
     }
 
     private static void requireConsistentSpectra(List<SpectrumInput> spectra) {
@@ -209,6 +275,9 @@ public record RunIdentity(
         }
         if (databaseDelivery != other.databaseDelivery) {
             return "databaseDelivery";
+        }
+        if (!derivedFrom.equals(other.derivedFrom)) {
+            return "derivedFrom";
         }
         return "";
     }
