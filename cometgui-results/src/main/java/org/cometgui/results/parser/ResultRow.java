@@ -18,6 +18,7 @@ package org.cometgui.results.parser;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * One row of a Percolator PSM or peptide table.
@@ -61,5 +62,15 @@ public record ResultRow(
         Objects.requireNonNull(posteriorErrorProbabilityText, "posteriorErrorProbabilityText");
         Objects.requireNonNull(peptide, "peptide");
         proteinIds = List.copyOf(proteinIds);
+    }
+
+    /**
+     * The spectrum this row identifies, read from its {@code PSMId}.
+     *
+     * @return the reference, or empty when the {@code PSMId} is not in Comet's {@code SpecId} shape
+     * @see SpectrumReference#of
+     */
+    public Optional<SpectrumReference> spectrumReference() {
+        return SpectrumReference.of(psmId);
     }
 }

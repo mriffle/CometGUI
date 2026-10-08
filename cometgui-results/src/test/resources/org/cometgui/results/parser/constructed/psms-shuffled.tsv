@@ -1,0 +1,24 @@
+PSMId	score	q-value	posterior_error_prob	peptide	proteinIds
+/runs/r1/outputs/comet/sample_A_1200_2_1	0.8	0.5	0.9	K.LLLLLK.R	sp|P10001|ALPHA_HUMAN
+/runs/r1/outputs/comet/2026_10_08_run_2_1_15_3_1	3.1	0	1e-07	R.MMAAK.L	sp|P10002|BETA_HUMAN	sp|P10003|GAMMA_HUMAN
+/runs/r1/outputs/comet/sample D_900_2_1	1.2	0.01	0.004	K.PEPTIDEK.A	sp|P10004|Delta_Human
+/runs/r1/outputs/comet/sample_A_7_2_1	1.2	0.005	0.003	K.AAAK.R	sp|P10005|EPS_HUMAN
+psm84	2.0	1	1	K.CCCK.R	decoy_sp|P10006|ZETA_HUMAN
+/runs/r1/outputs/comet/2026_10_08_run_2_1_15_2_1	0.4	0.0100001	0.5	K.DDDK.R	sp|P10007|ETA_HUMAN
+/runs/r1/outputs/comet/sample_A_88_4_1	nan	0.00999999	0.002	K.EEEK.R	sp|P10008|THETA_HUMAN	sp|P10001|ALPHA_HUMAN
+/runs/r1/outputs/comet/sample D_3_1_1	-0.7	NaN	0.6	K.FFFK.R	sp|P10009|IOTA_HUMAN
+/runs/r1/outputs/comet/sample_A_1200_3_1	0.9		0.7	K.GGGK.R	sp|P10010|KAPPA_HUMAN
+/runs/r1/outputs/comet/2026_10_08_run_2_1_2_2_1	2.5	0.005		K.HHHK.R	sp|P10011|LAMBDA_HUMAN
+/runs/r1/outputs/comet/sample D_450_3_1	0.0	1.5	0.95	K.IIIK.R	sp|P10012|MU_HUMAN
+/runs/r1/outputs/comet/sample_A_60_2_1	-0.0	1e-3	0.001	K.M[15.9949]KK.R	sp|P10013|NU_HUMAN
+odd_x_2_1	1.7	0.01	0.004	K.KKKK.R	sp|P10014|XI_HUMAN
+/runs/r1/outputs/comet/2026_10_08_run_2_1_15_3_2	1.0	-nan	0.8	K.NNNK.R	sp|P10015|OMICRON_HUMAN
+/runs/r1/outputs/comet/sample_A_5_2_1	2.2	0.2	0.2	K.QQQK.R	sp|P10016|PI_HUMAN	sp|P10017|RHO_HUMAN	sp|P10018|SIGMA_HUMAN
+/runs/r1/outputs/comet/sample D_900_3_1	0.6	0,01	0.4	K.RRRK.R	sp|P10019|TAU_HUMAN
+/runs/r1/outputs/comet/sample_A_10_2_1	1.5	0.3	inf	K.SSSK.R	sp|P10020|UPSILON_HUMAN
+/runs/r1/outputs/comet/2026_10_08_run_2_1_100_2_1	1.8	-0.1	0.9	K.TTTK.R	sp|P10021|PHI_HUMAN
+/runs/r1/outputs/comet/sample D_12_2_1	0.2	0.004999	0.05	K.VVVK.R	sp|P10022|CHI_HUMAN
+/runs/r1/outputs/comet/sample_A_1200_2_2	0.8	0	0.01	K.WWWK.R	sp|P10023|PSI_HUMAN
+/runs/r1/outputs/comet/2026_10_08_run_2_1_9_2_1	1.1	0.05	0.1	K.YYYK.R	sp|P10003|GAMMA_HUMAN
+/runs/r1/outputs/comet/sample D_9_2_1	1.1	Infinity	0.3	K.PEPTIDEK.A	sp|P10024|OMEGA_HUMAN
+/runs/r1/outputs/comet/sample_A_33_2_1	0.5	0.02	0.2	K.AAAK.R	sp|P10001|ALPHA_HUMAN	sp|P10002|BETA_HUMAN

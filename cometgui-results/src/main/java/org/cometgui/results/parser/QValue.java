@@ -40,7 +40,11 @@ public final class QValue {
          * {@code inf}, {@code Infinity}, a comma decimal separator, or any other text.
          */
         UNPARSABLE,
-        /** A finite number outside {@code [0, 1]}, which no q-value can be. */
+        /**
+         * A decimal number outside {@code [0, 1]}, which no q-value can be -- including one too
+         * large for a {@code double} ({@code 1e400}) and a negative one too small for it ({@code
+         * -1e-400}).
+         */
         OUT_OF_RANGE
     }
 
@@ -66,10 +70,19 @@ public final class QValue {
         if (text.isEmpty()) {
             return new QValue(text, Status.MISSING, Double.NaN);
         }
-        double parsed = DecimalText.parse(text);
-        if (Double.isNaN(parsed)) {
+        if (!DecimalText.isDecimal(text)) {
             return new QValue(text, Status.UNPARSABLE, Double.NaN);
         }
+        double parsed = Double.parseDouble(text);
+        if (parsed == 0.0 && DecimalText.hasNonZeroSignificand(text)) {
+            // Closer to zero than any double: not zero. Negative is out of range; positive is
+            // held as the smallest positive double, so it orders after 0 and fails a cutoff of 0.
+            if (text.charAt(0) == '-') {
+                return new QValue(text, Status.OUT_OF_RANGE, Double.NaN);
+            }
+            return new QValue(text, Status.KNOWN, Double.MIN_VALUE);
+        }
+        // An infinite parse is a decimal too large for a double: out of range, not unparsable.
         if (parsed < 0.0 || parsed > 1.0) {
             return new QValue(text, Status.OUT_OF_RANGE, Double.NaN);
         }
@@ -105,6 +118,10 @@ public final class QValue {
 
     /**
      * The number, for a known q-value.
+     *
+     * <p>A positive decimal closer to zero than any {@code double} ({@code 1e-400}) is not zero:
+     * its value is {@link Double#MIN_VALUE}, the nearest {@code double} above zero, so that it
+     * fails a cutoff of 0 and orders after an exact 0, as the decimal does.
      *
      * @return the value, within {@code [0, 1]}
      * @throws IllegalStateException if the q-value is not known: there is no number to compare, and

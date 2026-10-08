@@ -20,7 +20,37 @@ psms-unknown-q.tsv       the real PSM table header; 15 rows. Multi-protein
                          Hand count at cutoff 0.01: passing 5 (c01 c02 c08
                          c12 c13), failing 2 (c03 c09), unknown 8.
 
+psms-shuffled.tsv        added 2026-10-08 by the phase 10 unit 2 agent for the
+                         results store's contract tests. The real PSM table
+                         header; 23 rows deliberately NOT in score or q-value
+                         order (every real fixture is sorted by score, which
+                         would hide a store that stops at the first failing
+                         row). PSMIds in Comet SpecId shape over three -N
+                         bases -- /runs/r1/outputs/comet/sample_A,
+                         /runs/r1/outputs/comet/2026_10_08_run_2_1 (digits and
+                         underscores of its own) and
+                         /runs/r1/outputs/comet/sample D (a space) -- plus two
+                         that are not (psm84; odd_x_2_1, a non-numeric scan).
+                         Ties on purpose: q-value 0 (2 rows), 0.005 (2), 0.01
+                         (2); score 1.2, 0.8, 1.1 (2 each) and 0.0 / -0.0;
+                         peptide K.PEPTIDEK.A and K.AAAK.R (2 each). Values a
+                         sort cannot place: score nan; PEP empty and inf.
+                         Proteins: 1 to 3 per row, one row's list a prefix of
+                         another's, and mixed case (Delta_Human).
+                         q-values known (16 rows: 0 0 0.001 0.004999 0.005
+                         0.005 0.00999999 0.01 0.01 0.0100001 0.02 0.05 0.2
+                         0.3 0.5 1, written 1e-3 once) or not (7 rows: NaN,
+                         empty, 1.5, -nan, 0,01, -0.1, Infinity) -- R-RES-02.
+                         Counts by hand, confirmed with the awk command of
+                         real-k562/PROVENANCE.txt (total passing failing
+                         unknown):  c=0     23 2 14 7
+                                    c=0.005 23 6 10 7
+                                    c=0.01  23 9 7 7
+                                    c=0.05  23 12 4 7
+                                    c=1     23 16 0 7
+
 SHA-256
   ea58b3b63f9031bf53b5675d117b1e7203137a0ebd2399c9def824334267b6c7  psms-unknown-q.tsv
+  3754547ea1ca3ff35b67913a8249b98831e924c0a84029c2a9769fc581a6f5d4  psms-shuffled.tsv
   2345706956b918d713a93fe5e523fbd31b7aceb095c68cfffbb9ff508969e276  weights-four-splits.txt
   44042567136e69e5854085952cf6a2a3a9e14221761bfcc3c4cb04782177016f  weights-two-splits.txt

@@ -43,10 +43,41 @@ final class DecimalText {
      *     above or its value is not finite (an exponent too large for a {@code double})
      */
     static double parse(String text) {
-        if (!DECIMAL.matcher(text).matches()) {
+        if (!isDecimal(text)) {
             return Double.NaN;
         }
         double value = Double.parseDouble(text);
         return Double.isFinite(value) ? value : Double.NaN;
+    }
+
+    /**
+     * Whether text is a decimal number in the form above, whatever its magnitude.
+     *
+     * @param text the text as written
+     * @return {@code true} if it is, even when its value is too large or too small for a {@code
+     *     double}
+     */
+    static boolean isDecimal(String text) {
+        return DECIMAL.matcher(text).matches();
+    }
+
+    /**
+     * Whether a decimal's significand -- the digits before any exponent -- holds a digit other than
+     * {@code 0}, so that its exact value is not zero even where a {@code double} rounds it to zero.
+     *
+     * @param decimal text for which {@link #isDecimal} is {@code true}
+     * @return {@code true} if the exact value is not zero
+     */
+    static boolean hasNonZeroSignificand(String decimal) {
+        for (int index = 0; index < decimal.length(); index++) {
+            char c = decimal.charAt(index);
+            if (c == 'e' || c == 'E') {
+                return false;
+            }
+            if (c >= '1' && c <= '9') {
+                return true;
+            }
+        }
+        return false;
     }
 }
