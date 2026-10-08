@@ -236,30 +236,41 @@ class KeyboardOnlyNavigationUiTest {
      * @param expected the section that must be selected
      */
     private static void assertSelected(FxUiDriver driver, SectionId expected) {
-        int showing = 0;
-        for (SectionId section : SectionId.displayOrder()) {
-            boolean visible = driver.isVisible(UiIds.sectionPane(section));
-            assertEquals(
-                    section == expected,
-                    visible,
-                    "#"
-                            + UiIds.sectionPane(section)
-                            + " showing, with "
-                            + expected.id()
-                            + " chosen");
-            if (visible) {
-                showing++;
-            }
-        }
-        assertEquals(1, showing, "exactly one section pane may be showing at a time");
+        /*
+         * The pane check and the focus check are reported TOGETHER, so a walk that lands on the
+         * wrong section says both which pane was showing and which entry the focus reached, from
+         * this walk alone. Reported one after the other, the focus half was never reached on a
+         * failure, and the only focus diagnostic left came from whatever state the failed walk
+         * leaked into the next test -- which changed as soon as a section gained tab stops.
+         */
+        int[] showing = {0};
+        assertAll(
+                () -> {
+                    for (SectionId section : SectionId.displayOrder()) {
+                        boolean visible = driver.isVisible(UiIds.sectionPane(section));
+                        assertEquals(
+                                section == expected,
+                                visible,
+                                "#"
+                                        + UiIds.sectionPane(section)
+                                        + " showing, with "
+                                        + expected.id()
+                                        + " chosen");
+                        if (visible) {
+                            showing[0]++;
+                        }
+                    }
+                },
+                () ->
+                        assertEquals(
+                                UiIds.navigationEntry(expected),
+                                driver.focusedNodeId(),
+                                "the roving tab stop must follow the selection"));
+        assertEquals(1, showing[0], "exactly one section pane may be showing at a time");
         assertEquals(
                 expected.title(),
                 driver.textOf(UiIds.SHELL_SECTION_TITLE),
                 "the header's echo of the selected section");
-        assertEquals(
-                UiIds.navigationEntry(expected),
-                driver.focusedNodeId(),
-                "the roving tab stop must follow the selection");
         assertEquals(
                 List.of(UiIds.navigationEntry(expected)),
                 traversableEntries(driver),
