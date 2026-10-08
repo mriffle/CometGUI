@@ -169,8 +169,7 @@ public final class Percolators {
      * @return the request
      */
     public static PercolatorRequest ready() {
-        ToolOffer offer =
-                managed3071(Path.of("/opt/percolator/3.07.1/percolator").toAbsolutePath());
+        ToolOffer offer = managed3071(Path.of("percolator-3.07.1", "percolator").toAbsolutePath());
         return new PercolatorRequest(
                 Optional.of(offer),
                 true,
@@ -247,7 +246,7 @@ public final class Percolators {
          *
          * @param failure the failure
          */
-        public void fails(RuntimeException failure) {
+        public void fails(IllegalStateException failure) {
             registrations.add(failure);
         }
 
@@ -282,7 +281,7 @@ public final class Percolators {
             if (next instanceof ToolRegistrationException refusal) {
                 throw refusal;
             }
-            if (next instanceof RuntimeException failure) {
+            if (next instanceof IllegalStateException failure) {
                 throw failure;
             }
             if (next instanceof ToolOffer offer) {

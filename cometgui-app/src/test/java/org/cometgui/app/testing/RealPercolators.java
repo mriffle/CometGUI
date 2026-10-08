@@ -145,7 +145,9 @@ public final class RealPercolators {
                         + " does not exist. The mirror is gitignored; refill it by fetching the"
                         + " artefact from the URL in manifests/tools.json and checking its"
                         + " SHA-256. This test fails rather than skips.");
-        Files.createDirectories(destination.toAbsolutePath().getParent());
+        Path directory = destination.toAbsolutePath().getParent();
+        assertTrue(directory != null, () -> destination + " has no directory");
+        Files.createDirectories(directory);
         try (ZipFile zip = new ZipFile(archive.toFile())) {
             ZipEntry entry = zip.getEntry("percolator");
             assertTrue(entry != null, archive + " holds no member named percolator");

@@ -57,9 +57,9 @@ import org.junit.jupiter.api.Test;
  */
 class PercolatorViewModelTest {
 
-    private static final Path P309 = Path.of("/opt/p309/percolator").toAbsolutePath();
+    private static final Path P309 = Path.of("p309", "percolator").toAbsolutePath();
 
-    private static final Path P3071 = Path.of("/opt/p3071/percolator").toAbsolutePath();
+    private static final Path P3071 = Path.of("p3071", "percolator").toAbsolutePath();
 
     private static final ToolOffer LOCAL_309 = Percolators.local309(P309);
 
@@ -881,7 +881,7 @@ class PercolatorViewModelTest {
             port.refuses(
                     new ToolRegistrationException(
                             "The file at /tmp/x is Percolator 3.04, older than 3.05."));
-            chooser.file(Path.of("/tmp/x").toAbsolutePath());
+            chooser.file(Path.of("x").toAbsolutePath());
             assertTrue(section.register());
             int reads = port.reads();
             settle();
@@ -901,7 +901,7 @@ class PercolatorViewModelTest {
         void failure() {
             readWith(LOCAL_309);
             port.fails(new IllegalStateException("no process service"));
-            chooser.file(Path.of("/tmp/y").toAbsolutePath());
+            chooser.file(Path.of("y").toAbsolutePath());
             assertTrue(section.register());
             settle();
             assertEquals(

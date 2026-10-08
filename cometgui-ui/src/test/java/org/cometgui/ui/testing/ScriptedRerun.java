@@ -56,7 +56,7 @@ public final class ScriptedRerun implements PercolatorRerunPort {
 
     private int cancels;
 
-    private RuntimeException cancelFailure;
+    private IllegalStateException cancelFailure;
 
     private final ScriptedEngine.Queue background = new ScriptedEngine.Queue("background");
 
@@ -92,7 +92,8 @@ public final class ScriptedRerun implements PercolatorRerunPort {
     }
 
     /**
-     * Makes the next start throw: a {@link RunNotStartedException} or a runtime exception.
+     * Makes the next start throw: a {@link RunNotStartedException} or an {@link
+     * IllegalStateException}.
      *
      * @param refusal what it throws
      */
@@ -105,8 +106,8 @@ public final class ScriptedRerun implements PercolatorRerunPort {
      *
      * @param failure what it throws
      */
-    public void failCancellations(RuntimeException failure) {
-        this.cancelFailure = failure;
+    public void failCancellations(IllegalStateException failure) {
+        this.cancelFailure = Objects.requireNonNull(failure, "failure");
     }
 
     @Override
@@ -124,7 +125,7 @@ public final class ScriptedRerun implements PercolatorRerunPort {
         if (refusal instanceof RunNotStartedException notStarted) {
             throw notStarted;
         }
-        if (refusal instanceof RuntimeException failed) {
+        if (refusal instanceof IllegalStateException failed) {
             throw failed;
         }
         started.add(new Started(percolator, observer));
