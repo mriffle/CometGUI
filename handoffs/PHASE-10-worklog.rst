@@ -232,6 +232,49 @@ brief's *Build economy* section verbatim.
        independent counter of P10-3, itself checked against both.
        ``CONSTRUCTED`` record for the fixture.
      - R-RES-03 (fixture first); gates 3, 6
+     - **Signed off 2026-10-08** (``e642695``). Diff read: 12 files, no
+       production code -- the generator (559 lines, stdlib only), six test
+       helpers/tests in ``org.cometgui.results.testing``, ``CONSTRUCTED.txt``
+       and ``real-k562/PROVENANCE.txt`` (numbers and SHA-256s only, no
+       data). I ran ``python3 scripts/fixtures/large-results-fixture.py
+       --self-check``: 1 000 000 PSM rows (147 155 274 bytes, SHA-256
+       ``4f7aaecd...``) and 400 000 peptide rows (``bdda5589...``); 1478 and
+       594 unknown q-values in ten kinds; 0 double-vs-decimal disagreements;
+       at q <= 0.01 219 777 PSMs and 88 111 peptides pass; second generation
+       byte-identical; 21 s. My own ``awk`` over ``psms.tsv`` (numeric
+       q-values only): 998 522 known, 219 777 at 0.01, 175 162 at 0.005,
+       5003 at 0, 1478 unknown -- equal. My ``awk`` over the K562 outputs:
+       3.07.1 PSMs 3897/982/1026, peptides 2985/567/603, 3.09 decoy PSMs
+       2773/4/9 -- equal to the pins. ``mvn -o -pl cometgui-results test``:
+       **197 tests, 0 failures** (new: ``LargeFixtureTest`` 6,
+       ``RealK562Test`` 14, ``IndependentCounterTest`` 10). Injections
+       (into the unit's test-side oracle, since the unit has no production
+       code), restored by ``sha256sum -c``: (1) the independent counter's
+       ``<= 0`` made ``< 0`` -- 10 failures (``counterEqualsManifest`` x2,
+       ``IndependentCounterTest`` x8); (2) the K562 pin at 0.01 made 1027
+       -- ``RealK562Test.counterEqualsAwk`` and ``phase00Summary`` red,
+       "expected passing=1027 but was 1026". **Files read outside the
+       module**: ``scratch/phase10/large/`` and
+       ``scratch/scientific-path/percolator-{3.07.1,3.09}/`` (the ``tests``
+       sandbox links ``scratch/`` whole); tier 1 must regenerate the first
+       with the command above before ``build.sh``.
+
+   * - D-013
+     - **``--no-analytics``** (added by tier 1 on the owner's decision of
+       2026-10-08, run next, before unit 2). One capability for the switch,
+       observed by the one probe on its own run and passed on every later
+       probe run once observed; one ``PercolatorOption``; the builder emits
+       it whenever the probed set holds it -- capability-gated, never
+       version-gated; the probe-generation constant bumped so installed
+       builds are re-probed. Acceptance: (1) the real 3.07.1 and 3.09 probe
+       observe it; (2) every Percolator invocation's recorded argv --
+       read back from ``provenance.json`` and from the probe's launches --
+       carries it; (3) a build whose probe does not observe it gets no such
+       argument and is not refused; (4) ``docs/percolator.rst`` and
+       ``docs/developer/version_capabilities.rst`` say so; (5) my injections
+       go red; (6) ``--only percolator``, ``workflow``, ``install`` green,
+       floors only rise.
+     - D-013; R-PERC-06
      -
 
    * - 2
