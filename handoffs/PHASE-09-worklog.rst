@@ -676,7 +676,29 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
        ``docs/developer/workflow_engine.rst`` updated; the traceability map
        for AC-RES-05, 06, 07 and AC-PRV-10.
      - R-DOC; all items (description)
-     -
+     - **Signed off 2026-10-08** (``72296dd``). Diff read: 10 documentation
+       files -- the three deliverable pages written as built (stub notes
+       removed), stale statements corrected in ``architecture.rst``,
+       ``tool_adapters.rst``, ``tool_manager.rst``, ``testing.rst``,
+       ``decoys.rst``, ``workflow_engine.rst`` (Percolator steps section,
+       Phase 09 gate table, "What has never run"); the map's AC-RES-05, 06,
+       07 move from "planned" to named tests and AC-PRV-10 gains the Phase 09
+       seed tests in place of its "planned 09" entry. ``--no-analytics`` is
+       described as escalated, not decided. ``scripts/ci/docs-build.sh`` PASS;
+       ``--only docs`` PASS, ``--only traceability`` PASS 8. My injection:
+       AC-RES-06's method renamed in the map -- ``traceability.sh`` rc 1,
+       ``[TEST-MISSING] AC-RES-06: ... declares no such method``; restored,
+       ``sha256sum -c`` OK. **Reported by the agent, carried as residue:**
+       ``PercolatorCapabilityProbe``'s second-constructor Javadoc still says
+       R-PERC-02 calls 8+8 insufficient (revision 11 reworded it);
+       Register is offered whenever a Tool Manager is present (wider than
+       P9-12 asked -- not a violation); the R-PERC-08 stdout weights fallback
+       and the specification's train-subset/search-input/decoy-prefix
+       Advanced settings are not built (documented); on a Mac with 3.07.1
+       not yet installed, Limelight on resolves to 3.09 with Limelight
+       unavailable because 3.07.1's XML claim there is only inferred
+       (R-TOOL-08, documented); the option tables are hand-written and could
+       be generated.
 
    * - 9
      - **Falsifiability harness** ``scripts/verify-percolator-gates.sh``
