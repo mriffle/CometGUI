@@ -1,0 +1,347 @@
+=====================================================
+PHASE-10 work log -- Results Model and UI
+=====================================================
+
+:Phase: 10
+:Phase orchestrator: tier-2 phase orchestrator, dispatched by tier 1 at
+   ``4f66dcd`` (brief ``handoffs/PHASE-10-BRIEF.rst``)
+:Started: 2026-10-08
+
+Maintained by the phase orchestrator as the phase runs. One row per work unit.
+A unit is not done until it carries a sign-off entry naming what was run and
+what was observed -- "agent reported success" is not a sign-off.
+
+.. contents:: Contents
+   :depth: 1
+   :local:
+
+Starting state
+==============
+
+``git status`` clean at ``4f66dcd`` on ``main``. **No baseline build was
+taken**, by the owner's build-economy rule (brief, *Build economy*): tier 1
+ran ``scripts/build.sh`` and the full ``scripts/verify-all-gates.sh`` at Phase
+09's exit gate on this tree.
+
+Facts established by the orchestrator before design (2026-10-08)
+-----------------------------------------------------------------
+
+* ``cometgui-results`` holds ``org.cometgui.results.parser``
+  (``ResultTableReader`` -- streaming, ``open``/``next``/``forEach``, and
+  ``readAll`` which builds an in-memory ``ResultTable`` of every row;
+  ``WeightsReader`` -> ``LearnedWeights``; ``QValue`` with ``KNOWN``,
+  ``MISSING``, ``UNPARSABLE``, ``OUT_OF_RANGE``) and
+  ``org.cometgui.results.filtering`` (``QValueFilter.classify`` -- the one
+  ``q <= cutoff`` comparison -- ``PsmQValueFilter``, ``PeptideQValueFilter``,
+  ``DisplayFilters``, ``FilterCounts``, ``FilterTally``, ``Visibility``).
+  ``org.cometgui.results.export`` is an empty package. The module depends on
+  ``cometgui-domain`` only.
+* The parent POM's PIT ``targetClasses`` include
+  ``org.cometgui.results.filtering.*`` and ``org.cometgui.results.parser.*``
+  (PIT's ``*`` matches sub-packages) but **not** ``results.export``. The
+  brief forbids changing the POM's PIT configuration.
+* The one display-filter state in the interface today is
+  ``PercolatorViewModel.displayFiltersProperty()`` (Phase 09 unit 7).
+* ``EngineStep.FINALISE_RESULTS`` is declared (``implementedInPhase`` 10) with
+  edges ``parse-percolator -> finalise-results`` (required) and
+  ``finalise-results -> finalise-provenance`` (if planned); it is not planned,
+  so ``finalise-provenance`` is ordered only after ``merge-pin``.
+* ``InputKind`` has ``psm-display-filter`` and ``peptide-display-filter``,
+  declared by no step (a test pins it).
+* Real Percolator outputs available: the Phase 09 checked-in tables over
+  CometGUI's synthetic 64+64 PIN (3.06.5, 3.07.1, 3.09; 64 rows each), and the
+  Phase 00 real run on the ``D-006`` K562 fixture,
+  ``scratch/scientific-path/percolator-{3.07.1,3.09}/`` (3897 target PSMs,
+  2985 target peptides, 1026 PSMs and 603 peptides at q < 0.01 per Phase 00's
+  summary; 3 weight splits of 22 features). ``D-006``: CometGUI does not
+  redistribute spectrum or FASTA data, so K562-derived output stays in
+  ``scratch/`` and is never committed (as Phase 09's P9-13 did).
+* Comet's ``SpecId`` -- and so Percolator's ``PSMId`` -- begins with the
+  ``-N`` base verbatim (an absolute path in a CometGUI run; Phase 08), then
+  ``_<scan>_<charge>_<rank>``.
+* ``ProvenanceEventLog.openAppend`` exists (``cometgui-provenance``);
+  ``HashService`` is a domain port.
+* No SQLite, H2 or other storage library is in the build; the only runtime
+  third-party dependencies are JavaFX and AtlantaFX.
+
+Design decisions, made before the first dispatch
+================================================
+
+Every unit is briefed with these. A unit that finds one wrong reports it; it
+does not quietly diverge.
+
+P10-1 -- one of everything
+    One table reader (``ResultTableReader``) and one weights reader
+    (``WeightsReader``), **extended in place**; one q-value predicate,
+    ``QValueFilter.classify`` -- no other product code compares a q-value with
+    a cutoff, the store, the export and the interface all call it; one filter
+    value type (``DisplayFilters``); **one display-filter state in the
+    interface**, shared by the Percolator and Results sections; one process
+    service; one hasher (``HashService``); one JSON writer and one atomic
+    writer (``org.cometgui.provenance.json``, ``.io``); one provenance event
+    log; one step graph and run store. Anything missing is added to the
+    owning class's module with its own tests. Every sign-off injects into the
+    one predicate and requires the new code's tests to go red too.
+
+P10-2 -- the large fixture comes first, and is independent
+    A committed, deterministic, stdlib-only Python generator
+    (``scripts/fixtures/large-results-fixture.py``) writes a Percolator-shaped
+    PSM table (1 000 000 rows, several source files, multi-protein rows) and
+    peptide table into ``scratch/phase10/large/`` with a manifest of SHA-256s
+    and **expected counts computed by the generator from what it assigned**
+    (Python ``decimal``), including every unknown-q-value kind. It is
+    recorded as constructed. Being Python, it shares no code with the Java
+    under test. Tests pin the fixture's SHA-256 and **fail, never skip**, when
+    it is absent, naming the command that makes it.
+
+P10-3 -- independent counts
+    Gate items 3 and 7 compare against numbers not produced by the code under
+    test: the generator's manifest; numbers pinned from ``awk`` with the
+    command recorded beside them; or a deliberately minimal counter in test
+    code (``split`` + ``BigDecimal``) that uses no ``org.cometgui.results``
+    class. Real fixtures first: the checked-in Phase 09 tables and the
+    ``scratch/scientific-path`` K562 outputs (SHA-256 pinned; fail not skip).
+
+P10-4 -- the store
+    ``org.cometgui.results.filtering.store`` (inside the existing PIT target,
+    so the POM is unchanged and the store is mutation-gated by
+    ``scripts/build.sh``). One ``ResultStore`` contract with two
+    implementations: in memory at or below a documented row threshold,
+    **disk-backed above it**. The disk-backed store keeps no row object for
+    every row: a binary index file (row byte offset into the raw file, the
+    q-value's status and value, score, PEP) memory-mapped off the heap,
+    rows read back by offset from the raw file and parsed by the one reader;
+    the raw file is only ever opened for reading. Queries -- q-value filter,
+    category, text, sort, offset and limit -- return a ``ResultPage`` of at
+    most ``limit`` rows plus the counts. Both implementations pass one
+    contract test suite. No third-party storage library is added (no new
+    licence, SBOM or native-library surface); the specification's SQLite is
+    an example.
+
+P10-5 -- what a filter shows, and the unknown category (``R-RES-02``)
+    Every row is in exactly one ``Visibility``: ``PASSES``, ``FAILS`` or
+    ``UNKNOWN_Q_VALUE``. A table's view selects a **category**: *passing*
+    (the default), *unknown q-value*, *failing* or *all*. Counts always show
+    total, passing, failing and unknown. Export writes exactly the rows of
+    the category selected, under the same predicate, and its metadata records
+    all four counts and which category was written -- so the unknown policy
+    is one rule in the UI and the export.
+
+P10-6 -- the run's derived files
+    Nothing derived is ever written under ``outputs/``. A run gains
+    ``results/`` (the store's index files, and ``view-state.json`` holding
+    the run's display-filter values, schema-versioned, written atomically)
+    and ``exports/`` (exported files, never overwritten). The paths are
+    ``RunLayout``'s. ``finalise-results`` is planned whenever Percolator is:
+    it builds and checks the store's indexes over the raw tables, records
+    counts at the default filters in its ``stage.finished`` details, and
+    ``finalise-provenance`` is ordered after it again (gate 9 of Phase 09
+    re-proved: raw outputs byte-identical across it).
+
+P10-7 -- export (``R-RES-04``, ``R-RES-01``)
+    ``org.cometgui.results.export``: a filtered table export is a new file in
+    ``exports/`` holding Percolator's header and the selected rows **verbatim
+    in file order** (text filter and sort are view-only and not applied,
+    which the metadata says), plus a JSON sidecar: run ID, table, source
+    file path and SHA-256, the cutoff applied, category, the four counts
+    before and the row count after, the CometGUI version, the time. The
+    weights summary exports the same way. Each export appends one event to
+    the run's provenance event log naming the file and the filter values.
+    ``cometgui-results`` gains a dependency on ``cometgui-provenance`` (for
+    the one JSON writer, atomic writer and event log; ``provenance`` depends
+    on ``domain`` alone, so no cycle) -- recorded in the handoff.
+
+P10-8 -- learned feature weights (``R-PERC-08``/``09``, ``AC-RES-08``/``09``)
+    A summary computed from ``LearnedWeights`` in ``results.parser``: per
+    feature, the **normalised** weight of each split (the split count read
+    from the file), mean signed, mean absolute, standard deviation
+    (population, divide by *n*, so one split gives 0), sign consistency
+    (``all positive``, ``all negative``, ``mixed``, ``all zero``; zero is
+    neither sign) and rank by mean absolute weight (1 = largest; ties share
+    the rank, competition ranking; order then by file order). The bias
+    ``m0`` is listed, labelled as the bias term, and **not ranked**. The
+    sortable table is the source of truth; a chart, if any, is secondary.
+
+P10-9 -- the interface
+    ``org.cometgui.ui.viewmodel.results`` and ``controls.results``. The
+    display-filter state is extracted from ``PercolatorViewModel`` into one
+    view-model both sections hold (its existing API delegates; its tests stay
+    green unchanged). Table views are bound to a **page** (at most the page
+    size, never every row) fetched on a background executor and applied on
+    the JavaFX thread; selection is held by a stable row key and survives
+    filter and sort changes; sort, text filter, category, column visibility
+    and copy (selected rows as tab-separated text). PSM table: PSMId, source
+    file (always shown when the run has several spectrum files), scan,
+    charge, peptide, proteins, score, q-value, PEP; peptide table: peptide,
+    proteins, score, q-value, PEP; target or decoy table selectable where
+    the decoy table exists. Not shown, recorded as deferred: Comet scores
+    (not in Percolator's tables; a PIN join is a later feature) and
+    supporting-PSM counts (not derivable from Percolator's tables without
+    grouping choices that could change their meaning). The source file is
+    the run's spectrum input whose ``-N`` base begins the ``PSMId``.
+
+P10-10 -- the process service is the witness (gate 2)
+    "Changing a filter launches no process" is asserted by counting calls on
+    the application's one ``ProcessRunner`` through the real composition
+    root, in a GUI test that changes both filters and sees the counts
+    change.
+
+P10-11 -- budgets (gate 6)
+    The budgets are documented in ``docs/developer/results_model.rst`` and
+    measured on this host. The heap budget is enforced by running the large
+    fixture's load, filters, sorts and page reads in a **child JVM with a
+    fixed ``-Xmx``**, with a negative control in the same budget
+    (``ResultTableReader.readAll``) that must fail with
+    ``OutOfMemoryError`` -- so the fixture provably crosses what the heap can
+    hold. The GUI half asserts the table's items never exceed the page size
+    on the large fixture.
+
+P10-12 -- harness
+    ``scripts/verify-results-gates.sh``, registered additively as
+    ``results``: one or more production-code injections per gate item, in a
+    git-archive sandbox, graded on the failing assertion's own words, with
+    the usual harness self-controls. Lean: target under ten minutes.
+
+Work units
+==========
+
+Run serially, in this order. Each unit's agent is fresh and is given the
+brief's *Build economy* section verbatim.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 5 40 17 38
+
+   * - #
+     - Unit and acceptance conditions
+     - Rules served
+     - Sign-off: what was run, what was seen, date
+
+   * - 1
+     - **Large performance fixture and independent counts.** The generator
+       of P10-2 with a self-check (a second, separate pass that re-counts
+       the written files and must agree with the manifest; a second run
+       byte-identical); q-values written as Percolator writes them (at most
+       six significant digits) with exact ``0``, ``0.005``, ``0.01`` and
+       ``1`` present, and every unknown kind (empty, ``NaN``, ``nan``,
+       ``inf``, ``0,01``, out of range) present in known numbers. In
+       ``cometgui-results`` tests: a locator for the fixture (pinned
+       SHA-256, fail-not-skip), a locator for the ``scratch/scientific-path``
+       real outputs (pinned SHA-256s, ``awk``-pinned counts at 0, 0.005,
+       0.01, 0.05 and 1 with the command recorded), and the minimal
+       independent counter of P10-3, itself checked against both.
+       ``CONSTRUCTED`` record for the fixture.
+     - R-RES-03 (fixture first); gates 3, 6
+     -
+
+   * - 2
+     - **The store contract and the in-memory store.**
+       ``results.filtering.store``: ``ResultStore``, ``ResultQuery``
+       (filter, category, text, sort, offset, limit), ``ResultPage``, the
+       stable row key; the in-memory implementation; the spectrum reference
+       (source base, scan, charge, rank) read from a ``PSMId`` in the parser
+       package; one contract test suite over the real fixtures with counts
+       equal to the independent ones at 0, 0.005, 0.01 and 1, inclusive at
+       the boundary, every unknown kind in its own category; raw files'
+       SHA-256 unchanged. Any parser extension in place, its tests green.
+     - R-RES-01, R-RES-02; gates 1, 3, 8
+     -
+
+   * - 3
+     - **The disk-backed store and the threshold.** Off-heap index
+       (P10-4), rows read back through the one reader, sorting every
+       column (external sort for text keys), text filter, threshold
+       documented and switched on by the factory; the same contract suite
+       passes for it; the child-JVM heap and time budget test of P10-11 with
+       its ``OutOfMemoryError`` negative control; index rebuilt when the raw
+       file's size or SHA-256 differs from the index's record.
+     - R-RES-03; gates 3, 6, 8
+     -
+
+   * - 4
+     - **Learned-feature-weights summary** (P10-8) in ``results.parser``,
+       with values, ranks and sign consistency checked against numbers
+       computed independently (recorded how) for the real three-split files
+       and the constructed two- and four-split files.
+     - R-PERC-09, AC-RES-08/09; gate 7
+     -
+
+   * - 5
+     - **``finalise-results`` and the run's derived files** (P10-6):
+       ``RunLayout`` paths; the view-state document and its store
+       (``workflow.storage``); the step action, planned with Percolator;
+       ``finalise-provenance`` ordered after it; rerun-preview expectations
+       updated with hand-typed step sets; raw outputs byte-identical across
+       the step; ``docs/reference/project_format.rst`` updated.
+     - R-RES-01 (view state), R-RES-03, R-RUN-01; Phase 09 gate 9
+     -
+
+   * - 6
+     - **Export** (P10-7): table and weights export with sidecar, provenance
+       event, distinct directory, never overwriting; raw files byte-identical
+       (SHA-256 before/after) after filtering and export; unknown-category
+       rows exported exactly as the view classifies them.
+     - R-RES-04, R-RES-01, R-RES-02, R-PERC-07; gates 4, 5, 8
+     -
+
+   * - 7
+     - **Results view-models** (P10-9): the shared display-filter
+       view-model (Percolator section delegating, its tests green
+       unchanged); the paged table view-model; the weights view-model; the
+       Results view-model (run choice, export actions) and its ports;
+       view-model coverage >= 80%.
+     - R-RES-01..04, R-PERC-09
+     -
+
+   * - 8
+     - **Results and weights panes, wiring, and the first GUI gates**: the
+       JavaFX panes (accessible names, pinned identifiers), the app's
+       ports and composition, ``SectionArrivals`` updated; GUI tests for
+       gate 1 (defaults, inclusive, out-of-range refused on screen), gate 2
+       (P10-10) and gate 6 (the large fixture, items never above the page
+       size, within budget).
+     - R-RES-01, R-RES-03; gates 1, 2, 6
+     -
+
+   * - 9
+     - **The remaining GUI gates and the real run**: displayed counts
+       against independent counts at 0, 0.005, 0.01 and 1 (gate 3); raw
+       files byte-identical after filtering and export through the
+       interface (gate 4); the export's metadata (gate 5); the weights table
+       against independent values (gate 7); the unknown category identical
+       on screen and in the export (gate 8); a real Comet + Percolator run
+       through the interface whose results appear in the Results section.
+     - gates 3, 4, 5, 7, 8
+     -
+
+   * - 10
+     - **Documentation**: ``docs/results.rst``,
+       ``docs/learned_feature_weights.rst``,
+       ``docs/developer/results_model.rst`` (budgets, threshold, store,
+       export format); stale statements corrected (workflow engine,
+       version capabilities' gate-9 note, project format); traceability map
+       entries for AC-RES-01..04, 08..10.
+     - R-DOC; all AC-RES of the phase
+     -
+
+   * - 11
+     - **The falsifiability harness** (P10-12), registered as ``results``.
+     - every gate item
+     -
+
+Rejections and rework
+=====================
+
+None yet.
+
+Deferred
+========
+
+* Comet scores in the PSM table and supporting-PSM counts in the peptide
+  table (P10-9).
+* Protein-level results (out of scope for release 1).
+
+Blockers escalated
+==================
+
+None yet.
