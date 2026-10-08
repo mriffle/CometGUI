@@ -621,7 +621,53 @@ once. Each unit agent is given the brief's *Build economy* section verbatim.
        managed XML-capable build exists; a real run uses the selected
        version.
      - R-PERC-01, 03, 04, 10, 11; gates 3, 4 (UI), 6 (UI)
-     -
+     - **Signed off 2026-10-08** (``7b2614d``, ``21127d2``, ``7870cbe``,
+       ``97881a9``; my integration repair ``ec85a0a``). Diff read:
+       ``viewmodel.percolator`` (``PercolatorViewModel``,
+       ``PercolatorRerunViewModel``, ``PercolatorPort``,
+       ``PercolatorRerunPort``), ``viewmodel.params.PercolatorRequest`` and
+       the Percolator half of the one readiness, ``controls.percolator.PercolatorPane``
+       (34 new pinned ``UiIds``, 399 -> 433); app: ``ToolManagerPercolatorPort``,
+       ``WorkflowRunPort`` building ``SearchRequest.withPercolator`` and the
+       rerun, ``SessionEngine``. Existing tests changed, each read:
+       ``RealRunUiTest`` (now also asserts the Percolator outputs, 3285 PSM
+       rows = PIN targets, no ``-X``), ``RealCancelUiTest`` and three
+       preview texts (gain the three Percolator steps),
+       ``CrossParameterValidationUiTest`` (gains the Percolator reason),
+       ``RunReadinessUiTest`` (offers a never-run Percolator, so the
+       ``paramui`` sandbox, which has no ``scratch/``, still runs it),
+       signature updates. None deleted or disabled. **Rejected item, repaired
+       by me:** ``--only shell`` was 29/30 -- control 1b's secondary
+       diagnostic (``expected <nav-..> but was <nav-..>``) had only ever come
+       from state a failed walk leaked into the next test, and that state
+       now names a Percolator control. Root cause fixed in the test, not the
+       harness: ``KeyboardOnlyNavigationUiTest.assertSelected`` reports pane
+       visibility and the roving tab stop together (``assertAll``), so the
+       walk itself now prints ``expected: <nav-comet-parameters> but was:
+       <nav-percolator>``; no assertion removed (``ec85a0a``); ``--only
+       shell`` **PASS 30** (346 s). ``mvn -pl cometgui-ui,cometgui-app
+       install`` with tests (upstream installed): Maven summary ui **587**,
+       app **207** (1 skipped, the opt-in upstream test), 0 failures, 0
+       ``BugInstance``. (Phase 08's "ui 876" came from a filtered multi-module
+       command; Phase 07's build counted 508.) My PIT over
+       ``viewmodel.percolator.*`` (switch enabled on the command line only,
+       report removed afterwards): 280 = 276 KILLED, 3 SURVIVED
+       (``generation++`` -> ``--``, equivalent: still unique), 1
+       NO_COVERAGE. My injections, landed and restored by ``sha256sum -c``:
+       (1) every Advanced setting shown as supported -- red,
+       ``PercolatorViewModelTest.onlySupported``; (2) advisories never shown
+       -- red, ``chooseAndReturn``, ``toggling``. Harnesses on ``ec85a0a``:
+       ``install`` **95**, ``workflow`` **110**, ``quality`` 42, ``paramui``
+       **87** (1810 s), ``shell`` 30 -- all PASS. **Residue:** the view-model
+       parses the integer settings with ``Integer.parseInt`` (no text reader
+       in ``PercolatorSettings``; range messages still the model's); a
+       successful rerun is offered again; Run is not blocked during a rerun
+       and the stepper does not follow a rerun. On the real 3.07.1/3.09 pair
+       a version rule and a capability rule select the same build, so the
+       version-blind proof rests on the future-version and inferred-claim
+       tests. Tests read outside the module: the 3.07.1 zip and
+       ``scratch/percolator/3.09`` (RealRunUiTest, RealCancelUiTest,
+       PercolatorRerunUiTest) besides the existing Comet and fixture files.
 
    * - 8
      - **Documentation and traceability.** ``docs/percolator.rst``,
