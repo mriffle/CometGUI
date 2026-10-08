@@ -509,7 +509,14 @@ class RealPercolatorRunTest {
         assertEquals("XML_OUTPUT", settings.get("percolator.skipped.01.missing"));
         assertFalse(settings.containsKey("percolator.skipped.02.version"));
         String reason = settings.get("percolator.skipped.01.reason");
-        assertTrue(reason.contains("3.09") && reason.contains("XML_OUTPUT"), reason);
+        assertEquals(
+                "Using Percolator 3.07.1 rather than 3.09 (registered local binary) because 3.09"
+                        + " (registered local binary) lacks XML_OUTPUT, which Limelight conversion"
+                        + " needs (the Limelight converter reads the Percolator XML that XML_OUTPUT"
+                        + " writes).",
+                reason,
+                "gate 4: the recorded reason names the skipped version and the capability it"
+                        + " lacks, in the resolver's own words");
         assertEquals(reason, settings.get(PercolatorProvenance.SELECTION_REASON));
         assertEquals(
                 RealPercolator.ADVISORIES_3071.get(0).text(),
