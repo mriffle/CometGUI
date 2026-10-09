@@ -422,7 +422,43 @@ brief's *Build economy* section verbatim.
        updated with hand-typed step sets; raw outputs byte-identical across
        the step; ``docs/reference/project_format.rst`` updated.
      - R-RES-01 (view state), R-RES-03, R-RUN-01; Phase 09 gate 9
-     -
+     - **Signed off 2026-10-09** (``aeb184c``, ``2c48ceb``). Diff read: 27
+       files -- ``RunLayout``: ``results/``, ``results/index/``,
+       ``results/view-state.json``, ``exports/``; ``workflow.storage``
+       ``ViewStateJson``/``ViewStateStore``/``ViewStateReading``
+       (``{"schemaVersion": 1, "psmQValueFilter": ..., "peptideQValueFilter":
+       ...}`` through the one JSON reader and atomic writer, cutoffs parsed
+       by the filters' own ``parse``; a refused file reads as the defaults
+       plus the refusal text and is never overwritten);
+       ``ResultSteps.FinaliseResults``, planned with Percolator in a search
+       and in the derived rerun, opening each table through
+       ``ResultStores.open`` with ``results/index/`` and recording rows and
+       the four counts at 0.01 per table plus the weights' split and feature
+       counts; ``finalise-provenance`` after it again; app GUI pins of the
+       preview updated; ``project_format.rst``, ``workflow_engine.rst``.
+       ``ResultStores.open(..., limit)`` made public (visibility only). I
+       ran ``-am install`` then ``-pl cometgui-domain,cometgui-workflow
+       verify``: **1172 and 730 tests, 0 failures**, 0 SpotBugs; app
+       ``PercolatorRerunUiTest, RealRunUiTest, RealCancelUiTest,
+       WorkflowRunPortTest``: 21, 0 failures. My injections, restored by
+       ``sha256sum -c``: (a) the index directory at the run root instead of
+       ``results/index/`` -- ``RunLayoutTest.derivedFiles`` red and
+       ``FinaliseResultsTest.aTableAboveTheLimitIsIndexedUnderResults``
+       errors (``NoSuchFile .../results``); (b) the view state accepting
+       schema version 2 -- ``ViewStateStoreTest.newer`` red. Agent's
+       injections include the dropped ``finalise-results ->
+       finalise-provenance`` edge (6 red) and the one predicate (3 red);
+       its PIT: workflow 45 mutations, 44 killed (1 NO_COVERAGE in Phase 09
+       code); ``RunLayout`` 36/36. I ran ``--only workflow --only percolator
+       --only quality --only docs --only traceability``: **5 passed** --
+       workflow 110 (470 s), percolator 109 (719 s), quality 42, docs,
+       traceability 8; and ``--only quality`` once more for unit 4's added
+       classes (42, 139 s). **Known weakness, recorded:** on the real K562
+       first-1000-records search no row reaches q <= 0.01 (smallest target
+       PSM q 0.018648), so the real-run count comparison cannot tell 0.01
+       from a smaller cutoff; the hand-typed table in
+       ``FinaliseResultsTest`` does. The step's ``store`` detail repeats
+       the factory's ``rows > limit`` rule (display only).
 
    * - 6
      - **Export** (P10-7): table and weights export with sidecar, provenance
