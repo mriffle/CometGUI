@@ -601,7 +601,41 @@ brief's *Build economy* section verbatim.
        on screen and in the export (gate 8); a real Comet + Percolator run
        through the interface whose results appear in the Results section.
      - gates 3, 4, 5, 7, 8
-     -
+     - **Signed off 2026-10-09** (``f83558f``, ``c22aa45``, ``c9c2a50``).
+       Diff read: app GUI tests ``ResultsCountsUiTest`` (gate 3: the real
+       K562 3.07.1 tables in a constructed run, four tables at 0, 0.005,
+       0.01, 0.05 and 1 equal to the ``awk`` pins and a test-side
+       ``BigDecimal`` counter; also at the run's own smallest q-value
+       0.00112905, where 599 target PSMs sit exactly on the cutoff, and the
+       64-row tables' 17 rows at exactly 0.0588235), ``ResultsExportUiTest``
+       (gates 4, 5, 8), ``ResultsWeightsUiTest`` (gate 7), ``RealRunUiTest
+       .theResultsAppear`` (a real Comet + Percolator run listed and opened
+       without a restart, counts equal the counter on its raw ``psms.tsv``,
+       ``finalise-results`` recorded); helpers ``IndependentCounts``,
+       ``TestJson`` (test-side JSON), ``K562Outputs``. **Product defect
+       found and fixed** (``c9c2a50``): pressing Last disabled the focused
+       paging button and focus fell into the table (unit 8's large-fixture
+       test failed 2 of 3 runs); ``ResultsPane`` now hands focus to the
+       enabled neighbour first, asserted red-then-green. I ran ``-am
+       install`` then the eight Results GUI classes and ``RealRunUiTest``:
+       **32 tests, 0 failures** (counts 4 in 76 s, export 6 in 33 s, weights
+       5 in 20 s, large fixture 1 in 23 s, real run 6 in 53 s); the agent's
+       ``cometgui-app verify`` on ``c9c2a50``: 246, 0 failures. My
+       injections, restored by ``sha256sum -c`` and reinstalled: (a) weights
+       statistics displayed at 4 decimals instead of 6 -- 4 of 5 red, "cells
+       that differ from the independent values ... lnrSp: mean signed"; (b)
+       the export dropping the header line -- 5 of 6 red, "the export is the
+       header and exactly the counter's rows of the category, verbatim".
+       The agent's twelve (passing label bound to failing; the one
+       predicate -- red only through the on-the-cutoff cases, the pinned
+       K562 cutoffs alone cannot see it; export beside the raw table; raw
+       mtime touched; sidecar cutoff from the default; wrong version;
+       weights sorted by mean signed; n-1 SD; three split headings; an
+       unknown row dropped from export and from the view; no refresh at run
+       end) were each red. I ran ``--only quality --only shell --only
+       paramui --only percolator --only workflow``: **5 passed** (60 m 02 s;
+       paramui 87 in 1882 s, percolator 109 in 729 s). Files read outside
+       the module: ``scratch/scientific-path/percolator-3.07.1/``.
 
    * - 10
      - **Documentation**: ``docs/results.rst``,
