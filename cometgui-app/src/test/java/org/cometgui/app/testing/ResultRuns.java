@@ -76,8 +76,31 @@ public final class ResultRuns {
     /** Real Percolator 3.07.1 weights over CometGUI's synthetic PIN: 3 splits, 3 features. */
     public static final String WEIGHTS_3071 = "real-3.07.1-weights.txt";
 
+    /**
+     * Real Percolator 3.07.1 target PSMs over CometGUI's synthetic PIN: 64 rows, 17 of them at
+     * exactly {@code 0.0588235}. Byte-identical to that run's target peptide table.
+     */
+    public static final String REAL_3071_PSMS = "real-3.07.1-psms.tsv";
+
+    /** Real Percolator 3.07.1 decoy PSMs over the same PIN: 64 rows. */
+    public static final String REAL_3071_DECOY_PSMS = "real-3.07.1-decoy-psms.tsv";
+
+    /** Constructed weights of two cross-validation splits, 5 features with the bias. */
+    public static final String WEIGHTS_TWO_SPLITS = "weights-two-splits.txt";
+
+    /** Constructed weights of four cross-validation splits, 3 features with the bias. */
+    public static final String WEIGHTS_FOUR_SPLITS = "weights-four-splits.txt";
+
     private static final Map<String, String> SHA256 =
             Map.of(
+                    REAL_3071_PSMS,
+                    "6e782dd7bbba9f16bce1c6556bc86032e7a9804b6494694db61573d88340ed53",
+                    REAL_3071_DECOY_PSMS,
+                    "3f9557b82119a4f9900e5964c762dd9ce504de508afdb5be67dfdcca465259e4",
+                    WEIGHTS_TWO_SPLITS,
+                    "44042567136e69e5854085952cf6a2a3a9e14221761bfcc3c4cb04782177016f",
+                    WEIGHTS_FOUR_SPLITS,
+                    "2345706956b918d713a93fe5e523fbd31b7aceb095c68cfffbb9ff508969e276",
                     PSMS_UNKNOWN_Q,
                     "ea58b3b63f9031bf53b5675d117b1e7203137a0ebd2399c9def824334267b6c7",
                     PSMS_SHUFFLED,

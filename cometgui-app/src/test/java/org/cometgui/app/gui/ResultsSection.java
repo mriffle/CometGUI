@@ -72,6 +72,75 @@ final class ResultsSection {
     }
 
     /**
+     * Types both cutoffs into the Results section's own filter fields, each committed with Enter,
+     * and waits for the table's answer.
+     *
+     * @param driver the driver
+     * @param psm the PSM cutoff
+     * @param peptide the peptide cutoff
+     */
+    static void filters(FxUiDriver driver, String psm, String peptide) {
+        ParameterEditorApp.enter(driver, "results-psm-filter", psm);
+        settle(driver, QUERY_BOUND);
+        ParameterEditorApp.enter(driver, "results-peptide-filter", peptide);
+        settle(driver, QUERY_BOUND);
+        assertEquals(psm, driver.textOf("results-psm-filter"), "the PSM filter's text");
+        assertEquals(peptide, driver.textOf("results-peptide-filter"), "the peptide filter's text");
+    }
+
+    /**
+     * Shows one of the open run's tables, chosen with the keyboard, and waits for its answer.
+     *
+     * @param driver the driver
+     * @param label the table as the selector names it, for example {@code Decoy PSMs}
+     */
+    static void showTable(FxUiDriver driver, String label) {
+        ParameterEditorApp.choose(driver, "results-table-choice", label);
+        settle(driver, QUERY_BOUND);
+    }
+
+    /**
+     * Shows another run's results, chosen with the keyboard in the run selector, and waits until
+     * they are shown.
+     *
+     * @param driver the driver
+     * @param runId the run
+     */
+    static void showRun(FxUiDriver driver, String runId) {
+        List<String> offered = ParameterEditorApp.comboItems(driver, "results-run");
+        String item =
+                offered.stream()
+                        .filter(label -> label.startsWith(runId + " -- "))
+                        .findFirst()
+                        .orElseGet(
+                                () -> fail("the run selector offers no " + runId + ": " + offered));
+        ParameterEditorApp.choose(driver, "results-run", item);
+        awaitOpened(driver, runId, OPEN_BOUND);
+        settle(driver, QUERY_BOUND);
+    }
+
+    /**
+     * Waits for the export started by a click to end -- the status no longer what it was before the
+     * click, and stating an outcome -- and returns what the section says.
+     *
+     * @param driver the driver
+     * @param button {@code results-export-table} or {@code results-export-weights}
+     * @return the export status then
+     */
+    static String export(FxUiDriver driver, String button) {
+        String before = driver.textOf("results-export-status");
+        driver.clickOn(button);
+        return RunSection.awaitText(
+                driver,
+                "results-export-status",
+                text ->
+                        !text.equals(before)
+                                && (text.startsWith("Exported ")
+                                        || text.startsWith("Nothing was exported")),
+                OPEN_BOUND);
+    }
+
+    /**
      * The four counts shown: total, passing, failing, unknown q-value.
      *
      * @param driver the driver

@@ -19,6 +19,21 @@ CometGUI's synthetic 64+64 PIN) and constructed/CONSTRUCTED.txt
   psms-shuffled.tsv          constructed/psms-shuffled.tsv          3754547ea1ca3ff35b67913a8249b98831e924c0a84029c2a9769fc581a6f5d4
   real-3.07.1-weights.txt    real/percolator-3.07.1/weights.txt     5370f2375d3ea1f13236f6208624c69f81fa8fb190e936e863488cfda4e7a434
 
+Added on 2026-10-09 by the phase 10 unit 9 agent, byte for byte, from the
+same originals' directory (cometgui-results/src/test/resources/org/cometgui/
+results/parser/), for the gate 3 and gate 7 GUI tests:
+
+  copy                         original (under .../results/parser/)          SHA-256
+  real-3.07.1-psms.tsv         real/percolator-3.07.1/psms.tsv               6e782dd7bbba9f16bce1c6556bc86032e7a9804b6494694db61573d88340ed53
+  real-3.07.1-decoy-psms.tsv   real/percolator-3.07.1/decoy-psms.tsv         3f9557b82119a4f9900e5964c762dd9ce504de508afdb5be67dfdcca465259e4
+  weights-two-splits.txt       constructed/weights-two-splits.txt            44042567136e69e5854085952cf6a2a3a9e14221761bfcc3c4cb04782177016f
+  weights-four-splits.txt      constructed/weights-four-splits.txt           2345706956b918d713a93fe5e523fbd31b7aceb095c68cfffbb9ff508969e276
+
+Percolator wrote real/percolator-3.07.1/peptides.tsv byte-identical to its
+psms.tsv, and decoy-peptides.tsv to decoy-psms.tsv (64 + 64 synthetic PIN), so
+ResultsCountsUiTest uses each copy for both tables. Its counts are awk-pinned
+in that test's documentation, with the command.
+
 The GUI tests put psms-unknown-q.tsv in a constructed run as its target PSM
 table (15 rows; q-values 0.01 and 0.010 exactly at the default cutoff,
 0.0100001 just above it, and every unknown kind) and psms-shuffled.tsv as its
@@ -33,3 +48,10 @@ different (the tests harness's sandbox links scratch/ whole):
       python3 scripts/fixtures/large-results-fixture.py; its SHA-256 and its
       counts at 0, 0.005, 0.01 and 1 as its manifest.json records them
       (ResultsLargeFixtureUiTest).
+
+  scratch/scientific-path/percolator-3.07.1/{psms,peptides}.{target,decoy}.txt
+  and weights.txt   the real K562 Percolator output (D-006: never committed),
+      held to the SHA-256s cometgui-results' real-k562/PROVENANCE.txt records,
+      with that record's awk-pinned counts (org.cometgui.app.testing.
+      K562Outputs; ResultsCountsUiTest, ResultsExportUiTest,
+      ResultsWeightsUiTest).

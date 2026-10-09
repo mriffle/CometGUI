@@ -29,15 +29,18 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import javafx.scene.input.KeyCode;
 import org.cometgui.app.config.RunWiring;
+import org.cometgui.app.testing.IndependentCounts;
 import org.cometgui.app.testing.InstalledComet;
 import org.cometgui.app.testing.RealPercolators;
 import org.cometgui.app.testing.RealSearch;
 import org.cometgui.app.testing.RealSearch.LaunchRecorder;
+import org.cometgui.app.testing.TestJson;
 import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.TestFxUiDriver;
 import org.cometgui.domain.build.BuildIdentity;
@@ -74,6 +77,11 @@ import org.junit.jupiter.api.io.TempDir;
  *       managed build, is the only Percolator here and so the resolved default; it rescores the
  *       merged PIN with no XML option (Limelight conversion is off), writes one PSM row per target
  *       row, and provenance names it and why.
+ *   <li>Its results appear in the Results section without a restart (Phase 10 unit 9): the run
+ *       listed and opened, the target PSM counts at 0.01, 0.05 and 1 equal to {@link
+ *       IndependentCounts} run on the run's own raw {@code outputs/percolator/psms.tsv}, and the
+ *       {@code finalise-results} step recorded as succeeded in the run's event log with the same
+ *       counts at 0.01.
  *   <li>Nothing changed: Run is disabled because nothing would run, and the preview says every step
  *       is reused.
  *   <li>A parameter changed: the rerun preview names every step and why, before anything starts.
@@ -270,6 +278,68 @@ class RealRunUiTest {
 
     @Test
     @Order(2)
+    @DisplayName(
+            "the run's results appear in the Results section without a restart: listed, its"
+                    + " counts the raw PSM table's, finalise-results recorded")
+    void theResultsAppear() throws IOException {
+        Path run = onlyRun(0);
+        String id = idOf(run);
+        driver.clickOn("nav-results");
+        ResultsSection.awaitOpened(driver, id, ResultsSection.OPEN_BOUND);
+        ResultsSection.settle(driver, ResultsSection.QUERY_BOUND);
+        List<String> listed = ParameterEditorApp.comboItems(driver, "results-run");
+        assertEquals(1, listed.size(), () -> "one run with results: " + listed);
+        assertTrue(
+                listed.get(0).startsWith(id + " -- created ")
+                        && listed.get(0).endsWith(", succeeded"),
+                () -> "the run, succeeded: " + listed);
+        assertEquals("Target PSMs", ParameterEditorApp.comboText(driver, "results-table-choice"));
+        assertEquals("0.01", driver.textOf("results-psm-filter"), "the default PSM filter");
+
+        Path psms = run.resolve("outputs/percolator/psms.tsv");
+        List<String> atDefault = IndependentCounts.counts(psms, "0.01");
+        assertEquals(atDefault, ResultsSection.counts(driver), "the counts at the default 0.01");
+        boolean separates = false;
+        for (String cutoff : List.of("0.05", "1", "0.01")) {
+            ResultsSection.filters(driver, cutoff, "0.01");
+            List<String> expected = IndependentCounts.counts(psms, cutoff);
+            assertEquals(expected, ResultsSection.counts(driver), "the counts at " + cutoff);
+            long passing = Long.parseLong(expected.get(1));
+            separates |= passing > 0 && passing < Long.parseLong(expected.get(0));
+        }
+        assertTrue(
+                separates, "some cutoff passes some rows and fails others, so counts can differ");
+
+        Map<String, Object> finished = null;
+        List<String> types = new ArrayList<>();
+        for (String line : Files.readAllLines(run.resolve("provenance/events.log"))) {
+            Map<String, Object> event = TestJson.object(line);
+            Object payload = event.get("payload");
+            types.add(String.valueOf(event.get("type")));
+            if ("stage.finished".equals(event.get("type"))
+                    && payload instanceof Map<?, ?> details
+                    && "finalise-results".equals(details.get("stage"))) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> found = (Map<String, Object>) details;
+                finished = found;
+            }
+        }
+        Map<String, Object> details = finished;
+        assertTrue(details != null, () -> "no finalise-results stage.finished event in " + types);
+        assertAll(
+                "finalise-results, as recorded",
+                () -> assertEquals("succeeded", details.get("state")),
+                () -> assertEquals("0.01", details.get("filters.psm")),
+                () -> assertEquals(atDefault.get(0), details.get("tables.percolator-psms.total")),
+                () -> assertEquals(atDefault.get(1), details.get("tables.percolator-psms.passing")),
+                () -> assertEquals(atDefault.get(2), details.get("tables.percolator-psms.failing")),
+                () ->
+                        assertEquals(
+                                atDefault.get(3), details.get("tables.percolator-psms.unknown-q")));
+    }
+
+    @Test
+    @Order(3)
     @DisplayName("nothing changed after a success: nothing would run, every step reused")
     void nothingChanged() {
         driver.clickOn("nav-run");
@@ -312,7 +382,7 @@ class RealRunUiTest {
     }
 
     @Test
-    @Order(3)
+    @Order(4)
     @DisplayName("a changed parameter: the rerun preview names every step and why, before Run")
     void previewAfterAParameterChange() {
         ParameterEditorApp.openEditor(driver);
@@ -349,7 +419,7 @@ class RealRunUiTest {
     }
 
     @Test
-    @Order(4)
+    @Order(5)
     @DisplayName(
             "a spectrum file changed in place: a new run, and the last run's refusal to reuse"
                     + " it in gate 8's words, naming the file and both hashes")
@@ -407,7 +477,7 @@ class RealRunUiTest {
     }
 
     @Test
-    @Order(5)
+    @Order(6)
     @DisplayName("a run Comet refuses: the failure is stated with its step, never swallowed")
     void aFailureIsStated() throws IOException {
         // Comet's own placeholder spectral library, NAMED (a new configuration starts empty), is
