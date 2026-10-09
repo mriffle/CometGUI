@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -174,6 +175,78 @@ class TableExportBehaviourTest {
                 "the existing sidecar changed");
         assertTrue(Files.isDirectory(exports.resolve(stem + "-4.tsv")));
         assertFalse(Files.exists(exports.resolve(stem + "-3.tsv")));
+    }
+
+    @Test
+    @DisplayName("after 10 000 taken names the export is refused; the 10 000th is still tried")
+    void namesRunOut() throws IOException {
+        RunLayout run = ExportTables.newRun(work);
+        Path exports = Files.createDirectories(run.exportsDirectory());
+        String stem = "target-psms_q0.01_all_20261009T120000.123Z";
+        Files.createFile(exports.resolve(stem + ".tsv"));
+        for (int n = 2; n <= ExportFiles.MAX_ATTEMPTS; n++) {
+            Files.createFile(exports.resolve(stem + "-" + n + ".tsv"));
+        }
+        ResultExporter exporter = ExportTables.exporter(run, ExportTables.fixed());
+
+        FileAlreadyExistsException refused =
+                assertThrows(
+                        FileAlreadyExistsException.class,
+                        () ->
+                                exporter.exportTable(
+                                        shuffled(),
+                                        TableKind.TARGET_PSMS,
+                                        PsmQValueFilter.DEFAULT,
+                                        Category.ALL));
+        assertEquals(
+                exports.resolve(stem + ".tsv")
+                        + ": no free name for a new export after 10000 attempts",
+                refused.getMessage());
+        assertEquals(ExportFiles.MAX_ATTEMPTS, names(exports).size(), "nothing was added");
+
+        Files.delete(exports.resolve(stem + "-10000.tsv"));
+        TableExport last =
+                exporter.exportTable(
+                        shuffled(), TableKind.TARGET_PSMS, PsmQValueFilter.DEFAULT, Category.ALL);
+        assertEquals(stem + "-10000.tsv", String.valueOf(last.file().getFileName()));
+    }
+
+    @Test
+    @DisplayName("a removal that itself fails is attached to the failure, not thrown instead of it")
+    void aFailedRemovalIsSuppressed() throws IOException {
+        RunLayout run = ExportTables.newRun(work);
+        ResultExporter exporter =
+                new ResultExporter(
+                        run,
+                        new RunId(ExportTables.RUN_ID),
+                        ExportTables.VERSION,
+                        ExportTables.fixed(),
+                        new TestHasher(),
+                        SecretRedactor.patternsOnly(),
+                        payload -> {
+                            assertTrue(
+                                    run.exportsDirectory().toFile().setWritable(false, false),
+                                    "could not make exports/ read-only");
+                            throw new IOException("the disk is full");
+                        });
+        try {
+            IOException failed =
+                    assertThrows(
+                            IOException.class,
+                            () ->
+                                    exporter.exportTable(
+                                            shuffled(),
+                                            TableKind.TARGET_PSMS,
+                                            PsmQValueFilter.DEFAULT,
+                                            Category.ALL));
+            assertTrue(failed.getMessage().endsWith(": the disk is full"), failed.getMessage());
+            assertEquals(
+                    2,
+                    failed.getCause().getSuppressed().length,
+                    "the export's and the sidecar's failed removals");
+        } finally {
+            assertTrue(run.exportsDirectory().toFile().setWritable(true, true));
+        }
     }
 
     @Test

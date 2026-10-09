@@ -26,12 +26,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import org.cometgui.domain.ports.FileHashes;
+import org.cometgui.domain.ports.HashService;
+import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunLayout;
+import org.cometgui.domain.secrets.SecretRedactor;
 import org.cometgui.results.parser.FeatureWeights;
 import org.cometgui.results.parser.WeightsReader;
 import org.cometgui.results.parser.WeightsSummary;
@@ -39,6 +45,7 @@ import org.cometgui.results.testing.Fixtures;
 import org.cometgui.results.testing.MiniJson;
 import org.cometgui.results.testing.RealK562;
 import org.cometgui.results.testing.ScratchFixtures;
+import org.cometgui.results.testing.TestHasher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -204,6 +211,48 @@ class WeightsExportTest {
         assertTrue(log.contains("\"weights.split-count\":\"" + n + "\""), log);
         assertTrue(log.contains("\"weights.feature-count\":\"" + names.length + "\""), log);
         assertEquals(1, Files.readAllLines(run.eventLogFile()).size());
+    }
+
+    @Test
+    @DisplayName("an artefact touched while it is read for export is refused, nothing written")
+    void aTouchedArtefactIsRefused() throws IOException {
+        Path file =
+                Files.copy(
+                        Fixtures.verified(
+                                "constructed/weights-two-splits.txt",
+                                "44042567136e69e5854085952cf6a2a3a9e14221761bfcc3c4cb04782177016f"),
+                        work.resolve("weights.txt"));
+        WeightsSummary summary = WeightsSummary.of(WeightsReader.read(file));
+        TestHasher real = new TestHasher();
+        HashService touching =
+                path -> {
+                    FileHashes hashes = real.hash(path);
+                    if (path.equals(file.toAbsolutePath().normalize())) {
+                        Files.setLastModifiedTime(
+                                file, FileTime.from(Instant.parse("2001-01-01T00:00:00Z")));
+                    }
+                    return hashes;
+                };
+        RunLayout run = ExportTables.newRun(work);
+        ResultExporter exporter =
+                new ResultExporter(
+                        run,
+                        new RunId(ExportTables.RUN_ID),
+                        ExportTables.VERSION,
+                        ExportTables.fixed(),
+                        touching,
+                        SecretRedactor.patternsOnly());
+
+        IOException refused =
+                assertThrows(IOException.class, () -> exporter.exportWeights(summary));
+
+        assertTrue(
+                refused.getMessage().contains("changed while it was being read for export"),
+                refused.getMessage());
+        assertTrue(Files.notExists(run.eventLogFile()));
+        try (Stream<Path> files = Files.list(run.exportsDirectory())) {
+            assertEquals(0, files.count());
+        }
     }
 
     @Test
