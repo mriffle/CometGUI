@@ -241,6 +241,44 @@ class ProjectResultsPortTest {
     }
 
     @Test
+    @DisplayName("a run gone since it was listed is not offered from the old list")
+    void aRunGoneSinceListed() throws IOException {
+        RunLayout layout =
+                run(
+                        "run-gone",
+                        CREATED,
+                        Map.of(TableKind.TARGET_PSMS, ResultRuns.PSMS_UNKNOWN_Q),
+                        false);
+        assertEquals(1, port.runs().size());
+        Files.delete(RunResultFiles.table(layout, TableKind.TARGET_PSMS));
+        assertEquals(List.of(), port.runs());
+        IOException refused =
+                assertThrows(IOException.class, () -> port.open(new RunId("run-gone")));
+        assertEquals(
+                "run run-gone is not a run with results in " + root.resolve("project"),
+                refused.getMessage());
+    }
+
+    @Test
+    @DisplayName("a table the reader refuses fails the open, naming the file")
+    void aRefusedTable() throws IOException {
+        RunLayout layout =
+                run(
+                        "run-broken",
+                        CREATED,
+                        Map.of(TableKind.TARGET_PSMS, ResultRuns.PSMS_UNKNOWN_Q),
+                        false);
+        Path peptides = RunResultFiles.table(layout, TableKind.TARGET_PEPTIDES);
+        Files.writeString(peptides, "not a Percolator table\n", StandardCharsets.UTF_8);
+        port.runs();
+        IOException refused =
+                assertThrows(IOException.class, () -> port.open(new RunId("run-broken")));
+        assertTrue(
+                refused.getMessage().contains(peptides.toString()),
+                () -> "the refusal names the table: " + refused.getMessage());
+    }
+
+    @Test
     @DisplayName("two spectrum files of one name: each is shown by its whole path")
     void sharedNames() throws IOException {
         ProjectLayout project = ResultRuns.project(root.resolve("project"));
