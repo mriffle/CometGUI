@@ -360,6 +360,35 @@ class FinaliseResultsTest {
 
     @Test
     @DisplayName(
+            "with the row limit equal to the tables' ten rows, every table stays in memory: the"
+                    + " limit is the most rows held in memory, and nothing is indexed")
+    void aTableAtTheLimitStaysInMemory(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
+        Staged staged = stage(directory);
+        try (RealProject project = staged.project()) {
+            PreparedRun prepared = prepare(staged, FakePercolator.EVERY);
+            PercolatorRun half = prepared.percolatorRun().orElseThrow();
+            RunResult result =
+                    run(
+                            project,
+                            prepared,
+                            Map.of(
+                                    EngineStep.FINALISE_RESULTS,
+                                    new ResultSteps.FinaliseResults(half, 10)));
+
+            assertEquals(
+                    AttemptOutcome.SUCCEEDED, result.outcome(), () -> result.failures().toString());
+            Map<String, String> finished =
+                    RunEvidence.finished(prepared.layout(), EngineStep.FINALISE_RESULTS);
+            for (String role : TABLES) {
+                assertTableCounts(finished, role, "memory");
+            }
+            assertFalse(Files.exists(prepared.layout().resultsDirectory()));
+        }
+    }
+
+    @Test
+    @DisplayName(
             "a build without DECOY_OUTPUT and WEIGHTS_OUTPUT: the decoy tables and weights are not"
                     + " there to open, and that is not an error")
     void missingOptionalTablesAreNotAnError(@TempDir Path directory)

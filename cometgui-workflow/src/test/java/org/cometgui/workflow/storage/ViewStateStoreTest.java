@@ -345,33 +345,49 @@ class ViewStateStoreTest {
     }
 
     @Test
-    @DisplayName("a reading's parts must agree")
+    @DisplayName("a reading's parts must agree, and a disagreement says which")
     void readingInvariants() {
         assertAll(
                 () ->
-                        assertThrows(
-                                IllegalArgumentException.class,
-                                () ->
-                                        new ViewStateReading(
-                                                DisplayFilters.DEFAULTS,
-                                                ViewStateReading.Source.DEFAULTS_FILE_REFUSED,
-                                                Optional.empty())),
+                        assertEquals(
+                                "a refusal is present exactly when the file was refused, but"
+                                        + " source is DEFAULTS_FILE_REFUSED and the refusal is"
+                                        + " absent",
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () ->
+                                                        new ViewStateReading(
+                                                                DisplayFilters.DEFAULTS,
+                                                                ViewStateReading.Source
+                                                                        .DEFAULTS_FILE_REFUSED,
+                                                                Optional.empty()))
+                                        .getMessage()),
                 () ->
-                        assertThrows(
-                                IllegalArgumentException.class,
-                                () ->
-                                        new ViewStateReading(
-                                                DisplayFilters.DEFAULTS,
-                                                ViewStateReading.Source.SAVED,
-                                                Optional.of("why"))),
+                        assertEquals(
+                                "a refusal is present exactly when the file was refused, but"
+                                        + " source is SAVED and the refusal is present",
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () ->
+                                                        new ViewStateReading(
+                                                                DisplayFilters.DEFAULTS,
+                                                                ViewStateReading.Source.SAVED,
+                                                                Optional.of("why")))
+                                        .getMessage()),
                 () ->
-                        assertThrows(
-                                IllegalArgumentException.class,
-                                () ->
-                                        new ViewStateReading(
-                                                CHOSEN,
-                                                ViewStateReading.Source.DEFAULTS_NOTHING_SAVED,
-                                                Optional.empty())),
+                        assertTrue(
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () ->
+                                                        new ViewStateReading(
+                                                                CHOSEN,
+                                                                ViewStateReading.Source
+                                                                        .DEFAULTS_NOTHING_SAVED,
+                                                                Optional.empty()))
+                                        .getMessage()
+                                        .startsWith(
+                                                "a reading from DEFAULTS_NOTHING_SAVED holds the"
+                                                        + " default filters, not ")),
                 () ->
                         assertEquals(
                                 CHOSEN,
