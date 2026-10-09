@@ -16,6 +16,8 @@
 
 package org.cometgui.app.config;
 
+import java.util.Set;
+import org.cometgui.domain.run.RunId;
 import org.cometgui.ui.viewmodel.params.RunEnginePort;
 import org.cometgui.ui.viewmodel.percolator.PercolatorRerunPort;
 
@@ -24,4 +26,14 @@ import org.cometgui.ui.viewmodel.percolator.PercolatorRerunPort;
  * Percolator section's rerun port, implemented by one object because both work over the same
  * session -- its project, its one hasher, its engine and its last run (decisions P8-16, P9-11).
  */
-public interface SessionEngine extends RunEnginePort, PercolatorRerunPort {}
+public interface SessionEngine extends RunEnginePort, PercolatorRerunPort {
+
+    /**
+     * The runs this session's engine is executing now: from the moment a run, a retry or a rerun is
+     * started until the engine reports it finished -- after its provenance event log is closed.
+     * While a run is executing the engine holds that log, so nothing can be exported from it.
+     *
+     * @return the runs' identifiers; empty when none is executing
+     */
+    Set<RunId> executingRuns();
+}

@@ -45,6 +45,7 @@ import org.cometgui.domain.platform.GlibcVersion;
 import org.cometgui.domain.platform.HostBaselineReport;
 import org.cometgui.domain.platform.HostBaselineVerifier;
 import org.cometgui.domain.tools.ToolManager;
+import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.ui.view.ShellView;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
@@ -61,6 +62,10 @@ import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
+import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
+import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
+import org.cometgui.ui.viewmodel.results.ResultsViewModel;
+import org.cometgui.ui.viewmodel.results.WeightsViewModel;
 
 /**
  * The running application: build the composition root, check the host, build the shell, show the
@@ -159,6 +164,12 @@ public final class CometGuiApplication extends Application {
 
     /** Where the Run section calls the engine; set by {@link #start}. */
     private ExecutorService runThreads;
+
+    /** Where the Results section reads its stores, one task at a time; set by {@link #start}. */
+    private ExecutorService resultThread;
+
+    /** The Results section, whose open stores are closed when the application stops. */
+    private ResultsViewModel results;
 
     /**
      * The constructor JavaFX itself calls: the real services for this host and a fresh run message
@@ -307,8 +318,17 @@ public final class CometGuiApplication extends Application {
                 new ProjectSession(
                         runSetup.projectDirectory(), services.clock(), services.runIds());
         runThreads = RunWiring.backgroundThreads();
+        CachingHashService hashes = RunWiring.hasher();
         SessionEngine engine =
-                RunWiring.port(services, messageLog, tools, toolsUnavailable, project, running);
+                RunWiring.port(
+                        services, messageLog, tools, toolsUnavailable, project, running, hashes);
+
+        /*
+         * THE ONE DISPLAY-FILTER STATE (design decision P10-1): built here once and given to both
+         * the Percolator section and the Results section, so a filter changed in one is the
+         * filter the other shows.
+         */
+        DisplayFiltersViewModel displayFilters = new DisplayFiltersViewModel();
 
         /*
          * The Percolator section (phase 09): the Tool Manager's Percolator builds behind a port,
@@ -323,7 +343,8 @@ public final class CometGuiApplication extends Application {
                         chooser,
                         runThreads,
                         Platform::runLater,
-                        toolManager::refresh);
+                        toolManager::refresh,
+                        displayFilters);
         PercolatorRerunViewModel percolatorRerun =
                 new PercolatorRerunViewModel(
                         engine, percolator.requestProperty(), runThreads, Platform::runLater);
@@ -336,6 +357,26 @@ public final class CometGuiApplication extends Application {
                         percolator.requestProperty(),
                         engine,
                         runThreads,
+                        Platform::runLater);
+
+        /*
+         * The Results section (phase 10): the session project's runs with Percolator results,
+         * read through a port that holds the project, the one hasher and the build -- and no
+         * process service, so that a filter change cannot launch anything (gate item 2). Every
+         * store is read on one daemon thread, in order, so a page is never asked of a store that
+         * a newer choice is closing; every answer is applied on this thread.
+         */
+        resultThread = RunWiring.resultThread();
+        ResultTableViewModel resultTable =
+                new ResultTableViewModel(displayFilters, resultThread, Platform::runLater);
+        WeightsViewModel weights = new WeightsViewModel();
+        results =
+                new ResultsViewModel(
+                        RunWiring.results(services, project, hashes, running, engine),
+                        displayFilters,
+                        resultTable,
+                        weights,
+                        resultThread,
                         Platform::runLater);
 
         ShellView shell =
@@ -353,7 +394,11 @@ public final class CometGuiApplication extends Application {
                         ParameterEditorWiring.expert(parameterSession, parameterEditor, running),
                         run,
                         percolator,
-                        percolatorRerun);
+                        percolatorRerun,
+                        results,
+                        resultTable,
+                        weights,
+                        displayFilters);
 
         /*
          * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds
@@ -387,9 +432,19 @@ public final class CometGuiApplication extends Application {
                                 percolatorRerun.refresh();
                             }
                         });
+        /*
+         * The Results section lists the runs with results, and whether each is executing, as of
+         * its last read: so it reads again now, and whenever a run or a Percolator rerun starts or
+         * ends.
+         */
+        run.runningProperty().addListener((observable, before, after) -> results.refresh());
+        percolatorRerun
+                .runningProperty()
+                .addListener((observable, before, after) -> results.refresh());
         percolator.refresh();
         run.recheck();
         percolatorRerun.refresh();
+        results.refresh();
 
         primaryStage.setTitle(WINDOW_TITLE);
         primaryStage.setScene(new Scene(shell, INITIAL_WIDTH, INITIAL_HEIGHT));
@@ -397,7 +452,8 @@ public final class CometGuiApplication extends Application {
     }
 
     /**
-     * Releases the session's project lock and stops the Run section's threads.
+     * Closes the Results section's stores, releases the session's project lock and stops the Run
+     * section's threads.
      *
      * <p>Called by JavaFX when the application ends. A run still in progress is not waited for: its
      * threads are daemons, and its tools are the process service's to end.
@@ -406,6 +462,13 @@ public final class CometGuiApplication extends Application {
      */
     @Override
     public void stop() throws IOException {
+        if (results != null) {
+            // closes the open run's stores, on the results thread, after anything it is reading
+            results.close();
+        }
+        if (resultThread != null) {
+            resultThread.shutdown();
+        }
         if (runThreads != null) {
             runThreads.shutdownNow();
         }

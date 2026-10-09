@@ -43,7 +43,9 @@ import org.cometgui.ui.controls.ToolManagerPane;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
 import org.cometgui.ui.controls.percolator.PercolatorPane;
+import org.cometgui.ui.controls.results.ResultsPane;
 import org.cometgui.ui.testing.Editors;
+import org.cometgui.ui.testing.EmptyResults;
 import org.cometgui.ui.testing.FxToolkit;
 import org.cometgui.ui.testing.Percolators;
 import org.cometgui.ui.testing.ScriptedEngine;
@@ -62,6 +64,10 @@ import org.cometgui.ui.viewmodel.params.ParameterSession;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
+import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
+import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
+import org.cometgui.ui.viewmodel.results.ResultsViewModel;
+import org.cometgui.ui.viewmodel.results.WeightsViewModel;
 import org.cometgui.workflow.state.WorkflowStage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,6 +101,8 @@ class ShellViewTest {
 
     private PercolatorViewModel percolatorSection;
 
+    private EmptyResults resultsPort;
+
     private ShellView shell;
 
     private Scene scene;
@@ -122,6 +130,14 @@ class ShellViewTest {
         ParameterEditorViewModel editor = Editors.editor(session, inputs, chooser);
         percolatorPort = new Percolators.Port(ToolOffers.percolatorAvailable());
         percolatorSection = Editors.percolator(percolatorPort);
+        resultsPort = new EmptyResults();
+        DisplayFiltersViewModel filters = new DisplayFiltersViewModel();
+        ResultTableViewModel resultTable =
+                new ResultTableViewModel(filters, Runnable::run, Runnable::run);
+        WeightsViewModel weights = new WeightsViewModel();
+        ResultsViewModel results =
+                new ResultsViewModel(
+                        resultsPort, filters, resultTable, weights, Runnable::run, Runnable::run);
         FxToolkit.onFxThread(
                 () -> {
                     shell =
@@ -147,7 +163,11 @@ class ShellViewTest {
                                                             EngineCheck.unavailable(
                                                                     "no engine in this test"))),
                                     percolatorSection,
-                                    Editors.rerun(percolatorSection));
+                                    Editors.rerun(percolatorSection),
+                                    results,
+                                    resultTable,
+                                    weights,
+                                    filters);
                     scene = new Scene(shell, 1280, 800);
                     scene.getRoot().applyCss();
                     scene.getRoot().layout();
@@ -374,6 +394,38 @@ class ShellViewTest {
     }
 
     @Test
+    @DisplayName(
+            "the Results pane fills its section, the note says so, and building the shell reads"
+                    + " no run")
+    void theResultsPaneFillsItsSection() {
+        Node resultsPane = scene.lookup("#" + UiIds.RESULTS_PANE);
+        Label note = (Label) scene.lookup("#" + UiIds.sectionNote(SectionId.RESULTS));
+        assertAll(
+                () -> assertInstanceOf(ResultsPane.class, resultsPane),
+                () ->
+                        assertTrue(
+                                isDescendantOf(resultsPane, shell.paneFor(SectionId.RESULTS)),
+                                "the Results section's content belongs to its pane"),
+                () ->
+                        assertTrue(
+                                note.getText().startsWith("This section is live: phase 10"),
+                                note::getText),
+                () -> assertEquals(0, resultsPort.reads(), "nothing was read"),
+                () ->
+                        assertEquals(
+                                ResultsViewModel.NOT_READ,
+                                ((Label) scene.lookup("#" + UiIds.RESULTS_READINESS)).getText()),
+                () ->
+                        assertNotNull(
+                                scene.lookup("#" + UiIds.RESULTS_TABLE),
+                                "the results table is reachable from the shell's scene"),
+                () ->
+                        assertNotNull(
+                                scene.lookup("#" + UiIds.WEIGHTS_TABLE),
+                                "the learned feature weights table is reachable too"));
+    }
+
+    @Test
     @DisplayName("the Tool Manager pane fills its section, and the arrival note is still there")
     void theToolManagerPaneFillsItsSection() throws InterruptedException {
         Node toolManagerPane = scene.lookup("#" + UiIds.TOOL_MANAGER_PANE);
@@ -458,6 +510,18 @@ class ShellViewTest {
         SpectrumInputsViewModel inputs = Editors.inputs(session, chooser, new Editors.KnownFiles());
         ParameterEditorViewModel editor = Editors.editor(session, inputs, chooser);
         StageStepperViewModel otherStepper = new StageStepperViewModel();
+        DisplayFiltersViewModel otherFilters = new DisplayFiltersViewModel();
+        ResultTableViewModel otherTable =
+                new ResultTableViewModel(otherFilters, Runnable::run, Runnable::run);
+        WeightsViewModel otherWeights = new WeightsViewModel();
+        ResultsViewModel otherResults =
+                new ResultsViewModel(
+                        new EmptyResults(),
+                        otherFilters,
+                        otherTable,
+                        otherWeights,
+                        Runnable::run,
+                        Runnable::run);
         Scene other =
                 FxToolkit.callOnFxThread(
                         () ->
@@ -486,8 +550,11 @@ class ShellViewTest {
                                                                                 "no engine"))),
                                                 Editors.percolator(new Percolators.Port()),
                                                 Editors.rerun(
-                                                        Editors.percolator(
-                                                                new Percolators.Port()))),
+                                                        Editors.percolator(new Percolators.Port())),
+                                                otherResults,
+                                                otherTable,
+                                                otherWeights,
+                                                otherFilters),
                                         800,
                                         600));
         Label banner = (Label) other.lookup("#" + UiIds.HOST_BASELINE_BANNER);

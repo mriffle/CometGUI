@@ -1,0 +1,35 @@
+COPIES OF cometgui-results' CHECKED-IN FIXTURES, for the Results section's GUI tests
+====================================================================================
+
+Copied byte for byte on 2026-10-09 by the phase 10 unit 8 agent, from the
+copies phase 10 unit 7 made for the view-model tests
+(cometgui-ui/src/test/resources/org/cometgui/ui/viewmodel/results/, whose
+FIXTURES.txt names the originals), so that the GUI tests in
+org.cometgui.app.gui read nothing outside the cometgui-app module except the
+large fixture named below. Each copy is the same bytes as its original;
+org.cometgui.app.testing.ResultRuns pins these SHA-256s and fails, naming the
+file, if a copy differs. The originals' provenance is the original
+directory's own record: cometgui-results/src/test/resources/org/cometgui/
+results/parser/real/PROVENANCE.txt (real Percolator 3.07.1 output over
+CometGUI's synthetic 64+64 PIN) and constructed/CONSTRUCTED.txt
+(hand-written, NOT produced by Percolator).
+
+  copy                       original (under .../results/parser/)   SHA-256
+  psms-unknown-q.tsv         constructed/psms-unknown-q.tsv         ea58b3b63f9031bf53b5675d117b1e7203137a0ebd2399c9def824334267b6c7
+  psms-shuffled.tsv          constructed/psms-shuffled.tsv          3754547ea1ca3ff35b67913a8249b98831e924c0a84029c2a9769fc581a6f5d4
+  real-3.07.1-weights.txt    real/percolator-3.07.1/weights.txt     5370f2375d3ea1f13236f6208624c69f81fa8fb190e936e863488cfda4e7a434
+
+The GUI tests put psms-unknown-q.tsv in a constructed run as its target PSM
+table (15 rows; q-values 0.01 and 0.010 exactly at the default cutoff,
+0.0100001 just above it, and every unknown kind) and psms-shuffled.tsv as its
+target peptide table (23 rows; the two tables share a header, as Percolator's
+do). The expected counts each test asserts are worked out by hand from these
+files, row by row, in the test's own documentation.
+
+Read from outside the module, failing -- never skipping -- when absent or
+different (the tests harness's sandbox links scratch/ whole):
+
+  scratch/phase10/large/psms.tsv   the large fixture (1 000 000 rows), made by
+      python3 scripts/fixtures/large-results-fixture.py; its SHA-256 and its
+      counts at 0, 0.005, 0.01 and 1 as its manifest.json records them
+      (ResultsLargeFixtureUiTest).

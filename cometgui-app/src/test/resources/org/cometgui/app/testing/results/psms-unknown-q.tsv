@@ -1,0 +1,16 @@
+PSMId	score	q-value	posterior_error_prob	peptide	proteinIds
+c01	2.5	0.001	1e-05	K.AAAAAAK.R	sp|P1|A	sp|P2|B	sp|P3|C
+c02	2.1	0.01	0.002	K.CCCCCCK.R	sp|P4|D
+c03	1.9	0.0100001	0.003	K.DDDDDDK.R	sp|P5|E	sp|P6|F
+c04	1.5	NaN	0.01	K.EEEEEEK.R	sp|P7|G
+c05	1.2		0.02	K.FFFFFFK.R	sp|P8|H
+c06	1.0	inf	0.03	K.GGGGGGK.R	sp|P9|I
+c07	0.9	0,005	0.04	K.HHHHHHK.R	sp|P10|J
+c08	0.8	0	0.05	K.IIIIIIK.R	sp|P11|K
+c09	0.5	1	nan	K.KKKKKKK.R	decoy_sp|P12|L	decoy_sp|P13|M
+c10	0.3	1.5	0.9	K.LLLLLLK.R	sp|P14|N
+c11	0.1	-0.01	0.95	K.MMMMMMK.R	sp|P15|O
+c12	0.2	1e-3	0.06	K.NNNNNNK.R	sp|P16|P
+c13	0.15	0.010	0.07	K.PPPPPPK.R	sp|P17|Q
+c14	-0.4	Infinity	1	K.QQQQQQK.R	sp|P18|R
+c15	-0.5	nan	1	K.RRRRRRK.R	sp|P19|S

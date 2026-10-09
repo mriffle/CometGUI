@@ -16,17 +16,27 @@
 
 package org.cometgui.app.testing;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import javafx.beans.property.SimpleObjectProperty;
 import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.config.ParameterEditorWiring;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.config.SessionEngine;
 import org.cometgui.domain.build.BuildIdentity;
+import org.cometgui.domain.run.RunId;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.results.export.TableExport;
+import org.cometgui.results.export.WeightsExport;
+import org.cometgui.results.filtering.DisplayFilters;
+import org.cometgui.results.filtering.QValueFilter;
+import org.cometgui.results.filtering.store.Category;
+import org.cometgui.results.filtering.store.TableKind;
+import org.cometgui.results.parser.WeightsSummary;
 import org.cometgui.ui.view.ShellView;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
@@ -47,6 +57,13 @@ import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
 import org.cometgui.ui.viewmodel.percolator.RerunCheck;
+import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
+import org.cometgui.ui.viewmodel.results.OpenedResults;
+import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
+import org.cometgui.ui.viewmodel.results.ResultsPort;
+import org.cometgui.ui.viewmodel.results.ResultsRun;
+import org.cometgui.ui.viewmodel.results.ResultsViewModel;
+import org.cometgui.ui.viewmodel.results.WeightsViewModel;
 
 /**
  * The shell for a GUI test that builds its own: the Comet parameter editor composed exactly as the
@@ -85,13 +102,18 @@ public final class TestEditors {
         ParameterEditorViewModel editor =
                 ParameterEditorWiring.editor(session, inputs, chooser, BUILD);
         NoEngine engine = new NoEngine();
+        DisplayFiltersViewModel filters = new DisplayFiltersViewModel();
         PercolatorViewModel percolator =
                 new PercolatorViewModel(
                         RunWiring.percolator(Optional.empty(), NoEngine.REASON),
                         chooser,
                         Runnable::run,
                         Runnable::run,
-                        () -> {});
+                        () -> {},
+                        filters);
+        ResultTableViewModel table =
+                new ResultTableViewModel(filters, Runnable::run, Runnable::run);
+        WeightsViewModel weights = new WeightsViewModel();
         return new ShellView(
                 navigation,
                 hostBaseline,
@@ -116,7 +138,48 @@ public final class TestEditors {
                         Runnable::run),
                 percolator,
                 new PercolatorRerunViewModel(
-                        engine, percolator.requestProperty(), Runnable::run, Runnable::run));
+                        engine, percolator.requestProperty(), Runnable::run, Runnable::run),
+                new ResultsViewModel(
+                        new NoResults(), filters, table, weights, Runnable::run, Runnable::run),
+                table,
+                weights,
+                filters);
+    }
+
+    /** The Results port of a shell built for a test that has no project: no run has results. */
+    private static final class NoResults implements ResultsPort {
+
+        @Override
+        public List<ResultsRun> runs() {
+            return List.of();
+        }
+
+        @Override
+        public OpenedResults open(RunId run) throws IOException {
+            throw new IOException(NoEngine.REASON);
+        }
+
+        @Override
+        public void close(OpenedResults opened) {
+            // nothing is ever opened
+        }
+
+        @Override
+        public void saveViewState(RunId run, DisplayFilters filters) throws IOException {
+            throw new IOException(NoEngine.REASON);
+        }
+
+        @Override
+        public TableExport exportTable(
+                RunId run, TableKind kind, QValueFilter filter, Category category)
+                throws IOException {
+            throw new IOException(NoEngine.REASON);
+        }
+
+        @Override
+        public WeightsExport exportWeights(RunId run, WeightsSummary weights) throws IOException {
+            throw new IOException(NoEngine.REASON);
+        }
     }
 
     /** The engine port of a shell built for a test that runs nothing: it says so. */
@@ -150,6 +213,11 @@ public final class TestEditors {
         public ActiveRun start(PercolatorRequest percolator, RunObserver observer)
                 throws RunNotStartedException {
             throw new RunNotStartedException(REASON, null);
+        }
+
+        @Override
+        public Set<RunId> executingRuns() {
+            return Set.of();
         }
     }
 }

@@ -27,6 +27,8 @@ import org.cometgui.params.percolator.schema.PercolatorSetting;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.params.EssentialsSection;
 import org.cometgui.ui.viewmodel.params.SearchFilter;
+import org.cometgui.ui.viewmodel.results.ResultsColumn;
+import org.cometgui.ui.viewmodel.results.WeightsColumn;
 
 /**
  * Every stable identifier the user interface sets with {@code setId(...)}, in one place.
@@ -499,6 +501,108 @@ public final class UiIds {
     /** What the Percolator rerun is doing, or how it ended. */
     public static final String PERCOLATOR_RERUN_OUTCOME = "percolator-rerun-outcome";
 
+    /** The Results section's content (Phase 10), a scroll pane. */
+    public static final String RESULTS_PANE = "results-pane";
+
+    /** What the Results section shows, or why it shows nothing. */
+    public static final String RESULTS_READINESS = "results-readiness";
+
+    /** The run selector: the runs of the project that have results. */
+    public static final String RESULTS_RUN = "results-run";
+
+    /** Reads the project's runs with results again. */
+    public static final String RESULTS_REFRESH = "results-refresh";
+
+    /** The table selector: target PSMs, target peptides and the decoy tables the run has. */
+    public static final String RESULTS_TABLE_CHOICE = "results-table-choice";
+
+    /** The PSM q-value display filter's field in the Results section. */
+    public static final String RESULTS_PSM_FILTER = "results-psm-filter";
+
+    /** The peptide q-value display filter's field in the Results section. */
+    public static final String RESULTS_PEPTIDE_FILTER = "results-peptide-filter";
+
+    /** What the display filters do and do not do, and any refusal of their text. */
+    public static final String RESULTS_FILTERS_STATUS = "results-filters-status";
+
+    /** Where the open run's filters came from, and whether a change was saved. */
+    public static final String RESULTS_VIEW_STATE = "results-view-state";
+
+    /** The table's total row count. */
+    public static final String RESULTS_COUNT_TOTAL = "results-count-total";
+
+    /** The number of rows passing the table's q-value filter. */
+    public static final String RESULTS_COUNT_PASSING = "results-count-passing";
+
+    /** The number of rows failing the table's q-value filter. */
+    public static final String RESULTS_COUNT_FAILING = "results-count-failing";
+
+    /** The number of rows with an unknown q-value. */
+    public static final String RESULTS_COUNT_UNKNOWN = "results-count-unknown";
+
+    /** All four counts in a sentence, with the table and the cutoff. */
+    public static final String RESULTS_COUNTS = "results-counts";
+
+    /** The category selector: passing, unknown q-value, failing or all rows. */
+    public static final String RESULTS_CATEGORY = "results-category";
+
+    /** The text filter's field, applied with Enter. */
+    public static final String RESULTS_TEXT_FILTER = "results-text-filter";
+
+    /** Shows the first page. */
+    public static final String RESULTS_FIRST_PAGE = "results-first-page";
+
+    /** Shows the previous page. */
+    public static final String RESULTS_PREVIOUS_PAGE = "results-previous-page";
+
+    /** Shows the next page. */
+    public static final String RESULTS_NEXT_PAGE = "results-next-page";
+
+    /** Shows the last page. */
+    public static final String RESULTS_LAST_PAGE = "results-last-page";
+
+    /** Where the page shown stands: rows a to b of n. */
+    public static final String RESULTS_PAGE = "results-page";
+
+    /** The results table, holding one page of rows. */
+    public static final String RESULTS_TABLE = "results-table";
+
+    /** What the table is doing, or why it could not be read. */
+    public static final String RESULTS_TABLE_STATUS = "results-table-status";
+
+    /** What is selected, and where it is. */
+    public static final String RESULTS_SELECTION = "results-selection";
+
+    /** Why the last change of a column's visibility was refused. */
+    public static final String RESULTS_COLUMN_STATUS = "results-column-status";
+
+    /** Copies the selected rows shown as tab-separated text. */
+    public static final String RESULTS_COPY = "results-copy";
+
+    /** What the last copy put on the clipboard. */
+    public static final String RESULTS_COPY_STATUS = "results-copy-status";
+
+    /** Exports the table shown under its filter and category. */
+    public static final String RESULTS_EXPORT_TABLE = "results-export-table";
+
+    /** Exports the learned feature weights. */
+    public static final String RESULTS_EXPORT_WEIGHTS = "results-export-weights";
+
+    /** The last export's outcome, or why it was refused. */
+    public static final String RESULTS_EXPORT_STATUS = "results-export-status";
+
+    /** The learned feature weights view's title. */
+    public static final String WEIGHTS_TITLE = "weights-title";
+
+    /** What the learned feature weights are, and are not. */
+    public static final String WEIGHTS_DESCRIPTION = "weights-description";
+
+    /** How many splits and features are shown, and from which file. */
+    public static final String WEIGHTS_STATUS = "weights-status";
+
+    /** The learned feature weights table, the source of truth. */
+    public static final String WEIGHTS_TABLE = "weights-table";
+
     /**
      * The two surfaces a parameter's control appears on. A parameter shown in Essentials is shown
      * in Advanced too, so the surface is part of every parameter identifier and the two controls
@@ -563,6 +667,63 @@ public final class UiIds {
             case MAXIMUM_ITERATIONS -> PERCOLATOR_MAXIMUM_ITERATIONS_STATE;
             case THREAD_COUNT -> PERCOLATOR_THREAD_COUNT_STATE;
         };
+    }
+
+    /**
+     * The identifier of the switch that shows or hides one column of the results table.
+     *
+     * @param column the column
+     * @return {@code "results-column-"} and the column's constant name hyphenated, for example
+     *     {@code results-column-q-value}
+     * @throws NullPointerException if {@code column} is {@code null}
+     */
+    public static String resultsColumnToggle(ResultsColumn column) {
+        return "results-column-" + hyphenated(Objects.requireNonNull(column, "column").name());
+    }
+
+    /**
+     * The identifier of the heading action that sorts the results table by one column.
+     *
+     * @param column the column
+     * @return {@code "results-sort-"} and the column's constant name hyphenated, for example {@code
+     *     results-sort-q-value}
+     * @throws NullPointerException if {@code column} is {@code null}
+     */
+    public static String resultsSort(ResultsColumn column) {
+        return "results-sort-" + hyphenated(Objects.requireNonNull(column, "column").name());
+    }
+
+    /**
+     * The identifier of the heading action that sorts the learned feature weights table by one of
+     * its columns other than a split's.
+     *
+     * @param column the column; neither {@link WeightsColumn#FILE_ORDER}, which has no heading, nor
+     *     {@link WeightsColumn#SPLIT}, whose headings {@link #weightsSortSplit(int)} names
+     * @return {@code "weights-sort-"} and the column's constant name hyphenated, for example {@code
+     *     weights-sort-mean-absolute}
+     * @throws IllegalArgumentException for {@link WeightsColumn#FILE_ORDER} or {@link
+     *     WeightsColumn#SPLIT}
+     * @throws NullPointerException if {@code column} is {@code null}
+     */
+    public static String weightsSort(WeightsColumn column) {
+        Objects.requireNonNull(column, "column");
+        if (column == WeightsColumn.FILE_ORDER || column == WeightsColumn.SPLIT) {
+            throw new IllegalArgumentException(
+                    "the weights table has no heading of its own for " + column);
+        }
+        return "weights-sort-" + hyphenated(column.name());
+    }
+
+    /**
+     * The identifier of the heading action that sorts the learned feature weights table by one
+     * split's weight.
+     *
+     * @param split the split's 0-based position
+     * @return {@code "weights-sort-split-"} and the split's 1-based number, as its heading says
+     * @throws IllegalArgumentException if {@code split} is negative
+     */
+    public static String weightsSortSplit(int split) {
+        return "weights-sort-split-" + (nonNegative(split) + 1);
     }
 
     /**

@@ -18,6 +18,7 @@ package org.cometgui.ui.controls;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
@@ -40,6 +41,8 @@ import org.cometgui.params.percolator.schema.PercolatorSetting;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.params.EssentialsSection;
 import org.cometgui.ui.viewmodel.params.SearchFilter;
+import org.cometgui.ui.viewmodel.results.ResultsColumn;
+import org.cometgui.ui.viewmodel.results.WeightsColumn;
 import org.cometgui.workflow.state.WorkflowStage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -159,8 +162,17 @@ class StableIdentifierPinTest {
      * Limelight switch and its status, registration, the two display filters, the Advanced toggle,
      * its container and each of its five settings' field and state, and the rerun's preview,
      * action, cancel and outcome).
+     *
+     * <p>Raised from 433 to 493 by phase 10 unit 8, which filled the Results section: 34 constants
+     * (the section's 30 -- run and table selectors, the action reading the runs again, the two
+     * filter fields and their status, the view state, the four counts and their sentence, category,
+     * text filter, the four page actions and the page's position, the table and its status,
+     * selection, column status, copy and its status, the two exports and their status -- and the
+     * learned feature weights' title, description, status and table); each results column's
+     * visibility switch (9) and sorting heading (9); the weights table's six non-split headings
+     * (6); and two split headings built from a position (2).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 433;
+    private static final int PINNED_IDENTIFIER_COUNT = 493;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -313,7 +325,41 @@ class StableIdentifierPinTest {
                     Map.entry("PERCOLATOR_RERUN_PREVIEW", "percolator-rerun-preview"),
                     Map.entry("PERCOLATOR_RERUN", "percolator-rerun"),
                     Map.entry("PERCOLATOR_RERUN_CANCEL", "percolator-rerun-cancel"),
-                    Map.entry("PERCOLATOR_RERUN_OUTCOME", "percolator-rerun-outcome"));
+                    Map.entry("PERCOLATOR_RERUN_OUTCOME", "percolator-rerun-outcome"),
+                    Map.entry("RESULTS_PANE", "results-pane"),
+                    Map.entry("RESULTS_READINESS", "results-readiness"),
+                    Map.entry("RESULTS_RUN", "results-run"),
+                    Map.entry("RESULTS_REFRESH", "results-refresh"),
+                    Map.entry("RESULTS_TABLE_CHOICE", "results-table-choice"),
+                    Map.entry("RESULTS_PSM_FILTER", "results-psm-filter"),
+                    Map.entry("RESULTS_PEPTIDE_FILTER", "results-peptide-filter"),
+                    Map.entry("RESULTS_FILTERS_STATUS", "results-filters-status"),
+                    Map.entry("RESULTS_VIEW_STATE", "results-view-state"),
+                    Map.entry("RESULTS_COUNT_TOTAL", "results-count-total"),
+                    Map.entry("RESULTS_COUNT_PASSING", "results-count-passing"),
+                    Map.entry("RESULTS_COUNT_FAILING", "results-count-failing"),
+                    Map.entry("RESULTS_COUNT_UNKNOWN", "results-count-unknown"),
+                    Map.entry("RESULTS_COUNTS", "results-counts"),
+                    Map.entry("RESULTS_CATEGORY", "results-category"),
+                    Map.entry("RESULTS_TEXT_FILTER", "results-text-filter"),
+                    Map.entry("RESULTS_FIRST_PAGE", "results-first-page"),
+                    Map.entry("RESULTS_PREVIOUS_PAGE", "results-previous-page"),
+                    Map.entry("RESULTS_NEXT_PAGE", "results-next-page"),
+                    Map.entry("RESULTS_LAST_PAGE", "results-last-page"),
+                    Map.entry("RESULTS_PAGE", "results-page"),
+                    Map.entry("RESULTS_TABLE", "results-table"),
+                    Map.entry("RESULTS_TABLE_STATUS", "results-table-status"),
+                    Map.entry("RESULTS_SELECTION", "results-selection"),
+                    Map.entry("RESULTS_COLUMN_STATUS", "results-column-status"),
+                    Map.entry("RESULTS_COPY", "results-copy"),
+                    Map.entry("RESULTS_COPY_STATUS", "results-copy-status"),
+                    Map.entry("RESULTS_EXPORT_TABLE", "results-export-table"),
+                    Map.entry("RESULTS_EXPORT_WEIGHTS", "results-export-weights"),
+                    Map.entry("RESULTS_EXPORT_STATUS", "results-export-status"),
+                    Map.entry("WEIGHTS_TITLE", "weights-title"),
+                    Map.entry("WEIGHTS_DESCRIPTION", "weights-description"),
+                    Map.entry("WEIGHTS_STATUS", "weights-status"),
+                    Map.entry("WEIGHTS_TABLE", "weights-table"));
 
     // -----------------------------------------------------------------------------------------
     // The parameter editor (Phase 07). A parameter's identifiers are built from its own name, so
@@ -700,7 +746,48 @@ class StableIdentifierPinTest {
                     Map.entry("migrationRowAccept(2)", "param-migration-row-2-accept"),
                     Map.entry("migrationRowGoTo(2)", "param-migration-row-2-goto"),
                     Map.entry("enzymeRow(12)", "adv-enzyme-row-12"),
-                    Map.entry("enzymeRowRemove(12)", "adv-enzyme-row-12-remove"));
+                    Map.entry("enzymeRowRemove(12)", "adv-enzyme-row-12-remove"),
+                    Map.entry("weightsSortSplit(0)", "weights-sort-split-1"),
+                    Map.entry("weightsSortSplit(3)", "weights-sort-split-4"));
+
+    /** Each results column's visibility switch, by its constant. */
+    private static final Map<ResultsColumn, String> RESULTS_COLUMN_TOGGLE =
+            Map.ofEntries(
+                    Map.entry(ResultsColumn.PSM_ID, "results-column-psm-id"),
+                    Map.entry(ResultsColumn.SOURCE_FILE, "results-column-source-file"),
+                    Map.entry(ResultsColumn.SCAN, "results-column-scan"),
+                    Map.entry(ResultsColumn.CHARGE, "results-column-charge"),
+                    Map.entry(ResultsColumn.PEPTIDE, "results-column-peptide"),
+                    Map.entry(ResultsColumn.PROTEINS, "results-column-proteins"),
+                    Map.entry(ResultsColumn.SCORE, "results-column-score"),
+                    Map.entry(ResultsColumn.Q_VALUE, "results-column-q-value"),
+                    Map.entry(ResultsColumn.PEP, "results-column-pep"));
+
+    /** Each results column's sorting heading, by its constant. */
+    private static final Map<ResultsColumn, String> RESULTS_SORT =
+            Map.ofEntries(
+                    Map.entry(ResultsColumn.PSM_ID, "results-sort-psm-id"),
+                    Map.entry(ResultsColumn.SOURCE_FILE, "results-sort-source-file"),
+                    Map.entry(ResultsColumn.SCAN, "results-sort-scan"),
+                    Map.entry(ResultsColumn.CHARGE, "results-sort-charge"),
+                    Map.entry(ResultsColumn.PEPTIDE, "results-sort-peptide"),
+                    Map.entry(ResultsColumn.PROTEINS, "results-sort-proteins"),
+                    Map.entry(ResultsColumn.SCORE, "results-sort-score"),
+                    Map.entry(ResultsColumn.Q_VALUE, "results-sort-q-value"),
+                    Map.entry(ResultsColumn.PEP, "results-sort-pep"));
+
+    /**
+     * Each learned-feature-weights heading other than a split's, by the column it sorts. {@code
+     * FILE_ORDER} has no heading and {@code SPLIT}'s are numbered (pinned by position above).
+     */
+    private static final Map<WeightsColumn, String> WEIGHTS_SORT =
+            Map.ofEntries(
+                    Map.entry(WeightsColumn.FEATURE, "weights-sort-feature"),
+                    Map.entry(WeightsColumn.MEAN_SIGNED, "weights-sort-mean-signed"),
+                    Map.entry(WeightsColumn.MEAN_ABSOLUTE, "weights-sort-mean-absolute"),
+                    Map.entry(WeightsColumn.STANDARD_DEVIATION, "weights-sort-standard-deviation"),
+                    Map.entry(WeightsColumn.SIGN_CONSISTENCY, "weights-sort-sign-consistency"),
+                    Map.entry(WeightsColumn.RANK, "weights-sort-rank"));
 
     /**
      * Every {@code public static String} method of {@link UiIds}, by name, that the tables above or
@@ -782,7 +869,11 @@ class StableIdentifierPinTest {
                     "migrationRowAccept",
                     "migrationRowGoTo",
                     "enzymeRow",
-                    "enzymeRowRemove");
+                    "enzymeRowRemove",
+                    "resultsColumnToggle",
+                    "resultsSort",
+                    "weightsSort",
+                    "weightsSortSplit");
 
     /**
      * The row key the Tool Manager's per-row identifiers are pinned for.
@@ -1225,6 +1316,33 @@ class StableIdentifierPinTest {
     }
 
     @Test
+    @DisplayName("every results column's switch and heading, and every weights heading, is pinned")
+    void resultsIdentifiersAreExactlyTheseLiterals() {
+        for (ResultsColumn column : ResultsColumn.values()) {
+            assertPinned(
+                    pinned(RESULTS_COLUMN_TOGGLE, column, "results column switch " + column),
+                    UiIds.resultsColumnToggle(column),
+                    "UiIds.resultsColumnToggle(" + column.name() + ")");
+            assertPinned(
+                    pinned(RESULTS_SORT, column, "results column heading " + column),
+                    UiIds.resultsSort(column),
+                    "UiIds.resultsSort(" + column.name() + ")");
+        }
+        for (WeightsColumn column : WeightsColumn.values()) {
+            if (column == WeightsColumn.FILE_ORDER || column == WeightsColumn.SPLIT) {
+                assertThrows(IllegalArgumentException.class, () -> UiIds.weightsSort(column));
+                continue;
+            }
+            assertPinned(
+                    pinned(WEIGHTS_SORT, column, "weights heading " + column),
+                    UiIds.weightsSort(column),
+                    "UiIds.weightsSort(" + column.name() + ")");
+        }
+        assertEquals(6, WEIGHTS_SORT.size(), "every weights column but file order and a split");
+        assertThrows(IllegalArgumentException.class, () -> UiIds.weightsSortSplit(-1));
+    }
+
+    @Test
     @DisplayName("every Essentials group and Advanced category identifier has its pinned spelling")
     void groupAndCategoryIdentifiersAreExactlyTheseLiterals() {
         for (EssentialsSection section : EssentialsSection.values()) {
@@ -1284,6 +1402,8 @@ class StableIdentifierPinTest {
         actual.put("migrationRowGoTo(2)", UiIds.migrationRowGoTo(2));
         actual.put("enzymeRow(12)", UiIds.enzymeRow(12));
         actual.put("enzymeRowRemove(12)", UiIds.enzymeRowRemove(12));
+        actual.put("weightsSortSplit(0)", UiIds.weightsSortSplit(0));
+        actual.put("weightsSortSplit(3)", UiIds.weightsSortSplit(3));
         assertEquals(BY_POSITION_OR_CHARACTER.keySet(), actual.keySet());
         for (Map.Entry<String, String> entry : actual.entrySet()) {
             assertPinned(
@@ -1430,6 +1550,9 @@ class StableIdentifierPinTest {
                 "ADVANCED_CATEGORY", ADVANCED_CATEGORY.keySet(), ParameterCategory.values());
         assertEveryConstantIsPinned(
                 "PARAMETER_OF_EACH_KIND", PARAMETER_OF_EACH_KIND.keySet(), ValueKind.values());
+        assertEveryConstantIsPinned(
+                "RESULTS_COLUMN_TOGGLE", RESULTS_COLUMN_TOGGLE.keySet(), ResultsColumn.values());
+        assertEveryConstantIsPinned("RESULTS_SORT", RESULTS_SORT.keySet(), ResultsColumn.values());
     }
 
     // -----------------------------------------------------------------------------------------
@@ -1514,6 +1637,9 @@ class StableIdentifierPinTest {
         addPins(pins, "Essentials group ", ESSENTIALS_GROUP);
         addPins(pins, "search filter ", SEARCH_FILTER);
         addListPins(pins, "Advanced category ", ADVANCED_CATEGORY);
+        addPins(pins, "results column switch ", RESULTS_COLUMN_TOGGLE);
+        addPins(pins, "results column heading ", RESULTS_SORT);
+        addPins(pins, "weights heading ", WEIGHTS_SORT);
         for (Map.Entry<String, String> entry : BY_POSITION_OR_CHARACTER.entrySet()) {
             pins.add(new Pin("UiIds." + entry.getKey(), entry.getValue()));
         }

@@ -40,6 +40,7 @@ import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
 import org.cometgui.ui.controls.params.RunControl;
 import org.cometgui.ui.controls.percolator.PercolatorPane;
+import org.cometgui.ui.controls.results.ResultsPane;
 import org.cometgui.ui.view.params.CometParametersView;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
@@ -57,6 +58,10 @@ import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
+import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
+import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
+import org.cometgui.ui.viewmodel.results.ResultsViewModel;
+import org.cometgui.ui.viewmodel.results.WeightsViewModel;
 
 /**
  * The application shell: a header, a left navigation over every section, and a content area holding
@@ -156,6 +161,11 @@ public final class ShellView extends BorderPane {
      * @param percolator the Percolator section: the build that runs, why, its settings and the
      *     display filters -- the Percolator half {@code run} runs with
      * @param percolatorRerun the Percolator section's compatible-version rerun of the last run
+     * @param results the Results section: the run and table shown, its view state and exports
+     * @param resultTable the Results section's table, one page of rows
+     * @param weights the Results section's learned feature weights
+     * @param displayFilters the interface's one display-filter state, which {@code percolator}
+     *     shows too
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
@@ -172,7 +182,11 @@ public final class ShellView extends BorderPane {
             ExpertViewModel expertMode,
             RunViewModel run,
             PercolatorViewModel percolator,
-            PercolatorRerunViewModel percolatorRerun) {
+            PercolatorRerunViewModel percolatorRerun,
+            ResultsViewModel results,
+            ResultTableViewModel resultTable,
+            WeightsViewModel weights,
+            DisplayFiltersViewModel displayFilters) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
@@ -233,6 +247,21 @@ public final class ShellView extends BorderPane {
                         Objects.requireNonNull(percolatorRerun, "percolatorRerun"));
         panes.get(SectionId.PERCOLATOR).addContent(percolatorPane);
         VBox.setVgrow(percolatorPane, Priority.ALWAYS);
+
+        /*
+         * The Results section (phase 10): its table holds one page of rows, never every row, and
+         * its filter fields edit the same display-filter state the Percolator section shows. The
+         * pane reads nothing on construction -- ResultsViewModel.refresh() is what asks the port,
+         * and the composition root calls it.
+         */
+        ResultsPane resultsPane =
+                new ResultsPane(
+                        Objects.requireNonNull(results, "results"),
+                        Objects.requireNonNull(resultTable, "resultTable"),
+                        Objects.requireNonNull(weights, "weights"),
+                        Objects.requireNonNull(displayFilters, "displayFilters"));
+        panes.get(SectionId.RESULTS).addContent(resultsPane);
+        VBox.setVgrow(resultsPane, Priority.ALWAYS);
 
         ToolManagerPane toolManagerPane = new ToolManagerPane(toolManager);
         panes.get(SectionId.TOOL_MANAGER).addContent(toolManagerPane);

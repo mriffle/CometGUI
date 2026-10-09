@@ -76,8 +76,9 @@ final class SectionArrivals {
                         + " Cancel stops it; the stage stepper follows the run; and before a rerun"
                         + " the preview below says which steps execute again. Every reason Run is"
                         + " disabled is stated in words: the parameters' (phase 07) and the"
-                        + " engine's, the Percolator section's among them. Not yet live: the"
-                        + " results arrive in phase 10; index modes are not offered here.");
+                        + " engine's, the Percolator section's among them. A run's results are"
+                        + " shown in the Results section (phase 10). Not yet live: index modes are"
+                        + " not offered here.");
         notes.put(
                 SectionId.COMET_PARAMETERS,
                 "This section is being filled by phase 07 (Comet Parameter Editor UI), on the"
@@ -91,9 +92,18 @@ final class SectionArrivals {
                         + " the Limelight-conversion switch that decides whether it must write"
                         + " Percolator XML, local-binary registration, the result filters, the"
                         + " Advanced settings, and the rerun of Percolator alone from the last run"
-                        + " are below. The Limelight converter itself arrives in phase 12, and the"
-                        + " filters' effect on the result tables in phase 10.");
-        notes.put(SectionId.RESULTS, "This section arrives in phase 10 (Results Model and UI).");
+                        + " are below. The same two filters are in the Results section, where they"
+                        + " change the tables shown (phase 10). The Limelight converter itself"
+                        + " arrives in phase 12.");
+        notes.put(
+                SectionId.RESULTS,
+                "This section is live: phase 10 (Results Model and UI) filled it. A run's PSMs and"
+                        + " peptides are shown a page at a time under the q-value filters -- the"
+                        + " same two the Percolator section shows, changing only what is displayed"
+                        + " and exported and never rerunning a tool -- with the counts, the rows"
+                        + " with an unknown q-value as their own category, sorting, a text filter,"
+                        + " column choice, copy and export, and below them the learned feature"
+                        + " weights.");
         notes.put(
                 SectionId.VISUALISATION,
                 "This section arrives in phase 11 (PDV Integration and mzTab Export).");

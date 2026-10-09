@@ -93,14 +93,83 @@ class AccessibleNameEnumerationUiTest {
      * Manager's content and everything the skins build. The failure message prints the number
      * actually seen.
      *
+     * <p>Plus, since phase 10 unit 8, the Results section with no run open -- which is what this
+     * walk sees: the application is launched by its own main and finds no project -- 49 identified
+     * controls ({@link #RESULTS_IDENTIFIED}): its own 39 (the pane, readiness, run selector and
+     * refresh, table selector, two filter fields and their status, view state, four counts and
+     * their sentence, category, text filter, four page actions and the page's position, table
+     * status, the table, nine column switches, column status, selection, copy and its status, two
+     * exports and their status) and the learned feature weights' 10 (title, description, status,
+     * table and the six headings it has before any split is known). The results table's nine
+     * sorting headings are not counted: a table with no run open shows no column, so their headers
+     * are not built. 68 + 49 = 117.
+     *
      * <p><strong>History of this floor.</strong> Phase 02 set it at 65 for ten sections and a
      * derivation that left the arrows out (its walk found 91). Phase 07 unit 2 removed the Settings
      * section from navigation (tier-1 decision, {@code STATUS.rst}, <em>The Settings section</em>),
      * which takes one navigation entry and three pane labels out of the derivation (65 - 4 = 61).
      * Rather than lower the floor to 61, the arrows -- which were always there and always counted
-     * by the walk -- were added to the derivation, and the floor was raised to 68.
+     * by the walk -- were added to the derivation, and the floor was raised to 68. Phase 10 unit 8
+     * raised it to 117 for the Results section, as derived above.
      */
-    private static final int MINIMUM_CONTROLS = 68;
+    private static final int MINIMUM_CONTROLS = 117;
+
+    /**
+     * The Results section's identified controls with no run open, typed out (P7-5). Every one must
+     * be reached by the walk and carry a name of its own; {@code ResultsAccessibilityUiTest} walks
+     * the same section with a run open, headings included.
+     */
+    static final List<String> RESULTS_IDENTIFIED =
+            List.of(
+                    "results-pane",
+                    "results-readiness",
+                    "results-run",
+                    "results-refresh",
+                    "results-table-choice",
+                    "results-psm-filter",
+                    "results-peptide-filter",
+                    "results-filters-status",
+                    "results-view-state",
+                    "results-count-total",
+                    "results-count-passing",
+                    "results-count-failing",
+                    "results-count-unknown",
+                    "results-counts",
+                    "results-category",
+                    "results-text-filter",
+                    "results-first-page",
+                    "results-previous-page",
+                    "results-next-page",
+                    "results-last-page",
+                    "results-page",
+                    "results-table-status",
+                    "results-table",
+                    "results-column-psm-id",
+                    "results-column-source-file",
+                    "results-column-scan",
+                    "results-column-charge",
+                    "results-column-peptide",
+                    "results-column-proteins",
+                    "results-column-score",
+                    "results-column-q-value",
+                    "results-column-pep",
+                    "results-column-status",
+                    "results-selection",
+                    "results-copy",
+                    "results-copy-status",
+                    "results-export-table",
+                    "results-export-weights",
+                    "results-export-status",
+                    "weights-title",
+                    "weights-description",
+                    "weights-status",
+                    "weights-table",
+                    "weights-sort-feature",
+                    "weights-sort-mean-signed",
+                    "weights-sort-mean-absolute",
+                    "weights-sort-standard-deviation",
+                    "weights-sort-sign-consistency",
+                    "weights-sort-rank");
 
     /**
      * The identifiers JavaFX's own skins give the controls they build. Every control this project
@@ -201,6 +270,29 @@ class AccessibleNameEnumerationUiTest {
     }
 
     @Test
+    @DisplayName("the Results section's 49 identified controls with no run open, each named")
+    void theResultsSectionIsEnumerated() {
+        assertEquals(49, RESULTS_IDENTIFIED.size(), "the derivation of MINIMUM_CONTROLS");
+        assertEquals(
+                RESULTS_IDENTIFIED.size(),
+                Set.copyOf(RESULTS_IDENTIFIED).size(),
+                "no identifier is listed twice");
+        List<String> resultsIds =
+                controls.stream()
+                        .map(control -> driver.callOnFxThread(control::getId))
+                        .filter(
+                                id ->
+                                        id != null
+                                                && (id.startsWith("results-")
+                                                        || id.startsWith("weights-")))
+                        .toList();
+        assertEquals(
+                Set.copyOf(RESULTS_IDENTIFIED),
+                Set.copyOf(resultsIds),
+                "the Results section's identified controls with no run open");
+    }
+
+    @Test
     @DisplayName("the walk saw the whole interface, not a corner of it")
     void theWalkSawTheWholeInterface() {
         List<String> identified =
@@ -226,6 +318,7 @@ class AccessibleNameEnumerationUiTest {
         for (MessageSeverity severity : MessageSeverity.values()) {
             expected.add(UiIds.consoleSeverityFilter(severity));
         }
+        expected.addAll(RESULTS_IDENTIFIED);
 
         assertAll(
                 () ->

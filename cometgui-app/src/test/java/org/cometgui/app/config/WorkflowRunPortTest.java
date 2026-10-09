@@ -32,12 +32,18 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.cometgui.app.testing.InstalledComet;
 import org.cometgui.app.testing.TestPercolators;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.project.ProjectId;
 import org.cometgui.domain.project.ProjectLayout;
+import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.tools.CapabilityEvidence;
 import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolOffer;
@@ -53,6 +59,7 @@ import org.cometgui.ui.viewmodel.params.RunNotStartedException;
 import org.cometgui.ui.viewmodel.params.RunObserver;
 import org.cometgui.ui.viewmodel.percolator.PercolatorOffers;
 import org.cometgui.ui.viewmodel.percolator.PercolatorPort;
+import org.cometgui.workflow.engine.RunResult;
 import org.cometgui.workflow.engine.StepTransition;
 import org.cometgui.workflow.state.Plan;
 import org.cometgui.workflow.storage.ProjectLock;
@@ -472,6 +479,88 @@ class WorkflowRunPortTest {
         assertEquals(
                 PercolatorOffers.unavailable("no reason was given"),
                 RunWiring.percolator(Optional.empty(), " ").offers());
+    }
+
+    @Test
+    @DisplayName(
+            "a started run is executing from its first transition until the engine reports it"
+                    + " finished, and not when its observer is told")
+    void executingRuns()
+            throws IOException,
+                    RunNotStartedException,
+                    InterruptedException,
+                    ExecutionException,
+                    TimeoutException {
+        Path root = scratch.toRealPath();
+        ProjectSession project = project(root);
+        Path fasta = fasta(root);
+        Path spectrum =
+                Files.writeString(
+                        root.resolve("inputs").resolve("sample.mzML"),
+                        "<mzML/>\n",
+                        StandardCharsets.US_ASCII);
+        SessionEngine port =
+                port(Optional.of(InstalledComet.at("2026.03.0", fakeComet(root))), project);
+        PercolatorRequest ready =
+                TestPercolators.ready(
+                        TestPercolators.installed(
+                                "3.07.1",
+                                ToolOrigin.MANAGED,
+                                fakePercolator(root),
+                                TestPercolators.ALL,
+                                List.of()));
+        List<Set<RunId>> whileRunning = new CopyOnWriteArrayList<>();
+        CompletableFuture<Set<RunId>> whenFinished = new CompletableFuture<>();
+        RunObserver observer =
+                new RunObserver() {
+                    @Override
+                    public void planned(Plan plan, String description) {}
+
+                    @Override
+                    public void onTransition(StepTransition transition) {
+                        whileRunning.add(port.executingRuns());
+                    }
+
+                    @Override
+                    public void onRunFinished(RunResult result) {
+                        whenFinished.complete(port.executingRuns());
+                    }
+                };
+        assertEquals(Set.of(), port.executingRuns(), "nothing has started");
+        port.start(
+                model(fasta).withText("decoy_search", "1", ValueOrigin.USER),
+                List.of(spectrum),
+                ready,
+                observer);
+        Set<RunId> atTheEnd = whenFinished.get(2, TimeUnit.MINUTES);
+        List<String> runDirectories;
+        try (var runs = Files.list(project.directory().resolve("runs"))) {
+            runDirectories = runs.map(run -> String.valueOf(run.getFileName())).toList();
+        }
+        assertEquals(1, runDirectories.size(), "one run: " + runDirectories);
+        assertAll(
+                () -> assertFalse(whileRunning.isEmpty(), "the engine reported transitions"),
+                () ->
+                        assertEquals(
+                                1,
+                                Set.copyOf(whileRunning).size(),
+                                "one executing set throughout: " + whileRunning),
+                () -> assertEquals(1, whileRunning.get(0).size(), whileRunning::toString),
+                () ->
+                        assertTrue(
+                                runDirectories
+                                        .get(0)
+                                        .endsWith(
+                                                "-"
+                                                        + whileRunning
+                                                                .get(0)
+                                                                .iterator()
+                                                                .next()
+                                                                .value()),
+                                () -> "the executing run is the run made: " + runDirectories),
+                () -> assertEquals(Set.of(), atTheEnd, "ended before its observer is told"),
+                () -> assertEquals(Set.of(), port.executingRuns()));
+        project.close();
     }
 
     @Test

@@ -24,8 +24,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import org.cometgui.domain.run.IndexMode;
+import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
@@ -46,6 +48,9 @@ import org.cometgui.ui.viewmodel.percolator.RerunCheck;
 import org.cometgui.workflow.engine.ReuseCheck;
 import org.cometgui.workflow.engine.ReuseRefusedException;
 import org.cometgui.workflow.engine.RunHandle;
+import org.cometgui.workflow.engine.RunResult;
+import org.cometgui.workflow.engine.StepStateListener;
+import org.cometgui.workflow.engine.StepTransition;
 import org.cometgui.workflow.engine.WorkflowEngine;
 import org.cometgui.workflow.state.InputKind;
 import org.cometgui.workflow.state.InputValue;
@@ -104,6 +109,13 @@ import org.cometgui.workflow.storage.ProjectLock;
  * the engine offers. Otherwise Run prepares a new run ({@code R-RUN-06}). The rerun preview the
  * check returns describes exactly that choice ({@link RerunOutlook}).
  *
+ * <h2>Which runs are executing</h2>
+ *
+ * <p>{@link #executingRuns()} holds every run this port started -- a new run, a retry or a rerun --
+ * from just before the engine starts it until the engine reports it finished, which it does after
+ * closing the run's provenance event log. The Results section refuses to export from a run listed
+ * there, because the engine holds that log while the run executes.
+ *
  * <p>Every method may block on file I/O and is called off the JavaFX thread.
  */
 public final class WorkflowRunPort implements SessionEngine {
@@ -130,6 +142,9 @@ public final class WorkflowRunPort implements SessionEngine {
     private final Supplier<ApplicationRecord> application;
 
     private volatile PreparedRun last;
+
+    /** The runs started here whose end the engine has not yet reported. */
+    private final Set<RunId> executing = ConcurrentHashMap.newKeySet();
 
     /**
      * The port.
@@ -241,7 +256,9 @@ public final class WorkflowRunPort implements SessionEngine {
                         workflow.prepare(project.store(), lock, request, application.get());
                 last = prepared;
                 observer.planned(prepared.plan(), describe(prepared, false));
-                RunHandle handle = workflow.start(engine, prepared, observer);
+                RunId id = prepared.identity().runId();
+                RunHandle handle =
+                        tracked(id, () -> workflow.start(engine, prepared, ended(id, observer)));
                 return handle::cancel;
             }
         } catch (RunBlockedException blocked) {
@@ -316,7 +333,9 @@ public final class WorkflowRunPort implements SessionEngine {
                                 + derived.layout().root()
                                 + ", rescoring the merged PIN of run "
                                 + derived.source().runId().value());
-                RunHandle handle = rerun.start(engine, derived, observer);
+                RunId id = derived.identity().runId();
+                RunHandle handle =
+                        tracked(id, () -> rerun.start(engine, derived, ended(id, observer)));
                 return handle::cancel;
             }
         } catch (RerunRefusedException refused) {
@@ -328,6 +347,60 @@ public final class WorkflowRunPort implements SessionEngine {
                     "the Percolator rerun could not be created or started: " + failed.getMessage(),
                     failed);
         }
+    }
+
+    @Override
+    public Set<RunId> executingRuns() {
+        return Set.copyOf(executing);
+    }
+
+    /** Starts a run, holding it as executing from before the start; a refused start is not. */
+    private RunHandle tracked(RunId id, Starter starter) throws IOException, ReuseRefusedException {
+        executing.add(id);
+        boolean started = false;
+        try {
+            RunHandle handle = starter.start();
+            started = true;
+            return handle;
+        } finally {
+            if (!started) {
+                executing.remove(id);
+            }
+        }
+    }
+
+    /**
+     * The listener the engine is given: the observer's, which first marks the run no longer
+     * executing when the engine reports it finished -- so that whoever the observer tells already
+     * sees the run as ended.
+     */
+    private StepStateListener ended(RunId id, StepStateListener observer) {
+        return new StepStateListener() {
+            @Override
+            public void onTransition(StepTransition transition) {
+                observer.onTransition(transition);
+            }
+
+            @Override
+            public void onRunFinished(RunResult result) {
+                executing.remove(id);
+                observer.onRunFinished(result);
+            }
+        };
+    }
+
+    /** One start of the engine. */
+    @FunctionalInterface
+    private interface Starter {
+
+        /**
+         * Starts it.
+         *
+         * @return the run's handle
+         * @throws IOException if it cannot start
+         * @throws ReuseRefusedException if the engine refuses to reuse a recorded result
+         */
+        RunHandle start() throws IOException, ReuseRefusedException;
     }
 
     /** The search's Percolator half, or the refusal that stops a run or a rerun starting. */
@@ -383,11 +456,17 @@ public final class WorkflowRunPort implements SessionEngine {
             throws IOException, ReuseRefusedException {
         ReuseCheck own = engine.checkReuse(previous.request());
         observer.planned(previous.plan(), describe(previous, true));
+        RunId id = previous.identity().runId();
+        StepStateListener listener = ended(id, observer);
         RunHandle handle =
-                own.accepted()
-                        ? workflow.start(engine, previous, observer)
-                        : engine.start(
-                                previous.request().withForced(own.offeredForced()), observer);
+                tracked(
+                        id,
+                        () ->
+                                own.accepted()
+                                        ? workflow.start(engine, previous, listener)
+                                        : engine.start(
+                                                previous.request().withForced(own.offeredForced()),
+                                                listener));
         return handle::cancel;
     }
 

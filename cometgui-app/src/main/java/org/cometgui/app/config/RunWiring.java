@@ -20,13 +20,16 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
+import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.ports.ProcessRunner;
+import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.secrets.SecretRedactor;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.params.comet.model.CometParameters;
@@ -40,6 +43,7 @@ import org.cometgui.ui.viewmodel.params.RunNotStartedException;
 import org.cometgui.ui.viewmodel.params.RunObserver;
 import org.cometgui.ui.viewmodel.percolator.PercolatorPort;
 import org.cometgui.ui.viewmodel.percolator.RerunCheck;
+import org.cometgui.ui.viewmodel.results.ResultsPort;
 import org.cometgui.workflow.engine.EngineServices;
 import org.cometgui.workflow.engine.WorkflowEngine;
 import org.cometgui.workflow.steps.CometWorkflow;
@@ -171,7 +175,43 @@ public final class RunWiring {
             String toolsUnavailable,
             ProjectSession project,
             BuildIdentity build) {
+        return port(services, messageLog, tools, toolsUnavailable, project, build, hasher());
+    }
+
+    /**
+     * The session's one hasher (P8-1): a {@link CachingHashService} over a {@link
+     * StreamingHashService}, shared by the engine, the workflow and the Results section.
+     *
+     * @return a new hasher; the composition root makes exactly one
+     */
+    public static CachingHashService hasher() {
+        return new CachingHashService(new StreamingHashService());
+    }
+
+    /**
+     * The engine port over the composition root, as {@link #port(ApplicationServices,
+     * BoundedMessageLog, Optional, String, ProjectSession, BuildIdentity)}, over a given hasher --
+     * the session's one, which the Results section's port uses too.
+     *
+     * @param services the composition root, whose process service and clock the engine uses
+     * @param messageLog the console's log, which tool output is appended to
+     * @param tools the Tool Manager, or empty
+     * @param toolsUnavailable why there is no Tool Manager, when {@code tools} is empty
+     * @param project the session's project
+     * @param build the running build, named in every parameter file and provenance record
+     * @param hashes the session's one hasher
+     * @return the port
+     */
+    public static SessionEngine port(
+            ApplicationServices services,
+            BoundedMessageLog messageLog,
+            Optional<ToolManager> tools,
+            String toolsUnavailable,
+            ProjectSession project,
+            BuildIdentity build,
+            CachingHashService hashes) {
         Objects.requireNonNull(services, "services");
+        Objects.requireNonNull(hashes, "hashes");
         Objects.requireNonNull(messageLog, "messageLog");
         Objects.requireNonNull(tools, "tools");
         Objects.requireNonNull(project, "project");
@@ -180,7 +220,6 @@ public final class RunWiring {
         if (processes.isEmpty()) {
             return new Unavailable(NO_PROCESS_SERVICE);
         }
-        CachingHashService hashes = new CachingHashService(new StreamingHashService());
         WorkflowEngine engine =
                 new WorkflowEngine(
                         new EngineServices(
@@ -205,6 +244,30 @@ public final class RunWiring {
     }
 
     /**
+     * The Results section's port over the session's project (Phase 10): its runs with Percolator
+     * results, their stores, view state and exports. It launches nothing: it is given no process
+     * service, only the project, the one hasher, the build and the engine's executing runs.
+     *
+     * @param services the composition root, whose clock dates every export
+     * @param project the session's project
+     * @param hashes the session's one hasher
+     * @param build the running build, whose version every export records
+     * @param engine the session's engine, which says which runs are executing
+     * @return the port
+     */
+    public static ResultsPort results(
+            ApplicationServices services,
+            ProjectSession project,
+            HashService hashes,
+            BuildIdentity build,
+            SessionEngine engine) {
+        Objects.requireNonNull(services, "services");
+        Objects.requireNonNull(engine, "engine");
+        return new ProjectResultsPort(
+                project, hashes, build.version(), services.clock(), engine::executingRuns);
+    }
+
+    /**
      * Where the Run section calls the engine: daemon threads, made as needed, so that a check, a
      * start and a cancel never wait for one another and none keeps the JVM alive.
      *
@@ -215,6 +278,21 @@ public final class RunWiring {
         return Executors.newCachedThreadPool(
                 work -> {
                     Thread thread = new Thread(work, "cometgui-run-" + next.incrementAndGet());
+                    thread.setDaemon(true);
+                    return thread;
+                });
+    }
+
+    /**
+     * Where the Results section reads its result stores: one daemon thread, so that its reads,
+     * opens and closes happen in the order they were asked for and none keeps the JVM alive.
+     *
+     * @return the executor; the caller shuts it down
+     */
+    public static ExecutorService resultThread() {
+        return Executors.newSingleThreadExecutor(
+                work -> {
+                    Thread thread = new Thread(work, "cometgui-results");
                     thread.setDaemon(true);
                     return thread;
                 });
@@ -248,6 +326,11 @@ public final class RunWiring {
         public ActiveRun start(PercolatorRequest percolator, RunObserver observer)
                 throws RunNotStartedException {
             throw new RunNotStartedException(reason, null);
+        }
+
+        @Override
+        public Set<RunId> executingRuns() {
+            return Set.of();
         }
     }
 }

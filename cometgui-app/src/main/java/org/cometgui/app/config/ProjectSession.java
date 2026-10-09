@@ -24,6 +24,8 @@ import java.util.Objects;
 import org.cometgui.domain.ports.RunIdSource;
 import org.cometgui.domain.project.ProjectId;
 import org.cometgui.domain.project.ProjectLayout;
+import org.cometgui.domain.run.RunDescriptor;
+import org.cometgui.domain.run.RunLayout;
 import org.cometgui.workflow.storage.ProjectLock;
 import org.cometgui.workflow.storage.ProjectStore;
 import org.cometgui.workflow.storage.RunStore;
@@ -96,6 +98,28 @@ public final class ProjectSession implements AutoCloseable {
      */
     public Path directory() {
         return layout.root();
+    }
+
+    /**
+     * The project's layout.
+     *
+     * @return where the project's files are, whether or not they exist yet
+     */
+    public ProjectLayout layout() {
+        return layout;
+    }
+
+    /**
+     * Reads one run's {@code run.json} without opening the project: reading needs no lock, because
+     * every write of the file is atomic ({@link RunStore}), so the Results section can list a
+     * project's runs without creating the project or taking its lock.
+     *
+     * @param run the run's directory
+     * @return its record
+     * @throws IOException as {@link RunStore#read}
+     */
+    public RunDescriptor readRun(RunLayout run) throws IOException {
+        return new RunStore(layout, clock, runIds).read(run);
     }
 
     /**
