@@ -316,7 +316,164 @@ state of the file means:**
 
 ``exports/`` -- filtered exports of the run's tables and learned weights
 (``R-PERC-07``: "derived filtered exports shall be new files under a distinct
-directory"). Each export is a new file; none is ever overwritten.
+directory"). Each export is a new file; none is ever overwritten. The formats
+are below, in `Exports and their sidecars`_.
+
+Exports and their sidecars
+--------------------------
+
+An export is two files in ``exports/`` and one line in the run's provenance
+event log (``R-RES-04``, ``R-RES-01``, design decision P10-7). They are
+written by ``org.cometgui.results.export.ResultExporter``.
+
+**A filtered table** is named
+``<table>_q<cutoff>_<category>_<yyyyMMdd'T'HHmmss.SSS'Z'>.tsv`` -- for example
+``target-psms_q0.01_passing_20261009T120000.123Z.tsv`` -- where ``<table>`` is
+``target-psms``, ``decoy-psms``, ``target-peptides`` or ``decoy-peptides``,
+``<cutoff>`` is the filter's cutoff exactly as it was set, ``<category>`` is
+``passing``, ``unknown-q-value``, ``failing`` or ``all``, and the time is UTC.
+It holds Percolator's header line and then **exactly the rows of that
+category** under that cutoff, **each row's bytes copied verbatim from the raw
+table, its line terminator included, in the raw table's order**. Where a row
+falls is decided by the one q-value predicate the results view uses, so a row
+with a missing, unparsable or out-of-range q-value is in ``unknown-q-value``
+(and ``all``) and nowhere else (``R-RES-02``). The view's text filter and sort
+are view-only and are **not** applied; the sidecar says so. The raw table is
+only ever read.
+
+**The learned feature weights** are named
+``learned-feature-weights_<time>.tsv``: UTF-8, ``\n`` line ends, tab-separated,
+one row per feature in the artefact's order, the bias term ``m0`` included. For
+an artefact of *n* splits the columns are ``feature``, ``bias`` (``true`` or
+``false``), ``split_1_normalised`` .. ``split_<n>_normalised``,
+``mean_signed``, ``mean_absolute``, ``standard_deviation``,
+``sign_consistency`` (``all positive``, ``all negative``, ``mixed`` or ``all
+zero``), ``rank`` (empty for the bias term, which is not ranked), and
+``split_1_raw`` .. ``split_<n>_raw``. *n* is read from the artefact, never
+assumed (``R-PERC-09``). Numbers are written by Java's ``Double.toString``:
+the shortest decimal that reads back as the same ``double``, with a ``.``
+decimal point whatever the locale, and ``E`` notation for very small or large
+magnitudes (``1.0E-4``). The values are those of the weights view's table,
+which is their one source.
+
+**Never overwritten.** If the name, or its sidecar's, is taken by anything at
+all, ``-2``, ``-3`` ... is added before ``.tsv`` until both are free. Every
+export in one CometGUI process holds one lock while it chooses its name and
+writes, so two exports never choose one name; two CometGUI *processes*
+exporting the same table, cutoff and category of one run in the same
+millisecond are the one case this cannot see.
+
+**The sidecar** is ``<export>.json`` beside it, written by the one JSON writer
+(every string value redacted, ``R-SEC-03``) through the one atomic writer. For
+a filtered table, schema version 1 -- the constructed shuffled PSM table of the
+tests, exported at 0.01, with the digests and two long texts abridged here::
+
+    {
+      "schemaVersion": 1,
+      "export": "filtered-table",
+      "runId": "run-0001",
+      "cometguiVersion": "0.1.0",
+      "created": "2026-10-09T12:00:00.123Z",
+      "file": {
+        "path": "exports/target-psms_q0.01_passing_20261009T120000.123Z.tsv",
+        "size": 862,
+        "md5": "97a8...",
+        "sha256": "77d2..."
+      },
+      "source": {
+        "table": "target-psms",
+        "path": "outputs/percolator/psms.tsv",
+        "size": 2096,
+        "md5": "9ed7...",
+        "sha256": "3754..."
+      },
+      "filter": {
+        "name": "psm-q-value",
+        "cutoff": "0.01",
+        "rule": "a row passes when its q-value is known and q-value <= cutoff; the cutoff is inclusive"
+      },
+      "category": "passing",
+      "unknownQValuePolicy": "a row whose q-value is missing, unparsable or outside [0, 1] is neither passing nor failing: ...",
+      "countsBefore": {
+        "total": 23,
+        "passing": 9,
+        "failing": 7,
+        "unknownQValue": 7
+      },
+      "rowsWritten": 9,
+      "rows": "the raw table's header line, then every row of the category written, ...",
+      "textFilterApplied": false,
+      "sortApplied": false
+    }
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 76
+
+   * - Member
+     - Meaning
+
+   * - ``schemaVersion``
+     - ``1``.
+   * - ``export``
+     - ``filtered-table`` or ``learned-feature-weights``.
+   * - ``runId``, ``cometguiVersion``
+     - The run's ID and the version of CometGUI that wrote the export.
+   * - ``created``
+     - When the export was made, in the provenance timestamp form (UTC,
+       milliseconds).
+   * - ``file``
+     - The export itself: its path relative to the run, its size in bytes, and
+       its MD5 and SHA-256, computed by the one hasher after it was written.
+   * - ``source``
+     - The raw table (or weights artefact) it came from: for a table its
+       ``table`` word; its path, relative to the run with ``/`` between names
+       when it is inside the run, otherwise absolute; its size; its MD5 and
+       SHA-256, in one pass, before it was read.
+   * - ``filter``
+     - Which filter (``psm-q-value`` or ``peptide-q-value``), its cutoff
+       exactly as set, and the rule in words. Tables only.
+   * - ``category``
+     - The rows written. Tables only.
+   * - ``unknownQValuePolicy``
+     - The unknown-q-value rule in words. Tables only.
+   * - ``countsBefore``
+     - Where every row of the raw table falls under the filter: ``total``,
+       ``passing``, ``failing``, ``unknownQValue``; they add up. Tables only.
+   * - ``rowsWritten``
+     - The rows in the export, its header excluded -- the count of
+       ``category`` in ``countsBefore`` (``total`` for ``all``). Tables only.
+   * - ``rows``, ``textFilterApplied``, ``sortApplied``
+     - What the rows are, in words, and that the view's text filter and sort
+       were not applied (both ``false``). Tables only.
+   * - ``splitCount``, ``featureCount``, ``numbers``
+     - Weights only: the splits, read from the artefact; the features, the
+       bias term included; how numbers are written, in words.
+
+**The event.** Each export appends one ``export.written`` event
+(:ref:`ref-provenance-format-event-types`) to ``provenance/events.log``. Its
+payload: ``run.id``; ``export.kind`` (the sidecar's ``export``); ``file.path``,
+``file.md5`` and ``file.sha256`` (the export's); ``export.sidecar`` (the
+sidecar's path); ``source.path``, ``source.md5`` and ``source.sha256``; for a
+table ``export.table``, ``export.category``, ``filter.name``,
+``filter.cutoff``, ``counts.total``, ``counts.passing``, ``counts.failing``,
+``counts.unknown-q-value`` and ``rows.written``; for the weights
+``weights.split-count`` and ``weights.feature-count``. This is where the filter
+values used for a derived export are written to provenance (``R-RES-01``,
+*Application provenance*). An export is made from a finished run, so the event
+follows ``run.finished``; ``provenance.json`` is not rewritten.
+
+**Order, and what a failure leaves.** The source is hashed; the export is
+written to a temporary file in ``exports/`` and renamed into place; the export
+is hashed and its sidecar written; the event is appended. A failure while the
+export is written -- a table the reader refuses, or one whose size or
+modification time changed while it was copied -- leaves no file under the
+export's name and no temporary file. A failure in the last two steps removes
+the export and its sidecar again, so **an export is never reported as made
+unless its event was recorded**. A process killed between the rename and the
+append can leave an export without a sidecar or event: such a file is
+incomplete and is not an export of record. An export is for a run that is not
+executing, because the run's engine holds the event log open while it runs.
 
 The index cache
 ---------------
@@ -953,7 +1110,9 @@ Reading and writing them is ``org.cometgui.workflow.storage``
 ``ProjectLock``), and so is the view state (``ViewStateJson``,
 ``ViewStateStore``, ``ViewStateReading``; tested against hand-typed documents
 by ``ViewStateStoreTest``). The ``results/`` and ``exports/`` paths are
-``RunLayout``'s. The index cache is ``org.cometgui.workflow.steps``
+``RunLayout``'s. Exports are ``org.cometgui.results.export``
+(``ResultExporter``; tested by ``TableExportGateTest``,
+``TableExportBehaviourTest``, ``WeightsExportTest`` and ``LargeExportTest``). The index cache is ``org.cometgui.workflow.steps``
 (``IndexCacheKey``, ``IndexCacheEntry``), and so are the Percolator files
 (``PercolatorSettingsFile``, ``PercolatorDeclarations``), and so is the derived
 run (``PercolatorRerun``, ``DerivedRun``, ``RerunSource``). The tests that hold the writers to

@@ -1123,7 +1123,7 @@ members always in this order.
 
    * - ``type``
      - string
-     - What happened; one of the seven
+     - What happened; one of the eight
        :ref:`event types <ref-provenance-format-event-types>`.
 
    * - ``payload``
@@ -1184,6 +1184,17 @@ Event types
        :ref:`status values <ref-provenance-format-status>`. A log
        whose last line said only "the run finished" could not answer the
        question a failed run raises.
+
+   * - ``export.written``
+     - A derived export -- a filtered Percolator table or the learned feature
+       weights -- was written into the run's ``exports/`` directory (added in
+       phase 10). Its payload names the export file and its checksums, the
+       source and its checksums, and for a table the filter, cutoff, category
+       and row counts; the keys are listed in
+       :ref:`ref-project-format` under *Exports and their sidecars*. An export
+       is made from a finished run, so this event normally follows
+       ``run.finished``; nothing in the log or its reader imposes an order
+       between types.
 
 Reading a damaged log
 ---------------------

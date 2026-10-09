@@ -35,5 +35,17 @@
       <groupId>org.cometgui</groupId>
       <artifactId>cometgui-domain</artifactId>
     </dependency>
+    <!--
+      Phase 10 unit 6 (design decision P10-7): org.cometgui.results.export writes
+      its files and records them through the project's ONE JSON writer
+      (org.cometgui.provenance.json), ONE atomic writer (.io) and ONE provenance
+      event log (.events) rather than a second copy of any of them (P10-1).
+      cometgui-provenance depends on cometgui-domain alone, so this edge makes
+      no cycle.
+    -->
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-provenance</artifactId>
+    </dependency>
   </dependencies>
 </project>

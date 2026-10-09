@@ -21,8 +21,8 @@ import java.util.Objects;
 /**
  * What a provenance event says happened.
  *
- * <p>The seven kinds below are the ones a run can emit before any stage exists to emit them, which
- * is the point of phase 04: the model is built first "so that no stage can be built without
+ * <p>The first seven kinds below are the ones a run can emit before any stage exists to emit them,
+ * which is the point of phase 04: the model is built first "so that no stage can be built without
  * recording itself". A stage that starts, invokes a tool, hashes a file, warns, and finishes has a
  * constant here for every one of those moments, so a later phase records its work by choosing a
  * constant rather than by inventing a vocabulary.
@@ -79,7 +79,21 @@ public enum ProvenanceEventType {
      * ProvenanceEvent#STATUS_KEY}. A log whose last line says only "the run finished" cannot answer
      * the question {@code AC-PRV-06} asks of a failed run.
      */
-    RUN_FINISHED("run.finished");
+    RUN_FINISHED("run.finished"),
+
+    /**
+     * A derived export was written from a run's results after the run: a filtered Percolator table
+     * or the learned feature weights, as a new file under the run's {@code exports/} directory.
+     *
+     * <p>Added by phase 10 ({@code R-RES-01}: the result-view filter values are "written to
+     * provenance when used to generate an export"; <em>Application provenance</em>: "result-view q
+     * filters when used for a derived export"). The payload names the export file and its
+     * checksums, the source table, the filter and category applied and the row counts; the keys are
+     * pinned by {@code org.cometgui.results.export}, which writes the event. Unlike the seven above
+     * it normally follows {@link #RUN_FINISHED}, because an export is made from a finished run;
+     * neither the log nor its reader imposes an order between types.
+     */
+    EXPORT_WRITTEN("export.written");
 
     private final String wireName;
 
@@ -123,6 +137,7 @@ public enum ProvenanceEventType {
                 "no provenance event type has the wire name \""
                         + wire
                         + "\"; expected one of [run.started, stage.started, stage.finished,"
-                        + " tool.invoked, file.hashed, warning.raised, run.finished]");
+                        + " tool.invoked, file.hashed, warning.raised, run.finished,"
+                        + " export.written]");
     }
 }

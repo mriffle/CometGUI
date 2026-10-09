@@ -23,14 +23,24 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.cometgui.domain.secrets.SecretRedactor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests for {@link ProvenanceEventType}.
@@ -56,12 +66,15 @@ class ProvenanceEventTypeTest {
                 () -> assertEquals("tool.invoked", ProvenanceEventType.TOOL_INVOKED.wireName()),
                 () -> assertEquals("file.hashed", ProvenanceEventType.FILE_HASHED.wireName()),
                 () -> assertEquals("warning.raised", ProvenanceEventType.WARNING_RAISED.wireName()),
-                () -> assertEquals("run.finished", ProvenanceEventType.RUN_FINISHED.wireName()));
+                () -> assertEquals("run.finished", ProvenanceEventType.RUN_FINISHED.wireName()),
+                () ->
+                        assertEquals(
+                                "export.written", ProvenanceEventType.EXPORT_WRITTEN.wireName()));
     }
 
     @Test
-    @DisplayName("the seven types the work unit names are the seven types that exist")
-    void theSevenTypesArePinned() {
+    @DisplayName("phase 04's seven types and phase 10's export type are the types that exist")
+    void theTypesArePinned() {
         List<String> names = new ArrayList<>();
         for (ProvenanceEventType type : ProvenanceEventType.values()) {
             names.add(type.name());
@@ -75,7 +88,8 @@ class ProvenanceEventTypeTest {
                         "TOOL_INVOKED",
                         "FILE_HASHED",
                         "WARNING_RAISED",
-                        "RUN_FINISHED"),
+                        "RUN_FINISHED",
+                        "EXPORT_WRITTEN"),
                 names);
     }
 
@@ -87,7 +101,7 @@ class ProvenanceEventTypeTest {
             assertTrue(distinct.add(type.wireName()), "two types share the wire name");
         }
 
-        assertEquals(7, distinct.size());
+        assertEquals(8, distinct.size());
     }
 
     @Test
@@ -135,7 +149,39 @@ class ProvenanceEventTypeTest {
                 () ->
                         assertSame(
                                 ProvenanceEventType.RUN_FINISHED,
-                                ProvenanceEventType.fromWireName("run.finished")));
+                                ProvenanceEventType.fromWireName("run.finished")),
+                () ->
+                        assertSame(
+                                ProvenanceEventType.EXPORT_WRITTEN,
+                                ProvenanceEventType.fromWireName("export.written")));
+    }
+
+    @Test
+    @DisplayName("an export.written event after run.finished is written and read back intact")
+    void anExportEventFollowsTheRunAndReadsBack(@TempDir Path directory) throws IOException {
+        Path path = directory.resolve("events.log");
+        Clock clock = Clock.fixed(Instant.parse("2026-10-09T12:00:00.123Z"), ZoneOffset.UTC);
+        try (ProvenanceEventLog log =
+                ProvenanceEventLog.openAppend(path, SecretRedactor.patternsOnly(), clock)) {
+            log.append(ProvenanceEventType.RUN_FINISHED, Map.of("status", "completed"));
+        }
+        try (ProvenanceEventLog log =
+                ProvenanceEventLog.openAppend(path, SecretRedactor.patternsOnly(), clock)) {
+            log.append(
+                    ProvenanceEventType.EXPORT_WRITTEN,
+                    Map.of("file.path", "exports/x.tsv", "filter.cutoff", "0.01"));
+        }
+
+        List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        assertEquals(
+                "{\"seq\":2,\"time\":\"2026-10-09T12:00:00.123Z\",\"type\":\"export.written\","
+                        + "\"payload\":{\"file.path\":\"exports/x.tsv\","
+                        + "\"filter.cutoff\":\"0.01\"}}",
+                lines.get(1));
+        RecoveredEventLog recovered = ProvenanceEventLogReader.recover(path);
+        assertTrue(recovered.intact(), () -> "defects: " + recovered.defects());
+        assertSame(ProvenanceEventType.EXPORT_WRITTEN, recovered.events().get(1).type());
+        assertEquals("0.01", recovered.events().get(1).payload().get("filter.cutoff"));
     }
 
     @Test
@@ -162,7 +208,7 @@ class ProvenanceEventTypeTest {
         assertEquals(
                 "no provenance event type has the wire name \"run.begun\"; expected one of"
                         + " [run.started, stage.started, stage.finished, tool.invoked,"
-                        + " file.hashed, warning.raised, run.finished]",
+                        + " file.hashed, warning.raised, run.finished, export.written]",
                 rejected.getMessage());
     }
 
