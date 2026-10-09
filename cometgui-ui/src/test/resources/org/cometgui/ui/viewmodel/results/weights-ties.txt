@@ -1,0 +1,9 @@
+# CONSTRUCTED BY HAND for CometGUI tests (phase 10 unit 4, 2026-10-08). NOT Percolator output.
+# Two splits built for the weights summary: a three-way tie on mean absolute weight, a two-way tie at zero, zeros mixed with a sign, a mixed sign, two all-zero features (one spelt -0.0000) and a bias m0 larger than every feature.
+# Every value is a multiple of 1/8, so every sum, mean and standard deviation is exact in binary floating point.
+c	z	a	f	d	b	e	y	m0
+0.75	0	0.5	2	0	-0.25	0.125	0.0000	-3
+1.5	0	1	4	0	-0.5	0.25	0	-6
+c	z	a	f	d	b	e	y	m0
+-0.25	-0.0000	0.5	1	0.5	-0.75	0.125	0	-1
+-0.5	0	1	2	1	-1.5	0.25	0	-2

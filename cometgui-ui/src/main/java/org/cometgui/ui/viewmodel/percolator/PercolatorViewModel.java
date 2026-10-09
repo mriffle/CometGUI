@@ -49,11 +49,10 @@ import org.cometgui.params.percolator.schema.SettingsApplicability;
 import org.cometgui.params.percolator.validation.TestFdr;
 import org.cometgui.params.percolator.validation.TrainFdr;
 import org.cometgui.results.filtering.DisplayFilters;
-import org.cometgui.results.filtering.PeptideQValueFilter;
-import org.cometgui.results.filtering.PsmQValueFilter;
 import org.cometgui.ui.viewmodel.NonNullProperty;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
+import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
 
 /**
  * The Percolator section (decision P9-12; {@code R-PERC-01}, {@code R-PERC-03}, {@code R-PERC-04},
@@ -95,6 +94,13 @@ import org.cometgui.ui.viewmodel.params.PercolatorRequest;
  * PercolatorRequest#problems()} are reasons in the engine's half of the one Run readiness: no build
  * has been read yet, none can run, the default is not installed, or a setting holds text the model
  * refused. The display filters never block a run: they change nothing a tool computes.
+ *
+ * <h2>The display filters are shared</h2>
+ *
+ * <p>Since Phase 10 the display filters are not this section's own state: they are the one {@link
+ * DisplayFiltersViewModel} the Results section holds too (design decisions P10-1 and P10-9), and
+ * every filter method and property here delegates to it, so a filter set in either section is the
+ * filter both show.
  */
 public final class PercolatorViewModel {
 
@@ -117,13 +123,11 @@ public final class PercolatorViewModel {
                     + " managed build has a capability you need, such as the Percolator XML that"
                     + " Limelight conversion reads.";
 
-    /** What the display filters are, and are not ({@code R-RES-01}, {@code R-PERC-04}). */
-    public static final String FILTERS_EXPLANATION =
-            "The PSM and the peptide q-value filters (each 0.01 by default, from 0 to 1, a q-value"
-                    + " equal to the cutoff passing) change only which PSMs and peptides are"
-                    + " displayed and exported. Changing them never reruns Percolator or any other"
-                    + " tool, and they are not Percolator's testFDR or trainFDR, the learning"
-                    + " thresholds under Advanced settings.";
+    /**
+     * What the display filters are, and are not ({@code R-RES-01}, {@code R-PERC-04}): the shared
+     * filters' own words, {@link DisplayFiltersViewModel#EXPLANATION}.
+     */
+    public static final String FILTERS_EXPLANATION = DisplayFiltersViewModel.EXPLANATION;
 
     private static final Set<DownstreamStage> NO_STAGES = EnumSet.noneOf(DownstreamStage.class);
 
@@ -136,6 +140,8 @@ public final class PercolatorViewModel {
     private final Executor ui;
 
     private final Runnable afterRegistration;
+
+    private final DisplayFiltersViewModel filters;
 
     // ---- state, on the interface thread ----
 
@@ -158,14 +164,6 @@ public final class PercolatorViewModel {
 
     private final Map<PercolatorSetting, String> settingRefusals =
             new EnumMap<>(PercolatorSetting.class);
-
-    private String psmText = PsmQValueFilter.DEFAULT.text();
-
-    private String peptideText = PeptideQValueFilter.DEFAULT.text();
-
-    private String psmRefusal = "";
-
-    private String peptideRefusal = "";
 
     private boolean registering;
 
@@ -201,19 +199,11 @@ public final class PercolatorViewModel {
 
     private final NonNullProperty<List<SettingState>> settingStates;
 
-    private final NonNullProperty<String> psmFilterText;
-
-    private final NonNullProperty<String> peptideFilterText;
-
-    private final NonNullProperty<String> filtersStatus;
-
-    private final NonNullProperty<DisplayFilters> displayFilters;
-
     private final NonNullProperty<PercolatorRequest> request;
 
     /**
-     * The section over the Tool Manager's Percolator builds. Nothing is read until {@link
-     * #refresh()} is called.
+     * The section over the Tool Manager's Percolator builds, with display filters of its own.
+     * Nothing is read until {@link #refresh()} is called.
      *
      * @param port the Tool Manager's Percolator builds and registration
      * @param chooser the file chooser a local binary is registered through
@@ -228,6 +218,29 @@ public final class PercolatorViewModel {
             Executor background,
             Executor ui,
             Runnable afterRegistration) {
+        this(port, chooser, background, ui, afterRegistration, new DisplayFiltersViewModel());
+    }
+
+    /**
+     * The section over the Tool Manager's Percolator builds, showing and editing the interface's
+     * one display-filter state. Nothing is read until {@link #refresh()} is called.
+     *
+     * @param port the Tool Manager's Percolator builds and registration
+     * @param chooser the file chooser a local binary is registered through
+     * @param background where the port is called: never the interface thread
+     * @param ui where every answer is applied: the interface thread
+     * @param afterRegistration run on the interface thread after a binary was registered, so the
+     *     rest of the interface -- the Tool Manager's list -- reads the builds again too
+     * @param filters the display filters the Results section holds too
+     */
+    public PercolatorViewModel(
+            PercolatorPort port,
+            FileChooserPort chooser,
+            Executor background,
+            Executor ui,
+            Runnable afterRegistration,
+            DisplayFiltersViewModel filters) {
+        this.filters = Objects.requireNonNull(filters, "filters");
         this.port = Objects.requireNonNull(port, "port");
         this.chooser = Objects.requireNonNull(chooser, "chooser");
         this.background = Objects.requireNonNull(background, "background");
@@ -251,10 +264,6 @@ public final class PercolatorViewModel {
         registrationStatus = new NonNullProperty<>(this, "registrationStatus", REGISTER_IDLE);
         registerEnabled = new ReadOnlyBooleanWrapper(this, "registerEnabled", false);
         settingStates = new NonNullProperty<>(this, "settingStates", List.of());
-        psmFilterText = new NonNullProperty<>(this, "psmFilterText", psmText);
-        peptideFilterText = new NonNullProperty<>(this, "peptideFilterText", peptideText);
-        filtersStatus = new NonNullProperty<>(this, "filtersStatus", FILTERS_EXPLANATION);
-        displayFilters = new NonNullProperty<>(this, "displayFilters", DisplayFilters.DEFAULTS);
         request = new NonNullProperty<>(this, "request", PercolatorRequest.pending(NOT_READ));
         publish();
     }
@@ -357,39 +366,21 @@ public final class PercolatorViewModel {
     }
 
     /**
-     * Sets the PSM display filter from typed text.
+     * Sets the PSM display filter from typed text, in the shared display filters.
      *
      * @param text for example {@code 0.05}
      */
     public void editPsmFilter(String text) {
-        psmText = Objects.requireNonNull(text, "text");
-        try {
-            PsmQValueFilter filter = PsmQValueFilter.parse(text);
-            displayFilters.set(displayFilters.get().withPsm(filter));
-            psmText = filter.text();
-            psmRefusal = "";
-        } catch (IllegalArgumentException refused) {
-            psmRefusal = refused.getMessage();
-        }
-        publish();
+        filters.editPsmFilter(text);
     }
 
     /**
-     * Sets the peptide display filter from typed text.
+     * Sets the peptide display filter from typed text, in the shared display filters.
      *
      * @param text for example {@code 0.05}
      */
     public void editPeptideFilter(String text) {
-        peptideText = Objects.requireNonNull(text, "text");
-        try {
-            PeptideQValueFilter filter = PeptideQValueFilter.parse(text);
-            displayFilters.set(displayFilters.get().withPeptide(filter));
-            peptideText = filter.text();
-            peptideRefusal = "";
-        } catch (IllegalArgumentException refused) {
-            peptideRefusal = refused.getMessage();
-        }
-        publish();
+        filters.editPeptideFilter(text);
     }
 
     /**
@@ -601,7 +592,7 @@ public final class PercolatorViewModel {
      * @return the read-only property
      */
     public ReadOnlyObjectProperty<String> psmFilterTextProperty() {
-        return psmFilterText.getReadOnlyProperty();
+        return filters.psmFilterTextProperty();
     }
 
     /**
@@ -610,7 +601,7 @@ public final class PercolatorViewModel {
      * @return the read-only property
      */
     public ReadOnlyObjectProperty<String> peptideFilterTextProperty() {
-        return peptideFilterText.getReadOnlyProperty();
+        return filters.peptideFilterTextProperty();
     }
 
     /**
@@ -619,16 +610,17 @@ public final class PercolatorViewModel {
      * @return the read-only property
      */
     public ReadOnlyObjectProperty<String> filtersStatusProperty() {
-        return filtersStatus.getReadOnlyProperty();
+        return filters.filtersStatusProperty();
     }
 
     /**
-     * The display filters' values, for the results views (Phase 10).
+     * The display filters' values: the shared filters' own property, which the Results section
+     * observes too.
      *
      * @return the read-only property
      */
     public ReadOnlyObjectProperty<DisplayFilters> displayFiltersProperty() {
-        return displayFilters.getReadOnlyProperty();
+        return filters.displayFiltersProperty();
     }
 
     /**
@@ -718,9 +710,6 @@ public final class PercolatorViewModel {
         skipped.set(skippedText());
         advisories.set(build.map(PercolatorViewModel::advisoriesOf).orElse(""));
         settingStates.set(settingStatesFor(build));
-        psmFilterText.set(psmText);
-        peptideFilterText.set(peptideText);
-        filtersStatus.set(filtersText());
         request.set(requestFor(build));
     }
 
@@ -913,17 +902,6 @@ public final class PercolatorViewModel {
                             refusal == null));
         }
         return List.copyOf(states);
-    }
-
-    private String filtersText() {
-        StringBuilder text = new StringBuilder(FILTERS_EXPLANATION);
-        if (!psmRefusal.isEmpty()) {
-            text.append("\nThe PSM filter's text is not used: ").append(psmRefusal);
-        }
-        if (!peptideRefusal.isEmpty()) {
-            text.append("\nThe peptide filter's text is not used: ").append(peptideRefusal);
-        }
-        return text.toString();
     }
 
     private PercolatorRequest requestFor(Optional<ToolOffer> build) {

@@ -1,0 +1,15 @@
+# CONSTRUCTED BY HAND for CometGUI tests (phase 09 unit 4, 2026-10-07). NOT Percolator output.
+# Percolator always writes three cross-validation bins; this file has FOUR, so a parser that assumed three fails (R-PERC-09).
+# Values spelt as Percolator spells them (0, 0.000, -0.0000) and with an exponent.
+feat_a	feat_b	m0
+0	-2.25	3.5
+0.000	-5.0000	6
+feat_a	feat_b	m0
+0.5	-0.25	1e-3
+1.5	-0.75	2E+1
+feat_a	feat_b	m0
+-0.0000	0.125	-1
+0.0000	0.375	-2
+feat_a	feat_b	m0
+0.75	-1.125	0.0625
+2.25	-3.375	0.1875

@@ -89,8 +89,8 @@ class ViewModelIndependenceTest {
 
     @Test
     @DisplayName(
-            "the scan reads the package's classes and those of its params and percolator"
-                    + " subpackages")
+            "the scan reads the package's classes and those of its params, percolator and"
+                    + " results subpackages")
     void theScanIsNotVacuous() {
         Map<String, String> sources = ViewModelSources.all();
         assertEquals(
@@ -170,7 +170,24 @@ class ViewModelIndependenceTest {
                         "percolator/RerunCheck.java",
                         "percolator/SettingState.java",
                         "percolator/VersionChoice.java",
-                        "percolator/package-info.java"),
+                        "percolator/package-info.java",
+                        "results/ColumnState.java",
+                        "results/CopyOutcome.java",
+                        "results/DisplayFiltersViewModel.java",
+                        "results/OpenedResults.java",
+                        "results/ResultRowView.java",
+                        "results/ResultTableViewModel.java",
+                        "results/ResultsColumn.java",
+                        "results/ResultsPort.java",
+                        "results/ResultsRun.java",
+                        "results/ResultsViewModel.java",
+                        "results/TableCounts.java",
+                        "results/TablePage.java",
+                        "results/WeightsColumn.java",
+                        "results/WeightsRowView.java",
+                        "results/WeightsSort.java",
+                        "results/WeightsViewModel.java",
+                        "results/package-info.java"),
                 List.copyOf(sources.keySet()),
                 "a source scan that read the wrong or an empty directory, or stopped at the top"
                         + " directory, would pass over anything");
@@ -180,6 +197,8 @@ class ViewModelIndependenceTest {
                 expected = "package org.cometgui.ui.viewmodel.params;";
             } else if (source.getKey().startsWith("percolator/")) {
                 expected = "package org.cometgui.ui.viewmodel.percolator;";
+            } else if (source.getKey().startsWith("results/")) {
+                expected = "package org.cometgui.ui.viewmodel.results;";
             } else {
                 expected = "package org.cometgui.ui.viewmodel;";
             }

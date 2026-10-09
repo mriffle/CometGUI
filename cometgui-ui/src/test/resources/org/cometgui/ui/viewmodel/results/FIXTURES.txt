@@ -1,0 +1,37 @@
+COPIES OF cometgui-results' CHECKED-IN FIXTURES, for the Results view-model tests
+================================================================================
+
+Copied byte for byte on 2026-10-09 by the phase 10 unit 7 agent, so that the
+view-model tests in org.cometgui.ui.viewmodel.results read nothing outside
+the cometgui-ui module except the two scratch fixtures named below. Each copy
+is the same bytes as its original; ResultsFixtures pins these SHA-256s, and
+the originals' provenance is the original directory's own record:
+cometgui-results/src/test/resources/org/cometgui/results/parser/
+real/PROVENANCE.txt (real Percolator 3.07.1 output over CometGUI's synthetic
+64+64 PIN) and constructed/CONSTRUCTED.txt (hand-written, NOT produced by
+Percolator).
+
+  copy                             original (under .../results/parser/)          SHA-256
+  psms-shuffled.tsv                constructed/psms-shuffled.tsv                 3754547ea1ca3ff35b67913a8249b98831e924c0a84029c2a9769fc581a6f5d4
+  psms-unknown-q.tsv               constructed/psms-unknown-q.tsv                ea58b3b63f9031bf53b5675d117b1e7203137a0ebd2399c9def824334267b6c7
+  weights-ties.txt                 constructed/weights-ties.txt                  86466aa30c1d4f72915a45d50f7828284b5e36750ce3a022cb65880fb6b06c92
+  weights-two-splits.txt           constructed/weights-two-splits.txt            44042567136e69e5854085952cf6a2a3a9e14221761bfcc3c4cb04782177016f
+  weights-four-splits.txt          constructed/weights-four-splits.txt           2345706956b918d713a93fe5e523fbd31b7aceb095c68cfffbb9ff508969e276
+  real-3.07.1-psms.tsv             real/percolator-3.07.1/psms.tsv               6e782dd7bbba9f16bce1c6556bc86032e7a9804b6494694db61573d88340ed53
+  real-3.07.1-peptides.tsv         real/percolator-3.07.1/peptides.tsv           6e782dd7bbba9f16bce1c6556bc86032e7a9804b6494694db61573d88340ed53
+  real-3.07.1-decoy-psms.tsv       real/percolator-3.07.1/decoy-psms.tsv         3f9557b82119a4f9900e5964c762dd9ce504de508afdb5be67dfdcca465259e4
+  real-3.07.1-weights.txt          real/percolator-3.07.1/weights.txt            5370f2375d3ea1f13236f6208624c69f81fa8fb190e936e863488cfda4e7a434
+
+(Percolator wrote the synthetic run's PSM and peptide tables byte-identical:
+each PSM is its own peptide there.)
+
+Read from outside the module, failing -- never skipping -- when absent or
+different (the tests harness's sandbox links scratch/ whole):
+
+  scratch/scientific-path/percolator-3.07.1/psms.target.txt,
+  peptides.target.txt, weights.txt   Phase 00's real K562 run (D-006: never
+      committed); SHA-256s and awk counts as cometgui-results'
+      real-k562/PROVENANCE.txt records them.
+  scratch/phase10/large/psms.tsv     the large fixture (1 000 000 rows); made
+      by python3 scripts/fixtures/large-results-fixture.py; SHA-256 and counts
+      as its manifest.json records them.
