@@ -89,6 +89,7 @@ readonly -a ALL_GATES=(
     paramui
     workflow
     percolator
+    results
 )
 
 PASSED=0
@@ -140,7 +141,8 @@ declare -a COVERED=()
 #                110 on 2026-10-07, phase 08 unit 9's first shipping count.
 #                percolator: 94 on 2026-10-08, phase 09 unit 9's first
 #                shipping count; 109 on 2026-10-08, when phase 10 unit D-013
-#                added controls A1-A3 (--no-analytics).)
+#                added controls A1-A3 (--no-analytics).  results: 100 on
+#                2026-10-09, phase 10 unit 11's first shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -342,6 +344,20 @@ gate_spec() {
             GATE_FLOOR=109
             GATE_UNIT="controls"
             ;;
+        results)
+            GATE_PHASE="10"
+            GATE_ITEMS="1,2,3,4,5,6,7,8"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-10-worklog.rst (and new ones, each marked so), each into production code of cometgui-results, cometgui-workflow, cometgui-ui or cometgui-app in a git-archive sandbox, each built with its upstream modules in one reactor (-pl TOP -am, nothing installed), proved to have reached the compiled classes and graded on the failing assertion's own words in the named testcase: the one q-value predicate made exclusive (both stores and the predicate's tests red at exactly the cutoff, the unknown category green); (NEW) a refused filter text still changing the filter, (NEW) the peptide filter's edit also setting the PSM filter, and (NEW) the range check widened to [0, 10]; a listener on the one display-filter state launching /bin/true through the application's one process runner (the headless GUI gate-2 test); the disk store's count loop skipping the last row (the in-memory store green), (NEW) the in-memory tally counting failing rows as passing (the disk store green), and the Passing count on screen bound to the failing count (the headless GUI counts test); the export opening the raw table for writing (a read-only raw output under outputs/ refuses it, a writable table elsewhere green), and (NEW) finalise-results writing the store's index under outputs/; the sidecar's cutoff taken from the default filter, and its rowsWritten one too many; (NEW) the store factory never switching to disk (the -Xmx64m child dies of OutOfMemoryError on the 1 000 000-row fixture, the readAll negative control unchanged), the results table's items accumulating (the large-fixture GUI test), and the table view-model asking for every row as one page; the n - 1 standard deviation, the mean absolute weight summing signed values, (NEW) ties no longer sharing a rank, (NEW) the split count fixed at three (the two- and four-split files red, the real three-split files green), and (NEW) a zero weight counted as positive; unknown-q-value rows written into the passing export, and (NEW) an empty q-value classed as failing rather than unknown; and, as controls on the harness itself, an unchanged file, a missing anchor, an injection that reached the source but not the bytecode, a selection that ran zero tests, a green run graded as red and a red without its diagnostic"
+            GATE_SCRIPT="scripts/verify-results-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-10 exit gate items 1 to 8 were proved here"
+                "bytecode as a HARNESS ERROR, not as a pass, and a selection that ran zero"
+            )
+            GATE_FLOOR=100
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -384,6 +400,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         percolator)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        results)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -392,7 +410,8 @@ usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
 that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07,
-PHASE-08 and PHASE-09 gate still fails on the defect it exists to catch.
+PHASE-08, PHASE-09 and PHASE-10 gate still fails on the defect it exists to
+catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -468,7 +487,7 @@ list_gates() {
     done
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
     printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06, 07:n of\n'
-    printf '  PHASE-07, 08:n of PHASE-08, 09:n of PHASE-09.\n'
+    printf '  PHASE-07, 08:n of PHASE-08, 09:n of PHASE-09, 10:n of PHASE-10.\n'
     printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
@@ -524,12 +543,21 @@ list_gates() {
     printf '  6 the compatible-version rerun, Comet untouched; 7 the effective seed in\n'
     printf '  provenance for every run; 8 the weights split count read from the\n'
     printf '  artefact; 9 raw outputs byte-identical across parsing and filtering.\n'
+    printf '  PHASE-10 items: 1 both default filters 0.01, independent, inclusive at\n'
+    printf '  exactly 0.01, rejecting values outside [0, 1]; 2 a filter change launching\n'
+    printf '  no process; 3 displayed counts equal to independent counts at 0, 0.005,\n'
+    printf '  0.01 and 1; 4 raw Percolator files byte-identical after filtering and\n'
+    printf '  export; 5 an export carrying the run ID, the cutoff and the before/after\n'
+    printf '  row counts; 6 the large fixture within its time and heap budget, the UI\n'
+    printf '  bound to a paged model; 7 weights values, ranking and sign consistency\n'
+    printf '  against an independent computation; 8 unknown q-values counted and shown\n'
+    printf '  as their own category, identically in UI and export.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
     printf '  phases/PHASE-05-tool-registry.rst, phases/PHASE-06-comet-param-model.rst,\n'
-    printf '  phases/PHASE-07-comet-param-ui.rst, phases/PHASE-08-workflow-comet.rst and\n'
-    printf '  phases/PHASE-09-percolator.rst.\n\n'
+    printf '  phases/PHASE-07-comet-param-ui.rst, phases/PHASE-08-workflow-comet.rst,\n'
+    printf '  phases/PHASE-09-percolator.rst and phases/PHASE-10-results.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -691,7 +719,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08 and PHASE-09 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09 and PHASE-10 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -729,7 +757,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05 06 07 08 09; do
+    for phase in 01 02 04 05 06 07 08 09 10; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"

@@ -55,21 +55,22 @@ Commands
 
    * - ``bash scripts/verify-all-gates.sh``
      - **Prove every gate still fails on the defect it exists to catch.** Runs
-       all sixteen falsifiability controls and exits non-zero if any control
+       all seventeen falsifiability controls and exits non-zero if any control
        stops biting. About an hour since Phases 05 and 06 (3875 s recorded in
        ``scripts/dev-verify.sh``), Phase 07's ``paramui`` adds about
-       twenty minutes, Phase 08's ``workflow`` about eight and Phase 09's
-       ``percolator`` about eleven. Run it before signing off a phase.
+       twenty minutes, Phase 08's ``workflow`` about eight, Phase 09's
+       ``percolator`` about eleven and Phase 10's ``results`` about ten.
+       Run it before signing off a phase.
 
    * - ``bash scripts/verify-all-gates.sh --list``
-     - The sixteen controls, what each injects, and the command that proves
+     - The seventeen controls, what each injects, and the command that proves
        it.
 
    * - ``bash scripts/verify-all-gates.sh --only NAME``
      - One control. Names: ``license``, ``workflows``, ``docs``,
        ``traceability``, ``sbom``, ``depscan``, ``pipeline``, ``quality``,
        ``shell``, ``tests``, ``provenance``, ``install``, ``params``,
-       ``paramui``, ``workflow``, ``percolator``. Repeatable, or
+       ``paramui``, ``workflow``, ``percolator``, ``results``. Repeatable, or
        comma-separated.
 
    * - ``bash scripts/ci/docs-build.sh``
@@ -392,7 +393,7 @@ catch, requires the narrowest command that should catch it to exit non-zero
 once the defect is removed. Every harness damages a copy under ``_build/``;
 the working tree is never touched.
 
-``bash scripts/verify-all-gates.sh`` runs all sixteen in one command. It injects
+``bash scripts/verify-all-gates.sh`` runs all seventeen in one command. It injects
 nothing itself -- it delegates -- and it fails if a sub-harness is missing or
 not executable rather than skipping it, because a skipped control counted as a
 pass is worse than no aggregator at all.
@@ -578,6 +579,17 @@ pass is worse than no aggregator at all.
      - Each failing assertion's own words, or the real binary's run: e.g. the
        real 3.09 handed ``-X`` -- ``RUN_PERCOLATOR=invocation percolator
        exited with code 1 ... ==> expected: <SUCCEEDED> but was: <FAILED>``.
+
+   * - Results model and UI (Phase 10, ``results``)
+     - ``scripts/verify-results-gates.sh``: twenty-two injections into
+       ``cometgui-results``, ``cometgui-workflow``, ``cometgui-ui`` and
+       ``cometgui-app`` -- at least one per exit gate item, items 2, 3 and 6
+       also through the headless GUI, items 3, 6, 7 and 8 against the large
+       fixture or the real K562 Percolator outputs. See
+       :ref:`dev-results-falsifiability`.
+     - Each failing assertion's own words, e.g. the store factory never
+       switching to disk -- ``the child failed: [OUT_OF_MEMORY Java heap
+       space] ==> expected: <0> but was: <3>``.
 
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs
@@ -1244,6 +1256,214 @@ control between 5 s and 14 s. The floor in ``verify-all-gates.sh`` was 94.
 Phase 10's unit ``D-013`` added A1-A3: measured the same day, 109 controls
 passed in 697 s (11 m 37 s) -- A1 43 s (it is graded on
 ``RealPercolatorRunTest``), A2 and A3 6 s each -- and the floor is 109.
+
+.. _dev-results-falsifiability:
+
+The results harness (Phase 10, ``results``)
+-------------------------------------------
+
+``bash scripts/verify-results-gates.sh`` proves that each of Phase 10's eight
+exit gate items fails on a defect it exists to catch. It is registered in
+``scripts/verify-all-gates.sh`` as ``results`` and takes its shape from
+``percolator`` -- a ``git archive HEAD`` sandbox, anchors that must match
+exactly once, bytecode digests proving each injection reached the compiled
+class, red read from surefire's XML by testcase and message, siblings
+required to stay green, one closed module set per control (``mvn -o -pl TOP
+-am test``, nothing installed) and one batched clean re-run. The differences:
+
+* The module sets nest (``cometgui-results`` within ``cometgui-workflow``
+  within ``cometgui-ui`` within ``cometgui-app``), and the script checks that
+  they still do. The baseline and the clean re-run use the largest set any
+  selected control needs, so ``--only`` over ``cometgui-results`` controls
+  compiles three modules, not eleven.
+* ``scratch/`` is symlinked in for ``scratch/phase10/large`` (the
+  1 000 000-row fixture; ``python3 scripts/fixtures/large-results-fixture.py``
+  makes it) and the real K562 outputs under ``scratch/scientific-path``; the
+  script refuses to start, naming the file, when one is missing.
+* ``Set.of``'s iteration order is salted per JVM, so where a failing
+  assertion prints a set (the stores' passing and unknown sets), the harness
+  matches the number of elements expected and shown, never their order.
+* A parameterised method's invocation is graded by its surefire name where
+  only some invocations may go red: control 7d requires
+  ``checkedInFiles(String, String, int, List)[1]`` and ``[2]`` (two and four
+  splits) red and ``[4]`` (the real three-split 3.07.1 file) green.
+
+.. list-table:: The controls ("recorded" names the unit of ``handoffs/PHASE-10-worklog.rst`` whose sign-off made the injection, or whose agent did, as that sign-off lists)
+   :header-rows: 1
+   :widths: 6 6 42 46
+
+   * - Control
+     - Item
+     - Injected defect
+     - Diagnostic required
+   * - 1a
+     - 1
+     - Recorded (unit 2): the one q-value predicate made exclusive,
+       ``q < cutoff``.
+     - ``QValueFilterTest`` ``atDefault`` and ``zero``: ``expected: <PASSES>
+       but was: <FAILS>``; both stores' ``inclusiveAtTheCutoff``: six
+       q-values expected to pass 0.01, five shown; the unknown category green.
+   * - 1b
+     - 1
+     - New: a refused PSM filter text resets the PSM filter to the default.
+     - ``DisplayFiltersViewModelTest.refused``: ``expected:
+       <DisplayFilters[psm=PsmQValueFilter(q <= 0.05), ...]> but was:
+       <DisplayFilters[psm=PsmQValueFilter(q <= 0.01), ...]>`` and a change
+       event for refused text; ``bothEndsAndIndependence`` green.
+   * - 1c
+     - 1
+     - New: the peptide filter's edit also sets the PSM filter.
+     - ``bothEndsAndIndependence``: ``expected:
+       <DisplayFilters[psm=PsmQValueFilter(q <= 0), peptide=...(q <= 1)]> but
+       was: <DisplayFilters[psm=PsmQValueFilter(q <= 1), ...]>``; ``refused``
+       and ``defaults`` green.
+   * - 1d
+     - 1
+     - New: the range check widened to [0, 10].
+     - ``QValueFilterTest.outOfRange``: ``Expected
+       java.lang.IllegalArgumentException to be thrown, but nothing was
+       thrown.``; the view-model's ``refused`` red; ``notANumber`` green.
+   * - 2
+     - 2
+     - Recorded (unit 8): a listener on the one display-filter state, in the
+       composition root, launches ``/bin/true`` through the application's one
+       process runner.
+     - *GUI*, ``ResultsNoProcessUiTest``: ``the one process runner was called
+       while the filters changed ==> expected: <[]> but was: <[[/bin/true],
+       ...``.
+   * - 3a
+     - 3
+     - Recorded (unit 3): the disk store's count loop skips the last row.
+     - ``counts() ==> expected: <FilterCounts[total=23, passing=2,
+       failing=14, unknownQValue=7]> but was: <FilterCounts[total=22, ...,
+       failing=13, ...]>``; the in-memory store green.
+   * - 3b
+     - 3
+     - New: the in-memory tally counts a failing row as passing.
+     - ``... but was: <FilterCounts[total=23, passing=16, failing=0,
+       ...]>``; the disk store, which counts its index itself, green.
+   * - 3c
+     - 3
+     - Recorded (unit 9): the Passing count on screen bound to the failing
+       count.
+     - *GUI*, ``ResultsCountsUiTest.theSyntheticRun``: ``counts shown that
+       differ from the independent counts ==> expected: <[]> but was:
+       <[Target PSMs at 0: shown [64, 64, 64, 0], expected [64, 0, 64, 0]``.
+   * - 4a
+     - 4
+     - Recorded (unit 6): the export opens the raw table ``READ`` and
+       ``WRITE``.
+     - ``aSourceInsideTheRunIsRelativeAndOnlyRead``: ``AccessDeniedException:
+       .../outputs/percolator/psms.tsv`` (the raw output is read-only);
+       ``theNameIsPinned``, over a writable table, green.
+   * - 4b
+     - 4
+     - New: ``finalise-results`` writes the store's index under ``outputs/``
+       instead of ``results/index/``.
+     - ``aTableAboveTheLimitIsIndexedUnderResults`` errors with
+       ``NoSuchFileException`` naming the run's ``results`` directory;
+       ``aTableAtTheLimitStaysInMemory`` green.
+   * - 5a
+     - 5
+     - Recorded (units 6 and 9): the sidecar's cutoff from the default filter.
+     - ``constructed/psms-shuffled.tsv at 0, PASSING: the cutoff applied ==>
+       expected: <0> but was: <0.01>``; the unknown export green.
+   * - 5b
+     - 5
+     - Recorded (unit 6): the sidecar's ``rowsWritten`` one too many.
+     - ``... at 0, PASSING ==> expected: <2> but was: <3>``, and on the real
+       3.07.1 table ``expected: <0> but was: <1>``.
+   * - 6a
+     - 6
+     - New: the store factory never switches to the disk store.
+     - ``DiskStoreBudgetTest.largeFixtureWithinBudget``: ``the child failed:
+       [OUT_OF_MEMORY Java heap space] ==> expected: <0> but was: <3>``; the
+       ``readAll`` negative control unchanged.
+   * - 6b
+     - 6
+     - Recorded (unit 8): the results table's items accumulate (``addAll``
+       for ``setAll``).
+     - *GUI*, ``ResultsLargeFixtureUiTest``: ``at 0: the results table holds
+       400 items, more than one page of 200``.
+   * - 6c
+     - 6
+     - Recorded (unit 7): the table view-model asks the store for every row,
+       up to its maximum, as one page.
+     - ``ResultTableViewModelTest$Page.paging``: ``... status: The table
+       could not be read: a page holds at most 200 rows, not 950 ==>
+       expected: <1> but was: <0>``; ``pageBound`` green.
+   * - 7a
+     - 7
+     - Recorded (unit 9): the sample standard deviation, *n* - 1.
+     - The real K562 weights: ``lnrSp sd ==> expected: <0.07918894423395786>
+       but was: <0.09698625332145443>``; the checked-in files red.
+   * - 7b
+     - 7
+     - Recorded (unit 4): the mean absolute weight sums signed values.
+     - ``lnrSp mean |w| ==> expected: <0.3363333333333333> but was:
+       <-0.3363333333333334>`` and ``lnrSp rank ==> expected: <1> but was:
+       <21>``.
+   * - 7c
+     - 7
+     - New: equal mean absolute weights no longer share a rank (ties broken
+       by file order).
+     - The real K562 weights: ``Charge1 rank ==> expected: <18> but was:
+       <19>`` (four all-zero features share rank 18); the constructed ties
+       red; the sign consistency green.
+   * - 7d
+     - 7
+     - New: the summary divides by three splits whatever the file holds.
+     - ``lnrSp mean ==> expected: <0.1275> but was: <0.085>`` (two splits),
+       ``feat_a mean ==> expected: <0.3125> but was: <0.4166666666666667>``
+       (four); the real three-split files green.
+   * - 7e
+     - 7
+     - New: a zero weight counted as positive in the sign consistency.
+     - ``deltLCn sign ==> expected: <ALL_ZERO> but was: <ALL_POSITIVE>`` (real
+       K562), ``mixedWithZero`` red.
+   * - 8a
+     - 8
+     - Recorded (unit 6): unknown-q-value rows written into the passing
+       export.
+     - ``constructed/psms-shuffled.tsv at 0, PASSING: the export is not the
+       raw header and selected lines ==> array lengths differ, expected: <255>
+       but was: <857>``; the unknown export green.
+   * - 8b
+     - 8
+     - New: an empty q-value classed as failing rather than unknown (in the
+       one predicate, so store and export alike).
+     - ``the hand count of unknown rows at 0 ==> expected: <8> but was:
+       <7>``; both stores' unknown category: eight spellings expected, seven
+       shown; a known q-value at the cutoff green.
+   * - H
+     - --
+     - The harness itself.
+     - An unchanged file, a missing anchor, a comment-only injection (a real
+       Maven run) and a selection naming a method that does not exist (a real
+       run of zero tests) are each a ``HARNESS ERROR``; a green run graded as
+       red and a red without its diagnostic are each a recorded failure.
+
+What it does not cover: Windows and macOS; the GUI export, weights and K562
+counts tests (``ResultsExportUiTest``, ``ResultsWeightsUiTest``,
+``ResultsCountsUiTest``'s K562 methods) and the real run
+(``RealRunUiTest``) -- each seen red at unit 9's sign-off, left out here to
+save 35-75 s classes in three runs each, so items 4, 5, 7 and 8 are graded on
+the unit tests beneath them; and the budgets' time limits, graded only as far
+as control 6a's child running out of heap. Two findings from building it:
+``ResultTableViewModelTest$Page.paging`` failed control 6c with a bare
+``expected: <1> but was: <0>``, so its page-number assertion now carries the
+table's status (a message only; no expected value changed); and the real K562
+weights *do* have ties -- four all-zero features share rank 18 -- so 7c is red
+on the real files too.
+
+Measured on 2026-10-09: 100 controls passed in 567 s (9 m 27 s) -- the
+baseline 139 s and the final clean run 126 s (each compiles and runs the
+``cometgui-app`` reactor's graded selection), the ``cometgui-results``
+controls 6-10 s each, 8a 26 s (the export gate test over 22 tables), the
+``cometgui-ui`` and ``cometgui-workflow`` controls 12-16 s, the GUI controls
+2, 6b and 3c 26 s, 24 s and 47 s, and control H 11 s. ``--self-test`` and
+``--only`` over ``cometgui-results`` controls need only that module set. The
+floor in ``verify-all-gates.sh`` is 100.
 
 Traps
 =====

@@ -20,8 +20,9 @@ filtering and exporting never launch a process or write under ``outputs/``.
    unit's sign-off. Every measured number below was produced on this
    project's Debian 12, x86-64 host (64 cores, JDK 25); nothing on this page
    has run on Windows or macOS (see `What has run, and where`_). The phase's
-   falsifiability harness (work unit 11, design decision P10-12) did not
-   exist when this page was written. ``specification.rst`` (*Q-value result
+   falsifiability harness (work unit 11, design decision P10-12) is
+   ``scripts/verify-results-gates.sh``; see `Which tests prove the exit
+   gate`_. ``specification.rst`` (*Q-value result
    filters*, *Learned feature weights*, *Result indexing*, ``R-RES-01``..\
    ``04``, ``R-PERC-08``/``09``) is the authority on what is required; where
    the build differs, this page says so.
@@ -764,6 +765,15 @@ generated :doc:`traceability`. Each work unit's sign-off in
 ``handoffs/PHASE-10-worklog.rst`` records the production-code injections that
 turned these tests red.
 
+``bash scripts/verify-results-gates.sh`` (registered in
+``scripts/verify-all-gates.sh`` as ``results``) repeats twenty-two of those
+injections, and new ones, at least one per gate item, in a ``git archive``
+sandbox: each proved to have reached the compiled class and graded on the
+failing assertion's own words in the named test above, with a sibling test
+required to stay green where one can show it. Its controls, their
+diagnostics and what it leaves out are listed in
+:ref:`dev-results-falsifiability`.
+
 What has run, and where
 =======================
 
@@ -822,4 +832,7 @@ Recorded rather than hidden:
   protein-level results (out of scope for release 1); the ``R-PERC-08``
   stdout fallback for a build without a weights file.
 * The phase's falsifiability harness, ``scripts/verify-results-gates.sh``
-  (P10-12, unit 11), was not yet written when this page was.
+  (P10-12, unit 11), grades items 4, 5, 7 and 8 on the unit tests, not on the
+  GUI export and weights tests, and grades the budgets' time limits only as
+  far as the factory's choice of store (see
+  :ref:`dev-results-falsifiability`).
