@@ -1349,11 +1349,14 @@ control_8b() {
             return Visibility.UNKNOWN_Q_VALUE;'
     assert_testcase "the in-memory store's unknown category" failed "${T_MEMORY}" unknownKindsInTheirOwnCategory
     assert_testcase "the disk store's unknown category" failed "${T_DISK}" unknownKindsInTheirOwnCategory
-    # Set.of's order is salted per JVM: eight unknown spellings expected, seven
-    # shown (the empty one gone), matched by count; a spelling may hold a comma
-    # (0,005), never a comma and a space.
-    assert_log_matches "in the stores' own words: eight unknown spellings, seven shown" "${DIRTY_LOG}" \
-        'message: constructed/psms-unknown-q\.tsv at 0 ==> expected: <\[(([^],]|,[^ ])*, ){7}([^],]|,[^ ])*\]> but was: <\[(([^],]|,[^ ])*, ){6}([^],]|,[^ ])*\]>'
+    # Set.of's order is salted per JVM: the spellings are matched by count, and
+    # so is WHICH constructed table the contract reaches first (orchestrator
+    # repair at sign-off: a run reached psms-shuffled.tsv first, whose seven
+    # unknown spellings show as six). Either way exactly one spelling -- the
+    # empty one -- is gone. A spelling may hold a comma (0,005), never a comma
+    # and a space.
+    assert_log_matches "in the stores' own words: every unknown spelling but the empty one shown" "${DIRTY_LOG}" \
+        'message: constructed/(psms-unknown-q\.tsv at 0 ==> expected: <\[(([^],]|,[^ ])*, ){7}([^],]|,[^ ])*\]> but was: <\[(([^],]|,[^ ])*, ){6}([^],]|,[^ ])*\]>|psms-shuffled\.tsv at 0 ==> expected: <\[(([^],]|,[^ ])*, ){6}([^],]|,[^ ])*\]> but was: <\[(([^],]|,[^ ])*, ){5}([^],]|,[^ ])*\]>)'
     assert_testcase "the unknown export" failed "${T_EXPORT_GATE}" theUnknownExportHoldsEveryUnknownKind
     assert_testcase "a known q-value at the cutoff stays green" passed "${T_PREDICATE}" atDefault
     restore_pristine "${PREDICATE}"
