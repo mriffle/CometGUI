@@ -645,7 +645,29 @@ brief's *Build economy* section verbatim.
        version capabilities' gate-9 note, project format); traceability map
        entries for AC-RES-01..04, 08..10.
      - R-DOC; all AC-RES of the phase
-     -
+     - **Signed off 2026-10-09** (``c42113c``). Diff read: 8 files --
+       ``docs/results.rst`` (320 lines), ``docs/learned_feature_weights.rst``,
+       ``docs/developer/results_model.rst`` (821 lines: code map, one of
+       everything, store contract, threshold, index and sort-file layouts,
+       budgets with measured numbers, finalise-results, export, fixtures and
+       how to regenerate them, the exit-gate test table, Linux only, known
+       limits); stale statements corrected in ``percolator.rst``,
+       ``version_capabilities.rst`` (gate-9 export note), ``architecture.rst``
+       (the ``results -> provenance`` edge); traceability: AC-RES-01..04, 08,
+       09 now ``test`` evidence (GUI, view-model, store and unit tests named
+       by class and method), AC-RES-10 keeps Phase 15's planned entry and
+       gains the budget tests (reported partial), AC-RES-05's note corrected.
+       I read the user page and spot-checked the facts against the code. I
+       ran ``scripts/ci/docs-build.sh``: PASSED. My injections: (a) a
+       traceability entry naming ``ResultsFilterzUiTest`` -- the docs build
+       fails, "the traceability report is not complete" (R-DOC-03); (b) an
+       undefined ``:ref:`` in ``results.rst`` -- "undefined label",
+       docs-build FAILED; both restored by ``sha256sum -c``. ``--only docs
+       --only traceability``: **2 passed** (docs, traceability 8). Code vs
+       work log, reported by the agent and correct: the disk index stores
+       length, scan and charge as well (56 bytes a row); unit 8's GUI timings
+       are 3.3 s in the sign-off and 3.4 s in the test's Javadoc.
+       ``docs/developer/testing.rst`` waits for unit 11's harness.
 
    * - 11
      - **The falsifiability harness** (P10-12), registered as ``results``.
