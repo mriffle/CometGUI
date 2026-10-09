@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -152,7 +153,7 @@ class ResultsExportUiTest {
         Path root = scratch.toRealPath();
         ProjectLayout project = ResultRuns.project(root.resolve("project"));
         Path generated = root.resolve("in/generated-decoy-psms.tsv");
-        Files.createDirectories(generated.getParent());
+        Files.createDirectories(root.resolve("in"));
         Files.writeString(generated, generatedTable(), StandardCharsets.UTF_8);
         unknownRun =
                 ResultRuns.run(
@@ -423,7 +424,8 @@ class ResultsExportUiTest {
                         + ".",
                 status);
         assertTrue(
-                file.getFileName().toString().matches("learned-feature-weights_[0-9T.]+Z\\.tsv"),
+                String.valueOf(file.getFileName())
+                        .matches("learned-feature-weights_[0-9T.]+Z\\.tsv"),
                 () -> "the name " + file.getFileName());
         Map<String, Object> json = TestJson.object(Files.readString(sidecar));
         assertAll(
@@ -472,7 +474,7 @@ class ResultsExportUiTest {
         for (Path exported : EXPORTED) {
             assertEquals(
                     "exports",
-                    String.valueOf(exported.getParent().getFileName()),
+                    String.valueOf(Objects.requireNonNull(exported.getParent()).getFileName()),
                     () -> exported + " is under exports/");
             assertTrue(treeAfter.contains(exported.toString()), () -> exported + " exists");
         }
@@ -550,8 +552,7 @@ class ResultsExportUiTest {
                 status,
                 "the status names the file and the row count");
         assertTrue(
-                file.getFileName()
-                        .toString()
+                String.valueOf(file.getFileName())
                         .matches(
                                 table
                                         + "_q"
