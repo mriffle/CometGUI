@@ -509,7 +509,41 @@ brief's *Build economy* section verbatim.
        Results view-model (run choice, export actions) and its ports;
        view-model coverage >= 80%.
      - R-RES-01..04, R-PERC-09
-     -
+     - **Signed off 2026-10-09** (``1a9bd02``, ``68984c2``, ``58da46a``; my
+       repair ``c7ae61e``). Diff read: 40 files in
+       ``ui.viewmodel.results`` -- ``DisplayFiltersViewModel`` (the one
+       filter state; ``PercolatorViewModel`` delegates, its 28 tests
+       unchanged and green; a six-argument constructor takes the shared
+       instance), ``ResultsPort`` (+ ``ResultsRun``, ``OpenedResults``),
+       ``ResultTableViewModel`` (pages of at most 200 rows built on the
+       background executor, stale answers dropped, cells as written, all
+       four counts, category, sort cycle, text filter on Enter, selection
+       as a set of ``RowKey`` with an anchor that follows its page via
+       ``positionOf`` or is shown "selected but hidden", copy as TSV,
+       source-file column mandatory with several spectrum files),
+       ``WeightsViewModel`` (the specified title and description; 4/6
+       decimals; sort on numbers; bias unranked), ``ResultsViewModel``
+       (runs, open/close, saved view state applied and saved on change,
+       exports refused while executing). I ran ``-am install`` then ``-pl
+       cometgui-ui verify``: **652 tests, 0 failures**, "All coverage
+       checks have been met", 0 SpotBugs. My injections, restored by
+       ``sha256sum -c``: (a) the source-file column mandatory only above
+       **two** files -- **stayed green** (tests used one file and three);
+       I added a two-file case (``c7ae61e``), which goes red on it
+       ("expected hideable=false but was hideable=true") and is green on
+       the real code; (b) a table opened on category ALL instead of
+       PASSING -- 16 red, e.g. ``ResultTableScratchFixturesTest.realK562``
+       "expected 0 but was 3897". The agent's seven (every row as one page,
+       no re-query on a filter change, selection by index, a second filter
+       state in the Percolator section, export while executing, a saved
+       state re-saved on apply, a refused filter applied) were each red.
+       Agent's PIT: 592 mutations, 589 killed; new package coverage 99.2%
+       lines, 92.7% branches. I ran ``--only quality --only shell --only
+       percolator``: **3 passed** -- quality 42, shell 30 (353 s),
+       percolator 109 (723 s). Files read outside the module:
+       ``scratch/scientific-path/percolator-3.07.1/`` and
+       ``scratch/phase10/large/psms.tsv`` (fail, not skip); small fixtures
+       copied into ui test resources with SHA-256 pins (``FIXTURES.txt``).
 
    * - 8
      - **Results and weights panes, wiring, and the first GUI gates**: the
@@ -553,6 +587,9 @@ Rejections and rework
 * **Unit 2** -- not sent back; one orchestrator repair (``a3e2992``): the
   contract's paging loops had no exit when a page came back empty before the
   end, so an injected off-by-one hung the suite instead of turning it red.
+* **Unit 7** -- not sent back; one orchestrator repair (``c7ae61e``): no test
+  had exactly two spectrum files, so a "mandatory above two" rule stayed
+  green.
 
 Deferred
 ========
