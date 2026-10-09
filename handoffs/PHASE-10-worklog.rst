@@ -672,7 +672,29 @@ brief's *Build economy* section verbatim.
    * - 11
      - **The falsifiability harness** (P10-12), registered as ``results``.
      - every gate item
-     -
+     - **Signed off 2026-10-09** (``35961b3``, ``2f88c02``; my repair
+       ``aea66af``). Diff read: ``scripts/verify-results-gates.sh`` -- 22
+       controls over items 1-8 (1a-1d, 2, 3a-3c, 4a-4b, 5a-5b, 6a-6c,
+       7a-7e, 8a-8b; recorded and new marked), each injected into production
+       code of a ``git archive`` sandbox, proved to reach the bytecode, graded
+       on the failing testcase's own words with green siblings, plus
+       self-controls H1-H6; registration in ``verify-all-gates.sh``
+       **additive only** (``results``, phase 10, items 1-8, floor 100; no
+       other entry or floor touched); ``testing.rst`` and
+       ``results_model.rst``; a test-only message added to
+       ``ResultTableViewModelTest.paging``. I ran ``verify-all-gates.sh
+       --only results --only docs --only traceability``: docs and
+       traceability passed, **results FAILED on one check** -- control 8b's
+       diagnostic pattern named ``psms-unknown-q.tsv``, but the contract
+       iterates its constructed tables in ``Set.of`` order (salted per JVM)
+       and my run reached ``psms-shuffled.tsv`` first, a correct red the
+       pattern did not accept. Repaired (``aea66af``): either table, each
+       with its own count, still exactly the empty spelling gone. Re-run
+       ``--only results``: **100 controls in 562 s**, 8b matched on the
+       shuffled table. The harness's H controls each reported a HARNESS
+       ERROR or failure as required. Cost: about 9.5 minutes added to the
+       full gate run. Not graded by it (each seen red at unit 9): the
+       export, weights and K562 counts GUI tests and the real run.
 
 Rejections and rework
 =====================
@@ -683,6 +705,10 @@ Rejections and rework
 * **Unit 7** -- not sent back; one orchestrator repair (``c7ae61e``): no test
   had exactly two spectrum files, so a "mandatory above two" rule stayed
   green.
+* **Unit 11** -- not sent back; one orchestrator repair (``aea66af``): control
+  8b's diagnostic was pinned to one constructed table while the contract
+  reaches its tables in ``Set.of`` order, so a correct red failed the
+  control on my run.
 
 Deferred
 ========
