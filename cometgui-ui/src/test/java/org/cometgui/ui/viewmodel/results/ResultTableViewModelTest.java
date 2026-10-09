@@ -221,7 +221,10 @@ class ResultTableViewModelTest {
             for (int page = 1; page <= 5; page++) {
                 sizes.add(table.page().rows().size());
                 texts.add(table.page().text());
-                assertEquals(page, table.page().pageNumber());
+                assertEquals(
+                        page,
+                        table.page().pageNumber(),
+                        "the page shown, with the table's status: " + table.statusProperty().get());
                 table.nextPage();
                 settle();
             }
