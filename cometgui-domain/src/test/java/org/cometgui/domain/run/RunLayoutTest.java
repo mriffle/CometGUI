@@ -19,6 +19,8 @@ package org.cometgui.domain.run;
 import static org.cometgui.domain.testing.TestPaths.absolute;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -127,6 +129,53 @@ class RunLayoutTest {
                         absolute(r + "/logs"),
                         absolute(r + "/provenance")),
                 RUN.directories());
+    }
+
+    @Test
+    @DisplayName(
+            "P10-6: what CometGUI derives is under results/ and exports/, never under outputs/,"
+                    + " and neither is a directory a new run is created with")
+    void derivedFiles() {
+        String r = "data/MyProject/runs/20260828T231500Z-run-0001/";
+        assertAll(
+                () -> assertEquals(absolute(r + "results"), RUN.resultsDirectory()),
+                () -> assertEquals(absolute(r + "results/index"), RUN.resultIndexDirectory()),
+                () -> assertEquals("results/index", RunLayout.resultIndexRelativePath()),
+                () -> assertEquals(absolute(r + "results/view-state.json"), RUN.viewStateFile()),
+                () -> assertEquals("results/view-state.json", RunLayout.viewStateRelativePath()),
+                () -> assertEquals(absolute(r + "exports"), RUN.exportsDirectory()),
+                () -> assertEquals("exports", RunLayout.exportsRelativePath()),
+                () ->
+                        assertEquals(
+                                RUN.root().resolve(RunLayout.resultIndexRelativePath()),
+                                RUN.resultIndexDirectory()),
+                () ->
+                        assertEquals(
+                                RUN.root().resolve(RunLayout.viewStateRelativePath()),
+                                RUN.viewStateFile()),
+                () ->
+                        assertEquals(
+                                RUN.root().resolve(RunLayout.exportsRelativePath()),
+                                RUN.exportsDirectory()));
+        for (Path derived :
+                List.of(
+                        RUN.resultsDirectory(),
+                        RUN.resultIndexDirectory(),
+                        RUN.viewStateFile(),
+                        RUN.exportsDirectory())) {
+            assertTrue(derived.startsWith(RUN.root()), derived::toString);
+            assertFalse(derived.startsWith(RUN.outputsDirectory()), derived::toString);
+            assertFalse(RUN.directories().contains(derived), derived::toString);
+        }
+    }
+
+    @Test
+    @DisplayName("two runs of one project have two result index directories")
+    void indexDirectoryPerRun() {
+        RunLayout other =
+                RunLayout.of(
+                        PROJECT, Instant.parse("2026-08-28T23:15:00.999Z"), new RunId("run-0002"));
+        assertNotEquals(RUN.resultIndexDirectory(), other.resultIndexDirectory());
     }
 
     @ParameterizedTest(name = "[{index}] position {0} -> {1}")

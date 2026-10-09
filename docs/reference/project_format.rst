@@ -13,10 +13,10 @@ inputs, outputs and logs, and parse its records, without reading the Java.
 The provenance record inside each run has its own reference,
 :doc:`provenance_format`.
 
-**This page describes schema version 1** of ``project.json`` and
-``project.lock``, and **schema versions 1 and 2** of ``run.json`` -- version 2
-is a *derived* run's (see `A derived run`_). See
-:ref:`ref-project-format-versions`.
+**This page describes schema version 1** of ``project.json``,
+``project.lock`` and a run's ``results/view-state.json``, and **schema
+versions 1 and 2** of ``run.json`` -- version 2 is a *derived* run's (see
+`A derived run`_). See :ref:`ref-project-format-versions`.
 
 .. contents:: Contents
    :depth: 2
@@ -56,6 +56,10 @@ A project holds mutable user intent and immutable run records
                     provenance.json  the provenance manifest
                     provenance.rst   the provenance report
                     events.log       the provenance event log
+                results/             what CometGUI derives from the results (see below)
+                    index/           the result stores' index files
+                    view-state.json  the run's display-filter values
+                exports/             filtered exports, new files, never overwritten
 
 **Where a project is.** In Phase 08 the application has exactly one project
 per session and no way to choose another: ``projects/default`` under the
@@ -241,6 +245,79 @@ A derived run's ``run.json`` is schema version 2: version 1 plus the
 -- are the source's, copied, because they describe the search whose merged PIN
 it rescored. A derived run cannot itself be rerun: rerun its source instead.
 
+What CometGUI derives: ``results/`` and ``exports/``
+----------------------------------------------------
+
+``outputs/`` holds what the tools wrote and **nothing CometGUI derives**
+(``R-PERC-07``). Everything derived from a run's results has a directory of its
+own (design decision P10-6), and neither directory is made when the run is
+created: each is made by what first writes into it, so a run that never reaches
+its results has neither.
+
+``results/index/`` -- the result stores' index files, written by the
+``finalise-results`` step (:ref:`dev-workflow-engine`) and by the Results
+section when it opens a table. A table above the in-memory row limit is
+indexed on disk, as ``<kind>.index`` and ``<kind>.sort-<column>-<direction>``
+files named by table kind (``target-psms``, ``target-peptides``,
+``decoy-psms``, ``decoy-peptides``); a smaller table is read into memory and
+leaves nothing here. Each run has its own index directory, so two runs' stores
+of one kind never share an index. An index records the size, modification time
+and SHA-256 of the raw table it was built from, and is rebuilt whenever they no
+longer match: it is a derived cache, never provenance, and deleting the
+directory loses nothing.
+
+``results/view-state.json`` -- the run's **view state**: the PSM and peptide
+display q-value filters its results were last shown with (``R-RES-01``:
+"filter values are stored in project/run view state"). It is not part of the
+run's record: it is never in ``run.json`` or provenance, it may change at any
+time, and changing it reruns nothing. It is written whole, by the one JSON
+writer through the one atomic writer, touching nothing else in the run::
+
+    {
+      "schemaVersion": 1,
+      "psmQValueFilter": "0.01",
+      "peptideQValueFilter": "0.01"
+    }
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 76
+
+   * - Member
+     - Meaning
+
+   * - ``schemaVersion``
+     - ``1``, the first member. The same policy as ``run.json``'s applies
+       (:ref:`ref-project-format-versions`).
+   * - ``psmQValueFilter``
+     - The PSM display filter's cutoff, as a string holding the decimal
+       exactly as it was set (``"0.050"`` stays ``"0.050"``): no binary
+       floating point between the screen and the file. It must be a decimal
+       number within ``[0, 1]``, both ends included, read by the PSM filter's
+       own parser -- the one range rule.
+   * - ``peptideQValueFilter``
+     - The peptide display filter's cutoff, the same way.
+
+The document ends with one newline; no other member is accepted. **What each
+state of the file means:**
+
+* **No file** -- nothing was saved; the filters are the defaults, 0.01 and
+  0.01.
+* **A version-1 file** -- its filters.
+* **A file CometGUI cannot read** -- not UTF-8, not JSON, a missing or unknown
+  member, a cutoff outside ``[0, 1]``, or another schema version: the run still
+  opens, with the default filters, and the refusal (naming the file and the
+  member, quoting no value) is given beside them for the interface to show.
+  **The file is never rewritten**: reading changes nothing, and saving filters
+  for that run is refused with the same message, so a view state written by a
+  newer CometGUI is never overwritten by an older one and a damaged file stays
+  for someone to look at. Removing the file is how filters are saved for that
+  run again.
+
+``exports/`` -- filtered exports of the run's tables and learned weights
+(``R-PERC-07``: "derived filtered exports shall be new files under a distinct
+directory"). Each export is a new file; none is ever overwritten.
+
 The index cache
 ---------------
 
@@ -293,10 +370,14 @@ create entries today. The engine side is described in
 Schema versions
 ===============
 
-``project.json``, ``run.json`` and ``project.lock`` each begin with a
-``schemaVersion`` member. ``project.json`` and ``project.lock`` declare ``1``;
+``project.json``, ``run.json``, ``project.lock`` and
+``results/view-state.json`` each begin with a ``schemaVersion`` member.
+``project.json``, ``project.lock`` and ``view-state.json`` declare ``1``;
 ``run.json`` declares ``1``, or ``2`` for a derived run. The policy for any
-other version (``R-RUN-04``) is the same for all three:
+other version (``R-RUN-04``) is the same for all four -- with one difference
+in what a refusal means for ``view-state.json``, which is not part of the
+run's record: the run opens with the default filters and the refusal is shown
+beside them (`What CometGUI derives: results/ and exports/`_):
 
 .. list-table::
    :header-rows: 1
@@ -343,7 +424,7 @@ there, is refused like any other malformed document.
 Conventions a reader may rely on
 ================================
 
-All three documents are written by the same JSON writer as the provenance
+All four documents are written by the same JSON writer as the provenance
 manifest and follow its byte-level conventions
 (:ref:`ref-provenance-format`): UTF-8, ``\n`` line endings, two-space
 indentation, one member per line, ``": "`` between a name and its value, one
@@ -869,7 +950,10 @@ The models are pure and live in ``org.cometgui.domain.project``
 ``RunAttempt``).
 Reading and writing them is ``org.cometgui.workflow.storage``
 (``ProjectJson``, ``RunJson``, ``ProjectStore``, ``RunStore``,
-``ProjectLock``). The index cache is ``org.cometgui.workflow.steps``
+``ProjectLock``), and so is the view state (``ViewStateJson``,
+``ViewStateStore``, ``ViewStateReading``; tested against hand-typed documents
+by ``ViewStateStoreTest``). The ``results/`` and ``exports/`` paths are
+``RunLayout``'s. The index cache is ``org.cometgui.workflow.steps``
 (``IndexCacheKey``, ``IndexCacheEntry``), and so are the Percolator files
 (``PercolatorSettingsFile``, ``PercolatorDeclarations``), and so is the derived
 run (``PercolatorRerun``, ``DerivedRun``, ``RerunSource``). The tests that hold the writers to

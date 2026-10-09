@@ -75,6 +75,23 @@ final class RunEvidence {
         return last;
     }
 
+    /**
+     * The sequence number of a step's last event of one type -- where it stands in the order the
+     * log recorded.
+     */
+    static long sequenceOf(RunLayout layout, ProvenanceEventType type, EngineStep step)
+            throws IOException {
+        long found = -1;
+        for (ProvenanceEvent event : events(layout)) {
+            if (event.type() == type
+                    && step.id().equals(event.payload().get(ProvenanceEvent.STAGE_KEY))) {
+                found = event.sequence();
+            }
+        }
+        assertTrue(found > 0, "no " + type + " event for " + step.id());
+        return found;
+    }
+
     /** The run's {@code provenance.json}, read back by the project's reader. */
     static ProvenanceManifest manifest(RunLayout layout) throws IOException {
         return ManifestReader.readFrom(layout.provenanceJsonFile());

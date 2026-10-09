@@ -31,6 +31,12 @@ the authority on what is required; where the build differs, this page says so.
    :doc:`version_capabilities`. ``finalise-results`` and every later step
    remain unimplemented (Phases 10 to 12).
 
+   **Amended in Phase 10** (2026-10-09, work unit 5): ``finalise-results`` is
+   implemented and planned whenever Percolator is, in a search and in a derived
+   run, so ``finalise-provenance`` is ordered after every Percolator step again
+   (`The results step: finalise-results`_). Every later step remains
+   unimplemented (Phases 11 and 12).
+
 The on-disk formats this page refers to have their own references:
 :doc:`../reference/project_format` (the project, ``run.json``, the lock and the
 index cache) and :doc:`../reference/provenance_format` (``provenance.json`` and
@@ -68,12 +74,14 @@ Where the code is
      - The Comet run: ``CometWorkflow`` (check, prepare, start, preview),
        ``PreRunChecks``, the preparation and search step actions,
        ``RunDeclarations``, ``RunInputs``, ``IndexCacheKey`` and
-       ``IndexCacheEntry``; the Percolator steps; and the derived run
+       ``IndexCacheEntry``; the Percolator steps; the results step
+       (``ResultSteps``, Phase 10); and the derived run
        (``PercolatorRerun``, ``DerivedRun``; see
        `Derived runs: the compatible-version Percolator rerun`_).
 
    * - ``org.cometgui.workflow.storage`` (``cometgui-workflow``)
-     - ``project.json``, ``run.json`` and ``project.lock``; see
+     - ``project.json``, ``run.json`` and ``project.lock``, and a run's view
+       state ``results/view-state.json`` (``ViewStateStore``, Phase 10); see
        :doc:`../reference/project_format`.
 
    * - ``org.cometgui.tools.comet`` (``cometgui-tools``)
@@ -306,12 +314,20 @@ and a step outside the plan is reported as not planned. A planned step with no
 action is refused by name when the run starts.
 
 Since Phase 09, ``CometWorkflow.planFor(mode, percolator)`` with
-``percolator`` set also wants ``parse-percolator``, which pulls in
-``run-percolator`` and through it ``merge-pin`` and ``resolve-percolator``.
-``finalise-results`` (Phase 10) is still not wanted, and its edge into
-``finalise-provenance`` is an *if planned* one, so it is not pulled in. A
-request's Percolator half is ``SearchRequest.withPercolator``; a request
-without one plans exactly the Phase 08 steps above.
+``percolator`` set also plans the Percolator steps. Since Phase 10 (design
+decision P10-6) it wants ``finalise-results``, which pulls in
+``parse-percolator``, ``run-percolator`` and through it ``merge-pin`` and
+``resolve-percolator``; the *if planned* edge ``finalise-results`` ->
+``finalise-provenance`` then orders core provenance after the results::
+
+    validate-configuration, resolve-comet, resolve-percolator,
+    serialise-comet-params, hash-inputs, [build-comet-index,] run-comet,
+    validate-comet-outputs, merge-pin, run-percolator, parse-percolator,
+    finalise-results, finalise-provenance
+
+A request's Percolator half is ``SearchRequest.withPercolator``; a request
+without one plans exactly the Phase 08 steps above, with no
+``finalise-results``.
 
 Fingerprints and the rerun preview
 ==================================
@@ -596,13 +612,14 @@ new run, because a different Percolator is a different configuration
 launcher:
 
 * **The plan.** ``PercolatorRerun.planFor(mode)`` is ``Plan.covering(wanted,
-  provided)``: it wants ``parse-percolator`` and ``finalise-provenance``, and
+  provided)``: it wants ``finalise-results`` and ``finalise-provenance``, and
   the Comet result steps of the source's search (``serialise-comet-params``,
   [``build-comet-index``,] ``run-comet``, ``validate-comet-outputs``,
   ``merge-pin``) are *provided*: the closure stops at them, so the plan is
   ``validate-configuration``, ``resolve-percolator``, ``run-percolator``,
-  ``parse-percolator``, ``finalise-provenance``. A provided step is never
-  planned, gets no state and has no action, so no Comet can be launched.
+  ``parse-percolator``, ``finalise-results``, ``finalise-provenance``. A
+  provided step is never planned, gets no state and has no action, so no Comet
+  can be launched.
 * **The check, before anything is created** (``preview`` and ``prepare``
   alike). The source is read, never written: its ``run.json`` (it must have
   ended; a derived run cannot be rerun again), its ``provenance.json``, the one
@@ -636,10 +653,9 @@ launcher:
   prepared) and ``reusedFromSource()``, the provided steps, shown as "not
   executed -- its result is reused from run ...".
 
-``finalise-provenance`` in a derived run re-hashes the two copies once more; like
-a search's (Phase 09 unit 5's residue), it is ordered only by planned steps it
-reads from, so it runs alongside Percolator until Phase 10 plans
-``finalise-results``. ``RealPercolatorRerunTest`` proves the scientist's case
+``finalise-provenance`` in a derived run re-hashes the two copies once more,
+after ``finalise-results`` (its other upstream step, ``merge-pin``, is
+provided). ``RealPercolatorRerunTest`` proves the scientist's case
 on real binaries: Comet 2026.03.0 and Percolator 3.09 with Limelight disabled,
 then the rerun with 3.07.1 and Limelight -- Comet launched zero times, a second
 execution record with another version, checksum and argument array (``-X`` and
@@ -899,12 +915,60 @@ passed is :doc:`version_capabilities`.
   ``PoutDocument`` when it was written, and records the counts as details of
   its ``stage.finished`` event.
 
-Known limits, recorded rather than hidden: ``finalise-provenance`` is ordered
-only after the planned steps it reads from, so until Phase 10 plans
-``finalise-results`` it can run alongside the Percolator steps (harmless today:
-``provenance.json`` is written when the attempt ends; pinned by a test); and
-``run.json`` does not record the Percolator half, so -- as for Comet -- a run
-with Percolator cannot be retried across an application restart.
+Known limit, recorded rather than hidden: ``run.json`` does not record the
+Percolator half, so -- as for Comet -- a run with Percolator cannot be retried
+across an application restart. (Phase 09 also recorded that
+``finalise-provenance`` could run alongside the Percolator steps, because
+nothing planned ordered it after them; Phase 10 planned ``finalise-results``,
+and that limit is gone.)
+
+The results step: ``finalise-results``
+--------------------------------------
+
+Phase 10 (design decision P10-6) implements step 12, "Finalise core result
+indexes and summaries", in ``ResultSteps.FinaliseResults``
+(``org.cometgui.workflow.steps``), over the same ``PercolatorRun`` as the
+Percolator steps, so a search and a derived run execute the same code. It is
+planned whenever Percolator is, after ``parse-percolator`` and before
+``finalise-provenance``.
+
+* It opens every result table the run's command produced -- target and decoy
+  PSMs and peptides, as present -- through the one store factory,
+  ``ResultStores.open``, with the run's own index directory
+  ``results/index/`` (:doc:`../reference/project_format`) and the engine's one
+  hasher. A table above the in-memory row limit
+  (``ResultStores.IN_MEMORY_ROW_LIMIT``) has its disk index built and checked
+  now, so the Results section opens it quickly later; a table at or below it
+  is read in memory and nothing is written. A decoy table the command did not
+  ask for is simply not there to open.
+* It records, as details of its ``stage.finished`` event, the cutoffs it
+  counted at (``filters.psm``, ``filters.peptide``: the defaults, ``0.01``)
+  and per table -- keyed by the table's provenance role, for example
+  ``tables.percolator-psms.`` -- ``rows``, ``store`` (``memory`` or
+  ``disk``), ``total``, ``passing``, ``failing`` and ``unknown-q``; and, when
+  the weights were written, ``weights.splits`` and ``weights.features``
+  through ``WeightsSummary``.
+* It declares the tables and the weights as its inputs (not the pout XML,
+  which no store reads). The index files are derived and rebuilt whenever they
+  do not match their table, so they are not declared outputs and are not in
+  provenance.
+* It only reads the raw outputs: nothing is written under ``outputs/``
+  (``R-PERC-07``), and every raw output is byte-identical across it. A table
+  the reader refuses fails the step naming the file and its role, and core
+  provenance is then not finalised after it.
+
+``FinaliseResultsTest`` proves the counts on a hand-typed table (rows at 0,
+0.005, 0.01, 0.0100001, 0.5 and 1, and four unknown q-values), the disk index
+under ``results/index/`` with the row limit lowered, the raw outputs'
+SHA-256 equal before and after, the order in the event log, and the refusal.
+``RealPercolatorRunTest`` and ``RealPercolatorRerunTest`` check the recorded
+counts of every real table against an independent count (``split`` and
+``BigDecimal``, no ``org.cometgui.results`` class), the event order and the
+raw outputs' SHA-256 before and after the step. Measured: the real search
+here (the two K562 files against the proteome's first 1000 records) leaves no
+row of any table at or below 0.01 -- its smallest PSM q-value is 0.018648 --
+so the real counts at the default filters are all ``passing = 0``; the
+hand-typed table is what distinguishes 0.01 from a smaller cutoff.
 
 In the application
 ==================
@@ -1021,9 +1085,11 @@ tests beside them, is in :doc:`version_capabilities`:
      - ``RealPercolatorRunTest.gate7TheSeedOfEveryRun``,
        ``gate5TheRealZeroDecoyPin``
    * - 9
-     - Raw outputs read-only and byte-identical through parsing and
-       provenance finalisation
-     - ``RealPercolatorRunTest.gate9RawOutputsAreUnchangedAndReadOnly``
+     - Raw outputs read-only and byte-identical through parsing,
+       ``finalise-results`` (Phase 10) and provenance finalisation
+     - ``RealPercolatorRunTest.gate9RawOutputsAreUnchangedAndReadOnly``,
+       ``finaliseResultsInEveryRealRun``;
+       ``RealPercolatorRerunTest.finaliseResultsInTheRerun``
 
 What has never run
 ==================

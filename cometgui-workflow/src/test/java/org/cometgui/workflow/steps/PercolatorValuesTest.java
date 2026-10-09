@@ -285,24 +285,41 @@ class PercolatorValuesTest {
                                 null));
     }
 
+    /**
+     * The plan with Percolator. Phase 09 pinned it without {@code finalise-results}, which nothing
+     * planned required then, so {@code finalise-provenance} was ordered only after {@code
+     * merge-pin} and could run alongside the Percolator steps. Phase 10 (design decision P10-6)
+     * plans {@code finalise-results} whenever Percolator is planned, and the declared if-planned
+     * edge {@code finalise-results -> finalise-provenance} restores the specification's order: core
+     * provenance is finalised after the results, and so after every Percolator step.
+     */
     @Test
     @DisplayName(
-            "the plan with Percolator: the three Percolator steps after merge-pin, and not"
-                    + " finalise-results (Phase 10), which nothing planned requires")
+            "the plan with Percolator: the three Percolator steps after merge-pin, then"
+                    + " finalise-results, and finalise-provenance ordered after it (P10-6)")
     void plans() {
         assertEquals(
                 "Plan[validate-configuration, resolve-comet, resolve-percolator,"
                         + " serialise-comet-params, hash-inputs, run-comet, validate-comet-outputs,"
-                        + " merge-pin, run-percolator, parse-percolator, finalise-provenance]",
+                        + " merge-pin, run-percolator, parse-percolator, finalise-results,"
+                        + " finalise-provenance]",
                 CometWorkflow.planFor(IndexMode.NONE, true).toString());
         assertEquals(
                 "Plan[validate-configuration, resolve-comet, resolve-percolator,"
                         + " serialise-comet-params, hash-inputs, build-comet-index, run-comet,"
                         + " validate-comet-outputs, merge-pin, run-percolator, parse-percolator,"
-                        + " finalise-provenance]",
+                        + " finalise-results, finalise-provenance]",
                 CometWorkflow.planFor(IndexMode.FRAGMENT_ION, true).toString());
+        assertEquals(
+                List.of(EngineStep.MERGE_PIN, EngineStep.FINALISE_RESULTS),
+                CometWorkflow.planFor(IndexMode.NONE, true)
+                        .upstreamOf(EngineStep.FINALISE_PROVENANCE));
+        assertEquals(
+                List.of(EngineStep.MERGE_PIN),
+                CometWorkflow.planFor(IndexMode.NONE, false)
+                        .upstreamOf(EngineStep.FINALISE_PROVENANCE));
         assertFalse(
-                CometWorkflow.planFor(IndexMode.NONE, true).contains(EngineStep.FINALISE_RESULTS));
+                CometWorkflow.planFor(IndexMode.NONE, false).contains(EngineStep.FINALISE_RESULTS));
         assertEquals(
                 CometWorkflow.planFor(IndexMode.NONE).steps(),
                 CometWorkflow.planFor(IndexMode.NONE, false).steps());
@@ -556,8 +573,8 @@ class PercolatorValuesTest {
                 "a run plans run-percolator exactly when it has a Percolator half; plan"
                         + " Plan[validate-configuration, resolve-comet, resolve-percolator,"
                         + " serialise-comet-params, hash-inputs, run-comet, validate-comet-outputs,"
-                        + " merge-pin, run-percolator, parse-percolator, finalise-provenance],"
-                        + " Percolator absent",
+                        + " merge-pin, run-percolator, parse-percolator, finalise-results,"
+                        + " finalise-provenance], Percolator absent",
                 refused.getMessage());
     }
 

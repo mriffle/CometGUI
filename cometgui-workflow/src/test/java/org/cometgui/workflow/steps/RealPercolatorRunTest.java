@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +40,7 @@ import java.util.TreeSet;
 import java.util.stream.Stream;
 import org.cometgui.domain.run.AttemptOutcome;
 import org.cometgui.domain.run.IndexMode;
+import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
@@ -47,6 +49,7 @@ import org.cometgui.params.comet.writer.CanonicalParamsWriter;
 import org.cometgui.params.percolator.PercolatorSettings;
 import org.cometgui.params.percolator.resolution.DownstreamStage;
 import org.cometgui.params.percolator.resolution.PercolatorResolver;
+import org.cometgui.provenance.events.ProvenanceEventType;
 import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.provenance.manifest.FileDirection;
 import org.cometgui.provenance.manifest.FileRecord;
@@ -130,12 +133,17 @@ class RealPercolatorRunTest {
 
     private static Ran chosen3071WithoutLimelight;
 
-    /** One run, and the raw outputs' SHA-256 just before and just after parsing. */
+    /**
+     * One run, and the raw outputs' SHA-256 just before and just after parsing, and just before and
+     * just after {@code finalise-results}.
+     */
     private record Ran(
             PreparedRun prepared,
             RunResult result,
             Map<String, String> beforeParse,
-            Map<String, String> afterParse) {
+            Map<String, String> afterParse,
+            Map<String, String> beforeFinalise,
+            Map<String, String> afterFinalise) {
 
         Path out() {
             return prepared.percolatorOutputDirectory().orElseThrow();
@@ -267,8 +275,17 @@ class RealPercolatorRunTest {
         actions.put(
                 EngineStep.PARSE_PERCOLATOR,
                 new HashingAround(actions.get(EngineStep.PARSE_PERCOLATOR), files, before, after));
+        Map<String, String> beforeFinalise = new TreeMap<>();
+        Map<String, String> afterFinalise = new TreeMap<>();
+        actions.put(
+                EngineStep.FINALISE_RESULTS,
+                new RawHashingStep(
+                        actions.get(EngineStep.FINALISE_RESULTS),
+                        out,
+                        beforeFinalise,
+                        afterFinalise));
         RunResult result = start(prepared, actions);
-        return new Ran(prepared, result, before, after);
+        return new Ran(prepared, result, before, after, beforeFinalise, afterFinalise);
     }
 
     private static RunResult start(PreparedRun prepared, Map<EngineStep, StepAction> actions)
@@ -395,6 +412,7 @@ class RealPercolatorRunTest {
                         EngineStep.MERGE_PIN,
                         EngineStep.RUN_PERCOLATOR,
                         EngineStep.PARSE_PERCOLATOR,
+                        EngineStep.FINALISE_RESULTS,
                         EngineStep.FINALISE_PROVENANCE)) {
             succeeded.put(step, StepState.SUCCEEDED);
         }
@@ -697,10 +715,106 @@ class RealPercolatorRunTest {
         }
     }
 
+    /**
+     * {@code finalise-results} in the four real runs. Measured on 2026-10-09: this search -- the
+     * two K562 files against only the proteome's first 1000 records -- leaves no row of any table
+     * at or below 0.01 (the smallest q-value of the target PSMs is 0.018648, of the target peptides
+     * 0.0274), so at the default filters every real table counts 0 passing and every row failing.
+     * The comparison with the independent count still catches swapped categories and a cutoff of
+     * 0.0187 or above, but it cannot tell 0.01 from a smaller cutoff; {@code FinaliseResultsTest}'s
+     * hand-typed table, with rows at 0, 0.005, 0.01 and 0.0100001, is what does.
+     */
     @Test
     @DisplayName(
-            "gate 9: every raw output's SHA-256 is equal before parsing, after parsing, after"
-                    + " provenance finalisation and in provenance; each is read-only after success")
+            "P10-6: finalise-results SUCCEEDED in every real run, ordered after parse-percolator"
+                    + " and before finalise-provenance in the event log; its counts at 0.01"
+                    + " equal an independent split + BigDecimal count of each raw table; the"
+                    + " weights' split and feature counts; every raw output byte-identical across"
+                    + " it; nothing under outputs/ but Percolator's own files")
+    void finaliseResultsInEveryRealRun() throws IOException {
+        BigDecimal cutoff = new BigDecimal("0.01");
+        for (Ran ran :
+                List.of(
+                        withLimelight3071,
+                        withoutLimelight309,
+                        chosen309WithLimelight,
+                        chosen3071WithoutLimelight)) {
+            RunLayout layout = ran.prepared().layout();
+            assertEquals(
+                    StepState.SUCCEEDED, ran.result().states().get(EngineStep.FINALISE_RESULTS));
+            long parsed =
+                    RunEvidence.sequenceOf(
+                            layout,
+                            ProvenanceEventType.STAGE_FINISHED,
+                            EngineStep.PARSE_PERCOLATOR);
+            long started =
+                    RunEvidence.sequenceOf(
+                            layout, ProvenanceEventType.STAGE_STARTED, EngineStep.FINALISE_RESULTS);
+            long finished =
+                    RunEvidence.sequenceOf(
+                            layout,
+                            ProvenanceEventType.STAGE_FINISHED,
+                            EngineStep.FINALISE_RESULTS);
+            long provenance =
+                    RunEvidence.sequenceOf(
+                            layout,
+                            ProvenanceEventType.STAGE_STARTED,
+                            EngineStep.FINALISE_PROVENANCE);
+            assertTrue(parsed < started, () -> parsed + " then " + started);
+            assertTrue(finished < provenance, () -> finished + " then " + provenance);
+
+            Map<String, String> details = RunEvidence.finished(layout, EngineStep.FINALISE_RESULTS);
+            RunEvidence.assertDetail(details, "filters.psm", "0.01");
+            RunEvidence.assertDetail(details, "filters.peptide", "0.01");
+            Map<String, String> tables = new TreeMap<>();
+            tables.put("percolator-psms", "psms.tsv");
+            tables.put("percolator-peptides", "peptides.tsv");
+            tables.put("percolator-decoy-psms", "decoy-psms.tsv");
+            tables.put("percolator-decoy-peptides", "decoy-peptides.tsv");
+            for (Map.Entry<String, String> table : tables.entrySet()) {
+                IndependentTableCount expected =
+                        IndependentTableCount.at(ran.out().resolve(table.getValue()), cutoff);
+                String prefix = "tables." + table.getKey() + ".";
+                RunEvidence.assertDetail(details, prefix + "rows", Long.toString(expected.total()));
+                RunEvidence.assertDetail(
+                        details, prefix + "total", Long.toString(expected.total()));
+                RunEvidence.assertDetail(
+                        details, prefix + "passing", Long.toString(expected.passing()));
+                RunEvidence.assertDetail(
+                        details, prefix + "failing", Long.toString(expected.failing()));
+                RunEvidence.assertDetail(
+                        details, prefix + "unknown-q", Long.toString(expected.unknown()));
+                RunEvidence.assertDetail(details, prefix + "store", "memory");
+            }
+            RunEvidence.assertDetail(details, "weights.splits", "3");
+            RunEvidence.assertDetail(details, "weights.features", "22");
+            assertFalse(
+                    Files.exists(layout.resultsDirectory()),
+                    "every real table is below the in-memory row limit, so nothing is indexed");
+            assertEquals(
+                    List.of("comet", "percolator"), RunEvidence.listing(layout.outputsDirectory()));
+
+            assertEquals(RunEvidence.listing(ran.out()).size(), ran.beforeFinalise().size());
+            assertEquals(
+                    ran.beforeFinalise(), ran.afterFinalise(), "finalise-results changed a byte");
+            assertEquals(independentHashes(ran.out()), ran.afterFinalise());
+        }
+        IndependentTableCount psms =
+                IndependentTableCount.at(withLimelight3071.out().resolve("psms.tsv"), cutoff);
+        System.out.printf(
+                Locale.ROOT,
+                "RealPercolatorRunTest finalise-results 3.07.1 target PSMs at 0.01: %s;"
+                        + " details %s%n",
+                psms,
+                RunEvidence.finished(
+                        withLimelight3071.prepared().layout(), EngineStep.FINALISE_RESULTS));
+    }
+
+    @Test
+    @DisplayName(
+            "gate 9: every raw output's SHA-256 is equal before parsing, after parsing, before and"
+                    + " after finalise-results, after provenance finalisation and in provenance;"
+                    + " each is read-only after success")
     void gate9RawOutputsAreUnchangedAndReadOnly() throws IOException {
         for (Ran ran :
                 List.of(
@@ -712,6 +826,12 @@ class RealPercolatorRunTest {
             Map<String, String> now = independentHashes(out);
             assertEquals(RunEvidence.listing(out).size(), ran.beforeParse().size());
             assertEquals(ran.beforeParse(), ran.afterParse(), "parsing changed a byte");
+            assertEquals(
+                    ran.beforeParse(),
+                    ran.beforeFinalise(),
+                    "something between parsing and finalise-results changed a byte");
+            assertEquals(
+                    ran.beforeFinalise(), ran.afterFinalise(), "finalise-results changed a byte");
             assertEquals(ran.beforeParse(), now, "finalisation changed a byte");
             assertEquals(now, outputHashes(ran.manifest(), out), "provenance records the bytes");
             for (String name : RunEvidence.listing(out)) {
@@ -725,10 +845,19 @@ class RealPercolatorRunTest {
         }
     }
 
+    /**
+     * The rerun preview after a real run. Phase 09 pinned {@code finalise-provenance} as reused
+     * after a Percolator change -- harmless then, because {@code finalise-results} was not planned
+     * and no planned edge carried the change into core provenance. Phase 10 (design decision P10-6)
+     * plans {@code finalise-results} whenever Percolator is planned, so a Percolator change
+     * re-executes it and, through the declared edge {@code finalise-results ->
+     * finalise-provenance}, core provenance after it: the specification's order, restored.
+     */
     @Test
     @DisplayName(
             "the rerun preview after the real 3.07.1 run: nothing for the same configuration;"
-                    + " Percolator alone (Comet reused) for a changed seed or another build")
+                    + " Percolator, the results and core provenance (Comet reused) for a changed"
+                    + " seed or another build")
     void rerunPreviewAfterARealPercolatorRun() throws IOException {
         Set<DownstreamStage> limelight = EnumSet.of(DownstreamStage.LIMELIGHT_CONVERSION);
         PercolatorChoice same = choice(offer3071, limelight);
@@ -747,6 +876,7 @@ class RealPercolatorRunTest {
                         EngineStep.MERGE_PIN,
                         EngineStep.RUN_PERCOLATOR,
                         EngineStep.PARSE_PERCOLATOR,
+                        EngineStep.FINALISE_RESULTS,
                         EngineStep.FINALISE_PROVENANCE),
                 nothing.preview().reused());
 
@@ -764,21 +894,26 @@ class RealPercolatorRunTest {
                                     withLimelight3071.prepared(),
                                     search(RealComet.NEWER, fasta, comet).withPercolator(changed))
                             .preview();
+            // The order Phase 10 restored (P10-6): finalise-results is planned with Percolator, and
+            // the if-planned edge finalise-results -> finalise-provenance carries a Percolator
+            // change into core provenance. Phase 09 pinned finalise-provenance as reused here,
+            // because without finalise-results no planned edge reached it.
             assertEquals(
-                    Set.of(EngineStep.RUN_PERCOLATOR, EngineStep.PARSE_PERCOLATOR),
+                    Set.of(
+                            EngineStep.RUN_PERCOLATOR,
+                            EngineStep.PARSE_PERCOLATOR,
+                            EngineStep.FINALISE_RESULTS,
+                            EngineStep.FINALISE_PROVENANCE),
                     preview.reExecuted());
             assertEquals(
                     Set.of(EngineStep.VALIDATE_CONFIGURATION, EngineStep.RESOLVE_PERCOLATOR),
                     preview.prepared());
-            // finalise-provenance is reused: without Phase 10's finalise-results in the plan, no
-            // planned edge carries a Percolator change into it.
             assertEquals(
                     Set.of(
                             EngineStep.SERIALISE_COMET_PARAMS,
                             EngineStep.RUN_COMET,
                             EngineStep.VALIDATE_COMET_OUTPUTS,
-                            EngineStep.MERGE_PIN,
-                            EngineStep.FINALISE_PROVENANCE),
+                            EngineStep.MERGE_PIN),
                     preview.reused());
         }
         assertEquals(launches, project.runner().launches().size(), "a preview launches nothing");

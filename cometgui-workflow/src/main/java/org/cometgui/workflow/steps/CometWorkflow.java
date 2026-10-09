@@ -90,9 +90,9 @@ import org.cometgui.workflow.storage.RunStore;
  *       validate-configuration}, {@code resolve-comet}, {@code serialise-comet-params}, {@code
  *       hash-inputs}, [{@code build-comet-index}], {@code run-comet}, {@code
  *       validate-comet-outputs}, {@code merge-pin} and {@code finalise-provenance} ({@link
- *       #planFor}), with Percolator also {@code resolve-percolator}, {@code run-percolator} and
- *       {@code parse-percolator}; a retry is simply another {@link #start} of the same {@link
- *       PreparedRun}.
+ *       #planFor}), with Percolator also {@code resolve-percolator}, {@code run-percolator}, {@code
+ *       parse-percolator} and {@code finalise-results}; a retry is simply another {@link #start} of
+ *       the same {@link PreparedRun}.
  *   <li>{@link #preview} -- the rerun preview of a changed configuration against a recorded run
  *       ({@code R-RUN-01}), with every result it would reuse re-hashed.
  * </ol>
@@ -164,15 +164,17 @@ public final class CometWorkflow {
     /**
      * The steps a run executes, with or without Percolator.
      *
-     * <p>With Percolator the plan also wants {@code parse-percolator}, which requires {@code
-     * run-percolator}, which requires {@code merge-pin} and {@code resolve-percolator}. {@code
-     * finalise-results} (Phase 10) is not wanted and nothing planned requires it; its edge into
-     * {@code finalise-provenance} is an if-planned one, so the plan does not pull it in.
+     * <p>With Percolator the plan also wants {@code finalise-results}, which requires {@code
+     * parse-percolator}, which requires {@code run-percolator}, which requires {@code merge-pin}
+     * and {@code resolve-percolator}. The if-planned edge {@code finalise-results ->
+     * finalise-provenance} then orders core provenance after the results, so it is finalised after
+     * every Percolator step (design decision P10-6).
      *
      * @param mode the index mode
      * @param percolator whether the run rescores the merged PIN with Percolator
      * @return everything up to {@code finalise-provenance}, with {@code build-comet-index} when an
-     *     index mode is set and the three Percolator steps when {@code percolator} is set
+     *     index mode is set, and the three Percolator steps and {@code finalise-results} when
+     *     {@code percolator} is set
      */
     public static Plan planFor(IndexMode mode, boolean percolator) {
         Objects.requireNonNull(mode, "mode");
@@ -181,7 +183,7 @@ public final class CometWorkflow {
             wanted.add(EngineStep.BUILD_COMET_INDEX);
         }
         if (percolator) {
-            wanted.add(EngineStep.PARSE_PERCOLATOR);
+            wanted.add(EngineStep.FINALISE_RESULTS);
         }
         return Plan.covering(wanted);
     }

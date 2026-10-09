@@ -40,6 +40,9 @@ import org.cometgui.domain.project.ProjectLayout;
  *       provenance/provenance.json
  *       provenance/provenance.rst
  *       provenance/events.log
+ *       results/index/                 (finalise-results; never under outputs/)
+ *       results/view-state.json
+ *       exports/
  * </pre>
  *
  * <p>Pure: no method touches the disk. {@code org.cometgui.workflow.storage.RunStore} creates the
@@ -58,6 +61,17 @@ import org.cometgui.domain.project.ProjectLayout;
  * to its spectrum file and base name. P8-3 escalates this as a proposed specification amendment. A
  * retried invocation's log is {@code comet-<nn>.1.log}, {@code .2.log} ..., because the process
  * service never overwrites a log.
+ *
+ * <h2>What CometGUI derives is never under {@code outputs/}</h2>
+ *
+ * <p>{@code outputs/} holds what the tools wrote and nothing else ({@code R-PERC-07}). Everything
+ * CometGUI derives from those files has a directory of its own (design decision P10-6): {@link
+ * #resultsDirectory() results/} holds the result stores' index files, in {@link
+ * #resultIndexDirectory() results/index/} -- one directory per run, so two runs' stores of one
+ * table kind never share an index -- and the run's display-filter {@link #viewStateFile() view
+ * state}; {@link #exportsDirectory() exports/} holds filtered exports. Neither is in {@link
+ * #directories()}: each is made by the step or action that first writes into it, so a run that
+ * never reaches the results has neither.
  *
  * <h2>The event log's name is pinned here</h2>
  *
@@ -107,6 +121,18 @@ public record RunLayout(Path root) {
 
     /** The provenance event log's name; see the class documentation. */
     public static final String EVENT_LOG_FILE_NAME = "events.log";
+
+    /** The directory of the files CometGUI derives from a run's results; never under outputs/. */
+    public static final String RESULTS_DIRECTORY_NAME = "results";
+
+    /** The subdirectory of {@code results/} holding the result stores' index files. */
+    public static final String RESULT_INDEX_DIRECTORY_NAME = "index";
+
+    /** The run's display-filter view state, in {@code results/}. */
+    public static final String VIEW_STATE_FILE_NAME = "view-state.json";
+
+    /** The directory of filtered exports, which are new files and never overwritten. */
+    public static final String EXPORTS_DIRECTORY_NAME = "exports";
 
     /** The suffix Comet gives a pepXML output. */
     public static final String PEP_XML_SUFFIX = ".pep.xml";
@@ -381,7 +407,77 @@ public record RunLayout(Path root) {
     }
 
     /**
+     * The directory of what CometGUI derives from the run's results -- the result indexes and the
+     * view state. Never under {@code outputs/}, and not in {@link #directories()}.
+     *
+     * @return {@code results/}
+     */
+    public Path resultsDirectory() {
+        return root.resolve(RESULTS_DIRECTORY_NAME);
+    }
+
+    /**
+     * The directory the result stores keep their index files in: this run's own, so no two runs'
+     * stores share one.
+     *
+     * @return {@code results/index/}
+     */
+    public Path resultIndexDirectory() {
+        return resultsDirectory().resolve(RESULT_INDEX_DIRECTORY_NAME);
+    }
+
+    /**
+     * The result index directory's path relative to the run.
+     *
+     * @return {@code results/index}, with {@code /} on every platform
+     */
+    public static String resultIndexRelativePath() {
+        return RESULTS_DIRECTORY_NAME + "/" + RESULT_INDEX_DIRECTORY_NAME;
+    }
+
+    /**
+     * The run's view state: the display-filter values the results were last shown with ({@code
+     * R-RES-01}).
+     *
+     * @return {@code results/view-state.json}
+     */
+    public Path viewStateFile() {
+        return resultsDirectory().resolve(VIEW_STATE_FILE_NAME);
+    }
+
+    /**
+     * The view state's path relative to the run.
+     *
+     * @return {@code results/view-state.json}, with {@code /} on every platform
+     */
+    public static String viewStateRelativePath() {
+        return RESULTS_DIRECTORY_NAME + "/" + VIEW_STATE_FILE_NAME;
+    }
+
+    /**
+     * The directory of the run's filtered exports ({@code R-PERC-07}: derived filtered exports are
+     * new files under a distinct directory). Not in {@link #directories()}.
+     *
+     * @return {@code exports/}
+     */
+    public Path exportsDirectory() {
+        return root.resolve(EXPORTS_DIRECTORY_NAME);
+    }
+
+    /**
+     * The exports directory's path relative to the run.
+     *
+     * @return {@code exports}
+     */
+    public static String exportsRelativePath() {
+        return EXPORTS_DIRECTORY_NAME;
+    }
+
+    /**
      * Every directory of the layout, each after its parent, starting with the run directory.
+     *
+     * <p>{@link #resultsDirectory() results/} and {@link #exportsDirectory() exports/} are not
+     * among them: each is made by what first writes into it.
      *
      * @return the directories to create for a new run
      */

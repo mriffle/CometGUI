@@ -395,6 +395,7 @@ class PercolatorRerunTest {
                             EngineStep.RESOLVE_PERCOLATOR,
                             EngineStep.RUN_PERCOLATOR,
                             EngineStep.PARSE_PERCOLATOR,
+                            EngineStep.FINALISE_RESULTS,
                             EngineStep.FINALISE_PROVENANCE),
                     preview.plan().steps());
             assertEquals(
@@ -424,8 +425,10 @@ class PercolatorRerunTest {
                                     + " recorded",
                             "parse-percolator: executes -- no successful earlier execution is"
                                     + " recorded; run-percolator re-executes",
+                            "finalise-results: executes -- no successful earlier execution is"
+                                    + " recorded; parse-percolator re-executes",
                             "finalise-provenance: executes -- no successful earlier execution is"
-                                    + " recorded"),
+                                    + " recorded; finalise-results re-executes"),
                     preview.lines());
             assertEquals(
                     before, RunEvidence.tree(project.project().root()), "a preview writes nothing");
@@ -463,6 +466,7 @@ class PercolatorRerunTest {
                             EngineStep.RESOLVE_PERCOLATOR,
                             EngineStep.RUN_PERCOLATOR,
                             EngineStep.PARSE_PERCOLATOR,
+                            EngineStep.FINALISE_RESULTS,
                             EngineStep.FINALISE_PROVENANCE),
                     result.states().keySet());
             for (StepState state : result.states().values()) {
@@ -577,7 +581,7 @@ class PercolatorRerunTest {
             }
             assertEquals(
                     "validate-configuration resolve-percolator run-percolator parse-percolator"
-                            + " finalise-provenance",
+                            + " finalise-results finalise-provenance",
                     settings.get("workflow.plan"));
             Map<String, String> inputs = new TreeMap<>();
             for (FileRecord file : manifest.files()) {
@@ -1344,6 +1348,7 @@ class PercolatorRerunTest {
                             EngineStep.RESOLVE_PERCOLATOR,
                             EngineStep.RUN_PERCOLATOR,
                             EngineStep.PARSE_PERCOLATOR,
+                            EngineStep.FINALISE_RESULTS,
                             EngineStep.FINALISE_PROVENANCE),
                     derived.actions().keySet());
             assertEquals(
@@ -1386,12 +1391,14 @@ class PercolatorRerunTest {
     void planWithIndex() {
         assertEquals(
                 "Plan[validate-configuration, resolve-percolator, run-percolator,"
-                        + " parse-percolator, finalise-provenance] provided[serialise-comet-params,"
+                        + " parse-percolator, finalise-results, finalise-provenance]"
+                        + " provided[serialise-comet-params,"
                         + " build-comet-index, run-comet, validate-comet-outputs, merge-pin]",
                 PercolatorRerun.planFor(IndexMode.FRAGMENT_ION).toString());
         assertEquals(
                 "Plan[validate-configuration, resolve-percolator, run-percolator,"
-                        + " parse-percolator, finalise-provenance] provided[serialise-comet-params,"
+                        + " parse-percolator, finalise-results, finalise-provenance]"
+                        + " provided[serialise-comet-params,"
                         + " run-comet, validate-comet-outputs, merge-pin]",
                 PercolatorRerun.planFor(IndexMode.NONE).toString());
     }

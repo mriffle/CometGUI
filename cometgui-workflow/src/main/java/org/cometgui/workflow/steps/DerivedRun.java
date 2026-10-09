@@ -46,9 +46,10 @@ import org.cometgui.workflow.storage.RunStore;
  * derivedFrom}.
  *
  * <p>Its plan executes {@code validate-configuration}, {@code resolve-percolator}, {@code
- * run-percolator}, {@code parse-percolator} and {@code finalise-provenance}; the Comet result steps
- * are {@linkplain Plan#provided() provided} by the source and have no action here, so no Comet can
- * be launched. {@link #request()} is an attempt -- the first, or a retry -- for {@code
+ * run-percolator}, {@code parse-percolator}, {@code finalise-results} and {@code
+ * finalise-provenance}, the last ordered after {@code finalise-results}; the Comet result steps are
+ * {@linkplain Plan#provided() provided} by the source and have no action here, so no Comet can be
+ * launched. {@link #request()} is an attempt -- the first, or a retry -- for {@code
  * WorkflowEngine.start}, exactly as for {@link PreparedRun}.
  */
 public final class DerivedRun {
@@ -197,6 +198,7 @@ public final class DerivedRun {
                 EngineStep.RESOLVE_PERCOLATOR, new PercolatorSteps.ResolvePercolator(percolator));
         actions.put(EngineStep.RUN_PERCOLATOR, new PercolatorSteps.RunPercolator(percolator));
         actions.put(EngineStep.PARSE_PERCOLATOR, new PercolatorSteps.ParsePercolator(percolator));
+        actions.put(EngineStep.FINALISE_RESULTS, new ResultSteps.FinaliseResults(percolator));
         actions.put(EngineStep.FINALISE_PROVENANCE, new DerivedSteps.FinaliseDerived(this));
         return Collections.unmodifiableMap(actions);
     }

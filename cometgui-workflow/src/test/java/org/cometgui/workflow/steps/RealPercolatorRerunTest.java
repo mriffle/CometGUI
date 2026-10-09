@@ -22,12 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -45,12 +47,15 @@ import org.cometgui.params.comet.model.DecoySource;
 import org.cometgui.params.percolator.PercolatorSettings;
 import org.cometgui.params.percolator.resolution.DownstreamStage;
 import org.cometgui.params.percolator.resolution.PercolatorResolver;
+import org.cometgui.provenance.events.ProvenanceEventType;
 import org.cometgui.provenance.manifest.FileDirection;
 import org.cometgui.provenance.manifest.FileRecord;
 import org.cometgui.provenance.manifest.ProvenanceManifest;
 import org.cometgui.provenance.manifest.ToolRecord;
 import org.cometgui.workflow.engine.ReuseRefusedException;
+import org.cometgui.workflow.engine.RunRequest;
 import org.cometgui.workflow.engine.RunResult;
+import org.cometgui.workflow.engine.StepAction;
 import org.cometgui.workflow.engine.StepStateListener;
 import org.cometgui.workflow.state.EngineStep;
 import org.cometgui.workflow.state.StepState;
@@ -124,6 +129,11 @@ class RealPercolatorRerunTest {
 
     private static RunResult rerunResult;
 
+    /** The rerun's raw outputs' SHA-256, hashed here just before and after finalise-results. */
+    private static final Map<String, String> BEFORE_FINALISE = new TreeMap<>();
+
+    private static final Map<String, String> AFTER_FINALISE = new TreeMap<>();
+
     /** Comet's launches, counted around the real process service, before and after the rerun. */
     private static int cometBefore;
 
@@ -183,8 +193,31 @@ class RealPercolatorRerunTest {
                         layout,
                         compatible,
                         RealProject.application());
+        // PercolatorRerun.start is engine.start(rerun.request()); the request is rebuilt here only
+        // to hash the raw outputs independently around finalise-results.
+        RunRequest request = rerun.request();
+        Map<EngineStep, StepAction> actions = new EnumMap<>(request.actions());
+        actions.put(
+                EngineStep.FINALISE_RESULTS,
+                new RawHashingStep(
+                        actions.get(EngineStep.FINALISE_RESULTS),
+                        rerun.percolatorOutputDirectory(),
+                        BEFORE_FINALISE,
+                        AFTER_FINALISE));
         rerunResult =
-                action.start(project.engine(), rerun, StepStateListener.NONE)
+                project.engine()
+                        .start(
+                                new RunRequest(
+                                        request.store(),
+                                        request.lock(),
+                                        request.layout(),
+                                        request.plan(),
+                                        request.inputs(),
+                                        request.forced(),
+                                        actions,
+                                        request.application(),
+                                        request.settings()),
+                                StepStateListener.NONE)
                         .await(RealProject.RUN_BOUND)
                         .orElseThrow();
 
@@ -310,8 +343,10 @@ class RealPercolatorRerunTest {
                         "run-percolator: executes -- no successful earlier execution is recorded",
                         "parse-percolator: executes -- no successful earlier execution is"
                                 + " recorded; run-percolator re-executes",
+                        "finalise-results: executes -- no successful earlier execution is"
+                                + " recorded; parse-percolator re-executes",
                         "finalise-provenance: executes -- no successful earlier execution is"
-                                + " recorded"),
+                                + " recorded; finalise-results re-executes"),
                 preview.lines());
         System.out.printf(
                 Locale.ROOT,
@@ -483,6 +518,60 @@ class RealPercolatorRerunTest {
                 "RealPercolatorRerunTest gate 9: the original's tree, %d paths, identical before"
                         + " and after%n",
                 treeAfter.size());
+    }
+
+    @Test
+    @DisplayName(
+            "P10-6 in the derived run: finalise-results SUCCEEDED after parse-percolator and before"
+                    + " finalise-provenance; its counts at 0.01 equal an independent count of each"
+                    + " raw table; the raw outputs byte-identical across it")
+    void finaliseResultsInTheRerun() throws IOException {
+        RunLayout layout = rerun.layout();
+        assertEquals(StepState.SUCCEEDED, rerunResult.states().get(EngineStep.FINALISE_RESULTS));
+        assertEquals(StepState.SUCCEEDED, originalResult.states().get(EngineStep.FINALISE_RESULTS));
+        long parsed =
+                RunEvidence.sequenceOf(
+                        layout, ProvenanceEventType.STAGE_FINISHED, EngineStep.PARSE_PERCOLATOR);
+        long started =
+                RunEvidence.sequenceOf(
+                        layout, ProvenanceEventType.STAGE_STARTED, EngineStep.FINALISE_RESULTS);
+        long finished =
+                RunEvidence.sequenceOf(
+                        layout, ProvenanceEventType.STAGE_FINISHED, EngineStep.FINALISE_RESULTS);
+        long provenance =
+                RunEvidence.sequenceOf(
+                        layout, ProvenanceEventType.STAGE_STARTED, EngineStep.FINALISE_PROVENANCE);
+        assertTrue(parsed < started, () -> parsed + " then " + started);
+        assertTrue(finished < provenance, () -> finished + " then " + provenance);
+
+        Path out = rerun.percolatorOutputDirectory();
+        Map<String, String> details = RunEvidence.finished(layout, EngineStep.FINALISE_RESULTS);
+        Map<String, String> tables = new TreeMap<>();
+        tables.put("percolator-psms", "psms.tsv");
+        tables.put("percolator-peptides", "peptides.tsv");
+        tables.put("percolator-decoy-psms", "decoy-psms.tsv");
+        tables.put("percolator-decoy-peptides", "decoy-peptides.tsv");
+        for (Map.Entry<String, String> table : tables.entrySet()) {
+            IndependentTableCount expected =
+                    IndependentTableCount.at(out.resolve(table.getValue()), new BigDecimal("0.01"));
+            String prefix = "tables." + table.getKey() + ".";
+            RunEvidence.assertDetail(details, prefix + "rows", Long.toString(expected.total()));
+            RunEvidence.assertDetail(details, prefix + "total", Long.toString(expected.total()));
+            RunEvidence.assertDetail(
+                    details, prefix + "passing", Long.toString(expected.passing()));
+            RunEvidence.assertDetail(
+                    details, prefix + "failing", Long.toString(expected.failing()));
+            RunEvidence.assertDetail(
+                    details, prefix + "unknown-q", Long.toString(expected.unknown()));
+        }
+        RunEvidence.assertDetail(details, "weights.splits", "3");
+        assertEquals(
+                List.of("comet", "percolator"), RunEvidence.listing(layout.outputsDirectory()));
+        assertEquals(6, BEFORE_FINALISE.size(), BEFORE_FINALISE::toString);
+        assertEquals(BEFORE_FINALISE, AFTER_FINALISE, "finalise-results changed a raw byte");
+        for (String name : RunEvidence.listing(out)) {
+            assertEquals(RealComet.sha256(out.resolve(name)), AFTER_FINALISE.get(name), name);
+        }
     }
 
     private static void assertNotWritable(Path file) throws IOException {

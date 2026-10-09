@@ -146,4 +146,20 @@ final class PercolatorDeclarations {
         }
         return new StepDeclaration(files, List.of());
     }
+
+    /**
+     * {@code finalise-results}: reads the result tables and the weights {@code run-percolator}
+     * wrote -- not the pout XML, which no result store reads. What it writes, the result stores'
+     * index files under {@code results/index/}, is derived and rebuilt whenever it does not match
+     * its table, so it is not a declared output: it is neither provenance nor a step result.
+     */
+    static StepDeclaration finaliseResults(PercolatorRun run) {
+        List<DeclaredFile> files = new ArrayList<>();
+        for (Map.Entry<PercolatorArtefact, Path> artefact : run.command().artefacts().entrySet()) {
+            if (artefact.getKey() != PercolatorArtefact.POUT_XML) {
+                files.add(DeclaredFile.input(roleOf(artefact.getKey()), artefact.getValue()));
+            }
+        }
+        return new StepDeclaration(files, List.of());
+    }
 }

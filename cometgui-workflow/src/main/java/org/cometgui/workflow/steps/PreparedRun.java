@@ -122,7 +122,8 @@ public final class PreparedRun {
      * The steps this run executes.
      *
      * @return the plan: up to {@code finalise-provenance}, with {@code build-comet-index} when an
-     *     index mode is set, and the three Percolator steps when the run has a Percolator half
+     *     index mode is set, and the three Percolator steps and {@code finalise-results} when the
+     *     run has a Percolator half
      */
     public Plan plan() {
         return plan;
@@ -162,6 +163,16 @@ public final class PreparedRun {
      */
     public Optional<Path> percolatorOutputDirectory() {
         return percolator.map(PercolatorRun::outputDirectory);
+    }
+
+    /**
+     * The run's Percolator half, for this package's tests: what an action of a Percolator step is
+     * built over.
+     *
+     * @return the Percolator half, or empty for a Comet-only run
+     */
+    Optional<PercolatorRun> percolatorRun() {
+        return percolator;
     }
 
     /**
@@ -231,6 +242,7 @@ public final class PreparedRun {
                     actions.put(EngineStep.RUN_PERCOLATOR, new PercolatorSteps.RunPercolator(half));
                     actions.put(
                             EngineStep.PARSE_PERCOLATOR, new PercolatorSteps.ParsePercolator(half));
+                    actions.put(EngineStep.FINALISE_RESULTS, new ResultSteps.FinaliseResults(half));
                 });
         return Collections.unmodifiableMap(actions);
     }

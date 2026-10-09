@@ -93,11 +93,10 @@ final class DerivedSteps {
      * {@code finalise-provenance}: both copies re-hashed once more, and their digests recorded on
      * the step's {@code stage.finished} event.
      *
-     * <p>It is ordered only by the planned steps it reads from, and in a derived run none is
-     * planned ({@code merge-pin} is provided; {@code finalise-results} is Phase 10's), so it runs
-     * alongside the Percolator steps rather than after them -- the same residue a search with
-     * Percolator has (Phase 09 unit 5). It only reads; {@code provenance.json} itself is written by
-     * the engine when the attempt ends, after every step.
+     * <p>It is ordered after {@code finalise-results}, which every derived run plans, by the
+     * if-planned edge between them -- so after every Percolator step ({@code merge-pin}, its other
+     * upstream step, is provided). It only reads; {@code provenance.json} itself is written by the
+     * engine when the attempt ends, after every step.
      */
     static final class FinaliseDerived implements StepAction {
 

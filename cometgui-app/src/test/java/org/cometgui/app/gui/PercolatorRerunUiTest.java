@@ -273,8 +273,10 @@ class PercolatorRerunUiTest {
                         + " recorded\n"
                         + "parse-percolator: executes -- no successful earlier execution is"
                         + " recorded; run-percolator re-executes\n"
+                        + "finalise-results: executes -- no successful earlier execution is"
+                        + " recorded; parse-percolator re-executes\n"
                         + "finalise-provenance: executes -- no successful earlier execution is"
-                        + " recorded",
+                        + " recorded; finalise-results re-executes",
                 preview);
         assertEquals("Rerun Percolator 3.07.1", driver.textOf("percolator-rerun"));
         assertFalse(RunSection.isDisabled(driver, "percolator-rerun"));

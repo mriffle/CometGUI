@@ -218,8 +218,10 @@ class RealCancelUiTest {
                         + " recorded; merge-pin re-executes)\n"
                         + "- parse-percolator: re-executes (no successful earlier execution is"
                         + " recorded; run-percolator re-executes)\n"
+                        + "- finalise-results: re-executes (no successful earlier execution is"
+                        + " recorded; parse-percolator re-executes)\n"
                         + "- finalise-provenance: re-executes (no successful earlier execution is"
-                        + " recorded; merge-pin re-executes)",
+                        + " recorded; merge-pin re-executes; finalise-results re-executes)",
                 driver.textOf("run-preview"));
         assertFalse(RunSection.isDisabled(driver, "run-start"), "the retry is offered");
         assertEquals(1, cometLaunches().size(), "the preview launched nothing");

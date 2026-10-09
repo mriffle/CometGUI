@@ -73,11 +73,21 @@ public final class ResultStores {
     }
 
     /**
-     * As {@link #open(Path, TableKind, Path, HashService)}, with another limit: for tests.
+     * As {@link #open(Path, TableKind, Path, HashService)}, with another limit. Product code passes
+     * {@link #IN_MEMORY_ROW_LIMIT} or calls the four-argument form; a lower limit is how a test
+     * outside this package -- {@code finalise-results}' -- makes a small table take the disk path.
      *
+     * @param file the raw Percolator table, only ever read
+     * @param kind which of the four tables it is
+     * @param indexDirectory where the disk store keeps its index if the table needs one
+     * @param hasher the one hasher
      * @param limit the most rows held in memory
+     * @return the open store; the caller closes it
+     * @throws PercolatorOutputException if the reader refuses the file
+     * @throws IOException if the disk store cannot build or read its index
+     * @throws NullPointerException if any argument is {@code null}
      */
-    static ResultStore open(
+    public static ResultStore open(
             Path file, TableKind kind, Path indexDirectory, HashService hasher, long limit)
             throws IOException {
         Objects.requireNonNull(file, "file");

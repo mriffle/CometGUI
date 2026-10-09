@@ -304,6 +304,8 @@ class RealRunUiTest {
                         + id
                         + "\n- parse-percolator: reused from run "
                         + id
+                        + "\n- finalise-results: reused from run "
+                        + id
                         + "\n- finalise-provenance: reused from run "
                         + id,
                 driver.textOf("run-preview"));
@@ -338,7 +340,9 @@ class RealRunUiTest {
                         + "- merge-pin: re-executes (validate-comet-outputs re-executes)\n"
                         + "- run-percolator: re-executes (merge-pin re-executes)\n"
                         + "- parse-percolator: re-executes (run-percolator re-executes)\n"
-                        + "- finalise-provenance: re-executes (merge-pin re-executes)",
+                        + "- finalise-results: re-executes (parse-percolator re-executes)\n"
+                        + "- finalise-provenance: re-executes (merge-pin re-executes;"
+                        + " finalise-results re-executes)",
                 driver.textOf("run-preview"));
         assertFalse(RunSection.isDisabled(driver, "run-start"), "and Run is offered");
         assertEquals(2, cometLaunches().size(), "a preview launches nothing");
@@ -384,7 +388,9 @@ class RealRunUiTest {
                         + "- merge-pin: re-executes (validate-comet-outputs re-executes)\n"
                         + "- run-percolator: re-executes (merge-pin re-executes)\n"
                         + "- parse-percolator: re-executes (run-percolator re-executes)\n"
-                        + "- finalise-provenance: re-executes (merge-pin re-executes)\n"
+                        + "- finalise-results: re-executes (parse-percolator re-executes)\n"
+                        + "- finalise-provenance: re-executes (merge-pin re-executes;"
+                        + " finalise-results re-executes)\n"
                         + "Run "
                         + id
                         + "'s recorded results cannot be reused because they no longer match the"
@@ -395,7 +401,8 @@ class RealRunUiTest {
                         + " 602aad75e18257feabdb94ece0fa82e19e5f17153eee4fb89875976920855c82, now "
                         + now
                         + "\nthese steps must run again: run-comet, validate-comet-outputs,"
-                        + " merge-pin, run-percolator, parse-percolator, finalise-provenance",
+                        + " merge-pin, run-percolator, parse-percolator, finalise-results,"
+                        + " finalise-provenance",
                 driver.textOf("run-preview"));
     }
 

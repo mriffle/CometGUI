@@ -117,7 +117,7 @@ public final class PercolatorRerun {
 
     /** The steps a derived run is asked to reach. */
     private static final Set<EngineStep> WANTED =
-            EnumSet.of(EngineStep.PARSE_PERCOLATOR, EngineStep.FINALISE_PROVENANCE);
+            EnumSet.of(EngineStep.FINALISE_RESULTS, EngineStep.FINALISE_PROVENANCE);
 
     private final CachingHashService hashes;
 
@@ -146,8 +146,9 @@ public final class PercolatorRerun {
      *
      * @param mode the source's index mode
      * @return {@code validate-configuration}, {@code resolve-percolator}, {@code run-percolator},
-     *     {@code parse-percolator}, {@code finalise-provenance}; provided {@code
-     *     serialise-comet-params}, [{@code build-comet-index},] {@code run-comet}, {@code
+     *     {@code parse-percolator}, {@code finalise-results}, {@code finalise-provenance} --
+     *     ordered after {@code finalise-results} by the if-planned edge between them; provided
+     *     {@code serialise-comet-params}, [{@code build-comet-index},] {@code run-comet}, {@code
      *     validate-comet-outputs}, {@code merge-pin}
      */
     public static Plan planFor(IndexMode mode) {
