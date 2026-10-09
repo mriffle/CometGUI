@@ -466,7 +466,41 @@ brief's *Build economy* section verbatim.
        (SHA-256 before/after) after filtering and export; unknown-category
        rows exported exactly as the view classifies them.
      - R-RES-04, R-RES-01, R-RES-02, R-PERC-07; gates 4, 5, 8
-     -
+     - **Signed off 2026-10-09** (``9965432``, ``f5d8088``). Diff read: 22
+       files -- ``cometgui-results`` -> ``cometgui-provenance`` edge (POM,
+       commented); ``ProvenanceEventType.EXPORT_WRITTEN``
+       (``export.written``, additive); ``results.export``:
+       ``ResultExporter.exportTable(table, kind, filter, category)`` and
+       ``exportWeights(summary)``, rows copied byte for byte from a
+       read-only channel in file order, classified only by
+       ``QValueFilter.classify``; written by the one atomic writer under
+       ``exports/``, never overwritten (``-2``, ``-3`` ... appended); JSON
+       sidecar (run ID, source path/MD5/SHA-256, filter name and cutoff,
+       category, the four counts before, rows written, text filter and sort
+       not applied, version, time, the export's own hashes); one event per
+       export in ``events.log`` (``provenance.json`` is not rewritten); a
+       failed sidecar or event removes the export. I ran ``-am install``
+       then ``-pl cometgui-results verify``: **1310 tests, 0 failures**, 0
+       SpotBugs (``TableExportGateTest`` 45 over 22 tables x 4 cutoffs x 4
+       categories, about 60-100 s; large fixture exported at 0.01: 219 777
+       rows, and in a ``-Xmx32m`` child JVM); the agent's
+       ``cometgui-provenance verify`` 674/0. My injections, restored by
+       ``sha256sum -c``: (a) the sidecar's ``rowsWritten`` one too many --
+       22 red, e.g. "decoy-peptides.tsv at 0, PASSING expected 0 but was
+       1"; (b) the provenance event never recorded -- 3 failures + 17
+       errors in ``TableExportBehaviourTest``/``WeightsExportTest``. The
+       agent's seven (unknown rows in the passing file, sidecar cutoff from
+       the default, overwrite, raw opened for writing, counts swapped, last
+       byte dropped, the one predicate) were each red. Agent's PIT on
+       ``results.export.*`` (not a POM target): 97 mutations, 93 killed, 4
+       survivors argued performance-only. I ran ``--only quality
+       --only provenance --only docs --only traceability --only
+       percolator``: **5 passed** -- provenance 24 (234 s), percolator 109
+       (721 s), quality 42, docs, traceability 8. Residue: two processes
+       exporting the same name in one millisecond; a crash between rename
+       and event; exports only for runs not executing (the engine holds
+       ``events.log``); POSIX-dependent tests; R-RES-01's "written to
+       provenance" is met by the ``events.log`` event -- tier 1 to confirm.
 
    * - 7
      - **Results view-models** (P10-9): the shared display-filter
