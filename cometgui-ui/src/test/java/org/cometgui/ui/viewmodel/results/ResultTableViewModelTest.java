@@ -807,6 +807,20 @@ class ResultTableViewModelTest {
                     table.columnsProperty().get().get(1));
             assertTrue(table.setColumnVisible(ResultsColumn.SOURCE_FILE, false));
             assertFalse(table.columnsProperty().get().get(1).visible());
+
+            // Two spectrum files -- the smallest multi-file run, and the real K562 run's shape --
+            // already make the column mandatory (orchestrator repair: a "> 2" rule stayed green).
+            table.show(
+                    store(ResultsFixtures.copy("psms-shuffled.tsv"), TableKind.TARGET_PSMS),
+                    Map.of(
+                            "/runs/r1/outputs/comet/sample_A", "a.mzML",
+                            "/runs/r1/outputs/comet/sample_B", "b.mzML"));
+            settle();
+            assertEquals(
+                    new ColumnState(ResultsColumn.SOURCE_FILE, true, false),
+                    table.columnsProperty().get().get(1));
+            assertFalse(table.setColumnVisible(ResultsColumn.SOURCE_FILE, false));
+            assertTrue(table.columnsProperty().get().get(1).visible());
         }
     }
 
