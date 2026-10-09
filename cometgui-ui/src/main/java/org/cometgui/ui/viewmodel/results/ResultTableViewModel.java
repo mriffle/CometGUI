@@ -686,9 +686,7 @@ public final class ResultTableViewModel {
 
     /** One answer from the store, made on the background executor. */
     private record Answer(
-            List<ResultRowView> rows,
-            long offset,
-            long matching,
+            TablePage page,
             FilterCounts counts,
             boolean followed,
             long anchorPosition,
@@ -729,18 +727,12 @@ public final class ResultTableViewModel {
                         for (ResultRow row : answered.rows()) {
                             rows.add(ResultRowView.of(row, names));
                         }
-                        answer =
-                                new Answer(
-                                        rows,
-                                        answered.offset(),
-                                        answered.matching(),
-                                        answered.counts(),
-                                        follow,
-                                        found,
-                                        null);
+                        // made here, so that a page that breaks its bound is a stated failure
+                        // rather than an exception on the interface thread, which JavaFX swallows
+                        TablePage made = TablePage.of(rows, answered.offset(), answered.matching());
+                        answer = new Answer(made, answered.counts(), follow, found, null);
                     } catch (IOException | RuntimeException failed) {
-                        answer =
-                                new Answer(List.of(), 0, 0, null, follow, HIDDEN, describe(failed));
+                        answer = new Answer(TablePage.NONE, null, follow, HIDDEN, describe(failed));
                     }
                     Answer answered = answer;
                     ui.execute(() -> answered(mine, question, answered));
@@ -761,11 +753,11 @@ public final class ResultTableViewModel {
             publishSelection();
             return;
         }
-        query = question.withPage(answer.offset(), PAGE_SIZE);
+        query = question.withPage(answer.page().offset(), PAGE_SIZE);
         if (answer.followed()) {
             anchorPosition = answer.anchorPosition();
         }
-        page.set(TablePage.of(answer.rows(), answer.offset(), answer.matching()));
+        page.set(answer.page());
         counts.set(TableCounts.of(kind, question.filter(), answer.counts()));
         status.set(READY);
         publishSelection();

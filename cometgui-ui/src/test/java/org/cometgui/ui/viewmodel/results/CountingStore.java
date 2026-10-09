@@ -52,6 +52,9 @@ final class CountingStore implements ResultStore {
     /** When set, every question fails with it. */
     private IOException failure;
 
+    /** When set, every page is asked for with the largest limit a query allows. */
+    private boolean widened;
+
     CountingStore(ResultStore real) {
         this.real = real;
     }
@@ -70,6 +73,10 @@ final class CountingStore implements ResultStore {
 
     void fail(IOException next) {
         failure = next;
+    }
+
+    void widen() {
+        widened = true;
     }
 
     @Override
@@ -103,7 +110,8 @@ final class CountingStore implements ResultStore {
         if (failure != null) {
             throw failure;
         }
-        ResultPage page = real.query(query);
+        ResultPage page =
+                real.query(widened ? query.withPage(0, ResultQuery.MAX_PAGE_SIZE) : query);
         mostRowsReturned = Math.max(mostRowsReturned, page.rows().size());
         return page;
     }

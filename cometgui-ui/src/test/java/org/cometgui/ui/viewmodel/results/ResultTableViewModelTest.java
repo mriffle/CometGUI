@@ -962,6 +962,20 @@ class ResultTableViewModelTest {
         }
 
         @Test
+        @DisplayName("a page above the page size is refused and said so, never shown")
+        void oversizedPage() throws IOException {
+            CountingStore store = store(numbered(950), TableKind.TARGET_PSMS);
+            store.widen();
+            table.show(store, Map.of());
+            table.setCategory(Category.ALL);
+            settle();
+            assertEquals(TablePage.NONE, table.page());
+            assertEquals(
+                    "The table could not be read: a page holds at most 200 rows, not 950",
+                    table.statusProperty().get());
+        }
+
+        @Test
         @DisplayName("clear shows nothing and drops what was pending")
         void clear() throws IOException {
             shuffled();
