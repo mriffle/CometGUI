@@ -553,7 +553,44 @@ brief's *Build economy* section verbatim.
        (P10-10) and gate 6 (the large fixture, items never above the page
        size, within budget).
      - R-RES-01, R-RES-03; gates 1, 2, 6
-     -
+     - **Signed off 2026-10-09** (``6ff1946``, ``e284b60``). Diff read: 32
+       files -- ``ui.controls.results.ResultsPane`` (a ``TableView`` whose
+       items are the current page only, ``setAll`` per page; TableView
+       sorting off, headings are buttons calling the view-model's store
+       sort; filter fields on the shared ``DisplayFiltersViewModel``;
+       counts, category, text filter on Enter, paging, column switches,
+       copy, exports) and ``WeightsPane`` (bar chart **not built**: the
+       pane would have to read numbers back from text); 34 ``UiIds``;
+       ``SectionArrivals``; ``ShellView``; app ``ProjectResultsPort``
+       (unlocked reads of ``runs/*/run.json``, locked writes, exports
+       refuse an executing run, ``-N`` base -> spectrum file name, a
+       derived run uses its source's bases), ``SessionEngine.executingRuns``
+       tracked by ``WorkflowRunPort``, one ``CachingHashService`` shared by
+       engine and port, refresh at start and at run start/end; workflow
+       ``RunResultFiles``. Pins raised exactly: identifiers 433 -> 493,
+       accessible-name floor 68 -> 117. I ran ``-am install`` then ``-pl
+       cometgui-app verify`` on the final commit (the agent had not):
+       **230 tests, 0 failures, 1 skipped** (opt-in upstream install), 0
+       SpotBugs, 12 m 53 s. The agent's ui verify: 654, coverage met. My
+       injections, restored by ``sha256sum -c``: (a) the peptide field
+       committing to the PSM filter -- ``ResultsFiltersUiTest``
+       ``outOfRangeAndNonNumbersAreRefused`` and ``theFiltersAreIndependent``
+       red; (b) the port's spectrum-name map empty --
+       ``ProjectResultsPortTest`` ``open``, ``derivedRun``, ``sharedNames``
+       and one more red. The agent's six (table items accumulating -- "the
+       results table holds 400 items, more than one page of 200"; a filter
+       listener launching ``/bin/true`` through the one runner -- gate 2
+       red; a second filter state; an accessible name removed; export of an
+       executing run; the one predicate) were each red. Gate 6 measured
+       (``ResultsLargeFixtureUiTest``, about 22 s): open 3.3 s, filter
+       0.7-1.0 s, sorts 1.3/3.3 s, page 0.4-0.6 s, heap growth 3 MB of a
+       64 MB budget, most items ever held 200. I ran ``--only quality
+       --only shell --only paramui --only percolator --only workflow``:
+       **5 passed** -- quality 42, shell 30 (383 s), paramui 87 (1881 s),
+       workflow 110 (469 s), percolator 109 (731 s). Files read outside the
+       module: ``scratch/phase10/large/psms.tsv``. Residue: a run whose
+       ``run.json`` cannot be read is left out of the list silently; the
+       copy test asserts the message, not the clipboard.
 
    * - 9
      - **The remaining GUI gates and the real run**: displayed counts
@@ -597,6 +634,8 @@ Deferred
 * Comet scores in the PSM table and supporting-PSM counts in the peptide
   table (P10-9).
 * Protein-level results (out of scope for release 1).
+* The optional learned-weights bar chart (unit 8): the view-model hands the
+  pane text, and drawing from it would mean reading numbers in the view.
 
 Blockers escalated
 ==================
