@@ -303,6 +303,21 @@ class ResultsExportUiTest {
             shown.addAll(ResultsSection.column(driver, 0));
         }
         assertEquals(ids(unknown), shown, "the unknown rows of all three pages, in file order");
+        assertEquals(
+                "results-previous-page",
+                driver.focusedNodeId(),
+                "Next, disabled on the last page, handed the keyboard focus to Previous");
+        driver.clickOn("results-first-page");
+        RunSection.awaitText(
+                driver,
+                "results-page",
+                "Rows 1 to 200 of 401 (page 1 of 3)"::equals,
+                ResultsSection.QUERY_BOUND);
+        ResultsSection.settle(driver, ResultsSection.QUERY_BOUND);
+        assertEquals(
+                "results-next-page",
+                driver.focusedNodeId(),
+                "First, disabled on the first page, handed the keyboard focus to Next");
 
         exportTable(
                 unknownRun,

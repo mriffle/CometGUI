@@ -678,10 +678,36 @@ public final class ResultsPane extends ScrollPane {
         return caption + ": " + (shown.isEmpty() ? "none shown" : shown);
     }
 
+    /**
+     * Enables the paging buttons that can move from this page and disables the others. A button
+     * that held the keyboard focus and is now disabled -- Next or Last on reaching the last page,
+     * First or Previous on reaching the first -- hands the focus to the enabled button leading back
+     * (Previous, or Next), so that the focus stays in the paging row. Without that, JavaFX moves
+     * the focus to the next focusable control, the table, and the section scrolls to it under the
+     * user's pointer.
+     */
     private static void enablePaging(
             Button first, Button previous, Button next, Button last, TablePage page) {
         boolean atStart = page.pageNumber() <= 1;
         boolean atEnd = page.pageNumber() >= page.pageCount();
+        Button keep = null;
+        if (atEnd && !atStart && (next.isFocused() || last.isFocused())) {
+            keep = previous;
+        } else if (atStart && !atEnd && (first.isFocused() || previous.isFocused())) {
+            keep = next;
+        }
+        // enable first, so that the focus can move to an enabled button before any is disabled
+        if (!atStart) {
+            first.setDisable(false);
+            previous.setDisable(false);
+        }
+        if (!atEnd) {
+            next.setDisable(false);
+            last.setDisable(false);
+        }
+        if (keep != null) {
+            keep.requestFocus();
+        }
         first.setDisable(atStart);
         previous.setDisable(atStart);
         next.setDisable(atEnd);
