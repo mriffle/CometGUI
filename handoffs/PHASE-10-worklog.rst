@@ -719,7 +719,20 @@ Deferred
 * The optional learned-weights bar chart (unit 8): the view-model hands the
   pane text, and drawing from it would mean reading numbers in the view.
 
+Phase-end checks
+================
+
+* PIT reports regenerated as ``scripts/build.sh`` does (root
+  ``test-compile org.pitest:pitest-maven:mutationCoverage``, 16 threads):
+  BUILD SUCCESS; results 943 mutations, 931 killed, **42 m 27 s**.
+* ``verify-all-gates.sh --only tests`` on ``66afdad``, detached and watched
+  to its exit: **PASS, 37 assertions in 13 778 s** (229 m 38 s; Phase 09:
+  7490 s).
+
 Blockers escalated
 ==================
 
-None yet.
+No blocker. Escalations for tier 1 are listed in
+``handoffs/PHASE-10-handoff.rst`` (PIT and gate-run cost, results.export as a
+PIT target, R-RES-01's provenance reading, ``D-013``'s ``--help`` launches,
+fixture prerequisites, ``.gitattributes``).
