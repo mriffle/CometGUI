@@ -251,7 +251,11 @@ public final class WeightsViewModel {
 
     /** Numeric order in which -0.0 equals 0.0, as it does as a weight. */
     private static int numbers(double left, double right) {
-        return Double.compare(left + 0.0, right + 0.0);
+        return Double.compare(zeroed(left), zeroed(right));
+    }
+
+    private static double zeroed(double value) {
+        return value == 0.0 ? 0.0 : value;
     }
 
     private static WeightsRowView view(FeatureWeights feature) {

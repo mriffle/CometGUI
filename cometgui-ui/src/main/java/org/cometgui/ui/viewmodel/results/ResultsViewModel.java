@@ -231,8 +231,6 @@ public final class ResultsViewModel {
                                                 "the run selector does not offer "
                                                         + run.id().value()));
         if (chosenRun.get().map(now -> now.id().equals(listed.id())).orElse(false)) {
-            chosenRun.set(Optional.of(listed));
-            publishExports();
             return;
         }
         open(listed);
@@ -255,7 +253,6 @@ public final class ResultsViewModel {
         }
         chosenTable.set(Optional.of(kind));
         table.show(opened.stores().get(kind), opened.sourceFiles());
-        publishExports();
     }
 
     /**

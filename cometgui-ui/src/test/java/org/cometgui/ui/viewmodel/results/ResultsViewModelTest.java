@@ -138,6 +138,13 @@ class ResultsViewModelTest {
             assertEquals(
                     "The runs with results have not been read yet.",
                     results.readinessProperty().get());
+            assertEquals(
+                    "Nothing can be exported: no run's results are open.",
+                    results.tableExportRefusalProperty().get(),
+                    "refused from the start");
+            assertEquals(
+                    "Nothing can be exported: no run's results are open.",
+                    results.weightsExportRefusalProperty().get());
             assertEquals(List.of(), port.calls());
             results.refresh();
             assertEquals(
@@ -217,6 +224,12 @@ class ResultsViewModelTest {
             results.choose(listed("r-old"));
             assertEquals("Opening the results of run r-old.", results.readinessProperty().get());
             assertEquals(TablePage.NONE, table.page(), "the old table is cleared at once");
+            assertAll(
+                    () -> assertEquals(List.of(), results.tablesProperty().get()),
+                    () -> assertEquals(Optional.empty(), results.chosenTableProperty().get()),
+                    () -> assertEquals("", results.viewStateStatusProperty().get()),
+                    () -> assertFalse(results.tableExportEnabledProperty().get()),
+                    () -> assertEquals(List.of(), weights.rowsProperty().get()));
             settle();
             assertEquals(List.of("runs", "open r-new", "close r-new", "open r-old"), port.calls());
             for (ResultStore store : first) {
@@ -287,6 +300,8 @@ class ResultsViewModelTest {
             assertEquals("close r-new", port.calls().get(port.calls().size() - 1));
             assertEquals(ResultsViewModel.NO_RESULTS, results.readinessProperty().get());
             assertEquals(List.of(), results.tablesProperty().get());
+            assertEquals(Optional.empty(), results.chosenRunProperty().get());
+            assertFalse(results.tableExportEnabledProperty().get());
         }
 
         @Test
@@ -376,6 +391,102 @@ class ResultsViewModelTest {
             assertEquals(TablePage.NONE, table.page());
             assertEquals(List.of(), weights.rowsProperty().get());
             assertEquals(ResultsViewModel.NOT_READ, results.readinessProperty().get());
+            assertEquals(Optional.empty(), results.chosenRunProperty().get());
+            assertFalse(results.tableExportEnabledProperty().get());
+            assertEquals(
+                    "Nothing can be exported: no run's results are open.",
+                    results.tableExportRefusalProperty().get());
+        }
+    }
+
+    @Nested
+    @DisplayName("answers in any order")
+    class Generations {
+
+        @Test
+        @DisplayName("runs created at the same instant are ordered by id")
+        void tie() {
+            for (String id : List.of("r-b", "r-a")) {
+                port.add(
+                        id,
+                        NEW,
+                        false,
+                        Map.of(TableKind.TARGET_PSMS, ResultsFixtures.copy("real-3.07.1-psms.tsv")),
+                        Optional.empty(),
+                        Map.of());
+            }
+            results.refresh();
+            settle();
+            assertEquals(
+                    List.of("r-a", "r-b"),
+                    results.runsProperty().get().stream().map(run -> run.id().value()).toList());
+            assertEquals(List.of("runs", "open r-a"), port.calls());
+        }
+
+        @Test
+        @DisplayName("a list read before a close is dropped when it arrives after it")
+        void listAcrossClose() {
+            addOld();
+            results.refresh();
+            results.close();
+            background.runFirst(); // the first list: r-old only
+            addNew(false);
+            results.refresh();
+            settle();
+            assertEquals("r-new", results.chosenRunProperty().get().orElseThrow().id().value());
+            assertEquals(List.of("runs", "runs", "open r-new"), port.calls());
+        }
+
+        @Test
+        @DisplayName("results opened before a close arrive after a newer opening: closed")
+        void openAcrossClose() {
+            addNew(false);
+            results.refresh();
+            background.runFirst();
+            ui.drain(); // r-new is being opened: A
+            results.close();
+            results.refresh();
+            background.runLast(); // the new list
+            ui.drain(); // r-new opened again: B
+            background.runLast(); // B opens
+            ui.drain();
+            background.runFirst(); // A opens, late
+            ui.drain();
+            settle();
+            assertEquals(
+                    List.of("runs", "runs", "open r-new", "open r-new", "close r-new"),
+                    port.calls());
+            assertEquals("23", table.counts().total());
+            assertThrows(IllegalStateException.class, port.openedStores().get(3)::rowCount);
+            assertEquals(23, port.openedStores().get(0).rowCount(), "B stays open");
+        }
+
+        @Test
+        @DisplayName("results opened before the list emptied arrive after a newer opening: closed")
+        void openAcrossEmptyList() {
+            addNew(false);
+            results.refresh();
+            background.runFirst();
+            ui.drain(); // A is being opened
+            background.runFirst(); // A opens; its answer waits
+            port.remove("r-new");
+            results.refresh();
+            background.runFirst();
+            ui.runLast(); // the empty list
+            addNew(false);
+            results.refresh();
+            background.runFirst();
+            ui.runLast(); // the list again: B is being opened
+            background.runFirst(); // B opens
+            ui.runLast(); // B shown
+            ui.runFirst(); // A's late answer
+            settle();
+            assertEquals(
+                    List.of("runs", "open r-new", "runs", "runs", "open r-new", "close r-new"),
+                    port.calls());
+            assertEquals("23", table.counts().total());
+            assertEquals(23, port.openedStores().get(3).rowCount(), "B stays open");
+            assertThrows(IllegalStateException.class, port.openedStores().get(0)::rowCount);
         }
     }
 
@@ -627,6 +738,10 @@ class ResultsViewModelTest {
             results.refresh();
             settle();
             assertTrue(results.exportWeights());
+            assertEquals(
+                    "Exporting the learned feature weights.", results.exportStatusProperty().get());
+            assertFalse(results.weightsExportEnabledProperty().get(), "one export at a time");
+            assertFalse(results.tableExportEnabledProperty().get());
             settle();
             String status = results.exportStatusProperty().get();
             assertTrue(

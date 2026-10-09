@@ -131,7 +131,7 @@ class ResultTableViewModelTest {
                     .append(i)
                     .append("|T\n");
         }
-        Path file = work.resolve("numbered.tsv");
+        Path file = work.resolve("numbered-" + rows + ".tsv");
         Files.writeString(file, text, StandardCharsets.UTF_8);
         return file;
     }
@@ -683,7 +683,13 @@ class ResultTableViewModelTest {
             table.toggle(new RowKey(5));
             assertEquals(List.of(), table.selectedProperty().get());
             assertEquals("No row is selected.", table.selectionStatusProperty().get());
-            table.select(new RowKey(4));
+            table.select(new RowKey(3));
+            table.toggle(new RowKey(4));
+            table.select(new RowKey(5));
+            assertEquals(
+                    List.of(new RowKey(5)),
+                    table.selectedProperty().get(),
+                    "select replaces the selection");
             table.clearSelection();
             assertEquals("No row is selected.", table.selectionStatusProperty().get());
             IllegalArgumentException refused =
@@ -821,7 +827,8 @@ class ResultTableViewModelTest {
             assertEquals(1, store.queries().size());
             assertEquals(TablePage.NONE, table.page(), "nothing applied before ui runs");
             ui.drain();
-            assertEquals(9, table.page().rows().size());
+            assertEquals(9, table.pageProperty().get().rows().size());
+            assertEquals("9", table.countsProperty().get().passing());
             assertFalse(table.busyProperty().get());
             ResultQuery asked = store.queries().get(0);
             assertEquals(
@@ -861,9 +868,70 @@ class ResultTableViewModelTest {
         }
 
         @Test
+        @DisplayName("showing another table starts it afresh: category, sort, text, selection")
+        void showResets() throws IOException {
+            shuffled();
+            table.setCategory(Category.FAILING);
+            table.sortBy(ResultsColumn.SCORE);
+            table.editText("beta");
+            table.applyText();
+            settle();
+            table.select(table.page().rows().get(0).key());
+            table.editText("gamma");
+            table.setColumnVisible(ResultsColumn.SOURCE_FILE, false);
+            assertFalse(table.columnStatusProperty().get().isEmpty());
+            table.show(
+                    store(ResultsFixtures.copy("psms-unknown-q.tsv"), TableKind.TARGET_PSMS),
+                    Map.of());
+            assertAll(
+                    () -> assertEquals(Category.PASSING, table.categoryProperty().get()),
+                    () -> assertEquals(ResultSort.FILE_ORDER, table.sortProperty().get()),
+                    () -> assertEquals("", table.textDraftProperty().get()),
+                    () -> assertEquals("", table.appliedTextProperty().get()),
+                    () -> assertEquals("", table.columnStatusProperty().get()),
+                    () -> assertEquals(List.of(), table.selectedProperty().get()),
+                    () -> assertEquals(TablePage.NONE, table.page(), "nothing before it answers"),
+                    () -> assertEquals(TableCounts.NONE, table.counts()),
+                    () -> assertTrue(table.busyProperty().get()));
+            settle();
+            assertEquals(List.of(2L, 3L, 9L, 13L, 14L), lines(), "c01 c02 c08 c12 c13");
+        }
+
+        @Test
+        @DisplayName("an answer for a table shown before a clear is dropped after it")
+        void staleAcrossClear() throws IOException {
+            table.show(
+                    store(ResultsFixtures.copy("psms-shuffled.tsv"), TableKind.TARGET_PSMS),
+                    SHUFFLED_SOURCES);
+            table.clear();
+            table.show(
+                    store(ResultsFixtures.copy("psms-unknown-q.tsv"), TableKind.TARGET_PSMS),
+                    Map.of());
+            background.runLast();
+            ui.drain();
+            background.runFirst();
+            ui.drain();
+            assertEquals("15", table.counts().total(), "the first table's answer was dropped");
+        }
+
+        @Test
+        @DisplayName("399 rows fill two pages, 400 two, 401 three")
+        void pageCount() throws IOException {
+            for (int[] expected : new int[][] {{399, 2}, {400, 2}, {401, 3}, {199, 1}}) {
+                table.show(store(numbered(expected[0]), TableKind.TARGET_PSMS), Map.of());
+                settle();
+                table.setCategory(Category.ALL);
+                settle();
+                assertEquals(expected[1], table.page().pageCount(), expected[0] + " rows");
+            }
+            assertEquals("Rows 1 to 199 of 199 (page 1 of 1)", table.page().text());
+        }
+
+        @Test
         @DisplayName("a store that cannot answer is said so")
         void failure() throws IOException {
             CountingStore store = shuffled();
+            table.select(new RowKey(3));
             store.fail(new IOException("the index is damaged"));
             table.setCategory(Category.ALL);
             settle();
@@ -877,7 +945,10 @@ class ResultTableViewModelTest {
                             assertEquals(
                                     "The counts could not be read: the index is damaged",
                                     table.counts().summary()),
-                    () -> assertFalse(table.busyProperty().get()));
+                    () -> assertFalse(table.busyProperty().get()),
+                    () ->
+                            assertEquals(
+                                    "1 row is selected.", table.selectionStatusProperty().get()));
             store.fail(null);
             ResultStore closed =
                     ResultStores.inMemory(
@@ -895,7 +966,14 @@ class ResultTableViewModelTest {
         void clear() throws IOException {
             shuffled();
             table.select(new RowKey(3));
+            table.editText("beta");
+            table.applyText();
+            table.sortBy(ResultsColumn.SCORE);
+            table.setColumnVisible(ResultsColumn.SOURCE_FILE, false);
+            settle();
+            table.editText("gamma");
             table.setCategory(Category.ALL);
+            assertTrue(table.busyProperty().get());
             table.clear();
             settle();
             assertAll(
@@ -904,7 +982,16 @@ class ResultTableViewModelTest {
                     () -> assertEquals(List.of(), table.columnsProperty().get()),
                     () -> assertEquals(List.of(), table.selectedProperty().get()),
                     () -> assertEquals(Category.PASSING, table.categoryProperty().get()),
-                    () -> assertEquals("No table is open.", table.statusProperty().get()));
+                    () -> assertEquals("No table is open.", table.statusProperty().get()),
+                    () -> assertEquals("", table.textDraftProperty().get()),
+                    () -> assertEquals("", table.appliedTextProperty().get()),
+                    () -> assertFalse(table.textPendingProperty().get()),
+                    () -> assertEquals(ResultSort.FILE_ORDER, table.sortProperty().get()),
+                    () -> assertEquals("", table.columnStatusProperty().get()),
+                    () -> assertFalse(table.busyProperty().get()),
+                    () ->
+                            assertEquals(
+                                    "No row is selected.", table.selectionStatusProperty().get()));
             table.setCategory(Category.ALL);
             table.sortBy(ResultsColumn.SCORE);
             table.nextPage();

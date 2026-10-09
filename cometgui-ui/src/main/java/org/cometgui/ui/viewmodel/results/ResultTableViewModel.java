@@ -242,6 +242,7 @@ public final class ResultTableViewModel {
         publishColumns();
         page.set(TablePage.NONE);
         counts.set(TableCounts.NONE);
+        publishSelection();
         fetch(true, 0);
     }
 
@@ -676,7 +677,6 @@ public final class ResultTableViewModel {
             return;
         }
         query = query.withFilter(filter);
-        publishQuery();
         fetch(true, 0);
     }
 
@@ -753,6 +753,8 @@ public final class ResultTableViewModel {
         }
         busy.set(false);
         if (answer.failure() != null) {
+            // where the selected row stands is not known until the store answers again
+            anchorPosition = UNKNOWN;
             page.set(TablePage.NONE);
             counts.set(TableCounts.unavailable(answer.failure()));
             status.set("The table could not be read: " + answer.failure());
