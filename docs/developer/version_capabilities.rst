@@ -77,6 +77,8 @@ Where the code is
      - The PSM/peptide table reader and the weights reader (the parsers' one
        home, which Phase 10 builds on); the display q-value filter *values*
        (``PsmQValueFilter``, ``PeptideQValueFilter``, ``DisplayFilters``).
+       Phase 10 added the result store, the weights summary and export
+       (:doc:`results_model`).
 
    * - ``org.cometgui.workflow.steps`` (``cometgui-workflow``)
      - ``PercolatorSelection``, ``PercolatorChoice``, ``PercolatorRun``,
@@ -88,6 +90,9 @@ Where the code is
        ``org.cometgui.ui.controls.percolator`` (``cometgui-ui``)
      - The Percolator section: ``PercolatorViewModel``,
        ``PercolatorRerunViewModel``, their ports, and ``PercolatorPane``.
+       Since Phase 10 the section's display filters are the interface's one
+       ``DisplayFiltersViewModel``, shared with the Results section, to which
+       ``PercolatorViewModel`` delegates.
 
    * - ``org.cometgui.app.config`` (``cometgui-app``)
      - Wiring: ``ToolManagerWiring`` gives the installer and registration the
@@ -469,9 +474,12 @@ Which tests prove the exit gate
      - Raw outputs byte-identical across filtering and export
      - ``RealPercolatorRunTest.gate9RawOutputsAreUnchangedAndReadOnly``;
        ``org.cometgui.results.filtering.RealOutputFilteringTest.rawFilesUntouched``;
-       ``RealPercolatorRerunTest.gate9TheOriginalIsUntouched``. Export does
-       not exist yet (Phase 10); what is proved is parsing, filtering values,
-       provenance finalisation and a derived run.
+       ``RealPercolatorRerunTest.gate9TheOriginalIsUntouched``. At Phase 09
+       export did not exist; what those prove is parsing, filtering values,
+       provenance finalisation and a derived run. Phase 10 added export and
+       proves the raw outputs byte-identical across it (its gate item 4; see
+       :ref:`dev-results-model`), and re-proved this item across
+       ``finalise-results``.
 
 The acceptance criteria's entries are in ``docs/traceability-map.toml`` and
 the generated :doc:`traceability`. The falsifiability harness for these items

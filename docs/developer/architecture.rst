@@ -28,6 +28,12 @@ something is deferred, it names the phase that owns it.
    (:doc:`version_capabilities`). Phase 09 changed no module edge; its POM
    changes are the two modules' own mutation switches.
 
+   **Amended in Phase 10** (2026-10-09, work unit 10): the state column for
+   the results store, export, Results section and its port
+   (:doc:`results_model`), and the one module edge Phase 10 added --
+   ``cometgui-results`` now depends on ``cometgui-provenance``, re-read from
+   ``cometgui-results/pom.xml``.
+
    Every measured number quoted below was produced by running the thing --
    either by the Phase 02 orchestrator at a work-unit sign-off, recorded in
    ``handoffs/PHASE-02-worklog.rst``, or, where it is marked as such, by the
@@ -52,7 +58,7 @@ deliberately does not.
    * - Module
      - Root package
      - Depends on (module scope)
-     - State after Phase 09
+     - State after Phase 10
 
    * - ``cometgui-domain``
      - ``org.cometgui.domain``
@@ -108,10 +114,13 @@ deliberately does not.
 
    * - ``cometgui-results``
      - ``org.cometgui.results``
-     - ``domain``
-     - Partly real (Phase 09): ``parser`` -- the Percolator PSM/peptide table
-       and weights readers -- and ``filtering`` -- the display q-value filter
-       values. The results store, tables and export are Phase 10's.
+     - ``domain``, ``provenance`` (since Phase 10: the one JSON writer,
+       atomic writer and event log, for export)
+     - Real: ``parser`` -- the Percolator PSM/peptide table and weights
+       readers (Phase 09) and the weights summary (Phase 10) --
+       ``filtering`` -- the display q-value filters (Phase 09) and, in
+       ``filtering.store``, the in-memory and disk-backed result stores --
+       and ``export`` (Phase 10). See :doc:`results_model`.
 
    * - ``cometgui-workflow``
      - ``org.cometgui.workflow``
@@ -120,8 +129,9 @@ deliberately does not.
      - Real: ``state`` (the stepper's stages since Phase 02; the declared
        seventeen-step graph, fingerprints and the rerun preview since Phase
        08), ``engine``, ``steps`` (the Comet run; since Phase 09 the
-       Percolator steps and the derived Percolator rerun) and ``storage``
-       (project and run records, the project lock). See
+       Percolator steps and the derived Percolator rerun; since Phase 10
+       ``finalise-results``) and ``storage`` (project and run records, the
+       project lock; since Phase 10 a run's view state). See
        :doc:`workflow_engine`.
 
    * - ``cometgui-ui``
@@ -131,18 +141,20 @@ deliberately does not.
      - Real: ``viewmodel``, ``view``, ``controls``. Since Phase 08 the Run
        section is live (``RunViewModel``, the engine half of
        ``RunReadinessViewModel``, ``RunControl``) behind the
-       ``RunEnginePort`` port, and since Phase 09 the Percolator section
+       ``RunEnginePort`` port, since Phase 09 the Percolator section
        (``viewmodel.percolator``, ``controls.percolator``) behind
-       ``PercolatorPort`` and ``PercolatorRerunPort``. ``dialogs`` is
-       empty.
+       ``PercolatorPort`` and ``PercolatorRerunPort``, and since Phase 10 the
+       Results section (``viewmodel.results``, ``controls.results``) behind
+       ``ResultsPort``. ``dialogs`` is empty.
 
    * - ``cometgui-app``
      - ``org.cometgui.app``
      - all ten above, plus ``io.github.mkpaz:atlantafx-base`` 2.1.0
      - Real: ``bootstrap``, ``config``. The only module with a ``main``. Since
        Phase 08 ``config`` wires the engine to the Run section
-       (``RunWiring``, ``WorkflowRunPort``, ``ProjectSession``), and since
-       Phase 09 the Percolator section (``ToolManagerPercolatorPort``).
+       (``RunWiring``, ``WorkflowRunPort``, ``ProjectSession``), since
+       Phase 09 the Percolator section (``ToolManagerPercolatorPort``), and
+       since Phase 10 the Results section (``ProjectResultsPort``).
 
    * - ``cometgui-archtests``
      - ``org.cometgui.archtests``

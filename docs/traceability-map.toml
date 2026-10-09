@@ -455,20 +455,88 @@ note = "Phase 08. Cancel pressed in the running application during a real search
 # --- AC-RES -----------------------------------------------------------------
 
 [[ac."AC-RES-01".evidence]]
-kind = "planned"
-phase = "10"
+kind = "test"
+class = "org.cometgui.app.gui.ResultsFiltersUiTest"
+method = "defaults"
+note = "Phase 10 unit 8, gate item 1. GUI test of the launched application (headless): the Results section's PSM q-value filter shows 0.01 when nothing was saved, and so does the Percolator section's, which is the same one filter state; the counts on screen are those at 0.01, worked out by hand from the run's table. No binary is run. Run on Linux only so far."
+
+[[ac."AC-RES-01".evidence]]
+kind = "test"
+class = "org.cometgui.results.filtering.QValueFilterTest"
+method = "defaults"
+note = "Phase 09 unit 4, nested class Defaults. Unit test: PsmQValueFilter.DEFAULT and DisplayFilters.DEFAULTS hold the cutoff 0.01, compared as a decimal."
+
+[[ac."AC-RES-01".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.results.DisplayFiltersViewModelTest"
+method = "defaults"
+note = "Phase 10 unit 7. View-model unit test: the interface's one display-filter state starts at the PSM cutoff 0.01 with the field text 0.01."
 
 [[ac."AC-RES-02".evidence]]
-kind = "planned"
-phase = "10"
+kind = "test"
+class = "org.cometgui.app.gui.ResultsFiltersUiTest"
+method = "defaults"
+note = "Phase 10 unit 8, gate item 1. GUI test of the launched application (headless): the Results section's peptide q-value filter shows 0.01 when nothing was saved, as does the Percolator section's (the same one state). No binary is run. Run on Linux only so far."
+
+[[ac."AC-RES-02".evidence]]
+kind = "test"
+class = "org.cometgui.results.filtering.QValueFilterTest"
+method = "defaults"
+note = "Phase 09 unit 4, nested class Defaults. Unit test: PeptideQValueFilter.DEFAULT and DisplayFilters.DEFAULTS hold the cutoff 0.01."
+
+[[ac."AC-RES-02".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.results.DisplayFiltersViewModelTest"
+method = "defaults"
+note = "Phase 10 unit 7. View-model unit test: the one display-filter state starts at the peptide cutoff 0.01 with the field text 0.01."
 
 [[ac."AC-RES-03".evidence]]
-kind = "planned"
-phase = "10"
+kind = "test"
+class = "org.cometgui.app.gui.ResultsFiltersUiTest"
+method = "theFiltersAreIndependent"
+note = "Phase 10 unit 8, gate item 1. GUI test of the launched application (headless): typing a new PSM cutoff changes the PSM counts and leaves the peptide filter and counts as they were, and the reverse; every expected count is hand-worked from the run's tables. Run on Linux only so far."
+
+[[ac."AC-RES-03".evidence]]
+kind = "test"
+class = "org.cometgui.results.filtering.store.ResultStoreContract"
+method = "psmAndPeptideFiltersIndependent"
+note = "Phase 10 unit 2. Unit test in the store contract, run against both stores by InMemoryResultStoreTest and DiskResultStoreTest: a PSM table is filtered only by the PSM filter and a peptide table only by the peptide filter; TableKind refuses the other one, so the two cannot be crossed by wiring."
+
+[[ac."AC-RES-03".evidence]]
+kind = "test"
+class = "org.cometgui.results.filtering.QValueFilterTest"
+method = "independent"
+note = "Phase 09 unit 4, nested class Independence. Unit test: DisplayFilters.withPsm and withPeptide each change one filter and leave the other."
+
+[[ac."AC-RES-03".evidence]]
+kind = "test"
+class = "org.cometgui.ui.viewmodel.results.DisplayFiltersViewModelTest"
+method = "bothEndsAndIndependence"
+note = "Phase 10 unit 7. View-model unit test: 0 and 1 are accepted for either filter, and editing one leaves the other filter as it was."
 
 [[ac."AC-RES-04".evidence]]
-kind = "planned"
-phase = "10"
+kind = "test"
+class = "org.cometgui.app.gui.ResultsNoProcessUiTest"
+method = "changingTheFiltersLaunchesNoProcess"
+note = "Phase 10 unit 8, gate item 2 (design decision P10-10). GUI test through the real composition root with a recording ProcessRunner in front of the real process service as the application's one runner: both filters are changed several times and the counts on screen change each time, the runner records no launch, and every file under the run's outputs/ keeps its SHA-256 (computed with the JDK alone). Run on Linux only so far."
+
+[[ac."AC-RES-04".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.ResultsExportUiTest"
+method = "theRawOutputsAreUntouched"
+note = "Phase 10 unit 9, gate item 4. GUI test: after every filter change and every export of the class (four categories, three tables, two runs, and the weights), each file under each run's outputs/ has the SHA-256, size and modification time it had before, nothing new is under outputs/, and every export is under exports/. Uses the real Phase 00 K562 Percolator 3.07.1 output from scratch/ (D-006, never committed; fails, never skips, without it). Run on Linux only so far."
+
+[[ac."AC-RES-04".evidence]]
+kind = "test"
+class = "org.cometgui.results.filtering.store.ResultStoreContract"
+method = "rawFileUntouched"
+note = "Phase 10 units 2 and 3. Unit test in the store contract, run against the in-memory and the disk-backed store: every raw table's SHA-256 is unchanged after opening, any number of queries and closing."
+
+[[ac."AC-RES-04".evidence]]
+kind = "test"
+class = "org.cometgui.results.export.TableExportBehaviourTest"
+method = "aSourceInsideTheRunIsRelativeAndOnlyRead"
+note = "Phase 10 unit 6. Unit test: exporting a table inside a run only reads outputs/; the raw table is byte-identical afterwards and the export is written under exports/."
 
 [[ac."AC-RES-05".evidence]]
 kind = "test"
@@ -480,7 +548,7 @@ note = "Phase 09 unit 2 (nested class Fdr). PercolatorSettings holds testFDR and
 kind = "test"
 class = "org.cometgui.results.filtering.QValueFilterTest"
 method = "ownTypes"
-note = "Phase 09 unit 4 (nested class NotLearningThresholds). The PSM and peptide display filters are their own types and mention nothing from org.cometgui.params. Unit test. Proves the representation only: the filters exist here as values (defaults 0.01 and 0.01, [0, 1], inclusive); applying them to result tables, counts and export is Phase 10's (AC-RES-01..04)."
+note = "Phase 09 unit 4 (nested class NotLearningThresholds). The PSM and peptide display filters are their own types and mention nothing from org.cometgui.params. Unit test. Proves the representation: the filters exist here as values (defaults 0.01 and 0.01, [0, 1], inclusive). Applying them to result tables, counts and export was done in Phase 10 (AC-RES-01..04)."
 
 [[ac."AC-RES-05".evidence]]
 kind = "test"
@@ -513,17 +581,75 @@ method = "gate2ThreeNineChosenWithLimelight"
 note = "Phase 09 unit 5. Linux only, real binaries: 3.09 chosen by the user WITH Limelight enabled still gets no XML option in the recorded argv, writes no .xml and succeeds; provenance records -X as not passed for want of XML_OUTPUT."
 
 [[ac."AC-RES-08".evidence]]
-kind = "planned"
-phase = "10"
+kind = "test"
+class = "org.cometgui.app.gui.ResultsWeightsUiTest"
+method = "twoAndFourSplits"
+note = "Phase 10 unit 9, gate item 7. GUI test: runs whose weights files hold two and four splits show exactly two and four split columns, with values equal to an independent BigDecimal computation from the file. The split count is read from the artefact, not assumed to be three. Run on Linux only so far."
+
+[[ac."AC-RES-08".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.ResultsWeightsUiTest"
+method = "theExportHoldsTheIndependentValues"
+note = "Phase 10 unit 9, gate item 7. GUI test: the Export button writes the learned feature weights at full precision, each value within 1e-12 of the independent computation, with the split count in the sidecar. Uses the real Phase 00 K562 weights from scratch/ (D-006; fails, never skips, without it). Run on Linux only so far."
+
+[[ac."AC-RES-08".evidence]]
+kind = "test"
+class = "org.cometgui.results.export.WeightsExportTest"
+method = "valuesEqualTheSummary"
+note = "Phase 10 unit 6. Unit test: every exported value equals the weights summary's and each split's weights equal the artefact's text; the sidecar records the split and feature counts."
+
+[[ac."AC-RES-08".evidence]]
+kind = "test"
+class = "org.cometgui.results.parser.WeightsSummaryTest"
+method = "splitCount"
+note = "Phase 10 unit 4, nested class Ties. Unit test: the summary's split count is read from the file (2 for a two-split file)."
 
 [[ac."AC-RES-09".evidence]]
-kind = "planned"
-phase = "10"
+kind = "test"
+class = "org.cometgui.app.gui.ResultsWeightsUiTest"
+method = "theK562WeightsOnScreen"
+note = "Phase 10 unit 9, gate item 7. GUI test: for every feature of the real K562 Percolator 3.07.1 weights (3 splits, 22 features; from scratch/, D-006, fails never skips without it), the table on screen shows each split's weight, mean signed, mean absolute, population standard deviation, sign consistency and rank equal to an independent BigDecimal computation from the raw file, rounded to the displayed 4 and 6 decimals. Run on Linux only so far."
+
+[[ac."AC-RES-09".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.ResultsWeightsUiTest"
+method = "theTwoIndependentComputationsAgree"
+note = "Phase 10 unit 9. The test's own BigDecimal computation is itself checked against a second, separate one: Python fractions, recorded in WEIGHTS-SUMMARY.txt (summary statistics only, D-006)."
+
+[[ac."AC-RES-09".evidence]]
+kind = "test"
+class = "org.cometgui.results.parser.WeightsSummaryIndependentTest"
+method = "realK562"
+note = "Phase 10 unit 4. Unit test: WeightsSummary over the real K562 weights equals values computed independently with Python fractions and decimal and pinned with the command that produced them."
+
+[[ac."AC-RES-09".evidence]]
+kind = "test"
+class = "org.cometgui.results.parser.WeightsSummaryIndependentTest"
+method = "checkedInFiles"
+note = "Phase 10 unit 4. Unit test: the same comparison over the checked-in weights Percolator 3.06.5, 3.07.1 and 3.09 wrote for CometGUI's synthetic PIN, and the constructed two- and four-split files."
 
 [[ac."AC-RES-10".evidence]]
 kind = "planned"
 phase = "15"
-note = "Foundations are laid earlier, in phase 10."
+note = "Phase 15 owns the specification's thresholds, set on stable dedicated nightly runners (Performance and resource tests); scripts/ci/nightly-performance.sh and nightly-large-dataset.sh are still stubs. Phase 10 built the large fixture, the disk-backed store and local budget tests, below."
+
+[[ac."AC-RES-10".evidence]]
+kind = "test"
+class = "org.cometgui.results.filtering.store.DiskStoreBudgetTest"
+method = "largeFixtureWithinBudget"
+note = "Phase 10 unit 3, gate item 6 -- local evidence only. A child JVM at -Xmx64m opens the 1 000 000-row synthetic large fixture (scratch/phase10/large/, made by scripts/fixtures/large-results-fixture.py, SHA-256 pinned; fails, never skips, without it) through the store factory, which picks the disk store, and its counts at eight cutoffs equal the generator's manifest; open, counts, numeric and text sorts and a text filter each finish within documented budgets (measured 0.1-2.7 s, budgets 1-10 s) on the phase 10 Linux host. Not the specification's nightly-runner thresholds, which remain Phase 15's."
+
+[[ac."AC-RES-10".evidence]]
+kind = "test"
+class = "org.cometgui.results.filtering.store.DiskStoreBudgetTest"
+method = "readAllDoesNotFit"
+note = "Phase 10 unit 3. The negative control: reading the same table into memory with ResultTableReader.readAll in the same 64 MB heap dies of OutOfMemoryError, so the fixture provably crosses what the budget can hold."
+
+[[ac."AC-RES-10".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.ResultsLargeFixtureUiTest"
+method = "theLargeFixture"
+note = "Phase 10 unit 8, gate item 6. GUI test: the large fixture as a run's target PSM table opens, filters, sorts and pages in the Results section within documented budgets (open 15 s, filter 4 s, sorts 6 s and 15 s, page 2.5 s; measured 3.4 s, 0.7-1.0 s, 1.3 s, 3.4 s, 0.4-0.6 s), the table never holds more than one page of 200 items, and the heap grows by less than 64 MB (measured 3 MB). Local evidence on the phase 10 Linux host only."
 
 # --- AC-VIS -----------------------------------------------------------------
 

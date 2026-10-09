@@ -21,9 +21,9 @@ not the newest one and why, and records the choice.**
    measured was measured on Linux x86-64. No Percolator has been run by
    CometGUI on Windows or macOS yet, so on those platforms this page describes
    what the application is built to do. The results tables and the learned
-   weights view are not built yet (:doc:`results`,
-   :doc:`learned_feature_weights`), and neither is Limelight conversion
-   (:doc:`limelight`); this page says only what the Percolator section itself
+   weights view, built in Phase 10, have their own pages (:doc:`results`,
+   :doc:`learned_feature_weights`); Limelight conversion is not built yet
+   (:doc:`limelight`). This page says only what the Percolator section itself
    does.
 
 .. contents:: Contents
@@ -250,8 +250,9 @@ which results you *see and export*: a PSM is shown when its q-value is at or
 below the PSM filter, and a peptide when its q-value is at or below the
 peptide filter. Each is 0.01 by default, may be anything from 0 to 1, and is
 set independently of the other. Changing them **never reruns Percolator or
-any other tool** and never changes Percolator's output files. (The results
-tables they apply to are built in a later phase; see :doc:`results`.)
+any other tool** and never changes Percolator's output files. They are the
+same two filters the Results section shows: change them in either section and
+both show the new value (see :doc:`results`).
 
 **testFDR and trainFDR** (under **Advanced settings**) are part of
 Percolator's own learning: ``trainFDR`` decides which matches Percolator

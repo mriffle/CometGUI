@@ -245,6 +245,8 @@ A derived run's ``run.json`` is schema version 2: version 1 plus the
 -- are the source's, copied, because they describe the search whose merged PIN
 it rescored. A derived run cannot itself be rerun: rerun its source instead.
 
+.. _ref-project-format-derived:
+
 What CometGUI derives: ``results/`` and ``exports/``
 ----------------------------------------------------
 
@@ -264,7 +266,8 @@ leaves nothing here. Each run has its own index directory, so two runs' stores
 of one kind never share an index. An index records the size, modification time
 and SHA-256 of the raw table it was built from, and is rebuilt whenever they no
 longer match: it is a derived cache, never provenance, and deleting the
-directory loses nothing.
+directory loses nothing. The files' byte layout and the checks that decide
+whether one is reused are in :ref:`dev-results-model`.
 
 ``results/view-state.json`` -- the run's **view state**: the PSM and peptide
 display q-value filters its results were last shown with (``R-RES-01``:
@@ -318,6 +321,8 @@ state of the file means:**
 (``R-PERC-07``: "derived filtered exports shall be new files under a distinct
 directory"). Each export is a new file; none is ever overwritten. The formats
 are below, in `Exports and their sidecars`_.
+
+.. _ref-project-format-exports:
 
 Exports and their sidecars
 --------------------------
