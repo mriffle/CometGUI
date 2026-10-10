@@ -181,7 +181,7 @@ public final class VariableModsViewModel {
      * @return the presets
      */
     public List<ModificationPreset> presets() {
-        return presets.offeredIn(slots);
+        return presets.offeredIn(slotsRelease);
     }
 
     /**
@@ -415,7 +415,7 @@ public final class VariableModsViewModel {
     private List<VariableModSlotView> build() {
         CometParameters model = session.model();
         Set<String> open = unresolvedSlots();
-        List<ModificationPreset> offered = presets.offeredIn(slots);
+        List<ModificationPreset> offered = presets.offeredIn(slotsRelease);
         List<VariableModSlotView> built = new ArrayList<>();
         List<String> names = slots.slots();
         for (int index = 0; index < names.size(); index++) {

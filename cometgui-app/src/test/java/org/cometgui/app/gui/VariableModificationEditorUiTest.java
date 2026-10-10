@@ -103,18 +103,19 @@ class VariableModificationEditorUiTest {
         choose(
                 driver,
                 "ess-varmod-preset",
-                "Phospho: +79.966331 on STY; max 3 per peptide; optional");
+                "Phospho: +79.966331 on STY; max 3 per peptide; optional; neutral loss"
+                        + " 97.976896");
         driver.clickOn("ess-varmod-add");
         assertAll(
                 "after adding phosphorylation",
                 () ->
                         assertEquals(
-                                "Serialised: variable_mod02 = 79.966331 STY 0 3 -1 0 0 0.0",
+                                "Serialised: variable_mod02 = 79.966331 STY 0 3 -1 0 0 97.976896",
                                 driver.textOf(SLOT_2)),
                 () ->
                         assertEquals(
                                 "Variable modification 2: Phospho: +79.966331 on STY; max 3 per"
-                                        + " peptide; optional",
+                                        + " peptide; optional; neutral loss 97.976896",
                                 driver.textOf("ess-variable_mod02")),
                 () ->
                         assertEquals(
@@ -124,12 +125,12 @@ class VariableModificationEditorUiTest {
         // Edit: the maximum count, a residue, and the mass.
         enter(driver, "ess-variable_mod02-part-maximum-count", "2");
         assertEquals(
-                "Serialised: variable_mod02 = 79.966331 STY 0 2 -1 0 0 0.0",
+                "Serialised: variable_mod02 = 79.966331 STY 0 2 -1 0 0 97.976896",
                 driver.textOf(SLOT_2),
                 "after the maximum count is typed");
         driver.clickOn("ess-variable_mod02-residue-T");
         assertEquals(
-                "Serialised: variable_mod02 = 79.966331 SY 0 2 -1 0 0 0.0",
+                "Serialised: variable_mod02 = 79.966331 SY 0 2 -1 0 0 97.976896",
                 driver.textOf(SLOT_2),
                 "after threonine is cleared");
         enter(driver, "ess-variable_mod02-part-mass", "79.96633");
@@ -137,7 +138,7 @@ class VariableModificationEditorUiTest {
                 "after the mass is typed",
                 () ->
                         assertEquals(
-                                "Serialised: variable_mod02 = 79.96633 SY 0 2 -1 0 0 0.0",
+                                "Serialised: variable_mod02 = 79.96633 SY 0 2 -1 0 0 97.976896",
                                 driver.textOf(SLOT_2)),
                 () ->
                         assertEquals(
@@ -151,7 +152,7 @@ class VariableModificationEditorUiTest {
                 "after moving slot 2 up",
                 () ->
                         assertEquals(
-                                "Serialised: variable_mod01 = 79.96633 SY 0 2 -1 0 0 0.0",
+                                "Serialised: variable_mod01 = 79.96633 SY 0 2 -1 0 0 97.976896",
                                 driver.textOf(SLOT_1)),
                 () ->
                         assertEquals(
@@ -237,7 +238,8 @@ class VariableModificationEditorUiTest {
                         assertEquals(
                                 List.of(
                                         "Oxidation: +15.994915 on M; max 3 per peptide; optional",
-                                        "Phospho: +79.966331 on STY; max 3 per peptide; optional",
+                                        "Phospho: +79.966331 on STY; max 3 per peptide;"
+                                                + " optional; neutral loss 97.976896",
                                         "Acetyl: +42.010565 on N-terminus, only at the protein"
                                                 + " N-terminus; max 1 per peptide; optional",
                                         "Deamidation: +0.984016 on NQ; max 3 per peptide; optional",

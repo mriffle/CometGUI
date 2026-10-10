@@ -1,60 +1,100 @@
 {
-  "modificationPresetFormat": 1,
-  "description": "Common variable modifications the variable-modification editor offers in one step (R-PARAM-09). Each mass difference is the monoisotopic delta of the cited Unimod record (fetched 2026-10-05); each tuple's other fields follow the cited Comet documentation. A preset is offered for a release only where a slot of that release can hold it. Documented in docs/developer/comet_parameter_schema.rst, section 'Common-modification presets'.",
+  "modificationPresetFormat": 2,
+  "description": "Common variable modifications the variable-modification editor offers in one step (R-PARAM-09). Each mass difference is the monoisotopic delta of the cited Unimod record (fetched 2026-10-05). Each preset lists the Comet releases it is offered for, each with that release's own Comet parameter documentation for the tuple's form, and is offered for exactly those releases (each of which must be able to hold it in a slot). Documented in docs/developer/comet_parameter_schema.rst, section 'Common-modification presets'.",
   "presets": [
     {
       "id": "oxidation-m",
       "name": "Oxidation",
       "description": "Oxidation of methionine (M), up to three per peptide, optional.",
-      "cometVersion": "2026.02.2",
       "tuple": "15.994915 M 0 3 -1 0 0 0.0",
       "massSource": "https://www.unimod.org/modifications_view.php?editid1=35 -- Unimod 35, Oxidation: monoisotopic 15.994915; site M, position Anywhere",
-      "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the page's first example, variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0, which is also comet -q's own variable_mod01; the precise mass is Unimod's"
+      "releases": [
+        {
+          "cometVersion": "2026.02.2",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the page's first example, variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0, which is also comet -q's own variable_mod01; the precise mass is Unimod's"
+        },
+        {
+          "cometVersion": "2026.03.0",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html -- the page's first example, variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0, which is also comet -q's own variable_mod01; the precise mass is Unimod's"
+        }
+      ]
     },
     {
       "id": "phospho-sty",
       "name": "Phospho",
-      "description": "Phosphorylation of serine, threonine and tyrosine (S, T, Y), up to three per peptide, optional, no neutral loss.",
-      "cometVersion": "2026.02.2",
-      "tuple": "79.966331 STY 0 3 -1 0 0 0.0",
+      "description": "Phosphorylation of serine, threonine and tyrosine (S, T, Y), up to three per peptide, optional, with the neutral loss of phosphoric acid (H3PO4, 97.976896) considered for fragment ions.",
+      "tuple": "79.966331 STY 0 3 -1 0 0 97.976896",
       "massSource": "https://www.unimod.org/modifications_view.php?editid1=21 -- Unimod 21, Phospho: monoisotopic 79.966331; sites S, T and Y, position Anywhere",
-      "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the page's example variable_mod02 = 79.966331 STY 0 3 -1 0 0 97.976896, here without the neutral loss (eighth field 0.0, 'not zero' enables one)"
+      "releases": [
+        {
+          "cometVersion": "2026.02.2",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the page's own example, variable_mod02 = 79.966331 STY 0 3 -1 0 0 97.976896, 'possible phosphorylation on any S, T, Y residue with a neutral loss of 98'"
+        },
+        {
+          "cometVersion": "2026.03.0",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html -- the page's own example, variable_mod02 = 79.966331 STY 0 3 -1 0 0 97.976896, 'possible phosphorylation on any S, T, Y residue with a neutral loss of 98'"
+        }
+      ]
     },
     {
       "id": "acetyl-protein-n-term",
       "name": "Acetyl",
       "description": "Acetylation of the protein N-terminus, written as Comet 2026.02.2 writes it: n at distance 0 from the protein N-terminus.",
-      "cometVersion": "2026.02.2",
       "tuple": "42.010565 n 0 1 0 0 0 0.0",
       "massSource": "https://www.unimod.org/modifications_view.php?editid1=1 -- Unimod 1, Acetyl: monoisotopic 42.010565; site N-term, position Protein N-term",
-      "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the page's example variable_mod01 = 15.994915 n 0 3 0 0 0 0.0, 'oxidation of protein N-terminus': n, distance 0, terminus 0 (protein N-terminus); one per peptide, as a terminus has one"
+      "releases": [
+        {
+          "cometVersion": "2026.02.2",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the page's example variable_mod01 = 15.994915 n 0 3 0 0 0 0.0, 'oxidation of protein N-terminus': n, distance 0, terminus 0 (protein N-terminus); one per peptide, as a terminus has one"
+        }
+      ]
     },
     {
       "id": "acetyl-protein-n-term-caret",
       "name": "Acetyl",
       "description": "Acetylation of the protein N-terminus with Comet 2026.03.0's protein N-terminus code ^.",
-      "cometVersion": "2026.03.0",
       "tuple": "42.010565 ^ 0 1 -1 0 0 0.0",
       "massSource": "https://www.unimod.org/modifications_view.php?editid1=1 -- Unimod 1, Acetyl: monoisotopic 42.010565; site N-term, position Protein N-term",
-      "formSource": "https://github.com/UWPR/Comet/blob/v2026.03.0/Comet.cpp#L996-L1003 -- comet -q's own comment above the slots: '^ = protein N-terminus only, $ = protein C-terminus only (e.g. 42.010565 ^ 0 1 -1 0 0 0.0)'"
+      "releases": [
+        {
+          "cometVersion": "2026.03.0",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html -- the page's own example, variable_mod01 = 42.010565 ^ 0 1 -1 0 0 0.0, 'acetylation of protein N-terminus (release 2026.03.0 and later)'; the same page gives 15.994915 n 0 3 0 0 0 0.0 as 'same as 15.994915 ^ 0 3 -1 0 0 0.0', and the two Acetyl forms were run on the real 2026.03.0 binary on 2026-10-10 with identical results"
+        }
+      ]
     },
     {
       "id": "deamidation-nq",
       "name": "Deamidation",
       "description": "Deamidation of asparagine and glutamine (N, Q), up to three per peptide, optional.",
-      "cometVersion": "2026.02.2",
       "tuple": "0.984016 NQ 0 3 -1 0 0 0.0",
       "massSource": "https://www.unimod.org/modifications_view.php?editid1=7 -- Unimod 7, Deamidated: monoisotopic 0.984016; sites N and Q, position Anywhere",
-      "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the fields of the page's first example, variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0, with two residues listed as one string"
+      "releases": [
+        {
+          "cometVersion": "2026.02.2",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the fields of the page's first example, variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0, with two residues listed as one string"
+        },
+        {
+          "cometVersion": "2026.03.0",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html -- the fields of the page's first example, variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0, with two residues listed as one string"
+        }
+      ]
     },
     {
       "id": "gln-pyro-glu",
       "name": "Gln->pyro-Glu",
       "description": "Cyclisation of a glutamine (Q) at the peptide N-terminus to pyroglutamic acid.",
-      "cometVersion": "2026.02.2",
       "tuple": "-17.026549 Q 0 1 0 2 0 0.0",
       "massSource": "https://www.unimod.org/modifications_view.php?editid1=28 -- Unimod 28, Gln->pyro-Glu: monoisotopic -17.026549; site Q, position Any N-term",
-      "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the page's example variable_mod03 = -17.026549 Q 0 1 0 2 0 0.0, 'cyclization of N-terminal glutamine to form pyroglutamic acid'"
+      "releases": [
+        {
+          "cometVersion": "2026.02.2",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html -- the page's example variable_mod03 = -17.026549 Q 0 1 0 2 0 0.0, 'cyclization of N-terminal glutamine to form pyroglutamic acid'"
+        },
+        {
+          "cometVersion": "2026.03.0",
+          "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html -- the page's example variable_mod03 = -17.026549 Q 0 1 0 2 0 0.0, 'cyclization of N-terminal glutamine to form pyroglutamic acid'"
+        }
+      ]
     }
   ]
 }

@@ -3577,22 +3577,55 @@ modifications in one step (``R-PARAM-09``, "common modification presets").
 Their masses are scientific data, so they are not in the editor: they are
 ``comet-modification-presets.json`` beside the metadata, read by
 ``ModificationPresets`` with the preset file's rules (every field required,
-no other allowed)::
+no other allowed). Format 2 (2026-10-10) lists, per preset, the releases it is
+offered for, each with that release's own documentation of the form::
 
-    {"modificationPresetFormat": 1, "description": "...",
+    {"modificationPresetFormat": 2, "description": "...",
      "presets": [{"id": "oxidation-m", "name": "Oxidation", "description": "...",
-                  "cometVersion": "2026.02.2",              // whose tuple syntax "tuple" is in
                   "tuple": "15.994915 M 0 3 -1 0 0 0.0",
                   "massSource": "https://www.unimod.org/...editid1=35 -- ... 15.994915 ...",
-                  "formSource": "https://uwpr.github.io/Comet/..."}]}
+                  "releases": [{"cometVersion": "2026.02.2",
+                                "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202602/..."},
+                               {"cometVersion": "2026.03.0",
+                                "formSource": "https://uwpr.github.io/Comet/parameters/parameters_202603/..."}]}]}
 
 A preset is refused, naming it and the field, when its id is not one or is
-used twice, its ``cometVersion`` is not curated, its tuple does not read under
-that release's codec, its mass difference is 0, a source cites no ``https://``
+used twice, it lists no release or one release twice, a listed
+``cometVersion`` is not curated, its tuple does not read under a listed
+release's codec, its mass difference is 0, a source cites no ``https://``
 reference, or the mass source does not quote the mass exactly as the tuple
-writes it. ``offeredIn(slots)`` is the presets a release's slots can hold
-(``VariableModSlots.unwritable``), so the one written with ``^`` is offered
-for 2026.03.0 and not for 2026.02.2 -- by the alphabet, not by a version test.
+writes it. ``offeredIn(release)`` is exactly the presets that list the release
+-- data, not a version test -- so one modification can have one form per
+release. ``ModificationPresetsTest`` also holds every offered preset to its
+release's ``VariableModSlots.unwritable``.
+
+**The owner's review of 2026-10-10.** Phospho is Comet's own documented
+example *with* the H3PO4 neutral loss, ``79.966331 STY 0 3 -1 0 0 97.976896``,
+cited for each release from that release's parameter page [VM]_ [VM3]_. Each
+release offers exactly **one** protein N-terminal Acetyl: 2026.02.2 the ``n``
+form, 2026.03.0 the ``^`` form only. The maximum of 3 per peptide stays and no
+preset was added.
+
+*Why 2026.03.0 drops the* ``n`` *form, by execution.* On 2026-10-10 the real
+2026.03.0 binary (``v2026.03.0__comet.linux.exe``, SHA-256 ``ad93b4cf...``)
+searched the LF copy of ``20100614_Velos1_TaGe_SA_K562_3.mzML`` (SHA-256
+``a562f6e6...54da``; 728 spectra loaded) against the whole
+``UP000005640_9606.fasta`` (SHA-256 ``2329a517...d5a0``), from its own ``-q``
+file with ``database_name`` set, ``spectral_library_name`` empty,
+``num_threads = 32``, ``output_txtfile = 1``, and ``variable_mod02`` the only
+difference::
+
+    comet -Pcomet.params -Nout k562_3.lf.mzML     # variable_mod02 = 42.010565 n 0 1 0 0 0 0.0
+    comet -Pcomet.params -Nout k562_3.lf.mzML     # variable_mod02 = 42.010565 ^ 0 1 -1 0 0 0.0
+
+Both exited 0 with 728 spectrum queries, 3 637 search hits and 61 hits
+carrying the N-terminal acetyl (``mod_nterm_mass="43.018390"``). The pepXML
+files differ in three lines only -- the run date, the output base name and
+the echoed ``variable_mod02`` parameter -- and the text output in its header
+line only. Repeated with ``clip_nterm_methionine = 1``: 3 637 hits, 94
+acetylated, and no difference beyond those three lines. Comet's own 2026.03.0
+page agrees: it gives ``15.994915 n 0 3 0 0 0 0.0`` as "same as ``15.994915 ^
+0 3 -1 0 0 0.0``" [VM3]_.
 
 .. list-table::
    :header-rows: 1
@@ -3606,17 +3639,17 @@ for 2026.03.0 and not for 2026.02.2 -- by the alphabet, not by a version test.
      - Unimod 35, 15.994915; the fields of ``-q``'s own ``variable_mod01``
        and the page's first example [VM]_
    * - Phospho (STY)
-     - ``79.966331 STY 0 3 -1 0 0 0.0``
-     - Unimod 21, 79.966331; the page's phospho example without its neutral
-       loss
+     - ``79.966331 STY 0 3 -1 0 0 97.976896``
+     - Unimod 21, 79.966331; the page's own phospho example, with its neutral
+       loss of 97.976896; both releases
    * - Acetyl (protein N-term)
      - ``42.010565 n 0 1 0 0 0 0.0``
      - Unimod 1, 42.010565; ``n`` at distance 0 from the protein N-terminus,
-       the page's "oxidation of protein N-terminus" form; both releases
+       the page's "oxidation of protein N-terminus" form; **2026.02.2 only**
    * - Acetyl (protein N-term, ``^``)
      - ``42.010565 ^ 0 1 -1 0 0 0.0``
-     - Unimod 1; the 2026.03.0 ``-q`` comment's own example [V26M]_;
-       2026.03.0 only
+     - Unimod 1; the 2026.03.0 page's own example [VM3]_ and ``-q``
+       comment's [V26M]_; **2026.03.0 only**
    * - Deamidation (NQ)
      - ``0.984016 NQ 0 3 -1 0 0 0.0``
      - Unimod 7, 0.984016
@@ -3627,7 +3660,8 @@ for 2026.03.0 and not for 2026.02.2 -- by the alphabet, not by a version test.
 The Unimod records were fetched on 2026-10-05 and each file entry quotes the
 record's monoisotopic delta and site. ``ModificationPresetsTest`` types the
 six tuples, summaries and Unimod record numbers by hand, the per-release
-offer, and one CONSTRUCTED breach per rule.
+offer (one Acetyl per release), each release's own page cited, and one
+CONSTRUCTED breach per rule.
 
 .. [UMx] https://www.unimod.org/modifications_view.php?editid1=35 (Oxidation),
    ``editid1=21`` (Phospho), ``editid1=1`` (Acetyl), ``editid1=7``
@@ -4887,6 +4921,7 @@ Citations
 Comet's documentation, 2026.02 page set, fetched 2026-10-02:
 
 .. [VM] https://uwpr.github.io/Comet/parameters/parameters_202602/variable_modXX.html
+.. [VM3] https://uwpr.github.io/Comet/parameters/parameters_202603/variable_modXX.html
 .. [EZ] https://uwpr.github.io/Comet/parameters/parameters_202602/search_enzyme_number.html
 .. [TL] https://uwpr.github.io/Comet/parameters/parameters_202602/peptide_mass_tolerance_lower.html
 .. [IA] https://uwpr.github.io/Comet/parameters/parameters_202602/use_A_ions.html

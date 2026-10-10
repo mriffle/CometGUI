@@ -87,15 +87,20 @@ class VariableModsViewModelTest {
         // add: the first unused slot is variable_mod02
         assertEquals(EditOutcome.applied(), editor.add(preset(editor, "phospho-sty")));
         assertEquals(
-                List.of(DEFAULT_OXIDATION, "79.966331 STY 0 3 -1 0 0 0.0", UNUSED),
+                List.of(DEFAULT_OXIDATION, "79.966331 STY 0 3 -1 0 0 97.976896", UNUSED),
                 serialised(editor, "variable_mod01", "variable_mod02", "variable_mod03"));
-        assertEquals("79.966331 STY 0 3 -1 0 0 0.0", session.model().text("variable_mod02"));
+        assertEquals("79.966331 STY 0 3 -1 0 0 97.976896", session.model().text("variable_mod02"));
         assertEquals(ValueOrigin.USER, session.model().origin("variable_mod02"));
 
         // edit: a minimum count, a neutral loss, and Y cleared from the residue multi-select
         assertEquals(
                 EditOutcome.applied(),
                 editor.setPart("variable_mod02", VariableModPart.MINIMUM_COUNT, "1"));
+        assertEquals(
+                "79.966331 STY 0 1,3 -1 0 0 97.976896", editor.slot("variable_mod02").serialised());
+        assertEquals(
+                EditOutcome.applied(),
+                editor.setPart("variable_mod02", VariableModPart.NEUTRAL_LOSS, "0.0"));
         assertEquals("79.966331 STY 0 1,3 -1 0 0 0.0", editor.slot("variable_mod02").serialised());
         assertEquals(
                 EditOutcome.applied(),
@@ -239,13 +244,13 @@ class VariableModsViewModelTest {
         }
 
         @Test
-        @DisplayName("2026.03.0 offers six presets; 2026.02.2 five, not the one written with ^")
+        @DisplayName(
+                "each release offers five presets and one Acetyl: ^ for 2026.03.0, n for 2026.02.2")
         void presetsPerRelease() {
             assertEquals(
                     List.of(
                             "oxidation-m",
                             "phospho-sty",
-                            "acetyl-protein-n-term",
                             "acetyl-protein-n-term-caret",
                             "deamidation-nq",
                             "gln-pyro-glu"),

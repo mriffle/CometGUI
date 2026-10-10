@@ -162,8 +162,9 @@ The common modifications
 
 Each common modification is a complete slot, ready to add. Every mass is the
 monoisotopic mass of its **Unimod** record; every other field follows an
-example on Comet's own ``variable_modXX`` documentation page or in Comet's own
-default parameter file.
+example on Comet's own ``variable_modXX`` documentation page for that release,
+or in Comet's own default parameter file. Each release offers five, and
+**exactly one Acetyl**: the form that release documents.
 
 .. list-table::
    :header-rows: 1
@@ -175,13 +176,13 @@ default parameter file.
    * - Oxidation, on M
      - ``15.994915 M 0 3 -1 0 0 0.0``
      - Unimod 35, Oxidation
-   * - Phospho, on S, T and Y
-     - ``79.966331 STY 0 3 -1 0 0 0.0``
+   * - Phospho, on S, T and Y, with the neutral loss of phosphoric acid
+     - ``79.966331 STY 0 3 -1 0 0 97.976896``
      - Unimod 21, Phospho
-   * - Acetyl, protein N-terminus (both releases)
+   * - Acetyl, protein N-terminus (**2026.02.2**)
      - ``42.010565 n 0 1 0 0 0 0.0``
      - Unimod 1, Acetyl
-   * - Acetyl, protein N-terminus (**2026.03.0 only**)
+   * - Acetyl, protein N-terminus (**2026.03.0**)
      - ``42.010565 ^ 0 1 -1 0 0 0.0``
      - Unimod 1, Acetyl
    * - Deamidation, on N and Q
@@ -191,14 +192,16 @@ default parameter file.
      - ``-17.026549 Q 0 1 0 2 0 0.0``
      - Unimod 28, Gln->pyro-Glu
 
-So Comet 2026.03.0 offers six and Comet 2026.02.2 five: a modification is
-offered only where the release can hold it. The masses are Unimod's; the
-other fields are CometGUI's choices, each based on an example in Comet's
-documentation, and two are worth knowing: the Phospho entry carries **no
-neutral loss** (Comet's own example adds ``97.976896``; type it into the
-*Neutral loss* box if you want it), and on 2026.03.0 both forms of the
-protein N-terminal Acetyl are offered. The full citations are in
-:ref:`dev-comet-parameter-modification-presets`.
+The masses are Unimod's; the other fields follow Comet's documentation, and
+two are worth knowing. **Phospho** is Comet's own documented example, so it
+asks Comet to consider the loss of phosphoric acid (``97.976896``) from
+fragment ions; set the *Neutral loss* box to ``0.0`` if you do not want that.
+**Acetyl** on the protein N-terminus is written ``n`` at distance ``0`` from
+the protein N-terminus for 2026.02.2, and with the protein N-terminus code
+``^`` for 2026.03.0, which Comet's 2026.03.0 documentation gives for exactly
+this. Both forms were run on the real Comet 2026.03.0 with the same spectra
+and database, and gave identical results, so 2026.03.0 offers only its own.
+The full citations are in :ref:`dev-comet-parameter-modification-presets`.
 
 Comet's own default ``variable_mod01`` is ``15.9949 M 0 3 -1 0 0 0.0`` --
 oxidation with a rounded mass -- so a new configuration starts with that slot

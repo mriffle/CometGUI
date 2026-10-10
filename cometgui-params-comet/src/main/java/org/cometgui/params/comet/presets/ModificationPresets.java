@@ -30,7 +30,6 @@ import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.value.ValueSyntaxException;
 import org.cometgui.params.comet.value.VariableModCodec;
-import org.cometgui.params.comet.value.VariableModSlots;
 import org.cometgui.params.comet.value.VariableModification;
 import org.cometgui.provenance.json.JsonParseException;
 import org.cometgui.provenance.json.JsonReader;
@@ -43,15 +42,16 @@ import org.cometgui.provenance.json.JsonValue;
  *
  * <p>The document has the preset file's rules: read with the project's one JSON reader, every field
  * required and no other allowed. A preset is refused, naming it and the field, when its id is not
- * one or is used twice, its {@code cometVersion} is not a curated release, its tuple is not one
- * that release reads, its mass difference is 0 (a preset that leaves a slot unused), or a source
- * cites no {@code https://} reference -- and the mass source must quote the mass exactly as the
- * tuple writes it, so that a mass changed in one place and not the other is refused.
+ * one or is used twice, it lists no release or one release twice, a listed {@code cometVersion} is
+ * not a curated release, its tuple is not one every listed release reads, its mass difference is 0
+ * (a preset that leaves a slot unused), or a source cites no {@code https://} reference -- and the
+ * mass source must quote the mass exactly as the tuple writes it, so that a mass changed in one
+ * place and not the other is refused.
  *
- * <p>Which presets a release offers is {@link #offeredIn(VariableModSlots)}: those a slot of that
- * release can hold. A preset written with Comet 2026.03.0's protein-terminus code {@code ^} is
- * therefore offered for 2026.03.0 and not for 2026.02.2, by the release's residue alphabet, not by
- * a version test.
+ * <p>Which presets a release offers is {@link #offeredIn(ToolVersion)}: exactly those that list it.
+ * The release list is data, so one modification can be offered in one form per release -- protein
+ * N-terminal acetylation as {@code n} at distance 0 for 2026.02.2 and as {@code ^} for 2026.03.0 --
+ * and no code tests a version.
  */
 public final class ModificationPresets {
 
@@ -60,7 +60,7 @@ public final class ModificationPresets {
             "/org/cometgui/params/comet/schema/comet-modification-presets.json";
 
     /** The only {@code modificationPresetFormat} this loader reads. */
-    public static final int FORMAT = 1;
+    public static final int FORMAT = 2;
 
     private static final String HTTPS = "https://";
 
@@ -68,14 +68,9 @@ public final class ModificationPresets {
             List.of("modificationPresetFormat", "description", "presets");
 
     private static final List<String> PRESET_FIELDS =
-            List.of(
-                    "id",
-                    "name",
-                    "description",
-                    "cometVersion",
-                    "tuple",
-                    "massSource",
-                    "formSource");
+            List.of("id", "name", "description", "tuple", "massSource", "releases");
+
+    private static final List<String> RELEASE_FIELDS = List.of("cometVersion", "formSource");
 
     private final List<ModificationPreset> presets;
 
@@ -156,14 +151,31 @@ public final class ModificationPresets {
                     "is not a preset id: lower-case letters, digits and hyphens, starting with a"
                             + " letter or digit");
         }
-        ToolVersion version = release(node, metadata);
         String tuple = node.text("tuple");
-        VariableModCodec codec = VariableModCodec.forVersion(metadata, version);
-        VariableModification modification;
-        try {
-            modification = codec.parse(codec.slots().get(0), tuple);
-        } catch (ValueSyntaxException unreadable) {
-            throw node.failure("tuple", unreadable.getMessage());
+        List<JsonValue> listed = node.array("releases");
+        if (listed.isEmpty()) {
+            throw node.failure("releases", "lists no release, so the preset is offered nowhere");
+        }
+        List<ModificationPreset.Release> releases = new ArrayList<>();
+        Set<ToolVersion> seen = new HashSet<>();
+        VariableModification modification = null;
+        for (int at = 0; at < listed.size(); at++) {
+            PresetLoader.Fields entry =
+                    PresetLoader.Fields.of(
+                            listed.get(at),
+                            "modification preset \"" + id + "\" releases[" + at + "]",
+                            "releases");
+            entry.only(RELEASE_FIELDS);
+            ToolVersion version = release(entry, metadata);
+            if (!seen.add(version)) {
+                throw entry.failure(
+                        "cometVersion", "lists Comet " + version.text() + " twice for one preset");
+            }
+            VariableModification read = readIn(node, metadata, version, tuple);
+            if (modification == null) {
+                modification = read;
+            }
+            releases.add(new ModificationPreset.Release(version, source(entry, "formSource")));
         }
         if (modification.isUnused()) {
             throw node.failure(
@@ -181,11 +193,26 @@ public final class ModificationPresets {
                 id,
                 node.text("name"),
                 node.text("description"),
-                version,
                 tuple,
                 modification,
                 massSource,
-                source(node, "formSource"));
+                releases);
+    }
+
+    /*
+     * The tuple read with one listed release's own codec, so a preset is never listed for a release
+     * that cannot read it -- a tuple written with ^ listed for 2026.02.2 is refused here.
+     * ModificationPresetsTest also holds every offered preset to its release's
+     * VariableModSlots.unwritable, which the old slot-driven offer used.
+     */
+    private static VariableModification readIn(
+            PresetLoader.Fields node, CuratedMetadata metadata, ToolVersion version, String tuple) {
+        VariableModCodec codec = VariableModCodec.forVersion(metadata, version);
+        try {
+            return codec.parse(codec.slots().get(0), tuple);
+        } catch (ValueSyntaxException unreadable) {
+            throw node.failure("tuple", unreadable.getMessage());
+        }
     }
 
     private static ToolVersion release(PresetLoader.Fields node, CuratedMetadata metadata) {
@@ -225,16 +252,15 @@ public final class ModificationPresets {
     }
 
     /**
-     * The presets a release offers: those a slot of the release can hold.
+     * The presets a release offers: exactly those that list it. The loader has already refused a
+     * preset that lists a release none of whose slots can hold it.
      *
-     * @param slots the release's slots
+     * @param release the Comet release
      * @return the presets, in document order
      */
-    public List<ModificationPreset> offeredIn(VariableModSlots slots) {
-        Objects.requireNonNull(slots, "slots");
-        return presets.stream()
-                .filter(preset -> slots.unwritable(preset.modification()).isEmpty())
-                .toList();
+    public List<ModificationPreset> offeredIn(ToolVersion release) {
+        Objects.requireNonNull(release, "release");
+        return presets.stream().filter(preset -> preset.offeredFor(release)).toList();
     }
 
     /**

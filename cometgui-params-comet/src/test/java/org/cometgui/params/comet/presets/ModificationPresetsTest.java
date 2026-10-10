@@ -20,7 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.schema.CuratedMetadata;
@@ -43,15 +45,27 @@ class ModificationPresetsTest {
 
     private static final ToolVersion C02 = ToolVersion.parse("2026.02.2");
 
+    /** Each release's Comet parameter documentation directory, typed by hand. */
+    private static final Map<ToolVersion, String> PAGE = Map.of(C02, "202602", C03, "202603");
+
     private static final String PRESET =
             """
             {"id": "oxidation-m", "name": "Oxidation", "description": "Oxidised methionine.",
-             "cometVersion": "2026.02.2", "tuple": "15.994915 M 0 3 -1 0 0 0.0",
+             "tuple": "15.994915 M 0 3 -1 0 0 0.0",
              "massSource": "https://www.unimod.org/modifications_view.php?editid1=35 15.994915",
-             "formSource": "https://uwpr.github.io/Comet/x"}""";
+             "releases": [{"cometVersion": "2026.02.2",
+                           "formSource": "https://uwpr.github.io/Comet/x"}]}""";
+
+    /** The same preset listed for both curated releases. */
+    private static final String BOTH =
+            PRESET.replace(
+                    "\"formSource\": \"https://uwpr.github.io/Comet/x\"}]",
+                    "\"formSource\": \"https://uwpr.github.io/Comet/x\"},"
+                            + " {\"cometVersion\": \"2026.03.0\","
+                            + " \"formSource\": \"https://uwpr.github.io/Comet/y\"}]");
 
     private static String document(String... presets) {
-        return "{\"modificationPresetFormat\": 1, \"description\": \"constructed\", \"presets\": ["
+        return "{\"modificationPresetFormat\": 2, \"description\": \"constructed\", \"presets\": ["
                 + String.join(",", presets)
                 + "]}";
     }
@@ -82,7 +96,7 @@ class ModificationPresetsTest {
         assertEquals(
                 List.of(
                         "15.994915 M 0 3 -1 0 0 0.0",
-                        "79.966331 STY 0 3 -1 0 0 0.0",
+                        "79.966331 STY 0 3 -1 0 0 97.976896",
                         "42.010565 n 0 1 0 0 0 0.0",
                         "42.010565 ^ 0 1 -1 0 0 0.0",
                         "0.984016 NQ 0 3 -1 0 0 0.0",
@@ -91,7 +105,8 @@ class ModificationPresetsTest {
         assertEquals(
                 List.of(
                         "Oxidation: +15.994915 on M; max 3 per peptide; optional",
-                        "Phospho: +79.966331 on STY; max 3 per peptide; optional",
+                        "Phospho: +79.966331 on STY; max 3 per peptide; optional; neutral loss"
+                                + " 97.976896",
                         "Acetyl: +42.010565 on N-terminus, only at the protein N-terminus; max 1"
                                 + " per peptide; optional",
                         "Acetyl: +42.010565 on protein N-terminus; max 1 per peptide; optional",
@@ -115,28 +130,73 @@ class ModificationPresetsTest {
                                     "https://www.unimod.org/modifications_view.php?"
                                             + unimod.get(index)),
                     preset.massSource());
-            assertTrue(preset.formSource().startsWith("https://"), preset.formSource());
+            for (ModificationPreset.Release release : preset.releases()) {
+                assertTrue(
+                        release.formSource()
+                                .startsWith(
+                                        "https://uwpr.github.io/Comet/parameters/parameters_"
+                                                + PAGE.get(release.cometVersion())
+                                                + "/variable_modXX.html -- "),
+                        () ->
+                                preset.id()
+                                        + " for Comet "
+                                        + release.cometVersion().text()
+                                        + " must cite that release's own parameter page: "
+                                        + release.formSource());
+            }
         }
-        assertEquals(C03, presets.byId("acetyl-protein-n-term-caret").orElseThrow().writtenFor());
-        assertEquals(C02, presets.byId("oxidation-m").orElseThrow().writtenFor());
+        assertEquals(
+                List.of(
+                        "oxidation-m [2026.02.2, 2026.03.0]",
+                        "phospho-sty [2026.02.2, 2026.03.0]",
+                        "acetyl-protein-n-term [2026.02.2]",
+                        "acetyl-protein-n-term-caret [2026.03.0]",
+                        "deamidation-nq [2026.02.2, 2026.03.0]",
+                        "gln-pyro-glu [2026.02.2, 2026.03.0]"),
+                presets.all().stream()
+                        .map(
+                                preset ->
+                                        preset.id()
+                                                + " "
+                                                + preset.releases().stream()
+                                                        .map(r -> r.cometVersion().text())
+                                                        .toList())
+                        .toList());
         assertEquals(Optional.empty(), presets.byId("nonesuch"));
     }
 
     @Test
-    @DisplayName("2026.03.0 offers all six; 2026.02.2 not the one written with ^")
+    @DisplayName(
+            "Phospho is Comet's own documented example, with the H3PO4 neutral loss of 97.976896")
+    void phosphoCarriesItsNeutralLoss() {
+        ModificationPreset phospho =
+                ModificationPresets.loadBundled(METADATA).byId("phospho-sty").orElseThrow();
+        assertEquals("79.966331 STY 0 3 -1 0 0 97.976896", phospho.tuple());
+        assertEquals(
+                List.of(new BigDecimal("97.976896")),
+                phospho.modification().neutralLosses(),
+                "the eighth field is the fragment neutral loss; 0.0 would be none");
+        for (ToolVersion release : List.of(C02, C03)) {
+            assertEquals(
+                    "79.966331 STY 0 3 -1 0 0 97.976896",
+                    VariableModCodec.forVersion(METADATA, release).format(phospho.modification()),
+                    "written back unchanged by Comet " + release.text());
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "each release offers five, and exactly one Acetyl: n for 2026.02.2, ^ for 2026.03.0")
     void offeredPerRelease() {
         ModificationPresets presets = ModificationPresets.loadBundled(METADATA);
         assertEquals(
                 List.of(
                         "oxidation-m",
                         "phospho-sty",
-                        "acetyl-protein-n-term",
                         "acetyl-protein-n-term-caret",
                         "deamidation-nq",
                         "gln-pyro-glu"),
-                presets.offeredIn(VariableModSlots.forRelease(METADATA, C03)).stream()
-                        .map(ModificationPreset::id)
-                        .toList());
+                presets.offeredIn(C03).stream().map(ModificationPreset::id).toList());
         assertEquals(
                 List.of(
                         "oxidation-m",
@@ -144,9 +204,22 @@ class ModificationPresetsTest {
                         "acetyl-protein-n-term",
                         "deamidation-nq",
                         "gln-pyro-glu"),
-                presets.offeredIn(VariableModSlots.forRelease(METADATA, C02)).stream()
-                        .map(ModificationPreset::id)
-                        .toList());
+                presets.offeredIn(C02).stream().map(ModificationPreset::id).toList());
+        for (ToolVersion release : List.of(C02, C03)) {
+            VariableModSlots slots = VariableModSlots.forRelease(METADATA, release);
+            assertEquals(
+                    1,
+                    presets.offeredIn(release).stream()
+                            .filter(preset -> preset.name().equals("Acetyl"))
+                            .count(),
+                    "exactly one Acetyl preset for Comet " + release.text());
+            for (ModificationPreset preset : presets.offeredIn(release)) {
+                assertEquals(
+                        Optional.empty(),
+                        slots.unwritable(preset.modification()),
+                        preset.id() + " is offered for Comet " + release.text());
+            }
+        }
         assertEquals(
                 "42.010565 ^ 0 1 -1 0 0 0.0",
                 VariableModCodec.forVersion(METADATA, C03)
@@ -171,10 +244,10 @@ class ModificationPresetsTest {
         rejected(
                 document(PRESET)
                         .replace(
-                                "\"modificationPresetFormat\": 1",
-                                "\"modificationPresetFormat\": 2"),
+                                "\"modificationPresetFormat\": 2",
+                                "\"modificationPresetFormat\": 3"),
                 "modificationPresetFormat",
-                "is 2, and this loader reads format 1 only");
+                "is 3, and this loader reads format 2 only");
         rejected(
                 document(PRESET).replace("\"description\": \"constructed\", ", ""),
                 "description",
@@ -189,6 +262,31 @@ class ModificationPresetsTest {
         rejected(document(PRESET, PRESET), "id", "is used by two presets");
         rejected(
                 document(PRESET.replace("oxidation-m", "Oxidation M")), "id", "is not a preset id");
+        rejected(
+                document(
+                        PRESET.replace(
+                                "\"formSource\": \"https://uwpr.github.io/Comet/x\"",
+                                "\"formSource\": \"https://uwpr.github.io/Comet/x\", \"x\": 1")),
+                "x",
+                "is not a field this format has");
+        rejected(
+                document(PRESET.replaceAll("(?s)\"releases\": \\[.*\\]", "\"releases\": []")),
+                "releases",
+                "lists no release, so the preset is offered nowhere");
+        rejected(
+                document(BOTH.replace("\"2026.03.0\"", "\"2026.02.2\"")),
+                "cometVersion",
+                "lists Comet 2026.02.2 twice for one preset");
+        rejected(
+                document(BOTH.replace("15.994915 M 0 3 -1 0 0 0.0", "15.994915 ^M 0 3 -1 0 0 0.0")),
+                "tuple",
+                "which Comet 2026.02.2 does not accept in a residue token");
+        assertEquals(
+                List.of("oxidation-m"),
+                ModificationPresets.load(document(BOTH), METADATA).offeredIn(C03).stream()
+                        .map(ModificationPreset::id)
+                        .toList(),
+                "a preset listing both releases is offered for each");
         rejected(
                 document(PRESET.replace("\"2026.02.2\"", "\"2025.01.0\"")),
                 "cometVersion",
