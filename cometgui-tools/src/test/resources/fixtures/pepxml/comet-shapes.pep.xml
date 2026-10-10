@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+ <msms_pipeline_analysis date="2026-10-10T12:00:00" xmlns="http://regis-web.systemsbiology.net/pepXML" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://sashimi.sourceforge.net/schema_revision/pepXML/pepXML_v120.xsd" summary_xml="/run/outputs/comet/shapes.pep.xml">
+ <msms_run_summary base_name="/data/shapes" msManufacturer="UNKNOWN" msModel="UNKNOWN" raw_data_type="raw" raw_data=".mzML">
+ <sample_enzyme name="Trypsin">
+  <specificity cut="KR" no_cut="P" sense="C"/>
+ </sample_enzyme>
+ <search_summary base_name="/run/outputs/comet/shapes" search_engine="Comet" search_engine_version="2026.03 rev. 0 (fa08489)" precursor_mass_type="monoisotopic" fragment_mass_type="monoisotopic" search_id="1">
+  <search_database local_path="/data/invented.fasta" type="AA"/>
+  <enzymatic_search_constraint enzyme="Trypsin" max_num_internal_cleavages="2" min_number_termini="2"/>
+  <aminoacid_modification aminoacid="M" massdiff="15.994915" mass="147.035400" variable="Y"/>
+  <aminoacid_modification aminoacid="C" massdiff="15.994915" mass="176.025564" variable="Y"/>
+  <aminoacid_modification aminoacid="S" massdiff="79.966331" mass="166.998359" variable="Y" binary="Y"/>
+  <aminoacid_modification aminoacid="C" massdiff="57.021464" mass="160.030649" variable="N"/>
+  <terminal_modification terminus="N" massdiff="42.010565" mass="43.018390" variable="Y" protein_terminus="N"/>
+  <terminal_modification terminus="C" massdiff="14.015650" mass="31.018390" variable="N" protein_terminus="N"/>
+  <terminal_modification terminus="N" massdiff="28.031300" mass="29.039125" variable="N" protein_terminus="Y"/>
+  <parameter name="decoy_prefix" value="DECOY_"/>
+  <parameter name="decoy_search" value="1"/>
+ </search_summary>
+ <spectrum_query spectrum="shapes.00101.00101.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=101" start_scan="101" end_scan="101" precursor_neutral_mass="1000.500000" assumed_charge="2" index="1" retention_time_sec="600.5">
+  <search_result>
+   <search_hit hit_rank="1" peptide="PEPTIDEK" peptide_prev_aa="R" peptide_next_aa="A" protein="sp|P00001|ONE_INVENTED" num_tot_proteins="3" num_matched_ions="9" tot_num_ions="14" calc_neutral_pep_mass="1000.498765" massdiff="0.001235" num_tol_term="2" num_missed_cleavages="0" num_matched_peptides="1200">
+    <alternative_protein protein="sp|P00002|TWO_INVENTED"/>
+    <alternative_protein protein="tr|Q00003|A&amp;B_INVENTED"/>
+    <search_score name="xcorr" value="2.5000"/>
+    <search_score name="deltacn" value="0.4000"/>
+    <search_score name="spscore" value="500.0"/>
+    <search_score name="sprank" value="1"/>
+    <search_score name="expect" value="1.00E-05"/>
+   </search_hit>
+   <search_hit hit_rank="2" peptide="ACDEFGHIK" peptide_prev_aa="K" peptide_next_aa="-" protein="DECOY_sp|P00004|FOUR_INVENTED" num_tot_proteins="2" num_matched_ions="3" tot_num_ions="16" calc_neutral_pep_mass="1000.490000" massdiff="0.010000" num_tol_term="2" num_missed_cleavages="0" num_matched_peptides="1200">
+    <alternative_protein protein="sp|P00005|FIVE_INVENTED"/>
+    <modification_info modified_peptide="ACDEFGHIK">
+     <mod_aminoacid_mass position="2" mass="160.030649" static="57.021464"/>
+    </modification_info>
+    <search_score name="xcorr" value="0.9000"/>
+    <search_score name="deltacn" value="0.6400"/>
+    <search_score name="spscore" value="40.0"/>
+    <search_score name="sprank" value="7"/>
+    <search_score name="expect" value="3.20E+00"/>
+   </search_hit>
+  </search_result>
+ </spectrum_query>
+ <spectrum_query spectrum="shapes.00102.00102.3" spectrumNativeID="controllerType=0 controllerNumber=1 scan=102" start_scan="102" end_scan="102" precursor_neutral_mass="1500.750000" assumed_charge="3" index="2" retention_time_sec="601.0">
+  <search_result>
+   <search_hit hit_rank="1" peptide="LLLLK" peptide_prev_aa="K" peptide_next_aa="G" protein="sp|P00006|SIX_INVENTED" num_tot_proteins="1" num_matched_ions="5" tot_num_ions="8" calc_neutral_pep_mass="1500.740000" massdiff="0.010000" num_tol_term="2" num_missed_cleavages="0" num_matched_peptides="900">
+    <search_score name="xcorr" value="1.1000"/>
+    <search_score name="expect" value="2.00E-01"/>
+   </search_hit>
+   <search_hit hit_rank="2" peptide="MMMMK" peptide_prev_aa="R" peptide_next_aa="V" protein="sp|P00007|SEVEN_INVENTED" num_tot_proteins="1" num_matched_ions="4" tot_num_ions="8" calc_neutral_pep_mass="1500.730000" massdiff="0.020000" num_tol_term="2" num_missed_cleavages="0" num_matched_peptides="900">
+    <modification_info modified_peptide="M[147]M[147]MMK">
+     <mod_aminoacid_mass position="1" mass="147.035400" variable="15.994915" source="param"/>
+     <mod_aminoacid_mass position="2" mass="147.035400" variable="15.994915" source="param"/>
+    </modification_info>
+    <search_score name="xcorr" value="0.8000"/>
+    <search_score name="expect" value="4.00E+00"/>
+   </search_hit>
+   <search_hit hit_rank="2" peptide="MMMMK" peptide_prev_aa="R" peptide_next_aa="V" protein="sp|P00007|SEVEN_INVENTED" num_tot_proteins="1" num_matched_ions="4" tot_num_ions="8" calc_neutral_pep_mass="1500.730000" massdiff="0.020000" num_tol_term="2" num_missed_cleavages="0" num_matched_peptides="900">
+    <modification_info modified_peptide="MM[147]M[147]MK">
+     <mod_aminoacid_mass position="2" mass="147.035400" variable="15.994915" source="param"/>
+     <mod_aminoacid_mass position="3" mass="147.035400" variable="15.994915" source="param"/>
+    </modification_info>
+    <search_score name="xcorr" value="0.8000"/>
+    <search_score name="expect" value="4.00E+00"/>
+   </search_hit>
+   <search_hit hit_rank="3" peptide="VVVVR" peptide_prev_aa="K" peptide_next_aa="L" protein="sp|P00008|EIGHT_INVENTED" num_tot_proteins="1" num_matched_ions="2" tot_num_ions="8" calc_neutral_pep_mass="1500.700000" massdiff="0.050000" num_tol_term="2" num_missed_cleavages="0" num_matched_peptides="900">
+    <search_score name="xcorr" value="0.5000"/>
+    <search_score name="expect" value="9.00E+00"/>
+   </search_hit>
+  </search_result>
+ </spectrum_query>
+ <spectrum_query spectrum="shapes.00103.00103.2" start_scan="103" end_scan="103" precursor_neutral_mass="800.400000" assumed_charge="2" index="3">
+  <search_result>
+  </search_result>
+ </spectrum_query>
+ <spectrum_query spectrum="shapes.00102.00102.2" spectrumNativeID="controllerType=0 controllerNumber=1 scan=102" start_scan="102" end_scan="102" precursor_neutral_mass="1000.495000" assumed_charge="2" index="4" retention_time_sec="601.0">
+  <search_result>
+   <search_hit hit_rank="1" peptide="SCMEK" peptide_prev_aa="-" peptide_next_aa="-" protein="sp|P00009|NINE_INVENTED" num_tot_proteins="1" num_matched_ions="6" tot_num_ions="8" calc_neutral_pep_mass="1000.480000" massdiff="-0.015000" num_tol_term="2" num_missed_cleavages="0" num_matched_peptides="700">
+    <modification_info modified_peptide="n[71]S[167]C[176]M[147]EK" mod_nterm_mass="71.049690" mod_cterm_mass="31.018390">
+     <mod_aminoacid_mass position="1" mass="166.998359" variable="79.966331" source="param"/>
+     <mod_aminoacid_mass position="2" mass="176.025564" static="57.021464" variable="15.994915" source="param"/>
+     <mod_aminoacid_mass position="3" mass="147.035400" variable="15.994915" source="peff" id="MOD:00719"/>
+     <aminoacid_substitution position="5" orig_aa="R"/>
+     <sequence_substitution position="4" num_aas="1" orig_aas="Q"/>
+    </modification_info>
+    <search_score name="xcorr" value="1.9000"/>
+    <search_score name="deltacn" value="0.3000"/>
+    <search_score name="spscore" value="210.0"/>
+    <search_score name="sprank" value="1"/>
+    <search_score name="expect" value="1.20E-03"/>
+    <search_score name="ascorepro_score" value="13.0000"/>
+    <search_score name="ascorepro_sitescore" value="1:13.00"/>
+   </search_hit>
+  </search_result>
+ </spectrum_query>
+ </msms_run_summary>
+</msms_pipeline_analysis>

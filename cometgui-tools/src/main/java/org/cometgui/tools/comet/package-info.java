@@ -34,5 +34,12 @@
  * {@code CometPepXmlValidator} and {@code CometPinValidator}, the per-file output checks with
  * {@code R-DEC-04}'s decoy check; and {@code PinMerger}, the merge into {@code merged.pin}. All PIN
  * reading goes through the one parser, {@code PinReader}, whose rules {@code PinHeader} begins.
+ *
+ * <p><strong>Phase 11 unit 4 landed the pepXML search-hit reader</strong> the mzTab exporter reads
+ * from: {@code PepXmlSearchHitReader}, which streams a Comet pepXML through the validator's
+ * hardened factory to a {@code PepXmlVisitor} one spectrum query at a time, carrying every value as
+ * the file's text and refusing, by file, line, query and hit, anything it cannot represent exactly;
+ * and {@code PepXmlHitIndex}, the join Percolator's {@code PSMId} needs: scan, charge and the hit's
+ * 1-based position, which is not its {@code hit_rank} (P11-13).
  */
 package org.cometgui.tools.comet;

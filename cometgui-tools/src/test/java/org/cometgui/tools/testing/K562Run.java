@@ -45,6 +45,33 @@ public final class K562Run {
     public static final String PEPXML_SHA256 =
             "34bf414524e6dedf12a777b44fdf49956c88addcc44c76565a0d9fed316f7dd7";
 
+    /** Comet 2026.02.2's pepXML for {@code _4}, from the same search. */
+    public static final String PEPXML_4 =
+            "scratch/scientific-path/comet/20100614_Velos1_TaGe_SA_K562_4.pep.xml";
+
+    /** Its SHA-256. */
+    public static final String PEPXML_4_SHA256 =
+            "28f8a6da4ead892322b449c9dba37869cfc75d47433ba2ac457986336889590c";
+
+    /** Percolator 3.07.1's target PSMs over both pepXML files' PINs, from the same path. */
+    public static final String PERCOLATOR_TARGET_PSMS =
+            "scratch/scientific-path/percolator-3.07.1/psms.target.txt";
+
+    /** Its SHA-256. */
+    public static final String PERCOLATOR_TARGET_PSMS_SHA256 =
+            "458b79b5a423f57406421d31ddd57b946eb8096ab6935447efd1e98e48f7fe9e";
+
+    /** Percolator 3.07.1's decoy PSMs, from the same run. */
+    public static final String PERCOLATOR_DECOY_PSMS =
+            "scratch/scientific-path/percolator-3.07.1/psms.decoy.txt";
+
+    /** Its SHA-256. */
+    public static final String PERCOLATOR_DECOY_PSMS_SHA256 =
+            "e1245d4f3fd128a5c7efcf89bc0b0ab0991d3f31bff437caa23bec3f437fc4c1";
+
+    private static final String REGENERATE =
+            "regenerate it with bash scripts/feasibility/run_scientific_path.sh";
+
     private K562Run() {}
 
     /**
@@ -68,10 +95,37 @@ public final class K562Run {
      * @throws IOException if it cannot be read
      */
     public static Path pepXml() throws IOException {
-        return verified(
-                PEPXML,
-                PEPXML_SHA256,
-                "regenerate it with bash scripts/feasibility/run_scientific_path.sh");
+        return verified(PEPXML, PEPXML_SHA256, REGENERATE);
+    }
+
+    /**
+     * The {@code _4} pepXML, verified.
+     *
+     * @return the file
+     * @throws IOException if it cannot be read
+     */
+    public static Path pepXml4() throws IOException {
+        return verified(PEPXML_4, PEPXML_4_SHA256, REGENERATE);
+    }
+
+    /**
+     * Percolator's target PSMs, verified.
+     *
+     * @return the file
+     * @throws IOException if it cannot be read
+     */
+    public static Path percolatorTargets() throws IOException {
+        return verified(PERCOLATOR_TARGET_PSMS, PERCOLATOR_TARGET_PSMS_SHA256, REGENERATE);
+    }
+
+    /**
+     * Percolator's decoy PSMs, verified.
+     *
+     * @return the file
+     * @throws IOException if it cannot be read
+     */
+    public static Path percolatorDecoys() throws IOException {
+        return verified(PERCOLATOR_DECOY_PSMS, PERCOLATOR_DECOY_PSMS_SHA256, REGENERATE);
     }
 
     private static Path verified(String relative, String sha256, String refill) throws IOException {

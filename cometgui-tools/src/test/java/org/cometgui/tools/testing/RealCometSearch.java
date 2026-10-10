@@ -154,7 +154,24 @@ public final class RealCometSearch {
      * @throws IOException if a file cannot be written
      */
     public static Search fastaSearch(Path root, Release release) throws IOException {
-        return search(root, release, false);
+        return search(root, release, false, Map.of());
+    }
+
+    /**
+     * Searches both K562 files against the FASTA subset with some parameters changed from the
+     * search's own -- for the tests that need a form Comet writes only under other settings, such
+     * as {@code decoy_search = 2}'s separate decoy pepXML or terminal modifications.
+     *
+     * @param root an empty directory for the binary, the inputs and the run
+     * @param release the Comet release
+     * @param changed parameter values replacing the search's, each of which the binary's {@code -q}
+     *     file must declare
+     * @return the search, merged
+     * @throws IOException if a file cannot be written
+     */
+    public static Search fastaSearch(Path root, Release release, Map<String, String> changed)
+            throws IOException {
+        return search(root, release, false, changed);
     }
 
     /**
@@ -167,10 +184,11 @@ public final class RealCometSearch {
      * @throws IOException if a file cannot be written
      */
     public static Search fragmentIndexSearch(Path root, Release release) throws IOException {
-        return search(root, release, true);
+        return search(root, release, true, Map.of());
     }
 
-    private static Search search(Path root, Release release, boolean fragmentIndex)
+    private static Search search(
+            Path root, Release release, boolean fragmentIndex, Map<String, String> changed)
             throws IOException {
         Path repository = UpstreamArtefacts.repositoryRoot();
         Path binary = UpstreamArtefacts.executableCopy(release.file(), root.resolve("bin/comet"));
@@ -195,7 +213,7 @@ public final class RealCometSearch {
         }
         Files.writeString(
                 run.cometParamsFile(),
-                parameters(binary, root, fasta),
+                parameters(binary, root, fasta, changed),
                 StandardCharsets.ISO_8859_1);
         CometSearchCommands commands;
         if (fragmentIndex) {
@@ -226,7 +244,8 @@ public final class RealCometSearch {
     }
 
     /** The binary's own {@code -q} parameter file with the search's values. */
-    private static String parameters(Path binary, Path root, Path fasta) throws IOException {
+    private static String parameters(
+            Path binary, Path root, Path fasta, Map<String, String> changed) throws IOException {
         Path dump = Files.createDirectories(root.resolve("q"));
         ToolRunOutcome written =
                 runner().run(
@@ -244,6 +263,7 @@ public final class RealCometSearch {
         values.put("decoy_search", "1");
         values.put("output_pepxmlfile", "1");
         values.put("output_percolatorfile", "1");
+        values.putAll(changed);
         return edited(
                 Files.readString(
                         dump.resolve(CometCapabilityProbe.WRITTEN_PARAMETERS_FILE),
