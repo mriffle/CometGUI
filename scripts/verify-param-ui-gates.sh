@@ -1120,7 +1120,7 @@ control_2a() {
         'up.setOnAction(event -> report("Moved " + name + " up.", mods.moveUp(name)));' \
         'up.setOnAction(event -> report("Moved " + name + " up.", mods.moveDown(name)));'
     assert_log_contains "and the slot that should have moved into slot 1 is named by its serialised tuple" \
-        "${DIRTY_LOG}" 'expected: <Serialised: variable_mod01 = 79.96633 SY 0 2 -1 0 0 0.0> but was: <Serialised: variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0>'
+        "${DIRTY_LOG}" 'expected: <Serialised: variable_mod01 = 79.96633 SY 0 2 -1 0 0 97.976896> but was: <Serialised: variable_mod01 = 15.9949 M 0 3 -1 0 0 0.0>'
     assert_testcase "the add/edit/reorder/remove walk is the method that failed" failed \
         "${T2}" addEditReorderRemove
     restore_pristine "${VARMOD_EDITOR}"
