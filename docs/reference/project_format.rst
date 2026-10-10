@@ -60,6 +60,10 @@ A project holds mutable user intent and immutable run records
                     index/           the result stores' index files
                     view-state.json  the run's display-filter values
                 exports/             filtered exports, new files, never overwritten
+                pdv/                 PDV's working files (see below)
+                    mztab/           the mzTab and MGFs PDV's window is given
+                    window/          PDV's working directory and home
+                    figures/0001/    one numbered directory per drawn figure
 
 **Where a project is.** In Phase 08 the application has exactly one project
 per session and no way to choose another: ``projects/default`` under the
@@ -321,6 +325,28 @@ state of the file means:**
 (``R-PERC-07``: "derived filtered exports shall be new files under a distinct
 directory"). Each export is a new file; none is ever overwritten. The formats
 are below, in `Exports and their sidecars`_.
+
+``pdv/`` -- what the Visualisation section and PDV write (phase 11), made
+only when PDV is first used for the run, and never beside the scientist's
+spectrum files, because PDV writes beside its own inputs:
+
+* ``pdv/mztab/psms.mztab`` and ``pdv/mztab/ms_run-<n>.mgf`` -- the mzTab
+  generated **only for PDV's** ``denovo-gui`` **mode** and the MGF copies of
+  the spectra it references, one entry per PSM. A run artefact, recorded by an
+  ``mztab.written`` event with its checksums; **not a deliverable and not an
+  interchange format**. PDV adds ``psms.mztab.db`` and ``ms_run-<n>.mgf.cui``.
+  The directory is deleted and rewritten whenever a source it was made from
+  changes, and otherwise reused.
+* ``pdv/window/`` -- the working directory of PDV's window, with ``home/``,
+  the home directory PDV is given (its ``.compomics`` preferences and Java
+  font cache).
+* ``pdv/figures/<nnnn>/`` -- one directory per drawn figure: ``home/``,
+  ``spectra.mgf``, ``spectrum-ids.txt`` and ``figures/`` (PDV's PNG and its
+  ``error.txt``). Never overwritten by a later drawing.
+
+Every PDV launch is recorded in ``provenance/events.log`` as a
+``pdv.launched`` event before PDV starts. The formats and the rules are in
+:ref:`user-pdv` and :ref:`dev-pdv-integration`.
 
 .. _ref-project-format-exports:
 

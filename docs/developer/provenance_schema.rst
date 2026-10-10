@@ -347,6 +347,19 @@ wire -- and the payload keys have their own shape rule, which is the settings
 pattern with one relaxation: a single bare segment is legal, because a payload
 is scoped to one event that already carries its type.
 
+The types, each with a wire name that a Java rename must never change: the
+seven Phase 04 wrote (``run.started``, ``stage.started``, ``stage.finished``,
+``tool.invoked``, ``file.hashed``, ``warning.raised``, ``run.finished``);
+``export.written`` (Phase 10); and ``pdv.launched`` and ``mztab.written``
+(Phase 11), each added additively. The last three record what happens to a
+**finished** run: ``provenance.json`` is the run's sealed record, so later
+events are appended to its ``events.log`` (tier 1's Phase 10 ruling). Their
+payload keys are pinned by the package that writes them --
+``org.cometgui.results.export``, and ``PdvLaunches`` and ``PdvMzTabs`` in
+``org.cometgui.workflow.pdv`` -- and listed in
+:ref:`ref-provenance-format-event-types`; :doc:`pdv_integration` explains why
+a PDV launch is written *before* the process starts.
+
 What a torn file yields
 -----------------------
 

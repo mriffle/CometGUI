@@ -83,14 +83,20 @@ deliberately does not.
 
    * - ``cometgui-tools``
      - ``org.cometgui.tools`` (minus ``.process``)
-     - ``domain``, ``process``
+     - ``domain``, ``process``, ``results`` (since Phase 11: the one
+       Percolator table reader, for the mzTab exporter)
      - Real: ``api`` and the capability probes (Phase 05), and ``comet`` --
        the Comet adapter: search and index commands, pepXML and PIN
        validation, the PIN merge, the FASTA decoy scanner and the ``.idx``
-       header reader (Phase 08), and ``percolator`` -- the capability probe,
+       header reader (Phase 08), and since Phase 11 the pepXML search-hit
+       reader -- and ``percolator`` -- the capability probe,
        local-binary registration, the command builder, the pre-launch PIN
-       check and the pout-XML reader (Phase 09). The Limelight and PDV
-       adapters (Phases 11, 12) are not built.
+       check and the pout-XML reader (Phase 09) -- and ``pdv`` -- the format
+       gate, the MGF re-encoding, the CLI figure command and the mzTab
+       exporter, with ``pdv.derived`` holding the ``denovo-gui`` command and
+       controller derived from CasanovoGUI (Phase 11; see
+       :doc:`pdv_integration`). The Limelight adapter (Phase 12) is not
+       built.
 
    * - ``cometgui-install``
      - ``org.cometgui.install``
@@ -132,7 +138,10 @@ deliberately does not.
        Percolator steps and the derived Percolator rerun; since Phase 10
        ``finalise-results``) and ``storage`` (project and run records, the
        project lock; since Phase 10 a run's view state). See
-       :doc:`workflow_engine`.
+       :doc:`workflow_engine`. Since Phase 11 ``pdv``: PDV through the Tool
+       Manager, the one recording launch path (``PdvLaunches``), a PSM's
+       figure, a run's mzTab and the live windows; see
+       :doc:`pdv_integration`.
 
    * - ``cometgui-ui``
      - ``org.cometgui.ui``
@@ -143,9 +152,11 @@ deliberately does not.
        ``RunReadinessViewModel``, ``RunControl``) behind the
        ``RunEnginePort`` port, since Phase 09 the Percolator section
        (``viewmodel.percolator``, ``controls.percolator``) behind
-       ``PercolatorPort`` and ``PercolatorRerunPort``, and since Phase 10 the
+       ``PercolatorPort`` and ``PercolatorRerunPort``, since Phase 10 the
        Results section (``viewmodel.results``, ``controls.results``) behind
-       ``ResultsPort``. ``dialogs`` is empty.
+       ``ResultsPort``, and since Phase 11 the Visualisation section
+       (``viewmodel.visualisation``, ``controls.visualisation``) behind
+       ``VisualisationPort``. ``dialogs`` is empty.
 
    * - ``cometgui-app``
      - ``org.cometgui.app``
@@ -153,8 +164,10 @@ deliberately does not.
      - Real: ``bootstrap``, ``config``. The only module with a ``main``. Since
        Phase 08 ``config`` wires the engine to the Run section
        (``RunWiring``, ``WorkflowRunPort``, ``ProjectSession``), since
-       Phase 09 the Percolator section (``ToolManagerPercolatorPort``), and
-       since Phase 10 the Results section (``ProjectResultsPort``).
+       Phase 09 the Percolator section (``ToolManagerPercolatorPort``),
+       since Phase 10 the Results section (``ProjectResultsPort``), and since
+       Phase 11 the Visualisation section (``ProjectVisualisationPort``,
+       ``PdvDisplay``).
 
    * - ``cometgui-archtests``
      - ``org.cometgui.archtests``
@@ -1095,9 +1108,11 @@ and exit 0**, and the census caught it with
 The derived files that exist today
 -----------------------------------
 
-Two source files and their two ``package-info.java`` companions, all four under
-a ``/derived/`` path, all four from ``Noble-Lab/CasanovoGUI`` at commit
-``480b3013e7f8fb51a2b8c58681043821e3e7f865``:
+Four source files and their three ``package-info.java`` companions, all seven
+under a ``/derived/`` path, all from ``Noble-Lab/CasanovoGUI`` at commit
+``480b3013e7f8fb51a2b8c58681043821e3e7f865``. The first two arrived in Phase
+02, the last two in Phase 11 (``R-PDV-05``; what was kept and changed is
+detailed in :doc:`pdv_integration`):
 
 .. list-table::
    :header-rows: 1
@@ -1117,6 +1132,19 @@ a ``/derived/`` path, all four from ``Noble-Lab/CasanovoGUI`` at commit
      - The coalescing flush -- one scheduled ``runLater`` per pulse however many
        lines arrive -- and the trimming cap at 5,000 lines.
 
+   * - ``cometgui-tools/src/main/java/org/cometgui/tools/pdv/derived/PdvController.java``
+     - ``src/main/java/org/casanovo/gui/core/PdvController.java``
+     - One PDV window per mzTab, the ephemeral loopback port, ``/ready``
+       polling with a five-minute cap, the 60 ms debounced ``/select``.
+       Launch moved onto the given ``ProcessRunner``; failures reported, not
+       swallowed; a real shutdown added.
+
+   * - ``cometgui-tools/src/main/java/org/cometgui/tools/pdv/derived/DenovoGuiCommand.java``
+     - ``src/main/java/org/casanovo/gui/core/PdvLauncher.java``
+     - The ``denovo-gui`` argument array of ``launchDenovo`` only -- nothing
+       of upstream's download, unpacking or version code. Builds a command
+       and starts nothing; ``--tol`` omitted by the product.
+
 Their ``package-info.java`` files carry the record as a statement about the
 material the package holds; the surrounding prose says plainly that the
 ``package-info`` itself is new writing.
@@ -1132,7 +1160,7 @@ dropped in copying. The line ``Copyright (C) 2026 The CometGUI authors.``
 (``D-009``) stays on a derived file as on every other file; upstream is
 attributed alongside it, not instead of it.
 
-Two operational facts worth knowing before adding a third derived file:
+Two operational facts worth knowing before adding another derived file:
 ``mvn spotless:apply`` applies only the **ordinary** header, so a derived file's
 header is copied in by hand (``mvn -pl <module> spotless:apply@spotless-check-derived``
 does apply the derived one); and a bare ``mvn checkstyle:check`` from the command

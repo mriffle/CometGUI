@@ -12,8 +12,12 @@ Tool adapters
    :doc:`workflow_engine`. The Percolator adapter (Phase 09) -- its
    capability probe, command builder and pre-launch PIN check -- is described
    on :doc:`version_capabilities`, and its workflow steps on
-   :doc:`workflow_engine`. The Limelight converter and PDV adapters are owned
-   by phases 12 and 11 and are not written yet.
+   :doc:`workflow_engine`. The PDV adapter (Phase 11) -- the format gate, the
+   MGF re-encoding, the CLI figure command, the ``denovo-gui`` command and
+   controller derived from CasanovoGUI, and the mzTab exporter -- is described
+   on :doc:`pdv_integration`; every PDV launch goes through the service
+   described here, by way of the one recording launch path. The Limelight
+   converter adapter is owned by phase 12 and is not written yet.
    Everything a tool adapter does with a subprocess, it does through the
    service described here.
 

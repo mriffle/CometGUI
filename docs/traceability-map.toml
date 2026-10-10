@@ -654,26 +654,112 @@ note = "Phase 10 unit 8, gate item 6. GUI test: the large fixture as a run's tar
 # --- AC-VIS -----------------------------------------------------------------
 
 [[ac."AC-VIS-01".evidence]]
-kind = "planned"
-phase = "11"
+kind = "test"
+class = "org.cometgui.app.gui.PdvFirstUseUiTest"
+method = "pdvInstallsOnFirstUseWhileASearchRuns"
+note = "Phase 11 unit 3, gate items 1 and 4. GUI test of the launched application from an EMPTY tool cache: drawing the selected PSM installs PDV 2.7.0 through the product's own Tool Manager over real HTTP (103 407 417 bytes from a loopback artefact server); the transfer is held mid-way while a second real Comet + Percolator search runs to success through the Run section, then released; the install is verified (the JAR's SHA-256 recomputed), the figure is drawn, and the run's events.log holds the pdv.launched event with the JAR's SHA-256 and manifest version, written before the process service started PDV. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
 
 [[ac."AC-VIS-02".evidence]]
-kind = "planned"
-phase = "11"
+kind = "test"
+class = "org.cometgui.tools.pdv.PdvFiguresRealTest"
+method = "aKnownPsmIsDrawn"
+note = "Phase 11 unit 2, gate item 2. The real PDV 2.7.0 command line on the real Comet pepXML and the K562 _3 subset mzML (1-based position and scan differ for every spectrum), through the product path -- format check, exact MGF re-encoding, the process service, a timeout -- draws Phase 00's known PSM (scan 11367, FNLTYVSHDGDDK) as one valid 800 x 400 PNG, judged by parsing it (signature, IHDR, every chunk CRC, decoded pixels not blank), never by exit status. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-VIS-02".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.PdvFirstUseUiTest"
+method = "pdvInstallsOnFirstUseWhileASearchRuns"
+note = "Phase 11 unit 3. Through the application: the PSM selected in the Results section of a real search's run is drawn by PDV and shown in the Visualisation section, a valid 800 x 400 PNG with PDV's two ion-series colours, annotated with that PSM's own peptide. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
 
 [[ac."AC-VIS-03".evidence]]
-kind = "planned"
-phase = "11"
+kind = "test"
+class = "org.cometgui.tools.pdv.PdvFiguresRealTest"
+method = "aKnownPsmIsDrawn"
+note = "Phase 11 unit 2, gate item 2. The automated PDV CLI test: one valid, annotated PNG asserted from its decoded content, not from its existence or PDV's exit status. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-VIS-03".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.PdvFiguresRealTest"
+method = "anAbsentSpectrumIsANamedFailure"
+note = "Phase 11 unit 2. The same real CLI asked for a spectrum id not in the run exits without a figure, and that is the named failure NO_FIGURE -- never a pass -- so the figure test can go red. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-VIS-03".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.PdvFirstUseUiTest"
+method = "pdvInstallsOnFirstUseWhileASearchRuns"
+note = "Phase 11 unit 3. The CLI figure drawn through the application is a valid annotated PNG, parsed and shown in the Visualisation section. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
 
 [[ac."AC-VIS-04".evidence]]
-kind = "planned"
-phase = "11"
-note = "Exact selection through PDV's loopback control server. D-005 decided 2026-08-30: CometGUI drives PDV as CasanovoGUI does, via a generated mzTab."
+kind = "test"
+class = "org.cometgui.app.gui.PdvLiveWindowUiTest"
+method = "theLiveWindow"
+note = "Phase 11 unit 7, gate item 5, through the product (D-005: CometGUI drives PDV as CasanovoGUI does, via a generated mzTab). A real search's run opened from the Visualisation section installs PDV, starts denovo-gui on an ephemeral loopback port and polls /ready; each of two PSMs selected in turn in the Results section's table is answered 200 selected by PDV's control server and shown in the interface, an unknown reference 404, all under a timeout; pdv.launched (kind denovo-gui, the started argv) precedes the start; Close PDV, the workflow API and the application's stop() each leave no process and a refused port. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-VIS-04".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.PdvControllerRealPdvTest"
+method = "eachSelectionDrawsThatPsm"
+note = "Phase 11 unit 7, gate item 5's display half (design decision P11-16: no control endpoint reports what is drawn). PDV's own unmodified main class on the product's K562 mzTab, driven over HTTP by the derived controller, with a test-side observer reading by reflection what PDV drew: five selections over four PSMs -- three of them (ranks 1 to 3 of scan 11288, the third with an oxidised M) sharing one spectrum -- each drawn on its own row with that PSM's peptide, charge, modifications and precursor, over peaks whose SHA-256 equals the producing mzML spectrum decoded by the test. No screen coordinates. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-VIS-04".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.PdvControllerRealPdvTest"
+method = "shutdownEndsPdv"
+note = "Phase 11 unit 7. Shutdown through the derived controller ends PDV's JVM and its control port, though PDV's /shutdown alone leaves PDV running. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
 
 [[ac."AC-VIS-05".evidence]]
-kind = "planned"
-phase = "11"
-note = "mzTab fidelity (R-PDV-03). Proved by comparison against the Comet and Percolator source, not against the exporter's own accounting."
+kind = "test"
+class = "org.cometgui.tools.pdv.fidelity.K562FidelityTest"
+method = "everyPsmExactlyOnce"
+note = "Phase 11 unit 6, gate item 6 (R-PDV-03). The real K562 _3 + _4 run (Comet 2026.02.2 pepXML, Percolator 3.07.1 target and decoy tables, 6670 rows) exported once and read back by the suite's own readers, which share no code with the exporter (P11-9, enforced by IndependenceGuardTest): every PSM exactly once and none invented, counted on both sides. No binary is run."
+
+[[ac."AC-VIS-05".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.fidelity.K562FidelityTest"
+method = "scores"
+note = "Phase 11 unit 6, gate item 6. Score, q-value and PEP are Percolator's own text in every row; the companion methods charge, observedMz, retentionTime, accessions, sequence, modificationsAgainstPepXml (parsed position and delta), modificationsAgainstPercolator, fixedModifications and nulls grade the other columns against the pepXML, the mzML and Percolator."
+
+[[ac."AC-VIS-05".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.fidelity.K562FidelityTest"
+method = "spectraRefIsTheProducingSpectrum"
+note = "Phase 11 unit 6, gate item 7. On a file where 1-based position and scan number differ for every producing spectrum (shown first by positionAndScanDiffer), every row's spectra_ref is resolved as PDV resolves it and lands on the spectrum that produced the PSM, peaks compared bit for bit; positionOrScanReferencesAreCaught and firstRowOfASharedSpectrumIsCaught show the wrong forms would be caught."
+
+[[ac."AC-VIS-05".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.fidelity.ConstructedFidelityTest"
+method = "everyCheckPasses"
+note = "Phase 11 unit 6, gates 6 and 7 on a constructed run holding what K562 lacks: decoy_search = 2 with shared PSMIds, an N-terminal modification, a residue with static and variable deltas, several proteins, tied hits, a query with no retention time (null), 32-bit peaks."
+
+[[ac."AC-VIS-05".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.fidelity.RealCometFidelityTest"
+method = "separateDecoys"
+note = "Phase 11 unit 6. What the real Comet 2026.02.2 writes with decoy_search = 2, a variable N-terminal acetyl and a static + variable cysteine, exported and graded; staticLabels does the same for fixed terminal and lysine labels. Percolator's tables are written from the PIN (synthetic numbers, compared as text). Real Comet; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-VIS-05".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.fidelity.UnrepresentableTest"
+method = "cTerminalModification"
+note = "Phase 11 unit 6, gate item 8. A C-terminal modification injected into a copy of the real sources makes the export fail naming the PSMId, the reason and the file, and leaves nothing at the final path; percolatorRowWithoutHit, peptideDisagreement, modificationDisagreement and spectrumMissing do the same for four other unfaithful PSMs."
+
+[[ac."AC-VIS-05".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.fidelity.RealPdvFidelityTest"
+method = "sampledRowsAreSelected"
+note = "Phase 11 unit 6. The real PDV 2.7.0 accepts the K562 export, reaches /ready, and selects by its own spectra_ref every row of the most-shared spectrum, decoy rows and second-ms_run rows, the references chosen by the suite's own reading. Real PDV 2.7.0 under the project-local Xvfb; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-VIS-05".evidence]]
+kind = "test"
+class = "org.cometgui.tools.pdv.fidelity.IndependenceGuardTest"
+method = "theSuiteIsIndependent"
+note = "Phase 11 unit 6, design decision P11-9. No source file of the fidelity suite names a reader, writer or helper the exporter uses, so the comparison is against the sources and not against the exporter's own accounting; theGuardCatchesEachForm shows the guard can fail."
+
+[[ac."AC-VIS-05".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.pdv.PdvMzTabsFidelityTest"
+method = "theRunLevelMzTabIsTrueToTheSources"
+note = "Phase 11 unit 6. The run-level path the product uses (PdvMzTabs.prepare on a finished run laid out from the K562 sources) graded by the same fidelity suite, compiled at test time from cometgui-tools' test sources so there is one suite. No binary is run."
 
 # --- AC-LL ------------------------------------------------------------------
 

@@ -28,6 +28,7 @@ pages describe the implementation that satisfies them.
    tool_registry
    version_capabilities
    results_model
+   pdv_integration
    pdv_mztab_spike
    provenance_schema
    security

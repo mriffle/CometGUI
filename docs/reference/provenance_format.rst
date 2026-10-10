@@ -1123,7 +1123,7 @@ members always in this order.
 
    * - ``type``
      - string
-     - What happened; one of the eight
+     - What happened; one of the ten
        :ref:`event types <ref-provenance-format-event-types>`.
 
    * - ``payload``
@@ -1195,6 +1195,32 @@ Event types
        is made from a finished run, so this event normally follows
        ``run.finished``; nothing in the log or its reader imposes an order
        between types.
+
+   * - ``pdv.launched``
+     - PDV was launched from the run (added in phase 11), written **before**
+       the process is started, so a launch that then fails still leaves its
+       record. The payload holds ``run.id``, ``tool`` (``pdv``),
+       ``tool.version`` (the version PDV's JAR manifest reports),
+       ``pdv.jar.path``, ``pdv.jar.md5``, ``pdv.jar.sha256``, ``pdv.launch``
+       (``cli-figure`` or ``denovo-gui``), ``argv.count`` and ``argv.0`` ..
+       ``argv.<n-1>`` (redacted), ``process.working-directory``,
+       ``process.environment`` (the variables the launch sets, one
+       ``NAME=value`` per line, redacted) and ``launch.<key>`` entries saying
+       what the launch was for. Launched from a finished run, so it normally
+       follows ``run.finished``.
+
+   * - ``mztab.written``
+     - The mzTab PDV is given for the run was written, with its MGF files, in
+       the run's ``pdv/mztab/`` directory (added in phase 11; ``R-PDV-02``:
+       a run artefact recorded with its checksum). The payload holds
+       ``run.id``, ``mztab.format``, ``mztab.path``, ``mztab.md5``,
+       ``mztab.sha256``; ``mgf.count`` and per MGF ``mgf.<n>.path``,
+       ``.md5``, ``.sha256``, ``.entries`` and ``.spectrum-file``;
+       ``source.count`` and per source ``source.<n>.role``
+       (``percolator-target-psms``, ``percolator-decoy-psms``, ``pepxml``,
+       ``decoy-pepxml`` or ``spectra``), ``.path``, ``.md5`` and ``.sha256``;
+       and ``psms.target``, ``psms.decoy``, ``psms.in`` and ``psms.out``. An
+       mzTab that is reused unchanged is not recorded again.
 
 Reading a damaged log
 ---------------------
@@ -1300,7 +1326,9 @@ open namespaces and are written by the stage that owns them.
      - ``settings``, under keys the exporting and converting stages pin.
 
    * - PDV launch and version
-     - ``tools[]``, as an invocation like any other.
+     - **Not in the manifest.** PDV is launched by the scientist from a
+       finished run, after ``provenance.json`` is sealed, so each launch is a
+       ``pdv.launched`` event in the run's ``events.log`` (phase 11).
 
 Format history
 ==============
