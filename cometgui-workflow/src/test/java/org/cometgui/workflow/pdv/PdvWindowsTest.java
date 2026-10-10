@@ -39,10 +39,12 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunIdentity;
@@ -132,12 +134,15 @@ class PdvWindowsTest {
 
     /** The windows over a runner that notes, at each start, the events already in the log. */
     private PdvWindows windows(ProcessRunner processes) {
+        return windows(processes, new StreamingHashService());
+    }
+
+    private PdvWindows windows(ProcessRunner processes, HashService hashes) {
         ProcessRunner noting =
                 (command, listener) -> {
                     recordedAtStart.add(lastLaunchArgv());
                     return processes.start(command, listener);
                 };
-        StreamingHashService hashes = new StreamingHashService();
         return new PdvWindows(
                 new PdvMzTabs(
                         hashes, SecretRedactor.patternsOnly(), CLOCK, () -> Set.copyOf(executing)),
@@ -538,6 +543,47 @@ class PdvWindowsTest {
                 () -> assertEquals(2, fake.windows().size()),
                 () -> assertEquals(2, launches().size(), "two launches, two events"),
                 () -> assertEquals(PdvWindowStatus.Phase.READY, next().phase()));
+    }
+
+    @Test
+    @DisplayName(
+            "a run whose sources changed is closed in PDV before its mzTab is written again, which"
+                    + " deletes the directory PDV reads")
+    void theWindowIsClosedBeforeTheMzTabIsMadeAgain() throws IOException, InterruptedException {
+        List<Boolean> aliveWhileHashing = new CopyOnWriteArrayList<>();
+        StreamingHashService real = new StreamingHashService();
+        windows.close();
+        windows =
+                windows(
+                        fake,
+                        file -> {
+                            if (!fake.windows().isEmpty()) {
+                                aliveWhileHashing.add(fake.windows().get(0).isAlive());
+                            }
+                            return real.hash(file);
+                        });
+        openReady();
+        aliveWhileHashing.clear();
+        table(
+                RunResultFiles.table(run, TableKind.TARGET_PSMS),
+                row(1, "2.6", "0.001", "R.PEPTIDEK.A"),
+                row(2, "1.5", "0.01", "K.KEDITPEP.-"));
+
+        windows.open(request(), statuses::add);
+
+        long written =
+                ProvenanceEventLogReader.recover(run.eventLogFile()).events().stream()
+                        .filter(event -> event.type() == ProvenanceEventType.MZTAB_WRITTEN)
+                        .count();
+        assertAll(
+                () ->
+                        assertEquals(
+                                2, written, "the changed source made the mzTab be written again"),
+                () -> assertFalse(aliveWhileHashing.isEmpty(), "the sources were hashed"),
+                () ->
+                        assertFalse(
+                                aliveWhileHashing.contains(Boolean.TRUE),
+                                "the first PDV was running while the mzTab was prepared again"));
     }
 
     @Test
