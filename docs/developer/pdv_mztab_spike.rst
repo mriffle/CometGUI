@@ -89,7 +89,7 @@ nothing derived from them is committed):
 Command::
 
    . tools/env.sh
-   python3 scripts/spikes/pdv_mztab_spike.py            # all 11 experiments
+   python3 scripts/spikes/pdv_mztab_spike.py            # all 12 experiments
    python3 scripts/spikes/pdv_mztab_spike.py --only R5-mgf-index
 
 It verifies the artefact, reads the sources with its own readers, writes one
@@ -100,7 +100,9 @@ has a written expectation; any deviation is a ``FAIL`` and the script exits 1.
 It finishes by checking that no PDV or Xvfb process it started is still alive.
 Outputs go to ``scratch/pdv-mztab-spike/`` (mzTabs, MGFs, per-run stdout and
 stderr, ``results.json``). Run on 2026-10-10: **289 checks passed across 11
-experiments, exit 0**, about four minutes.
+experiments, exit 0**, about four minutes. Re-run the same day after unit 2
+added ``R12-per-psm-mgf`` (below): **328 checks passed across 12 experiments,
+exit 0**.
 
 The production-shaped launch (experiment R1) is exactly::
 
@@ -372,6 +374,55 @@ In R11, **1,404 of 2,130** target PSMs are unreachable this way. Writing two
 textually different references that parse to the same spectrum would work
 around it, and would be exactly the kind of invented identifier ``R-PDV-03``
 forbids; this is a question for the orchestrator, not an exporter detail.
+
+R12: one MGF entry per row (unit 2, design decision P11-12)
+-----------------------------------------------------------
+
+*Added by Phase 11 unit 2, 2026-10-10.* The orchestrator resolved the
+duplicate-reference problem as P11-12: the MGF PDV is given holds **one entry
+per mzTab PSM row**, each an exact copy of the producing spectrum with its
+native id as ``TITLE``, so every row has its own ``ms_run[1]:index=<row>``.
+Experiment ``R12-per-psm-mgf`` proves it by execution::
+
+   python3 scripts/spikes/pdv_mztab_spike.py --only R12-per-psm-mgf
+
+It needs ``cometgui-tools`` built (``mvn -o -pl cometgui-tools -am install
+-DskipTests``): the MGF is written by the **product** writer,
+``org.cometgui.tools.pdv.PdvMgfWriter.writeOnePerRow``, unchanged, through the
+spike-local main ``scripts/spikes/pdv_mztab_spike/PerPsmMgf.java``. The
+observer now also reports a SHA-256 over every drawn peak (sorted, eight
+big-endian bytes per value), which the spike computes from the mzML's own
+decoded doubles, so "the right spectrum" is a bit-for-bit comparison.
+
+Observed on 2026-10-10, **39 checks passed**:
+
+* the product writer wrote 2,130 entries for the 2,130 ``_3`` target PSMs;
+  entry *n*'s ``TITLE`` is row *n*'s pepXML ``spectrumNativeID``; 1,404
+  titles repeat (2,130 rows over 726 spectra); and every entry's
+  ``PEPMASS`` is the mzML's selected-ion text and every peak parses back to
+  the mzML's exact double, read by the spike's own parser;
+* all 2,130 ``spectra_ref`` values are distinct;
+* every row of seven spectra that carry several PSMs -- 23 PSMs, including
+  one spectrum with five PSMs and two whose rows lie on PDV's second page
+  (rows 1011-1020) -- answered ``200 selected`` and was drawn **on its own
+  row**, with **bit-identical peaks**, the exact precursor, and **its own
+  peptide**, charge and modifications (scan 11288's five PSMs were drawn on
+  rows 1, 1150, 1306, 1431 and 1624, each with a different peptide);
+* ``index=2130``, one past the last row, answers ``404`` and redraws nothing.
+
+**One PDV behaviour the design must know.** PDV's MGF index (compomics
+utilities, inside PDV) does not keep a repeated ``TITLE``: the *k*-th repeat
+of a title is renamed ``<title>_k``. So the first row of a spectrum is drawn
+titled ``controllerType=0 controllerNumber=1 scan=11288`` and the later ones
+``..._1`` to ``..._4``. The spectrum, its peaks and the row are right; only the
+title PDV displays carries the suffix, and P11-11's "the drawn spectrum names
+itself" holds exactly only for a spectrum's first row. R12 states the rule as
+an expectation -- the first occurrence keeps its title, the *k*-th repeat is
+``<title>_k`` -- so a PDV that changed it would fail the experiment.
+CometGUI's writer does not alter titles to avoid this.
+
+K562 ``_3`` has no spectrum with target PSMs at two charge states, so that
+case was not exercised.
 
 Multiple spectrum files
 =======================

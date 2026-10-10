@@ -118,9 +118,11 @@ public final class PdvObserver {
                 double total = 0;
                 double maxIntensity = -1;
                 double maxMz = -1;
+                java.util.List<double[]> pairs = new java.util.ArrayList<>();
                 for (Object p : peaks) {
                     double mz = p.getClass().getField("mz").getDouble(p);
                     double in = p.getClass().getField("intensity").getDouble(p);
+                    pairs.add(new double[] {mz, in});
                     total += in;
                     if (in > maxIntensity) {
                         maxIntensity = in;
@@ -134,6 +136,7 @@ public final class PdvObserver {
                         .append(",\"peakCount\":").append(peaks.size())
                         .append(",\"totalIntensity\":").append(total)
                         .append(",\"basePeakMz\":").append(maxMz)
+                        .append(",\"peaksSha256\":").append(q(peakDigest(pairs)))
                         .append("}");
             }
 
@@ -171,6 +174,28 @@ public final class PdvObserver {
             sb.append(",\"observerError\":").append(q(String.valueOf(e)));
         }
         return sb.append('}').toString();
+    }
+
+    /**
+     * Unit 2 (R12): an exact digest of the drawn peaks -- SHA-256 over every (m/z, intensity) pair,
+     * sorted by m/z then intensity, each value as its 8 IEEE 754 bytes, big-endian. The spike
+     * computes the same digest from the mzML's decoded doubles, so equality means PDV holds every
+     * peak bit for bit.
+     */
+    private static String peakDigest(java.util.List<double[]> pairs) {
+        pairs.sort((a, b) -> a[0] != b[0] ? Double.compare(a[0], b[0]) : Double.compare(a[1], b[1]));
+        try {
+            java.security.MessageDigest sha = java.security.MessageDigest.getInstance("SHA-256");
+            java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(16);
+            for (double[] pair : pairs) {
+                buffer.clear();
+                buffer.putDouble(pair[0]).putDouble(pair[1]);
+                sha.update(buffer.array());
+            }
+            return java.util.HexFormat.of().formatHex(sha.digest());
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            return "no-sha256";
+        }
     }
 
     private static Object field(Object target, String name) throws ReflectiveOperationException {

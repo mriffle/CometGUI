@@ -20,6 +20,16 @@
  *
  * <p><strong>Phase 05 unit 7 landed the identity probe</strong>, which reads the version out of the
  * JAR's own manifest because PDV has no version option and builds a Swing frame before reading its
- * first argument. Opening a spectrum and driving the figure CLI are still phase 11's.
+ * first argument.
+ *
+ * <p><strong>Phase 11 unit 2</strong> landed what every PDV route stands on: {@link
+ * org.cometgui.tools.pdv.PdvSpectrumSupport}, which decides before anything launches whether the
+ * selected PDV can be given a run's spectrum source; the source readers ({@link
+ * org.cometgui.tools.pdv.SourceSpectra}, {@link org.cometgui.tools.pdv.MzMlSpectrumReader}, {@link
+ * org.cometgui.tools.pdv.MgfSpectrumReader}); {@link org.cometgui.tools.pdv.PdvMgfWriter}, the
+ * exact MGF re-encoding PDV is given (design decisions P11-11 and P11-12); and {@link
+ * org.cometgui.tools.pdv.PdvFigures}, the CLI figure command judged by its parsed output ({@link
+ * org.cometgui.tools.pdv.PngFigure}). The {@code denovo-gui} launcher, controller and mzTab
+ * exporter are later units'.
  */
 package org.cometgui.tools.pdv;

@@ -35,6 +35,11 @@ What it does, end to end, with nothing installed on the host:
    ``/proc/<pid>/net/*``) throughout each run, and logs every host-name
    lookup in the observer runs, to answer the analytics question.
 
+8. (Unit 2, R12) Runs the PRODUCT MGF writer, PdvMgfWriter.writeOnePerRow,
+   through scripts/spikes/pdv_mztab_spike/PerPsmMgf.java against the built
+   cometgui-tools classes, to prove design decision P11-12: one MGF entry per
+   mzTab row lets PSMs that share a spectrum each be selected and drawn.
+
 Every experiment has a written expectation; any deviation is a FAIL and the
 script exits 1.  PDV's exit status is never used as evidence.  K562 data and
 everything derived from it (mzTab, MGF, logs) are written under
@@ -53,6 +58,7 @@ import re
 import shutil
 import signal
 import socket
+import struct
 import subprocess
 import sys
 import threading
@@ -88,6 +94,10 @@ FONT_ROOT = os.path.join(ROOT, "tools", "fontstack-bookworm-20260829", "root")
 SHIM_SRC = os.path.join(ROOT, "scripts", "feasibility", "gui-spike", "xkbcomp-path-shim.c")
 HELPERS = os.path.join(ROOT, "scripts", "feasibility", "pdv_spike_helpers.py")
 OBSERVER_SRC = os.path.join(ROOT, "scripts", "spikes", "pdv_mztab_spike", "PdvObserver.java")
+# R12 (unit 2): the PRODUCT MGF writer, run through a spike-local main against the module's classes.
+PERPSM_SRC = os.path.join(ROOT, "scripts", "spikes", "pdv_mztab_spike", "PerPsmMgf.java")
+TOOLS_CLASSES = os.path.join(ROOT, "cometgui-tools", "target", "classes")
+DOMAIN_CLASSES = os.path.join(ROOT, "cometgui-domain", "target", "classes")
 
 PROTON = 1.007276466812
 READY_DEADLINE_S = 150
@@ -250,6 +260,15 @@ def read_pepxml(path):
     return out
 
 
+def peak_digest(mz, intensity):
+    """SHA-256 over (m/z, intensity) pairs sorted by m/z then intensity, 8 big-endian bytes each:
+    the digest PdvObserver computes from what PDV drew (R12)."""
+    h = hashlib.sha256()
+    for m, i in sorted(zip(mz, intensity)):
+        h.update(struct.pack(">dd", m, i))
+    return h.hexdigest()
+
+
 def read_mzml(path, helpers):
     """native id -> {index, position, scan, msLevel, selectedIonMzText, peak stats}."""
     out = {}
@@ -278,6 +297,7 @@ def read_mzml(path, helpers):
         out[native] = {"index": int(el.get("index")), "position": position,
                        "scan": int(m.group(1)) if m else None, "msLevel": level,
                        "selectedIonMzText": sel, "isolationTargetMzText": iso, "peakCount": len(mz),
+                       "peaksSha256": peak_digest(mz, inten),
                        "totalIntensity": float(sum(inten)),
                        "basePeakMz": mz[base] if base is not None else None}
         el.clear()
@@ -1072,8 +1092,165 @@ class Spike:
                 # Every K562_3 target PSM: import at scale, paging (1000 rows/page), and how many
                 # PSMs the duplicate-spectra_ref rule makes unreachable.
                 self.run_full(full)
+            if self.wanted("R12-per-psm-mgf"):
+                # Unit 2, design decision P11-12: one MGF entry per mzTab row, written by the
+                # PRODUCT writer, so PSMs that share a spectrum each have their own spectra_ref.
+                self.run_per_psm(full)
         finally:
             self.xvfb.stop()
+
+    def run_per_psm(self, full):
+        name = "R12-per-psm-mgf"
+        log("\n=== %s: every K562_3 target PSM (%d), one MGF entry per row by the product writer"
+            % (name, len(full)))
+        exp = self.results["experiments"].setdefault(
+            name, {"description": "every K562_3 target PSM; per-row MGF written by PdvMgfWriter"})
+        for path in (os.path.join(TOOLS_CLASSES, "org", "cometgui", "tools", "pdv", "PdvMgfWriter.class"),
+                     os.path.join(DOMAIN_CLASSES, "org", "cometgui", "domain", "tools", "ToolVersion.class")):
+            if not os.path.isfile(path):
+                raise SpikeFailure("R12 runs the product writer and %s is missing: build it with "
+                                   "mvn -o -pl cometgui-tools -am install -DskipTests" % path)
+        rundir = os.path.join(OUT, "runs", name)
+        shutil.rmtree(rundir, ignore_errors=True)
+        spectra = os.path.join(rundir, "spectra")
+        os.makedirs(spectra)
+        psms = self.psms(3, full, 1)
+        rows_file = os.path.join(rundir, "rows.txt")
+        with open(rows_file, "w", newline="\n") as f:
+            for p in psms:
+                f.write(p["query"]["nativeId"] + "\n")
+        classes = os.path.join(BUILD, "perpsm", "classes")
+        shutil.rmtree(classes, ignore_errors=True)
+        os.makedirs(classes)
+        cp = os.pathsep.join([TOOLS_CLASSES, DOMAIN_CLASSES])
+        subprocess.run([shutil.which("javac"), "-cp", cp, "-d", classes, PERPSM_SRC], check=True)
+        mgf_name = os.path.basename(MZML[3])[:-5] + ".mgf"
+        done = subprocess.run([shutil.which("java"), "-cp", os.pathsep.join([classes, cp]), "PerPsmMgf",
+                               MZML[3], rows_file, spectra, mgf_name],
+                              capture_output=True, text=True, timeout=300)
+        mgf = os.path.join(spectra, mgf_name)
+        exp["writer"] = {"stdout": done.stdout.strip(), "stderr": done.stderr.strip()[-2000:],
+                         "invokedVia": "scripts/spikes/pdv_mztab_spike/PerPsmMgf.java -> "
+                                       "org.cometgui.tools.pdv.PdvMgfWriter.writeOnePerRow (product code)"}
+        self.check(name, done.stdout.strip() == "PERPSMMGF %d %s" % (len(psms), mgf),
+                   "the product writer reports %d entries in %s (said %r)" % (len(psms), mgf_name,
+                                                                             done.stdout.strip()))
+        if not os.path.isfile(mgf):
+            raise SpikeFailure("the product writer wrote no MGF: %s" % done.stderr[-2000:])
+        entries = read_mgf_entries(mgf)
+        titles = [e["title"] for e in entries]
+        self.check(name, titles == [p["query"]["nativeId"] for p in psms],
+                   "entry n's TITLE is row n's pepXML spectrumNativeID, for all %d rows" % len(psms))
+        duplicate_titles = len(titles) - len(set(titles))
+        exp["duplicateTitles"] = duplicate_titles
+        exp["distinctSpectra"] = len(set(titles))
+        self.check(name, duplicate_titles == self.results["percolatorK562_3"]
+                   - self.results["k562_3DistinctSpectraWithTargetPsm"],
+                   "the MGF repeats a title once per extra PSM of a spectrum: %d duplicate titles over "
+                   "%d spectra" % (duplicate_titles, len(set(titles))))
+        exact = 0
+        for e, p in zip(entries, psms):
+            truth = p["spectrum"]
+            if (e["pepmass"] == truth["selectedIonMzText"]
+                    and len(e["peaks"]) == truth["peakCount"]
+                    and peak_digest([m for m, _ in e["peaks"]], [i for _, i in e["peaks"]])
+                    == truth["peaksSha256"]):
+                exact += 1
+        self.check(name, exact == len(psms),
+                   "every entry's PEPMASS is the mzML's selected-ion text and every peak parses back "
+                   "to the mzML's exact double (%d of %d entries, read by the spike's own parser)"
+                   % (exact, len(psms)))
+        for n, p in enumerate(psms):
+            p["mgfOrdinal"] = n
+        staged = [mgf]   # already in the run's own directory: PDV's .mgf.cui lands beside it
+        mztab = write_mztab(os.path.join(rundir, name + ".mztab"), psms,
+                            [(os.path.basename(s), s) for s in staged], "mgf-index")
+        refs = {}
+        for p in psms:
+            refs.setdefault(p["ref"], []).append(p)
+        exp.update({"rows": len(psms), "distinctRefs": len(refs), "mztabSha256": sha256(mztab)})
+        self.check(name, len(refs) == len(psms),
+                   "every row has its own spectra_ref (%d distinct of %d)" % (len(refs), len(psms)))
+        # Targets: every row of spectra that carry several PSMs -- the first few in file order, the
+        # spectrum with the most PSMs, and spectra whose rows lie on PDV's second page (row >= 1000).
+        groups = {}
+        for p in psms:
+            groups.setdefault(p["query"]["nativeId"], []).append(p)
+        shared = [g for g in groups.values() if len(g) > 1]
+        chosen = shared[:5]
+        biggest = max(shared, key=len)
+        if biggest not in chosen:
+            chosen.append(biggest)
+        late = [g for g in shared if int(g[0]["rowKey"]) >= 1000 and g not in chosen][:2]
+        chosen += late
+        targets = [p for g in chosen for p in g]
+        # PDV's MGF index (compomics-utilities, inside PDV) does not keep a repeated TITLE: it
+        # renames the k-th repeat of a title "<title>_k" (k = 1, 2, ...), as observed on 2026-10-10.
+        # The expectation below states that rule exactly, so a PDV that changed it would fail here.
+        occurrence = {}
+        for p in psms:
+            k = occurrence.get(p["query"]["nativeId"], 0)
+            p["expectedDrawnTitle"] = p["query"]["nativeId"] + ("_%d" % k if k else "")
+            occurrence[p["query"]["nativeId"]] = k + 1
+        exp["targetSpectra"] = [{"nativeId": g[0]["query"]["nativeId"], "rows": [q["rowKey"] for q in g],
+                                 "psms": [q["row"]["psmId"] for q in g]} for g in chosen]
+        self.check(name, len(late) == 2 and len(biggest) >= 4,
+                   "targets include a spectrum with %d PSMs and %d spectra whose rows start on PDV's "
+                   "second page" % (len(biggest), len(late)))
+        pdv = Pdv(name, self.xvfb.env, mztab, staged, self.observer_cp)
+        try:
+            ready = pdv.poll_ready()
+            exp["ready"] = ready
+            self.check(name, ready["ready"], "/ready reached 200 by polling (%.1fs)" % ready["seconds"])
+            if not ready["ready"]:
+                exp["stderrExcerpt"] = pdv.stderr_text().splitlines()[-20:]
+                return
+            initial = wait_until(lambda: pdv.displayed(), 10, 0.05)
+            exp["initialDisplay"] = pdv.displayed()[0] if initial else None
+            exp["selects"] = []
+            drawn_rows = {}
+            for p in targets:
+                r, shown = pdv.select(p["ref"])
+                # judge_display wants the drawn title to be the native id; R12 states PDV's
+                # renaming rule instead (above), so that one comparison is replaced, not dropped.
+                problems = [x for x in judge_display(p, shown, "mgf") if not x.startswith("MGF title ")]
+                spec = (shown or {}).get("spectrum") or {}
+                truth = p["spectrum"]
+                if spec and spec.get("title") != p["expectedDrawnTitle"]:
+                    problems.append("drawn title %r != %r" % (spec.get("title"), p["expectedDrawnTitle"]))
+                if shown is not None and shown.get("rowKey") != p["rowKey"]:
+                    problems.append("row %r drawn, expected its own row %r" % (shown.get("rowKey"), p["rowKey"]))
+                if spec and float(spec["precursorMz"]) != float(truth["selectedIonMzText"]):
+                    problems.append("precursor %r is not exactly the mzML's %s"
+                                    % (spec["precursorMz"], truth["selectedIonMzText"]))
+                if spec and spec.get("peaksSha256") != truth["peaksSha256"]:
+                    problems.append("drawn peaks differ from the mzML's exact peaks (digest %s != %s)"
+                                    % (spec.get("peaksSha256"), truth["peaksSha256"]))
+                drawn_rows.setdefault(p["query"]["nativeId"], set()).add((shown or {}).get("rowKey"))
+                exp["selects"].append({"psmId": p["row"]["psmId"], "ref": p["ref"], "row": p["rowKey"],
+                                       "response": r, "displayed": shown, "problems": problems})
+                self.check(name, r["status"] == 200 and r["body"] == "selected" and not problems,
+                           "%s (row %s, shares %s with %d other PSM(s)) -> %r, drawn on its own row with "
+                           "the exact spectrum (peaks bit-identical), its own peptide %s, titled %r%s"
+                           % (p["row"]["psmId"], p["rowKey"], p["query"]["nativeId"],
+                              len(groups[p["query"]["nativeId"]]) - 1, (r["status"], r["body"]),
+                              p["hit"]["peptide"], p["expectedDrawnTitle"],
+                              "" if not problems else ": " + "; ".join(problems)))
+            for g in chosen:
+                nid = g[0]["query"]["nativeId"]
+                self.check(name, drawn_rows.get(nid) == {q["rowKey"] for q in g},
+                           "the %d PSMs of %s were drawn on %d distinct rows (%s)"
+                           % (len(g), nid, len(drawn_rows.get(nid, ())), sorted(drawn_rows.get(nid, ()))))
+            unknown = "ms_run[1]:index=%d" % len(psms)
+            r, shown = pdv.select(unknown, expect_display=False)
+            exp["unknownRef"] = {"ref": unknown, "response": r, "displayed": shown}
+            self.check(name, r["status"] == 404 and shown is None,
+                       "the index one past the last row -> 404, nothing redrawn (got %r)" % ((r["status"], r["body"]),))
+        finally:
+            pdv.stop()
+            exp["externalSockets"] = pdv.sampler.external()
+            exp["filesWritten"] = pdv.files_written()
+            self.check(name, not exp["externalSockets"], "no socket to a non-loopback address")
 
     def run_full(self, full):
         name = "R11-full-mgf"
@@ -1126,6 +1303,30 @@ class Spike:
             self.check(name, not exp["externalSockets"], "no socket to a non-loopback address")
 
 
+def read_mgf_entries(path):
+    """[(title, pepmass text, [(m/z, intensity)])] read independently of the product's reader."""
+    entries = []
+    with open(path) as f:
+        cur = None
+        for line in f:
+            line = line.rstrip("\n")
+            if line == "BEGIN IONS":
+                cur = {"title": None, "pepmass": None, "peaks": []}
+            elif line == "END IONS":
+                entries.append(cur)
+                cur = None
+            elif cur is not None and line.startswith("TITLE="):
+                cur["title"] = line[6:]
+            elif cur is not None and line.startswith("PEPMASS="):
+                cur["pepmass"] = line[8:]
+            elif cur is not None and line[:1].isdigit():
+                m, i = line.split(" ")
+                if "e" in m.lower() or "e" in i.lower():
+                    raise SpikeFailure("MGF peak line %r uses exponent notation" % line)
+                cur["peaks"].append((float(m), float(i)))
+    return entries
+
+
 def no_leftovers(spike):
     """Nothing this script started may outlive it."""
     me = os.getpid()
@@ -1151,7 +1352,7 @@ def main(argv):
     if not shutil.which("java") or not shutil.which("javac"):
         print("pdv_mztab_spike: no java/javac on PATH -- source tools/env.sh first", file=sys.stderr)
         return 2
-    for p in [PDV_ZIP, PDV_JAR, PSMS, MZML_FIXTURE_CRLF, HELPERS, OBSERVER_SRC, SHIM_SRC] + \
+    for p in [PDV_ZIP, PDV_JAR, PSMS, MZML_FIXTURE_CRLF, HELPERS, OBSERVER_SRC, SHIM_SRC, PERPSM_SRC] + \
             list(PEPXML.values()) + list(MZML.values()):
         if not os.path.isfile(p):
             print("pdv_mztab_spike: missing input %s" % p, file=sys.stderr)
