@@ -645,6 +645,78 @@ Unit 6 sign-off
   the mzTab's ``retention_time`` is the pepXML's; MGF and mzXML sources and
   real Percolator output for the constructed searches were not exercised.
 
+Unit 7 sign-off
+---------------
+
+**Accepted 2026-10-11**, commits ``309fa97``, ``cb53c88``, ``1ec639d``.
+**Derived** (``cometgui-tools`` ``org.cometgui.tools.pdv.derived``, derived
+header and per-file record naming the upstream path at ``480b3013...``):
+``PdvController`` (from ``PdvController.java``) and ``DenovoGuiCommand``
+(from ``PdvLauncher.java``'s ``launchDenovo`` argument array only), plus a
+hand-written ``package-info``. **CometGUI-authored:** ``PdvMzTabRefs``
+((decoy, PSMId) -> ``spectra_ref`` from the product's own mzTab),
+``PdvWindowState``/``PdvSelectOutcome``/``PdvControlAnswer``/``PdvWindowShutdown``;
+``workflow.pdv.PdvWindows`` (one window per run: close, ``prepare``, launch
+through ``PdvLaunches.forRun(..., DENOVO_GUI, ...)``, poll, select, close);
+the Visualisation section's Open/Close PDV and selection; app
+``CometGuiApplication.stop()`` closing every window. No POM or module edge.
+
+* **Diff read** (the derived controller's polling, select and shutdown
+  paths): launches through the given ``ProcessRunner`` only; polling on a
+  scheduled executor with the upstream 5-minute cap; every select returns
+  PDV's status and body; death and deadline are actionable messages; the
+  bind race is handled by relaunching on a fresh port (up to three
+  launches, each recorded); shutdown = ``/shutdown`` + process-tree end +
+  bounded wait. ``--tol`` omitted (Comet's ``fragment_bin_tol`` is not an
+  annotation tolerance -- not invented); ``--hide-psm-table`` off. No
+  download/unzip/version/GitHub code brought in.
+* **Tests, run by me** after ``mvn -o -pl cometgui-app -am install``:
+  ``mvn -pl cometgui-tools validate`` (both Spotless and both Checkstyle file
+  sets) PASS; ``verify`` tools **970**, workflow **786**, ui **699**, 0
+  failures each; ``cometgui-archtests`` **33**, 0 failures (two new: only
+  ``workflow.pdv`` may open a PDV window); app ``PdvLiveWindowUiTest`` (43 s),
+  ``PdvFirstUseUiTest`` (40 s), ``ProjectVisualisationPortTest`` (7) -- 9 run,
+  0 failures; no PDV or Xvfb left afterwards.
+* **Gate item 5 tests**: ``PdvLiveWindowUiTest`` (real Comet + Percolator run
+  through the UI; Open installs PDV, ready on an ephemeral port by polling;
+  two Results selections each show ``200 selected``; an unknown ref 404;
+  ``pdv.launched`` with kind ``denovo-gui`` and the started argv; Close and
+  the application's ``stop()`` leave no process and a refused port);
+  ``PdvControllerRealPdvTest`` (P11-16: PDV's unmodified main class under a
+  test-side reflective observer, driven through the derived controller over
+  HTTP; five selections incl. two PSMs sharing one spectrum and an oxidised
+  M -- each drawing's row, peptide, charge, modifications, precursor and a
+  SHA-256 over every peak equal to the producing mzML spectrum decoded by
+  the test).
+* **My injections** (restored, ``sha256sum -c`` clean): Q1 the Visualisation
+  view model no longer closing the window when the Results run changes ->
+  ``VisualisationWindowTest.anotherRunClosesTheWindow`` and
+  ``aStaleOpeningIsClosed`` red (2 of 26); Q2 ``DenovoGuiCommand`` passing
+  ``port + 1`` -> ``DenovoGuiCommandTest`` 2 failures and the real
+  ``PdvControllerRealPdvTest`` "no state change within PT3M" (PDV never
+  ready on the port the controller polls).
+* **Targeted PIT, by me** (derived and new tools classes, their unit tests):
+  182 mutations -- 125 KILLED, 37 TIMED_OUT, 10 SURVIVED, 10 NO_COVERAGE.
+  The survivors are the ten the agent argued equivalent (timer
+  cancellations also guarded by state, ``starting``/``stillStarting`` after
+  polling is cancelled, an index that cannot be 0, ``setDaemon``,
+  ``HttpClient.shutdownNow``). **KILLED-only this is 69 %**; with timeouts
+  89 % -- the controller's timing code is where the owner's open
+  ``TIMED_OUT`` scoring question bites (the module-wide gate is unaffected).
+  Workflow ``PdvWindows`` 34/34 (agent).
+* **Harnesses, run by me on ``1ec639d``**, all PASS: ``quality`` 142 s
+  (grades the derived-file machinery), ``shell`` 411 s, ``results`` 572 s,
+  ``workflow`` 481 s, ``paramui`` 1917 s.
+* **Outside files**: as before (artefacts, K562 mzML/pepXML/Percolator, X11
+  and font stacks, the shim, host ``gcc`` and ``timeout``); the observer test
+  also puts its own ``target/test-classes`` on PDV's class path.
+* **Residue:** the display claim rests on the observer test, not the GUI
+  test (no endpoint reports what is drawn); the bind-race relaunch is proven
+  against the fake only; a foreign server answering ``/ready`` on the
+  reserved port would be trusted; the spectra_ref index is an in-memory map
+  (unmeasured at 1M PSMs); ``cometgui-app``'s ``ProjectXvfb`` copy has no
+  ``timeout`` cap; 57 ``<defunct>`` Xvfb zombies (PID 1 does not reap).
+
 Rejections and rework
 =====================
 
