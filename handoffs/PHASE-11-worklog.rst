@@ -598,6 +598,53 @@ Unit 5 sign-off
   share a PSMId -- key on (decoy flag, PSMId); stop a running PDV before
   ``prepare`` (a regeneration deletes the directory).
 
+Unit 6 sign-off
+---------------
+
+**Accepted 2026-10-10**, commit ``a821c3f`` (tests only: 15 files in
+``cometgui-tools`` ``org.cometgui.tools.pdv.fidelity`` and
+``cometgui-workflow`` ``PdvMzTabsFidelityTest``). **No exporter defect found.**
+
+* **Diff read; independence audited by me**: the seven readers
+  (``MzMlFile``, ``MzTabFile``, ``PepXmlFile``, ``PercolatorTable``,
+  ``MgfEntries``, ``Peptidoforms``, ``FidelityCheck``) import nothing from
+  ``org.cometgui``; the only project types in the package are the exporter's
+  entry points (``PdvMzTabExporter``, request, source, exception,
+  ``SpectrumFileFormat``) and the test support that runs real tools.
+  ``IndependenceGuardTest`` enforces it mechanically.
+* **Tests, run by me** after ``mvn -o -pl cometgui-workflow -am install``:
+  ``cometgui-tools verify`` **928, 0 failures** (fidelity: K562 17,
+  constructed 6, real Comet 2, unrepresentable 5, real PDV 2, guard 2);
+  ``cometgui-workflow verify`` **772, 0 failures** (re-run after the agent's
+  SpotBugs fix, which it had not re-run in full).
+* **Coverage of the gate items** (agent's figures, the tests re-run by me):
+  gate 6 -- 6670 K562 rows identity-matched both ways, plus constructed (9),
+  real Comet ``decoy_search = 2`` with N-terminal and static+variable
+  modifications (13 216) and static TMT (4170) runs, and the run-level
+  ``prepare`` path; gate 7 -- position != scan shown from the mzML for every
+  producing spectrum, every row's ``spectra_ref`` resolved as PDV does and
+  1 034 444 peak values compared bit for bit, wrong-reference forms (file
+  position, scan, first row of a shared spectrum) shown to be caught; gate 8
+  -- five unfaithful PSMs injected into copies of the real sources, each
+  refused naming the PSMId, reason and file, nothing left at the final path.
+* **My injections into the exporter**, graded on the 34 fidelity tests only
+  (restored, ``sha256sum -c`` clean): N1 score and q-value columns swapped
+  -> 4 failures, "search_engine_score[1] is "0.00112905", the source's score
+  is "2.37114"" (my first N1 matched two anchors, was refused by my own
+  guard, and its green run was discarded); N2 charge 3 written as 2 -> 4
+  failures, ``K562FidelityTest.charge``; N3 flanks swapped -> 4 failures,
+  ``K562FidelityTest.sequence``.
+* ``--only quality`` PASS.
+* **Outside files**: as units 2-5, plus the host's ``gcc`` and
+  ``/usr/bin/timeout``; **and** ``PdvMzTabsFidelityTest`` compiles
+  ``cometgui-tools/src/test/java/org/cometgui/tools/pdv/fidelity/*.java`` at
+  test time (the ``tests`` sandbox copies every module's ``src``).
+* **Not errors, recorded:** ``database``/``database_version`` are ``null``
+  although the pepXML names the FASTA (``search_database``) -- nothing
+  invented, left as is; the MGF's ``RTINSECONDS`` is the mzML scan time while
+  the mzTab's ``retention_time`` is the pepXML's; MGF and mzXML sources and
+  real Percolator output for the constructed searches were not exercised.
+
 Rejections and rework
 =====================
 
