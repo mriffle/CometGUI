@@ -77,6 +77,11 @@ import org.junit.jupiter.api.condition.OS;
  * C[+57.021464][+15.994915]}). One PDV launch, polled -- never slept on -- under deadlines.
  * Everything written is K562-derived ({@code D-006}), under this module's build directory, deleted
  * afterwards. The control API proves import and selection; it cannot report what PDV drew (P11-16).
+ *
+ * <p>PDV runs under the host's {@code timeout} and lives at most {@link #PDV_LIFETIME}: PIT halts a
+ * minion whose mutant timed out, so no {@code @AfterAll} can stop it then (see {@link
+ * ProjectXvfb#LIFETIME}). The display is started only after the export, so a mutant that hangs the
+ * export starts nothing at all.
  */
 @EnabledOnOs(OS.LINUX)
 class PdvMzTabRealPdvTest {
@@ -86,6 +91,7 @@ class PdvMzTabRealPdvTest {
     private static final String MADE = "constructed";
 
     private static final Duration READY_DEADLINE = Duration.ofMinutes(3);
+    private static final Duration PDV_LIFETIME = Duration.ofMinutes(5);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20);
 
     private static ProjectXvfb display;
@@ -105,7 +111,6 @@ class PdvMzTabRealPdvTest {
                 Path.of(System.getProperty("cometgui.buildDirectory", "target")).toAbsolutePath();
         Files.createDirectories(build);
         work = Files.createTempDirectory(build, "mztab-pdv-");
-        display = ProjectXvfb.start(work.resolve("xvfb"));
         Path made = work.resolve("made");
         String nterm = MADE + "_101_2_1";
         String both = MADE + "_101_2_2";
@@ -188,6 +193,7 @@ class PdvMzTabRealPdvTest {
                 refByPsmId.put(fields[22] + "/" + fields[23], fields[16]);
             }
         }
+        display = ProjectXvfb.start(work.resolve("xvfb"));
         port = freePort();
         Path home = Files.createDirectories(work.resolve("home"));
         List<String> spectra = new ArrayList<>();
@@ -200,6 +206,9 @@ class PdvMzTabRealPdvTest {
         ToolCommand command =
                 new ToolCommand(
                         List.of(
+                                timeout().toString(),
+                                "--kill-after=10s",
+                                Long.toString(PDV_LIFETIME.toSeconds()),
                                 JavaRuntime.ofThisApplication().launcher().toString(),
                                 "-Duser.home=" + home,
                                 "-jar",
@@ -245,6 +254,20 @@ class PdvMzTabRealPdvTest {
             text.append(row).append('\n');
         }
         return Files.writeString(copy, text.toString(), StandardCharsets.UTF_8);
+    }
+
+    /** The host's {@code timeout}, as {@link ProjectXvfb} finds it. */
+    private static Path timeout() {
+        String path = Objects.requireNonNullElse(System.getenv("PATH"), "");
+        for (String directory : path.split(java.io.File.pathSeparator)) {
+            Path candidate = Path.of(directory, "timeout");
+            if (Files.isExecutable(candidate)) {
+                return candidate;
+            }
+        }
+        throw new AssertionError(
+                "no timeout on PATH: PDV must not outlive a halted test JVM, so this test fails"
+                        + " rather than launch it unbounded");
     }
 
     private static int freePort() throws IOException {

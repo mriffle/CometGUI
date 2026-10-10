@@ -55,6 +55,13 @@ import org.cometgui.tools.process.ProcessService;
  *
  * <p>Anything missing <strong>fails</strong> the test, naming what and how to get it back. A real
  * PDV test that skipped without a display would be a check that cannot go red.
+ *
+ * <p><strong>A display outlives no test by more than {@link #LIFETIME}.</strong> Xvfb runs under
+ * the host's {@code timeout}, which ends it then if nothing else has. A test stops its display in
+ * its {@code @AfterAll}, but PIT ends a minion whose mutant timed out with {@code Runtime.halt}, so
+ * no {@code @AfterAll} and no shutdown hook runs; before this cap, two targeted PIT runs over the
+ * real-PDV tests left 60 orphaned Xvfb servers behind (phase 11, unit 5). Stopping the display
+ * normally is unchanged: the process service kills {@code timeout}'s descendants, Xvfb, first.
  */
 public final class ProjectXvfb implements AutoCloseable {
 
@@ -66,6 +73,9 @@ public final class ProjectXvfb implements AutoCloseable {
 
     /** The shim's source, relative to the repository root. */
     public static final String SHIM_SOURCE = "scripts/feasibility/gui-spike/xkbcomp-path-shim.c";
+
+    /** The longest a display may live: far longer than any test class that uses one. */
+    public static final Duration LIFETIME = Duration.ofMinutes(10);
 
     private static final Duration START_DEADLINE = Duration.ofSeconds(30);
     private static final Duration STOP_DEADLINE = Duration.ofSeconds(15);
@@ -142,6 +152,9 @@ public final class ProjectXvfb implements AutoCloseable {
         ToolCommand command =
                 new ToolCommand(
                         List.of(
+                                onPath("timeout").toString(),
+                                "--kill-after=10s",
+                                Long.toString(LIFETIME.toSeconds()),
                                 xvfb.toString(),
                                 "-displayfd",
                                 "1",
