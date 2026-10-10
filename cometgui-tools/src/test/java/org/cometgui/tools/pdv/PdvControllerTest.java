@@ -728,6 +728,77 @@ class PdvControllerTest {
     }
 
     @Test
+    @DisplayName(
+            "a selection waiting in the debounce when PDV's window is closed is told, not left"
+                    + " waiting")
+    void aWaitingSelectionIsToldOfTheClose()
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
+        PdvController controller = controller(timing(BOUND, Duration.ofSeconds(30), 3));
+        openReady(controller);
+        CompletableFuture<PdvSelectOutcome> waiting = controller.select(mzTab(), KNOWN);
+
+        pdv.windows().get(0).die(0);
+        PdvWindowState closed = nextIn(Phase.CLOSED);
+
+        assertEquals(
+                new PdvSelectOutcome(
+                        PdvSelectOutcome.Kind.NOT_OPEN, KNOWN, Optional.empty(), closed.message()),
+                await(waiting));
+    }
+
+    @Test
+    @DisplayName("a /shutdown nobody answers is reported, and the process is ended all the same")
+    void anUnansweredShutdown()
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
+        PdvController controller = controller();
+        openReady(controller);
+        FakePdvWindows.Window window = pdv.windows().get(0);
+        java.net.http.HttpClient.newHttpClient()
+                .send(
+                        java.net.http.HttpRequest.newBuilder(
+                                        java.net.URI.create(
+                                                "http://127.0.0.1:" + window.port() + "/shutdown"))
+                                .build(),
+                        java.net.http.HttpResponse.BodyHandlers.discarding());
+
+        PdvWindowShutdown shutdown = controller.shutdown(mzTab()).orElseThrow();
+
+        assertAll(
+                () ->
+                        assertTrue(
+                                shutdown.controlServer().startsWith("was not answered ("),
+                                shutdown.controlServer()),
+                () -> assertTrue(shutdown.exited()),
+                () -> assertTrue(window.cancelled()));
+    }
+
+    @Test
+    @DisplayName("a failure quotes the last twelve lines PDV wrote, and no more")
+    void theLastTwelveLines()
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
+        pdv.loadingFor(Integer.MAX_VALUE);
+        PdvController controller = controller();
+        open(controller);
+        nextIn(Phase.STARTING);
+        String[] lines = new String[15];
+        for (int index = 0; index < lines.length; index++) {
+            lines[index] = "line " + index;
+        }
+
+        pdv.windows().get(0).die(1, lines);
+        PdvWindowState failed = nextIn(Phase.FAILED);
+
+        assertTrue(
+                failed.message()
+                        .endsWith(
+                                " The last lines PDV wrote: line 3 | line 4 | line 5 | line 6 |"
+                                        + " line 7 | line 8 | line 9 | line 10 | line 11 | line"
+                                        + " 12 | line 13 | line 14"),
+                failed.message());
+        assertEquals(12, PdvController.REMEMBERED_LINES);
+    }
+
+    @Test
     @DisplayName("the product's timing is upstream's cap and debounce, and nothing is non-positive")
     void timing() {
         PdvController.Timing product = PdvController.Timing.DEFAULT;
@@ -738,6 +809,7 @@ class PdvControllerTest {
                 () -> assertEquals(Duration.ofSeconds(5), product.requestTimeout()),
                 () -> assertEquals(Duration.ofSeconds(15), product.shutdownDeadline()),
                 () -> assertEquals(3, product.launchAttempts()),
+                () -> assertEquals(1, timing(BOUND, Duration.ofMillis(1), 1).launchAttempts()),
                 () ->
                         assertThrows(
                                 IllegalArgumentException.class,
