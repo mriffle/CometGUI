@@ -365,6 +365,67 @@ Commit ``2da544c`` (``scripts/spikes/pdv_mztab_spike.py``,
 * ``docs`` and ``traceability`` run by the agent; ``docs-build.sh`` re-run by
   me with this entry.
 
+Unit 2 sign-off
+---------------
+
+**Accepted 2026-10-10**, commit ``ff324f2`` (37 files: 20 main and 11 test
+classes in ``cometgui-tools`` ``org.cometgui.tools.pdv`` and
+``org.cometgui.tools.testing``; the spike's R12 experiment).
+
+* **Diff read**, ``PdvFigures`` in full: format check, then an empty work
+  directory, MGF, ids file, launch through ``ToolRunner`` over the process
+  service with a timeout; judged only by the files (timeout, invalid PNG,
+  a figure owned by no requested id, non-zero exit, ``NO_FIGURE`` on exit 0,
+  ``error.txt`` lines). ``HOME`` and ``-Duser.home`` point into the work
+  directory (P11-17). No POM, gate script or record changed.
+* **Tests, run by me** after ``mvn -o -pl cometgui-domain,cometgui-process
+  install -DskipTests``: ``mvn -o -pl cometgui-tools verify`` -> **703 tests,
+  0 failures, 0 skipped**, BUILD SUCCESS (Checkstyle, SpotBugs, JaCoCo in
+  ``verify``); ``PdvFiguresRealTest`` 2 tests ran in 5.1 s against real PDV
+  under the project-local Xvfb.
+* **My injections** (production code; each anchor asserted unique and gone,
+  ``pdv`` tests only, 118 run each time; restored with ``git checkout`` and
+  ``sha256sum -c`` clean):
+
+  - J1 ``PngFigure``: the blank-figure floor ``nonWhite <
+    MINIMUM_NON_WHITE_FRACTION * total`` -> ``nonWhite < 0``: 1 failure,
+    ``PngFigureTest.floor`` "Expected InvalidFigureException ... nothing was
+    thrown".
+  - J2 ``PdvMgfWriter.writeOnePerRow`` writing each spectrum once
+    (``LinkedHashSet``): 1 failure, ``PdvMgfWriterTest.onePerRow``.
+  - J3 ``MzMlSpectrumReader`` position off by one: 9 failures, 7 errors,
+    e.g. ``MzMlSpectrumReaderTest.identity``, ``theRealFixture``.
+
+* **Targeted PIT, by me** (``-DtargetClasses=org.cometgui.tools.pdv.*``,
+  pdv tests): 444 mutations, 434 KILLED, 3 TIMED_OUT, 7 SURVIVED -- the same
+  seven the agent argued equivalent (two ``Inflater.end``/``close`` calls,
+  three unreachable boundaries, the redundant external-entities setting, one
+  in-memory ``close``). KILLED-only 97.7 %. **Population:** every compiled
+  class is mutated except ``PdvFigure`` (record), ``PeakEncoding`` (enum),
+  ``SpectrumVisitor`` (interface), ``package-info``.
+* ``--only quality`` -> PASS (140 s).
+* **Outside files the tests read** (brief, build economy 5):
+  ``scratch/phase05/artefacts/v2.7.0__PDV-2.7.0.zip``, ``manifests/tools.json``,
+  ``scratch/fixture/..._K562_3.mzML``,
+  ``scratch/scientific-path/comet/..._K562_3.pep.xml``,
+  ``tools/x11-bookworm-20260829/``, ``tools/fontstack-bookworm-20260829/``,
+  ``scripts/feasibility/gui-spike/xkbcomp-path-shim.c``; and the host's
+  ``gcc`` (compiles the shim, as the Phase 00 spikes do). The agent read
+  the ``tests`` sandbox: ``scratch/`` and ``tools/`` are linked,
+  ``scripts/`` and ``manifests/`` copied. ``--only tests`` at phase end.
+* **Findings carried forward.** P11-12 proved: one MGF entry per PSM row --
+  23 PSMs of seven shared spectra each drawn on their own row with
+  bit-identical peaks. **PDV renames the k-th repeat of an MGF title to
+  ``<title>_k``**, so P11-11's "the drawn spectrum names itself" holds
+  exactly only for a spectrum's first row (R12 pins the rule). mzXML is
+  refused, not re-encoded (``PdvSpectrumSupport``: 2.7.0 = mzML, MGF).
+  32-bit peaks are written as the float's exact decimal expansion, because
+  PDV parses doubles. With ``HOME`` moved, the desktop wiring must pass
+  ``XAUTHORITY`` with ``DISPLAY`` (units 3 and 7). Stale:
+  ``docs/developer/tool_adapters.rst`` (unit 8).
+* **Note:** my targeted PIT overwrote ``cometgui-tools``' PIT report; the
+  full reports are regenerated before ``--only tests`` (Phase 08's trap).
+
 Rejections and rework
 =====================
 
