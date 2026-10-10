@@ -40,6 +40,7 @@ import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
 import org.cometgui.tools.pdv.PdvFigures;
+import org.cometgui.tools.pdv.derived.PdvController;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
@@ -52,6 +53,8 @@ import org.cometgui.ui.viewmodel.visualisation.VisualisationPort;
 import org.cometgui.workflow.engine.EngineServices;
 import org.cometgui.workflow.engine.WorkflowEngine;
 import org.cometgui.workflow.pdv.PdvLaunches;
+import org.cometgui.workflow.pdv.PdvMzTabs;
+import org.cometgui.workflow.pdv.PdvWindows;
 import org.cometgui.workflow.pdv.PsmFigures;
 import org.cometgui.workflow.steps.CometWorkflow;
 import org.cometgui.workflow.steps.PercolatorRerun;
@@ -304,9 +307,12 @@ public final class RunWiring {
 
     /**
      * The Visualisation section's port (phase 11): PDV's state and install through the Tool
-     * Manager, and drawing a PSM's spectrum through the one recording launch path -- over the
-     * composition root's one process service, the session's one hasher and the one secret rule set,
-     * so that every PDV launch is in the run's event log before PDV starts.
+     * Manager, drawing a PSM's spectrum, and PDV's live {@code denovo-gui} window -- both through
+     * the one recording launch path, over the composition root's one process service, the session's
+     * one hasher and the one secret rule set, so that every PDV launch is in the run's event log
+     * before PDV starts. The live window's controller is the derived {@link PdvController} with
+     * {@link PdvController.Timing#DEFAULT}; the port's {@code closeAllPdv} shuts every window down
+     * and is what the application calls when it exits.
      *
      * @param services the composition root: its process service, clock and environment
      * @param project the session's project
@@ -335,18 +341,29 @@ public final class RunWiring {
                         services.environment().osName().orElse(""),
                         services.environment().osArch().orElse(""));
         Optional<PsmFigures> figures = Optional.empty();
+        Optional<PdvWindows> windows = Optional.empty();
         String noFigures = NO_PROCESS_SERVICE;
         if (services.processRunner().isPresent() && host.isPresent()) {
-            figures =
+            SecretRedactor redactor = SecretRedactor.patternsOnly();
+            PdvLaunches launches =
+                    new PdvLaunches(
+                            services.processRunner().get(),
+                            hashes,
+                            redactor,
+                            services.clock(),
+                            host.get());
+            figures = Optional.of(new PsmFigures(launches, PdvFigures.DEFAULT_TIMEOUT));
+            windows =
                     Optional.of(
-                            new PsmFigures(
-                                    new PdvLaunches(
-                                            services.processRunner().get(),
+                            new PdvWindows(
+                                    new PdvMzTabs(
                                             hashes,
-                                            SecretRedactor.patternsOnly(),
+                                            redactor,
                                             services.clock(),
-                                            host.get()),
-                                    PdvFigures.DEFAULT_TIMEOUT));
+                                            engine::executingRuns),
+                                    launches,
+                                    new PdvController(PdvController.Timing.DEFAULT),
+                                    engine::executingRuns));
         } else if (host.isEmpty()) {
             noFigures =
                     "No spectrum can be drawn: this machine's operating system and architecture"
@@ -360,7 +377,8 @@ public final class RunWiring {
                 figures,
                 noFigures,
                 engine::executingRuns,
-                () -> display.environment(environment));
+                () -> display.environment(environment),
+                windows);
     }
 
     /**

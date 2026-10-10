@@ -111,8 +111,9 @@ final class SectionArrivals {
                         + " Manager, with its progress and a Cancel control, never holding up a"
                         + " search -- and drawing the annotated spectrum of the PSM selected in the"
                         + " Results section with PDV, each launch recorded in the run's provenance"
-                        + " event log with PDV's version and checksum. Not yet live: Open run in"
-                        + " PDV, the PDV window that follows the Results selection.");
+                        + " event log with PDV's version and checksum; and Open run in PDV, a PDV"
+                        + " window that shows each PSM selected in the Results section, closed when"
+                        + " another run is chosen there and when CometGUI exits.");
         notes.put(
                 SectionId.LIMELIGHT,
                 "This section arrives in phase 12 (Limelight Conversion and Upload).");

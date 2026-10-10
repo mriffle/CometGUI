@@ -29,13 +29,20 @@
  * org.cometgui.tools.pdv.MgfSpectrumReader}); {@link org.cometgui.tools.pdv.PdvMgfWriter}, the
  * exact MGF re-encoding PDV is given (design decisions P11-11 and P11-12); and {@link
  * org.cometgui.tools.pdv.PdvFigures}, the CLI figure command judged by its parsed output ({@link
- * org.cometgui.tools.pdv.PngFigure}). The {@code denovo-gui} launcher and controller are later
- * units'.
+ * org.cometgui.tools.pdv.PngFigure}).
  *
  * <p><strong>Phase 11 unit 5</strong> landed {@link org.cometgui.tools.pdv.PdvMzTabExporter}: the
  * mzTab {@code denovo-gui} is given, and its MGFs, from a run's Percolator PSM tables (through the
  * one table reader in {@code org.cometgui.results.parser}), Comet pepXML and spectrum files --
  * every value transcribed, every PSM joined to exactly one hit and one spectrum or refused by name
  * ({@link org.cometgui.tools.pdv.PdvMzTabException}), written all or nothing.
+ *
+ * <p><strong>Phase 11 unit 7</strong> landed the live control path: the {@code denovo-gui} command
+ * and its controller, derived from Noble-Lab/CasanovoGUI and therefore in {@code
+ * org.cometgui.tools.pdv.derived}; here, what they report -- {@link
+ * org.cometgui.tools.pdv.PdvWindowState}, {@link org.cometgui.tools.pdv.PdvSelectOutcome}, {@link
+ * org.cometgui.tools.pdv.PdvControlAnswer}, {@link org.cometgui.tools.pdv.PdvWindowShutdown} -- and
+ * {@link org.cometgui.tools.pdv.PdvMzTabRefs}, the (decoy, {@code PSMId}) to {@code spectra_ref}
+ * index read from the exporter's mzTab.
  */
 package org.cometgui.tools.pdv;

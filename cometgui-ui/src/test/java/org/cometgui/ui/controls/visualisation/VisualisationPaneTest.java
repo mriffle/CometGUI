@@ -67,6 +67,7 @@ import org.cometgui.ui.viewmodel.results.ResultsViewModel;
 import org.cometgui.ui.viewmodel.results.WeightsViewModel;
 import org.cometgui.ui.viewmodel.visualisation.VisualisationViewModel;
 import org.cometgui.workflow.pdv.PdvStatus;
+import org.cometgui.workflow.pdv.PdvWindowStatus;
 import org.cometgui.workflow.storage.ViewStateStore;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -202,6 +203,90 @@ class VisualisationPaneTest {
                                 "The annotated spectrum PDV drew: " + port.figure(),
                                 figure.getAccessibleText()),
                 () -> assertTrue(outcome.getText().startsWith("PDV drew the annotated spectrum")));
+        FxToolkit.onFxThread(results::close);
+    }
+
+    @Test
+    @DisplayName(
+            "the pane follows PDV's window: Open, its state, the PSM shown, and Close, each only"
+                    + " through the section")
+    void thePaneFollowsTheWindow() throws IOException, InterruptedException {
+        ScriptedVisualisation port = new ScriptedVisualisation(work);
+        Path psms =
+                Files.writeString(
+                        work.resolve("psms.tsv"),
+                        "PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n"
+                                + work.resolve("outputs/comet/k562_3")
+                                + "_101_2_1\t1.5\t0.001\t0.0001\tK.PEPTIDEA.R\tsp|P1|A\n",
+                        StandardCharsets.UTF_8);
+        DisplayFiltersViewModel filters = new DisplayFiltersViewModel();
+        ResultTableViewModel table =
+                new ResultTableViewModel(filters, Runnable::run, Runnable::run);
+        ResultsViewModel results =
+                new ResultsViewModel(
+                        new OneTable(work, psms),
+                        filters,
+                        table,
+                        new WeightsViewModel(),
+                        Runnable::run,
+                        Runnable::run);
+        VisualisationViewModel section =
+                new VisualisationViewModel(
+                        port, results, table, Runnable::run, Runnable::run, () -> {});
+        Scene scene =
+                FxToolkit.callOnFxThread(
+                        () -> {
+                            Scene built = new Scene(new VisualisationPane(section), 900, 900);
+                            built.getRoot().applyCss();
+                            built.getRoot().layout();
+                            return built;
+                        });
+        Button open = (Button) scene.lookup("#" + UiIds.VISUALISATION_OPEN);
+        Button close = (Button) scene.lookup("#" + UiIds.VISUALISATION_CLOSE);
+        Label refusal = (Label) scene.lookup("#" + UiIds.VISUALISATION_OPEN_REFUSAL);
+        Label window = (Label) scene.lookup("#" + UiIds.VISUALISATION_WINDOW);
+        Label selection = (Label) scene.lookup("#" + UiIds.VISUALISATION_SELECTION);
+        assertAll(
+                () -> assertTrue(open.isDisabled()),
+                () -> assertTrue(close.isDisabled()),
+                () ->
+                        assertEquals(
+                                VisualisationViewModel.NO_RUN
+                                        + " Open a run there to show it in PDV.",
+                                refusal.getText()),
+                () -> assertEquals(refusal.getText(), open.getAccessibleHelp()),
+                () -> assertEquals(VisualisationViewModel.NO_WINDOW, window.getText()),
+                () -> assertEquals(VisualisationViewModel.NOTHING_SHOWN, selection.getText()));
+
+        port.status(PdvStatus.installed(ToolVersion.parse("2.7.0"), work.resolve("PDV.jar")));
+        FxToolkit.onFxThread(
+                () -> {
+                    section.refresh();
+                    results.refresh();
+                });
+        assertAll(() -> assertFalse(open.isDisabled()), () -> assertEquals("", refusal.getText()));
+        FxToolkit.onFxThread(open::fire);
+        FxToolkit.onFxThread(
+                () -> port.windowState(new RunId("run-1"), PdvWindowStatus.Phase.READY, "ready"));
+        FxToolkit.onFxThread(() -> table.select(table.page().rows().get(0).key()));
+        assertAll(
+                () -> assertEquals(List.of("run-1"), port.opens()),
+                () ->
+                        assertTrue(
+                                window.getText().startsWith("PDV is ready on loopback port 41547"),
+                                window.getText()),
+                () -> assertFalse(close.isDisabled()),
+                () ->
+                        assertTrue(
+                                selection.getText().startsWith("Target PSM ")
+                                        && selection
+                                                .getText()
+                                                .endsWith(
+                                                        " is shown in PDV: PDV answered /select"
+                                                                + " with 200 selected."),
+                                selection.getText()));
+        FxToolkit.onFxThread(close::fire);
+        assertEquals(List.of("run-1"), port.closes());
         FxToolkit.onFxThread(results::close);
     }
 

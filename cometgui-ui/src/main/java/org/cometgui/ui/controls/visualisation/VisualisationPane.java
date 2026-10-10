@@ -39,13 +39,13 @@ import org.cometgui.ui.controls.params.Texts;
 import org.cometgui.ui.viewmodel.visualisation.VisualisationViewModel;
 
 /**
- * The Visualisation section's first form: PDV's state with an install's progress and its Cancel
- * control, the run and PSM selected in the Results section, the action that draws that PSM's
- * annotated spectrum, why it cannot when it cannot, what the last action did, and the figure.
+ * The Visualisation section: PDV's state with an install's progress and its Cancel control, the run
+ * and PSM selected in the Results section; PDV's live window -- "Open run in PDV", "Close PDV", why
+ * it cannot be opened when it cannot, the window's state and what PDV answered for the last PSM
+ * sent to it; and the action that draws the selected PSM's annotated spectrum as a figure, why it
+ * cannot when it cannot, what the last drawing did, and the figure.
  *
- * <p><strong>"Open run in PDV" is not here.</strong> The live PDV window, held open on a control
- * port and driven by the Results selection, is phase 11's later work; until then this form has no
- * control for it rather than one that does nothing, and the section's arrival note says so.
+ * <p>Every control here only calls the view-model; nothing is parsed, hashed or sent from here.
  */
 public final class VisualisationPane extends ScrollPane {
 
@@ -122,6 +122,39 @@ public final class VisualisationPane extends ScrollPane {
                         "nothing has been drawn");
         follow(outcome, visualisation.outcomeProperty());
 
+        Button open =
+                Texts.button(
+                        UiIds.VISUALISATION_OPEN,
+                        "Open run in PDV",
+                        "Open the Results section's run in PDV's window, installing PDV first if it"
+                                + " is not installed; the PSM selected there is then shown in it");
+        open.setOnAction(event -> visualisation.openInPdv());
+        open.disableProperty().bind(visualisation.openEnabledProperty().not());
+        open.accessibleHelpProperty().bind(visualisation.openRefusalProperty());
+        Button close =
+                Texts.button(
+                        UiIds.VISUALISATION_CLOSE, "Close PDV", "Close PDV's window for this run");
+        close.setOnAction(event -> visualisation.closePdv());
+        close.disableProperty().bind(visualisation.closeEnabledProperty().not());
+        Label openRefusal =
+                Texts.label(
+                        UiIds.VISUALISATION_OPEN_REFUSAL,
+                        visualisation.openRefusalProperty().get(),
+                        "the run can be opened in PDV");
+        follow(openRefusal, visualisation.openRefusalProperty());
+        Label window =
+                Texts.label(
+                        UiIds.VISUALISATION_WINDOW,
+                        visualisation.windowTextProperty().get(),
+                        "PDV's window");
+        follow(window, visualisation.windowTextProperty());
+        Label selection =
+                Texts.label(
+                        UiIds.VISUALISATION_SELECTION,
+                        visualisation.selectionTextProperty().get(),
+                        "the PSM shown in PDV's window");
+        follow(selection, visualisation.selectionTextProperty());
+
         figure.setId(UiIds.VISUALISATION_FIGURE);
         figure.setAccessibleRole(AccessibleRole.IMAGE_VIEW);
         figure.setAccessibleText("No annotated spectrum has been drawn yet.");
@@ -140,6 +173,12 @@ public final class VisualisationPane extends ScrollPane {
                         caption("Selected in the Results section"),
                         run,
                         psm,
+                        caption("PDV's window"),
+                        new HBox(8, open, close),
+                        openRefusal,
+                        window,
+                        selection,
+                        caption("A figure of the selected PSM"),
                         draw,
                         refusal,
                         outcome,

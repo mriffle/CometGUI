@@ -37,12 +37,17 @@
  *   <li>{@link org.cometgui.workflow.pdv.PdvMzTabs} makes a finished run's mzTab for PDV under
  *       {@code <run>/pdv/mztab/}, or reuses the recorded one whose sources are unchanged, and
  *       records each export as an {@code mztab.written} event (unit 5).
+ *   <li>{@link org.cometgui.workflow.pdv.PdvWindows} is the live control path (unit 7): a finished
+ *       run opened in PDV's {@code denovo-gui} window -- its mzTab prepared, its launch the second
+ *       {@link org.cometgui.workflow.pdv.PdvLaunchKind} through the same {@link
+ *       org.cometgui.workflow.pdv.PdvLaunches#forRun}, driven by the derived controller in {@code
+ *       org.cometgui.tools.pdv.derived} -- a Results selection sent to it by (decoy flag, {@code
+ *       PSMId}), and the window closed when its result set closes or the application exits.
  * </ul>
  *
- * <p>A later launch kind -- the {@code denovo-gui} window -- is a second {@link
- * org.cometgui.workflow.pdv.PdvLaunchKind} through the same {@link
- * org.cometgui.workflow.pdv.PdvLaunches#forRun}; there is no other constructor of a PDV launch.
+ * <p>There is no other constructor of a PDV launch: {@code PdvLaunchPathRuleTest} allows only this
+ * package to construct the figure command or to open a window.
  *
- * <p>Written by phase 11, work unit 3.
+ * <p>Written by phase 11, work units 3, 5 and 7.
  */
 package org.cometgui.workflow.pdv;

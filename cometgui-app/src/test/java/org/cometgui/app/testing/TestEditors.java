@@ -21,7 +21,10 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import javafx.beans.property.SimpleObjectProperty;
 import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.config.ParameterEditorWiring;
@@ -70,7 +73,9 @@ import org.cometgui.ui.viewmodel.results.WeightsViewModel;
 import org.cometgui.ui.viewmodel.visualisation.VisualisationPort;
 import org.cometgui.ui.viewmodel.visualisation.VisualisationViewModel;
 import org.cometgui.workflow.pdv.DrawnSpectrum;
+import org.cometgui.workflow.pdv.PdvSelection;
 import org.cometgui.workflow.pdv.PdvStatus;
+import org.cometgui.workflow.pdv.PdvWindowStatus;
 
 /**
  * The shell for a GUI test that builds its own: the Comet parameter editor composed exactly as the
@@ -176,6 +181,34 @@ public final class TestEditors {
         @Override
         public DrawnSpectrum draw(ResultsRun run, String psmId) throws IOException {
             throw new IOException(REASON);
+        }
+
+        @Override
+        public PdvWindowStatus openInPdv(ResultsRun run, Consumer<PdvWindowStatus> listener)
+                throws IOException {
+            throw new IOException(REASON);
+        }
+
+        @Override
+        public CompletableFuture<PdvSelection> showInPdv(
+                ResultsRun run, boolean decoy, String psmId) {
+            return CompletableFuture.completedFuture(
+                    new PdvSelection(
+                            run.id(),
+                            Optional.empty(),
+                            PdvSelection.Kind.NOT_OPEN,
+                            OptionalInt.empty(),
+                            REASON));
+        }
+
+        @Override
+        public void closePdv(RunId run) {
+            // nothing is ever opened
+        }
+
+        @Override
+        public void closeAllPdv() {
+            // nothing is ever opened
         }
     }
 

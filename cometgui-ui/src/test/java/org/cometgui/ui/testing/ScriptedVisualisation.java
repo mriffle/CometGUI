@@ -21,6 +21,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
@@ -30,13 +36,27 @@ import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.ui.viewmodel.results.ResultsRun;
 import org.cometgui.ui.viewmodel.visualisation.VisualisationPort;
 import org.cometgui.workflow.pdv.DrawnSpectrum;
+import org.cometgui.workflow.pdv.PdvSelection;
 import org.cometgui.workflow.pdv.PdvStatus;
+import org.cometgui.workflow.pdv.PdvWindowStatus;
 
 /**
  * A Visualisation port that answers from a script and records what it was asked: PDV's state as
  * set, an install whose reports the test sends, and drawings answered with a figure or a failure.
  */
 public final class ScriptedVisualisation implements VisualisationPort {
+
+    private final List<String> opens = new ArrayList<>();
+
+    private final List<String> shows = new ArrayList<>();
+
+    private final List<String> closes = new ArrayList<>();
+
+    private volatile Consumer<PdvWindowStatus> windowListener;
+
+    private volatile String openFailure;
+
+    private volatile Function<String, PdvSelection> showAnswer;
 
     /** What {@link #pdv()} says until a test sets a status. */
     public static final String NO_PDV = "No PDV in this test.";
@@ -208,5 +228,104 @@ public final class ScriptedVisualisation implements VisualisationPort {
      */
     public synchronized int statusReads() {
         return statusReads;
+    }
+
+    /**
+     * Makes {@link #openInPdv} fail with this message, or succeed again with {@code null}.
+     *
+     * @param failure the failure's message, or {@code null}
+     */
+    public void openFails(String failure) {
+        openFailure = failure;
+    }
+
+    /**
+     * How {@link #showInPdv} answers, given {@code <decoy|target> <psm id>}; by default every PSM
+     * is selected.
+     *
+     * @param answer the answer
+     */
+    public void answeringShow(Function<String, PdvSelection> answer) {
+        showAnswer = answer;
+    }
+
+    @Override
+    public synchronized PdvWindowStatus openInPdv(ResultsRun run, Consumer<PdvWindowStatus> states)
+            throws IOException {
+        opens.add(run.id().value());
+        if (openFailure != null) {
+            throw new IOException(openFailure);
+        }
+        windowListener = states;
+        return window(run.id(), PdvWindowStatus.Phase.STARTING, "starting");
+    }
+
+    /**
+     * Sends a window state to the listener the last opening gave, as the controller would.
+     *
+     * @param run the run
+     * @param phase the phase
+     * @param message the message
+     */
+    public void windowState(RunId run, PdvWindowStatus.Phase phase, String message) {
+        windowListener.accept(window(run, phase, message));
+    }
+
+    private static PdvWindowStatus window(RunId run, PdvWindowStatus.Phase phase, String message) {
+        return new PdvWindowStatus(run, phase, OptionalInt.of(41_547), message);
+    }
+
+    @Override
+    public synchronized CompletableFuture<PdvSelection> showInPdv(
+            ResultsRun run, boolean decoy, String psmId) {
+        String key = (decoy ? "decoy " : "target ") + psmId;
+        shows.add(run.id().value() + " " + key);
+        Function<String, PdvSelection> answer = showAnswer;
+        return CompletableFuture.completedFuture(
+                answer != null
+                        ? answer.apply(key)
+                        : new PdvSelection(
+                                run.id(),
+                                Optional.of("ms_run[1]:index=" + (shows.size() - 1)),
+                                PdvSelection.Kind.SELECTED,
+                                OptionalInt.of(200),
+                                "PDV answered /select with 200 selected."));
+    }
+
+    @Override
+    public synchronized void closePdv(RunId run) {
+        closes.add(run.value());
+    }
+
+    @Override
+    public synchronized void closeAllPdv() {
+        closes.add("all");
+    }
+
+    /**
+     * The runs opened in PDV, in order.
+     *
+     * @return their identifiers
+     */
+    public synchronized List<String> opens() {
+        return List.copyOf(opens);
+    }
+
+    /**
+     * The PSMs shown in PDV, in order, as {@code <run id> <decoy|target> <psm id>}.
+     *
+     * @return them
+     */
+    public synchronized List<String> shows() {
+        return List.copyOf(shows);
+    }
+
+    /**
+     * The windows closed, in order: a run's identifier, or {@code all}.
+     *
+     * @return them
+     */
+    public synchronized List<String> closes() {
+        return List.copyOf(closes);
     }
 }

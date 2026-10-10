@@ -173,6 +173,9 @@ public final class CometGuiApplication extends Application {
     /** The Results section, whose open stores are closed when the application stops. */
     private ResultsViewModel results;
 
+    /** The Visualisation section, whose PDV windows are shut down when the application stops. */
+    private VisualisationViewModel visualisation;
+
     /**
      * The constructor JavaFX itself calls: the real services for this host and a fresh run message
      * log.
@@ -399,7 +402,7 @@ public final class CometGuiApplication extends Application {
          * an install it starts runs on the Tool Manager's own threads, and when it ends the Tool
          * Manager's rows are read again.
          */
-        VisualisationViewModel visualisation =
+        visualisation =
                 new VisualisationViewModel(
                         RunWiring.visualisation(
                                 services,
@@ -491,16 +494,22 @@ public final class CometGuiApplication extends Application {
     }
 
     /**
-     * Closes the Results section's stores, releases the session's project lock and stops the Run
-     * section's threads.
+     * Shuts down every PDV window, closes the Results section's stores, releases the session's
+     * project lock and stops the Run section's threads.
      *
-     * <p>Called by JavaFX when the application ends. A run still in progress is not waited for: its
-     * threads are daemons, and its tools are the process service's to end.
+     * <p>Called by JavaFX when the application ends. Each PDV window is sent {@code /shutdown} and
+     * its process ended through the process service, waited for within the controller's bound
+     * ({@code R-PDV-04}): PDV is a separate JVM that would otherwise outlive CometGUI. A run still
+     * in progress is not waited for: its threads are daemons, and its tools are the process
+     * service's to end.
      *
      * @throws IOException if the project lock cannot be released
      */
     @Override
     public void stop() throws IOException {
+        if (visualisation != null) {
+            visualisation.closeAllWindows();
+        }
         if (results != null) {
             // closes the open run's stores, on the results thread, after anything it is reading
             results.close();

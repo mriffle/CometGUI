@@ -24,20 +24,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.function.IntFunction;
 import org.cometgui.archtests.fixtures.ConstructsPdvFigures;
+import org.cometgui.archtests.fixtures.OpensPdvWindow;
 import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.tools.pdv.PdvFigures;
+import org.cometgui.tools.pdv.derived.PdvController;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Every PDV figure launch goes through the one recording launch path (phase 11, design decision
- * P11-4): only {@code org.cometgui.workflow.pdv} -- where {@code PdvLaunches} hands out the runner
- * that records each launch in the run's event log before it starts -- may construct {@link
- * PdvFigures}. A construction anywhere else could hand PDV the application's own process service
- * and launch it with no record. Graded against the product and against a fixture that must be
- * rejected, both with the same rule object.
+ * Every PDV launch goes through the one recording launch path (phase 11, design decision P11-4):
+ * only {@code org.cometgui.workflow.pdv} -- where {@code PdvLaunches} hands out the runner that
+ * records each launch in the run's event log before it starts -- may construct {@link PdvFigures}
+ * (the figure command) or call {@link PdvController#open} (the {@code denovo-gui} window, unit 7).
+ * Either anywhere else could hand PDV the application's own process service and launch it with no
+ * record. Each rule is graded against the product and against a fixture that must be rejected, both
+ * with the same rule object.
  */
 class PdvLaunchPathRuleTest {
 
@@ -52,6 +57,52 @@ class PdvLaunchPathRuleTest {
                             "P11-4: every PDV launch is recorded in the run's event log before it"
                                     + " starts, and only org.cometgui.workflow.pdv hands PDV a"
                                     + " runner that does that");
+
+    /** The window rule: the derived controller's launch is called only by the recording path. */
+    static final ArchRule PDV_WINDOWS_ONLY_THROUGH_THE_RECORDING_PATH =
+            noClasses()
+                    .that()
+                    .resideOutsideOfPackage("org.cometgui.workflow.pdv..")
+                    .should()
+                    .callMethod(
+                            PdvController.class,
+                            "open",
+                            Path.class,
+                            ProcessRunner.class,
+                            IntFunction.class,
+                            PdvController.Listener.class)
+                    .because(
+                            "P11-4: every PDV launch is recorded in the run's event log before it"
+                                    + " starts, and only org.cometgui.workflow.pdv hands the"
+                                    + " denovo-gui window a runner that does that");
+
+    @Test
+    @DisplayName("no product class outside org.cometgui.workflow.pdv opens a PDV window")
+    void theProductKeepsTheWindowRule() {
+        PDV_WINDOWS_ONLY_THROUGH_THE_RECORDING_PATH.check(ProductClasses.all());
+    }
+
+    @Test
+    @DisplayName("the window rule rejects a class that opens a PDV window elsewhere, naming it")
+    void theWindowRuleRejectsAShortcut() {
+        JavaClasses fixture = new ClassFileImporter().importClasses(OpensPdvWindow.class);
+        assertEquals(1, fixture.size());
+
+        AssertionError rejected =
+                assertThrows(
+                        AssertionError.class,
+                        () -> PDV_WINDOWS_ONLY_THROUGH_THE_RECORDING_PATH.check(fixture));
+
+        String message = rejected.getMessage();
+        assertTrue(message.contains("P11-4"), message);
+        assertTrue(
+                message.contains("org.cometgui.archtests.fixtures.OpensPdvWindow.shortcut("),
+                message);
+        assertTrue(
+                message.contains(
+                        "calls method <org.cometgui.tools.pdv.derived.PdvController.open("),
+                message);
+    }
 
     @Test
     @DisplayName("no product class outside org.cometgui.workflow.pdv constructs PdvFigures")

@@ -68,9 +68,16 @@ final class ParameterEditorApp {
 
     private final RunningApplication application;
 
-    private ParameterEditorApp(ScriptedChooser chooser, RunningApplication application) {
+    /** The application object JavaFX would call {@code stop()} on. */
+    private final javafx.application.Application instance;
+
+    private ParameterEditorApp(
+            ScriptedChooser chooser,
+            RunningApplication application,
+            javafx.application.Application instance) {
         this.chooser = chooser;
         this.application = application;
+        this.instance = instance;
     }
 
     /**
@@ -123,11 +130,16 @@ final class ParameterEditorApp {
                         null);
         try {
             Stage primary = FxToolkit.registerPrimaryStage();
-            FxToolkit.setupApplication(
-                    () ->
-                            new CometGuiApplication(
-                                    services, log, () -> build, owner -> chooser, runSetup));
-            return new ParameterEditorApp(chooser, RunningApplication.showing(primary));
+            javafx.application.Application started =
+                    FxToolkit.setupApplication(
+                            () ->
+                                    new CometGuiApplication(
+                                            services,
+                                            log,
+                                            () -> build,
+                                            owner -> chooser,
+                                            runSetup));
+            return new ParameterEditorApp(chooser, RunningApplication.showing(primary), started);
         } catch (TimeoutException timedOut) {
             return fail("the application did not start", timedOut);
         }
@@ -154,6 +166,16 @@ final class ParameterEditorApp {
     /** Ends the application. */
     void stop() {
         application.stop();
+    }
+
+    /**
+     * Ends the application the way JavaFX does when its last window closes: {@code
+     * Application.stop()} on the application thread, through TestFX's own clean-up.
+     *
+     * @throws TimeoutException if the application thread does not answer in time
+     */
+    void stopApplication() throws TimeoutException {
+        FxToolkit.cleanupApplication(instance);
     }
 
     /**

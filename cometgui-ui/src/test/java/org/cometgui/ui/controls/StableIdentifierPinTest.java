@@ -180,8 +180,11 @@ class StableIdentifierPinTest {
      * <p>Raised from 498 to 509 by phase 11 unit 3, the Visualisation section's first form: 11
      * constants (its pane, PDV's state, the install's progress bar and Cancel, the run, the PSM,
      * the draw action, its refusal, the outcome, the figure and the figure's status).
+     *
+     * <p>Raised from 509 to 514 by phase 11 unit 7, the live PDV window: 5 constants (the open
+     * action, its refusal, the close action, the window's state and the last selection's answer).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 509;
+    private static final int PINNED_IDENTIFIER_COUNT = 514;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -380,7 +383,12 @@ class StableIdentifierPinTest {
                     Map.entry("VISUALISATION_DRAW_REFUSAL", "visualisation-draw-refusal"),
                     Map.entry("VISUALISATION_OUTCOME", "visualisation-outcome"),
                     Map.entry("VISUALISATION_FIGURE", "visualisation-figure"),
-                    Map.entry("VISUALISATION_FIGURE_STATUS", "visualisation-figure-status"));
+                    Map.entry("VISUALISATION_FIGURE_STATUS", "visualisation-figure-status"),
+                    Map.entry("VISUALISATION_OPEN", "visualisation-open"),
+                    Map.entry("VISUALISATION_OPEN_REFUSAL", "visualisation-open-refusal"),
+                    Map.entry("VISUALISATION_CLOSE", "visualisation-close"),
+                    Map.entry("VISUALISATION_WINDOW", "visualisation-window"),
+                    Map.entry("VISUALISATION_SELECTION", "visualisation-selection"));
 
     // -----------------------------------------------------------------------------------------
     // The parameter editor (Phase 07). A parameter's identifiers are built from its own name, so

@@ -642,6 +642,21 @@ public final class UiIds {
     /** Why the last figure cannot be shown; empty while it is shown or none is drawn. */
     public static final String VISUALISATION_FIGURE_STATUS = "visualisation-figure-status";
 
+    /** Opens the Results section's run in PDV's live window, installing PDV first if need be. */
+    public static final String VISUALISATION_OPEN = "visualisation-open";
+
+    /** Why the run cannot be opened in PDV now; empty when it can. */
+    public static final String VISUALISATION_OPEN_REFUSAL = "visualisation-open-refusal";
+
+    /** Closes PDV's live window. */
+    public static final String VISUALISATION_CLOSE = "visualisation-close";
+
+    /** PDV's live window in words: starting, ready on its port, failed, closed. */
+    public static final String VISUALISATION_WINDOW = "visualisation-window";
+
+    /** What PDV answered when the last selected PSM was sent to its window. */
+    public static final String VISUALISATION_SELECTION = "visualisation-selection";
+
     /**
      * The two surfaces a parameter's control appears on. A parameter shown in Essentials is shown
      * in Advanced too, so the surface is part of every parameter identifier and the two controls

@@ -172,7 +172,8 @@ class ProjectVisualisationPortTest {
                 figures,
                 "Nothing can be launched in this test.",
                 () -> Set.copyOf(executing),
-                () -> Map.of("DISPLAY", ":7"));
+                () -> Map.of("DISPLAY", ":7"),
+                Optional.empty());
     }
 
     private static ResultsRun listed() {

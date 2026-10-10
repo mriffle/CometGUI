@@ -21,7 +21,10 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunIdentity;
@@ -36,7 +39,11 @@ import org.cometgui.ui.viewmodel.visualisation.VisualisationPort;
 import org.cometgui.workflow.pdv.DrawnSpectrum;
 import org.cometgui.workflow.pdv.PdvInstallation;
 import org.cometgui.workflow.pdv.PdvProvisioning;
+import org.cometgui.workflow.pdv.PdvSelection;
 import org.cometgui.workflow.pdv.PdvStatus;
+import org.cometgui.workflow.pdv.PdvWindowRequest;
+import org.cometgui.workflow.pdv.PdvWindowStatus;
+import org.cometgui.workflow.pdv.PdvWindows;
 import org.cometgui.workflow.pdv.PsmFigureRequest;
 import org.cometgui.workflow.pdv.PsmFigures;
 
@@ -45,9 +52,10 @@ import org.cometgui.workflow.pdv.PsmFigures;
  * {@link VisualisationPort}).
  *
  * <p>PDV's state and its install are {@link PdvProvisioning}'s over the one Tool Manager -- the
- * object the Tool Manager section shows. A drawing is {@link PsmFigures}', whose every PDV launch
- * goes through the one recording launch path; this class only finds the run, refuses a run that is
- * executing, takes the project's lock and supplies PDV, the Java runtime and the display.
+ * object the Tool Manager section shows. A drawing is {@link PsmFigures}', and the live window is
+ * {@link PdvWindows}', and every PDV launch of either goes through the one recording launch path;
+ * this class only finds the run, refuses a run that is executing, takes the project's lock and
+ * supplies PDV, the Java runtime and the display.
  *
  * <h2>A run that is executing</h2>
  *
@@ -73,6 +81,8 @@ final class ProjectVisualisationPort implements VisualisationPort {
 
     private final Supplier<Map<String, String>> display;
 
+    private final Optional<PdvWindows> windows;
+
     /**
      * The port.
      *
@@ -84,6 +94,8 @@ final class ProjectVisualisationPort implements VisualisationPort {
      * @param noFigures why nothing can be drawn, when {@code figures} is empty
      * @param executing the runs the session's engine is executing now
      * @param display the variables PDV needs to reach the display
+     * @param windows the live windows, over the same launch path; empty exactly when {@code
+     *     figures} is, and for the same reason
      */
     ProjectVisualisationPort(
             ProjectSession project,
@@ -92,7 +104,8 @@ final class ProjectVisualisationPort implements VisualisationPort {
             Optional<PsmFigures> figures,
             String noFigures,
             Supplier<Set<RunId>> executing,
-            Supplier<Map<String, String>> display) {
+            Supplier<Map<String, String>> display,
+            Optional<PdvWindows> windows) {
         this.project = Objects.requireNonNull(project, "project");
         this.tools = Objects.requireNonNull(tools, "tools");
         this.toolsUnavailable = Objects.requireNonNull(toolsUnavailable, "toolsUnavailable");
@@ -100,6 +113,7 @@ final class ProjectVisualisationPort implements VisualisationPort {
         this.noFigures = Objects.requireNonNull(noFigures, "noFigures");
         this.executing = Objects.requireNonNull(executing, "executing");
         this.display = Objects.requireNonNull(display, "display");
+        this.windows = Objects.requireNonNull(windows, "windows");
     }
 
     @Override
@@ -120,21 +134,92 @@ final class ProjectVisualisationPort implements VisualisationPort {
     public DrawnSpectrum draw(ResultsRun run, String psmId) throws IOException {
         Objects.requireNonNull(run, "run");
         Objects.requireNonNull(psmId, "psmId");
+        refuseExecuting(run, "Draw when the run has ended.");
+        PsmFigures drawing = figures.orElseThrow(() -> new IOException(noFigures));
+        PdvInstallation pdv = installed();
+        Located located = locate(run);
+        project.lock();
+        return drawing.draw(
+                new PsmFigureRequest(
+                        located.layout(),
+                        located.identity(),
+                        located.searched(),
+                        psmId,
+                        pdv,
+                        JavaRuntime.ofThisApplication(),
+                        display.get()));
+    }
+
+    @Override
+    public PdvWindowStatus openInPdv(ResultsRun run, Consumer<PdvWindowStatus> listener)
+            throws IOException {
+        Objects.requireNonNull(run, "run");
+        Objects.requireNonNull(listener, "listener");
+        refuseExecuting(run, "Open it in PDV when the run has ended.");
+        PdvWindows open = windows.orElseThrow(() -> new IOException(noFigures));
+        PdvInstallation pdv = installed();
+        Located located = locate(run);
+        project.lock();
+        return open.open(
+                new PdvWindowRequest(
+                        located.layout(),
+                        located.identity(),
+                        located.searched(),
+                        pdv,
+                        JavaRuntime.ofThisApplication(),
+                        display.get()),
+                listener);
+    }
+
+    @Override
+    public CompletableFuture<PdvSelection> showInPdv(ResultsRun run, boolean decoy, String psmId) {
+        Objects.requireNonNull(run, "run");
+        Objects.requireNonNull(psmId, "psmId");
+        return windows.map(open -> open.select(run.id(), decoy, psmId))
+                .orElseGet(
+                        () ->
+                                CompletableFuture.completedFuture(
+                                        new PdvSelection(
+                                                run.id(),
+                                                Optional.empty(),
+                                                PdvSelection.Kind.NOT_OPEN,
+                                                OptionalInt.empty(),
+                                                noFigures)));
+    }
+
+    @Override
+    public void closePdv(RunId run) {
+        Objects.requireNonNull(run, "run");
+        windows.ifPresent(open -> open.close(run));
+    }
+
+    @Override
+    public void closeAllPdv() {
+        windows.ifPresent(PdvWindows::close);
+    }
+
+    private void refuseExecuting(ResultsRun run, String when) throws IOException {
         if (executing.get().contains(run.id())) {
             throw new IOException(
                     "run "
                             + run.id().value()
                             + " is executing: the workflow engine holds its provenance event log,"
-                            + " where every PDV launch is recorded. Draw when the run has ended.");
+                            + " where every PDV launch is recorded. "
+                            + when);
         }
-        PsmFigures drawing = figures.orElseThrow(() -> new IOException(noFigures));
+    }
+
+    private PdvInstallation installed() throws IOException {
         PdvStatus status = pdv();
-        PdvInstallation pdv =
-                status.installation()
-                        .orElseThrow(
-                                () ->
-                                        new IOException(
-                                                "PDV is not installed: " + status.explanation()));
+        return status.installation()
+                .orElseThrow(
+                        () -> new IOException("PDV is not installed: " + status.explanation()));
+    }
+
+    /** A run's directory, its recorded identity, and the run whose pepXML it shows. */
+    private record Located(RunLayout layout, RunIdentity identity, RunLayout searched) {}
+
+    private Located locate(ResultsRun run) throws IOException {
         Path runs = project.layout().runsDirectory();
         RunLayout layout =
                 new RunLayout(
@@ -157,15 +242,6 @@ final class ProjectVisualisationPort implements VisualisationPort {
                                                 runs.resolve(source.directoryName())
                                                         .toAbsolutePath()))
                         .orElse(layout);
-        project.lock();
-        return drawing.draw(
-                new PsmFigureRequest(
-                        layout,
-                        identity,
-                        searched,
-                        psmId,
-                        pdv,
-                        JavaRuntime.ofThisApplication(),
-                        display.get()));
+        return new Located(layout, identity, searched);
     }
 }
