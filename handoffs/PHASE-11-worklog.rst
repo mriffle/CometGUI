@@ -536,6 +536,68 @@ changed beyond a ``package-info`` comment; no POM.
   1 000 000 joined PSMs costs about 1.4 GB of heap; streaming the same file
   without keeping fits 64 MB.
 
+Unit 5 sign-off
+---------------
+
+**Accepted 2026-10-10**, commits ``bd25042`` and ``32f68ce``.
+``org.cometgui.tools.pdv.PdvMzTabExporter`` (+ ``PsmHit``,
+``PercolatorPeptide``, ``LongIntMap``, request/export/source/MGF records,
+``PdvMzTabException`` with 19 reasons); ``org.cometgui.workflow.pdv.PdvMzTabs``
+(``prepare`` -> ``<run>/pdv/mztab/``, reuse only when the last
+``mztab.written`` event matches every source SHA-256); new
+``ProvenanceEventType.MZTAB_WRITTEN``. **Module edge added:
+``cometgui-tools`` -> ``cometgui-results``** (commented in the POM; P11-2).
+
+* **Diff read** (the row-writing loop, accession, modification and
+  terminal rules): every value is source text -- Percolator score, q-value,
+  PEP and ``proteinIds``; pepXML peptide, charge, flanks,
+  ``retention_time_sec``; the spectrum file's selected-ion m/z;
+  ``calc_mass_to_charge`` omitted; ``null`` where no source states a value.
+  N-terminal deltas only where exactly one N-terminal declaration exists and
+  its mass text equals the hit's; every C-terminal modification refused.
+  Written in a staging directory, read back (one line per row, references
+  ``0..n-1``, MGF entry counts), then renamed; nothing at the final path on
+  failure.
+* **Tests, run by me** after ``mvn -o -pl cometgui-workflow -am install``:
+  ``cometgui-tools verify`` **894, 0 failures** (``PdvMzTabExporterRealTest``
+  7, ``PdvMzTabRealPdvTest`` 2 against real PDV); ``cometgui-workflow verify``
+  **771, 0 failures**; ``cometgui-archtests`` 31, 0 failures (run directly:
+  ``--only quality`` covers formatting, static analysis and the derived-file
+  machinery, **not ArchUnit**, which only ``tests``/``build.sh`` run -- the
+  brief's "quality for architecture rules" is imprecise; noted for tier 1).
+* **My injections** (183 ``pdv`` tests each; restored, ``sha256sum -c``
+  clean):
+
+  - M1 the C-terminal refusal disabled: 1 failure,
+    ``PdvMzTabExporterTest.refused`` "nothing was thrown".
+  - M2 accession = first protein only: 2 failures, e.g.
+    ``PdvMzTabExporterRealTest.accessions`` "expected
+    sp|O60739|EIF1B_HUMAN;sp|P41567|EIF1_HUMAN but was sp|O60739|EIF1B_HUMAN".
+  - M3 retention time always ``null``: 4 failures.
+
+* **Targeted PIT, by me**: exporter classes 416 mutations -- 366 KILLED, 42
+  TIMED_OUT, 8 NO_COVERAGE (the ``SOURCE_CHANGED``/``INCOMPLETE`` fallbacks),
+  **0 SURVIVED**; ``PdvMzTabs`` 41/41 KILLED.
+* **Harnesses, run by me on ``32f68ce``**, all PASS: ``quality`` 141 s,
+  ``provenance`` 236 s, ``workflow`` 475 s, ``results`` 572 s,
+  ``percolator`` 723 s.
+* **Process hygiene.** PIT halts minions with ``Runtime.halt``, so real-PDV
+  tests orphan PDV and Xvfb; the agent now launches both under the host's
+  ``/usr/bin/timeout`` (PDV 300 s, Xvfb 600 s, test support only). Observed
+  by me: 45 PDV processes after my PIT run, all gone within their caps; Xvfb
+  gone within 10 minutes; 56 earlier Xvfb zombies remain ``<defunct>`` (PID
+  1 does not reap, Phase 03). Halted minions also leave ``target/mzt*``
+  directories until ``mvn clean``.
+* **Outside files the tests read** (new to tools): ``scratch/fixture/..._4.mzML``,
+  ``scratch/scientific-path/comet/..._4.pep.xml``; host ``/usr/bin/timeout``.
+* **Measured by the agent:** 1 000 450 PSMs exported in 54-65 s, live heap
+  peak 92 MB, completes at ``-Xmx128m``; output 278 MB mzTab and 1.78 GB MGF
+  (one entry per PSM, P11-12). Real K562 ``_3`` + ``_4``: 3897 target + 2773
+  decoy rows in, 6670 lines out.
+* **For units 6 and 7:** with ``decoy_search = 2`` target and decoy rows
+  share a PSMId -- key on (decoy flag, PSMId); stop a running PDV before
+  ``prepare`` (a regeneration deletes the directory).
+
 Rejections and rework
 =====================
 
