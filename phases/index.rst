@@ -76,7 +76,7 @@ authoritative for its own scope and exit gate.
      - PDV Integration and mzTab Export
      - 05, 10
      - D-005 DECIDED -- enhanced control mode via a generated mzTab
-     - NOT STARTED
+     - IN PROGRESS (dispatched 2026-10-10)
    * - `12 <PHASE-12-limelight.rst>`_
      - Limelight Conversion and Upload
      - 09, 10

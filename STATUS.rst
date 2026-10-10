@@ -4,12 +4,15 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-10-10
-:Updated by: Main orchestrator, session 10 (**Phase 10 signed off PARTIAL** --
-   :ref:`status-p10-signed`; ``D-011`` and ``D-013`` decided; ``main`` pushed)
-:Current phase: **tier-1 repair between phases** -- ``D-011`` option A and the
-   owner's review of the modification presets -- then Phase 11 (PDV), on the
-   owner's standing instruction (2026-10-08): *"When all is green with the
-   current phase, push, then move on to the next phase."*
+:Updated by: Main orchestrator, session 10 (between-phase repair signed off --
+   :ref:`status-fix-p10-p11`; specification revision 17; ``main`` pushed;
+   **Phase 11 dispatched**. Earlier: Phase 10 signed off PARTIAL --
+   :ref:`status-p10-signed`)
+:Current phase: **Phase 11 -- PDV Integration**, dispatched 2026-10-10 with
+   ``handoffs/PHASE-11-BRIEF.rst``, after the between-phase repair was signed
+   off (:ref:`status-fix-p10-p11`). Standing owner instruction (2026-10-08):
+   *"When all is green with the current phase, push, then move on to the
+   next phase."*
 :Overall: Eleven phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
    05, 08, 09 and 10 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
@@ -263,8 +266,8 @@ Phase board
        (:ref:`status-p10-signed`). PARTIAL on platform alone.
    * - 11
      - PDV integration
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-10-10 (``handoffs/PHASE-11-BRIEF.rst``).
    * - 12
      - Limelight conversion and upload
      - NOT STARTED
@@ -3268,6 +3271,45 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-fix-p10-p11:
+
+Between Phases 10 and 11: ``D-011`` A, the preset review, a preflight (2026-10-10)
+====================================================================================
+
+One tier-1 fix agent, four commits:
+
+* ``c96722c`` -- ``D-011`` option A. The false 2026.02.2 macOS x86-64 Comet row
+  is removed (the agent re-read all four macOS files: Mach-O ``cffaedfe``, CPU
+  type ``0x0100000C``, arm64). Local Comet registration did not exist -- only
+  Percolator's -- so it was built (``LocalCometRegistration``, through the
+  existing banner check and probe, never claiming Thermo RAW), with
+  ``ToolManager.noManagedBuild()`` explaining any tool the manifest has no
+  runnable row for here, driven by the missing rows alone. Apple silicon is
+  unchanged in effect; Linux aarch64 now also says why it has no managed
+  Percolator.
+* ``bf1a5b6`` -- the owner's preset review: Phospho carries Comet's documented
+  H3PO4 neutral loss (``79.966331 STY 0 3 -1 0 0 97.976896``); one Acetyl per
+  release (``n`` form for 2026.02.2, ``^`` for 2026.03.0). Before dropping the
+  ``n`` form from 2026.03.0 the agent ran the real 2026.03.0 binary with each:
+  3637 hits both, 61 acetylated both, pepXML differing only in date, base name
+  and the echoed parameter.
+* ``8b330f1`` -- ``scripts/verify-test-gates.sh`` refuses to start without
+  Phase 10's large fixture (its pinned SHA-256s, read from the one place they
+  live) or the K562 Percolator 3.07.1 outputs; each new refusal shown on a
+  symlinked copy.
+* ``d15da09`` -- ``paramui`` control 2a's expected failure text updated for the
+  new Phospho tuple; the control still requires its injection to fail.
+
+**Tier 1's sign-off:** diff read -- no POM, no floor, no test removed; install
+control 16 now proves "native build first" on a synthetic sibling row instead
+of the removed false one, still graded on its injection. ``--only docs
+traceability install params paramui`` **5 of 5 passed**. Tier 1's own
+injection -- Phospho's neutral loss back to 0.0 -- failed 2 of 2117
+``cometgui-params-comet`` tests (``ModificationPresetsTest.theBundledPresets``);
+restored and verified. **Specification revision 17** amends the macOS x86-64
+row. ``D-011`` option D -- asking UWPR/Comet for an Intel build -- is the
+owner's.
+
 .. _status-p10-signed:
 
 Phase 10 signed off PARTIAL (2026-10-10)
@@ -4026,6 +4068,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-10
+     - 10+, 11
+     - Between-phase repair signed off (``D-011`` A, the owner's preset review,
+       a ``tests`` preflight; 5/5 affected gates, a tier-1 injection).
+       Specification revision 17. ``main`` pushed; **Phase 11 dispatched**.
+       See :ref:`status-fix-p10-p11`.
    * - 2026-10-10
      - 10
      - **Phase 10 signed off PARTIAL** at ``8f424d0`` (build 11/11, gates

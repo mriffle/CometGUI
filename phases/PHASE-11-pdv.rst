@@ -3,7 +3,7 @@ PHASE-11: PDV Integration
 =========================
 
 :Phase: 11
-:Status: NOT STARTED
+:Status: IN PROGRESS (dispatched 2026-10-10)
 :Depends on: 05, 10
 :Blocked by decisions: none -- D-005 DECIDED 2026-08-30 (enhanced, via mzTab)
 :Delivers: R-PDV-01, R-PDV-02, R-PDV-03, R-PDV-04, R-PDV-05

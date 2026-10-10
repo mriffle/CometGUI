@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 16
-:Revision date: 2026-10-08
-:Supersedes: Revision 15, 2026-10-07
+:Revision: 17
+:Revision date: 2026-10-10
+:Supersedes: Revision 16, 2026-10-08
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,11 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 17
+     - 2026-10-10
+     - ``D-011`` decided (options A and D): Intel macOS gets no managed
+       Comet; the Tool Manager says so and offers local-binary registration.
+       The *macOS x86-64* release-target row is amended.
    * - 16
      - 2026-10-08
      - The run layout's Percolator log, from Phase 09: one stream-tagged
@@ -650,9 +655,14 @@ supported matrix is normative and appears here once.
      - 2 -- best effort
      - ``.dmg``
      - Built and smoke-tested if CI runners permit; not release-blocking.
-       *Revision 13:* upstream publishes **no** x86-64 macOS Comet (both macOS
-       files are arm64), so there is no managed Comet for this platform; what
-       it offers instead is ``D-011``, open.
+       Upstream publishes **no** x86-64 macOS Comet: both macOS files are
+       arm64 (Mach-O CPU type ``0x0100000C``) in 2026.02.2 and 2026.03.0, so
+       CometGUI offers no managed Comet here (``D-011`` option A, revision
+       17). The Tool Manager says so and offers local-binary registration of
+       a Comet the user built (``R-TOOL-08``). Percolator, PDV and the
+       Limelight converter are managed as on other platforms. An x86-64
+       asset, should upstream publish one (``D-011`` option D, the owner's
+       request), enters the manifest like any other release.
    * - Linux aarch64
      - 3 -- unsupported in release 1
      - not packaged
