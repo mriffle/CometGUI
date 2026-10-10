@@ -625,6 +625,14 @@ byte-identical). The tests pin the result -- ``psms.tsv``
 naming the command, when a file is absent or differs. Its record is
 ``cometgui-results/src/test/resources/org/cometgui/results/large-fixture/CONSTRUCTED.txt``.
 
+``scripts/verify-test-gates.sh`` checks the same three SHA-256s -- read from
+``LargeFixture.java``, so the pin lives in one place -- and the presence of
+the real K562 Percolator 3.07.1 outputs below, **before** it builds anything,
+and refuses to start with a message naming the missing or changed file and
+how to remake it; ``bash scripts/verify-test-gates.sh --preflight`` runs only
+those checks. Without them the run would die inside its sandbox build as a
+pile of results-suite failures after many minutes.
+
 **The real fixtures.** Phase 00's K562 search (Comet 2026.02.2 over the two
 ``D-006`` K562 mzML files against the full human reference proteome, then
 Percolator 3.07.1 and 3.09) left its Percolator outputs in

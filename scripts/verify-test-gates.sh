@@ -123,10 +123,16 @@ they exist to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME} [-h|--help]
+  bash scripts/${SCRIPT_NAME} --preflight   check every precondition below and
+                                            stop, running no Maven at all
 
 It needs a populated ${M2REPO#"${ROOT}/"} and a built tree (run
-bash scripts/build.sh first), the project-local toolchain in tools/, and the
-font stack in tools/fontstack-bookworm-20260829.  It writes only under _build/.
+bash scripts/build.sh first), the project-local toolchain in tools/, the
+font stack in tools/fontstack-bookworm-20260829, and the gitignored inputs the
+sandbox build's tests read and fail without: scratch/phase05/artefacts,
+scratch/phase06/artefacts, scratch/fixture, scratch/phase10/large (held to the
+SHA-256s LargeFixture.java pins) and scratch/scientific-path/percolator-3.07.1.
+It writes only under _build/.
 USAGE
 }
 
@@ -1162,15 +1168,12 @@ control_harness_self_test() {
     fi
 }
 
-# -------------------------------------------------------------------- main --
-main() {
-    case "${1:-}" in
-        -h|--help) usage; exit 0 ;;
-        "") ;;
-        *) usage >&2; die "unknown option: $1" ;;
-    esac
-
-    cd -- "${ROOT}"
+# ----------------------------------------------------------- preconditions --
+# Everything the run needs before it builds anything, checked here rather than
+# discovered as test failures inside a sandbox build -- which is how a missing
+# scratch input presented the first time, and cost a diagnosis.  Each failure
+# is a FATAL naming the path and how to refill it.  --preflight runs this alone.
+preflight() {
     [ -f "${ROOT}/tools/env.sh" ] || die "tools/env.sh is missing; run bash scripts/build.sh first."
     # shellcheck disable=SC1091
     . "${ROOT}/tools/env.sh"
@@ -1192,8 +1195,65 @@ main() {
     # fails rather than skips without them.
     [ -d "${ROOT}/scratch/fixture" ] \
         || die "scratch/fixture does not exist. cometgui-params-comet's validation-corpus test searches the Crux K562 mzML and the UniProt human proteome from there with the real Comet binaries and fails rather than skip without them, so the sandbox build would die before any control ran. The inputs are gitignored (D-006); refill them with python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches by checksum, as docs/developer/comet_parameter_schema.rst (Validation agreed with the real binaries) describes."
+    # Phase 10's large results fixture (P10-2): LargeFixture and the results
+    # suites in cometgui-results, cometgui-ui and cometgui-app read it and fail
+    # rather than skip when it is missing or changed -- so the sandbox build
+    # would die with a pile of results failures instead of grading anything.
+    # Existence is not enough: a fixture regenerated with other arguments is
+    # present and wrong, so each file is held to the SHA-256 pinned in
+    # LargeFixture.java, read from there so the pin lives in one place.
+    local large="scratch/phase10/large"
+    local large_pins="cometgui-results/src/test/java/org/cometgui/results/testing/LargeFixture.java"
+    local large_remake="Regenerate it from the repository root with python3 scripts/fixtures/large-results-fixture.py (about 15 s; the defaults reproduce the pinned bytes), as docs/developer/results_model.rst describes."
+    [ -d "${ROOT}/${large}" ] \
+        || die "${large} does not exist. Phase 10's results suites read the large synthetic results fixture from there and fail rather than skip without it, so the sandbox build would die before any control ran. ${large_remake}"
+    [ -f "${ROOT}/${large_pins}" ] \
+        || die "HARNESS ERROR: ${large_pins} is missing, so the large fixture's pinned SHA-256s cannot be read."
+    local file constant pinned actual
+    for file in psms.tsv:PSMS_SHA256 peptides.tsv:PEPTIDES_SHA256 manifest.json:MANIFEST_SHA256; do
+        constant="${file#*:}"
+        file="${file%%:*}"
+        pinned="$(grep -A1 "static final String ${constant} =" "${ROOT}/${large_pins}" \
+            | grep -oE '"[0-9a-f]{64}"' | tr -d '"' || true)"
+        [ "${#pinned}" -eq 64 ] \
+            || die "HARNESS ERROR: no 64-hex-digit ${constant} could be read from ${large_pins}; the pin moved or changed shape."
+        [ -f "${ROOT}/${large}/${file}" ] \
+            || die "${large}/${file} does not exist. Phase 10's results suites read it and fail rather than skip without it. ${large_remake}"
+        actual="$(sha256sum -- "${ROOT}/${large}/${file}" | cut -d' ' -f1)"
+        [ "${actual}" = "${pinned}" ] \
+            || die "${large}/${file} has SHA-256 ${actual}, not the ${pinned} pinned as ${constant} in ${large_pins}. A fixture made with other arguments, or damaged, would fail the results suites inside the sandbox build. ${large_remake}"
+    done
+    # The real K562 Percolator 3.07.1 outputs: cometgui-results (RealK562),
+    # cometgui-ui (ResultsFixtures) and cometgui-app (K562Outputs) read them
+    # and fail rather than skip without them.
+    local k562="scratch/scientific-path/percolator-3.07.1"
+    local k562_remake="Make it again with bash scripts/feasibility/run_scientific_path.sh (Phase 00; see docs/feasibility/scientific-path.rst)."
+    [ -d "${ROOT}/${k562}" ] \
+        || die "${k562} does not exist. The results suites read the real K562 Percolator 3.07.1 outputs from there and fail rather than skip without them, so the sandbox build would die before any control ran. ${k562_remake}"
+    for file in psms.target.txt psms.decoy.txt peptides.target.txt peptides.decoy.txt weights.txt; do
+        [ -f "${ROOT}/${k562}/${file}" ] \
+            || die "${k562}/${file} does not exist. The results suites read it and fail rather than skip without it. ${k562_remake}"
+    done
     bash "${ROOT}/scripts/fetch-fontstack.sh" --verify >/dev/null \
         || die "the font stack is missing; run bash scripts/fetch-fontstack.sh first."
+}
+
+# -------------------------------------------------------------------- main --
+main() {
+    PREFLIGHT_ONLY=0
+    case "${1:-}" in
+        -h|--help) usage; exit 0 ;;
+        --preflight) PREFLIGHT_ONLY=1 ;;
+        "") ;;
+        *) usage >&2; die "unknown option: $1" ;;
+    esac
+
+    cd -- "${ROOT}"
+    preflight
+    if [ "${PREFLIGHT_ONLY}" -eq 1 ]; then
+        printf '\nPREFLIGHT: every precondition holds; no control was run.\n'
+        exit 0
+    fi
 
     mkdir -p "${LOGS}"
     rm -f "${LOGS}"/*.log
