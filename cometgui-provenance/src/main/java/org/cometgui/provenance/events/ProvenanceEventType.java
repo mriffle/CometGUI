@@ -110,7 +110,20 @@ public enum ProvenanceEventType {
      * record is {@code provenance.json} and what happens to a finished run is appended to its event
      * log.
      */
-    PDV_LAUNCHED("pdv.launched");
+    PDV_LAUNCHED("pdv.launched"),
+
+    /**
+     * The mzTab PDV's {@code denovo-gui} mode is given for a run was written, with the MGFs it
+     * references, in the run's PDV directory.
+     *
+     * <p>Added by phase 11 ({@code R-PDV-02}: "The generated file is a run artefact: it is recorded
+     * in provenance with its checksum like any other output"). The payload names the mzTab and each
+     * MGF with their MD5 and SHA-256, every source file the export read with its MD5 and SHA-256,
+     * and the PSM counts read from the Percolator tables and written to the mzTab; the keys are
+     * pinned by {@code org.cometgui.workflow.pdv}, which writes the event. Like {@link
+     * #PDV_LAUNCHED} it follows {@link #RUN_FINISHED}: the mzTab is made from a finished run.
+     */
+    MZTAB_WRITTEN("mztab.written");
 
     private final String wireName;
 
@@ -155,6 +168,6 @@ public enum ProvenanceEventType {
                         + wire
                         + "\"; expected one of [run.started, stage.started, stage.finished,"
                         + " tool.invoked, file.hashed, warning.raised, run.finished,"
-                        + " export.written, pdv.launched]");
+                        + " export.written, pdv.launched, mztab.written]");
     }
 }

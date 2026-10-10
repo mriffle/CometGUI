@@ -37,6 +37,13 @@ public final class K562Run {
     public static final String MZML_SHA256 =
             "cbd0c1b37fb990e6f44528278956306754145ff7318ec7f89fed3b4d3c9b0bc7";
 
+    /** The as-fetched {@code _4} fixture mzML, the other file of the same search. */
+    public static final String MZML_4 = "scratch/fixture/20100614_Velos1_TaGe_SA_K562_4.mzML";
+
+    /** Its SHA-256, as {@link RealCometSearch} records it. */
+    public static final String MZML_4_SHA256 =
+            "d30aa5af4b15e1c927616fce4dacfd68c6249e6cc2b7461913481c12d8408cfa";
+
     /** Comet 2026.02.2's pepXML for that file, from Phase 00's scientific path. */
     public static final String PEPXML =
             "scratch/scientific-path/comet/20100614_Velos1_TaGe_SA_K562_3.pep.xml";
@@ -84,6 +91,20 @@ public final class K562Run {
         return verified(
                 MZML,
                 MZML_SHA256,
+                "refill it with python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches"
+                        + " by checksum");
+    }
+
+    /**
+     * The {@code _4} fixture mzML, verified.
+     *
+     * @return the file
+     * @throws IOException if it cannot be read
+     */
+    public static Path mzml4() throws IOException {
+        return verified(
+                MZML_4,
+                MZML_4_SHA256,
                 "refill it with python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches"
                         + " by checksum");
     }

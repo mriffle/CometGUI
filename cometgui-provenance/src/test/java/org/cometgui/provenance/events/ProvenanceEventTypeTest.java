@@ -68,7 +68,8 @@ class ProvenanceEventTypeTest {
                 () -> assertEquals("warning.raised", ProvenanceEventType.WARNING_RAISED.wireName()),
                 () -> assertEquals("run.finished", ProvenanceEventType.RUN_FINISHED.wireName()),
                 () -> assertEquals("export.written", ProvenanceEventType.EXPORT_WRITTEN.wireName()),
-                () -> assertEquals("pdv.launched", ProvenanceEventType.PDV_LAUNCHED.wireName()));
+                () -> assertEquals("pdv.launched", ProvenanceEventType.PDV_LAUNCHED.wireName()),
+                () -> assertEquals("mztab.written", ProvenanceEventType.MZTAB_WRITTEN.wireName()));
     }
 
     @Test
@@ -91,7 +92,8 @@ class ProvenanceEventTypeTest {
                         "WARNING_RAISED",
                         "RUN_FINISHED",
                         "EXPORT_WRITTEN",
-                        "PDV_LAUNCHED"),
+                        "PDV_LAUNCHED",
+                        "MZTAB_WRITTEN"),
                 names);
     }
 
@@ -103,7 +105,7 @@ class ProvenanceEventTypeTest {
             assertTrue(distinct.add(type.wireName()), "two types share the wire name");
         }
 
-        assertEquals(9, distinct.size());
+        assertEquals(10, distinct.size());
     }
 
     @Test
@@ -159,7 +161,36 @@ class ProvenanceEventTypeTest {
                 () ->
                         assertSame(
                                 ProvenanceEventType.PDV_LAUNCHED,
-                                ProvenanceEventType.fromWireName("pdv.launched")));
+                                ProvenanceEventType.fromWireName("pdv.launched")),
+                () ->
+                        assertSame(
+                                ProvenanceEventType.MZTAB_WRITTEN,
+                                ProvenanceEventType.fromWireName("mztab.written")));
+    }
+
+    @Test
+    @DisplayName("an mztab.written event after run.finished is written and read back intact")
+    void anMzTabEventFollowsTheRunAndReadsBack(@TempDir Path directory) throws IOException {
+        Path path = directory.resolve("events.log");
+        Clock clock = Clock.fixed(Instant.parse("2026-10-10T12:00:00.500Z"), ZoneOffset.UTC);
+        try (ProvenanceEventLog log =
+                ProvenanceEventLog.openAppend(path, SecretRedactor.patternsOnly(), clock)) {
+            log.append(ProvenanceEventType.RUN_FINISHED, Map.of("status", "completed"));
+            log.append(
+                    ProvenanceEventType.MZTAB_WRITTEN,
+                    Map.of("mztab.path", "pdv/mztab/psms.mztab", "psms.out", "6670"));
+        }
+
+        List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        assertEquals(
+                "{\"seq\":2,\"time\":\"2026-10-10T12:00:00.500Z\",\"type\":\"mztab.written\","
+                        + "\"payload\":{\"mztab.path\":\"pdv/mztab/psms.mztab\","
+                        + "\"psms.out\":\"6670\"}}",
+                lines.get(1));
+        RecoveredEventLog recovered = ProvenanceEventLogReader.recover(path);
+        assertTrue(recovered.intact(), () -> "defects: " + recovered.defects());
+        assertSame(ProvenanceEventType.MZTAB_WRITTEN, recovered.events().get(1).type());
+        assertEquals("6670", recovered.events().get(1).payload().get("psms.out"));
     }
 
     @Test
@@ -250,7 +281,7 @@ class ProvenanceEventTypeTest {
                 "no provenance event type has the wire name \"run.begun\"; expected one of"
                         + " [run.started, stage.started, stage.finished, tool.invoked,"
                         + " file.hashed, warning.raised, run.finished, export.written,"
-                        + " pdv.launched]",
+                        + " pdv.launched, mztab.written]",
                 rejected.getMessage());
     }
 

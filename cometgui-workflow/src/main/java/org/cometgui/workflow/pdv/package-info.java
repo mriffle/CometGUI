@@ -34,6 +34,9 @@
  *       event that cannot be written means nothing is started.
  *   <li>{@link org.cometgui.workflow.pdv.PsmFigures} draws the selected PSM's annotated spectrum
  *       with PDV's command line ({@code org.cometgui.tools.pdv.PdvFigures}) through such a runner.
+ *   <li>{@link org.cometgui.workflow.pdv.PdvMzTabs} makes a finished run's mzTab for PDV under
+ *       {@code <run>/pdv/mztab/}, or reuses the recorded one whose sources are unchanged, and
+ *       records each export as an {@code mztab.written} event (unit 5).
  * </ul>
  *
  * <p>A later launch kind -- the {@code denovo-gui} window -- is a second {@link

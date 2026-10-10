@@ -29,7 +29,13 @@
  * org.cometgui.tools.pdv.MgfSpectrumReader}); {@link org.cometgui.tools.pdv.PdvMgfWriter}, the
  * exact MGF re-encoding PDV is given (design decisions P11-11 and P11-12); and {@link
  * org.cometgui.tools.pdv.PdvFigures}, the CLI figure command judged by its parsed output ({@link
- * org.cometgui.tools.pdv.PngFigure}). The {@code denovo-gui} launcher, controller and mzTab
- * exporter are later units'.
+ * org.cometgui.tools.pdv.PngFigure}). The {@code denovo-gui} launcher and controller are later
+ * units'.
+ *
+ * <p><strong>Phase 11 unit 5</strong> landed {@link org.cometgui.tools.pdv.PdvMzTabExporter}: the
+ * mzTab {@code denovo-gui} is given, and its MGFs, from a run's Percolator PSM tables (through the
+ * one table reader in {@code org.cometgui.results.parser}), Comet pepXML and spectrum files --
+ * every value transcribed, every PSM joined to exactly one hit and one spectrum or refused by name
+ * ({@link org.cometgui.tools.pdv.PdvMzTabException}), written all or nothing.
  */
 package org.cometgui.tools.pdv;

@@ -52,5 +52,18 @@
       <groupId>org.cometgui</groupId>
       <artifactId>cometgui-process</artifactId>
     </dependency>
+    <!--
+      Phase 11 unit 5 (design decision P11-2): the mzTab exporter in
+      org.cometgui.tools.pdv reads the run's Percolator PSM tables through the
+      project's ONE table reader (org.cometgui.results.parser.ResultTableReader,
+      with ResultRow, QValue and SpectrumReference) rather than a second copy of
+      it (P11-1).  cometgui-results depends on cometgui-domain and
+      cometgui-provenance, neither of which depends on this module, so the edge
+      makes no cycle; LayeringRulesTest.majorLayersAreFreeOfCycles grades it.
+    -->
+    <dependency>
+      <groupId>org.cometgui</groupId>
+      <artifactId>cometgui-results</artifactId>
+    </dependency>
   </dependencies>
 </project>
