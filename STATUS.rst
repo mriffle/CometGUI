@@ -3,21 +3,20 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-08
-:Updated by: Main orchestrator, session 10 (**Phase 09 signed off PARTIAL** --
-   :ref:`status-p09-signed`; specification revision 16; ``D-013`` raised;
-   ``main`` pushed; **Phase 10 dispatched**)
-:Current phase: **Phase 10 -- Results Model and UI**, dispatched 2026-10-08
-   with ``handoffs/PHASE-10-BRIEF.rst``. Standing owner instruction
-   (2026-10-08): *"When all is green with the current phase, push, then move
-   on to the next phase."*
-:Overall: Ten phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
-   05, 08 and 09 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
+:Updated: 2026-10-10
+:Updated by: Main orchestrator, session 10 (**Phase 10 signed off PARTIAL** --
+   :ref:`status-p10-signed`; ``D-011`` and ``D-013`` decided; ``main`` pushed)
+:Current phase: **tier-1 repair between phases** -- ``D-011`` option A and the
+   owner's review of the modification presets -- then Phase 11 (PDV), on the
+   owner's standing instruction (2026-10-08): *"When all is green with the
+   current phase, push, then move on to the next phase."*
+:Overall: Eleven phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
+   05, 08, 09 and 10 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (about 4.7 hours since Phase 09 -- build
-   53 min, ``tests`` 123, the other fifteen about 100 -- run as three jobs,
-   ``tests`` detached, since one background job is capped at two hours) runs once
+   ``scripts/verify-all-gates.sh`` (**about 8 hours since Phase 10** -- build
+   102 min, ``tests`` 235, the other sixteen about 140 -- run as three
+   detached jobs; raised with the owner, :ref:`status-p10-signed`) runs once
    per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
    :ref:`status-p06-signed`); ``D-011``, what an Intel Mac gets now that
@@ -258,8 +257,10 @@ Phase board
        half waits for Phase 10.
    * - 10
      - Results model and UI
-     - IN PROGRESS
-     - Dispatched 2026-10-08 (``handoffs/PHASE-10-BRIEF.rst``).
+     - PARTIAL
+     - **Signed off 2026-10-10** at ``8f424d0``: build 11/11, gates 17/17 (new
+       ``results``, 100 controls), three tier-1 injections
+       (:ref:`status-p10-signed`). PARTIAL on platform alone.
    * - 11
      - PDV integration
      - NOT STARTED
@@ -3267,6 +3268,64 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-p10-signed:
+
+Phase 10 signed off PARTIAL (2026-10-10)
+========================================
+
+Twelve units -- 1-11 and ``D-013``, which tier 1 added mid-phase on the
+owner's decision -- all accepted by the phase orchestrator, with three repairs
+of its own where an injection first stayed green. Record:
+``handoffs/PHASE-10-worklog.rst`` and ``handoffs/PHASE-10-handoff.rst``.
+
+**What exists.** The results model and screen, built on Phase 09's parsers and
+filters (extended, not copied): a store that switches to disk-backed paging,
+PSM and peptide tables with independent inclusive 1% q-value filters and a
+source-file column, missing q-values as their own category, exports with a
+sidecar recording run ID, cutoffs and before/after counts, and the learned
+weights view; a generated 1,000,000-row performance fixture (checksums pinned).
+``D-013``: ``--no-analytics`` on every Percolator run. New harness
+``scripts/verify-results-gates.sh`` (``results``, 100 controls); ``percolator``
+floor 94 to 109.
+
+**Tier 1's exit-gate run**, at ``8f424d0`` on a quiet tree, the large fixture
+regenerated first and checked against its pinned SHA-256: ``scripts/build.sh``
+11/11 in 6114 s; ``--only tests`` 37 assertions in 14096 s; the other sixteen
+controls passed (``results`` 100, ``percolator`` 109, ``workflow`` 110,
+``paramui`` 87, ``params`` 109, ``install`` 95, ``pipeline`` 24). **17 of 17.**
+
+**Nothing weakened:** no test deleted or disabled; the assertions removed were
+count updates for the new capability (11 probe runs to 12, probe generation 2
+to 3); one POM dependency added so export reuses the one JSON and provenance
+writer; floors only rose.
+
+**Tier 1's own injections**, tests counted, restored and verified:
+
+* the 0.01 cutoff made exclusive -- **326 of 1310** results tests failed, e.g.
+  ``QValueFilterTest.tally``;
+* missing q-values classified as failing -- **275 of 1310** failed;
+* ``--no-analytics`` never passed -- **16 of 592** tools tests failed, e.g.
+  ``PercolatorCommandRealBinaryTest.percolator3071WithXml`` on the real binary.
+
+**Grade: PARTIAL**, on platform alone; all eight items met on Linux.
+
+**Settled by tier 1:** the export's filter values are recorded in its sidecar
+and as an ``export.written`` provenance event in ``events.log`` --
+``provenance.json`` is the run's sealed record and is not rewritten; accepted
+as meeting ``R-RES-01``. Percolator ``--help`` launches send no analytics
+(read from source).
+
+**Raised with the owner -- build time.** The full exit-gate run is now about 8
+hours: ``build.sh`` 102 minutes, of which PIT is 71; ``--only tests`` 235,
+because its controls rebuild the reactor repeatedly. The phase escalated that
+cutting it needs a POM-level choice, which only the owner may approve.
+
+**Residue carried forward:** ``org.cometgui.results.export.*`` is not in PIT's
+targets (part of the build-time decision); the large fixture and
+``scratch/scientific-path/percolator-3.07.1`` are prerequisites the ``tests``
+preflight does not check; new fixtures lack ``.gitattributes`` rules; the
+optional weights chart was not built.
+
 .. _status-p09-signed:
 
 Phase 09 signed off PARTIAL (2026-10-08)
@@ -3967,6 +4026,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-10
+     - 10
+     - **Phase 10 signed off PARTIAL** at ``8f424d0`` (build 11/11, gates
+       17/17, three tier-1 injections). ``D-011`` (A + D) and ``D-013`` (A,
+       implemented) recorded as decided. ``main`` pushed. See
+       :ref:`status-p10-signed`.
    * - 2026-10-08
      - 09, 10
      - **Phase 09 signed off PARTIAL** at ``6bc3d98`` (build 11/11, gates

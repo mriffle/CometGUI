@@ -2,8 +2,8 @@
 Decisions
 =========
 
-:Updated: 2026-10-08 (D-013 raised and OPEN: Percolator's usage analytics;
-   D-011 still OPEN)
+:Updated: 2026-10-10 (D-011 and D-013 decided by the owner on 2026-10-08;
+   no decision now open)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -907,7 +907,7 @@ established by running the real binary, as they were for 2026.02.2.
 D-011 -- What an Intel Mac gets, given no Intel macOS Comet exists
 ==================================================================
 
-:Status: **OPEN** -- raised 2026-10-05; blocks nothing before Phase 15/16
+:Status: **DECIDED 2026-10-08** -- options A and D
 :Raised: 2026-10-05, by the Comet 2026.03.0 intake work package, confirmed by
    tier 1 from the upstream files' headers
 :Blocks: the *macOS x86-64* release-target row (tier 2, best effort, not
@@ -940,6 +940,14 @@ D. **Ask upstream** (UWPR/Comet) for an x86-64 macOS asset; combinable with A.
 
 **Recommendation.** A, plus D. It costs one manifest row and one diagnostic,
 and the 2026.02.2 row is false whatever is chosen.
+
+**DECISION (2026-10-08).** The owner directed: *"A plus D sounds good. I'll
+handle D."* Intel macOS gets no managed Comet: the false 2026.02.2 row is
+removed and the Tool Manager on an Intel Mac explains why and offers
+local-binary registration (a tier-1 repair after Phase 10). **D -- asking
+UWPR/Comet for an x86-64 macOS asset -- is the owner's own action**, not the
+project's; an upstream asset, if published, enters the registry like any
+other release.
 
 ----
 
@@ -983,7 +991,7 @@ real binaries, not assumed.
 D-013 -- Percolator's usage analytics
 =====================================
 
-:Status: **OPEN** -- raised 2026-10-08
+:Status: **DECIDED 2026-10-08** -- option A, implemented in Phase 10
 :Raised: 2026-10-08, by Phase 09, confirmed by tier 1 in the binaries
 :Blocks: nothing in the build; it decides what every user's machine sends
    to a third party
@@ -1010,4 +1018,13 @@ Percolator's default and say so in the documentation.
 scientist should not, by default, report on their use to a third party they
 never chose; and the project's own test runs should not either. It is cheap,
 capability-gated, and reversible.
+
+**DECISION (2026-10-08).** The owner directed: *"Let's use the no analytics
+switch."* Implemented as a unit tier 1 added to Phase 10: ``--no-analytics``
+is passed on every Percolator run, probe runs included, wherever the probe
+observes it, and is recorded in provenance; a build that lacks it is not
+refused. Tier 1 confirmed from Percolator's source that a ``--help`` launch
+never reaches the analytics call (3.07.1 posts only from ``Caller::run()``;
+3.09's call is commented out), so the switch-free ``--help`` launches send
+nothing.
 

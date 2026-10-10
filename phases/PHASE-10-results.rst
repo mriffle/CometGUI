@@ -3,7 +3,7 @@ PHASE-10: Results Model and UI
 ==============================
 
 :Phase: 10
-:Status: IN PROGRESS (dispatched 2026-10-08)
+:Status: PARTIAL (signed off 2026-10-10)
 :Depends on: 09
 :Blocked by decisions: none
 :Delivers: R-RES-01, R-RES-02, R-RES-03, R-RES-04

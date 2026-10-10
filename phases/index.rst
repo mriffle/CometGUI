@@ -71,7 +71,7 @@ authoritative for its own scope and exit gate.
      - Results Model and UI
      - 09
      - --
-     - IN PROGRESS (dispatched 2026-10-08)
+     - PARTIAL (signed off 2026-10-10; Linux only)
    * - `11 <PHASE-11-pdv.rst>`_
      - PDV Integration and mzTab Export
      - 05, 10
