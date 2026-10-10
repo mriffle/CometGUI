@@ -39,6 +39,7 @@ import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgressListener;
 import org.cometgui.domain.tools.LoaderDiagnostic;
+import org.cometgui.domain.tools.NoManagedBuild;
 import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolManager;
@@ -242,6 +243,28 @@ public final class ManagedToolManager implements ToolManager {
             offers.addAll(offersFor(tool));
         }
         return List.copyOf(offers);
+    }
+
+    /*
+     * THE ABSENCE OF A ROW IS THE FACT (D-011).  A tool is listed when the manifest knows some
+     * release of it and select() -- the same question offersFor() asks -- finds no row this host
+     * can run.  Nothing here names a platform or a version: Comet on an Intel Mac is listed because
+     * upstream has never published an x86-64 macOS Comet and the manifest therefore carries no such
+     * row, and the day upstream publishes one, adding its row is the whole change.
+     *
+     * A tool the manifest does not name at all is not listed: "no managed build here" is a
+     * statement about releases that exist elsewhere, and a tool with no releases has nothing to be
+     * missing.
+     */
+    @Override
+    public List<NoManagedBuild> noManagedBuild() {
+        List<NoManagedBuild> missing = new ArrayList<>();
+        for (ToolName tool : ToolName.values()) {
+            if (!releasesOf(tool).isEmpty() && manifest.select(host, tool).isEmpty()) {
+                missing.add(new NoManagedBuild(tool, host, registrars.containsKey(tool)));
+            }
+        }
+        return List.copyOf(missing);
     }
 
     @Override
@@ -628,12 +651,13 @@ public final class ManagedToolManager implements ToolManager {
      * platform's bytes; and the OFFERED set decides, so R-PERC-01's rule that the product never
      * presents a build it cannot run is enforced at the one place a user can act on it.
      *
-     * The first offered row is taken, and select() orders native before translated, so on Apple
-     * silicon a Comet install takes the aarch64 build rather than the x86-64 one that would run
-     * under Rosetta 2.  THAT CHOICE IS THE PORT'S TO MAKE ONLY BECAUSE THE PORT CANNOT EXPRESS THE
-     * OTHER ONE: install(tool, version) names a release, and Comet 2026.02.2 is two macOS rows, so
-     * a user on that machine cannot ask for the translated one.  Reported upward rather than
-     * papered over; on every platform this project can execute today the question does not arise.
+     * The first offered row is taken, and select() orders native before translated, so where a
+     * release has both a native and a translated build for this host the native one is installed.
+     * THAT CHOICE IS THE PORT'S TO MAKE ONLY BECAUSE THE PORT CANNOT EXPRESS THE OTHER ONE:
+     * install(tool, version) names a release, so a user cannot ask for the translated build of a
+     * release that has both.  No shipped release has both today -- the 2026.02.2 "x86-64" macOS
+     * Comet row that did was removed under D-011, its file being arm64 -- so the question does not
+     * arise on any platform.
      */
     private ArtefactRecord installableRecord(ToolName tool, ToolVersion version) {
         List<ArtefactSelection> rows = manifest.select(host, tool, version);

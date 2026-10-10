@@ -198,10 +198,9 @@ class ShippedManifestTest {
     /** {@code D-004}'s sentence about Comet, which the shipped manifest has to keep true. */
     private static final String COMET_RUNS_NATIVELY =
             "D-004: \"Comet still runs natively (it publishes an aarch64 macOS"
-                    + " build), so only the Percolator stage is translated.\" Comet is"
-                    + " the one tool that really has both builds on this host, so it is"
-                    + " the only place the native-before-translated ordering key can be"
-                    + " observed against the shipped data";
+                    + " build), so only the Percolator stage is translated.\" Upstream"
+                    + " publishes no x86-64 macOS Comet at all (D-011), so on Apple silicon"
+                    + " every Comet offered is native";
 
     private static final Pattern BANNED =
             Pattern.compile("\\b(verified|confirmed|proven|tested)\\b", Pattern.CASE_INSENSITIVE);
@@ -250,7 +249,7 @@ class ShippedManifestTest {
                                         + " root: "
                                         + resource),
                 () -> assertEquals(1, shipped().schemaVersion()),
-                () -> assertEquals(27, shipped().artefacts().size()));
+                () -> assertEquals(26, shipped().artefacts().size()));
     }
 
     // ------------------------------------------------------------------- round trip --
@@ -606,9 +605,7 @@ class ShippedManifestTest {
     }
 
     @Test
-    @DisplayName(
-            "on Apple silicon each Comet release is offered natively first, and the one release"
-                    + " with an x86-64 build offers it second")
+    @DisplayName("on Apple silicon every Comet release is offered once, natively")
     void cometIsOfferedNativelyOnAppleSilicon() throws IOException {
         List<ArtefactSelection> offered = shipped().select(MACOS_AARCH64, ToolName.COMET);
         List<String> described = new ArrayList<>();
@@ -618,49 +615,18 @@ class ShippedManifestTest {
                             + (selection.isTranslated() ? " (translated)" : " (native)"));
         }
         /*
-         * The release that publishes BOTH builds, found in the data rather than assumed to be the
-         * first: since 2026.03.0, which publishes no x86-64 macOS row (see its absence below), the
-         * head of the whole list is a native build whatever the second ordering key says, so
-         * "native first" has to be read inside the one release where the key decides something.
+         * One row per release, and none translated.  Until D-011 the 2026.02.2 release carried a
+         * second, "x86-64", row here, offered as running under Rosetta 2 -- but its file is the
+         * same arm64 Mach-O as the native one, so the row described nothing real.  The
+         * native-before-translated ordering key is graded on synthetic rows by
+         * ArtefactManifestTest.selectionIsOrdered, which does not depend on what upstream ships.
          */
-        List<ArtefactSelection> twoBuildRelease =
-                offered.stream()
-                        .filter(
-                                selection ->
-                                        selection
-                                                .artefact()
-                                                .version()
-                                                .equals(ToolVersion.parse("2026.02.2")))
-                        .toList();
-
-        assertAll(
-                () ->
-                        assertEquals(
-                                List.of(
-                                        "comet 2026.03.0 macos-aarch64 (native)",
-                                        "comet 2026.02.2 macos-aarch64 (native)",
-                                        "comet 2026.02.2 macos-x86-64 (translated)"),
-                                described,
-                                COMET_RUNS_NATIVELY),
-                () ->
-                        assertEquals(
-                                2,
-                                twoBuildRelease.size(),
-                                "2026.02.2 is the release with both macOS builds: " + described),
-                () ->
-                        assertEquals(
-                                ArtefactExecutability.NATIVE,
-                                twoBuildRelease.get(0).executability(),
-                                "the native build must be first, not merely present"),
-                () ->
-                        assertTrue(
-                                !twoBuildRelease
-                                        .get(0)
-                                        .artefact()
-                                        .url()
-                                        .equals(twoBuildRelease.get(1).artefact().url()),
-                                "two different downloads with two different digests, which"
-                                        + " is why both are offered rather than collapsed"));
+        assertEquals(
+                List.of(
+                        "comet 2026.03.0 macos-aarch64 (native)",
+                        "comet 2026.02.2 macos-aarch64 (native)"),
+                described,
+                COMET_RUNS_NATIVELY);
     }
 
     @Test
@@ -671,21 +637,20 @@ class ShippedManifestTest {
         /*
          * D-010: 2026.03.0 is the default.  Nothing in the product names a default; select()
          * orders newest version first, so the default is offered.get(0).  The expectation is
-         * written out per host because one host differs: an Intel Mac has no 2026.03.0 row (see
-         * comet202603HasNoIntelMacRow), so its default is the newest release it CAN run.  And each
-         * one is also derived from the rows themselves, so the order is graded against the data
-         * and not only against this table.
+         * written out per host, and each one is also derived from the rows themselves, so the
+         * order is graded against the data and not only against this table.  An Intel Mac is not
+         * in the list because it has no managed Comet at all (D-011; see
+         * noCometReleaseHasAnIntelMacRow).
          */
         HostPlatform linuxAarch64 =
                 new HostPlatform(HostOperatingSystem.LINUX, HostArchitecture.AARCH64);
         List<HostPlatform> hosts =
-                List.of(LINUX_X86_64, linuxAarch64, MACOS_AARCH64, MACOS_X86_64, WINDOWS_X86_64);
+                List.of(LINUX_X86_64, linuxAarch64, MACOS_AARCH64, WINDOWS_X86_64);
         List<String> expected =
                 List.of(
                         "linux-x86-64 2026.03.0",
                         "linux-aarch64 2026.03.0",
                         "macos-aarch64 2026.03.0",
-                        "macos-x86-64 2026.02.2",
                         "windows-x86-64 2026.03.0");
         ArtefactManifest manifest = shipped();
         List<String> defaults = new ArrayList<>();
@@ -730,24 +695,59 @@ class ShippedManifestTest {
 
     @Test
     @DisplayName(
-            "Comet 2026.03.0 has no macos-x86-64 row, because the file upstream names for it is"
-                    + " an arm64 build")
-    void comet202603HasNoIntelMacRow() throws IOException {
+            "no Comet release has a macos-x86-64 row, because upstream has never published an"
+                    + " x86-64 macOS Comet, and so an Intel Mac is offered none")
+    void noCometReleaseHasAnIntelMacRow() throws IOException {
         /*
-         * Read from the bytes on 2026-10-04: v2026.03.0's comet.macos.exe is a thin Mach-O whose
-         * cputype is 0x0100000c (ARM64), as is comet.aarch64.macos.exe, and upstream's
-         * macos-build.yml builds it with a plain make on a macos-14 (arm64) runner.  A row
-         * claiming x86-64 for it would be a false statement about the artefact, so the row is
-         * absent rather than invented -- and an Intel Mac is offered 2026.02.2 alone.
+         * D-011, decided 2026-10-08 (option A).  Read from the bytes: comet.macos.exe is a thin
+         * Mach-O whose cputype is 0x0100000C (ARM64) in v2026.02.2 AND v2026.03.0, exactly like
+         * comet.aarch64.macos.exe, and an arm64 binary cannot run on an Intel Mac -- Rosetta 2
+         * translates the other way.  A row claiming x86-64 for either file is a false statement
+         * about the artefact, so the absence of a row IS the fact, for every release, and the
+         * Tool Manager's explanation on an Intel Mac is derived from that absence alone.
+         *
+         * Asked of EVERY Comet release the manifest names, not of a list typed here, so a release
+         * added later with such a row fails this test without anyone remembering to extend it.
+         * The release list is checked to be non-empty so the filter cannot pass by matching
+         * nothing.
          */
-        assertEquals(
-                List.of(),
-                shipped().artefacts().stream()
+        ArtefactManifest manifest = shipped();
+        List<ToolVersion> releases =
+                manifest.artefacts().stream()
                         .filter(record -> record.tool() == ToolName.COMET)
-                        .filter(record -> record.version().equals(ToolVersion.parse("2026.03.0")))
-                        .filter(record -> record.platform().equals(MACOS_X86_64))
-                        .map(ArtefactRecord::describe)
-                        .toList());
+                        .map(ArtefactRecord::version)
+                        .distinct()
+                        .toList();
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(
+                                        ToolVersion.parse("2026.02.2"),
+                                        ToolVersion.parse("2026.03.0")),
+                                releases,
+                                "the Comet releases this question is asked of"),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                manifest.artefacts().stream()
+                                        .filter(record -> record.tool() == ToolName.COMET)
+                                        .filter(record -> record.platform().equals(MACOS_X86_64))
+                                        .map(ArtefactRecord::describe)
+                                        .toList(),
+                                "no Comet row of any release may claim macos-x86-64"),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                describedBy(manifest.select(MACOS_X86_64, ToolName.COMET)),
+                                "and so an Intel Mac is offered no managed Comet: Rosetta 2 does"
+                                        + " not run arm64 code on an x86-64 machine"),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "percolator 3.07.1 macos-x86-64",
+                                        "percolator 3.06.5 macos-x86-64"),
+                                describedBy(manifest.select(MACOS_X86_64, ToolName.PERCOLATOR)),
+                                "while its Percolator rows are untouched"));
     }
 
     @Test

@@ -40,6 +40,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import org.cometgui.app.config.ToolManagerWiring;
 import org.cometgui.app.testing.FxToolkit;
+import org.cometgui.app.testing.ScriptedChooser;
 import org.cometgui.app.testing.TestEditors;
 import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.platform.GlibcVersion;
@@ -244,7 +245,9 @@ class ToolManagerSectionUiTest {
                         new ProcessService(Clock.systemUTC()),
                         Clock.systemUTC(),
                         Runnable::run);
-        toolManager = new ToolManagerViewModel(manager, Runnable::run);
+        toolManager =
+                new ToolManagerViewModel(
+                        manager, Runnable::run, Runnable::run, new ScriptedChooser());
         FxToolkit.onFxThread(
                 () -> {
                     ShellView shell =

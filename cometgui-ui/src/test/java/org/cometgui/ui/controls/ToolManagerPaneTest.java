@@ -32,11 +32,16 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Control;
 import javafx.scene.control.Label;
+import org.cometgui.domain.tools.HostArchitecture;
+import org.cometgui.domain.tools.HostOperatingSystem;
+import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
+import org.cometgui.domain.tools.NoManagedBuild;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.ui.testing.Editors;
 import org.cometgui.ui.testing.FxToolkit;
 import org.cometgui.ui.testing.ScriptedToolManager;
 import org.cometgui.ui.testing.ToolOffers;
@@ -68,6 +73,9 @@ class ToolManagerPaneTest {
 
     private static final Path LOCAL_PERCOLATOR =
             Path.of("usr", "local", "bin", "percolator").toAbsolutePath();
+
+    private static final HostPlatform INTEL_MAC =
+            new HostPlatform(HostOperatingSystem.MACOS, HostArchitecture.X86_64);
 
     private static final String COMET = "comet-2026_02_2-1";
 
@@ -402,6 +410,95 @@ class ToolManagerPaneTest {
                                                 + fixture.controls().size()));
     }
 
+    @Test
+    @DisplayName(
+            "D-011: on an Intel Mac the section says plainly that no managed Comet exists and"
+                    + " offers the user's own")
+    void anIntelMacIsToldAndOfferedRegistration() throws InterruptedException {
+        ScriptedToolManager manager =
+                new ScriptedToolManager(
+                        ToolOffers.cometUnavailableHere("2026.03.0"),
+                        ToolOffers.cometUnavailableHere("2026.02.2"),
+                        ToolOffers.percolatorAvailable());
+        manager.missing(new NoManagedBuild(ToolName.COMET, INTEL_MAC, true));
+        Path own = Path.of("Users", "scientist", "comet.exe").toAbsolutePath();
+        manager.registering((tool, executable) -> ToolOffers.localComet(executable));
+        Fixture fixture =
+                new Fixture(
+                        new ToolManagerViewModel(
+                                manager,
+                                Runnable::run,
+                                Runnable::run,
+                                new Editors.ScriptedChooser().file(own)));
+        fixture.build();
+        fixture.refresh();
+        String register = UiIds.noManagedBuildRegister("comet");
+
+        boolean shownBefore = fixture.isShowing(UiIds.TOOL_MANAGER_NO_MANAGED_BUILD);
+        String explanation = fixture.textOf(UiIds.noManagedBuildText("comet"));
+        boolean buttonShown = fixture.isShowing(register);
+        boolean buttonEnabled = !fixture.isDisabled(register);
+        String buttonText = ((Button) fixture.node(register)).getText();
+        boolean installOffered = !fixture.isDisabled(UiIds.toolRowInstall("comet-2026_03_0-1"));
+        fixture.press(register);
+
+        assertAll(
+                () -> assertTrue(shownBefore),
+                () ->
+                        assertEquals(
+                                "No CometGUI-managed Comet exists for an Intel Mac (macos-x86-64):"
+                                        + " the Comet developers publish no build of it for this"
+                                        + " kind of computer, so there is nothing for CometGUI to"
+                                        + " download and install. You can register a Comet you"
+                                        + " have built or obtained yourself: CometGUI runs it to"
+                                        + " read its version and check what it can do, and then"
+                                        + " lists it below as your own binary.",
+                                explanation),
+                () -> assertTrue(buttonShown),
+                () -> assertTrue(buttonEnabled),
+                () -> assertEquals("Register your own Comet...", buttonText),
+                () -> assertFalse(installOffered, "no install that cannot work is offered"),
+                () -> assertEquals(List.of("comet " + own), manager.registrationsAsked()),
+                () ->
+                        assertEquals(
+                                "Registered Comet 2026.03.0 from "
+                                        + own
+                                        + ". It is listed below as your own binary.",
+                                fixture.textOf(UiIds.noManagedBuildStatus("comet"))),
+                () ->
+                        assertEquals(
+                                "Your own binary: installed",
+                                fixture.textOf(UiIds.toolRowState("comet-2026_03_0-2")),
+                                "and the registered Comet is a row"));
+    }
+
+    @Test
+    @DisplayName("where every tool has a managed build, the section says nothing extra")
+    void nothingMissingShowsNothing() throws InterruptedException {
+        Fixture fixture = shown(everyKindOfOffer());
+
+        assertAll(
+                () -> assertFalse(fixture.isShowing(UiIds.TOOL_MANAGER_NO_MANAGED_BUILD)),
+                () ->
+                        assertEquals(
+                                null,
+                                fixture.node(UiIds.noManagedBuild("comet")),
+                                "no explanation exists to be found"));
+    }
+
+    @Test
+    @DisplayName("a tool the product cannot register is explained with no register action")
+    void aToolThatCannotBeRegisteredHasNoAction() throws InterruptedException {
+        ScriptedToolManager manager = new ScriptedToolManager(ToolOffers.percolatorAvailable());
+        manager.missing(new NoManagedBuild(ToolName.PDV, INTEL_MAC, false));
+        Fixture fixture = shown(manager);
+
+        assertAll(
+                () -> assertTrue(fixture.isShowing(UiIds.noManagedBuildText("pdv"))),
+                () -> assertFalse(fixture.isShowing(UiIds.noManagedBuildRegister("pdv"))),
+                () -> assertFalse(fixture.isShowing(UiIds.noManagedBuildStatus("pdv"))));
+    }
+
     private static ScriptedToolManager everyKindOfOffer() {
         return new ScriptedToolManager(
                 ToolOffers.cometInstalled(COMET_AT),
@@ -413,7 +510,13 @@ class ToolManagerPaneTest {
     }
 
     private static Fixture shown(ScriptedToolManager manager) throws InterruptedException {
-        Fixture fixture = new Fixture(new ToolManagerViewModel(manager, Runnable::run));
+        Fixture fixture =
+                new Fixture(
+                        new ToolManagerViewModel(
+                                manager,
+                                Runnable::run,
+                                Runnable::run,
+                                new Editors.ScriptedChooser()));
         fixture.build();
         fixture.refresh();
         return fixture;

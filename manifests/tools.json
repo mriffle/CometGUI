@@ -96,51 +96,6 @@
       "version": "2026.02.2",
       "releaseTag": "v2026.02.2",
       "os": "macos",
-      "arch": "x86-64",
-      "kind": "BARE_EXECUTABLE",
-      "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/comet.macos.exe",
-      "sizeBytes": 3998328,
-      "sha256": "b248e8644d8a2034572223e613859cda9aa85fb00a06800fc3ae98411534db62",
-      "md5": "1981bb029e620cbe82b814a51938207d",
-      "expectedExecutablePath": "bin/comet",
-      "executable": true,
-      "licence": {
-        "spdx": "Apache-2.0",
-        "url": "https://raw.githubusercontent.com/UWPR/Comet/v2026.02.2/LICENSE",
-        "note": "upstream LICENSE at tag v2026.02.2 opens \"This project is licensed under the Apache License, Version 2.0, except where otherwise noted\" and carries an embedded MIT section (Gygi Lab, 2022); recorded here as upstream metadata, while the licence audit AC-REL-03 is a human sign-off"
-      },
-      "companions": [],
-      "capabilities": [
-        {
-          "capability": "PEPXML_OUTPUT",
-          "evidence": "unverified",
-          "note": "no Comet binary for macos-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
-        },
-        {
-          "capability": "PIN_OUTPUT",
-          "evidence": "unverified",
-          "note": "no Comet binary for macos-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
-        },
-        {
-          "capability": "COMPLETE_PARAMS_QUERY",
-          "evidence": "unverified",
-          "note": "no Comet binary for macos-x86-64 has ever been run anywhere in this project; the claim is that upstream publishes this capability in release v2026.02.2, and the host probe decides (R-TOOL-07)."
-        }
-      ],
-      "advisories": [],
-      "minimumHostRequirements": {
-        "glibc": null,
-        "glibcxx": null,
-        "macos": null,
-        "requiredHostLibraries": []
-      },
-      "minimumCometGuiVersion": "0.1.0"
-    },
-    {
-      "tool": "comet",
-      "version": "2026.02.2",
-      "releaseTag": "v2026.02.2",
-      "os": "macos",
       "arch": "aarch64",
       "kind": "BARE_EXECUTABLE",
       "url": "https://github.com/UWPR/Comet/releases/download/v2026.02.2/comet.aarch64.macos.exe",

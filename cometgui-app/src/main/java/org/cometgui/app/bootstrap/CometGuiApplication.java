@@ -36,6 +36,7 @@ import org.cometgui.app.config.ProjectSession;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.config.SessionEngine;
 import org.cometgui.app.config.ToolManagerUnavailableException;
+import org.cometgui.app.config.ToolManagerWiring;
 import org.cometgui.app.config.derived.AtlantaFxThemes;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
@@ -289,9 +290,20 @@ public final class CometGuiApplication extends Application {
         } catch (ToolManagerUnavailableException unavailable) {
             toolsUnavailable = unavailable.getMessage();
         }
+        /*
+         * One chooser over the application window, made before the Tool Manager because the Tool
+         * Manager is where a scientist with no managed build of a tool registers their own
+         * (D-011), and the parameter editor below uses the same one.  A registration runs the
+         * chosen binary, so it runs on an install thread and never on this one.
+         */
+        FileChooserPort chooser = choosers.apply(() -> primaryStage);
         ToolManagerViewModel toolManager =
                 tools.isPresent()
-                        ? new ToolManagerViewModel(tools.get(), Platform::runLater)
+                        ? new ToolManagerViewModel(
+                                tools.get(),
+                                Platform::runLater,
+                                ToolManagerWiring.installThreads(),
+                                chooser)
                         : ToolManagerViewModel.unavailable(toolsUnavailable, Platform::runLater);
 
         /*
@@ -300,7 +312,6 @@ public final class CometGuiApplication extends Application {
          * editor, the parameter search and the Expert level over it, and the editor's state.
          */
         ParameterSession parameterSession = ParameterEditorWiring.newSession();
-        FileChooserPort chooser = choosers.apply(() -> primaryStage);
         SpectrumInputsViewModel spectrumInputs =
                 new SpectrumInputsViewModel(parameterSession, chooser, services.fileSystem());
         BuildIdentity running = build.get();

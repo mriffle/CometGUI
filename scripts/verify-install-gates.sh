@@ -916,7 +916,7 @@ readonly SEL_12="ProbeGatedOffersTest#anUnreachableBinaryIsRefusedAndDoesNotBlan
 readonly SEL_13="ManifestAlternativesTest#aSiblingRowOfTheSameVersionIsAnAlternative+theSiblingRelationHoldsBothWays"
 readonly SEL_14="CometCapabilityProbeTest#withoutOneThermoLibrary+withNoThermoLibraries+withTheThermoLibraries"
 readonly SEL_15="LocalPercolatorRegistrationTest#tooOld+exactlyTheMinimum"
-readonly SEL_16="ShippedManifestTest#aPlatformIndependentDownloadIsOfferedOnce+cometIsOfferedNativelyOnAppleSilicon,ArtefactManifestTest#selectionIsOrdered"
+readonly SEL_16="ShippedManifestTest#aPlatformIndependentDownloadIsOfferedOnce,ManifestAlternativesTest#theNativeBuildOfAReleaseIsOfferedFirst,ArtefactManifestTest#selectionIsOrdered"
 readonly SEL_17="ManagedToolManagerInstallTest#anInstallRunsEndToEndThroughThePort,ManagedToolManagerOffersTest#theRowsAScientistSeesOnLinux"
 readonly SEL_18="SyntheticPinTest\$LocaleIndependence#theFixturesDoNotFollowTheDefaultLocale+bothFormatCallSitesHold"
 readonly SEL_19="PlatformFixupsTest#aDeletionThatChangesNothingIsReportedAsNotCleared+onMacOsEveryQuarantinedFileIsClearedThroughXattr+onOtherHostsTheAttributeIsNotTouched"
@@ -1351,7 +1351,12 @@ control_16() {
         'pdv is a JAR, and a row marked TRANSLATED_ROSETTA_2 would tell a scientist that a Java program runs under Rosetta 2 ==> expected: <NATIVE> but was: <TRANSLATED_ROSETTA_2>' \
         '                    .thenComparing(ArtefactSelection::isTranslated);' \
         '                    .thenComparing(ArtefactSelection::isTranslated, Comparator.reverseOrder());'
-    assert_log_contains "and D-004's sentence, against the shipped manifest" \
+    # D-011 (2026-10-10): the shipped manifest no longer has a release with a
+    # native and a translated build on one host -- the 2026.02.2 "x86-64" macOS
+    # Comet row was arm64 and was removed -- so D-004's sentence is graded on
+    # ManifestAlternativesTest's synthetic sibling row instead, with the same
+    # failure text.
+    assert_log_contains "and D-004's sentence, on a synthetic sibling row" \
         "${DIRTY_LOG}" 'the native build must be first, not merely present ==> expected: <NATIVE> but was: <TRANSLATED_ROSETTA_2>'
     assert_testcase "and the fixture ordering test" failed \
         "${MOD_INSTALL}" ArtefactManifestTest selectionIsOrdered
@@ -1405,7 +1410,7 @@ control_21() {
     # of OFFER_ORDER makes the oldest release the default on every host.
     java_control_inject "offer order oldest first" "${MANIFEST_CLASS}" \
         "${MOD_INSTALL}" "${SEL_21}" fixed \
-        "D-010's default, host by host ==> expected: <[linux-x86-64 2026.03.0, linux-aarch64 2026.03.0, macos-aarch64 2026.03.0, macos-x86-64 2026.02.2, windows-x86-64 2026.03.0]> but was: <[linux-x86-64 2026.02.2, linux-aarch64 2026.02.2, macos-aarch64 2026.02.2, macos-x86-64 2026.02.2, windows-x86-64 2026.02.2]>" \
+        "D-010's default, host by host ==> expected: <[linux-x86-64 2026.03.0, linux-aarch64 2026.03.0, macos-aarch64 2026.03.0, windows-x86-64 2026.03.0]> but was: <[linux-x86-64 2026.02.2, linux-aarch64 2026.02.2, macos-aarch64 2026.02.2, windows-x86-64 2026.02.2]>" \
         '                            Comparator.reverseOrder())
                     .thenComparing(ArtefactSelection::isTranslated);' \
         '                            Comparator.naturalOrder())
@@ -1597,8 +1602,8 @@ control_G() {
 
     # The five recorded injections (commit 9a33bb4's message), each asserting
     # the generator's INNER diagnostic -- the ToolMatrixError text specific to
-    # that defect.  artefacts[0] is Comet 2026.02.2 linux-x86-64; artefacts[2]
-    # is the first record carrying companions.
+    # that defect.  artefacts[0] is Comet 2026.02.2 linux-x86-64; the first
+    # record carrying companions is found below rather than assumed by index.
     generator_rejects 1 "a missing sha256" delete "artefacts[0].sha256" "" \
         'artefacts[0] (comet 2026.02.2 linux-x86-64) is missing the required field "sha256"'
     generator_rejects 2 "an unknown platform" set "artefacts[0].os" '"plan9"' \

@@ -123,7 +123,10 @@ class ShellViewTest {
                                 HostBaselineOutcome.SUPPORTED, "64-bit host, glibc 2.36."));
         toolManager =
                 new ToolManagerViewModel(
-                        new ScriptedToolManager(ToolOffers.percolatorAvailable()), Runnable::run);
+                        new ScriptedToolManager(ToolOffers.percolatorAvailable()),
+                        Runnable::run,
+                        Runnable::run,
+                        new Editors.ScriptedChooser());
         ParameterSession session = Editors.session();
         Editors.ScriptedChooser chooser = new Editors.ScriptedChooser();
         SpectrumInputsViewModel inputs = Editors.inputs(session, chooser, new Editors.KnownFiles());
@@ -532,7 +535,10 @@ class ShellViewTest {
                                                 otherStepper,
                                                 new ConsoleViewModel(new BoundedMessageLog(8)),
                                                 new ToolManagerViewModel(
-                                                        new ScriptedToolManager(), Runnable::run),
+                                                        new ScriptedToolManager(),
+                                                        Runnable::run,
+                                                        Runnable::run,
+                                                        new Editors.ScriptedChooser()),
                                                 session,
                                                 editor,
                                                 inputs,

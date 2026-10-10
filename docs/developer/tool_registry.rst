@@ -163,17 +163,21 @@ means "what is on offer here" goes through ``select``.
 ``macos-aarch64`` and the ``macos-x86-64`` rows are runnable, so keying the
 one-row-per-download rule on the version would have shown PDV's 103 MB download
 twice, the second marked as running under Rosetta 2 -- a false statement about
-a Java program. Comet is the opposite case: its two macOS builds are two
-different files with two different digests, so they are two genuine offers,
-with the native one ordered before the translated one (``D-004``).
+a Java program. Two genuinely different builds of one release -- two files with
+two digests, one native and one translated on the same host -- are the opposite
+case: two genuine offers, the native one ordered first (``D-004``). No shipped
+release has such a pair today. Comet 2026.02.2 appeared to, until ``D-011``
+removed its false ``macos``/``x86-64`` row (see
+:ref:`dev-tool-registry-no-intel-mac-comet`); the rule is still graded, on a
+synthetic sibling row in ``ManifestAlternativesTest`` and on synthetic
+Percolator rows in ``ArtefactManifestTest``.
 
 That distinction bit twice in this phase, in both directions, and it is the
 rule to carry: **the download URL is how this product asks "is this the same
 build?"**. The identity probe still compares *versions*, because the question
 that stage asks is "is this binary the release the manifest pinned", which a
-banner answers as a version; the two macOS Comet rows genuinely are both
-2026.02.2, and the SHA-256 checked four steps earlier is what tells those two
-files apart.
+banner answers as a version; two builds of one release genuinely share it, and
+the SHA-256 checked four steps earlier is what tells those files apart.
 
 .. _dev-tool-registry-default:
 
@@ -187,7 +191,7 @@ lists a tool's releases in that order, so the default is simply the first row
 offered. ``D-010`` made Comet 2026.03.0 the default and kept 2026.02.2 offered;
 adding 2026.03.0's rows to the manifest is the whole of the change, and two
 tests hold it to the decision: ``ShippedManifestTest`` host by host (an Intel
-Mac, which has no 2026.03.0 row, defaults to 2026.02.2) and
+Mac is not among them: it has no managed Comet at all, ``D-011``) and
 ``ManagedToolManagerOffersTest`` through the port. The 2026.03.0 rows sit
 *after* 2026.02.2's in ``manifests/tools.json``, because manifest order decides
 nothing a user sees and every check that names a record by its index keeps
@@ -613,20 +617,55 @@ with an advisory, exactly as the Windows Percolator rows do. The 2026.02.2
 binary imports the same four and its record lists none; that row is left as it
 was and the gap is reported, not silently repaired.
 
-Comet 2026.03.0 has no macOS x86-64 row
-----------------------------------------
+.. _dev-tool-registry-no-intel-mac-comet:
+
+No Comet release has a macOS x86-64 row (``D-011``)
+---------------------------------------------------
 
 Upstream publishes ``comet.macos.exe`` beside ``comet.aarch64.macos.exe``, and
-the 2026.02.2 manifest files the former as ``macos``/``x86-64``. **The bytes
-say otherwise**, in both releases: each is a thin Mach-O whose ``cputype`` is
-``0x0100000c`` -- ARM64 -- and the two 2026.03.0 files differ in only 115
-bytes. Upstream's ``macos-build.yml`` builds ``comet.macos.exe`` with a plain
-``make`` on a ``macos-14`` runner, which is an Apple-silicon machine. So the
-2026.03.0 manifest has **no** ``macos``/``x86-64`` row: writing one would state
-an architecture the artefact does not have. An Intel Mac is offered 2026.02.2,
-whose row is unchanged and whose architecture claim is the same false one; that
-and ``D-004``'s premise that Comet publishes a native x86-64 macOS build are
-reported upward rather than decided here.
+the 2026.02.2 manifest once filed the former as ``macos``/``x86-64``. **The
+bytes say otherwise**, in both releases: each is a thin Mach-O (magic
+``cffaedfe``) whose ``cputype`` is ``0x0100000C`` -- ARM64 -- and the two
+2026.03.0 files differ in only 115 bytes. Upstream's ``macos-build.yml``
+builds ``comet.macos.exe`` with a plain ``make`` on a ``macos-14`` runner,
+which is an Apple-silicon machine. **Upstream has never published an Intel
+macOS Comet**, and an arm64 binary cannot run on an Intel Mac: Rosetta 2
+translates x86-64 code on Apple silicon, not the other way round.
+
+``D-011`` (decided 2026-10-08, options A and D) settles what that means:
+
+* **The manifest carries no ``macos``/``x86-64`` Comet row for any release.**
+  The false 2026.02.2 row was removed on 2026-10-10.
+  ``ShippedManifestTest.noCometReleaseHasAnIntelMacRow`` asks every Comet
+  release the manifest names, not a list typed in the test, so a release added
+  later with such a row fails it.
+* **An Intel Mac is offered no Comet install.** Every Comet release is shown
+  as ``UNAVAILABLE_ON_THIS_PLATFORM``, and ``install`` refuses it.
+* **The Tool Manager says so, plainly, and offers the user's own Comet.**
+  ``ToolManager.noManagedBuild()`` lists each tool of which the manifest names
+  releases but ``select`` finds no row this host can run, with whether a local
+  binary of it can be registered. The Tool Manager section shows one sentence
+  per such tool above the rows -- *"No CometGUI-managed Comet exists for an
+  Intel Mac (macos-x86-64): ..."* -- and a **Register your own Comet...**
+  action, which runs ``registerLocalBinary``.
+* **A Comet the user built is registered, not refused.** Comet now has a
+  local registrar beside Percolator's, ``LocalCometRegistration`` in
+  ``cometgui-app``: it reads the version with the installer's own
+  ``VersionBanner.comet()`` (``-h``), checksums the file, and probes its
+  capabilities with ``CometCapabilityProbe`` and **no** companion gates, so a
+  local Comet never claims Thermo RAW reading. Each refusal -- no file, not
+  readable, not Comet, no answer, not checksummable, could not be exercised --
+  is its own sentence. A registration lasts for the session, as Percolator's
+  does.
+
+**Nothing branches on a platform-and-version pair.** The explanation is
+derived from the absence of rows, so the same rule reports Percolator on
+Linux aarch64 (tier 3, which publishes none) and would stop reporting Comet on
+an Intel Mac the day an upstream x86-64 asset -- ``D-011`` option D, the
+owner's own request to UWPR -- enters the manifest like any other release.
+Apple silicon, Linux x86-64 and Windows report nothing missing; on Apple
+silicon the only change is that Comet 2026.02.2 is one native row rather than
+a native row plus a false "translated" one.
 
 The Windows Visual C++ runtime
 ------------------------------

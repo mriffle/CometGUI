@@ -98,6 +98,7 @@ class ViewModelIndependenceTest {
                         "ConsoleViewModel.java",
                         "HostBaselineViewModel.java",
                         "NavigationViewModel.java",
+                        "NoManagedBuildViewModel.java",
                         "NonNullProperty.java",
                         "SectionId.java",
                         "StageStepperViewModel.java",

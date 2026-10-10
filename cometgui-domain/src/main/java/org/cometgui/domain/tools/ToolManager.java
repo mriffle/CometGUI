@@ -56,6 +56,21 @@ public interface ToolManager {
     List<ToolOffer> offers();
 
     /**
+     * The tools of which no managed build exists for this machine at all.
+     *
+     * <p>A tool is listed exactly when the artefact manifest names no build of any release that
+     * this platform can run -- so {@link #offers()} shows each of its releases as {@link
+     * ToolInstallState#UNAVAILABLE_ON_THIS_PLATFORM} and there is nothing to install. The Tool
+     * Manager says so in one sentence for the tool rather than leaving the user to infer it from a
+     * column of unavailable rows, and offers local-binary registration where the product supports
+     * it for that tool ({@code R-TOOL-08}). Derived from the manifest alone: nothing names a
+     * platform or a release.
+     *
+     * @return the tools, in the order {@link #offers()} lists tools, immutable and usually empty
+     */
+    List<NoManagedBuild> noManagedBuild();
+
+    /**
      * Starts installing one tool build and returns as soon as it is under way.
      *
      * <p>Progress, and the terminal phase the install ends in, arrive through {@code listener}. Use

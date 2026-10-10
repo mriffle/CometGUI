@@ -203,7 +203,52 @@ public final class ToolOffers {
     }
 
     /**
-     * Two builds of one release, as Apple silicon offers Comet 2026.02.2.
+     * A Comet release the manifest publishes nothing of for this platform, as an Intel Mac is
+     * offered every Comet release ({@code D-011}).
+     *
+     * @param version the release
+     * @return the offer
+     */
+    public static ToolOffer cometUnavailableHere(String version) {
+        return new ToolOffer(
+                ToolName.COMET,
+                ToolVersion.parse(version),
+                ToolOrigin.MANAGED,
+                ToolInstallState.UNAVAILABLE_ON_THIS_PLATFORM,
+                List.of(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                OptionalLong.empty());
+    }
+
+    /**
+     * A Comet binary the user registered.
+     *
+     * @param executable where it lives, which must be absolute
+     * @return the offer
+     */
+    public static ToolOffer localComet(Path executable) {
+        return new ToolOffer(
+                ToolName.COMET,
+                ToolVersion.parse("2026.03.0"),
+                ToolOrigin.LOCAL,
+                ToolInstallState.INSTALLED,
+                List.of(
+                        new DeclaredCapability(
+                                ToolCapability.PEPXML_OUTPUT,
+                                CapabilityEvidence.OBSERVED_BY_EXECUTION,
+                                "probed by execution when it was registered")),
+                List.of(),
+                Optional.empty(),
+                Optional.of(executable),
+                OptionalLong.empty());
+    }
+
+    /**
+     * Two builds of one release, as a release published as a native and a translated build for one
+     * host would be offered. No shipped release is, today ({@code D-011} removed the one that was);
+     * the view must still keep two such rows apart.
      *
      * @return the native build and the translated one, in that order, identical in every component
      *     a view can render

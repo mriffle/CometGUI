@@ -139,7 +139,9 @@ public final class ShownToolManager implements AutoCloseable {
             throws InterruptedException {
         Objects.requireNonNull(manager, "manager");
         Objects.requireNonNull(stage, "stage");
-        ToolManagerViewModel viewModel = new ToolManagerViewModel(manager, Platform::runLater);
+        ToolManagerViewModel viewModel =
+                new ToolManagerViewModel(
+                        manager, Platform::runLater, Runnable::run, new ScriptedChooser());
         Scene[] built = new Scene[1];
         FxToolkit.onFxThread(
                 () -> {

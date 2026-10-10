@@ -33,9 +33,8 @@ One line at the top says what the list holds -- ``6 tool builds on this
 host.`` -- and then one row per build.
 
 A row is a whole build, not a tool: a tool can appear more than once, because a
-tool can have more than one version, and on an Apple silicon Mac Comet is
-published both as a native build and as an x86-64 build that runs under Rosetta
-2. Both are offered, the native one first.
+tool can have more than one version, and a binary you registered yourself is a
+row of its own after the releases CometGUI can install.
 
 Each row carries:
 
@@ -114,8 +113,8 @@ The four kinds of row
        an absence of information, not a set of findings.
 
    * - **Your own binary**
-     - ``Your own binary: installed``, for a Percolator you registered
-       yourself.
+     - ``Your own binary: installed``, for a Percolator or a Comet you
+       registered yourself.
      - Nothing to download; it was never fetched. Note the limit in
        :ref:`tool-manager-limits`.
 
@@ -123,6 +122,47 @@ A build that is not published here, and a build that cannot run here, are both
 **shown and not hidden**. The rule is that the application must not *promise* a
 one-click install that cannot work -- not that it should pretend a release does
 not exist.
+
+.. _tool-manager-no-managed-build:
+
+When CometGUI has no build of a tool for your computer
+------------------------------------------------------
+
+Sometimes the developers of a tool publish no build of it at all for your kind
+of computer. Then CometGUI has nothing to download, and the Tool Manager says
+so in one sentence above the list, rather than leaving you to work it out from
+a column of rows reading ``not published for this platform``.
+
+**On an Intel Mac this is Comet.** The Comet developers publish macOS builds
+for Apple silicon only -- both macOS files they publish are Apple-silicon
+programs, whatever the file names suggest -- and an Apple-silicon program
+cannot run on an Intel Mac. So on an Intel Mac the Tool Manager reads:
+
+    No CometGUI-managed Comet exists for an Intel Mac (macos-x86-64): the Comet
+    developers publish no build of it for this kind of computer, so there is
+    nothing for CometGUI to download and install. You can register a Comet you
+    have built or obtained yourself: CometGUI runs it to read its version and
+    check what it can do, and then lists it below as your own binary.
+
+Below it, **Register your own Comet...** opens a file chooser. CometGUI runs
+the file you choose to read its Comet version, checksums it, and asks it for
+its parameter files to see what it can do; if any of that fails you are told
+which, in a sentence of its own, and nothing is added. A Comet registered this
+way appears in the list as ``Your own binary: installed`` and a search whose
+parameters are for that Comet release uses it. CometGUI did not download it,
+so it carries an advisory saying so, and it is never assumed to read Thermo RAW
+files.
+
+Every Comet release is still listed, as ``not published for this platform``,
+with no Install action: CometGUI does not offer an install that cannot work.
+On an Apple silicon Mac, on Linux and on Windows none of this appears -- Comet
+is installed from the Tool Manager as usual.
+
+The same sentence appears for any tool, on any computer, for which CometGUI's
+list of published builds has none -- for example Percolator on Linux on a
+64-bit ARM processor, a platform release 1 does not support. Where CometGUI
+cannot register a binary of that tool, the sentence says so and there is no
+register action.
 
 Your own Percolator
 -------------------
@@ -247,17 +287,17 @@ What this section cannot do yet
 
 Stated plainly, because finding these out by trying is worse.
 
-**A registered local binary lasts the session.** A Percolator you register
-yourself is checksummed, probed and shown as ``Your own binary``, and it is
-forgotten when the application exits. Persisting it needs a settings store that
-no phase has built yet.
+**A registered local binary lasts the session.** A Percolator or Comet you
+register yourself is checksummed, probed and shown as ``Your own binary``, and
+it is forgotten when the application exits. Persisting it needs a settings
+store that no phase has built yet.
 
-**Registering one is done from the Percolator section, not from here.** The
-Tool Manager shows a local binary correctly once it is registered, but this
-screen has no registration action of its own. Since Phase 09 the Percolator
-section has one -- **Register a local Percolator binary...**, with a file
-chooser (:doc:`percolator`) -- and the binary it registers appears here as
-``Your own binary: installed``.
+**This screen registers a binary only for a tool it has no build of.** The
+register action appears only in the sentence described in
+:ref:`tool-manager-no-managed-build` -- on an Intel Mac, for Comet. A
+Percolator of your own is registered from the Percolator section --
+**Register a local Percolator binary...**, with a file chooser
+(:doc:`percolator`) -- and appears here as ``Your own binary: installed``.
 
 **There is no Refresh.** Rows are read when the section is built and again
 around an install. A tool installed or removed outside CometGUI while it is

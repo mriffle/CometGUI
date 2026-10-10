@@ -16,6 +16,7 @@
 
 package org.cometgui.ui.viewmodel;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,8 +30,12 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallProgress;
+import org.cometgui.domain.tools.NoManagedBuild;
 import org.cometgui.domain.tools.ToolManager;
+import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
+import org.cometgui.domain.tools.ToolRegistrationException;
+import org.cometgui.ui.viewmodel.params.FileChooserPort;
 
 /**
  * The Tool Manager: every tool build this machine may be shown, and the two actions a user has.
@@ -46,14 +51,15 @@ import org.cometgui.domain.tools.ToolOffer;
  *
  * <h2>Why a row's key carries an ordinal</h2>
  *
- * <p><strong>Two offers can legitimately share a tool and a version.</strong> On Apple silicon
- * Comet 2026.02.2 is published as a native build and as an x86-64 build and both are offered, so a
- * key built from the tool and the version alone would name two rows with one string -- and {@code
- * Scene.lookup} returns whichever node it reaches first, which is how a test comes to assert
- * against the wrong control. The key is therefore the tool, the version with its dots written as
- * underscores (a dot in an identifier is read as a style class), and a 1-based ordinal within the
- * offers that share both. No platform this project can execute today produces a second ordinal,
- * which is precisely why it is written down rather than discovered on the first Apple silicon Mac.
+ * <p><strong>Two offers can legitimately share a tool and a version.</strong> A release published
+ * as a native and a translated build for one host is two offers, and a binary the user registers
+ * may report a version the manifest also names, so a key built from the tool and the version alone
+ * would name two rows with one string -- and {@code Scene.lookup} returns whichever node it reaches
+ * first, which is how a test comes to assert against the wrong control. The key is therefore the
+ * tool, the version with its dots written as underscores (a dot in an identifier is read as a style
+ * class), and a 1-based ordinal within the offers that share both. No platform this project can
+ * execute today produces a second ordinal, which is precisely why it is written down rather than
+ * discovered on the first one that does.
  *
  * <h2>Nothing is read until someone asks</h2>
  *
@@ -106,6 +112,15 @@ public final class ToolManagerViewModel {
     /** How work gets back onto the interface thread from an install thread. */
     private final Executor uiThread;
 
+    /** Where a local-binary registration runs, because it runs the binary and can take seconds. */
+    private final Executor background;
+
+    /** How the user picks the binary to register; {@code null} exactly when {@link #tools} is. */
+    private final FileChooserPort chooser;
+
+    private final ObservableList<NoManagedBuildViewModel> noManagedBuild =
+            FXCollections.observableArrayList();
+
     private final ObservableList<ToolRowViewModel> rows = FXCollections.observableArrayList();
 
     private final ReadOnlyStringWrapper summary =
@@ -120,12 +135,18 @@ public final class ToolManagerViewModel {
      *     passes {@code Runnable::run} for a deterministic sequence -- which applies reports on
      *     whatever thread raised them, so anything with a live scene in front of it must pass the
      *     real one
-     * @throws NullPointerException if either argument is {@code null}
+     * @param background where a local-binary registration runs; it runs the binary, so it must not
+     *     be the interface thread in production, and a test passes {@code Runnable::run}
+     * @param chooser how the user picks a binary of their own to register
+     * @throws NullPointerException if any argument is {@code null}
      */
-    public ToolManagerViewModel(ToolManager tools, Executor uiThread) {
+    public ToolManagerViewModel(
+            ToolManager tools, Executor uiThread, Executor background, FileChooserPort chooser) {
         this.tools = Objects.requireNonNull(tools, "tools");
         this.unavailableReason = null;
         this.uiThread = Objects.requireNonNull(uiThread, "uiThread");
+        this.background = Objects.requireNonNull(background, "background");
+        this.chooser = Objects.requireNonNull(chooser, "chooser");
     }
 
     private ToolManagerViewModel(String unavailableReason, Executor uiThread) {
@@ -137,6 +158,8 @@ public final class ToolManagerViewModel {
                             + " reason leaves the section empty with no explanation");
         }
         this.uiThread = Objects.requireNonNull(uiThread, "uiThread");
+        this.background = uiThread;
+        this.chooser = null;
     }
 
     /**
@@ -194,6 +217,19 @@ public final class ToolManagerViewModel {
     }
 
     /**
+     * The tools of which no managed build exists for this computer, each said plainly, in the
+     * port's order ({@code D-011}).
+     *
+     * <p>The same caution as {@link #rows()}: a caller that listens must keep the returned wrapper.
+     *
+     * @return an unmodifiable observable view, empty until {@link #refresh()} has run and empty on
+     *     every host where every tool has a managed build
+     */
+    public ObservableList<NoManagedBuildViewModel> noManagedBuild() {
+        return FXCollections.unmodifiableObservableList(noManagedBuild);
+    }
+
+    /**
      * What the list below the heading holds, in one line.
      *
      * @return the read-only property, never holding {@code null}
@@ -222,9 +258,11 @@ public final class ToolManagerViewModel {
     public void refresh() {
         if (tools == null) {
             rows.clear();
+            noManagedBuild.clear();
             summary.set(unavailableReason);
             return;
         }
+        refreshNoManagedBuild();
         Map<String, ToolRowViewModel> existing = new LinkedHashMap<>();
         for (ToolRowViewModel row : rows) {
             existing.put(row.key(), row);
@@ -273,6 +311,65 @@ public final class ToolManagerViewModel {
                         progress -> uiThread.execute(() -> onProgress(row, progress)));
         row.installStarted(handle);
         refresh();
+    }
+
+    /**
+     * Registers a binary of the user's own for a tool with no managed build here: asks the chooser
+     * for the file (on this thread, as a modal chooser is), then registers it through the port on
+     * the background executor and reads the rows again on the interface thread.
+     *
+     * @param gap the tool's entry in {@link #noManagedBuild()}
+     * @return {@code true} if a registration started; {@code false} if none can (the product does
+     *     not register this tool, or one is already running) or no file was chosen
+     * @throws NullPointerException if {@code gap} is {@code null}
+     * @throws IllegalStateException if this host has no Tool Manager
+     * @throws IllegalArgumentException if {@code gap} is not one of this view-model's entries
+     */
+    public boolean register(NoManagedBuildViewModel gap) {
+        Objects.requireNonNull(gap, "gap");
+        requireAvailable();
+        requireOwnGap(gap);
+        if (!gap.canRegister()) {
+            return false;
+        }
+        Optional<Path> chosen = chooser.chooseFile(gap.chooserText());
+        if (chosen.isEmpty()) {
+            gap.said("No file was chosen, so nothing was registered.");
+            return false;
+        }
+        Path executable = chosen.get().toAbsolutePath();
+        ToolName tool = gap.tool();
+        String name = NoManagedBuildViewModel.toolWords(tool);
+        gap.started(
+                "Registering "
+                        + executable
+                        + ": CometGUI is running it to read its version and check what it can do.");
+        background.execute(
+                () -> {
+                    String outcome;
+                    try {
+                        ToolOffer offer = tools.registerLocalBinary(tool, executable);
+                        outcome =
+                                "Registered "
+                                        + name
+                                        + " "
+                                        + offer.version().text()
+                                        + " from "
+                                        + executable
+                                        + ". It is listed below as your own binary.";
+                    } catch (ToolRegistrationException refused) {
+                        outcome = name + " was not registered: " + refused.getMessage();
+                    } catch (RuntimeException failed) {
+                        outcome = name + " could not be registered: " + failed;
+                    }
+                    String said = outcome;
+                    uiThread.execute(
+                            () -> {
+                                gap.finished(said);
+                                refresh();
+                            });
+                });
+        return true;
     }
 
     /**
@@ -328,6 +425,36 @@ public final class ToolManagerViewModel {
                     "this host has no Tool Manager, so nothing can be installed from it: "
                             + unavailableReason);
         }
+    }
+
+    /*
+     * An entry for a tool still missing keeps its identity and its status, so a refusal stays on
+     * screen after the refresh that follows it; the port's order is kept.
+     */
+    private void refreshNoManagedBuild() {
+        Map<ToolName, NoManagedBuildViewModel> existing = new LinkedHashMap<>();
+        for (NoManagedBuildViewModel gap : noManagedBuild) {
+            existing.put(gap.tool(), gap);
+        }
+        List<NoManagedBuildViewModel> next = new ArrayList<>();
+        for (NoManagedBuild fact : tools.noManagedBuild()) {
+            NoManagedBuildViewModel gap = existing.get(fact.tool());
+            if (gap == null || !gap.fact().equals(fact)) {
+                gap = new NoManagedBuildViewModel(fact);
+            }
+            next.add(gap);
+        }
+        noManagedBuild.setAll(next);
+    }
+
+    private void requireOwnGap(NoManagedBuildViewModel gap) {
+        for (NoManagedBuildViewModel own : noManagedBuild) {
+            if (own == gap) {
+                return;
+            }
+        }
+        throw new IllegalArgumentException(
+                "this Tool Manager is not showing " + gap + ", so it cannot act on it");
     }
 
     private void requireOwnRow(ToolRowViewModel row) {

@@ -31,6 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.cometgui.app.testing.ArtefactMirror;
 import org.cometgui.app.testing.FakeEnvironment;
 import org.cometgui.domain.platform.GlibcVersion;
 import org.cometgui.domain.ports.EnvironmentReader;
@@ -38,13 +40,16 @@ import org.cometgui.domain.ports.ProcessListener;
 import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.domain.ports.RunningProcess;
 import org.cometgui.domain.ports.ToolCommand;
+import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
 import org.cometgui.domain.tools.HostPlatform;
+import org.cometgui.domain.tools.NoManagedBuild;
 import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
+import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.install.probe.CapabilityProber;
@@ -318,6 +323,166 @@ class ToolManagerWiringTest {
                                         + " directory; an install creates what it needs"));
     }
 
+    private ToolManager managerOverRealProcessesOn(HostPlatform host) throws IOException {
+        return ToolManagerWiring.toolManager(
+                host,
+                DEBIAN_12,
+                temporary.resolve("cache-" + host.id()),
+                new ProcessService(Clock.systemUTC()),
+                Clock.systemUTC(),
+                Runnable::run);
+    }
+
+    private static List<String> cometRows(List<ToolOffer> offers) {
+        List<String> rows = new ArrayList<>();
+        for (ToolOffer offer : offers) {
+            if (offer.tool() == ToolName.COMET) {
+                rows.add(offer.version().text() + " " + offer.origin() + " " + offer.state());
+            }
+        }
+        return rows;
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    @DisplayName(
+            "D-011: an Intel Mac is offered no Comet install, is told so, and can register its own"
+                    + " Comet")
+    void anIntelMacIsOfferedRegistrationInsteadOfAComet()
+            throws IOException, ToolRegistrationException {
+        HostPlatform intelMac =
+                new HostPlatform(HostOperatingSystem.MACOS, HostArchitecture.X86_64);
+        ToolManager manager = managerOverRealProcessesOn(intelMac);
+        /*
+         * The real Linux Comet 2026.03.0 stands in for "a Comet the user built": registration
+         * runs the file it is given, so what it proves is the path -- identity, probe, LOCAL row
+         * -- and not that this binary would run on a Mac, which nothing on this host can show.
+         */
+        Path ownComet =
+                Files.copy(
+                        ArtefactMirror.artefact("v2026.03.0__comet.linux.exe"),
+                        temporary.resolve("my-comet"));
+        Files.setPosixFilePermissions(ownComet, PosixFilePermissions.fromString("rwxr-xr-x"));
+
+        List<String> before = cometRows(manager.offers());
+        IllegalArgumentException noInstall =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                manager.install(
+                                        ToolName.COMET,
+                                        ToolVersion.parse("2026.03.0"),
+                                        progress -> {}));
+        ToolOffer registered = manager.registerLocalBinary(ToolName.COMET, ownComet);
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(new NoManagedBuild(ToolName.COMET, intelMac, true)),
+                                manager.noManagedBuild(),
+                                "the one tool with no managed build here is Comet, and a local"
+                                        + " Comet can be registered"),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "2026.03.0 MANAGED UNAVAILABLE_ON_THIS_PLATFORM",
+                                        "2026.02.2 MANAGED UNAVAILABLE_ON_THIS_PLATFORM"),
+                                before,
+                                "no install that cannot work is offered"),
+                () ->
+                        assertTrue(
+                                noInstall
+                                        .getMessage()
+                                        .startsWith(
+                                                "no offer names comet 2026.03.0"
+                                                        + " on macos-x86-64: the manifest"
+                                                        + " publishes no artefact"),
+                                noInstall::getMessage),
+                () -> assertEquals(ToolOrigin.LOCAL, registered.origin()),
+                () -> assertEquals(ToolVersion.parse("2026.03.0"), registered.version()),
+                () -> assertEquals(Optional.of(ownComet), registered.installedPath()),
+                () ->
+                        assertEquals(
+                                Set.of(
+                                        ToolCapability.PEPXML_OUTPUT,
+                                        ToolCapability.PIN_OUTPUT,
+                                        ToolCapability.COMPLETE_PARAMS_QUERY),
+                                registered.capabilities().stream()
+                                        .map(DeclaredCapability::capability)
+                                        .collect(Collectors.toSet()),
+                                "probed by running the file, and never Thermo RAW, which a local"
+                                        + " binary has no manifest row to claim"),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "2026.03.0 MANAGED UNAVAILABLE_ON_THIS_PLATFORM",
+                                        "2026.02.2 MANAGED UNAVAILABLE_ON_THIS_PLATFORM",
+                                        "2026.03.0 LOCAL INSTALLED"),
+                                cometRows(manager.offers()),
+                                "and the registered Comet is then a row a run can use"));
+    }
+
+    @Test
+    @DisplayName(
+            "D-011: Apple silicon, Linux and Windows are unchanged -- every Comet release is"
+                    + " installable and nothing is reported missing")
+    void otherHostsStillHaveAManagedComet() throws IOException {
+        List<HostPlatform> hosts =
+                List.of(
+                        LINUX,
+                        new HostPlatform(HostOperatingSystem.MACOS, HostArchitecture.AARCH64),
+                        new HostPlatform(HostOperatingSystem.WINDOWS, HostArchitecture.X86_64));
+        List<String> seen = new ArrayList<>();
+        for (HostPlatform host : hosts) {
+            ToolManager manager = managerOverRealProcessesOn(host);
+            seen.add(
+                    host.id() + " " + cometRows(manager.offers()) + " " + manager.noManagedBuild());
+        }
+
+        assertEquals(
+                List.of(
+                        "linux-x86-64 [2026.03.0 MANAGED NOT_INSTALLED,"
+                                + " 2026.02.2 MANAGED NOT_INSTALLED] []",
+                        "macos-aarch64 [2026.03.0 MANAGED NOT_INSTALLED,"
+                                + " 2026.02.2 MANAGED NOT_INSTALLED] []",
+                        "windows-x86-64 [2026.03.0 MANAGED NOT_INSTALLED,"
+                                + " 2026.02.2 MANAGED NOT_INSTALLED] []"),
+                seen);
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    @DisplayName("a file that is not Comet is refused as Comet, in the registrar's own words")
+    void registerLocalBinaryRefusesAFileThatIsNotComet() throws IOException {
+        Path notComet = temporary.resolve("not-comet");
+        Files.writeString(notComet, "#!/bin/sh\necho hello\nexit 0\n");
+        Files.setPosixFilePermissions(notComet, PosixFilePermissions.fromString("rwxr-xr-x"));
+        ToolManager manager =
+                managerOverRealProcessesOn(
+                        new HostPlatform(HostOperatingSystem.MACOS, HostArchitecture.X86_64));
+
+        ToolRegistrationException refused =
+                assertThrows(
+                        ToolRegistrationException.class,
+                        () -> manager.registerLocalBinary(ToolName.COMET, notComet));
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                "The file at "
+                                        + notComet
+                                        + " is not Comet: it printed no \"Comet version\" line in"
+                                        + " answer to -h. It exited 0 saying: hello",
+                                refused.getMessage()),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "2026.03.0 MANAGED UNAVAILABLE_ON_THIS_PLATFORM",
+                                        "2026.02.2 MANAGED UNAVAILABLE_ON_THIS_PLATFORM"),
+                                cometRows(manager.offers()),
+                                "and a refused file is not a row"));
+    }
+
     @Test
     @DisplayName("a platform the product publishes nothing for is explained, naming both values")
     void anUnsupportedPlatformIsExplained() {
@@ -412,14 +577,16 @@ class ToolManagerWiringTest {
     }
 
     @Test
-    @DisplayName("the local registrars are Percolator's alone, and nothing else is offered one")
-    void onlyPercolatorHasALocalRegistrar() {
+    @DisplayName(
+            "the local registrars are Percolator's and Comet's, and nothing else is offered one")
+    void onlyPercolatorAndCometHaveALocalRegistrar() {
         assertEquals(
-                Set.of(ToolName.PERCOLATOR),
+                Set.of(ToolName.PERCOLATOR, ToolName.COMET),
                 ToolManagerWiring.localRegistrars(
                                 new RecordingRunner(), new StreamingHashService(), LINUX)
                         .keySet(),
-                "the specification offers a registered local binary for Percolator and for no"
-                        + " other tool");
+                "the specification offers a registered local binary for Percolator, D-011 offers"
+                        + " one for Comet where no managed Comet exists, and PDV and the converter"
+                        + " are installed from the manifest alone");
     }
 }

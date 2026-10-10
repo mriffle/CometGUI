@@ -53,6 +53,14 @@ once on a GitHub ``windows-latest`` runner, which is why that row's
 one hosted image is not a clean end-user machine, and the row says what it saw
 rather than what it implies.
 
+**There is no Comet for an Intel Mac.** The table has no ``macos-x86-64``
+Comet row, for any release, because the Comet developers have never published
+one: both macOS files they publish are Apple-silicon (arm64) programs, whatever
+their names suggest, and an Apple-silicon program cannot run on an Intel Mac
+(``D-011``). On an Intel Mac the Tool Manager says so and offers to register a
+Comet you have built yourself instead; see :ref:`tool-manager-no-managed-build`.
+Percolator, PDV and the Limelight converter are unaffected there.
+
 .. include:: /_generated/tool-platform-matrix.rsti
 
 Where the numbers come from

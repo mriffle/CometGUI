@@ -35,6 +35,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import org.cometgui.ui.viewmodel.NoManagedBuildViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
 import org.cometgui.ui.viewmodel.ToolRowViewModel;
 
@@ -85,6 +86,14 @@ public final class ToolManagerPane extends VBox {
      */
     private final ObservableList<ToolRowViewModel> rows;
 
+    /** Held for the same reason as {@link #rows}: the wrapper observes the list weakly. */
+    private final ObservableList<NoManagedBuildViewModel> gaps;
+
+    /** One explanation per tool with no managed build here, above the rows ({@code D-011}). */
+    private final VBox gapBox = new VBox(8);
+
+    private final List<NoManagedBuildView> gapViews = new ArrayList<>();
+
     private final Label summary = new Label();
 
     private final VBox rowBox = new VBox(12);
@@ -106,6 +115,7 @@ public final class ToolManagerPane extends VBox {
     public ToolManagerPane(ToolManagerViewModel viewModel) {
         this.viewModel = Objects.requireNonNull(viewModel, "viewModel");
         this.rows = viewModel.rows();
+        this.gaps = viewModel.noManagedBuild();
         setId(UiIds.TOOL_MANAGER_PANE);
         setSpacing(8);
         setPadding(new Insets(8));
@@ -123,10 +133,14 @@ public final class ToolManagerPane extends VBox {
         named(scroller, "the tool builds this machine can have");
         VBox.setVgrow(scroller, Priority.ALWAYS);
 
-        getChildren().addAll(summary, scroller);
+        gapBox.setId(UiIds.TOOL_MANAGER_NO_MANAGED_BUILD);
+
+        getChildren().addAll(summary, gapBox, scroller);
 
         rows.addListener((ListChangeListener<ToolRowViewModel>) change -> showRows());
         showRows();
+        gaps.addListener((ListChangeListener<NoManagedBuildViewModel>) change -> showGaps());
+        showGaps();
     }
 
     /**
@@ -162,6 +176,77 @@ public final class ToolManagerPane extends VBox {
     }
 
     /** One tool build: everything the row says, and the two actions. */
+    private void showGaps() {
+        for (NoManagedBuildView dropped : gapViews) {
+            dropped.detach();
+        }
+        gapViews.clear();
+        for (NoManagedBuildViewModel gap : gaps) {
+            gapViews.add(new NoManagedBuildView(viewModel, gap));
+        }
+        gapBox.getChildren().setAll(gapViews);
+        gapBox.setVisible(!gapViews.isEmpty());
+        gapBox.setManaged(!gapViews.isEmpty());
+    }
+
+    /**
+     * One tool with no managed build here: the plain explanation, the register action where the
+     * product can register that tool, and what the last registration did.
+     */
+    private static final class NoManagedBuildView extends VBox {
+
+        private final NoManagedBuildViewModel gap;
+
+        private final Button register = new Button();
+
+        private final Label status = new Label();
+
+        private final ChangeListener<Object> onChange;
+
+        NoManagedBuildView(ToolManagerViewModel viewModel, NoManagedBuildViewModel gap) {
+            this.gap = gap;
+            String tool = gap.tool().id();
+            setId(UiIds.noManagedBuild(tool));
+            setSpacing(4);
+            setPadding(new Insets(4));
+
+            Label explanation = new Label(gap.explanationText());
+            explanation.setId(UiIds.noManagedBuildText(tool));
+            explanation.setWrapText(true);
+            named(explanation, "why CometGUI cannot install " + tool + " here");
+
+            register.setText(gap.registerActionText());
+            register.setId(UiIds.noManagedBuildRegister(tool));
+            named(register, gap.registerActionText());
+            register.setOnAction(event -> viewModel.register(gap));
+            register.setVisible(gap.fact().localRegistration());
+            register.setManaged(gap.fact().localRegistration());
+
+            status.setId(UiIds.noManagedBuildStatus(tool));
+            status.setWrapText(true);
+            named(status, "what registering your own " + tool + " did");
+
+            getChildren().addAll(explanation, register, status);
+
+            onChange = (property, was, now) -> show();
+            gap.registeringProperty().addListener(onChange);
+            gap.statusProperty().addListener(onChange);
+            show();
+        }
+
+        void detach() {
+            gap.registeringProperty().removeListener(onChange);
+            gap.statusProperty().removeListener(onChange);
+        }
+
+        private void show() {
+            register.setDisable(!gap.canRegister());
+            status.setText(gap.status());
+            status.setVisible(!gap.status().isEmpty());
+            status.setManaged(!gap.status().isEmpty());
+        }
+    }
+
     private static final class ToolRowView extends VBox {
 
         private final ToolRowViewModel row;

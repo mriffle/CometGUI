@@ -23,10 +23,12 @@ import java.util.Objects;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallProgress;
 import org.cometgui.domain.tools.InstallProgressListener;
+import org.cometgui.domain.tools.NoManagedBuild;
 import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
+import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.domain.tools.ToolVersion;
 
 /**
@@ -61,6 +63,17 @@ public final class ScriptedToolManager implements ToolManager {
     private List<ToolOffer> offers;
 
     private InstallProgressListener listener;
+
+    private List<NoManagedBuild> missing = List.of();
+
+    private final List<String> registrationsAsked = new ArrayList<>();
+
+    private Registration registration =
+            (tool, executable) -> {
+                throw new UnsupportedOperationException(
+                        "this double was not scripted to register local binaries; the offers it"
+                                + " answers with are written out by the test");
+            };
 
     /**
      * A manager answering with these offers, in this order.
@@ -105,12 +118,69 @@ public final class ScriptedToolManager implements ToolManager {
         return handle;
     }
 
+    /**
+     * Scripts the tools this manager reports as having no managed build here.
+     *
+     * @param facts the facts to answer {@link #noManagedBuild()} with
+     */
+    public void missing(NoManagedBuild... facts) {
+        this.missing = List.of(facts);
+    }
+
+    /**
+     * Scripts what {@link #registerLocalBinary} does: answer with an offer, or refuse.
+     *
+     * @param script the registration to perform when asked
+     */
+    public void registering(Registration script) {
+        this.registration = Objects.requireNonNull(script, "script");
+    }
+
+    /**
+     * What a registration was asked for, oldest first, as {@code "tool path"}.
+     *
+     * @return the requests
+     */
+    public List<String> registrationsAsked() {
+        return List.copyOf(registrationsAsked);
+    }
+
     /** {@inheritDoc} */
     @Override
-    public ToolOffer registerLocalBinary(ToolName tool, Path executable) {
-        throw new UnsupportedOperationException(
-                "this double does not register local binaries; the offers it answers with are"
-                        + " written out by the test");
+    public List<NoManagedBuild> noManagedBuild() {
+        return List.copyOf(missing);
+    }
+
+    /**
+     * Registers through the scripted {@link Registration}; a successful registration's offer is
+     * appended to the offers, as {@code ManagedToolManager} keeps a registration and lists it.
+     *
+     * @throws ToolRegistrationException if the script refuses
+     */
+    @Override
+    public ToolOffer registerLocalBinary(ToolName tool, Path executable)
+            throws ToolRegistrationException {
+        registrationsAsked.add(tool.id() + " " + executable);
+        ToolOffer registered = registration.register(tool, executable);
+        List<ToolOffer> more = new ArrayList<>(offers);
+        more.add(registered);
+        offers = List.copyOf(more);
+        return registered;
+    }
+
+    /** What a scripted registration does. */
+    @FunctionalInterface
+    public interface Registration {
+
+        /**
+         * Registers, or refuses.
+         *
+         * @param tool the tool
+         * @param executable the file
+         * @return the offer
+         * @throws ToolRegistrationException to refuse
+         */
+        ToolOffer register(ToolName tool, Path executable) throws ToolRegistrationException;
     }
 
     /**

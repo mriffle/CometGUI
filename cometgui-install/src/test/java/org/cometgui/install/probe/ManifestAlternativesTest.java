@@ -23,9 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.cometgui.domain.platform.GlibcVersion;
+import org.cometgui.domain.tools.ArtefactExecutability;
 import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
 import org.cometgui.domain.tools.HostPlatform;
@@ -33,6 +36,7 @@ import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.install.registry.ArtefactManifest;
 import org.cometgui.install.registry.ArtefactRecord;
+import org.cometgui.install.registry.ArtefactSelection;
 import org.cometgui.install.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,9 +49,13 @@ import org.junit.jupiter.api.Test;
 class ManifestAlternativesTest {
 
     /**
-     * The Comet release that publishes both a native and an x86-64 macOS build. 2026.03.0 does not:
-     * the file upstream names {@code comet.macos.exe} is an arm64 build, so its manifest has no
-     * macos-x86-64 row.
+     * The Comet release the sibling cases give a second macOS build in {@link #withTwoMacBuilds()}.
+     *
+     * <p><strong>No shipped release has two.</strong> Upstream has never published an x86-64 macOS
+     * Comet -- {@code comet.macos.exe} is an arm64 Mach-O (CPU type {@code 0x0100000C}) in
+     * 2026.02.2 and 2026.03.0 alike -- so {@code D-011} removed the false 2026.02.2 row that made
+     * the shipped manifest the fixture for this rule. The rule itself stands: it is keyed on the
+     * download, and a manifest with two builds of one release is one upstream asset away.
      */
     private static final ToolVersion TWO_MACOS_BUILDS = ToolVersion.parse("2026.02.2");
 
@@ -85,7 +93,7 @@ class ManifestAlternativesTest {
         ArtefactRecord nativeComet = cometFor(appleSilicon, HostArchitecture.AARCH64);
 
         List<String> alternatives =
-                new ManifestAlternatives(ProbeRecords.shipped(), appleSilicon, DEBIAN_12)
+                new ManifestAlternatives(withTwoMacBuilds(), appleSilicon, DEBIAN_12)
                         .forArtefact(nativeComet);
 
         assertAll(
@@ -102,12 +110,40 @@ class ManifestAlternativesTest {
         assertEquals(
                 List.of("comet 2026.02.2 macos-x86-64"),
                 sameRelease(alternatives, nativeComet),
-                "Comet publishes TWO macOS builds of one version and D-004 says the x86-64 one runs"
-                        + " on Apple silicon under Rosetta 2, so "
+                "where a release has TWO macOS builds, the x86-64 one runs on Apple silicon under"
+                        + " Rosetta 2, so "
                         + "a native build that will not load has"
                         + " somewhere to send the user -- and R-PLAT-03 requires it to be named."
                         + " Excluding the failing build by VERSION rather than by row takes the"
                         + " sibling with it and tells the scientist there is nothing else");
+    }
+
+    @Test
+    @DisplayName(
+            "where one release has a native and a translated build here, the native one is offered"
+                    + " first")
+    void theNativeBuildOfAReleaseIsOfferedFirst() throws IOException {
+        /*
+         * D-004's ordering, graded on the synthetic sibling: no shipped release has two builds for
+         * one host since D-011 removed the false 2026.02.2 x86-64 macOS Comet row, so the shipped
+         * manifest can no longer show this order, and a rule nobody can watch fail is not graded.
+         */
+        HostPlatform appleSilicon =
+                new HostPlatform(HostOperatingSystem.MACOS, HostArchitecture.AARCH64);
+        List<ArtefactSelection> release =
+                withTwoMacBuilds().select(appleSilicon, ToolName.COMET, TWO_MACOS_BUILDS);
+
+        assertAll(
+                () -> assertEquals(2, release.size(), "both builds are offered, not collapsed"),
+                () ->
+                        assertEquals(
+                                ArtefactExecutability.NATIVE,
+                                release.get(0).executability(),
+                                "the native build must be first, not merely present"),
+                () ->
+                        assertEquals(
+                                ArtefactExecutability.TRANSLATED_ROSETTA_2,
+                                release.get(1).executability()));
     }
 
     @Test
@@ -120,7 +156,7 @@ class ManifestAlternativesTest {
         assertEquals(
                 List.of("comet 2026.02.2 macos-aarch64"),
                 sameRelease(
-                        new ManifestAlternatives(ProbeRecords.shipped(), appleSilicon, DEBIAN_12)
+                        new ManifestAlternatives(withTwoMacBuilds(), appleSilicon, DEBIAN_12)
                                 .forArtefact(translatedComet),
                         translatedComet),
                 "the rule is about which ROW failed, not which of the two is preferred");
@@ -226,7 +262,7 @@ class ManifestAlternativesTest {
      */
     private static ArtefactRecord cometFor(HostPlatform host, HostArchitecture builtFor)
             throws IOException {
-        return ProbeRecords.shipped().select(host, ToolName.COMET).stream()
+        return withTwoMacBuilds().select(host, ToolName.COMET).stream()
                 .map(selection -> selection.artefact())
                 .filter(record -> record.version().equals(TWO_MACOS_BUILDS))
                 .filter(record -> record.platform().architecture() == builtFor)
@@ -251,6 +287,57 @@ class ManifestAlternativesTest {
     private static List<String> sameRelease(List<String> alternatives, ArtefactRecord failing) {
         String release = failing.tool().id() + " " + failing.version().text() + " ";
         return alternatives.stream().filter(described -> described.startsWith(release)).toList();
+    }
+
+    /**
+     * The shipped manifest plus one synthetic x86-64 macOS build of {@link #TWO_MACOS_BUILDS}: the
+     * shipped 2026.02.2 {@code macos-aarch64} row with another platform and another download.
+     *
+     * <p>The URL is invented and says so, and nothing outside this test sees the row. The shipped
+     * manifest has no same-release sibling on any host (see {@link #TWO_MACOS_BUILDS}), and a rule
+     * graded only where the data happens to exercise it stops being graded when the data changes.
+     *
+     * @return the manifest
+     * @throws IOException if the shipped manifest cannot be read
+     */
+    private static ArtefactManifest withTwoMacBuilds() throws IOException {
+        ArtefactManifest shipped = ProbeRecords.shipped();
+        ArtefactRecord arm =
+                shipped.artefacts().stream()
+                        .filter(record -> record.tool() == ToolName.COMET)
+                        .filter(record -> record.version().equals(TWO_MACOS_BUILDS))
+                        .filter(
+                                record ->
+                                        record.platform()
+                                                .equals(
+                                                        new HostPlatform(
+                                                                HostOperatingSystem.MACOS,
+                                                                HostArchitecture.AARCH64)))
+                        .findFirst()
+                        .orElseThrow();
+        ArtefactRecord intel =
+                new ArtefactRecord(
+                        arm.tool(),
+                        arm.version(),
+                        arm.releaseTag(),
+                        new HostPlatform(HostOperatingSystem.MACOS, HostArchitecture.X86_64),
+                        arm.kind(),
+                        URI.create(
+                                "https://example.invalid/synthetic-test-row/comet.x86_64.macos.exe"),
+                        arm.sizeBytes(),
+                        arm.hashes(),
+                        arm.member(),
+                        arm.expectedExecutablePath(),
+                        arm.executable(),
+                        arm.licence(),
+                        arm.companions(),
+                        arm.capabilities(),
+                        arm.advisories(),
+                        arm.minimumHostRequirements(),
+                        arm.minimumCometGuiVersion());
+        List<ArtefactRecord> records = new ArrayList<>(shipped.artefacts());
+        records.add(intel);
+        return new ArtefactManifest(shipped.schemaVersion(), records);
     }
 
     private static ManifestAlternatives alternatives(HostRuntimeVersions versions)

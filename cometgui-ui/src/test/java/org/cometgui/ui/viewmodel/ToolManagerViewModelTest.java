@@ -33,13 +33,17 @@ import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
 import org.cometgui.domain.tools.InstallProgressListener;
+import org.cometgui.domain.tools.NoManagedBuild;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
+import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.ui.testing.Editors;
 import org.cometgui.ui.testing.Nulls;
 import org.cometgui.ui.testing.ScriptedToolManager;
 import org.cometgui.ui.testing.ToolOffers;
+import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -68,7 +72,10 @@ class ToolManagerViewModelTest {
     void aFreshToolManagerHasReadNothing() {
         ToolManagerViewModel viewModel =
                 new ToolManagerViewModel(
-                        new ScriptedToolManager(ToolOffers.percolatorAvailable()), Runnable::run);
+                        new ScriptedToolManager(ToolOffers.percolatorAvailable()),
+                        Runnable::run,
+                        Runnable::run,
+                        new Editors.ScriptedChooser());
 
         assertAll(
                 () -> assertEquals(List.of(), viewModel.rows()),
@@ -119,8 +126,8 @@ class ToolManagerViewModelTest {
                         assertEquals(
                                 List.of("comet-2026_02_2-1", "comet-2026_02_2-2"),
                                 keysOf(viewModel),
-                                "on Apple silicon Comet 2026.02.2 is two published builds and both"
-                                        + " are offered; a key built from the tool and the version"
+                                "a release published as two builds for one host is two offers;"
+                                        + " a key built from the tool and the version"
                                         + " alone would name both rows with one string"),
                 () -> assertNotEquals(viewModel.rows().get(0).key(), viewModel.rows().get(1).key()),
                 () -> assertEquals("2 tool builds on this host.", viewModel.summary()));
@@ -338,14 +345,37 @@ class ToolManagerViewModelTest {
                                 NullPointerException.class,
                                 () ->
                                         new ToolManagerViewModel(
-                                                Nulls.of(ToolManager.class), Runnable::run)),
+                                                Nulls.of(ToolManager.class),
+                                                Runnable::run,
+                                                Runnable::run,
+                                                new Editors.ScriptedChooser())),
                 () ->
                         assertThrows(
                                 NullPointerException.class,
                                 () ->
                                         new ToolManagerViewModel(
                                                 new ScriptedToolManager(),
-                                                Nulls.of(Executor.class))),
+                                                Nulls.of(Executor.class),
+                                                Runnable::run,
+                                                new Editors.ScriptedChooser())),
+                () ->
+                        assertThrows(
+                                NullPointerException.class,
+                                () ->
+                                        new ToolManagerViewModel(
+                                                new ScriptedToolManager(),
+                                                Runnable::run,
+                                                Nulls.of(Executor.class),
+                                                new Editors.ScriptedChooser())),
+                () ->
+                        assertThrows(
+                                NullPointerException.class,
+                                () ->
+                                        new ToolManagerViewModel(
+                                                new ScriptedToolManager(),
+                                                Runnable::run,
+                                                Runnable::run,
+                                                Nulls.of(FileChooserPort.class))),
                 () ->
                         assertThrows(
                                 NullPointerException.class,
@@ -365,7 +395,8 @@ class ToolManagerViewModelTest {
     }
 
     private static ToolManagerViewModel over(ToolManager tools) {
-        return new ToolManagerViewModel(tools, Runnable::run);
+        return new ToolManagerViewModel(
+                tools, Runnable::run, Runnable::run, new Editors.ScriptedChooser());
     }
 
     private static ScriptedToolManager manager() {
@@ -412,13 +443,19 @@ class ToolManagerViewModelTest {
         }
 
         @Override
+        public List<NoManagedBuild> noManagedBuild() {
+            return delegate.noManagedBuild();
+        }
+
+        @Override
         public InstallHandle install(
                 ToolName tool, ToolVersion version, InstallProgressListener listener) {
             return delegate.install(tool, version, listener);
         }
 
         @Override
-        public ToolOffer registerLocalBinary(ToolName tool, Path executable) {
+        public ToolOffer registerLocalBinary(ToolName tool, Path executable)
+                throws ToolRegistrationException {
             return delegate.registerLocalBinary(tool, executable);
         }
 

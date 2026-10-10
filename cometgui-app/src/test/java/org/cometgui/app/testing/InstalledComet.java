@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallProgressListener;
+import org.cometgui.domain.tools.NoManagedBuild;
 import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
@@ -151,6 +152,16 @@ public final class InstalledComet implements ToolManager {
         synchronized (askedOn) {
             return List.copyOf(askedOn);
         }
+    }
+
+    /**
+     * Nothing is reported missing: the offers this double answers with are written by the test.
+     *
+     * @return an empty list
+     */
+    @Override
+    public List<NoManagedBuild> noManagedBuild() {
+        return List.of();
     }
 
     @Override

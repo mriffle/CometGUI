@@ -143,6 +143,12 @@ public final class UiIds {
     /** The container holding one row per tool build the port offered. */
     public static final String TOOL_MANAGER_ROWS = "tool-manager-rows";
 
+    /**
+     * The container holding one explanation per tool of which no managed build exists for this
+     * computer ({@code D-011}), above the rows; hidden when there are none.
+     */
+    public static final String TOOL_MANAGER_NO_MANAGED_BUILD = "tool-manager-no-managed-build";
+
     /** The Comet parameter editor's root, in the Comet Parameters section. */
     public static final String PARAM_EDITOR = "param-editor";
 
@@ -875,18 +881,65 @@ public final class UiIds {
     }
 
     /*
-     * ONE TOOL BUILD IS ONE ROW, AND A ROW IS NOT NAMED AFTER ITS TOOL AND VERSION.  On Apple
-     * silicon Comet 2026.02.2 is two published builds and org.cometgui.domain.tools.ToolManager
-     * offers both, so an identifier built from the tool and the version alone would name two
-     * controls with one string and Scene.lookup would return whichever it reached first.  The key
-     * these methods take is therefore produced by the view-model, which is the one place that can
-     * see the whole offered list and can tell the second row of a release from the first.
+     * ONE TOOL BUILD IS ONE ROW, AND A ROW IS NOT NAMED AFTER ITS TOOL AND VERSION.  A release
+     * published as two builds for one host, or a registered binary reporting a version the
+     * manifest also names, is two offers of one tool and version, so an identifier built from the
+     * tool and the version alone would name two controls with one string and Scene.lookup would
+     * return whichever it reached first.  The key these methods take is therefore produced by the
+     * view-model, which is the one place that can see the whole offered list and can tell the
+     * second row of a release from the first.
      *
      * The key's shape is checked here rather than trusted, because these identifiers are looked up
      * as CSS selectors: a dot in a key would be read as a style class and the lookup would
      * silently find nothing, which is exactly the shape of failure this project's pinned
      * identifiers exist to stop.
      */
+
+    /**
+     * The identifier of one tool's "no managed build here" explanation ({@code D-011}).
+     *
+     * @param toolId the tool's identifier, for example {@code comet}
+     * @return {@code "no-managed-build-"} followed by the tool identifier
+     * @throws NullPointerException if {@code toolId} is {@code null}
+     * @throws IllegalArgumentException if the identifier is not of the tool-row key shape
+     */
+    public static String noManagedBuild(String toolId) {
+        Objects.requireNonNull(toolId, "toolId");
+        if (!isToolRowKey(toolId)) {
+            throw new IllegalArgumentException("not a usable tool identifier: \"" + toolId + "\"");
+        }
+        return "no-managed-build-" + toolId;
+    }
+
+    /**
+     * The identifier of the sentence explaining why a tool has no managed build here.
+     *
+     * @param toolId the tool's identifier
+     * @return the explanation identifier with {@code "-text"} appended
+     */
+    public static String noManagedBuildText(String toolId) {
+        return noManagedBuild(toolId) + "-text";
+    }
+
+    /**
+     * The identifier of the action registering the user's own binary of that tool.
+     *
+     * @param toolId the tool's identifier
+     * @return the explanation identifier with {@code "-register"} appended
+     */
+    public static String noManagedBuildRegister(String toolId) {
+        return noManagedBuild(toolId) + "-register";
+    }
+
+    /**
+     * The identifier of the sentence saying what the last registration did.
+     *
+     * @param toolId the tool's identifier
+     * @return the explanation identifier with {@code "-status"} appended
+     */
+    public static String noManagedBuildStatus(String toolId) {
+        return noManagedBuild(toolId) + "-status";
+    }
 
     /**
      * The identifier of one tool build's row.

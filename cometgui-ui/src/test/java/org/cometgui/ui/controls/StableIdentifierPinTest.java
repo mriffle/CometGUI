@@ -171,8 +171,13 @@ class StableIdentifierPinTest {
      * learned feature weights' title, description, status and table); each results column's
      * visibility switch (9) and sorting heading (9); the weights table's six non-split headings
      * (6); and two split headings built from a position (2).
+     *
+     * <p>Raised from 493 to 498 by the D-011 repair of 2026-10-10, which made the Tool Manager say
+     * plainly when no managed build of a tool exists for the computer and offer the user's own: 1
+     * constant (the container of those explanations) and the four identifiers one explanation
+     * carries (its box, its sentence, its register action and its status).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 493;
+    private static final int PINNED_IDENTIFIER_COUNT = 498;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -206,6 +211,7 @@ class StableIdentifierPinTest {
                     Map.entry("TOOL_MANAGER_PANE", "tool-manager-pane"),
                     Map.entry("TOOL_MANAGER_SUMMARY", "tool-manager-summary"),
                     Map.entry("TOOL_MANAGER_ROWS", "tool-manager-rows"),
+                    Map.entry("TOOL_MANAGER_NO_MANAGED_BUILD", "tool-manager-no-managed-build"),
                     Map.entry("PARAM_EDITOR", "param-editor"),
                     Map.entry("PARAM_RELEASE", "param-release"),
                     Map.entry("PARAM_RELEASE_STATUS", "param-release-status"),
@@ -820,6 +826,10 @@ class StableIdentifierPinTest {
                     "toolRowProgress",
                     "toolRowInstall",
                     "toolRowCancel",
+                    "noManagedBuild",
+                    "noManagedBuildText",
+                    "noManagedBuildRegister",
+                    "noManagedBuildStatus",
                     "parameterControl",
                     "parameterLabel",
                     "parameterReset",
@@ -907,6 +917,17 @@ class StableIdentifierPinTest {
                     Map.entry("toolRowProgress", "tool-row-percolator-3_07_1-1-progress"),
                     Map.entry("toolRowInstall", "tool-row-percolator-3_07_1-1-install"),
                     Map.entry("toolRowCancel", "tool-row-percolator-3_07_1-1-cancel"));
+
+    /**
+     * Every identifier one "no managed build here" explanation carries ({@code D-011}), for Comet,
+     * by the {@link UiIds} method that produces it. Typed out in full, as {@link #TOOL_ROW} is.
+     */
+    private static final Map<String, String> NO_MANAGED_BUILD =
+            Map.ofEntries(
+                    Map.entry("noManagedBuild", "no-managed-build-comet"),
+                    Map.entry("noManagedBuildText", "no-managed-build-comet-text"),
+                    Map.entry("noManagedBuildRegister", "no-managed-build-comet-register"),
+                    Map.entry("noManagedBuildStatus", "no-managed-build-comet-status"));
 
     /** Each section's pane, as {@code UiIds.sectionPane} must spell it. */
     private static final Map<SectionId, String> SECTION_PANE =
@@ -1230,6 +1251,38 @@ class StableIdentifierPinTest {
                     method.invoke(null, PINNED_TOOL_ROW_KEY),
                     "UiIds." + method.getName() + "(\"" + PINNED_TOOL_ROW_KEY + "\")");
         }
+    }
+
+    @Test
+    @DisplayName(
+            "every identifier a no-managed-build explanation carries has its pinned spelling, and"
+                    + " a new one fails until it is pinned")
+    void noManagedBuildIdentifiersAreExactlyTheseLiterals() throws ReflectiveOperationException {
+        Set<String> declared = new TreeSet<>();
+        for (Method method : UiIds.class.getDeclaredMethods()) {
+            if (!method.isSynthetic()
+                    && method.getName().startsWith("noManagedBuild")
+                    && Modifier.isPublic(method.getModifiers())
+                    && Modifier.isStatic(method.getModifiers())) {
+                declared.add(method.getName());
+                String pinned = NO_MANAGED_BUILD.get(method.getName());
+                assertTrue(
+                        pinned != null,
+                        () ->
+                                "UiIds."
+                                        + method.getName()
+                                        + " is not pinned. "
+                                        + adviceFor("UiIds." + method.getName()));
+                assertPinned(
+                        pinned,
+                        method.invoke(null, "comet"),
+                        "UiIds." + method.getName() + "(\"comet\")");
+            }
+        }
+        assertEquals(
+                NO_MANAGED_BUILD.keySet(),
+                declared,
+                "the pinned table and the methods UiIds declares must name the same methods");
     }
 
     @Test
@@ -1616,6 +1669,9 @@ class StableIdentifierPinTest {
         addListPins(pins, "branch row of stage ", STAGE_BRANCH);
         for (Map.Entry<String, String> rowIdentifier : TOOL_ROW.entrySet()) {
             pins.add(new Pin("UiIds." + rowIdentifier.getKey(), rowIdentifier.getValue()));
+        }
+        for (Map.Entry<String, String> gapIdentifier : NO_MANAGED_BUILD.entrySet()) {
+            pins.add(new Pin("UiIds." + gapIdentifier.getKey(), gapIdentifier.getValue()));
         }
         for (Map.Entry<ValueKind, List<String>> kind : PARAMETER_OF_EACH_KIND.entrySet()) {
             for (String id : kind.getValue().subList(1, 3)) {

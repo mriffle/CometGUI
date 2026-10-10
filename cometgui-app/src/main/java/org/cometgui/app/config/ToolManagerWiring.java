@@ -246,9 +246,11 @@ public final class ToolManagerWiring {
     /**
      * The tools a binary already on the machine can be registered for.
      *
-     * <p>Percolator alone, because the specification's <em>Percolator installation modes</em> is
-     * the only place the product offers it -- it is the documented remedy wherever no managed
-     * XML-capable build exists for a platform. Comet, PDV and the converter are installed from the
+     * <p>Percolator and Comet. Percolator because the specification's <em>Percolator installation
+     * modes</em> makes it the documented remedy wherever no managed XML-capable build exists for a
+     * platform; Comet because {@code D-011} (decided 2026-10-08) makes it the remedy where no
+     * managed Comet exists at all -- upstream has never published an x86-64 macOS Comet, so an
+     * Intel Mac registers one the user built. PDV and the converter are installed from the
      * manifest, where their checksums are pinned, and {@link ManagedToolManager} refuses a tool it
      * has no registrar for rather than pretending to probe one.
      *
@@ -263,7 +265,12 @@ public final class ToolManagerWiring {
         LocalPercolatorRegistration percolator =
                 new LocalPercolatorRegistration(
                         runner, new PercolatorCapabilityProbe(runner), hashes, host);
-        return Map.of(ToolName.PERCOLATOR, executable -> percolator.register(executable).offer());
+        LocalCometRegistration comet = new LocalCometRegistration(runner, hashes, host);
+        return Map.of(
+                ToolName.PERCOLATOR,
+                executable -> percolator.register(executable).offer(),
+                ToolName.COMET,
+                comet::register);
     }
 
     /**

@@ -31,6 +31,7 @@ import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.ui.testing.Editors;
 import org.cometgui.ui.testing.FxToolkit;
 import org.cometgui.ui.testing.ScriptedToolManager;
 import org.cometgui.ui.testing.ToolOffers;
@@ -136,7 +137,9 @@ class ProgressReachesTheInterfaceThreadTest {
     @DisplayName("a mid-install report reaches the row's property on the interface thread")
     void aMidInstallReportReachesThePropertyOnTheInterfaceThread() throws InterruptedException {
         ScriptedToolManager manager = new ScriptedToolManager(ToolOffers.percolatorAvailable());
-        ToolManagerViewModel viewModel = new ToolManagerViewModel(manager, Platform::runLater);
+        ToolManagerViewModel viewModel =
+                new ToolManagerViewModel(
+                        manager, Platform::runLater, Runnable::run, new Editors.ScriptedChooser());
         showInALiveScene(viewModel);
         ToolRowViewModel row = viewModel.rows().get(0);
         ArrivedOn arrived = new ArrivedOn();
@@ -156,7 +159,9 @@ class ProgressReachesTheInterfaceThreadTest {
     @DisplayName("a terminal report rebuilds the row list on the interface thread")
     void aTerminalReportRebuildsTheRowListOnTheInterfaceThread() throws InterruptedException {
         ScriptedToolManager manager = new ScriptedToolManager(ToolOffers.percolatorAvailable());
-        ToolManagerViewModel viewModel = new ToolManagerViewModel(manager, Platform::runLater);
+        ToolManagerViewModel viewModel =
+                new ToolManagerViewModel(
+                        manager, Platform::runLater, Runnable::run, new Editors.ScriptedChooser());
         showInALiveScene(viewModel);
         /*
          * The view this test listens on is HELD, here, until the last assertion. rows() builds a

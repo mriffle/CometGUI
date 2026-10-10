@@ -232,6 +232,7 @@ final class ToolManagerHarness {
         private RecordedLoadability loadability = new RecordedLoadability();
         private Map<ToolName, LocalBinaryRegistrar> registrars = Map.of();
         private Executor installs = new BackgroundInstalls();
+        private ArtefactManifest manifest;
 
         private Builder(Path root) {
             this.root = root;
@@ -279,6 +280,17 @@ final class ToolManagerHarness {
             return this;
         }
 
+        /**
+         * A manifest other than the shipped one, for a rule the shipped data cannot reach.
+         *
+         * @param artefacts the manifest
+         * @return this builder
+         */
+        Builder over(ArtefactManifest artefacts) {
+            this.manifest = artefacts;
+            return this;
+        }
+
         Builder installingOn(Executor executor) {
             this.installs = executor;
             return this;
@@ -287,7 +299,7 @@ final class ToolManagerHarness {
         ToolManagerHarness build() throws IOException {
             return new ToolManagerHarness(
                     root,
-                    ToolManagerFixtures.shippedManifest(),
+                    manifest == null ? ToolManagerFixtures.shippedManifest() : manifest,
                     host,
                     versions,
                     fetcher,
