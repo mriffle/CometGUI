@@ -165,6 +165,66 @@ P11-10 -- forbidden, always
     to the orchestrator **at once** (escalated the same day, ``D-013``
     precedent).
 
+P11-11 -- the spectrum route is MGF (from unit 1)
+    PDV receives an MGF re-encoding of each source spectrum file and the
+    mzTab carries the standard ``ms_run[n]:index=<0-based MGF ordinal>``.
+    The subset-mzML route works only with ``ms_run[n]:scan=<1-based
+    position>`` -- a reference that states a false scan number -- and is
+    **rejected**. The MGF carries peaks at full, round-trip-exact precision
+    (Phase 00's converter rounds; it is not reused) and each entry's
+    ``TITLE`` is the mzML native id, so the drawn spectrum names itself.
+
+P11-12 -- every PSM selectable (from unit 1; the orchestrator's call, flagged to tier 1)
+    PDV keeps only the first mzTab row per exact ``spectra_ref``
+    (``MztabImport.java:425``, ``putIfAbsent``): on ``_3``, 1404 of 2130
+    target PSMs share a spectrum with an earlier row and could never be
+    selected, which fails ``R-PDV-02`` ("any PSM"). Resolution: the PDV MGF
+    holds **one entry per mzTab PSM row**, each an exact copy of the
+    producing spectrum's peaks and native-id title, so every row has its own
+    ``spectra_ref`` and every reference still resolves to the spectrum that
+    produced its PSM. Unit 2 must prove by execution that PDV draws the
+    right spectrum for PSMs that share one (duplicate titles included); if
+    PDV cannot, the unit stops and the phase escalates.
+
+P11-13 -- joining Percolator to pepXML (from unit 1)
+    ``PSMId``'s rank is the hit's **1-based position** in its
+    ``spectrum_query``, not ``hit_rank`` (tied hits share a ``hit_rank``;
+    they differ for 81 ``_3`` and 99 ``_4`` PSMs). Join on (``-N`` base,
+    scan, charge, position) and then verify the Percolator peptide against
+    the hit; a mismatch fails the export naming the PSM.
+
+P11-14 -- accessions come from Percolator (from unit 1)
+    The results model shows Percolator's ``proteinIds``; the mzTab
+    ``accession`` transcribes them. The pepXML drops ``DECOY_`` on
+    alternative proteins where the PIN and Percolator keep it (31 ``_3``,
+    12 ``_4`` PSMs) -- a documented divergence, not something to reconcile.
+
+P11-15 -- the mzTab shape PDV requires (from unit 1)
+    ``MTD`` lines, one ``PSH``, ``PSM`` lines; no blank or comment lines and
+    no empty field (``null``). ``spectra_ref``, ``sequence``, ``charge``
+    required. Modifications as bracketed signed masses transcribed from the
+    pepXML text in an ``opt_`` ProForma column, fixed modifications written
+    explicitly (PDV applies none); no C-terminal form exists, so a
+    C-terminal modification fails the export by name. ``calc_mass_to_charge``
+    omitted (``null`` there kills the import). ``ms_run[n]-location`` is the
+    last ``ms_run[n]-*`` line and names the MGF passed to ``--spectrum``.
+
+P11-16 -- asserting what PDV shows (from unit 1; flagged to tier 1)
+    No endpoint reports the displayed spectrum: ``/select`` answers ``200
+    selected`` once the row is found and a redraw queued, ``404 unknown
+    ref``, ``400 missing ref``, ``503`` before ready; ``/shutdown`` stops
+    only the control server, **not PDV** (lifecycle must also end the
+    process). Gate item 5 is asserted through the control API (known 200,
+    unknown 404, under a timeout) **and** a test-side observer that runs
+    PDV's unmodified main class in the test JVM and reads which spectrum it
+    drew by reflection -- no screen coordinates.
+
+P11-17 -- PDV writes beside its inputs (from unit 1)
+    ``<mztab>.db`` beside the mzTab, ``.mgf.cui`` beside each MGF, and files
+    under ``~/.compomics`` and ``~/.java``. The mzTab and MGFs therefore live
+    in a run-owned PDV directory, never beside the source spectra; tests
+    give PDV a temporary ``HOME``.
+
 Work units
 ==========
 
@@ -279,7 +339,31 @@ Unit sign-offs
 Unit 1 sign-off
 ---------------
 
-*Pending.*
+**Accepted 2026-10-10 with conditions, which became P11-11..P11-17.**
+Commit ``2da544c`` (``scripts/spikes/pdv_mztab_spike.py``,
+``scripts/spikes/pdv_mztab_spike/PdvObserver.java``,
+``docs/developer/pdv_mztab_spike.rst``, one toctree line). No product code.
+
+* **Diff read.** Four files; nothing under ``cometgui-*``; no gate script,
+  POM or record touched. K562 outputs only under ``scratch/pdv-mztab-spike/``.
+* **Re-run by me**, the agent's output directory moved aside first:
+  ``python3 scripts/spikes/pdv_mztab_spike.py`` -> ``all 289 checks passed
+  across 11 experiments``, exit 0, 5 min 19 s; afterwards ``pgrep`` found no
+  PDV or Xvfb left running. Seen in the log: honest native-id refs on the
+  subset mzML answer ``200 selected`` and draw nothing (``No spectrum to
+  display ... _cus_706``); a shared-spectrum PSM shows the first row's PSM
+  instead of its own; unknown ref 404; R11 joined all 2130 ``_3`` target
+  PSMs and drew rows 0 and 1106 correctly over MGF index refs; no
+  non-loopback socket.
+* **Source claims checked by me** in ``scratch/pdv-src`` (PDV ``v2.7.0``):
+  ``MztabImport.java`` 270-280 splits on ``:index=`` for MGF and on
+  ``:.*scan=`` for mzML; line 425 is the ``putIfAbsent`` on the verbatim
+  ``spectra_ref``.
+* **Analytics:** none reachable from PDV's code; a Google Analytics sender
+  ships unused in ``lib/utilities-4.11.14.jar`` (no PDV class references
+  it). Recorded for the handoff; nothing to escalate as a behaviour.
+* ``docs`` and ``traceability`` run by the agent; ``docs-build.sh`` re-run by
+  me with this entry.
 
 Rejections and rework
 =====================
