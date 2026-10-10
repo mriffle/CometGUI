@@ -93,7 +93,24 @@ public enum ProvenanceEventType {
      * it normally follows {@link #RUN_FINISHED}, because an export is made from a finished run;
      * neither the log nor its reader imposes an order between types.
      */
-    EXPORT_WRITTEN("export.written");
+    EXPORT_WRITTEN("export.written"),
+
+    /**
+     * PDV was launched from a run: written <em>before</em> the process is started, so that a launch
+     * that then fails -- PDV refuses its input, exits non-zero, never starts at all -- still leaves
+     * its record.
+     *
+     * <p>Added by phase 11 (<em>Managed installation</em>: "Its JAR checksum and reported version
+     * shall appear in provenance whenever PDV is launched from a run"; <em>Application
+     * provenance</em>: "PDV launch and version when used"). The payload names the JAR, its MD5 and
+     * SHA-256, the version its own manifest reports, the kind of launch, the argument array after
+     * redaction and what the launch was for; the keys are pinned by {@code
+     * org.cometgui.workflow.pdv}, the one path through which every PDV process is started. Like
+     * {@link #EXPORT_WRITTEN} it normally follows {@link #RUN_FINISHED}, because the run's sealed
+     * record is {@code provenance.json} and what happens to a finished run is appended to its event
+     * log.
+     */
+    PDV_LAUNCHED("pdv.launched");
 
     private final String wireName;
 
@@ -138,6 +155,6 @@ public enum ProvenanceEventType {
                         + wire
                         + "\"; expected one of [run.started, stage.started, stage.finished,"
                         + " tool.invoked, file.hashed, warning.raised, run.finished,"
-                        + " export.written]");
+                        + " export.written, pdv.launched]");
     }
 }

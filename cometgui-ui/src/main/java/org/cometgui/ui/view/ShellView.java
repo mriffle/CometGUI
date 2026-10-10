@@ -41,6 +41,7 @@ import org.cometgui.ui.controls.derived.ConsolePane;
 import org.cometgui.ui.controls.params.RunControl;
 import org.cometgui.ui.controls.percolator.PercolatorPane;
 import org.cometgui.ui.controls.results.ResultsPane;
+import org.cometgui.ui.controls.visualisation.VisualisationPane;
 import org.cometgui.ui.view.params.CometParametersView;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
@@ -62,6 +63,7 @@ import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
 import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
 import org.cometgui.ui.viewmodel.results.ResultsViewModel;
 import org.cometgui.ui.viewmodel.results.WeightsViewModel;
+import org.cometgui.ui.viewmodel.visualisation.VisualisationViewModel;
 
 /**
  * The application shell: a header, a left navigation over every section, and a content area holding
@@ -166,6 +168,8 @@ public final class ShellView extends BorderPane {
      * @param weights the Results section's learned feature weights
      * @param displayFilters the interface's one display-filter state, which {@code percolator}
      *     shows too
+     * @param visualisation the Visualisation section: PDV's state and drawing the PSM selected in
+     *     {@code resultTable}
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
@@ -186,7 +190,8 @@ public final class ShellView extends BorderPane {
             ResultsViewModel results,
             ResultTableViewModel resultTable,
             WeightsViewModel weights,
-            DisplayFiltersViewModel displayFilters) {
+            DisplayFiltersViewModel displayFilters,
+            VisualisationViewModel visualisation) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
@@ -262,6 +267,17 @@ public final class ShellView extends BorderPane {
                         Objects.requireNonNull(displayFilters, "displayFilters"));
         panes.get(SectionId.RESULTS).addContent(resultsPane);
         VBox.setVgrow(resultsPane, Priority.ALWAYS);
+
+        /*
+         * The Visualisation section (phase 11): PDV's state and drawing the PSM selected in the
+         * Results section above -- that section's selection, not one of its own. The pane reads
+         * nothing on construction; VisualisationViewModel.refresh() asks the port, and the
+         * composition root calls it.
+         */
+        VisualisationPane visualisationPane =
+                new VisualisationPane(Objects.requireNonNull(visualisation, "visualisation"));
+        panes.get(SectionId.VISUALISATION).addContent(visualisationPane);
+        VBox.setVgrow(visualisationPane, Priority.ALWAYS);
 
         ToolManagerPane toolManagerPane = new ToolManagerPane(toolManager);
         panes.get(SectionId.TOOL_MANAGER).addContent(toolManagerPane);

@@ -89,8 +89,8 @@ class ViewModelIndependenceTest {
 
     @Test
     @DisplayName(
-            "the scan reads the package's classes and those of its params, percolator and"
-                    + " results subpackages")
+            "the scan reads the package's classes and those of its params, percolator, results"
+                    + " and visualisation subpackages")
     void theScanIsNotVacuous() {
         Map<String, String> sources = ViewModelSources.all();
         assertEquals(
@@ -188,7 +188,10 @@ class ViewModelIndependenceTest {
                         "results/WeightsRowView.java",
                         "results/WeightsSort.java",
                         "results/WeightsViewModel.java",
-                        "results/package-info.java"),
+                        "results/package-info.java",
+                        "visualisation/VisualisationPort.java",
+                        "visualisation/VisualisationViewModel.java",
+                        "visualisation/package-info.java"),
                 List.copyOf(sources.keySet()),
                 "a source scan that read the wrong or an empty directory, or stopped at the top"
                         + " directory, would pass over anything");
@@ -200,6 +203,8 @@ class ViewModelIndependenceTest {
                 expected = "package org.cometgui.ui.viewmodel.percolator;";
             } else if (source.getKey().startsWith("results/")) {
                 expected = "package org.cometgui.ui.viewmodel.results;";
+            } else if (source.getKey().startsWith("visualisation/")) {
+                expected = "package org.cometgui.ui.viewmodel.visualisation;";
             } else {
                 expected = "package org.cometgui.ui.viewmodel;";
             }

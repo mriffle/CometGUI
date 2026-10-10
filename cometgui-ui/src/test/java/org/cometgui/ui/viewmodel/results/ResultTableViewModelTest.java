@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.cometgui.results.filtering.FilterCounts;
 import org.cometgui.results.filtering.store.Category;
 import org.cometgui.results.filtering.store.ResultQuery;
@@ -719,6 +720,49 @@ class ResultTableViewModelTest {
             table.sortBy(ResultsColumn.PSM_ID);
             settle();
             assertTrue(table.selectionStatusProperty().get().startsWith("1 row is selected: row "));
+        }
+
+        @Test
+        @DisplayName(
+                "the anchor's row as it was shown when selected: kept off its page, moved on"
+                        + " deselection, emptied by clearing and by another table")
+        void anchorRow() throws IOException {
+            table.show(store(numbered(950), TableKind.TARGET_PSMS), Map.of());
+            settle();
+            table.setCategory(Category.ALL);
+            settle();
+            assertEquals(Optional.empty(), table.anchorRowProperty().get());
+            table.select(new RowKey(2));
+            assertEquals("/r/outputs/comet/run_A_1_2_1", anchorPsm());
+            assertEquals("K.PEP1K.R", table.anchorRowProperty().get().orElseThrow().peptide());
+            table.nextPage();
+            settle();
+            assertEquals(
+                    "/r/outputs/comet/run_A_1_2_1",
+                    anchorPsm(),
+                    "the anchor is known while another page is shown");
+            table.toggle(new RowKey(300));
+            assertEquals("/r/outputs/comet/run_A_299_2_1", anchorPsm());
+            table.toggle(new RowKey(300));
+            assertEquals(
+                    "/r/outputs/comet/run_A_1_2_1",
+                    anchorPsm(),
+                    "deselecting the anchor makes the remaining row the anchor, as first shown");
+            table.select(new RowKey(301));
+            assertEquals("/r/outputs/comet/run_A_300_2_1", anchorPsm());
+            table.clearSelection();
+            assertEquals(Optional.empty(), table.anchorRowProperty().get());
+            table.select(new RowKey(301));
+            table.show(store(numbered(5), TableKind.TARGET_PSMS), Map.of());
+            settle();
+            assertEquals(Optional.empty(), table.anchorRowProperty().get(), "another table");
+            table.select(new RowKey(2));
+            table.clear();
+            assertEquals(Optional.empty(), table.anchorRowProperty().get(), "no table");
+        }
+
+        private String anchorPsm() {
+            return table.anchorRowProperty().get().orElseThrow().psmId();
         }
     }
 

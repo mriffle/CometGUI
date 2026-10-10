@@ -67,6 +67,7 @@ import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
 import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
 import org.cometgui.ui.viewmodel.results.ResultsViewModel;
 import org.cometgui.ui.viewmodel.results.WeightsViewModel;
+import org.cometgui.ui.viewmodel.visualisation.VisualisationViewModel;
 
 /**
  * The running application: build the composition root, check the host, build the shell, show the
@@ -390,6 +391,30 @@ public final class CometGuiApplication extends Application {
                         resultThread,
                         Platform::runLater);
 
+        /*
+         * The Visualisation section (phase 11): PDV's state and its install through the one Tool
+         * Manager, and drawing the PSM selected in the Results section -- the Results table's own
+         * selection -- through the one recording launch path, over the one process service and
+         * the one hasher. The port is called on the Run section's daemon threads, never this one;
+         * an install it starts runs on the Tool Manager's own threads, and when it ends the Tool
+         * Manager's rows are read again.
+         */
+        VisualisationViewModel visualisation =
+                new VisualisationViewModel(
+                        RunWiring.visualisation(
+                                services,
+                                project,
+                                hashes,
+                                engine,
+                                tools,
+                                toolsUnavailable,
+                                runSetup.pdvDisplay()),
+                        results,
+                        resultTable,
+                        runThreads,
+                        Platform::runLater,
+                        toolManager::refresh);
+
         ShellView shell =
                 new ShellView(
                         new NavigationViewModel(),
@@ -409,7 +434,8 @@ public final class CometGuiApplication extends Application {
                         results,
                         resultTable,
                         weights,
-                        displayFilters);
+                        displayFilters,
+                        visualisation);
 
         /*
          * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds
@@ -435,6 +461,7 @@ public final class CometGuiApplication extends Application {
                                 change -> {
                                     run.recheck();
                                     percolator.refresh();
+                                    visualisation.refresh();
                                 });
         run.runningProperty()
                 .addListener(
@@ -456,6 +483,7 @@ public final class CometGuiApplication extends Application {
         run.recheck();
         percolatorRerun.refresh();
         results.refresh();
+        visualisation.refresh();
 
         primaryStage.setTitle(WINDOW_TITLE);
         primaryStage.setScene(new Scene(shell, INITIAL_WIDTH, INITIAL_HEIGHT));

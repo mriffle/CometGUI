@@ -106,7 +106,13 @@ final class SectionArrivals {
                         + " weights.");
         notes.put(
                 SectionId.VISUALISATION,
-                "This section arrives in phase 11 (PDV Integration and mzTab Export).");
+                "This section is being filled by phase 11 (PDV Integration and mzTab Export)."
+                        + " Live: PDV's state, its install on first use -- through the Tool"
+                        + " Manager, with its progress and a Cancel control, never holding up a"
+                        + " search -- and drawing the annotated spectrum of the PSM selected in the"
+                        + " Results section with PDV, each launch recorded in the run's provenance"
+                        + " event log with PDV's version and checksum. Not yet live: Open run in"
+                        + " PDV, the PDV window that follows the Results selection.");
         notes.put(
                 SectionId.LIMELIGHT,
                 "This section arrives in phase 12 (Limelight Conversion and Upload).");

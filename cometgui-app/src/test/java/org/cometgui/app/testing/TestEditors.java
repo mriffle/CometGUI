@@ -29,6 +29,9 @@ import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.config.SessionEngine;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.run.RunId;
+import org.cometgui.domain.tools.InstallHandle;
+import org.cometgui.domain.tools.InstallProgressListener;
+import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.results.export.TableExport;
 import org.cometgui.results.export.WeightsExport;
@@ -64,6 +67,10 @@ import org.cometgui.ui.viewmodel.results.ResultsPort;
 import org.cometgui.ui.viewmodel.results.ResultsRun;
 import org.cometgui.ui.viewmodel.results.ResultsViewModel;
 import org.cometgui.ui.viewmodel.results.WeightsViewModel;
+import org.cometgui.ui.viewmodel.visualisation.VisualisationPort;
+import org.cometgui.ui.viewmodel.visualisation.VisualisationViewModel;
+import org.cometgui.workflow.pdv.DrawnSpectrum;
+import org.cometgui.workflow.pdv.PdvStatus;
 
 /**
  * The shell for a GUI test that builds its own: the Comet parameter editor composed exactly as the
@@ -114,6 +121,9 @@ public final class TestEditors {
         ResultTableViewModel table =
                 new ResultTableViewModel(filters, Runnable::run, Runnable::run);
         WeightsViewModel weights = new WeightsViewModel();
+        ResultsViewModel results =
+                new ResultsViewModel(
+                        new NoResults(), filters, table, weights, Runnable::run, Runnable::run);
         return new ShellView(
                 navigation,
                 hostBaseline,
@@ -139,11 +149,34 @@ public final class TestEditors {
                 percolator,
                 new PercolatorRerunViewModel(
                         engine, percolator.requestProperty(), Runnable::run, Runnable::run),
-                new ResultsViewModel(
-                        new NoResults(), filters, table, weights, Runnable::run, Runnable::run),
+                results,
                 table,
                 weights,
-                filters);
+                filters,
+                new VisualisationViewModel(
+                        new NoPdv(), results, table, Runnable::run, Runnable::run, () -> {}));
+    }
+
+    /** A Visualisation port with no PDV, which says so. */
+    private static final class NoPdv implements VisualisationPort {
+
+        static final String REASON = "No PDV in this shell.";
+
+        @Override
+        public PdvStatus pdv() {
+            return PdvStatus.unavailable(REASON);
+        }
+
+        @Override
+        public InstallHandle install(ToolVersion version, InstallProgressListener listener)
+                throws IOException {
+            throw new IOException(REASON);
+        }
+
+        @Override
+        public DrawnSpectrum draw(ResultsRun run, String psmId) throws IOException {
+            throw new IOException(REASON);
+        }
     }
 
     /** The Results port of a shell built for a test that has no project: no run has results. */

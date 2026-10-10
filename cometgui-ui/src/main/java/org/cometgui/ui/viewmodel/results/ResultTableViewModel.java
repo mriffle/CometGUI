@@ -19,10 +19,12 @@ package org.cometgui.ui.viewmodel.results;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -92,6 +94,10 @@ import org.cometgui.ui.viewmodel.NonNullProperty;
  * the page. Only {@link #select}, {@link #toggle}, {@link #clearSelection()} and showing another
  * table change it.
  *
+ * <p>The anchor's row, as it was shown when it was selected, is published as {@link
+ * #anchorRowProperty()}: the Visualisation section draws the spectrum of exactly that row, so the
+ * PSM it acts on is this one selection and not a second one of its own (phase 11).
+ *
  * <h2>Copy</h2>
  *
  * <p>{@link #copy()} gives the selected rows <em>shown on the current page</em>, in the page's
@@ -145,6 +151,9 @@ public final class ResultTableViewModel {
 
     private RowKey anchor;
 
+    /** Each selected row as the page showed it when it was selected, by key. */
+    private final Map<RowKey, ResultRowView> selectedRows = new LinkedHashMap<>();
+
     /**
      * The anchor's position among the current query's matching rows; {@code HIDDEN} when the query
      * does not match it; {@code UNKNOWN} when it is not known -- the anchor became the anchor by
@@ -176,6 +185,8 @@ public final class ResultTableViewModel {
 
     private final NonNullProperty<List<RowKey>> selected;
 
+    private final NonNullProperty<Optional<ResultRowView>> anchorRow;
+
     private final NonNullProperty<String> selectionStatus;
 
     private final NonNullProperty<String> status;
@@ -204,6 +215,7 @@ public final class ResultTableViewModel {
         columns = new NonNullProperty<>(this, "columns", List.of());
         columnStatus = new NonNullProperty<>(this, "columnStatus", "");
         selected = new NonNullProperty<>(this, "selected", List.of());
+        anchorRow = new NonNullProperty<>(this, "anchorRow", Optional.empty());
         selectionStatus = new NonNullProperty<>(this, "selectionStatus", NOTHING_SELECTED);
         status = new NonNullProperty<>(this, "status", TablePage.NONE.text());
         busy = new ReadOnlyBooleanWrapper(this, "busy", false);
@@ -234,6 +246,7 @@ public final class ResultTableViewModel {
                         0,
                         PAGE_SIZE);
         selection.clear();
+        selectedRows.clear();
         anchor = null;
         anchorPosition = HIDDEN;
         textDraft.set("");
@@ -253,6 +266,7 @@ public final class ResultTableViewModel {
         kind = null;
         query = null;
         selection.clear();
+        selectedRows.clear();
         anchor = null;
         anchorPosition = HIDDEN;
         textDraft.set("");
@@ -397,8 +411,11 @@ public final class ResultTableViewModel {
      */
     public void select(RowKey key) {
         long position = positionOnPage(key);
+        ResultRowView row = rowOnPage(key);
         selection.clear();
+        selectedRows.clear();
         selection.add(key);
+        selectedRows.put(key, row);
         anchor = key;
         anchorPosition = position;
         publishSelection();
@@ -414,6 +431,7 @@ public final class ResultTableViewModel {
     public void toggle(RowKey key) {
         long position = positionOnPage(key);
         if (selection.remove(key)) {
+            selectedRows.remove(key);
             if (key.equals(anchor)) {
                 anchor = null;
                 anchorPosition = HIDDEN;
@@ -426,6 +444,7 @@ public final class ResultTableViewModel {
             }
         } else {
             selection.add(key);
+            selectedRows.put(key, rowOnPage(key));
             anchor = key;
             anchorPosition = position;
         }
@@ -435,6 +454,7 @@ public final class ResultTableViewModel {
     /** Selects nothing. */
     public void clearSelection() {
         selection.clear();
+        selectedRows.clear();
         anchor = null;
         anchorPosition = HIDDEN;
         publishSelection();
@@ -640,6 +660,16 @@ public final class ResultTableViewModel {
     }
 
     /**
+     * The most recently selected row -- the anchor -- as the page showed it when it was selected,
+     * so that it is known whichever page is shown now.
+     *
+     * @return the read-only property; empty when nothing is selected
+     */
+    public ReadOnlyObjectProperty<Optional<ResultRowView>> anchorRowProperty() {
+        return anchorRow.getReadOnlyProperty();
+    }
+
+    /**
      * What is selected and where it is -- including a selected row the filter now hides.
      *
      * @return the read-only property
@@ -782,6 +812,14 @@ public final class ResultTableViewModel {
         return position;
     }
 
+    /** The row of the page shown with that key; {@link #positionOnPage} has found it there. */
+    private ResultRowView rowOnPage(RowKey key) {
+        return page.get().rows().stream()
+                .filter(row -> row.key().equals(key))
+                .findFirst()
+                .orElseThrow();
+    }
+
     private long positionOnPageOrUnknown(RowKey key) {
         TablePage shown = page.get();
         List<ResultRowView> rows = shown.rows();
@@ -811,6 +849,7 @@ public final class ResultTableViewModel {
 
     private void publishSelection() {
         selected.set(List.copyOf(selection));
+        anchorRow.set(anchor == null ? Optional.empty() : Optional.of(selectedRows.get(anchor)));
         selectionStatus.set(selectionText());
     }
 

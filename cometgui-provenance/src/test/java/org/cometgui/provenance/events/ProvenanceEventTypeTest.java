@@ -67,13 +67,14 @@ class ProvenanceEventTypeTest {
                 () -> assertEquals("file.hashed", ProvenanceEventType.FILE_HASHED.wireName()),
                 () -> assertEquals("warning.raised", ProvenanceEventType.WARNING_RAISED.wireName()),
                 () -> assertEquals("run.finished", ProvenanceEventType.RUN_FINISHED.wireName()),
-                () ->
-                        assertEquals(
-                                "export.written", ProvenanceEventType.EXPORT_WRITTEN.wireName()));
+                () -> assertEquals("export.written", ProvenanceEventType.EXPORT_WRITTEN.wireName()),
+                () -> assertEquals("pdv.launched", ProvenanceEventType.PDV_LAUNCHED.wireName()));
     }
 
     @Test
-    @DisplayName("phase 04's seven types and phase 10's export type are the types that exist")
+    @DisplayName(
+            "phase 04's seven types, phase 10's export type and phase 11's PDV launch are the types"
+                    + " that exist")
     void theTypesArePinned() {
         List<String> names = new ArrayList<>();
         for (ProvenanceEventType type : ProvenanceEventType.values()) {
@@ -89,7 +90,8 @@ class ProvenanceEventTypeTest {
                         "FILE_HASHED",
                         "WARNING_RAISED",
                         "RUN_FINISHED",
-                        "EXPORT_WRITTEN"),
+                        "EXPORT_WRITTEN",
+                        "PDV_LAUNCHED"),
                 names);
     }
 
@@ -101,7 +103,7 @@ class ProvenanceEventTypeTest {
             assertTrue(distinct.add(type.wireName()), "two types share the wire name");
         }
 
-        assertEquals(8, distinct.size());
+        assertEquals(9, distinct.size());
     }
 
     @Test
@@ -153,7 +155,11 @@ class ProvenanceEventTypeTest {
                 () ->
                         assertSame(
                                 ProvenanceEventType.EXPORT_WRITTEN,
-                                ProvenanceEventType.fromWireName("export.written")));
+                                ProvenanceEventType.fromWireName("export.written")),
+                () ->
+                        assertSame(
+                                ProvenanceEventType.PDV_LAUNCHED,
+                                ProvenanceEventType.fromWireName("pdv.launched")));
     }
 
     @Test
@@ -185,6 +191,41 @@ class ProvenanceEventTypeTest {
     }
 
     @Test
+    @DisplayName(
+            "a pdv.launched event after run.finished is written and read back intact, a multi-line"
+                    + " value included")
+    void aPdvLaunchFollowsTheRunAndReadsBack(@TempDir Path directory) throws IOException {
+        Path path = directory.resolve("events.log");
+        Clock clock = Clock.fixed(Instant.parse("2026-10-10T12:00:00.250Z"), ZoneOffset.UTC);
+        try (ProvenanceEventLog log =
+                ProvenanceEventLog.openAppend(path, SecretRedactor.patternsOnly(), clock)) {
+            log.append(ProvenanceEventType.RUN_FINISHED, Map.of("status", "completed"));
+            log.append(
+                    ProvenanceEventType.PDV_LAUNCHED,
+                    Map.of(
+                            "pdv.jar.sha256",
+                            "fc876310b6f9dd95bd9538f212e28d45ac0226ea1615a9c09f2e904d70d07908",
+                            "process.environment",
+                            "DISPLAY=:7\nLANG=C.UTF-8"));
+        }
+
+        List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        assertEquals(2, lines.size(), "one line per event, the line break escaped");
+        assertEquals(
+                "{\"seq\":2,\"time\":\"2026-10-10T12:00:00.250Z\",\"type\":\"pdv.launched\","
+                        + "\"payload\":{\"pdv.jar.sha256\":"
+                        + "\"fc876310b6f9dd95bd9538f212e28d45ac0226ea1615a9c09f2e904d70d07908\","
+                        + "\"process.environment\":\"DISPLAY=:7\\nLANG=C.UTF-8\"}}",
+                lines.get(1));
+        RecoveredEventLog recovered = ProvenanceEventLogReader.recover(path);
+        assertTrue(recovered.intact(), () -> "defects: " + recovered.defects());
+        assertSame(ProvenanceEventType.PDV_LAUNCHED, recovered.events().get(1).type());
+        assertEquals(
+                "DISPLAY=:7\nLANG=C.UTF-8",
+                recovered.events().get(1).payload().get("process.environment"));
+    }
+
+    @Test
     @DisplayName("resolution is exact: no case folding, no trimming, no underscores")
     void fromWireNameIsExact() {
         assertAll(
@@ -208,7 +249,8 @@ class ProvenanceEventTypeTest {
         assertEquals(
                 "no provenance event type has the wire name \"run.begun\"; expected one of"
                         + " [run.started, stage.started, stage.finished, tool.invoked,"
-                        + " file.hashed, warning.raised, run.finished, export.written]",
+                        + " file.hashed, warning.raised, run.finished, export.written,"
+                        + " pdv.launched]",
                 rejected.getMessage());
     }
 

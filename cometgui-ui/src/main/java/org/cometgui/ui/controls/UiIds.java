@@ -609,6 +609,39 @@ public final class UiIds {
     /** The learned feature weights table, the source of truth. */
     public static final String WEIGHTS_TABLE = "weights-table";
 
+    /** The Visualisation section's content. */
+    public static final String VISUALISATION_PANE = "visualisation-pane";
+
+    /** PDV's state, or the running install's progress, in words. */
+    public static final String VISUALISATION_PDV_STATUS = "visualisation-pdv-status";
+
+    /** The progress bar of an install the Visualisation section started. */
+    public static final String VISUALISATION_INSTALL_PROGRESS = "visualisation-install-progress";
+
+    /** Cancels the install the Visualisation section started. */
+    public static final String VISUALISATION_INSTALL_CANCEL = "visualisation-install-cancel";
+
+    /** The run open in the Results section. */
+    public static final String VISUALISATION_RUN = "visualisation-run";
+
+    /** The PSM selected in the Results section. */
+    public static final String VISUALISATION_PSM = "visualisation-psm";
+
+    /** Draws the selected PSM's annotated spectrum with PDV, installing PDV first if it is not. */
+    public static final String VISUALISATION_DRAW = "visualisation-draw";
+
+    /** Why the spectrum cannot be drawn now; empty when it can. */
+    public static final String VISUALISATION_DRAW_REFUSAL = "visualisation-draw-refusal";
+
+    /** What the last drawing or install did, or why nothing was drawn. */
+    public static final String VISUALISATION_OUTCOME = "visualisation-outcome";
+
+    /** The last annotated spectrum PDV drew. */
+    public static final String VISUALISATION_FIGURE = "visualisation-figure";
+
+    /** Why the last figure cannot be shown; empty while it is shown or none is drawn. */
+    public static final String VISUALISATION_FIGURE_STATUS = "visualisation-figure-status";
+
     /**
      * The two surfaces a parameter's control appears on. A parameter shown in Essentials is shown
      * in Advanced too, so the surface is part of every parameter identifier and the two controls

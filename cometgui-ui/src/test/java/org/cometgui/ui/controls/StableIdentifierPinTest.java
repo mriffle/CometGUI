@@ -176,8 +176,12 @@ class StableIdentifierPinTest {
      * plainly when no managed build of a tool exists for the computer and offer the user's own: 1
      * constant (the container of those explanations) and the four identifiers one explanation
      * carries (its box, its sentence, its register action and its status).
+     *
+     * <p>Raised from 498 to 509 by phase 11 unit 3, the Visualisation section's first form: 11
+     * constants (its pane, PDV's state, the install's progress bar and Cancel, the run, the PSM,
+     * the draw action, its refusal, the outcome, the figure and the figure's status).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 498;
+    private static final int PINNED_IDENTIFIER_COUNT = 509;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -365,7 +369,18 @@ class StableIdentifierPinTest {
                     Map.entry("WEIGHTS_TITLE", "weights-title"),
                     Map.entry("WEIGHTS_DESCRIPTION", "weights-description"),
                     Map.entry("WEIGHTS_STATUS", "weights-status"),
-                    Map.entry("WEIGHTS_TABLE", "weights-table"));
+                    Map.entry("WEIGHTS_TABLE", "weights-table"),
+                    Map.entry("VISUALISATION_PANE", "visualisation-pane"),
+                    Map.entry("VISUALISATION_PDV_STATUS", "visualisation-pdv-status"),
+                    Map.entry("VISUALISATION_INSTALL_PROGRESS", "visualisation-install-progress"),
+                    Map.entry("VISUALISATION_INSTALL_CANCEL", "visualisation-install-cancel"),
+                    Map.entry("VISUALISATION_RUN", "visualisation-run"),
+                    Map.entry("VISUALISATION_PSM", "visualisation-psm"),
+                    Map.entry("VISUALISATION_DRAW", "visualisation-draw"),
+                    Map.entry("VISUALISATION_DRAW_REFUSAL", "visualisation-draw-refusal"),
+                    Map.entry("VISUALISATION_OUTCOME", "visualisation-outcome"),
+                    Map.entry("VISUALISATION_FIGURE", "visualisation-figure"),
+                    Map.entry("VISUALISATION_FIGURE_STATUS", "visualisation-figure-status"));
 
     // -----------------------------------------------------------------------------------------
     // The parameter editor (Phase 07). A parameter's identifiers are built from its own name, so

@@ -36,6 +36,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.cometgui.domain.ports.DownloadProgressListener;
 import org.cometgui.install.download.ArtefactFetcher;
 import org.cometgui.install.download.DownloadReport;
@@ -93,6 +95,9 @@ public final class LoopbackArtefactServer implements ArtefactFetcher, AutoClosea
     /** What tripping does, set by the test that is cancelling. */
     private volatile Runnable onThreshold = () -> {};
 
+    /** Transfers held still at a byte count until the test releases them, per URL. */
+    private final Map<URI, Hold> holds = new ConcurrentHashMap<>();
+
     /**
      * Starts a server on a free loopback port.
      *
@@ -131,6 +136,102 @@ public final class LoopbackArtefactServer implements ArtefactFetcher, AutoClosea
         cancelAfter.put(manifestUrl, bytes);
         onThreshold = Objects.requireNonNull(action, "action");
         return this;
+    }
+
+    /**
+     * Holds one URL's transfer still once this many bytes have reached the progress listener, until
+     * {@link Hold#release()} -- a transfer throttled to a standstill part way, so that a test can
+     * do something else <em>while it is observably in progress</em> and say so by state rather than
+     * by timing. The transfer's own thread waits inside its progress report; nothing is dropped and
+     * nothing is cancelled, and on release it carries on from where it stood.
+     *
+     * @param manifestUrl the transfer to hold
+     * @param bytes how many bytes to let through first
+     * @return the hold
+     */
+    public Hold holdingAfter(URI manifestUrl, long bytes) {
+        Hold hold = new Hold(bytes);
+        holds.put(Objects.requireNonNull(manifestUrl, "manifestUrl"), hold);
+        return hold;
+    }
+
+    /** A transfer held still part way; see {@link #holdingAfter}. */
+    public static final class Hold {
+
+        /** The longest a transfer is held if the test never releases it, so nothing hangs. */
+        private static final long LONGEST_HOLD_MINUTES = 20;
+
+        private final long threshold;
+
+        private final CountDownLatch reached = new CountDownLatch(1);
+
+        private final CountDownLatch released = new CountDownLatch(1);
+
+        private volatile long heldAt = -1;
+
+        private volatile boolean resumed;
+
+        /** Whether the hold ran out without a release: a test that forgot, or failed first. */
+        private volatile boolean abandoned;
+
+        private Hold(long threshold) {
+            this.threshold = threshold;
+        }
+
+        /**
+         * Waits for the transfer to reach the hold.
+         *
+         * @param seconds how long to wait at most
+         * @return {@code true} if it is being held
+         * @throws InterruptedException if interrupted
+         */
+        public boolean awaitHeld(long seconds) throws InterruptedException {
+            return reached.await(seconds, TimeUnit.SECONDS);
+        }
+
+        /**
+         * Whether the transfer is standing still at the hold now: reached and not yet resumed.
+         *
+         * @return {@code true} while it is held
+         */
+        public boolean holding() {
+            return reached.getCount() == 0 && !resumed;
+        }
+
+        /**
+         * The byte count the transfer stood at when it was held.
+         *
+         * @return the count, or -1 if it has not been held
+         */
+        public long heldAt() {
+            return heldAt;
+        }
+
+        /**
+         * Whether the transfer carried on only because nobody released it in time.
+         *
+         * @return {@code true} if the hold was abandoned
+         */
+        public boolean abandoned() {
+            return abandoned;
+        }
+
+        /** Lets the transfer carry on. */
+        public void release() {
+            released.countDown();
+        }
+
+        private void hold(long transferred) {
+            heldAt = transferred;
+            reached.countDown();
+            try {
+                abandoned = !released.await(LONGEST_HOLD_MINUTES, TimeUnit.MINUTES);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            } finally {
+                resumed = true;
+            }
+        }
     }
 
     /**
@@ -179,6 +280,10 @@ public final class LoopbackArtefactServer implements ArtefactFetcher, AutoClosea
                 threshold == null
                         ? request.listener()
                         : tripping(manifestUrl, threshold, request.listener());
+        Hold hold = holds.get(manifestUrl);
+        if (hold != null) {
+            listener = holding(hold, listener);
+        }
         return downloader.fetch(
                 new DownloadRequest(
                         URI.create(
@@ -210,6 +315,15 @@ public final class LoopbackArtefactServer implements ArtefactFetcher, AutoClosea
             if (transferred >= threshold
                     && trippedAt.putIfAbsent(manifestUrl, transferred) == null) {
                 onThreshold.run();
+            }
+        };
+    }
+
+    private static DownloadProgressListener holding(Hold hold, DownloadProgressListener delegate) {
+        return (transferred, total) -> {
+            delegate.onProgress(transferred, total);
+            if (transferred >= hold.threshold && hold.heldAt < 0) {
+                hold.hold(transferred);
             }
         };
     }

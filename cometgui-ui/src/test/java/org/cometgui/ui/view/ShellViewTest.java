@@ -50,6 +50,7 @@ import org.cometgui.ui.testing.FxToolkit;
 import org.cometgui.ui.testing.Percolators;
 import org.cometgui.ui.testing.ScriptedEngine;
 import org.cometgui.ui.testing.ScriptedToolManager;
+import org.cometgui.ui.testing.ScriptedVisualisation;
 import org.cometgui.ui.testing.ToolOffers;
 import org.cometgui.ui.viewmodel.ConsoleViewModel;
 import org.cometgui.ui.viewmodel.HostBaselineViewModel;
@@ -68,6 +69,7 @@ import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
 import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
 import org.cometgui.ui.viewmodel.results.ResultsViewModel;
 import org.cometgui.ui.viewmodel.results.WeightsViewModel;
+import org.cometgui.ui.viewmodel.visualisation.VisualisationViewModel;
 import org.cometgui.workflow.state.WorkflowStage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -170,7 +172,14 @@ class ShellViewTest {
                                     results,
                                     resultTable,
                                     weights,
-                                    filters);
+                                    filters,
+                                    new VisualisationViewModel(
+                                            new ScriptedVisualisation(),
+                                            results,
+                                            resultTable,
+                                            Runnable::run,
+                                            Runnable::run,
+                                            () -> {}));
                     scene = new Scene(shell, 1280, 800);
                     scene.getRoot().applyCss();
                     scene.getRoot().layout();
@@ -560,7 +569,14 @@ class ShellViewTest {
                                                 otherResults,
                                                 otherTable,
                                                 otherWeights,
-                                                otherFilters),
+                                                otherFilters,
+                                                new VisualisationViewModel(
+                                                        new ScriptedVisualisation(),
+                                                        otherResults,
+                                                        otherTable,
+                                                        Runnable::run,
+                                                        Runnable::run,
+                                                        () -> {})),
                                         800,
                                         600));
         Label banner = (Label) other.lookup("#" + UiIds.HOST_BASELINE_BANNER);

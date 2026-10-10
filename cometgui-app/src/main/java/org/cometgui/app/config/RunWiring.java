@@ -18,6 +18,7 @@ package org.cometgui.app.config;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -27,15 +28,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
+import org.cometgui.domain.ports.EnvironmentReader;
 import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.secrets.SecretRedactor;
+import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
+import org.cometgui.tools.pdv.PdvFigures;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
@@ -44,8 +48,11 @@ import org.cometgui.ui.viewmodel.params.RunObserver;
 import org.cometgui.ui.viewmodel.percolator.PercolatorPort;
 import org.cometgui.ui.viewmodel.percolator.RerunCheck;
 import org.cometgui.ui.viewmodel.results.ResultsPort;
+import org.cometgui.ui.viewmodel.visualisation.VisualisationPort;
 import org.cometgui.workflow.engine.EngineServices;
 import org.cometgui.workflow.engine.WorkflowEngine;
+import org.cometgui.workflow.pdv.PdvLaunches;
+import org.cometgui.workflow.pdv.PsmFigures;
 import org.cometgui.workflow.steps.CometWorkflow;
 import org.cometgui.workflow.steps.PercolatorRerun;
 
@@ -88,16 +95,19 @@ public final class RunWiring {
     private RunWiring() {}
 
     /**
-     * Where the Run section finds its tools and its project: the composition root's choice, and a
-     * GUI test's seam.
+     * Where the Run section finds its tools and its project, and where PDV finds its display: the
+     * composition root's choice, and a GUI test's seam.
      *
      * @param tools makes the Tool Manager, or says why this machine has none
      * @param projectDirectory where the session's project is created and locked
+     * @param pdvDisplay the variables PDV is given to reach a display, from the application's
+     *     environment: {@link PdvDisplay#fromHost} on a desktop, a test's own display in a test
      */
-    public record Setup(ToolManagerSource tools, Path projectDirectory) {
+    public record Setup(
+            ToolManagerSource tools, Path projectDirectory, PdvDisplaySource pdvDisplay) {
 
         /**
-         * Requires both.
+         * Requires all three.
          *
          * @throws NullPointerException naming a component that is {@code null}
          * @throws IllegalArgumentException if the project directory is not absolute
@@ -105,10 +115,22 @@ public final class RunWiring {
         public Setup {
             Objects.requireNonNull(tools, "tools");
             Objects.requireNonNull(projectDirectory, "projectDirectory");
+            Objects.requireNonNull(pdvDisplay, "pdvDisplay");
             if (!projectDirectory.isAbsolute()) {
                 throw new IllegalArgumentException(
                         "the project directory must be absolute: " + projectDirectory);
             }
+        }
+
+        /**
+         * The Tool Manager and the project, with PDV given this desktop's display ({@link
+         * PdvDisplay#fromHost}).
+         *
+         * @param tools makes the Tool Manager, or says why this machine has none
+         * @param projectDirectory where the session's project is created and locked
+         */
+        public Setup(ToolManagerSource tools, Path projectDirectory) {
+            this(tools, projectDirectory, PdvDisplay::fromHost);
         }
 
         /**
@@ -128,6 +150,19 @@ public final class RunWiring {
                     ProjectSession.defaultDirectory(
                             services.fileSystem().applicationDataDirectory()));
         }
+    }
+
+    /** The variables PDV is given to reach a display. */
+    @FunctionalInterface
+    public interface PdvDisplaySource {
+
+        /**
+         * The variables.
+         *
+         * @param host the application's environment
+         * @return the variables; never {@code HOME} or {@code LANG}, which PDV's command sets
+         */
+        Map<String, String> environment(EnvironmentReader host);
     }
 
     /** Makes the Tool Manager, or says why there is none. */
@@ -265,6 +300,67 @@ public final class RunWiring {
         Objects.requireNonNull(engine, "engine");
         return new ProjectResultsPort(
                 project, hashes, build.version(), services.clock(), engine::executingRuns);
+    }
+
+    /**
+     * The Visualisation section's port (phase 11): PDV's state and install through the Tool
+     * Manager, and drawing a PSM's spectrum through the one recording launch path -- over the
+     * composition root's one process service, the session's one hasher and the one secret rule set,
+     * so that every PDV launch is in the run's event log before PDV starts.
+     *
+     * @param services the composition root: its process service, clock and environment
+     * @param project the session's project
+     * @param hashes the session's one hasher
+     * @param engine the session's engine, which says which runs are executing
+     * @param tools the Tool Manager, or empty
+     * @param toolsUnavailable why there is no Tool Manager, when {@code tools} is empty
+     * @param display the variables PDV is given to reach a display
+     * @return the port
+     */
+    public static VisualisationPort visualisation(
+            ApplicationServices services,
+            ProjectSession project,
+            HashService hashes,
+            SessionEngine engine,
+            Optional<ToolManager> tools,
+            String toolsUnavailable,
+            PdvDisplaySource display) {
+        Objects.requireNonNull(services, "services");
+        Objects.requireNonNull(hashes, "hashes");
+        Objects.requireNonNull(engine, "engine");
+        Objects.requireNonNull(tools, "tools");
+        Objects.requireNonNull(display, "display");
+        Optional<HostPlatform> host =
+                HostPlatform.of(
+                        services.environment().osName().orElse(""),
+                        services.environment().osArch().orElse(""));
+        Optional<PsmFigures> figures = Optional.empty();
+        String noFigures = NO_PROCESS_SERVICE;
+        if (services.processRunner().isPresent() && host.isPresent()) {
+            figures =
+                    Optional.of(
+                            new PsmFigures(
+                                    new PdvLaunches(
+                                            services.processRunner().get(),
+                                            hashes,
+                                            SecretRedactor.patternsOnly(),
+                                            services.clock(),
+                                            host.get()),
+                                    PdvFigures.DEFAULT_TIMEOUT));
+        } else if (host.isEmpty()) {
+            noFigures =
+                    "No spectrum can be drawn: this machine's operating system and architecture"
+                            + " are not ones CometGUI recognises.";
+        }
+        EnvironmentReader environment = services.environment();
+        return new ProjectVisualisationPort(
+                project,
+                () -> tools,
+                toolsUnavailable,
+                figures,
+                noFigures,
+                engine::executingRuns,
+                () -> display.environment(environment));
     }
 
     /**
