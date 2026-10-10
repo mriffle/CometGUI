@@ -492,6 +492,50 @@ changed, no module edge added.
   tier 1. No outcome event follows ``pdv.launched``. While the section
   installs PDV, the Tool Manager row refreshes only when the install ends.
 
+Unit 4 sign-off
+---------------
+
+**Accepted 2026-10-10**, commit ``a3c690f`` (28 files, all ``cometgui-tools``:
+``org.cometgui.tools.comet.PepXmlSearchHitReader``, ``PepXmlHitIndex``,
+``PepXmlHitKey(startScan, assumedCharge, position)`` and the ``PepXml*``
+records; constructed fixture ``comet-shapes.pep.xml``; test helpers
+``RealCometSearch``/``K562Run`` extended). No existing production class
+changed beyond a ``package-info`` comment; no POM.
+
+* **Diff read**: StAX, hardened as the validator; values as ``PepXmlDecimal``
+  (the file's text, exact ``BigDecimal`` alongside); hit position = 1-based
+  place in the query (P11-13); 19 known elements only, unknown attributes
+  refused on the four mass-defining elements; the index refuses two
+  queries with one scan and charge.
+* **Tests, run by me**: ``mvn -o -pl cometgui-tools verify`` -> **829
+  tests, 0 failures** (703 before unit 4).
+* **My injections** (126 ``PepXml*`` tests each; restored, ``sha256sum -c``
+  clean): L1 hit position 0-based -> 19 failures + 6 errors; L2
+  ``retention_time_sec`` dropped -> 7 failures + 1 error, e.g.
+  ``PepXmlSearchHitReaderRealBinaryTest`` "expected Optional[4741.0] but was
+  Optional.empty"; L3 the variable delta read from ``static`` -> 18 + 22.
+* **Targeted PIT, by me** (``PepXml*`` classes and tests): 152 mutations on
+  the new classes, 148 KILLED, 1 SURVIVED (``line > 0`` boundary, -1 or
+  >= 1 only: equivalent), 1 NO_COVERAGE (``addSuppressed`` after a failed
+  close); 2 further NO_COVERAGE in the pre-existing ``PepXmlSummary`` only
+  because I narrowed the tests.
+* ``--only quality`` PASS (141 s), ``--only percolator`` PASS (715 s; the
+  shared ``RealCometSearch`` helper changed).
+* **Outside files the tests read**: ``scratch/scientific-path/comet/..._{3,4}.pep.xml``,
+  ``scratch/scientific-path/percolator-3.07.1/psms.{target,decoy}.txt``,
+  ``scratch/phase05/artefacts/`` Comet 2026.02.2 and 2026.03.0,
+  ``scratch/fixture/`` mzML and FASTA.
+* **Facts for unit 5** (from Comet's source and real runs):
+  ``mod_nterm_mass``/``mod_cterm_mass`` are whole terminal-group masses, not
+  deltas -- a variable terminal mod on a static one sums to a value no
+  declaration states (measured ``71.049690``); a residue may carry static and
+  variable deltas together; values are printed un-normalised
+  (``15.994900``); ``decoy_search = 2`` writes ``<base>.decoy.pep.xml`` with
+  PSMIds shared with the target file, and ``RunLayout`` has no accessor for
+  it; Comet writes ``DECOY_`` only on a decoy hit's first protein. Keeping
+  1 000 000 joined PSMs costs about 1.4 GB of heap; streaming the same file
+  without keeping fits 64 MB.
+
 Rejections and rework
 =====================
 
