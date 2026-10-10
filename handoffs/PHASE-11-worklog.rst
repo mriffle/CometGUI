@@ -426,6 +426,72 @@ classes in ``cometgui-tools`` ``org.cometgui.tools.pdv`` and
 * **Note:** my targeted PIT overwrote ``cometgui-tools``' PIT report; the
   full reports are regenerated before ``--only tests`` (Phase 08's trap).
 
+Unit 3 sign-off
+---------------
+
+**Accepted 2026-10-10**, commit ``a177e62`` (43 files: new
+``org.cometgui.workflow.pdv`` -- ``PdvProvisioning``, ``PdvLaunches``,
+``PsmFigures``; ``ProvenanceEventType.PDV_LAUNCHED``; ``ui.viewmodel.visualisation``
+and ``ui.controls.visualisation``; app ``ProjectVisualisationPort``,
+``PdvDisplay``, ``RunWiring``; archtests ``PdvLaunchPathRuleTest``). No POM
+changed, no module edge added.
+
+* **Diff read**, ``PdvLaunches`` in full: the per-run ``ProcessRunner`` refuses
+  a command that does not launch the offered JAR, hashes the JAR with the
+  one ``HashService``, reads its manifest version and refuses a mismatch,
+  appends ``pdv.launched`` (version, JAR path, MD5, SHA-256, kind, redacted
+  argv, working directory, redacted environment, ``launch.*`` context) to
+  the run's ``events.log``, and only then starts the process. Unit 7's
+  ``denovo-gui`` launcher must take this runner (``PdvLaunchKind.DENOVO_GUI``
+  exists); construction of ``PdvFigures`` outside ``workflow.pdv`` is
+  refused by ``PdvLaunchPathRuleTest``. Drawing for an executing run is
+  refused (Phase 10's rule for exports). "Open run in PDV" is absent.
+* **Tests, run by me** after ``mvn -o -pl cometgui-app -am install
+  -DskipTests``: ``cometgui-workflow verify`` **760 tests, 0 failures**;
+  ``cometgui-app`` ``PdvFirstUseUiTest`` (1 test, 40 s, real Comet,
+  Percolator and PDV from an empty cache through a held loopback transfer)
+  and ``ProjectVisualisationPortTest`` (7) -- 8 run, 0 failures.
+* **My injections** (anchor asserted unique and gone; restored, ``sha256sum
+  -c`` clean):
+
+  - K1 ``PsmFigures.nativeIdOf`` matching the spectrum's 1-based
+    **position** instead of its scan number (the Phase 00 landmine): 28
+    ``workflow.pdv`` tests, 2 failures + 2 errors, e.g.
+    ``PsmFiguresTest.anAmbiguousScanIsRefused`` "no spectrum there carries
+    that scan number".
+  - K2 ``PdvLaunches``' other-program refusal removed: 1 failure,
+    ``PdvLaunchesTest.anotherProgramIsRefused``.
+  - K3 ``VisualisationViewModel`` drawing without installing
+    (``status.state() == INSTALLED`` -> ``!= null``): ``VisualisationViewModelTest``
+    3 failures + 3 errors of 14; and **the gate-1 GUI test**
+    ``PdvFirstUseUiTest`` -> "the PDV transfer did not reach 30000000
+    bytes". **My first two K3 attempts did not land** -- ``if (true)`` did
+    not compile and the second form was stopped by the ui coverage check
+    before ``install``, so the app test ran against the old jar and stayed
+    green; caught by hashing the installed jar (unchanged). The third
+    attempt packaged the injected jar over the installed one (hash
+    changed) and the test went red. Clean jar reinstalled afterwards.
+
+* **Targeted PIT, by me**, ``-DtargetClasses=org.cometgui.workflow.pdv.*``:
+  **68 mutations, 68 KILLED**; every compiled class mutated except the
+  ``DrawnSpectrum`` record and ``package-info``.
+* **Harnesses, run by me on ``a177e62``**, all PASS: ``quality`` 140 s,
+  ``provenance`` 234 s, ``shell`` 401 s, ``results`` 566 s, ``workflow`` 477 s,
+  ``percolator`` 713 s, ``install`` 340 s, ``paramui`` 1904 s.
+* **Outside files the tests read** (``PdvFirstUseUiTest``):
+  ``scratch/phase05/artefacts/`` (PDV, Comet, Percolator 3.07.1 artefacts),
+  ``scratch/fixture/..._K562_3/_4.mzML`` and the FASTA,
+  ``manifests/tools.json``, the X11 and font stacks under ``tools/``,
+  ``scripts/feasibility/gui-spike/xkbcomp-path-shim.c``, the host's ``gcc``.
+  ``cometgui-app`` carries its own copy of ``ProjectXvfb`` (test classes are
+  not shared between modules).
+* **For later units and tier 1:** ``org.cometgui.workflow.pdv`` and
+  ``ui.viewmodel.visualisation`` are not POM PIT targets (a POM change;
+  escalated, not made). ``EngineStep.LAUNCH_PDV`` untouched: launches are
+  user-initiated through the port, not planned engine steps -- left for
+  tier 1. No outcome event follows ``pdv.launched``. While the section
+  installs PDV, the Tool Manager row refreshes only when the install ends.
+
 Rejections and rework
 =====================
 
