@@ -5,8 +5,8 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 17
-:Revision date: 2026-10-10
+:Revision: 18
+:Revision date: 2026-10-11
 :Supersedes: Revision 16, 2026-10-08
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
@@ -33,6 +33,14 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 18
+     - 2026-10-11
+     - PDV text brought into line with what Phase 11 measured: PDV 2.7.0's
+       paths CometGUI uses read MGF and mzML, and mzXML is refused before
+       launch; the live window reads a generated mzTab and an MGF holding an
+       exact copy of the producing spectrum per PSM row; the controls live in
+       the Visualisation section, driven by the Results selection; launch
+       provenance is a ``pdv.launched`` event in the run's ``events.log``.
    * - 17
      - 2026-10-10
      - ``D-011`` decided (options A and D): Intel macOS gets no managed
@@ -1120,8 +1128,11 @@ confirm the table above rather than trusting it.
 PDV
 ---
 
-PDV supports Comet pepXML with MGF, mzML and mzXML spectrum files and shall be
-the supported annotated-spectrum viewer. The initial managed version shall be
+PDV shall be the supported annotated-spectrum viewer. PDV 2.7.0 reads Comet
+pepXML with MGF and mzML spectrum files on the paths CometGUI uses; Phase 11
+measured that its ``denovo-gui`` mode cannot read mzXML, so an mzXML source is
+refused before PDV is launched, with the clear error the baseline integration
+requires (*PDV Integration*). The initial managed version shall be
 **PDV 2.7.0** (2026-08-14); Revision 1 named 2.6.0, which was superseded
 before implementation began. The download is ~99 MB, which is large enough that
 installation must be cancellable, resumable-or-restartable, and must not block
@@ -2285,7 +2296,9 @@ Managed installation
 
 PDV shall be managed by the same Tool Registry as Comet and Percolator, with
 PDV 2.7.0 as the initial verified version. Its JAR checksum and reported
-version shall appear in provenance whenever PDV is launched from a run. Because
+version shall appear in provenance whenever PDV is launched from a run: a
+``pdv.launched`` event in the run's ``events.log``, written before the process
+starts, so that a launch that fails still leaves its record. Because
 the download is approximately 99 MB, PDV installation shall be deferred until
 first use, cancellable, and shall not be a prerequisite for a search.
 
@@ -2293,14 +2306,17 @@ Baseline integration
 --------------------
 
 The baseline production integration shall use documented PDV functionality for
-Comet pepXML plus MGF/mzML/mzXML. The Comet pepXML produced by the search shall
+Comet pepXML plus MGF or mzML. The Comet pepXML produced by the search shall
 be preserved even though the primary result tables come from Percolator,
 because it is the native search identification data PDV understands.
 
-The Results UI shall provide: Open run in PDV; Open the selected
+The run's Visualisation section, driven by the selection in the Results
+tables, shall provide: Open run in PDV; Open the selected
 source/spectrum context in PDV where a robust documented mapping exists; and a
 clear error when the source spectrum format cannot be visualised by the
-selected PDV version.
+selected PDV version. The selected PSM's figure is drawn from the preserved
+pepXML and its spectra; the live window (below) reads the generated mzTab and
+its MGF.
 
 Exact-selection integration via mzTab
 --------------------------------------
@@ -2318,7 +2334,11 @@ The mechanism is PDV's existing de novo external-control mode, used unmodified::
         [--hide-psm-table]
 
 with ``/ready``, ``/select?ref=<spectra_ref>`` and ``/shutdown`` on
-``127.0.0.1``. This is verified to exist and to work: ``Noble-Lab/CasanovoGUI``
+``127.0.0.1``. CometGUI passes as ``--spectrum`` a generated MGF rather
+than the source file: PDV 2.7.0 selects only the first mzTab row for any one
+``spectra_ref``, so the MGF holds one exact copy of the producing spectrum per
+PSM row and every row gets its own reference (Phase 11, design decision
+P11-12; about 1.8 GB of MGF per million PSMs). This is verified to exist and to work: ``Noble-Lab/CasanovoGUI``
 drives it in production from ``PdvLauncher`` and ``PdvController``, reserving an
 ephemeral port, polling readiness, and sending a debounced ``/select`` when the
 user clicks a peptide.

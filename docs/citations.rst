@@ -32,7 +32,13 @@ it as its authors ask, in the README of their repository at tag ``v2.7.0``:
 
    Li K, Vaudel M, Zhang B, Ren Y, Wen B. PDV: an integrative proteomics data
    viewer. *Bioinformatics* **35** (7), 1249--1251 (2019).
-   https://doi.org/10.1093/bioinformatics/bty770
+   ``doi:10.1093/bioinformatics/bty770``; free full text at
+   https://pmc.ncbi.nlm.nih.gov/articles/PMC6821182/
+
+   The DOI is given as text rather than as a link because the publisher's
+   site answers automated requests with 403 Forbidden, so the nightly link
+   check could never confirm it; the PubMed Central copy is the same article
+   and is checked.
 
 * **Project:** https://github.com/wenbostar/PDV -- version 2.7.0, tag
   ``v2.7.0`` (commit ``aaf38f971ea3edf9aa6ed1490448fd92cb2ca1fd``).

@@ -76,12 +76,12 @@ authoritative for its own scope and exit gate.
      - PDV Integration and mzTab Export
      - 05, 10
      - D-005 DECIDED -- enhanced control mode via a generated mzTab
-     - IN PROGRESS (dispatched 2026-10-10)
+     - PARTIAL (signed off 2026-10-11; Linux only)
    * - `12 <PHASE-12-limelight.rst>`_
      - Limelight Conversion and Upload
      - 09, 10
      - none open; D-002 and D-007 both DECIDED
-     - NOT STARTED
+     - IN PROGRESS (dispatched 2026-10-11)
    * - `13 <PHASE-13-provenance-ui.rst>`_
      - Provenance UI and Reports
      - 04, 08, 09, 12

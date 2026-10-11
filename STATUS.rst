@@ -3,28 +3,27 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-10
-:Updated by: Main orchestrator, session 10 (between-phase repair signed off --
-   :ref:`status-fix-p10-p11`; specification revision 17; ``main`` pushed;
-   **Phase 11 dispatched**. Earlier: Phase 10 signed off PARTIAL --
-   :ref:`status-p10-signed`)
-:Current phase: **Phase 11 -- PDV Integration**, dispatched 2026-10-10 with
-   ``handoffs/PHASE-11-BRIEF.rst``, after the between-phase repair was signed
-   off (:ref:`status-fix-p10-p11`). Standing owner instruction (2026-10-08):
+:Updated: 2026-10-11
+:Updated by: Main orchestrator, session 10 (**Phase 11 signed off PARTIAL** --
+   :ref:`status-p11-signed`; specification revision 18; ``main`` pushed;
+   **Phase 12 dispatched**)
+:Current phase: **Phase 12 -- Limelight Conversion and Upload**, dispatched
+   2026-10-11 with ``handoffs/PHASE-12-BRIEF.rst``, after Phase 11 was signed
+   off (:ref:`status-p11-signed`). Standing owner instruction (2026-10-08):
    *"When all is green with the current phase, push, then move on to the
    next phase."*
-:Overall: Eleven phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
-   05, 08, 09 and 10 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
+:Overall: Twelve phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
+   05, 08, 09, 10 and 11 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (**about 8 hours since Phase 10** -- build
-   102 min, ``tests`` 235, the other sixteen about 140 -- run as three
-   detached jobs; raised with the owner, :ref:`status-p10-signed`) runs once
+   ``scripts/verify-all-gates.sh`` (**about 9 hours since Phase 11** -- build
+   120 min, ``tests`` 268, the other seventeen 142 -- run detached; raised
+   with the owner, :ref:`status-p10-signed`) runs once
    per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
-   :ref:`status-p06-signed`); ``D-011``, what an Intel Mac gets now that
-   Comet is known to publish no Intel macOS build (raised 2026-10-05, blocks
-   nothing before Phase 15). The nightly is red **by the owner's decision**
+   :ref:`status-p06-signed`); and how to cut the build time (same
+   section as above). No ``D-`` item is open; ``D-011`` option D, asking
+   UWPR for an Intel macOS Comet build, is the owner's own action. The nightly is red **by the owner's decision**
    until Phase 15 replaces its stubs (:ref:`status-nightly-masking`).
 
 This file is the **only** authoritative record of where the project is. Update
@@ -266,12 +265,15 @@ Phase board
        (:ref:`status-p10-signed`). PARTIAL on platform alone.
    * - 11
      - PDV integration
-     - IN PROGRESS
-     - Dispatched 2026-10-10 (``handoffs/PHASE-11-BRIEF.rst``).
+     - PARTIAL
+     - **Signed off 2026-10-11** at ``2770967``: build 11/11, gates 18/18 (new
+       ``pdv``, 107 controls; ``pipeline`` after a citation-link repair),
+       three tier-1 injections (:ref:`status-p11-signed`). PARTIAL on
+       platform alone.
    * - 12
      - Limelight conversion and upload
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-10-11 (``handoffs/PHASE-12-BRIEF.rst``).
    * - 13
      - Provenance UI and reports
      - NOT STARTED
@@ -3271,6 +3273,85 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-p11-signed:
+
+Phase 11 signed off PARTIAL (2026-10-11)
+========================================
+
+Nine units, all accepted by the phase orchestrator, with one repair of its
+own (a stale "arrives in phase 11" note). Record:
+``handoffs/PHASE-11-worklog.rst`` and ``handoffs/PHASE-11-handoff.rst``.
+
+**What exists.** PDV 2.7.0 installed on first use through the Tool Manager,
+cancellable and never holding up a search; the selected PSM's annotated
+spectrum drawn with PDV's command-line figure mode and judged by parsing the
+PNG; a live PDV window (``denovo-gui`` on an ephemeral loopback port) that
+follows the Results selection; every launch recorded as ``pdv.launched`` in
+the run's ``events.log`` -- JAR SHA-256 and manifest version -- before the
+process starts, with an architecture rule forbidding any other launch path.
+At its centre, an mzTab exporter that transcribes Percolator's and Comet's
+values and refuses, naming the PSM, anything it cannot represent, proved by
+an independent fidelity suite with its own readers. The controller and the
+``denovo-gui`` command derive from ``Noble-Lab/CasanovoGUI``, recorded per
+``D-001``. New harness ``scripts/verify-pdv-gates.sh`` (``pdv``, 107
+controls, floor 107).
+
+**Tier 1's exit-gate run**, at ``2770967`` on a quiet tree, every prerequisite
+present and the large fixture regenerated: ``scripts/build.sh`` 11/11 in
+7187 s; ``--only tests`` 37 assertions in 16 073 s; the other sixteen controls
+in 142 minutes, ``pdv`` 107, ``results`` 100, ``percolator`` 109,
+``workflow`` 110, ``paramui`` 87, ``params`` 109, ``install`` 95.
+**``pipeline`` went red** on one thing: the nightly link check found the PDV
+paper's DOI broken -- the publisher answers every automated request with 403,
+though the DOI is correct (checked against Crossref). Tier 1 kept the DOI as
+citation text and linked the free PubMed Central copy, which the check
+reads; nothing exempted. Re-run: ``pipeline`` (0 broken), ``docs``,
+``traceability`` **passed. 18 of 18.**
+
+**Nothing weakened:** no test deleted or disabled, no assumption added, no
+floor lowered, no PIT configuration changed; one POM gained a dependency
+(``cometgui-tools`` on ``cometgui-results``, so that the exporter reads
+Percolator tables through the one reader); ``verify-all-gates.sh`` changed
+additively.
+
+**Tier 1's own injections**, upstream modules installed fresh, tests counted,
+each restored and verified with ``sha256sum -c``:
+
+* the mzTab's flanking residues swapped -- **8 of 970** tools tests failed,
+  among them all three independent fidelity suites;
+* charge written one too high, only above 3+ -- **5 of 970** failed, e.g.
+  ``K562FidelityTest.charge`` ("6670 compared, 305 failed") and the real-PDV
+  observer test;
+* the launch record dropping its last argument while keeping the count --
+  **7 of 786** workflow tests failed, e.g.
+  ``PdvLaunchesTest.theRecordPrecedesTheStart``.
+
+**Grade: PARTIAL**, on platform alone; all eight items met on Linux.
+
+**Settled by tier 1:**
+
+* **P11-12 accepted.** PDV selects only the first mzTab row for any one
+  ``spectra_ref``, so its MGF holds one exact copy of the producing spectrum
+  per PSM row. The cost, about 1.8 GB of MGF per million PSMs, is recorded.
+* **P11-16 accepted.** PDV's API cannot report what it shows, so item 5's
+  "displayed spectrum changes" is proved by running PDV's unmodified code in
+  the test JVM and reading what it drew; the production window is proved
+  through the API's answers. Recorded as a limit of the evidence.
+* **Specification revision 18** brings the PDV text into line: mzXML is
+  refused before launch; the live window reads a generated mzTab and MGF;
+  the controls live in the Visualisation section; launch provenance is in
+  ``events.log``.
+
+**Residue carried forward:** ``org.cometgui.workflow.pdv`` and
+``ui.viewmodel.visualisation`` are not PIT targets (joins the owner's
+build-time question); the ``tests`` preflight does not check for the host
+``gcc`` and ``/usr/bin/timeout`` that the real-PDV tests need;
+``EngineStep.LAUNCH_PDV`` is declared and unused; ``database`` fields are
+null in the mzTab; the bind-race relaunch is proved against a fake only; the
+derived controller's timing code is 69 % KILLED-only (the owner's
+``TIMED_OUT`` question); this container keeps ``<defunct>`` Xvfb processes
+because its PID 1 does not reap them.
+
 .. _status-fix-p10-p11:
 
 Between Phases 10 and 11: ``D-011`` A, the preset review, a preflight (2026-10-10)
@@ -4068,6 +4149,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-11
+     - 11, 12
+     - **Phase 11 signed off PARTIAL** at ``2770967`` (build 11/11, gates
+       18/18 after a citation-link repair, three tier-1 injections).
+       Specification revision 18. ``main`` pushed; **Phase 12 dispatched**.
+       See :ref:`status-p11-signed`.
    * - 2026-10-10
      - 10+, 11
      - Between-phase repair signed off (``D-011`` A, the owner's preset review,
