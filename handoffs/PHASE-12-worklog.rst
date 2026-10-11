@@ -253,6 +253,33 @@ import** logs" cannot be met with a submit key -- import status is visible
 only in the web application's logged-in session. The product shows the
 upload log and the project page URL.
 
+Design decision from unit 3 (2026-10-11)
+========================================
+
+P12-18 -- the converter is given a copy of the pout XML with the run's
+pepXML directory removed from its PSM ids (the orchestrator's call; flagged to tier 1)
+    Every CometGUI run gives Comet an **absolute** ``-N <run>/outputs/comet/<base>``,
+    so Comet's PIN ``SpecId`` and Percolator's ``psm_id`` carry that absolute
+    path (Phase 00 ran with relative names, which is why nobody saw it).
+    Observed by unit 3 with the real tools: with ``-d <run>/outputs/comet``
+    the converter looks for ``<dir>/<absolute id>.pep.xml``; with ``-d /`` it
+    finds the file and then fails "Unable to find any comet results",
+    because it keys Comet's side by file name and Percolator's by the whole
+    id. With the directory removed from the ids it converts 1838/1838 PSMs.
+    So ``workflow.limelight.PoutForConverter`` requires every id with a
+    separator to be exactly ``<pepXML dir>/<name>``, writes a copy with that
+    directory string removed under ``<run>/results/limelight/``, reads it back
+    through the one pout reader (same ids in order, same decoy count),
+    records **both** files' MD5 and SHA-256 in the events (roles
+    ``percolator-xml`` and ``percolator-xml-for-converter``), and deletes the
+    copy afterwards. The Limelight XML carries no PSM ids, so its content is
+    unaffected; its ``conversion_program`` names the copy's path. Rejected
+    alternative: a relative Comet ``-N``, which changes Phase 08's run model
+    and Phase 11's ``SpectrumReference`` and still leaves existing runs
+    needing the copy. Limits: the removal is global (the copy's
+    ``<command_line>`` loses the directory too); a run directory containing
+    an XML-special character is refused.
+
 Work units
 ==========
 
@@ -304,7 +331,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        the output validated and its checksums equal to the test's own.
      - R-LL-01 (install), R-LL-04, R-LL-05; gate 1, 2, 5, 8 (model);
        AC-LL-01, 02
-     -
+     - Accepted, ``0e38c4f``
    * - 4
      - **Compatibility and the compatible rerun** (P12-9). The run's own
        XML capability; the disabled state and its explanation; the offered
@@ -451,6 +478,63 @@ test classes in ``org.cometgui.tools.limelight``) and ``30b8439`` (rework).
   class; restore by copy and ``touch``, and check the compiled class.
 
 Unit 3 sign-off
+---------------
+
+**Accepted 2026-10-11.** Commit ``0e38c4f`` (30 files: ``org.cometgui.workflow.limelight``
+-- ``LimelightConversions`` the one path, ``ConverterLaunch``,
+``PoutForConverter``, ``LimelightProvisioning``/``LimelightConverterStatus``,
+readiness and refusal types; ``workflow.storage.LimelightSettings*``;
+``RunLayout`` limelight paths; three ``ProvenanceEventType`` values;
+``RunResultFiles.makeReadOnly``; ``cometgui-app`` ``LimelightFirstUseInstallTest``;
+archtest ``LimelightConversionPathRuleTest``).
+
+* **Diff read**: ``ConverterLaunch`` (event ``limelight.converting`` before
+  the start, the process service's ``StageRunner`` writing the log through
+  ``ProcessRedactor``), ``PoutForConverter`` in full, the prerequisite
+  checks. No POM, gate script or record touched; no module edge added.
+  Additive enum values only. P12-18 accepted (above).
+* **Deviations accepted:** settings live in ``<run>/results/limelight-settings.json``,
+  separate from ``view-state.json``; the log is ``logs/limelight-converter.log``
+  for the first conversion and ``limelight-converter.<n>.log`` after (the
+  ``StageRunner`` never appends), each event naming its own log;
+  ``LimelightProvisioning``/``LimelightConverterStatus`` mirror
+  ``PdvProvisioning``/``PdvStatus`` (about 330 lines, both over the one
+  Tool Manager port -- recorded as residue, not a second installer).
+* **Tests, run by me**: ``mvn -B -o -pl cometgui-workflow verify`` -> **878
+  tests, 0 failures, 0 skipped** (``RealLimelightConversionTest`` 2 in 19 s:
+  real Comet 2026.03.0, Percolator 3.07.1, the real converter twice;
+  ``LimelightConversionsTest`` 36); ``cometgui-domain`` 1175 and
+  ``cometgui-provenance`` 677 (2 skipped, pre-existing), 0 failures;
+  ``cometgui-app`` ``LimelightFirstUseInstallTest`` + ``ToolManagerWiringTest``
+  15, 0 failures; ``cometgui-archtests`` 35, 0 failures.
+* **My injections** (production code, anchor unique and gone, the 65
+  ``workflow.limelight`` tests, restored and ``sha256sum -c`` OK):
+
+  - L1 the converter's reported-version check made unreachable: 1 failure,
+    ``aConverterThatIsNotWhatItWasOffered``. (First form called a method
+    ``ToolVersion`` lacks; compile error, did not land -- redone.)
+  - L3 ``saveSettings``' decoy refusal made unreachable: 1 failure,
+    ``gate8DecoyImportAgainstANoDecoyRun``.
+  - L2 ``PoutForConverter``'s read-back decoy-count comparison disabled:
+    **green** (65 run). The comparison is a defensive re-check that a correct
+    prefix removal cannot violate; the id comparison beside it and the
+    real test carry the copy. Recorded as residue, not a hole in a gate item.
+
+* **Targeted PIT, by me** (``workflow.limelight.*``,
+  ``storage.LimelightSettings*``): 256 mutations, 244 KILLED, 5 TIMED_OUT
+  (cancellation and loop mutants that hang), 6 NO_COVERAGE, 1 SURVIVED
+  (``pepXmls`` returning an already-empty map -- equivalent). KILLED-only
+  95.3 %. Population: every class mutated except ``LimelightPrerequisite``
+  (enum) and ``package-info``.
+* **Harnesses, run by me**: ``quality`` PASS (141 s), ``provenance`` PASS
+  (235 s), ``workflow`` PASS (493 s).
+* **Files outside the module the tests read**: ``scratch/phase05/artefacts/v2.8.1__cometPercolator2LimelightXML.jar``
+  (workflow and app), ``scratch/scientific-path/limelight/limelight.xml``,
+  and everything ``RealPercolatorRunTest`` reads (Comet 2026.03.0 from
+  ``scratch/phase05/artefacts``, ``scratch/fixture``, ``scratch/percolator/3.07.1-linux-x86_64``);
+  ``manifests/``. No project document.
+
+Unit 4 sign-off
 ---------------
 
 Pending.
