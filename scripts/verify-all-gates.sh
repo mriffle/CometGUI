@@ -90,6 +90,7 @@ readonly -a ALL_GATES=(
     workflow
     percolator
     results
+    pdv
 )
 
 PASSED=0
@@ -142,7 +143,9 @@ declare -a COVERED=()
 #                percolator: 94 on 2026-10-08, phase 09 unit 9's first
 #                shipping count; 109 on 2026-10-08, when phase 10 unit D-013
 #                added controls A1-A3 (--no-analytics).  results: 100 on
-#                2026-10-09, phase 10 unit 11's first shipping count.)
+#                2026-10-09, phase 10 unit 11's first shipping count.
+#                pdv: 107 on 2026-10-11, phase 11 unit 9's first shipping
+#                count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -358,6 +361,20 @@ gate_spec() {
             GATE_FLOOR=100
             GATE_UNIT="controls"
             ;;
+        pdv)
+            GATE_PHASE="11"
+            GATE_ITEMS="1,2,3,4,5,6,7,8"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-11-worklog.rst (and new ones, each marked so), each into production code of cometgui-tools, cometgui-workflow, cometgui-ui or cometgui-app in a git-archive sandbox, each built with its upstream modules in one reactor (-pl TOP -am, nothing installed), proved to have reached the compiled classes and graded on the failing assertion's own words in the named testcase, with every process left under the sandbox ended after each run: Draw drawing without installing PDV (the view-model's install-then-draw), and (NEW) the install's start holding the interface thread (the first-use GUI test, real Comet, Percolator and PDV from an empty cache through a held transfer, finds the interface frozen); the PNG judge's blank-figure floor removed, (NEW) PDV's exit 0 with a requested figure missing no longer NO_FIGURE, and (NEW) -k p for -k s, both red against the real PDV 2.7.0; (NEW) the format check bypassed before launch, and (NEW) mzXML marked supported; the launcher's other-program refusal removed, (NEW) PDV started before its launch is recorded, (NEW) the JAR's MD5 recorded as its SHA-256, and (NEW) the manifest-version check removed; the denovo-gui command given port + 1, (NEW) the controller sending the next row's reference (200 from PDV, red only in the in-JVM observer of the real PDV), (NEW) a window's shutdown no longer ending PDV's process, another Results run no longer closing the window, and (NEW) the application's stop() no longer closing PDV's windows (the live-window GUI test); score and q-value swapped, (NEW) PEP fed the q-value, accessions cut to the first protein, (NEW) a static modification's delta rounded, and (NEW) the decoy flag constant, each graded on the fidelity suite against the real K562 sources; (NEW) spectra_ref by scan number, by 1-based file position and to a shared spectrum's first row, each with the exporter's own read-back of its references also switched off so that the fidelity suite is what catches it; the C-terminal refusal disabled, (NEW) the PSM's name dropped from the refusal, and (NEW) a refused export leaving its staging directory; and, as controls on the harness itself, an unchanged file, a missing anchor, an injection that reached the source but not the bytecode, a test method renamed so its selection ran zero tests, a green run graded as red and a red without its diagnostic"
+            GATE_SCRIPT="scripts/verify-pdv-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-11 exit gate items 1 to 8 were proved here"
+                "bytecode as a HARNESS ERROR, not as a pass, and a selection that ran zero"
+            )
+            GATE_FLOOR=107
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -402,6 +419,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         results)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        pdv)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -410,8 +429,8 @@ usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
 that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07,
-PHASE-08, PHASE-09 and PHASE-10 gate still fails on the defect it exists to
-catch.
+PHASE-08, PHASE-09, PHASE-10 and PHASE-11 gate still fails on the defect it
+exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -487,7 +506,8 @@ list_gates() {
     done
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
     printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06, 07:n of\n'
-    printf '  PHASE-07, 08:n of PHASE-08, 09:n of PHASE-09, 10:n of PHASE-10.\n'
+    printf '  PHASE-07, 08:n of PHASE-08, 09:n of PHASE-09, 10:n of PHASE-10, 11:n of\n'
+    printf '  PHASE-11.\n'
     printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
@@ -552,12 +572,23 @@ list_gates() {
     printf '  bound to a paged model; 7 weights values, ranking and sign consistency\n'
     printf '  against an independent computation; 8 unknown q-values counted and shown\n'
     printf '  as their own category, identically in UI and export.\n'
+    printf '  PHASE-11 items: 1 PDV installed on demand from an empty cache, the search\n'
+    printf '  workflow usable while it downloads; 2 a real PDV CLI figure from a real\n'
+    printf '  Comet pepXML, judged by its content; 3 an unsupported spectrum format\n'
+    printf '  giving the specified error before PDV is launched; 4 the JAR checksum and\n'
+    printf '  version in the run'"'"'s provenance whenever PDV is launched; 5 an ephemeral\n'
+    printf '  port, /ready polled, a selection changing the displayed spectrum through\n'
+    printf '  the control API under a timeout; 6 the mzTab accurate and true to the\n'
+    printf '  source files; 7 spectra_ref resolving to the producing spectrum where file\n'
+    printf '  position and scan number differ; 8 an unrepresentable PSM failing the\n'
+    printf '  export loudly, by name.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
     printf '  phases/PHASE-05-tool-registry.rst, phases/PHASE-06-comet-param-model.rst,\n'
     printf '  phases/PHASE-07-comet-param-ui.rst, phases/PHASE-08-workflow-comet.rst,\n'
-    printf '  phases/PHASE-09-percolator.rst and phases/PHASE-10-results.rst.\n\n'
+    printf '  phases/PHASE-09-percolator.rst, phases/PHASE-10-results.rst and\n'
+    printf '  phases/PHASE-11-pdv.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -719,7 +750,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09 and PHASE-10 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09, PHASE-10 and PHASE-11 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -757,7 +788,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05 06 07 08 09 10; do
+    for phase in 01 02 04 05 06 07 08 09 10 11; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"

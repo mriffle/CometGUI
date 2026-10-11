@@ -617,6 +617,12 @@ to ``PdvFirstUseUiTest``; ``AC-VIS-02`` and ``AC-VIS-03`` to
 ``PdvLiveWindowUiTest`` and ``PdvControllerRealPdvTest``; ``AC-VIS-05`` to the
 fidelity suite and ``PdvMzTabsFidelityTest``.
 
+**That these tests can fail.** ``bash scripts/verify-pdv-gates.sh``
+(registered in ``scripts/verify-all-gates.sh`` as ``pdv``) injects a
+production defect for every exit gate item into a sandbox copy and requires
+the named tests red with their own diagnostic; see
+:ref:`dev-pdv-falsifiability`.
+
 What has only run on Linux
 ==========================
 

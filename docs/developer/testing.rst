@@ -591,6 +591,18 @@ pass is worse than no aggregator at all.
        switching to disk -- ``the child failed: [OUT_OF_MEMORY Java heap
        space] ==> expected: <0> but was: <3>``.
 
+   * - PDV integration and the mzTab exporter (Phase 11, ``pdv``)
+     - ``scripts/verify-pdv-gates.sh``: twenty-seven injections into
+       ``cometgui-tools``, ``cometgui-workflow``, ``cometgui-ui`` and
+       ``cometgui-app`` -- at least two per exit gate item; items 2 and 5
+       also against the real PDV 2.7.0, items 1 and 5 through the headless
+       GUI, items 6 to 8 against the real K562 sources. See
+       :ref:`dev-pdv-falsifiability`.
+     - Each failing assertion's own words, e.g. the controller sending the
+       next row's reference -- ``PDV drew nothing on row 0 within PT1M;
+       seen: [PDVOBS displayed row=1 ...`` from the in-JVM observer of the
+       real PDV, which answered ``200 selected``.
+
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs
 from the pristine state -- and reports a control whose defect was *not*
@@ -1464,6 +1476,223 @@ controls 6-10 s each, 8a 26 s (the export gate test over 22 tables), the
 2, 6b and 3c 26 s, 24 s and 47 s, and control H 11 s. ``--self-test`` and
 ``--only`` over ``cometgui-results`` controls need only that module set. The
 floor in ``verify-all-gates.sh`` is 100.
+
+.. _dev-pdv-falsifiability:
+
+The PDV harness (Phase 11, ``pdv``)
+-----------------------------------
+
+``bash scripts/verify-pdv-gates.sh`` proves that each of Phase 11's eight
+exit gate items fails on a defect it exists to catch. It is registered in
+``scripts/verify-all-gates.sh`` as ``pdv`` and takes its shape from
+``results`` -- a ``git archive HEAD`` sandbox, anchors that must match exactly
+once, bytecode digests proving each injection reached the compiled class, red
+read from surefire's XML by testcase and message, siblings required to stay
+green, nested module sets (``cometgui-tools`` within ``cometgui-workflow``
+within ``cometgui-ui`` within ``cometgui-app``), ``mvn -o -pl TOP -am test``
+with nothing installed, and one batched clean re-run. The differences:
+
+* **A preflight refuses to start**, naming what is missing, without the PDV,
+  Comet and Percolator artefacts under ``scratch/phase05/artefacts/``, the
+  K562 mzML, FASTA, pepXML and Percolator outputs, the project-local X11 and
+  font stacks under ``tools/``, the xkbcomp shim source, the host's ``gcc``
+  and ``/usr/bin/timeout`` -- or while a process from an earlier run is still
+  alive in the sandbox.
+* **Processes.** After every Maven run the script waits up to 20 s for every
+  process whose command line or working directory lies in the sandbox (real
+  PDV, Xvfb, their ``timeout`` wrappers) to end, then ends what is left and
+  says so; one that survives ``KILL`` is a harness error. Between controls,
+  anything left in the build directories since the baseline (a test's
+  temporary directory) is removed.
+* **Several anchors in one file.** Control 7's injections also switch off the
+  exporter's own read-back of its references, which would otherwise refuse
+  every wrong reference itself: the point is that the *fidelity suite*
+  catches it.
+* **Tests counted.** Every run prints the number of testcases its fresh
+  reports hold, besides the per-selector check that each named class and
+  method ran.
+
+.. list-table:: The controls ("recorded" names the unit of ``handoffs/PHASE-11-worklog.rst`` whose sign-off made the injection)
+   :header-rows: 1
+   :widths: 6 6 42 46
+
+   * - Control
+     - Item
+     - Injected defect
+     - Diagnostic required
+   * - 1a
+     - 1
+     - Recorded (unit 3, K3): Draw draws without installing PDV.
+     - ``VisualisationViewModelTest.installThenDraw``: ``expected: <Installing
+       PDV 2.7.0: starting.> but was: <PDV 2.7.0 is not installed. ...``, and
+       no install asked of the Tool Manager; ``drawAtOnce`` green.
+   * - 1b
+     - 1
+     - New: starting the install holds the JavaFX thread for 40 s.
+     - *GUI*, ``PdvFirstUseUiTest`` (real Comet, Percolator and PDV from an
+       empty cache): ``pressing Draw did not return within PT30S: the
+       interface is frozen``.
+   * - 2a
+     - 2
+     - Recorded (unit 2, J1): the PNG judge's blank-figure floor removed.
+     - ``PngFigureTest.floor``: ``Expected ...InvalidFigureException to be
+       thrown, but nothing was thrown``; ``everyFilter`` green.
+   * - 2b
+     - 2
+     - New: PDV exiting 0 with a requested figure missing is no longer
+       ``NO_FIGURE``.
+     - *Real PDV*, ``PdvFiguresRealTest.anAbsentSpectrumIsANamedFailure``:
+       ``expected: <NO_FIGURE> but was: <PDV_REPORTED_ERRORS>``; the real
+       figure of a known PSM green.
+   * - 2c
+     - 2
+     - New: ``-k p`` for ``-k s`` (the ids read as peptide sequences).
+     - *Real PDV*, ``aKnownPsmIsDrawn``: ``PDV exited 0 and wrote no figure
+       for "controllerType=0 controllerNumber=1 scan=11367"``.
+   * - 3a
+     - 3
+     - New: the format check bypassed before launch.
+     - ``PdvFiguresTest.formatGateBeforeLaunch``: ``expected:
+       <...UnsupportedSpectrumFileException> but was:
+       <java.lang.IllegalArgumentException>``; ``drawn`` green.
+   * - 3b
+     - 3
+     - New: mzXML marked supported by PDV 2.7.0.
+     - ``PdvSpectrumSupportTest.supported``: ``expected: <[MZML, MGF]> but
+       was: <[MZML, MZXML, MGF]>`` (the expected ``Set.of`` in either order);
+       ``accepted`` green.
+   * - 4a
+     - 4
+     - Recorded (unit 3, K2): the launcher's other-program refusal removed.
+     - ``PdvLaunchesTest.anotherProgramIsRefused``: ``Expected
+       java.io.IOException to be thrown, but nothing was thrown.``
+   * - 4b
+     - 4
+     - New: PDV started before its launch is recorded.
+     - ``theRecordPrecedesTheStart``: ``recorded first ==> expected: <[1]>
+       but was: <[0]>``.
+   * - 4c
+     - 4
+     - New: the JAR's MD5 recorded as its SHA-256.
+     - ``theRecordPrecedesTheStart``: the independent 64-digit SHA-256
+       expected, a 32-digit MD5 found.
+   * - 4d
+     - 4
+     - New: the manifest-version check removed.
+     - ``aVersionMismatchIsRefused``: nothing thrown.
+   * - 5a
+     - 5
+     - Recorded (unit 7, Q2): the ``denovo-gui`` command given ``port + 1``.
+     - ``DenovoGuiCommandTest.theProductCommand``: ``--port, 41547`` expected,
+       ``--port, 41548`` given.
+   * - 5b
+     - 5
+     - New: the controller sends the *next* row's reference.
+     - *Real PDV*, ``PdvControllerRealPdvTest``: ``PDV drew nothing on row 0
+       within PT1M; seen: [PDVOBS displayed row=1 ...`` -- PDV answered ``200
+       selected`` for the wrong row, so only the observer can see it; the
+       unknown reference still 404.
+   * - 5c
+     - 5
+     - New: a window's shutdown no longer ends PDV's process.
+     - ``PdvControllerTest.shutdownEndsTheProcess``: ``its process had not
+       ended 10.0 s after it was told to stop. ==> expected: <CLOSED> but was:
+       <FAILED>``.
+   * - 5d
+     - 5
+     - Recorded (unit 7, Q1): another Results run no longer closes the window.
+     - ``VisualisationWindowTest``: ``expected: <PDV's window for run run-1
+       was closed: ...> but was: <PDV is ready on loopback port ...``.
+   * - 5e
+     - 5
+     - New: the application's ``stop()`` no longer closes PDV's windows.
+     - *GUI*, ``PdvLiveWindowUiTest``: ``PDV ended``, ``the launched process
+       ended ==> expected: <false> but was: <true>``.
+   * - 6a
+     - 6
+     - Recorded (unit 6, N1): score and q-value columns swapped.
+     - ``K562FidelityTest.scores``: ``search_engine_score[1] is "0.00112905",
+       the source's score is "2.37114"``; ``charge`` green.
+   * - 6b
+     - 6
+     - New: the PEP column fed the q-value.
+     - ``search_engine_score[3] is "0.00112905", the source's
+       posterior_error_prob is "9.27998e-07"``.
+   * - 6c
+     - 6
+     - Recorded (unit 5, M2, graded there on the exporter's own tests): the
+       accession cut to the first protein.
+     - ``accession as Percolator's proteinIds: 6670 compared, 402 failed``.
+   * - 6d
+     - 6
+     - New: a static modification's delta rounded to two places.
+     - ``residue 4 (C) lacks the fixed 57.021464:
+       EEEC[+57.02]HFYAGGQVYPGEASR``; modifications against the pepXML red.
+   * - 6e
+     - 6
+     - New: the decoy flag written ``0`` for every row.
+     - ``counts differ: the sources hold 7 target and 2 decoy PSMs, the mzTab
+       9 and 0``; on K562, ``2773 joined source PSMs have no mzTab row``.
+   * - 7a
+     - 7
+     - New: ``spectra_ref`` by instrument scan number, the exporter's
+       read-back also off.
+     - ``spectra_ref ms_run[1]:index=11367 is beyond ms_run-1.mgf's 3638
+       entries``; ``positionAndScanDiffer`` green.
+   * - 7b
+     - 7
+     - New: ``spectra_ref`` by the spectrum's 1-based file position,
+       read-back off.
+     - ``ms_run[1]:index=181 (entry 181) states CHARGE=3+, the PSM's
+       assumed_charge is 2``.
+   * - 7c
+     - 7
+     - New: ``spectra_ref`` to the first row of a shared spectrum, read-back
+       off.
+     - ``spectra_ref ms_run[1]:index=7 is also target PSM ..._11460_3_1's, and
+       PDV selects only the first row of a reference``.
+   * - 8a
+     - 8
+     - Recorded (unit 5, M1): the C-terminal refusal disabled.
+     - ``UnrepresentableTest.cTerminalModification``: ``the message names the
+       reason UNREPRESENTABLE_MODIFICATION`` (the export still failed, for
+       the wrong reason); the exporter's own refusal red.
+   * - 8b
+     - 8
+     - New: the PSM's name dropped from the refusal.
+     - ``the message names the PSM ..._3_11367_2_1: The mzTab for PDV was not
+       written: a PSM ...``.
+   * - 8c
+     - 8
+     - New: a refused export leaves its staging directory behind.
+     - ``nothing at all is left beside it ==> expected: <[]> but was:
+       <[.mztab-staging-...]>``.
+   * - H
+     - --
+     - The harness itself.
+     - An unchanged file, a missing anchor, a comment-only injection (a real
+       Maven run) and a test method renamed in the sandbox so that its
+       selection runs zero tests (a real run) are each a ``HARNESS ERROR``; a
+       green run graded as red and a red without its diagnostic are each a
+       recorded failure.
+
+What it does not cover: Windows and macOS; two GUI and real-PDV grades that
+unit sign-offs saw red, left out because they cost a test's full time bound
+-- K3 in ``PdvFirstUseUiTest`` (the six-minute ``PDV_BOUND``; reproduced once
+while building this script, 401 s) and Q2 in ``PdvControllerRealPdvTest``
+(the three-minute readiness bound); item 1's GUI test is graded by 1b and
+the real PDV's control path by 5b instead. The bind-race relaunch and a
+foreign ``/ready`` stay proved against the fake only.
+
+Measured on 2026-10-11 through ``bash scripts/verify-all-gates.sh --only
+pdv``: 107 controls passed in 820 s (13 m 40 s) -- the baseline 133 s and the
+final clean run 119 s (each compiles the ``cometgui-app`` reactor and runs
+every graded selection: 47 tests, among them both GUI tests and the real-PDV
+observer), the ``cometgui-tools``, ``cometgui-workflow`` and ``cometgui-ui``
+controls 8-15 s each, 5c 39 s (the fake's ten-second shutdown deadline), 5b
+77 s (the observer's one-minute draw bound), the GUI controls 1b 111 s and
+5e 56 s, and control H 15 s. No process was left for the script to end. The
+floor in ``verify-all-gates.sh`` is 107.
 
 Traps
 =====
