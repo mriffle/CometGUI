@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CometGUI Phase 12 unit 1 spike, throwaway.  Raises ONLY SubmitUploadMain to
+     DEBUG so that limelightSubmitImport.jar v8.3.1 prints the server's uploadKey
+     (= import tracking id), which it otherwise keeps to itself
+     (SubmitUploadMain.java:339-343).  Same layout as the JAR's own log4j2.xml. -->
+<Configuration>
+  <Appenders>
+    <Console name="STDOUT" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d %-5p [%t] %C{2} (%F:%L) - %m{nolookups}%n"/>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Logger name="org.yeastrc.limelight.limelight_submit_import.main.SubmitUploadMain" level="debug"/>
+    <Root level="warn"><AppenderRef ref="STDOUT"/></Root>
+  </Loggers>
+</Configuration>

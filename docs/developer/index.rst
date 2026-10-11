@@ -30,6 +30,7 @@ pages describe the implementation that satisfies them.
    results_model
    pdv_integration
    pdv_mztab_spike
+   limelight_upload_spike
    provenance_schema
    security
    testing
