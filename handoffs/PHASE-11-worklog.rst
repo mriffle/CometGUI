@@ -792,17 +792,30 @@ Unit 9 sign-off
   red.
 * **Cost:** about 14 minutes added to the full gate run.
 
+End-of-phase checks (orchestrator, 2026-10-11)
+-----------------------------------------------
+
+* Full PIT regenerated as ``build.sh`` runs it (exit 0, 5169 s); every gated
+  module above 80 % KILLED-only (tools 1714/1832, results 888/943, process
+  160/175 the lowest at 91.4 %). Stray ``cometgui-ui`` PIT report removed.
+* ``verify-test-gates.sh --preflight`` held; ``--only tests`` on ``39e7fdd``
+  **PASS, 37 assertions, 16 221 s**. No PDV or Xvfb left running afterwards.
+
 Rejections and rework
 =====================
 
-None yet.
+No unit was sent back. Orchestrator repair: ``1f25b47`` (the Visualisation
+section's arrival note). Injections of mine that first failed to land (K3
+twice; N1 once) are recorded in their units' sign-offs.
 
 Deferred
 ========
 
-None yet.
+See ``handoffs/PHASE-11-handoff.rst``, *Incomplete, deferred, residue*.
 
 Blockers escalated
 ==================
 
-None yet.
+No blocker. Escalations (specification text the build contradicts, P11-12,
+P11-16, PIT targets, ``LAUNCH_PDV``, the ``tests`` preflight) are in the
+handoff.
