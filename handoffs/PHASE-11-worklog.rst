@@ -754,6 +754,44 @@ Linux-only marked).
   stub; ``docs/developer/testing.rst``'s "not tested yet" table is Phase 01's
   throughout (no application, no pinned binaries).
 
+Unit 9 sign-off
+---------------
+
+**Accepted 2026-10-11**, commit ``2a7ffe5``: ``scripts/verify-pdv-gates.sh``
+(new), registered in ``scripts/verify-all-gates.sh`` as ``pdv`` (floor
+**107** graded controls, items 1-8, ``--list`` text, banner);
+``docs/developer/testing.rst`` and ``pdv_integration.rst`` describe it.
+
+* **Diff read**: the ``verify-all-gates.sh`` change is additive (a new case
+  in each dispatch, the ``--list`` text, one comment's closing parenthesis
+  moved); no existing floor or control changed. The harness works on a
+  ``git archive HEAD`` copy under ``_build/pdv-gate-sandbox``, builds
+  ``-pl TOP -am`` offline and installs nothing (``_build/m2repo`` checksummed
+  before and after), proves each anchor unique and gone and the compiled
+  class changed, reads red from surefire XML and requires every named test
+  to have run, runs a clean baseline first and last, ends any process left
+  under the sandbox, and refuses to start (exit 3) without the scratch
+  artefacts, the X11/font stacks, the shim, ``gcc`` or ``timeout``. Control H
+  grades the harness itself (unchanged file, missing anchor, an injection
+  reaching source but not bytecode, a selection running zero tests, a green
+  graded as red, a red without its diagnostic).
+* **27 production injections** -- 8 from this work log, 19 new -- across items
+  1-8; item 7's three ``spectra_ref`` defects also switch the exporter's own
+  read-back off so the fidelity suite is what catches them; item 5's display
+  control (5b) is red only in the real-PDV observer test (PDV still answers
+  200).
+* **Run by me**: ``bash scripts/verify-all-gates.sh --only pdv`` -> ``PASS
+  pdv: 107 controls in 821s`` (13 min 41 s); no PDV or Xvfb left afterwards;
+  ``--list`` shows the PHASE-11 item text.
+* **Not graded as recorded, by the agent's choice (accepted):** K3 in the
+  GUI test costs its 6-minute bound, so item 1 is graded by 1a (view model)
+  and 1b (FX thread frozen, GUI); Q2 in the observer test costs its 3-minute
+  bound, so 5a grades the command and 5b the real PDV. Item 3a goes red by
+  ``IllegalArgumentException`` rather than a launch; 8a's real-source copy
+  still refuses (as ``PEPTIDE_MISMATCH``), so the reason check is what goes
+  red.
+* **Cost:** about 14 minutes added to the full gate run.
+
 Rejections and rework
 =====================
 
