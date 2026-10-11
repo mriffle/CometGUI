@@ -256,8 +256,8 @@ upload log and the project page URL.
 Design decision from unit 3 (2026-10-11)
 ========================================
 
-P12-18 -- the converter is given a copy of the pout XML with the run's
-pepXML directory removed from its PSM ids (the orchestrator's call; flagged to tier 1)
+P12-18 -- the converter reads a copy of the pout XML without the pepXML directory in its ids
+    *The orchestrator's call; flagged to tier 1.*
     Every CometGUI run gives Comet an **absolute** ``-N <run>/outputs/comet/<base>``,
     so Comet's PIN ``SpecId`` and Percolator's ``psm_id`` carry that absolute
     path (Phase 00 ran with relative names, which is why nobody saw it).
