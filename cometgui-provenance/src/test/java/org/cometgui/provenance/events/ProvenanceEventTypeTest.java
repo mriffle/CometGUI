@@ -69,13 +69,25 @@ class ProvenanceEventTypeTest {
                 () -> assertEquals("run.finished", ProvenanceEventType.RUN_FINISHED.wireName()),
                 () -> assertEquals("export.written", ProvenanceEventType.EXPORT_WRITTEN.wireName()),
                 () -> assertEquals("pdv.launched", ProvenanceEventType.PDV_LAUNCHED.wireName()),
-                () -> assertEquals("mztab.written", ProvenanceEventType.MZTAB_WRITTEN.wireName()));
+                () -> assertEquals("mztab.written", ProvenanceEventType.MZTAB_WRITTEN.wireName()),
+                () ->
+                        assertEquals(
+                                "limelight.converting",
+                                ProvenanceEventType.LIMELIGHT_CONVERTING.wireName()),
+                () ->
+                        assertEquals(
+                                "limelight.converted",
+                                ProvenanceEventType.LIMELIGHT_CONVERTED.wireName()),
+                () ->
+                        assertEquals(
+                                "limelight.unconverted",
+                                ProvenanceEventType.LIMELIGHT_CONVERSION_FAILED.wireName()));
     }
 
     @Test
     @DisplayName(
-            "phase 04's seven types, phase 10's export type and phase 11's PDV launch are the types"
-                    + " that exist")
+            "phase 04's seven types, phase 10's export type, phase 11's PDV types and phase 12's"
+                    + " Limelight conversion types are the types that exist")
     void theTypesArePinned() {
         List<String> names = new ArrayList<>();
         for (ProvenanceEventType type : ProvenanceEventType.values()) {
@@ -93,7 +105,10 @@ class ProvenanceEventTypeTest {
                         "RUN_FINISHED",
                         "EXPORT_WRITTEN",
                         "PDV_LAUNCHED",
-                        "MZTAB_WRITTEN"),
+                        "MZTAB_WRITTEN",
+                        "LIMELIGHT_CONVERTING",
+                        "LIMELIGHT_CONVERTED",
+                        "LIMELIGHT_CONVERSION_FAILED"),
                 names);
     }
 
@@ -105,7 +120,7 @@ class ProvenanceEventTypeTest {
             assertTrue(distinct.add(type.wireName()), "two types share the wire name");
         }
 
-        assertEquals(10, distinct.size());
+        assertEquals(13, distinct.size());
     }
 
     @Test
@@ -165,7 +180,63 @@ class ProvenanceEventTypeTest {
                 () ->
                         assertSame(
                                 ProvenanceEventType.MZTAB_WRITTEN,
-                                ProvenanceEventType.fromWireName("mztab.written")));
+                                ProvenanceEventType.fromWireName("mztab.written")),
+                () ->
+                        assertSame(
+                                ProvenanceEventType.LIMELIGHT_CONVERTING,
+                                ProvenanceEventType.fromWireName("limelight.converting")),
+                () ->
+                        assertSame(
+                                ProvenanceEventType.LIMELIGHT_CONVERTED,
+                                ProvenanceEventType.fromWireName("limelight.converted")),
+                () ->
+                        assertSame(
+                                ProvenanceEventType.LIMELIGHT_CONVERSION_FAILED,
+                                ProvenanceEventType.fromWireName("limelight.unconverted")));
+    }
+
+    @Test
+    @DisplayName(
+            "the three Limelight conversion events after run.finished are written and read back"
+                    + " intact, in order")
+    void limelightConversionEventsFollowTheRunAndReadBack(@TempDir Path directory)
+            throws IOException {
+        Path path = directory.resolve("events.log");
+        Clock clock = Clock.fixed(Instant.parse("2026-10-11T12:00:00.750Z"), ZoneOffset.UTC);
+        try (ProvenanceEventLog log =
+                ProvenanceEventLog.openAppend(path, SecretRedactor.patternsOnly(), clock)) {
+            log.append(ProvenanceEventType.RUN_FINISHED, Map.of("status", "completed"));
+            log.append(
+                    ProvenanceEventType.LIMELIGHT_CONVERTING, Map.of("limelight.q-cutoff", "0.01"));
+            log.append(
+                    ProvenanceEventType.LIMELIGHT_CONVERSION_FAILED,
+                    Map.of("limelight.failure", "no-output"));
+            log.append(
+                    ProvenanceEventType.LIMELIGHT_CONVERTED,
+                    Map.of("output.sha256", "e".repeat(64)));
+        }
+
+        List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        assertEquals(
+                "{\"seq\":2,\"time\":\"2026-10-11T12:00:00.750Z\","
+                        + "\"type\":\"limelight.converting\","
+                        + "\"payload\":{\"limelight.q-cutoff\":\"0.01\"}}",
+                lines.get(1));
+        assertEquals(
+                "{\"seq\":3,\"time\":\"2026-10-11T12:00:00.750Z\","
+                        + "\"type\":\"limelight.unconverted\","
+                        + "\"payload\":{\"limelight.failure\":\"no-output\"}}",
+                lines.get(2));
+        RecoveredEventLog recovered = ProvenanceEventLogReader.recover(path);
+        assertTrue(recovered.intact(), () -> "defects: " + recovered.defects());
+        assertEquals(
+                List.of(
+                        ProvenanceEventType.RUN_FINISHED,
+                        ProvenanceEventType.LIMELIGHT_CONVERTING,
+                        ProvenanceEventType.LIMELIGHT_CONVERSION_FAILED,
+                        ProvenanceEventType.LIMELIGHT_CONVERTED),
+                recovered.events().stream().map(ProvenanceEvent::type).toList());
+        assertEquals("e".repeat(64), recovered.events().get(3).payload().get("output.sha256"));
     }
 
     @Test
@@ -281,7 +352,8 @@ class ProvenanceEventTypeTest {
                 "no provenance event type has the wire name \"run.begun\"; expected one of"
                         + " [run.started, stage.started, stage.finished, tool.invoked,"
                         + " file.hashed, warning.raised, run.finished, export.written,"
-                        + " pdv.launched, mztab.written]",
+                        + " pdv.launched, mztab.written, limelight.converting,"
+                        + " limelight.converted, limelight.unconverted]",
                 rejected.getMessage());
     }
 

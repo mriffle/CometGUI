@@ -42,6 +42,10 @@ import org.cometgui.domain.project.ProjectLayout;
  *       provenance/events.log
  *       results/index/                 (finalise-results; never under outputs/)
  *       results/view-state.json
+ *       results/limelight-settings.json   (phase 12)
+ *       results/limelight/                (phase 12: the converter's input, while it runs)
+ *       outputs/limelight/                (phase 12: one Limelight XML per conversion)
+ *       logs/limelight-converter.log      (phase 12)
  *       exports/
  * </pre>
  *
@@ -133,6 +137,15 @@ public record RunLayout(Path root) {
 
     /** The directory of filtered exports, which are new files and never overwritten. */
     public static final String EXPORTS_DIRECTORY_NAME = "exports";
+
+    /**
+     * The subdirectory of {@code outputs/} holding the Limelight converter's XML files, and of
+     * {@code results/} holding what CometGUI gives the converter to read while it runs.
+     */
+    public static final String LIMELIGHT_DIRECTORY_NAME = "limelight";
+
+    /** The run's Limelight conversion settings, in {@code results/}. */
+    public static final String LIMELIGHT_SETTINGS_FILE_NAME = "limelight-settings.json";
 
     /** The suffix Comet gives a pepXML output. */
     public static final String PEP_XML_SUFFIX = ".pep.xml";
@@ -471,6 +484,38 @@ public record RunLayout(Path root) {
      */
     public static String exportsRelativePath() {
         return EXPORTS_DIRECTORY_NAME;
+    }
+
+    /**
+     * The directory of the Limelight converter's output files: one new Limelight XML file per
+     * conversion, never overwritten (phase 12, design decision P12-5). Not in {@link
+     * #directories()}: the first conversion makes it.
+     *
+     * @return {@code outputs/limelight/}
+     */
+    public Path limelightOutputDirectory() {
+        return outputsDirectory().resolve(LIMELIGHT_DIRECTORY_NAME);
+    }
+
+    /**
+     * The run's Limelight conversion settings -- the Limelight q-value cutoff and the converter's
+     * options the next conversion uses (phase 12, design decision P12-6). Beside the view state and
+     * separate from it: the one is never read from or written to the other.
+     *
+     * @return {@code results/limelight-settings.json}
+     */
+    public Path limelightSettingsFile() {
+        return resultsDirectory().resolve(LIMELIGHT_SETTINGS_FILE_NAME);
+    }
+
+    /**
+     * The directory of what CometGUI derives from the run's results for the Limelight converter to
+     * read while a conversion runs (phase 12). Never under {@code outputs/}.
+     *
+     * @return {@code results/limelight/}
+     */
+    public Path limelightWorkDirectory() {
+        return resultsDirectory().resolve(LIMELIGHT_DIRECTORY_NAME);
     }
 
     /**

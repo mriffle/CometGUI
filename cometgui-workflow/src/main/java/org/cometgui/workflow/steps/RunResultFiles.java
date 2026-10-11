@@ -16,6 +16,7 @@
 
 package org.cometgui.workflow.steps;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
 import org.cometgui.domain.run.RunLayout;
@@ -34,7 +35,44 @@ import org.cometgui.tools.percolator.PercolatorArtefact;
  */
 public final class RunResultFiles {
 
+    /**
+     * The provenance role of each Comet pepXML a run's search wrote, as {@code provenance.json}
+     * records it among the outputs (phase 12 reads a run's recorded pepXML checksums by it).
+     */
+    public static final String PEP_XML_ROLE = RunDeclarations.PEP_XML;
+
+    /**
+     * The provenance role of the pout XML {@code run-percolator} wrote, as {@code provenance.json}
+     * records it among the outputs (phase 12 reads the run's recorded checksum by it).
+     */
+    public static final String POUT_XML_ROLE = PercolatorDeclarations.POUT_XML;
+
     private RunResultFiles() {}
+
+    /**
+     * Where a run's pout XML is, whether or not the run wrote one.
+     *
+     * @param run the run
+     * @return {@code outputs/percolator/pout.xml} under the run's directory
+     * @throws NullPointerException if {@code run} is {@code null}
+     */
+    public static Path percolatorXml(RunLayout run) {
+        return percolatorOutputDirectory(run).resolve(PercolatorArtefact.POUT_XML.fileName());
+    }
+
+    /**
+     * Makes one of a run's raw tool outputs read-only, by the one rule {@code run-percolator}
+     * applies to Percolator's ({@code R-PERC-07}): every write permission removed on a POSIX file
+     * system, the DOS read-only attribute set elsewhere. Phase 12 applies it to each Limelight XML
+     * file a conversion keeps.
+     *
+     * @param file the output
+     * @throws IOException if neither view is available or the change cannot be made
+     * @throws NullPointerException if {@code file} is {@code null}
+     */
+    public static void makeReadOnly(Path file) throws IOException {
+        PercolatorSteps.makeReadOnly(Objects.requireNonNull(file, "file"));
+    }
 
     /**
      * The directory of a run's raw Percolator outputs.

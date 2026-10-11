@@ -170,6 +170,36 @@ class RunLayoutTest {
     }
 
     @Test
+    @DisplayName(
+            "phase 12: Limelight XML under outputs/limelight/, its settings and the converter's"
+                    + " input under results/, none of them a directory a new run is created with")
+    void limelightPaths() {
+        String r = "data/MyProject/runs/20260828T231500Z-run-0001/";
+        assertAll(
+                () ->
+                        assertEquals(
+                                absolute(r + "outputs/limelight"), RUN.limelightOutputDirectory()),
+                () ->
+                        assertEquals(
+                                absolute(r + "results/limelight-settings.json"),
+                                RUN.limelightSettingsFile()),
+                () ->
+                        assertEquals(
+                                absolute(r + "results/limelight"), RUN.limelightWorkDirectory()));
+        assertTrue(RUN.limelightOutputDirectory().startsWith(RUN.outputsDirectory()));
+        for (Path derived : List.of(RUN.limelightSettingsFile(), RUN.limelightWorkDirectory())) {
+            assertFalse(derived.startsWith(RUN.outputsDirectory()), derived::toString);
+        }
+        for (Path made :
+                List.of(
+                        RUN.limelightOutputDirectory(),
+                        RUN.limelightSettingsFile(),
+                        RUN.limelightWorkDirectory())) {
+            assertFalse(RUN.directories().contains(made), made::toString);
+        }
+    }
+
+    @Test
     @DisplayName("two runs of one project have two result index directories")
     void indexDirectoryPerRun() {
         RunLayout other =

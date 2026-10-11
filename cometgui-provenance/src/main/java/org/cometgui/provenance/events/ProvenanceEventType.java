@@ -123,7 +123,43 @@ public enum ProvenanceEventType {
      * pinned by {@code org.cometgui.workflow.pdv}, which writes the event. Like {@link
      * #PDV_LAUNCHED} it follows {@link #RUN_FINISHED}: the mzTab is made from a finished run.
      */
-    MZTAB_WRITTEN("mztab.written");
+    MZTAB_WRITTEN("mztab.written"),
+
+    /**
+     * A Limelight conversion of a run is about to start: written <em>before</em> the converter's
+     * process is started, so that a conversion that never ends -- the application closed, the
+     * machine stopped -- still leaves its record.
+     *
+     * <p>Added by phase 12 (<em>Application provenance</em>: "Limelight conversion parameters";
+     * design decision P12-5). The payload names the converter JAR, its MD5 and SHA-256 and the
+     * version it reports, the argument array after redaction, the Limelight q-value cutoff and
+     * options, and the MD5 and SHA-256 of every file the converter is given to read; the keys are
+     * pinned by {@code org.cometgui.workflow.limelight}, the one path through which a conversion is
+     * started. Exactly one of {@link #LIMELIGHT_CONVERTED} and {@link #LIMELIGHT_CONVERSION_FAILED}
+     * follows it for the same output path, unless the application stopped first. Like {@link
+     * #PDV_LAUNCHED} it follows {@link #RUN_FINISHED}.
+     */
+    LIMELIGHT_CONVERTING("limelight.converting"),
+
+    /**
+     * A Limelight conversion produced a Limelight XML file that passed every check ({@code
+     * R-LL-04}) and is now at its final path, read-only.
+     *
+     * <p>Added by phase 12. The payload repeats {@link #LIMELIGHT_CONVERTING}'s and adds the output
+     * file's path, size, MD5 and SHA-256, what it holds, and the converter log's path and
+     * checksums.
+     */
+    LIMELIGHT_CONVERTED("limelight.converted"),
+
+    /**
+     * A Limelight conversion that was started ended without a Limelight XML file: the converter
+     * failed, or what it wrote was judged not to be a valid Limelight XML file. Nothing is at the
+     * output path.
+     *
+     * <p>Added by phase 12. The payload repeats {@link #LIMELIGHT_CONVERTING}'s and adds the named
+     * failure and its reason; it carries no output checksum, because there is no output.
+     */
+    LIMELIGHT_CONVERSION_FAILED("limelight.unconverted");
 
     private final String wireName;
 
@@ -168,6 +204,7 @@ public enum ProvenanceEventType {
                         + wire
                         + "\"; expected one of [run.started, stage.started, stage.finished,"
                         + " tool.invoked, file.hashed, warning.raised, run.finished,"
-                        + " export.written, pdv.launched, mztab.written]");
+                        + " export.written, pdv.launched, mztab.written, limelight.converting,"
+                        + " limelight.converted, limelight.unconverted]");
     }
 }
