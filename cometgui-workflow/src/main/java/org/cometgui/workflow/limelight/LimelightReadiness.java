@@ -47,6 +47,9 @@ import org.cometgui.workflow.storage.LimelightSettings;
  * @param decoyImportUnavailable why decoy import cannot be offered for this run, or empty when it
  *     can
  * @param converter the installed, verified converter, when there is one
+ * @param compatibility whether the run's own Percolator wrote the XML the converter reads, and what
+ *     is offered when it did not -- the {@link LimelightPrerequisite#PERCOLATOR_XML} refusal is its
+ *     explanation (P12-9)
  */
 public record LimelightReadiness(
         RunId runId,
@@ -58,7 +61,8 @@ public record LimelightReadiness(
         Path fasta,
         Optional<Path> output,
         Optional<String> decoyImportUnavailable,
-        Optional<LimelightConverterInstallation> converter) {
+        Optional<LimelightConverterInstallation> converter,
+        LimelightCompatibility compatibility) {
 
     /**
      * Validates the answer and copies its refusals.
@@ -76,6 +80,7 @@ public record LimelightReadiness(
         Objects.requireNonNull(output, "output");
         Objects.requireNonNull(decoyImportUnavailable, "decoyImportUnavailable");
         Objects.requireNonNull(converter, "converter");
+        Objects.requireNonNull(compatibility, "compatibility");
     }
 
     /**

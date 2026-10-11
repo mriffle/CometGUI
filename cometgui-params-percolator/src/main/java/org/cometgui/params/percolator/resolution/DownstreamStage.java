@@ -41,12 +41,14 @@ public enum DownstreamStage {
     LIMELIGHT_CONVERSION(
             "limelight-conversion",
             "Limelight conversion",
+            "Limelight",
             EnumSet.of(ToolCapability.XML_OUTPUT),
             "the Limelight converter reads the Percolator XML that XML_OUTPUT writes",
             List.of(StageRemedy.REGISTER_LOCAL_BINARY, StageRemedy.CONVERT_ON_SUPPORTED_PLATFORM));
 
     private final String id;
     private final String label;
+    private final String purpose;
     private final Set<ToolCapability> requiredCapabilities;
     private final String why;
     private final List<StageRemedy> remedies;
@@ -54,11 +56,13 @@ public enum DownstreamStage {
     DownstreamStage(
             String id,
             String label,
+            String purpose,
             Set<ToolCapability> requiredCapabilities,
             String why,
             List<StageRemedy> remedies) {
         this.id = id;
         this.label = label;
+        this.purpose = purpose;
         this.requiredCapabilities = Collections.unmodifiableSet(requiredCapabilities);
         this.why = why;
         this.remedies = List.copyOf(remedies);
@@ -80,6 +84,16 @@ public enum DownstreamStage {
      */
     public String label() {
         return label;
+    }
+
+    /**
+     * What a Percolator rerun is for when it is made for this stage, as the action's label names
+     * it: "Rerun Percolator with 3.07.1 for <em>Limelight</em>" ({@code R-LL-01}).
+     *
+     * @return for example {@code Limelight}
+     */
+    public String purpose() {
+        return purpose;
     }
 
     /**

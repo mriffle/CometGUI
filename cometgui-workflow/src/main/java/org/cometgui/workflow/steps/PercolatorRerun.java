@@ -37,6 +37,7 @@ import org.cometgui.domain.run.IndexMode;
 import org.cometgui.domain.run.RunDerivation;
 import org.cometgui.domain.run.RunIdentity;
 import org.cometgui.domain.run.RunLayout;
+import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.Diagnostic;
@@ -44,6 +45,8 @@ import org.cometgui.params.comet.parser.CometParamsParser;
 import org.cometgui.params.comet.parser.ParseResult;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.MetadataLoader;
+import org.cometgui.params.percolator.PercolatorSettings;
+import org.cometgui.params.percolator.resolution.CompatibilityAction;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
 import org.cometgui.tools.comet.PinDecoyConfiguration;
@@ -159,6 +162,49 @@ public final class PercolatorRerun {
             }
         }
         return Plan.covering(WANTED, provided);
+    }
+
+    /**
+     * The Percolator choice of the compatible rerun offered for a downstream stage (phase 12,
+     * design decision P12-9): the build {@link CompatibilityAction} took from Phase 09's resolution
+     * of a run with that stage enabled, hashed now, with the stage enabled and that resolution --
+     * so the rerun uses the version its label names and nothing else. Give the choice to {@link
+     * #preview}, {@link #prepare} and {@link #start} as any other: this is the one rerun, not a
+     * second.
+     *
+     * @param action the action offered for the stage
+     * @param settings the Percolator settings the rerun runs with
+     * @return the choice
+     * @throws RerunRefusedException if the action offers no rerun, or its build is not installed
+     *     yet -- saying which; nothing was hashed
+     * @throws IOException if the build's executable cannot be hashed
+     */
+    public PercolatorChoice compatibleChoice(
+            CompatibilityAction action, PercolatorSettings settings)
+            throws IOException, RerunRefusedException {
+        Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(settings, "settings");
+        if (!action.offersRerun()) {
+            throw new RerunRefusedException(
+                    "No Percolator rerun is offered for "
+                            + action.stage().label()
+                            + ": "
+                            + action.explanation());
+        }
+        ToolOffer build = action.build().orElseThrow();
+        if (action.installFirst()) {
+            throw new RerunRefusedException(
+                    "Percolator "
+                            + build.version().text()
+                            + " is not installed, and the rerun runs only an installed build:"
+                            + " install it, then ask for the rerun again.");
+        }
+        Path executable = build.installedPath().orElseThrow();
+        return new PercolatorChoice(
+                new PercolatorSelection(build, executable, hashes.rehash(executable).sha256()),
+                settings,
+                action.resolution().enabledStages(),
+                action.resolution());
     }
 
     /**

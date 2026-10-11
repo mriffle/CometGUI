@@ -920,12 +920,10 @@ class LimelightConversionsTest {
         assertAll(
                 () ->
                         assertEquals(
-                                "run run-0001's Percolator wrote no XML: its provenance records no"
-                                        + " Percolator XML output "
+                                "run run-0001's provenance records no Percolator execution,"
+                                        + " so it has no Percolator XML "
                                         + pout
-                                        + " (Percolator ran without XML output, or with a build"
-                                        + " that cannot write it), and the Limelight converter"
-                                        + " reads only Percolator XML",
+                                        + ", which the Limelight converter requires",
                                 noXml.message()),
                 () ->
                         assertTrue(

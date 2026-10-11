@@ -395,6 +395,13 @@ final class LimelightFixtures {
     }
 
     static void writeManifest(RunLayout layout, List<FileRecord> files) throws IOException {
+        writeManifest(layout, files, Map.of());
+    }
+
+    /** A {@code provenance.json} with these settings -- a recorded Percolator execution's keys. */
+    static void writeManifest(
+            RunLayout layout, List<FileRecord> files, Map<String, String> settings)
+            throws IOException {
         ManifestWriter.redactingWith(SecretRedactor.patternsOnly())
                 .writeTo(
                         layout.provenanceJsonFile(),
@@ -408,7 +415,7 @@ final class LimelightFixtures {
                                         CREATED,
                                         Optional.of(CREATED.plusSeconds(60))),
                                 ApplicationRecord.capture("0.1.0-SNAPSHOT", "test"),
-                                Map.of(),
+                                settings,
                                 List.of(),
                                 files));
     }

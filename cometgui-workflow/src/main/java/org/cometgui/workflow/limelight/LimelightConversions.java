@@ -44,8 +44,12 @@ import org.cometgui.domain.run.RunIdentity;
 import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.secrets.SecretRedactor;
 import org.cometgui.domain.tools.HostPlatform;
+import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolName;
+import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.params.percolator.resolution.CompatibilityAction;
+import org.cometgui.params.percolator.resolution.DownstreamStage;
 import org.cometgui.provenance.events.ProvenanceEvent;
 import org.cometgui.provenance.events.ProvenanceEventType;
 import org.cometgui.provenance.manifest.FileDirection;
@@ -62,7 +66,9 @@ import org.cometgui.tools.limelight.LimelightConverter;
 import org.cometgui.tools.limelight.LimelightConverterIdentity;
 import org.cometgui.tools.limelight.PepXmlSet;
 import org.cometgui.tools.limelight.PercolatorXmlPsms;
+import org.cometgui.tools.percolator.PercolatorOption;
 import org.cometgui.tools.process.RunMessageSink;
+import org.cometgui.workflow.steps.PercolatorProvenance;
 import org.cometgui.workflow.steps.RunResultFiles;
 import org.cometgui.workflow.storage.LimelightSettings;
 import org.cometgui.workflow.storage.LimelightSettingsStore;
@@ -264,6 +270,18 @@ public final class LimelightConversions {
     /** What a default output's name ends with. */
     public static final String OUTPUT_SUFFIX = ".xml";
 
+    /** The stage a run's Percolator XML is for. */
+    private static final DownstreamStage LIMELIGHT = DownstreamStage.LIMELIGHT_CONVERSION;
+
+    /** {@code percolator.origin} of a registered local binary. */
+    private static final String LOCAL = "local";
+
+    /** A {@code percolator.not-emitted.<nn>} entry's option key ends with this. */
+    private static final String OPTION_SUFFIX = ".option";
+
+    /** ... and its reason key with this. */
+    private static final String REASON_SUFFIX = ".reason";
+
     /** How long the converter is given to report its version. */
     public static final Duration IDENTITY_TIMEOUT = Duration.ofMinutes(2);
 
@@ -397,6 +415,33 @@ public final class LimelightConversions {
             }
         }
         LimelightSettingsStore.write(run, settings);
+    }
+
+    /**
+     * Whether a run's own Percolator wrote the XML the Limelight converter reads -- read from what
+     * the run recorded, never from the Percolator selected now -- and, when it did not, the action
+     * offered (P12-9, {@code R-LL-01}, {@code R-LL-02}). Reads and hashes the run's Percolator XML;
+     * starts nothing and writes nothing. The same answer {@link #check} gives as {@link
+     * LimelightReadiness#compatibility()}, without the other prerequisites.
+     *
+     * @param run the run
+     * @param identity its recorded identity
+     * @return the answer
+     * @throws IOException if the Percolator XML cannot be hashed for a reason that is not a refusal
+     */
+    public LimelightCompatibility compatibility(RunLayout run, RunIdentity identity)
+            throws IOException {
+        Objects.requireNonNull(run, "run");
+        Objects.requireNonNull(identity, "identity");
+        String name = "run " + identity.runId().value();
+        if (executing.get().contains(identity.runId())) {
+            return stillExecuting(identity, name);
+        }
+        List<LimelightRefusal> problems = new ArrayList<>();
+        Optional<ProvenanceManifest> manifest =
+                manifest(run, name, problems, LimelightPrerequisite.PERCOLATOR_XML);
+        return percolatorXml(identity, name, manifest, problems, RunResultFiles.percolatorXml(run))
+                .compatibility();
     }
 
     /**
@@ -653,6 +698,20 @@ public final class LimelightConversions {
 
     // ------------------------------------------------------------------------- the assessment --
 
+    private static String executingMessage(String name) {
+        return name
+                + " is executing: its results are not final and the workflow engine holds its event"
+                + " log. Convert it when the run has ended.";
+    }
+
+    private static LimelightCompatibility stillExecuting(RunIdentity identity, String name) {
+        return new LimelightCompatibility(
+                identity.runId(),
+                Optional.empty(),
+                Optional.of(executingMessage(name)),
+                Optional.empty());
+    }
+
     private Assessment assess(
             RunLayout run, RunIdentity identity, LimelightSettings settings, Optional<Path> output)
             throws IOException {
@@ -669,12 +728,7 @@ public final class LimelightConversions {
         List<LimelightRefusal> refusals = new ArrayList<>();
         if (executing.get().contains(identity.runId())) {
             refusals.add(
-                    LimelightRefusal.of(
-                            LimelightPrerequisite.RUN_ENDED,
-                            name
-                                    + " is executing: its results are not final and the workflow"
-                                    + " engine holds its event log. Convert it when the run has"
-                                    + " ended."));
+                    LimelightRefusal.of(LimelightPrerequisite.RUN_ENDED, executingMessage(name)));
             return new Assessment(
                     new LimelightReadiness(
                             identity.runId(),
@@ -688,7 +742,8 @@ public final class LimelightConversions {
                             Optional.of(
                                     "Whether decoys can be imported is decided when the run has"
                                             + " ended."),
-                            Optional.empty()),
+                            Optional.empty(),
+                            stillExecuting(identity, name)),
                     Optional.empty(),
                     Map.of(),
                     null,
@@ -704,15 +759,16 @@ public final class LimelightConversions {
                         params,
                         identity.parameters().hashes().sha256());
 
+        List<LimelightRefusal> manifestProblems = new ArrayList<>();
         Optional<ProvenanceManifest> manifest =
-                manifest(run, name, refusals, LimelightPrerequisite.PERCOLATOR_XML);
-        FileHashes poutHashes = null;
+                manifest(run, name, manifestProblems, LimelightPrerequisite.PERCOLATOR_XML);
+        refusals.addAll(manifestProblems);
+        PoutCheck poutCheck = percolatorXml(identity, name, manifest, manifestProblems, pout);
+        poutCheck.refusal().ifPresent(refusals::add);
+        FileHashes poutHashes = poutCheck.hashes();
         Optional<PercolatorXmlPsms> psms = Optional.empty();
-        if (manifest.isPresent()) {
-            poutHashes = percolatorXml(refusals, name, manifest.get(), pout);
-            if (poutHashes != null) {
-                psms = readPercolatorXml(refusals, pout);
-            }
+        if (poutHashes != null) {
+            psms = readPercolatorXml(refusals, pout);
         }
 
         String searchedName =
@@ -780,7 +836,8 @@ public final class LimelightConversions {
                         fasta,
                         target,
                         decoys,
-                        status.installation()),
+                        status.installation(),
+                        poutCheck.compatibility()),
                 psms,
                 recordedPepXml,
                 paramsHashes,
@@ -873,34 +930,49 @@ public final class LimelightConversions {
         }
     }
 
-    /** The run's recorded pout XML, unchanged, or a refusal. */
-    private FileHashes percolatorXml(
-            List<LimelightRefusal> refusals, String name, ProvenanceManifest manifest, Path pout)
+    /**
+     * The run's Percolator XML, read from what the run recorded (P12-9): its hashes when it is
+     * there, recorded complete and unchanged; otherwise the refusal, whose words are the
+     * compatibility's explanation, and the action offered.
+     */
+    private PoutCheck percolatorXml(
+            RunIdentity identity,
+            String name,
+            Optional<ProvenanceManifest> manifest,
+            List<LimelightRefusal> manifestProblems,
+            Path pout)
             throws IOException {
+        RunId id = identity.runId();
+        if (manifest.isEmpty()) {
+            return new PoutCheck(
+                    new LimelightCompatibility(
+                            id,
+                            Optional.empty(),
+                            Optional.of(manifestProblems.get(0).message()),
+                            Optional.empty()),
+                    null,
+                    Optional.empty());
+        }
+        Map<String, String> settings = manifest.get().settings();
+        Optional<String> percolator = recordedPercolator(settings);
         FileRecord record = null;
-        for (FileRecord file : manifest.files()) {
+        for (FileRecord file : manifest.get().files()) {
             if (file.direction() == FileDirection.OUTPUT
                     && RunResultFiles.POUT_XML_ROLE.equals(file.role())
                     && file.path().equals(pout)) {
                 record = file;
             }
         }
+        List<LimelightRefusal> found = new ArrayList<>();
+        FileHashes poutHashes = null;
         if (record == null) {
-            refusals.add(
+            found.add(
                     LimelightRefusal.of(
                             LimelightPrerequisite.PERCOLATOR_XML,
                             pout,
-                            name
-                                    + "'s Percolator wrote no XML: its provenance records no"
-                                    + " Percolator XML output "
-                                    + pout
-                                    + " (Percolator ran without XML output, or with a build that"
-                                    + " cannot write it), and the Limelight converter reads only"
-                                    + " Percolator XML"));
-            return null;
-        }
-        if (record.status() != ProvenanceStatus.COMPLETED) {
-            refusals.add(
+                            noXml(name, settings, percolator, pout)));
+        } else if (record.status() != ProvenanceStatus.COMPLETED) {
+            found.add(
                     LimelightRefusal.of(
                             LimelightPrerequisite.PERCOLATOR_XML,
                             pout,
@@ -911,15 +983,112 @@ public final class LimelightConversions {
                                     + " is recorded "
                                     + record.status().wireName()
                                     + ", not complete, so it is not converted"));
-            return null;
+        } else {
+            poutHashes =
+                    recorded(
+                            found,
+                            LimelightPrerequisite.PERCOLATOR_XML,
+                            name,
+                            "Percolator XML",
+                            pout,
+                            record.hashes().sha256());
         }
-        return recorded(
-                refusals,
-                LimelightPrerequisite.PERCOLATOR_XML,
-                name,
-                "Percolator XML",
-                pout,
-                record.hashes().sha256());
+        if (found.isEmpty()) {
+            return new PoutCheck(
+                    new LimelightCompatibility(id, percolator, Optional.empty(), Optional.empty()),
+                    poutHashes,
+                    Optional.empty());
+        }
+        LimelightRefusal refusal = found.get(0);
+        return new PoutCheck(
+                new LimelightCompatibility(
+                        id,
+                        percolator,
+                        Optional.of(refusal.message()),
+                        Optional.of(
+                                CompatibilityAction.forStage(
+                                        provisioning.percolatorOffers(), LIMELIGHT))),
+                null,
+                Optional.of(refusal));
+    }
+
+    /** The run's recorded Percolator, named as resolution names a build, if it records one. */
+    private static Optional<String> recordedPercolator(Map<String, String> settings) {
+        String version = settings.get(PercolatorProvenance.VERSION);
+        if (version == null) {
+            return Optional.empty();
+        }
+        return Optional.of(
+                CompatibilityAction.buildName(
+                        version,
+                        LOCAL.equals(settings.get(PercolatorProvenance.ORIGIN))
+                                ? ToolOrigin.LOCAL
+                                : ToolOrigin.MANAGED));
+    }
+
+    /**
+     * Why a run records no Percolator XML, from its recorded Percolator execution: Phase 09's own
+     * sentence for {@code -X} when the command left it out, otherwise the recorded capabilities and
+     * what the run recorded about pout XML.
+     */
+    private static String noXml(
+            String name, Map<String, String> settings, Optional<String> percolator, Path pout) {
+        if (percolator.isEmpty()) {
+            return name
+                    + "'s provenance records no Percolator execution, so it has no Percolator XML "
+                    + pout
+                    + ", which the Limelight converter requires";
+        }
+        String head =
+                name
+                        + "'s Percolator "
+                        + percolator.get()
+                        + " did not write the Percolator XML the Limelight converter requires: ";
+        Set<String> recorded =
+                Set.of(settings.getOrDefault(PercolatorProvenance.CAPABILITIES, "").split(" "));
+        List<String> needed = new ArrayList<>();
+        boolean capable = true;
+        for (ToolCapability capability : LIMELIGHT.requiredCapabilities()) {
+            needed.add(capability.id());
+            capable &= recorded.contains(capability.id());
+        }
+        String capabilities = String.join(" and ", needed);
+        if (!capable) {
+            return head
+                    + notEmittedXml(settings)
+                            .orElse(
+                                    "its recorded capabilities do not include "
+                                            + capabilities
+                                            + ", which "
+                                            + LIMELIGHT.label()
+                                            + " needs ("
+                                            + LIMELIGHT.why()
+                                            + ")");
+        }
+        return head
+                + "it was observed to have "
+                + capabilities
+                + ", but the run records no Percolator XML output "
+                + pout
+                + ", and its record of the pout XML reads: "
+                + settings.getOrDefault(PercolatorProvenance.POUT_XML, "nothing");
+    }
+
+    /** Phase 09's recorded reason for leaving {@code -X} out of the command, if it did. */
+    private static Optional<String> notEmittedXml(Map<String, String> settings) {
+        String option = PercolatorOption.XML_OUTPUT.spelling();
+        for (Map.Entry<String, String> setting : settings.entrySet()) {
+            String key = setting.getKey();
+            if (key.startsWith(PercolatorProvenance.NOT_EMITTED_PREFIX)
+                    && key.endsWith(OPTION_SUFFIX)
+                    && option.equals(setting.getValue())) {
+                return Optional.ofNullable(
+                        settings.get(
+                                key.substring(0, key.length() - OPTION_SUFFIX.length())
+                                        + REASON_SUFFIX));
+            }
+        }
+        return Optional.empty();
     }
 
     private static Optional<PercolatorXmlPsms> readPercolatorXml(
@@ -1209,6 +1378,15 @@ public final class LimelightConversions {
         return new LimelightConversionRefusedException(
                 List.of(LimelightRefusal.of(prerequisite, message)));
     }
+
+    /**
+     * What the run's Percolator XML came to: the compatibility, its hashes when it can be read
+     * ({@code null} otherwise), and the refusal when it cannot.
+     */
+    private record PoutCheck(
+            LimelightCompatibility compatibility,
+            FileHashes hashes,
+            Optional<LimelightRefusal> refusal) {}
 
     /** One file the converter reads, and what it is. */
     private record Input(String role, Path path, FileHashes hashes) {}

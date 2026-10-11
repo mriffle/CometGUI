@@ -38,10 +38,12 @@ final class ResolutionMessages {
 
     /** How an offer is named: its version as upstream wrote it, and whether it is local. */
     static String label(ToolOffer offer) {
-        String version = offer.version().text();
-        return offer.origin() == ToolOrigin.LOCAL
-                ? version + " (registered local binary)"
-                : version;
+        return label(offer.version().text(), offer.origin());
+    }
+
+    /** The same, for a build known only by its version text and origin -- as a run recorded it. */
+    static String label(String version, ToolOrigin origin) {
+        return origin == ToolOrigin.LOCAL ? version + " (registered local binary)" : version;
     }
 
     static String noPercolator() {
@@ -208,6 +210,56 @@ final class ResolutionMessages {
 
     static String buildsChanged() {
         return "the Percolator builds available on this computer changed";
+    }
+
+    /** The compatible rerun's label, built from the build resolution returned ({@code R-LL-01}). */
+    static String rerunLabel(ToolOffer build, DownstreamStage stage) {
+        return "Rerun Percolator with " + label(build) + " for " + stage.purpose();
+    }
+
+    static String rerun(ToolOffer build, DownstreamStage stage, String selectionReason) {
+        String name = label(build);
+        String install =
+                build.state() == ToolInstallState.INSTALLED
+                        ? ""
+                        : " Percolator "
+                                + name
+                                + " is not installed yet: it is installed when the rerun is"
+                                + " chosen, and not before.";
+        return "Percolator "
+                + name
+                + " is the Percolator that a run with "
+                + stage.label()
+                + " enabled resolves to here, and it has been observed to have "
+                + capabilities(stage.requiredCapabilities())
+                + ". The rerun makes a new run that rescores this run's merged PIN with it; Comet"
+                + " is not run again, and this run is kept as it is."
+                + install
+                + " "
+                + selectionReason;
+    }
+
+    static String registerLabel(DownstreamStage stage) {
+        return "Register a local Percolator binary for " + stage.purpose();
+    }
+
+    /** {@code R-LL-02}: said plainly, before the resolver's own explanation. */
+    static String noManagedBuild(DownstreamStage stage) {
+        return "No managed Percolator build that can write "
+                + capabilities(stage.requiredCapabilities())
+                + " exists for this platform, so CometGUI cannot install one and offers no"
+                + " Percolator rerun for "
+                + stage.purpose()
+                + ".";
+    }
+
+    /** A managed build claims the capability here but cannot be used, or is not observed. */
+    static String notObtainable(DownstreamStage stage) {
+        return "No Percolator that can be used on this computer has been observed to have "
+                + capabilities(stage.requiredCapabilities())
+                + ", so CometGUI offers no Percolator rerun for "
+                + stage.purpose()
+                + ".";
     }
 
     static String capabilities(Collection<ToolCapability> capabilities) {

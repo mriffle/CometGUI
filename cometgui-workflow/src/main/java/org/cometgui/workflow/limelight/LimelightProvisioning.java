@@ -151,6 +151,18 @@ public final class LimelightProvisioning {
         return tools.install(ToolName.LIMELIGHT_CONVERTER, version, listener);
     }
 
+    /**
+     * The Percolator builds the Tool Manager offers now, in its order: what the action offered for
+     * a run without Percolator XML is resolved over (P12-9), from the same one Tool Manager.
+     *
+     * @return the Percolator offers, immutable
+     */
+    public List<ToolOffer> percolatorOffers() {
+        return tools.offers().stream()
+                .filter(offer -> offer.tool() == ToolName.PERCOLATOR)
+                .toList();
+    }
+
     private static Optional<ToolOffer> newest(List<ToolOffer> offers, Predicate<ToolOffer> which) {
         return offers.stream().filter(which).max(BY_VERSION);
     }
