@@ -22,11 +22,12 @@
  * version it prints.
  *
  * <p><strong>Phase 12 unit 2 landed the converter adapter</strong>: {@link
- * org.cometgui.tools.limelight.PercolatorXmlPsms} reads what the converter will read from the run's
- * Percolator XML (PSM ids, decoy PSMs); {@link org.cometgui.tools.limelight.PepXmlSet} derives
- * every pepXML name the converter will open and proves each is the run's own; {@link
- * org.cometgui.tools.limelight.LimelightConversionRequest} is a typed request that cannot be made
- * with a decoy choice its Percolator XML contradicts; {@link
+ * org.cometgui.tools.limelight.PercolatorXmlPsms} is a strict view of what the converter will read
+ * from the run's Percolator XML (PSM ids, decoy PSMs), over {@code
+ * org.cometgui.tools.percolator.PoutDocument}, the product's one pout XML reader; {@link
+ * org.cometgui.tools.limelight.PepXmlSet} derives every pepXML name the converter will open and
+ * proves each is the run's own; {@link org.cometgui.tools.limelight.LimelightConversionRequest} is
+ * a typed request that cannot be made with a decoy choice its Percolator XML contradicts; {@link
  * org.cometgui.tools.limelight.LimelightConverterCommand} builds the argument array from names the
  * real JAR's help prints; {@link org.cometgui.tools.limelight.LimelightConverter} runs it and keeps
  * the output only when {@link org.cometgui.tools.limelight.LimelightXmlJudge} finds it a valid

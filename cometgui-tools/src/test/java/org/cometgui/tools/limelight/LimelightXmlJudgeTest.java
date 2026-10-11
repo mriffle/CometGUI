@@ -19,6 +19,7 @@ package org.cometgui.tools.limelight;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Optional;
+import javax.xml.stream.XMLInputFactory;
 import org.cometgui.tools.limelight.LimelightConversionException.Failure;
 import org.cometgui.tools.testing.Nulls;
 import org.junit.jupiter.api.BeforeAll;
@@ -465,5 +467,35 @@ class LimelightXmlJudgeTest {
         assertAll(
                 () -> assertTrue(message.contains(": 7795 error(s), the first: "), message),
                 () -> assertEquals(4, message.split(" \\| ").length - 1, message));
+    }
+
+    @Test
+    @DisplayName("both hardening settings are FORCED from their unsafe values, not merely assumed")
+    void hardeningIsForced() {
+        XMLInputFactory unsafe = XMLInputFactory.newDefaultFactory();
+        unsafe.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.TRUE);
+        unsafe.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.TRUE);
+
+        XMLInputFactory hardened = LimelightXmlJudge.harden(unsafe);
+
+        assertAll(
+                () -> assertSame(unsafe, hardened),
+                () ->
+                        assertEquals(
+                                Boolean.FALSE, hardened.getProperty(XMLInputFactory.SUPPORT_DTD)),
+                () ->
+                        assertEquals(
+                                Boolean.FALSE,
+                                hardened.getProperty(
+                                        XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES)),
+                () ->
+                        assertEquals(
+                                "factory",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () ->
+                                                        LimelightXmlJudge.harden(
+                                                                Nulls.of(XMLInputFactory.class)))
+                                        .getMessage()));
     }
 }

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import javax.xml.stream.XMLInputFactory;
 import org.junit.jupiter.api.DisplayName;
@@ -339,5 +340,49 @@ class PoutDocumentTest {
                 "file",
                 assertThrows(NullPointerException.class, () -> PoutDocument.read(null))
                         .getMessage());
+    }
+
+    @Test
+    @DisplayName("the same walk keeps every PSM id in order and counts p:decoy=\"true\" (Phase 12)")
+    void idsAndDecoyCount(@TempDir Path directory) throws IOException {
+        PoutDocument decoys = PoutDocument.read(write(directory, "d.xml", withDecoys(5)));
+        PoutDocument targets = PoutDocument.read(write(directory, "t.xml", targetsOnly(3)));
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of("psm0", "psm1", "psm2", "psm3", "psm4"), decoys.psmIds()),
+                () -> assertEquals(2, decoys.decoyPsmCount()),
+                () -> assertEquals(0, decoys.psmsWithoutId()),
+                () -> assertFalse(decoys.hasDoctype()),
+                () -> assertEquals(List.of("psm0", "psm1", "psm2"), targets.psmIds()),
+                () -> assertEquals(0, targets.decoyPsmCount()));
+    }
+
+    @Test
+    @DisplayName(
+            "the probe still ACCEPTS what it did before Phase 12: a DOCTYPE, a psm without an id,"
+                    + " an unknown decoy value -- recorded, not refused")
+    void nothingNewIsRefused(@TempDir Path directory) throws IOException {
+        PoutDocument document =
+                PoutDocument.read(
+                        write(
+                                directory,
+                                "odd.xml",
+                                "<?xml version=\"1.0\"?>\n<!DOCTYPE percolator_output>\n"
+                                        + OPEN.substring(OPEN.indexOf('\n') + 1)
+                                        + "<psms><psm p:decoy=\"maybe\" p:psm_id=\"a\"/>"
+                                        + "<psm p:decoy=\"true\"/><psm p:psm_id=\"\"/>"
+                                        + "<psm p:decoy=\"true\" p:psm_id=\"b\"/></psms>"
+                                        + "</percolator_output>\n"));
+
+        assertAll(
+                () -> assertTrue(document.isPercolatorOutput()),
+                () -> assertEquals(4, document.psmCount()),
+                () -> assertTrue(document.hasDoctype()),
+                () -> assertEquals(2, document.psmsWithoutId()),
+                () -> assertEquals(List.of("a", "b"), document.psmIds()),
+                () -> assertEquals(2, document.decoyPsmCount()),
+                () -> assertEquals(Set.of("maybe", "true"), document.psmDecoyValues()));
     }
 }

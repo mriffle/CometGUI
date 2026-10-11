@@ -115,6 +115,23 @@ public final class LimelightXmlJudge {
                 Optional.ofNullable(structure.psmQValueDefault));
     }
 
+    /**
+     * Forces a factory into the safe state, whatever state it arrived in: DTD support and external
+     * entities off. The Limelight XML reader's own, for the reason {@code PoutDocument.harden}
+     * gives for its: a hardening call a factory's defaults make redundant can be deleted with the
+     * suite green, so it is forced and a test hands it the unsafe values.
+     *
+     * @param factory the factory
+     * @return the same factory, hardened
+     * @throws NullPointerException if {@code factory} is {@code null}
+     */
+    static XMLInputFactory harden(XMLInputFactory factory) {
+        Objects.requireNonNull(factory, "factory");
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
+        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
+        return factory;
+    }
+
     private static LimelightConversionException unreadable(Path file, IOException cause) {
         return new LimelightConversionException(
                 Failure.UNREADABLE_OUTPUT,
@@ -140,8 +157,7 @@ public final class LimelightXmlJudge {
     private static Structure readStructure(Path file) throws IOException {
         try (InputStream in = open(file)) {
             XMLStreamReader reader =
-                    PercolatorXmlPsms.harden(XMLInputFactory.newDefaultFactory())
-                            .createXMLStreamReader(in);
+                    harden(XMLInputFactory.newDefaultFactory()).createXMLStreamReader(in);
             return walk(file, reader);
         } catch (XMLStreamException malformed) {
             throw new LimelightConversionException(
@@ -242,8 +258,7 @@ public final class LimelightXmlJudge {
             validator.setErrorHandler(errors);
             validator.validate(
                     new StAXSource(
-                            PercolatorXmlPsms.harden(XMLInputFactory.newDefaultFactory())
-                                    .createXMLStreamReader(in)));
+                            harden(XMLInputFactory.newDefaultFactory()).createXMLStreamReader(in)));
         } catch (XMLStreamException | SAXException stopped) {
             errors.stopped(stopped);
         }

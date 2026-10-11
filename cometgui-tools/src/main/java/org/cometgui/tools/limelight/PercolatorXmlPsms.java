@@ -17,25 +17,29 @@
 package org.cometgui.tools.limelight;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamConstants;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
+import java.util.Set;
+import java.util.TreeSet;
 import org.cometgui.tools.percolator.PoutDocument;
 
 /**
  * What the Limelight converter will read from a run's Percolator XML: whether it is Percolator XML
- * at all, every PSM id, and how many PSMs are decoys.
+ * at all, every PSM id, and how many PSMs are decoys -- a strict view over {@link PoutDocument}.
  *
- * <p>Read by streaming ({@code StAX}): a real {@code pout} file is several megabytes (2 874 350
- * bytes for the two-file K562 fixture) and grows with the run, so the document is never held. Only
- * the {@code psm} elements' {@code p:psm_id} and {@code p:decoy} attributes are kept.
+ * <p><strong>One reader of pout XML.</strong> The document is walked once, by {@link
+ * PoutDocument#read}, the product's only reader of the format (design decision P12-1): streaming,
+ * DTD support and external entities forced off. This class reads nothing itself. It adds the
+ * refusals the converter adapter needs and the capability probe must not start making (the probe
+ * accepted these documents before Phase 12, and still does):
+ *
+ * <ul>
+ *   <li>a {@code psm} without a {@code p:psm_id}, because no pepXML name can be derived from it;
+ *   <li>a {@code p:decoy} value other than {@code true} or {@code false}, because a file that says
+ *       something else about decoys is not one whose decoy count can be trusted;
+ *   <li>a DOCTYPE, which Percolator never writes. It is never resolved either way.
+ * </ul>
  *
  * <h2>Decoys, as the real files carry them</h2>
  *
@@ -43,154 +47,64 @@ import org.cometgui.tools.percolator.PoutDocument;
  * p:decoy} attribute at all</strong> ({@code percolator-3.07.1/percolator.pout.xml}: 3897 PSMs,
  * none carrying it). With {@code -X -Z} every PSM carries {@code p:decoy="true"} or {@code "false"}
  * ({@code decoy-chain/withZ.pout.xml}: 3897 false, 2773 true). A missing attribute is therefore a
- * target, and {@link #decoyPsmCount()} counts {@code "true"} only; any other value is refused,
- * because a file that says something else about decoys is not one this reader understands. This
- * count is what design decision P12-7 reads at configuration time to decide whether Limelight decoy
- * import can be offered.
+ * target. {@link #decoyPsmCount()} is what design decision P12-7 reads at configuration time to
+ * decide whether Limelight decoy import can be offered.
  *
- * <h2>Hardened</h2>
- *
- * <p>DTD support and external entities are forced off on the factory ({@link #harden}), for the
- * reason {@link PoutDocument} gives: the file is written by a binary the user may have registered
- * themselves. The namespace and document element are {@link PoutDocument}'s, so "is this Percolator
- * XML" has one definition in this module.
- *
- * <p><strong>Two readers of one format, recorded rather than hidden.</strong> {@link PoutDocument}
- * is the capability probe's reader of the synthetic document a probe run writes; it keeps counts
- * and the set of decoy values, which is what the {@code XML_OUTPUT} and {@code XML_DECOY_OUTPUT}
- * verdicts need. This one keeps the ids, which the pepXML-set check ({@link PepXmlSet}) needs and
- * the probe does not.
+ * <p>A well-formed document whose element is not {@code percolator_output} in Percolator's
+ * namespace is reported by {@link #isPercolatorXml()} as {@code false}, with no PSMs.
  */
 public final class PercolatorXmlPsms {
 
-    private final Path file;
-    private final boolean percolatorXml;
-    private final List<String> psmIds;
-    private final int decoyPsmCount;
+    /** The only {@code p:decoy} values Percolator writes. */
+    static final Set<String> DECOY_VALUES = Set.of("true", "false");
 
-    private PercolatorXmlPsms(
-            Path file, boolean percolatorXml, List<String> psmIds, int decoyPsmCount) {
+    private final Path file;
+    private final PoutDocument document;
+
+    private PercolatorXmlPsms(Path file, PoutDocument document) {
         this.file = file;
-        this.percolatorXml = percolatorXml;
-        this.psmIds = psmIds;
-        this.decoyPsmCount = decoyPsmCount;
+        this.document = document;
     }
 
     /**
-     * Reads a Percolator XML file.
-     *
-     * <p>A well-formed document whose element is not {@code percolator_output} in Percolator's
-     * namespace is read no further and reported by {@link #isPercolatorXml()} as {@code false},
-     * with no PSMs.
+     * Reads a Percolator XML file through {@link PoutDocument}.
      *
      * @param file the file
      * @return what it holds
-     * @throws IOException if the file is absent, is empty, is not well-formed XML, carries a
-     *     DOCTYPE, or has a {@code psm} without an id or with a {@code p:decoy} value other than
-     *     {@code true} or {@code false} -- each naming the file
+     * @throws IOException if the file is absent, is empty or is not well-formed XML ({@link
+     *     PoutDocument}'s own refusals), or carries a DOCTYPE, a {@code psm} without an id, or a
+     *     {@code p:decoy} value other than {@code true} or {@code false} -- each naming the file
      * @throws NullPointerException if {@code file} is {@code null}
      */
     public static PercolatorXmlPsms read(Path file) throws IOException {
         Objects.requireNonNull(file, "file");
-        if (!Files.isRegularFile(file)) {
-            throw new IOException("there is no Percolator XML file at " + file);
-        }
-        if (Files.size(file) == 0L) {
+        PoutDocument document = PoutDocument.read(file);
+        if (document.hasDoctype()) {
             throw new IOException(
                     "the Percolator XML file "
                             + file
-                            + " is empty (zero bytes), which is what an aborted Percolator run"
-                            + " leaves behind");
+                            + " carries a DOCTYPE, which Percolator never writes, so it is not"
+                            + " read");
         }
-        try (InputStream bytes = Files.newInputStream(file)) {
-            return walk(
-                    file, harden(XMLInputFactory.newDefaultFactory()).createXMLStreamReader(bytes));
-        } catch (XMLStreamException notADocument) {
+        if (document.psmsWithoutId() > 0) {
             throw new IOException(
                     "the Percolator XML file "
                             + file
-                            + " is not well-formed XML: "
-                            + notADocument.getMessage(),
-                    notADocument);
+                            + " has "
+                            + document.psmsWithoutId()
+                            + " psm element(s) without a p:psm_id");
         }
-    }
-
-    /**
-     * Forces a factory into the safe state, whatever state it arrived in.
-     *
-     * @param factory the factory
-     * @return the same factory, with DTD support and external entities off
-     * @throws NullPointerException if {@code factory} is {@code null}
-     */
-    static XMLInputFactory harden(XMLInputFactory factory) {
-        Objects.requireNonNull(factory, "factory");
-        factory.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
-        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.FALSE);
-        return factory;
-    }
-
-    private static PercolatorXmlPsms walk(Path file, XMLStreamReader reader)
-            throws XMLStreamException, IOException {
-        boolean root = true;
-        List<String> ids = new ArrayList<>();
-        int decoys = 0;
-        while (reader.hasNext()) {
-            int event = reader.next();
-            if (event == XMLStreamConstants.DTD) {
-                throw new IOException(
-                        "the Percolator XML file "
-                                + file
-                                + " carries a DOCTYPE, which Percolator never writes, so it is not"
-                                + " read");
-            }
-            if (event != XMLStreamConstants.START_ELEMENT) {
-                continue;
-            }
-            if (root) {
-                root = false;
-                if (!PoutDocument.ROOT_ELEMENT.equals(reader.getLocalName())
-                        || !PoutDocument.NAMESPACE.equals(reader.getNamespaceURI())) {
-                    return new PercolatorXmlPsms(file, false, List.of(), 0);
-                }
-            } else if ("psm".equals(reader.getLocalName())
-                    && PoutDocument.NAMESPACE.equals(reader.getNamespaceURI())) {
-                ids.add(psmId(file, reader));
-                if (isDecoy(file, reader)) {
-                    decoys++;
-                }
-            }
-        }
-        return new PercolatorXmlPsms(file, true, List.copyOf(ids), decoys);
-    }
-
-    private static String psmId(Path file, XMLStreamReader reader) throws IOException {
-        String id = reader.getAttributeValue(PoutDocument.NAMESPACE, "psm_id");
-        if (id == null || id.isEmpty()) {
+        Set<String> unknown = new TreeSet<>(document.psmDecoyValues());
+        unknown.removeAll(DECOY_VALUES);
+        if (!unknown.isEmpty()) {
             throw new IOException(
                     "the Percolator XML file "
                             + file
-                            + " has a psm element without a p:psm_id at line "
-                            + reader.getLocation().getLineNumber());
+                            + " says p:decoy="
+                            + unknown
+                            + "; Percolator writes only \"true\" or \"false\"");
         }
-        return id;
-    }
-
-    private static boolean isDecoy(Path file, XMLStreamReader reader) throws IOException {
-        String decoy = reader.getAttributeValue(PoutDocument.NAMESPACE, "decoy");
-        if (decoy == null || "false".equals(decoy)) {
-            return false;
-        }
-        if ("true".equals(decoy)) {
-            return true;
-        }
-        throw new IOException(
-                "the Percolator XML file "
-                        + file
-                        + " says p:decoy=\""
-                        + decoy
-                        + "\" at line "
-                        + reader.getLocation().getLineNumber()
-                        + "; Percolator writes only \"true\" or \"false\"");
+        return new PercolatorXmlPsms(file, document);
     }
 
     /**
@@ -208,7 +122,7 @@ public final class PercolatorXmlPsms {
      * @return {@code true} for Percolator XML
      */
     public boolean isPercolatorXml() {
-        return percolatorXml;
+        return document.isPercolatorOutput();
     }
 
     /**
@@ -217,15 +131,16 @@ public final class PercolatorXmlPsms {
      * @return the ids, immutable; empty when the file is not Percolator XML
      */
     public List<String> psmIds() {
-        return List.copyOf(psmIds);
+        return isPercolatorXml() ? document.psmIds() : List.of();
     }
 
     /**
      * How many {@code psm} elements say {@code p:decoy="true"}.
      *
-     * @return the count; zero for any run made without Percolator's {@code -Z}
+     * @return the count; zero for any run made without Percolator's {@code -Z}, and for a file that
+     *     is not Percolator XML
      */
     public int decoyPsmCount() {
-        return decoyPsmCount;
+        return isPercolatorXml() ? document.decoyPsmCount() : 0;
     }
 }

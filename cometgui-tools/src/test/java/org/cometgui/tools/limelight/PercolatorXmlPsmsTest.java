@@ -19,7 +19,6 @@ package org.cometgui.tools.limelight;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
-import javax.xml.stream.XMLInputFactory;
 import org.cometgui.tools.limelight.LimelightFixtures.Psm;
 import org.cometgui.tools.testing.Nulls;
 import org.junit.jupiter.api.DisplayName;
@@ -85,31 +83,35 @@ class PercolatorXmlPsmsTest {
     }
 
     @Test
-    @DisplayName("a decoy value other than true or false is refused, naming the file and line")
+    @DisplayName("a decoy value other than true or false is refused, naming the file and value")
     void anUnknownDecoyValueIsRefused(@TempDir Path directory) throws IOException {
         Path file =
                 LimelightFixtures.pout(
                         directory.resolve("x.pout.xml"),
-                        List.of(Psm.target("a_1_2_1"), new Psm("a_2_2_1", "TRUE")));
+                        List.of(
+                                Psm.target("a_1_2_1"),
+                                new Psm("a_2_2_1", "TRUE"),
+                                new Psm("a_3_2_1", "maybe"),
+                                new Psm("a_4_2_1", "true")));
 
         assertEquals(
                 "the Percolator XML file "
                         + file
-                        + " says p:decoy=\"TRUE\" at line 13; Percolator writes only \"true\" or"
+                        + " says p:decoy=[TRUE, maybe]; Percolator writes only \"true\" or"
                         + " \"false\"",
                 assertThrows(IOException.class, () -> PercolatorXmlPsms.read(file)).getMessage());
     }
 
     @Test
-    @DisplayName("a psm without an id is refused, naming the line")
+    @DisplayName("a psm without an id is refused, with how many there are")
     void aPsmWithoutAnIdIsRefused(@TempDir Path directory) throws IOException {
         Path file =
-                LimelightFixtures.pout(directory.resolve("x.pout.xml"), List.of(Psm.target("")));
+                LimelightFixtures.pout(
+                        directory.resolve("x.pout.xml"),
+                        List.of(Psm.target(""), Psm.target("a_1_2_1"), Psm.target("")));
 
         assertEquals(
-                "the Percolator XML file "
-                        + file
-                        + " has a psm element without a p:psm_id at line 8",
+                "the Percolator XML file " + file + " has 2 psm element(s) without a p:psm_id",
                 assertThrows(IOException.class, () -> PercolatorXmlPsms.read(file)).getMessage());
     }
 
@@ -129,8 +131,8 @@ class PercolatorXmlPsmsTest {
     }
 
     @Test
-    @DisplayName("psm elements in another namespace are not Percolator's PSMs")
-    void psmsInAnotherNamespaceAreIgnored(@TempDir Path directory) throws IOException {
+    @DisplayName("PSMs are known by local name, as PoutDocument has always counted them")
+    void psmsAreKnownByLocalName(@TempDir Path directory) throws IOException {
         Path file = directory.resolve("x.pout.xml");
         Files.writeString(
                 file,
@@ -143,8 +145,8 @@ class PercolatorXmlPsmsTest {
         PercolatorXmlPsms read = PercolatorXmlPsms.read(file);
 
         assertAll(
-                () -> assertEquals(List.of("b_1_2_1"), read.psmIds()),
-                () -> assertEquals(0, read.decoyPsmCount()));
+                () -> assertEquals(List.of("a_1_2_1", "b_1_2_1"), read.psmIds()),
+                () -> assertEquals(1, read.decoyPsmCount()));
     }
 
     @Test
@@ -187,26 +189,28 @@ class PercolatorXmlPsmsTest {
         assertAll(
                 () ->
                         assertEquals(
-                                "there is no Percolator XML file at " + missing,
+                                "Percolator wrote no file at "
+                                        + missing
+                                        + ", so it produced no XML to inspect",
                                 assertThrows(
                                                 IOException.class,
                                                 () -> PercolatorXmlPsms.read(missing))
                                         .getMessage()),
                 () ->
                         assertEquals(
-                                "there is no Percolator XML file at " + directory,
+                                "Percolator wrote no file at "
+                                        + directory
+                                        + ", so it produced no XML to inspect",
                                 assertThrows(
                                                 IOException.class,
                                                 () -> PercolatorXmlPsms.read(directory))
                                         .getMessage()),
                 () ->
-                        assertEquals(
-                                "the Percolator XML file "
-                                        + empty
-                                        + " is empty (zero bytes), which is what an aborted"
-                                        + " Percolator run leaves behind",
+                        assertTrue(
                                 assertThrows(IOException.class, () -> PercolatorXmlPsms.read(empty))
-                                        .getMessage()),
+                                        .getMessage()
+                                        .startsWith(
+                                                "Percolator left a ZERO-BYTE file at " + empty)),
                 () ->
                         assertTrue(
                                 assertThrows(
@@ -214,7 +218,7 @@ class PercolatorXmlPsmsTest {
                                                 () -> PercolatorXmlPsms.read(malformed))
                                         .getMessage()
                                         .startsWith(
-                                                "the Percolator XML file "
+                                                "the file Percolator wrote at "
                                                         + malformed
                                                         + " is not well-formed XML: ")));
     }
@@ -223,57 +227,40 @@ class PercolatorXmlPsmsTest {
     @DisplayName("a DOCTYPE is refused, and an external entity is never read")
     void aDoctypeIsRefused(@TempDir Path directory) throws IOException {
         Path secret = Files.writeString(directory.resolve("secret.txt"), "a_9_9_9");
-        Path file = directory.resolve("xxe.pout.xml");
-        Files.writeString(
-                file,
-                "<?xml version=\"1.0\"?>\n<!DOCTYPE percolator_output [<!ENTITY s SYSTEM \""
-                        + secret.toUri()
-                        + "\">]>\n<percolator_output"
-                        + " xmlns=\"http://per-colator.com/percolator_out/15\""
-                        + " xmlns:p=\"http://per-colator.com/percolator_out/15\"><psms>"
-                        + "<psm p:psm_id=\"&s;\"/></psms></percolator_output>");
+        String body =
+                "<percolator_output xmlns=\"http://per-colator.com/percolator_out/15\""
+                        + " xmlns:p=\"http://per-colator.com/percolator_out/15\"><psms>";
+        Path referenced =
+                Files.writeString(
+                        directory.resolve("xxe.pout.xml"),
+                        "<?xml version=\"1.0\"?>\n<!DOCTYPE percolator_output [<!ENTITY s SYSTEM \""
+                                + secret.toUri()
+                                + "\">]>\n"
+                                + body
+                                + "<psm p:psm_id=\"&s;\"/></psms></percolator_output>");
+        Path declared =
+                Files.writeString(
+                        directory.resolve("dtd.pout.xml"),
+                        "<?xml version=\"1.0\"?>\n<!DOCTYPE percolator_output [<!ENTITY s SYSTEM \""
+                                + secret.toUri()
+                                + "\">]>\n"
+                                + body
+                                + "<psm p:psm_id=\"a_1_2_1\"/></psms></percolator_output>");
 
-        IOException refused = assertThrows(IOException.class, () -> PercolatorXmlPsms.read(file));
+        IOException entity =
+                assertThrows(IOException.class, () -> PercolatorXmlPsms.read(referenced));
+        IOException doctype =
+                assertThrows(IOException.class, () -> PercolatorXmlPsms.read(declared));
 
         assertAll(
+                () -> assertFalse(entity.getMessage().contains("a_9_9_9"), entity.getMessage()),
                 () ->
                         assertEquals(
                                 "the Percolator XML file "
-                                        + file
+                                        + declared
                                         + " carries a DOCTYPE, which Percolator never writes, so it"
                                         + " is not read",
-                                refused.getMessage()),
-                () -> assertFalse(refused.getMessage().contains("a_9_9_9")));
-    }
-
-    @Test
-    @DisplayName("both hardening settings are FORCED from their unsafe values, not merely assumed")
-    void hardeningIsForced() {
-        XMLInputFactory unsafe = XMLInputFactory.newDefaultFactory();
-        unsafe.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.TRUE);
-        unsafe.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, Boolean.TRUE);
-
-        XMLInputFactory hardened = PercolatorXmlPsms.harden(unsafe);
-
-        assertAll(
-                () -> assertSame(unsafe, hardened),
-                () ->
-                        assertEquals(
-                                Boolean.FALSE, hardened.getProperty(XMLInputFactory.SUPPORT_DTD)),
-                () ->
-                        assertEquals(
-                                Boolean.FALSE,
-                                hardened.getProperty(
-                                        XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES)),
-                () ->
-                        assertEquals(
-                                "factory",
-                                assertThrows(
-                                                NullPointerException.class,
-                                                () ->
-                                                        PercolatorXmlPsms.harden(
-                                                                Nulls.of(XMLInputFactory.class)))
-                                        .getMessage()),
+                                doctype.getMessage()),
                 () ->
                         assertEquals(
                                 "file",

@@ -20,8 +20,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import javax.xml.stream.XMLInputFactory;
@@ -59,6 +61,18 @@ import javax.xml.stream.XMLStreamReader;
  * otherwise be reading the probing machine's files. Both properties are forced on the factory
  * rather than assumed of it, for the reason phase 05 unit 4 recorded when five XML hardening calls
  * turned out to be deletable with the suite still green.
+ *
+ * <h2>The one reader of pout XML</h2>
+ *
+ * <p>This is the product's only walk over a Percolator {@code pout} document (Phase 12 design
+ * decision P12-1). Besides the counts the capability probe needs, the same pass keeps what the
+ * Limelight converter adapter needs -- every {@code psm}'s {@code p:psm_id} in document order
+ * ({@link #psmIds()}), how many say {@code p:decoy="true"} ({@link #decoyPsmCount()}), how many
+ * carry no id ({@link #psmsWithoutId()}) and whether the document carries a DOCTYPE ({@link
+ * #hasDoctype()}). <strong>None of those refuses anything here</strong>: what the probe accepted
+ * before Phase 12 it still accepts. {@code org.cometgui.tools.limelight.PercolatorXmlPsms} is the
+ * stricter view the converter adapter reads through, and it is where a missing id, an unknown decoy
+ * value or a DOCTYPE is refused.
  */
 public final class PoutDocument {
 
@@ -73,18 +87,34 @@ public final class PoutDocument {
     private final int psmCount;
     private final int peptideCount;
     private final Set<String> psmDecoyValues;
+    private final List<String> psmIds;
+    private final int decoyPsmCount;
+    private final int psmsWithoutId;
+    private final boolean doctype;
 
-    private PoutDocument(
-            String rootElement,
-            String namespace,
-            int psmCount,
-            int peptideCount,
-            Set<String> psmDecoyValues) {
-        this.rootElement = rootElement;
-        this.namespace = namespace;
-        this.psmCount = psmCount;
-        this.peptideCount = peptideCount;
-        this.psmDecoyValues = psmDecoyValues;
+    /** What one walk found; a holder so the constructor's argument list stays readable. */
+    private static final class Walk {
+        private String rootElement = "";
+        private String namespace = "";
+        private int psmCount;
+        private int peptideCount;
+        private final Set<String> decoyValues = new LinkedHashSet<>();
+        private final List<String> psmIds = new ArrayList<>();
+        private int decoyPsmCount;
+        private int psmsWithoutId;
+        private boolean doctype;
+    }
+
+    private PoutDocument(Walk walk) {
+        this.rootElement = walk.rootElement;
+        this.namespace = walk.namespace;
+        this.psmCount = walk.psmCount;
+        this.peptideCount = walk.peptideCount;
+        this.psmDecoyValues = Collections.unmodifiableSet(walk.decoyValues);
+        this.psmIds = List.copyOf(walk.psmIds);
+        this.decoyPsmCount = walk.decoyPsmCount;
+        this.psmsWithoutId = walk.psmsWithoutId;
+        this.doctype = walk.doctype;
     }
 
     /**
@@ -161,36 +191,44 @@ public final class PoutDocument {
     }
 
     private static PoutDocument walk(XMLStreamReader reader) throws XMLStreamException {
-        String rootElement = "";
-        String namespace = "";
-        int psmCount = 0;
-        int peptideCount = 0;
-        Set<String> decoyValues = new LinkedHashSet<>();
+        Walk walk = new Walk();
         while (reader.hasNext()) {
-            if (reader.next() != XMLStreamConstants.START_ELEMENT) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.DTD) {
+                walk.doctype = true;
+            }
+            if (event != XMLStreamConstants.START_ELEMENT) {
                 continue;
             }
             String local = reader.getLocalName();
-            if (rootElement.isEmpty()) {
-                rootElement = local;
-                namespace = Objects.toString(reader.getNamespaceURI(), "");
+            if (walk.rootElement.isEmpty()) {
+                walk.rootElement = local;
+                walk.namespace = Objects.toString(reader.getNamespaceURI(), "");
             }
             if ("psm".equals(local)) {
-                psmCount++;
-                String decoy = reader.getAttributeValue(NAMESPACE, "decoy");
-                if (decoy != null) {
-                    decoyValues.add(decoy);
-                }
+                psm(walk, reader);
             } else if ("peptide".equals(local)) {
-                peptideCount++;
+                walk.peptideCount++;
             }
         }
-        return new PoutDocument(
-                rootElement,
-                namespace,
-                psmCount,
-                peptideCount,
-                Collections.unmodifiableSet(decoyValues));
+        return new PoutDocument(walk);
+    }
+
+    private static void psm(Walk walk, XMLStreamReader reader) {
+        walk.psmCount++;
+        String decoy = reader.getAttributeValue(NAMESPACE, "decoy");
+        if (decoy != null) {
+            walk.decoyValues.add(decoy);
+        }
+        if ("true".equals(decoy)) {
+            walk.decoyPsmCount++;
+        }
+        String id = reader.getAttributeValue(NAMESPACE, "psm_id");
+        if (id == null || id.isEmpty()) {
+            walk.psmsWithoutId++;
+        } else {
+            walk.psmIds.add(id);
+        }
     }
 
     /**
@@ -241,6 +279,43 @@ public final class PoutDocument {
      */
     public Set<String> psmDecoyValues() {
         return Set.copyOf(psmDecoyValues);
+    }
+
+    /**
+     * Every {@code psm} element's {@code p:psm_id}, in document order, skipping any without one.
+     *
+     * @return the ids, immutable
+     */
+    public List<String> psmIds() {
+        return List.copyOf(psmIds);
+    }
+
+    /**
+     * How many {@code psm} elements say {@code p:decoy="true"}.
+     *
+     * @return the count; zero for any run made without Percolator's {@code -Z}
+     */
+    public int decoyPsmCount() {
+        return decoyPsmCount;
+    }
+
+    /**
+     * How many {@code psm} elements carry no {@code p:psm_id}, or an empty one.
+     *
+     * @return the count; zero for every document a real Percolator has written
+     */
+    public int psmsWithoutId() {
+        return psmsWithoutId;
+    }
+
+    /**
+     * Whether the document carries a DOCTYPE. It is never resolved (see {@link #harden}); this only
+     * says it was there, which no real Percolator output does.
+     *
+     * @return {@code true} when a DOCTYPE was seen
+     */
+    public boolean hasDoctype() {
+        return doctype;
     }
 
     /**
