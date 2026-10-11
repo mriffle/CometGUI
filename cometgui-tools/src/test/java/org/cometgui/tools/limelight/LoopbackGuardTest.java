@@ -22,6 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -29,6 +32,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import org.cometgui.domain.secrets.SessionSecrets;
 import org.cometgui.tools.limelight.LimelightUploadOutcome.Failed;
@@ -114,6 +118,38 @@ class LoopbackGuardTest {
         assertEquals(
                 List.of("CONNECT upload.cometgui.invalid:443 HTTP/1.1"),
                 LoopbackGuard.takeCaught());
+    }
+
+    @Test
+    @DisplayName("this machine's own non-loopback address is caught too, and never left it")
+    void theMachinesOwnAddressIsCaught(@TempDir Path tmp) throws IOException {
+        String own = ownNonLoopbackAddress();
+        Path file = Files.writeString(tmp.resolve("x.xml"), "<limelight_input/>");
+
+        Failed failed = upload("https://" + own + ":9/limelight", file);
+
+        assertEquals(LimelightUploadStep.AUTH_TEST, failed.step());
+        assertEquals(List.of("CONNECT " + own + ":9 HTTP/1.1"), LoopbackGuard.takeCaught());
+    }
+
+    /**
+     * An IPv4 address of one of this machine's own interfaces that is not loopback: outside {@code
+     * http.nonProxyHosts}, so the guard must catch it, yet a connection to it -- if the guard were
+     * ever bypassed -- stays inside this machine. That makes this the test to run against an
+     * injected bypass without sending a packet anywhere.
+     */
+    private static String ownNonLoopbackAddress() throws IOException {
+        for (NetworkInterface face : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+            if (!face.isUp() || face.isLoopback()) {
+                continue;
+            }
+            for (InetAddress address : Collections.list(face.getInetAddresses())) {
+                if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                    return address.getHostAddress();
+                }
+            }
+        }
+        throw new AssertionError("this machine has no non-loopback IPv4 address to test with");
     }
 
     @Test
