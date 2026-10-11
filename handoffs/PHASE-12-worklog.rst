@@ -194,6 +194,65 @@ P12-13 -- forbidden, always
     third-party contact found in the converter or uploader is reported to the
     orchestrator **at once** (``D-013`` precedent).
 
+Design decisions from unit 1 (2026-10-11)
+=========================================
+
+P12-14 -- the upload is an in-product client (option B)
+    ``org.cometgui.tools.limelight`` holds a ``java.net.http`` client of the
+    submit-import protocol as ``limelight-core`` v8.3.1 (``61554282``)
+    defines it: five XML-over-HTTP POSTs under ``<url>/d/rws/for-page/``
+    (auth test, FASTA check only if a FASTA is sent -- it is not, initialise,
+    upload file as one raw streamed body with its parameters Base64-encoded
+    in a header for server program version >= 16, final submit), the wire
+    names as JAXB writes them (``statusFailErrorMessage``, not the Java field
+    name). The key never leaves the JVM and never reaches an argument array.
+    The importer JAR is **not** a managed tool; no manifest row, no fifth
+    ``ToolName``, no specification amendment. The committed wire schema
+    ``scripts/spikes/limelight_upload_spike/submit-import-wire-v16.xsd`` is
+    the reference both the client's tests and the fake use.
+
+P12-15 -- what the upload retains and shows
+    The server's ``uploadKey`` (the import tracking id) and ``importerSubDir``
+    are retained in the ``limelight.uploaded`` event; the project page URL is
+    shown as ``<url>/d/pg/project/<id>``. A refusal is shown with the
+    server's own flag and ``statusFailErrorMessage``. The project is an
+    integer id typed by the user: **no endpoint lists projects for a submit
+    key** (``ProjectsList_RestWebserviceController.java:117`` needs a
+    logged-in session). The real server validates the XML later, in its
+    background importer, so CometGUI validates before sending (P12-3) and the
+    fake validates on receipt. The client sends the file's local path, as
+    the importer does; whether to send it is unit 5's to argue (it is the
+    user's path, not a secret).
+
+P12-16 -- the one fake, and the test guard
+    The ``D-007`` fake lives once in ``cometgui-tools`` test sources
+    (``org.cometgui.tools.limelight.fake``), validating every request against
+    the wire schema and every received Limelight XML against
+    ``limelight-xml.xsd`` read from the pinned converter JAR. A module that
+    needs it elsewhere (``cometgui-app`` GUI tests) carries a copy **and a
+    test that fails if the copy's bytes differ from the original** (Phase 11
+    copied ``ProjectXvfb``; the drift guard is new). No test-jar: it is a POM
+    change with an unproven reactor interaction, and not needed. The guard
+    against a real server: every test JVM that can upload routes HTTP(S)
+    through a loopback sinkhole proxy (the spike caught every non-loopback
+    attempt over http and https), paired with an architecture rule that
+    production code never sets a proxy itself, so the guard cannot be
+    bypassed by the product.
+
+P12-17 -- credentials, as the spike found them
+    A session store held in memory always works and is the default. Linux
+    Secret Service through ``secret-tool`` with the secret on standard input
+    where it is installed and a keyring is running (absent on this host, so
+    proved only against a scripted stand-in); macOS ``security -i`` with
+    commands on standard input (unverified); Windows session-only (the
+    foreign-function route is not attempted this phase). Never ``cmdkey``,
+    never ``security add-generic-password -w <secret>``.
+
+Escalated from unit 1 (to tier 1, in the handoff): "show live upload **and
+import** logs" cannot be met with a submit key -- import status is visible
+only in the web application's logged-in session. The product shows the
+upload log and the project page URL.
+
 Work units
 ==========
 
@@ -223,7 +282,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        costed recommendation: in-product client versus managed importer
        JAR. Evidence page and re-runnable script; no product code.
      - R-SEC-03/04 risk; D-007; prerequisite for 5, 7
-     - see `Unit 1 sign-off`_
+     - Accepted, ``e13b46d``
    * - 2
      - **The converter adapter** (``tools.limelight``). The command from a
        typed request (P12-4) with the q cutoff always explicit; the output
@@ -304,6 +363,32 @@ Unit sign-offs
 ==============
 
 Unit 1 sign-off
+---------------
+
+**Accepted 2026-10-11.** Commit ``e13b46d`` (``docs/developer/limelight_upload_spike.rst``,
+one toctree line, ``scripts/spikes/limelight_upload_spike.py`` and seven
+files beside it). No product code.
+
+* **Diff read.** Nine files; nothing under ``cometgui-*``; no POM, gate
+  script or record touched; nothing under ``scratch/`` committed. No real
+  Limelight host appears in the script.
+* **Re-run by me**: ``. tools/env.sh; python3 scripts/spikes/limelight_upload_spike.py``
+  -> ``93 of 93 checks passed in 57.0 s``, exit 0; the last checks show the
+  key in only its own file and in the JFR recording of the argv run.
+* **My injection** into the fake (a copy, run with ``--fake-source``): the
+  received-XML validation ``v.validate(new StreamSource(f.toFile()))`` replaced
+  by an empty statement, anchor count 0 after the edit -> exit 1, **13
+  FAIL** lines, among them the in-JVM client no longer holding the server's
+  refusal for ``missing-attribute.xml`` and ``truncated.xml``.
+* **Analytics**: none in the importer v8.3.1 or the converter v2.8.1 (class
+  scan and JFR socket events; the converter makes no socket I/O). Nothing to
+  escalate as behaviour.
+* ``docs`` and ``traceability`` run by the agent (PASS); ``docs-build.sh``
+  re-run by me with this entry.
+* Decisions P12-14..P12-17 follow from it; the "import logs" question is
+  escalated.
+
+Unit 2 sign-off
 ---------------
 
 Pending.
