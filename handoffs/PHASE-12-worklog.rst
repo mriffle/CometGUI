@@ -292,7 +292,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        or empty file, no arguments and an unknown option each judged a
        failure; what ``-q`` changes established and pinned.
      - R-LL-03, R-LL-04, R-LL-05; gate 2
-     -
+     - Accepted after one rework, ``79e2aa7`` ``30b8439``
    * - 3
      - **Conversion in the workflow** (``workflow.limelight``). Install on
        first use through the Tool Manager port (an empty cache through a
@@ -389,6 +389,68 @@ files beside it). No product code.
   escalated.
 
 Unit 2 sign-off
+---------------
+
+**Accepted 2026-10-11 after one rework.** Commits ``79e2aa7`` (11 main and 10
+test classes in ``org.cometgui.tools.limelight``) and ``30b8439`` (rework).
+
+* **Rework, sent back by me:** the first commit added ``PercolatorXmlPsms``,
+  a second StAX walker of pout XML beside ``tools.percolator.PoutDocument``
+  (the parser package-info names that "its one reader"; P12-1). Now
+  ``PoutDocument``'s one walk also records PSM ids, the decoy-PSM count,
+  id-less PSMs and a DOCTYPE; ``PercolatorXmlPsms`` is a view that adds the
+  adapter's refusals; the probe refuses nothing new (``nothingNewIsRefused``).
+* **Diff read**, ``LimelightConverter`` in full: refuses an existing output;
+  schema from the JAR that runs; the converter writes ``<output>.partial``;
+  timeout, non-zero exit, the judge (exists, non-empty, readable,
+  well-formed, root ``limelight_input``, XSD) and the q cutoff read back from
+  the file each fail and delete the staging file; only then an atomic move.
+  No POM, gate script or record touched; no module edge added.
+* **Accepted addition to P12-7:** a run **with** decoy PSMs is refused
+  without ``--import-decoys`` (re-observed by the agent on
+  ``concat.pout.xml``: "Unable to find any comet results for reported
+  peptide"), matching Phase 00.
+* **What ``-q`` does** (agent, by execution over eleven values): it sets only
+  ``default_filter_value`` of Percolator's PSM ``q-value`` annotation; it
+  filters nothing (3897 PSMs at every value); no ``-q`` equals ``-q 0.01``;
+  NaN/Infinity/text exit 0 writing nothing. ``theCutoffReachesTheFile``
+  reads the value back as text.
+* **Tests, run by me:** ``mvn -B -o -pl cometgui-tools verify`` -> **1068
+  tests, 0 failures, 0 errors, 0 skipped**, BUILD SUCCESS.
+* **My injections** (production code, anchor unique and gone, ``limelight``
+  tests, 104 run each time, restored and ``sha256sum -c`` OK):
+
+  - K1 ``LimelightXmlJudge`` root check reduced to ``local.isEmpty()``: 1
+    failure, ``LimelightXmlJudgeTest.wrongRoot`` (4 assertions). (My first
+    form, ``false && (...)``, was stopped by Checkstyle and never reached the
+    tests -- recorded as an injection that did not land.)
+  - K2 ``PepXmlSet.PSM_ID`` with one ``_\d+`` group dropped: 7 failures, 9
+    errors (``PepXmlSetTest.theNameRule``, ``aChangedPepXmlIsRefused``, six
+    real-converter tests).
+  - K3 the "decoys present but not imported" refusal made unreachable: 1
+    failure, ``LimelightConversionRequestTest.decoysWithoutImportAreRefused``.
+
+* **Targeted PIT, by me** (``limelight.*`` and ``PoutDocument*``, tests
+  restricted to the same): 185 mutations, 182 KILLED; the three others are
+  ``PoutDocument``'s pre-existing peptide count (2 SURVIVED, 1 NO_COVERAGE),
+  which only the probe tests outside my filter exercise -- the agent's run
+  including them killed 185/185. **Population:** every compiled
+  ``tools.limelight`` class mutated except ``package-info``.
+* ``--only quality`` -> PASS (140 s), run by me; archtests 33/33 by the agent.
+* **Files outside the module the tests read** (all under ``scratch/``,
+  checked by SHA-256): ``phase05/artefacts/v2.8.1__cometPercolator2LimelightXML.jar``;
+  ``scientific-path/comet/`` (``comet.params``, both pepXML),
+  ``scientific-path/percolator-3.07.1/percolator.pout.xml``,
+  ``scientific-path/limelight/limelight.xml``, ``scientific-path/corrupt/*.xml``,
+  ``scientific-path/decoy-chain/`` (``withZ.pout.xml``, ``concat.pout.xml``,
+  ``concat_target_decoy.fasta``, ``comet/``); ``fixture/UP000005640_9606.fasta``.
+  The root is located by a ``manifests`` directory. No project document is
+  read. ``--only tests`` at phase end.
+* **Trap recorded** (agent): restoring an injected file with ``mv`` keeps
+  the backup's older mtime and the incremental compiler keeps the injected
+  class; restore by copy and ``touch``, and check the compiled class.
+
+Unit 3 sign-off
 ---------------
 
 Pending.
