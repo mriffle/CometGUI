@@ -341,7 +341,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        both Percolator executions with distinct versions, checksums and
        argv.
      - R-LL-01, R-LL-02; gate 3 (model), 4; AC-LL-03, 04
-     -
+     - Accepted, ``879efc0``
    * - 5
      - **Upload core** (shape from unit 1). The client; the ``D-007`` fake,
        shared once; the loopback guard (P12-11); credential storage
@@ -535,6 +535,65 @@ archtest ``LimelightConversionPathRuleTest``).
   ``manifests/``. No project document.
 
 Unit 4 sign-off
+---------------
+
+**Accepted 2026-10-11.** Commit ``879efc0`` (14 files:
+``params.percolator.resolution.CompatibilityAction`` with its words in
+``ResolutionMessages`` and ``DownstreamStage.purpose()``;
+``workflow.limelight.LimelightCompatibility`` and
+``LimelightConversions.compatibility``; one additive entry point
+``PercolatorRerun.compatibleChoice``).
+
+* **Diff read.** Compatibility is read from the run's ``provenance.json``
+  (its Percolator record and the pout XML file record) and Phase 09's
+  recorded not-emitted reason; ``check()`` carries the same object. The
+  action is ``PercolatorResolver.resolve(offers, {LIMELIGHT_CONVERSION})``:
+  available -> the rerun labelled from the resolved build; otherwise
+  registration, opening "No managed Percolator build that can write
+  XML_OUTPUT exists for this platform" when no managed offer here claims
+  it. ``compatibleChoice`` hands Phase 09's ``preview``/``prepare``/``start``
+  a ``PercolatorChoice``; no second rerun. No POM, gate script or record
+  touched; no module edge.
+* **Tests, run by me**: ``cometgui-params-percolator`` install (with tests)
+  -> **68, 0 failures**; ``cometgui-workflow`` limelight, rerun and real
+  tests -> **120, 0 failures, 0 skipped**, including
+  ``RealLimelightCompatibleRerunTest`` (4, 23 s: 3.09 registered local ->
+  not convertible, the 3.07.1 rerun offered, conversion of the original
+  refused with no launch, the derived run converted to 3285 PSMs = its own
+  target rows, Comet launches 2 -> 2, merged PIN SHA-256 and the original's
+  ``provenance.json`` unchanged, the two executions differing in version,
+  SHA-256 and argv) and ``RealPercolatorRerunTest`` (6).
+* **My injections** (production code, anchor unique and gone, restored and
+  ``sha256sum -c`` OK):
+
+  - N1 ``CompatibilityAction.forStage`` offering the rerun whenever any
+    build is selected (not when the stage is available): 4 failures,
+    ``noManagedBuildForThisPlatform``, ``aLocalClaimIsNotAManagedBuild``,
+    ``anInferredManagedClaim``, ``aFailedManagedBuild``.
+  - N2 the label built from the literal ``3.07.1``: 3 failures,
+    ``whateverResolutionReturns`` (3.08.2), ``aFutureBuild``,
+    ``aRegisteredLocalBinary``.
+  - N3 ``LimelightConversions.convert`` no longer refusing an unready run:
+    17 failures in ``LimelightConversionsTest``, 1 in
+    ``LimelightCompatibilityTest.noXmlCapability``, and
+    ``RealLimelightCompatibleRerunTest`` red.
+
+* **Targeted PIT, by me** (``CompatibilityAction*``, ``ResolutionMessages*``,
+  ``DownstreamStage*``): **59/59 KILLED**. The agent's workflow run: 194, 191
+  killed, the three others unit 3's already-recorded ones.
+* **Harnesses, run by me**: ``quality`` 42 controls PASS (141 s);
+  ``workflow`` 110 PASS (496 s); ``percolator`` 109 PASS (736 s).
+* **Files outside the modules the tests read** (``scratch/``, SHA-checked):
+  ``phase05/artefacts`` (converter JAR, Comet 2026.03.0,
+  ``rel-3-07-01__percolator-noxml-ubuntu-portable.zip``), ``fixture``,
+  ``percolator/3.09``; ``manifests/``. No project document.
+* **Residue recorded**: the rerun's settings are passed by the caller (no
+  reader of a run's archived ``percolator-settings.json`` exists); a 3.07.1
+  run whose pout XML was deleted still offers the rerun, which Phase 09 then
+  refuses as already run; installing an uninstalled resolved build is the
+  interface's (unit 6).
+
+Unit 5 sign-off
 ---------------
 
 Pending.
