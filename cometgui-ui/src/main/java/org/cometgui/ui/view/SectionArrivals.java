@@ -106,8 +106,8 @@ final class SectionArrivals {
                         + " weights.");
         notes.put(
                 SectionId.VISUALISATION,
-                "This section is being filled by phase 11 (PDV Integration and mzTab Export)."
-                        + " Live: PDV's state, its install on first use -- through the Tool"
+                "This section is live: phase 11 (PDV Integration and mzTab Export) filled it."
+                        + " PDV's state, its install on first use -- through the Tool"
                         + " Manager, with its progress and a Cancel control, never holding up a"
                         + " search -- and drawing the annotated spectrum of the PSM selected in the"
                         + " Results section with PDV, each launch recorded in the run's provenance"

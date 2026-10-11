@@ -717,6 +717,43 @@ the Visualisation section's Open/Close PDV and selection; app
   (unmeasured at 1M PSMs); ``cometgui-app``'s ``ProjectXvfb`` copy has no
   ``timeout`` cap; 57 ``<defunct>`` Xvfb zombies (PID 1 does not reap).
 
+Unit 8 sign-off
+---------------
+
+**Accepted 2026-10-11**, commit ``5c6c717`` (documentation only):
+``docs/pdv.rst`` written (the stub called ``D-005`` open), new
+``docs/developer/pdv_integration.rst``; ``architecture.rst`` (PDV packages,
+the ``tools -> results`` edge, seven derived files),
+``provenance_schema.rst`` and ``reference/provenance_format.rst`` (ten event
+types; the latter wrongly said a PDV launch is recorded in the manifest's
+``tools[]``), ``reference/project_format.rst`` (``pdv/``), ``tool_adapters.rst``,
+``citations.rst`` (PDV, its licence disagreement, CasanovoGUI and the derived
+files, mzTab 1.0 -- DOIs checked against Crossref by the agent), and
+``traceability-map.toml`` (AC-VIS-01..05 planned -> 19 named test entries,
+Linux-only marked).
+
+* **Read by me**: ``docs/pdv.rst``'s mzTab section states plainly that the
+  file is "not a scientific deliverable and not an interchange format", is a
+  run artefact at ``<run>/pdv/mztab/psms.mztab`` recorded with its checksum.
+* ``scripts/ci/docs-build.sh`` PASS; ``--only docs`` PASS (65 s);
+  ``--only traceability`` PASS (15 s).
+* **My falsification**: ``PdvFiguresRealTest`` misspelt in the map ->
+  ``traceability.sh`` exit 1, ``[TEST-MISSING] AC-VIS-02 ... PdvFiguresRealTezt``
+  and two for AC-VIS-03; restored, ``sha256sum -c`` OK.
+* **Specification text the build contradicts** (reported by the agent,
+  checked by me, escalated, not changed): *Baseline integration* lists mzXML
+  (refused, P11-7); "Open run in PDV" reads the generated mzTab and MGF
+  copies, not the pepXML; the Open control sits in the Visualisation section
+  driven by the Results selection rather than "the Results UI"; PDV's
+  checksum and version are in ``events.log`` (tier 1's Phase 10 ruling).
+* **Orchestrator repair** (``SectionArrivals``): the Visualisation note said
+  the section "is being filled by phase 11"; now "is live: phase 11 ...
+  filled it". ``cometgui-ui verify`` 699, 0 failures.
+* **Stale, left for tier 1** (outside this phase's scope to rewrite):
+  ``docs/developer/index.rst`` still calls every page but two a Phase 01
+  stub; ``docs/developer/testing.rst``'s "not tested yet" table is Phase 01's
+  throughout (no application, no pinned binaries).
+
 Rejections and rework
 =====================
 
