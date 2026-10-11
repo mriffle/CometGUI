@@ -18,6 +18,7 @@ package org.cometgui.tools.process;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
@@ -66,10 +67,12 @@ import org.cometgui.domain.ports.ToolCommand;
  *
  * <h2>Standard input is closed, not inherited</h2>
  *
- * <p>No tool in this workflow reads standard input. Redirecting it to {@code INHERIT} would let a
- * tool that did read it block on the launching terminal -- invisibly, forever, inside a desktop
- * application that has no terminal. The default pipe is kept and closed immediately after the
- * start, so such a tool sees end of file at once instead of hanging.
+ * <p>No tool in this workflow reads standard input, with one exception added by phase 12: {@link
+ * #startWithInput} writes a few bytes -- a secret for an OS keychain tool -- and then closes it.
+ * Redirecting it to {@code INHERIT} would let a tool that did read it block on the launching
+ * terminal -- invisibly, forever, inside a desktop application that has no terminal. The default
+ * pipe is kept and closed immediately after the start, so such a tool sees end of file at once
+ * instead of hanging.
  *
  * <h2>Threading</h2>
  *
@@ -83,6 +86,12 @@ import org.cometgui.domain.ports.ToolCommand;
  * <p>Thread safe and stateless: one instance serves the whole application.
  */
 public final class ProcessService implements ProcessRunner {
+
+    /**
+     * The most bytes {@link #startWithInput} writes: {@code PIPE_BUF} on Linux, so one write never
+     * waits for the tool to read.
+     */
+    public static final int MAXIMUM_STANDARD_INPUT = 4096;
 
     /** How long a cancelled process has to end politely before it is killed. */
     private static final Duration DEFAULT_TERMINATION_GRACE = Duration.ofSeconds(5);
@@ -141,6 +150,47 @@ public final class ProcessService implements ProcessRunner {
     public StartedProcess start(ToolCommand command, ProcessListener listener) throws IOException {
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(listener, "listener");
+        return launch(command, null, listener);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The bytes are written in one call straight after the start and the pipe is closed, before
+     * the output pumps begin. That is safe only because the input is tiny: at most {@value
+     * #MAXIMUM_STANDARD_INPUT} bytes, which is at or below {@code PIPE_BUF} on every supported
+     * system, so the write completes without the tool reading a byte and cannot deadlock against a
+     * tool that writes its output first. Nothing here keeps, logs or renders the bytes.
+     *
+     * @param command the validated argument array, working directory and environment
+     * @param standardInput at most {@value #MAXIMUM_STANDARD_INPUT} bytes
+     * @param listener receives output lines and the exit code, on the service's own threads
+     * @return the handle on the started process
+     * @throws IOException if the process cannot be started or its input cannot be written; the
+     *     process is then destroyed, and the message never contains the input
+     * @throws IllegalArgumentException if the input is larger than {@value #MAXIMUM_STANDARD_INPUT}
+     *     bytes
+     */
+    @Override
+    public StartedProcess startWithInput(
+            ToolCommand command, byte[] standardInput, ProcessListener listener)
+            throws IOException {
+        Objects.requireNonNull(command, "command");
+        Objects.requireNonNull(standardInput, "standardInput");
+        Objects.requireNonNull(listener, "listener");
+        if (standardInput.length > MAXIMUM_STANDARD_INPUT) {
+            throw new IllegalArgumentException(
+                    "at most "
+                            + MAXIMUM_STANDARD_INPUT
+                            + " bytes can be written to a process's standard input, but "
+                            + standardInput.length
+                            + " were given");
+        }
+        return launch(command, standardInput, listener);
+    }
+
+    private StartedProcess launch(ToolCommand command, byte[] input, ProcessListener listener)
+            throws IOException {
         Path workingDirectory = command.workingDirectory();
         if (!Files.isDirectory(workingDirectory)) {
             throw new IOException(
@@ -155,11 +205,15 @@ public final class ProcessService implements ProcessRunner {
         builder.environment().putAll(command.environment());
         Process process = startOrExplain(builder, command);
         Instant startedAt = clock.instant();
-        try {
-            closeStandardInput(process);
-        } catch (IOException notClosed) {
-            process.toHandle().destroy();
-            throw new IOException("could not close standard input of " + command, notClosed);
+        if (input == null) {
+            try {
+                closeStandardInput(process);
+            } catch (IOException notClosed) {
+                process.toHandle().destroy();
+                throw new IOException("could not close standard input of " + command, notClosed);
+            }
+        } else {
+            writeStandardInput(process, input);
         }
         GuardedListener guarded = new GuardedListener(listener);
         AtomicBoolean cancellationRequested = new AtomicBoolean();
@@ -212,6 +266,40 @@ public final class ProcessService implements ProcessRunner {
      */
     static void closeStandardInput(Process process) throws IOException {
         process.getOutputStream().close();
+    }
+
+    /**
+     * Writes the bytes to the process's standard input and closes it, so the tool sees them and
+     * then end of file.
+     *
+     * <p>A tool may exit, or close its input, before it reads a byte -- {@code secret-tool} does
+     * when it cannot reach a keyring -- and the write then fails with a broken pipe. That is not a
+     * failure to start the tool: what the tool did instead is in its exit status and its standard
+     * error, which the caller reads as usual. So the failure is absorbed here, never reported with
+     * the bytes, and the pipe is closed either way.
+     *
+     * @param process the freshly started process
+     * @param input the bytes
+     * @return {@code true} if every byte was handed to the pipe, {@code false} if the tool had
+     *     already stopped reading
+     */
+    static boolean writeStandardInput(Process process, byte[] input) {
+        OutputStream pipe = process.getOutputStream();
+        boolean written = false;
+        try {
+            pipe.write(input);
+            pipe.flush();
+            written = true;
+        } catch (IOException toolStoppedReading) {
+            // the tool's exit status says what it did instead
+        } finally {
+            try {
+                pipe.close();
+            } catch (IOException alreadyClosed) {
+                // closing a pipe the tool has closed changes nothing
+            }
+        }
+        return written;
     }
 
     private static Process startOrExplain(ProcessBuilder builder, ToolCommand command)

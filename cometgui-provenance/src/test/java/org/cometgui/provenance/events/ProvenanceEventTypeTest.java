@@ -81,13 +81,25 @@ class ProvenanceEventTypeTest {
                 () ->
                         assertEquals(
                                 "limelight.unconverted",
-                                ProvenanceEventType.LIMELIGHT_CONVERSION_FAILED.wireName()));
+                                ProvenanceEventType.LIMELIGHT_CONVERSION_FAILED.wireName()),
+                () ->
+                        assertEquals(
+                                "limelight.uploading",
+                                ProvenanceEventType.LIMELIGHT_UPLOADING.wireName()),
+                () ->
+                        assertEquals(
+                                "limelight.uploaded",
+                                ProvenanceEventType.LIMELIGHT_UPLOADED.wireName()),
+                () ->
+                        assertEquals(
+                                "limelight.unuploaded",
+                                ProvenanceEventType.LIMELIGHT_UPLOAD_FAILED.wireName()));
     }
 
     @Test
     @DisplayName(
             "phase 04's seven types, phase 10's export type, phase 11's PDV types and phase 12's"
-                    + " Limelight conversion types are the types that exist")
+                    + " Limelight conversion and upload types are the types that exist")
     void theTypesArePinned() {
         List<String> names = new ArrayList<>();
         for (ProvenanceEventType type : ProvenanceEventType.values()) {
@@ -108,7 +120,10 @@ class ProvenanceEventTypeTest {
                         "MZTAB_WRITTEN",
                         "LIMELIGHT_CONVERTING",
                         "LIMELIGHT_CONVERTED",
-                        "LIMELIGHT_CONVERSION_FAILED"),
+                        "LIMELIGHT_CONVERSION_FAILED",
+                        "LIMELIGHT_UPLOADING",
+                        "LIMELIGHT_UPLOADED",
+                        "LIMELIGHT_UPLOAD_FAILED"),
                 names);
     }
 
@@ -120,7 +135,7 @@ class ProvenanceEventTypeTest {
             assertTrue(distinct.add(type.wireName()), "two types share the wire name");
         }
 
-        assertEquals(13, distinct.size());
+        assertEquals(16, distinct.size());
     }
 
     @Test
@@ -192,7 +207,19 @@ class ProvenanceEventTypeTest {
                 () ->
                         assertSame(
                                 ProvenanceEventType.LIMELIGHT_CONVERSION_FAILED,
-                                ProvenanceEventType.fromWireName("limelight.unconverted")));
+                                ProvenanceEventType.fromWireName("limelight.unconverted")),
+                () ->
+                        assertSame(
+                                ProvenanceEventType.LIMELIGHT_UPLOADING,
+                                ProvenanceEventType.fromWireName("limelight.uploading")),
+                () ->
+                        assertSame(
+                                ProvenanceEventType.LIMELIGHT_UPLOADED,
+                                ProvenanceEventType.fromWireName("limelight.uploaded")),
+                () ->
+                        assertSame(
+                                ProvenanceEventType.LIMELIGHT_UPLOAD_FAILED,
+                                ProvenanceEventType.fromWireName("limelight.unuploaded")));
     }
 
     @Test
@@ -353,7 +380,8 @@ class ProvenanceEventTypeTest {
                         + " [run.started, stage.started, stage.finished, tool.invoked,"
                         + " file.hashed, warning.raised, run.finished, export.written,"
                         + " pdv.launched, mztab.written, limelight.converting,"
-                        + " limelight.converted, limelight.unconverted]",
+                        + " limelight.converted, limelight.unconverted, limelight.uploading,"
+                        + " limelight.uploaded, limelight.unuploaded]",
                 rejected.getMessage());
     }
 

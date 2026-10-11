@@ -38,6 +38,19 @@
  * rules alone cannot catch a bare token passed as {@code -k <value>}; the registry can, and that is
  * what makes phase 04's exit gate item 6 an honest claim rather than a hopeful one.
  *
+ * <p><strong>Credentials held while the application runs</strong> (phase 12, work unit 5; design
+ * decisions P12-12 and P12-17). {@link org.cometgui.domain.secrets.SessionSecrets} is the one
+ * registry that grows: {@link org.cometgui.domain.secrets.SessionSecrets#admit} is the entry point
+ * every credential passes through, registering it before it returns the {@link
+ * org.cometgui.domain.secrets.Credential} the rest of the application carries (which prints nothing
+ * of itself). {@link org.cometgui.domain.secrets.CredentialStore} is the port for keeping one
+ * between uses, keyed by an account such as a server URL; {@link
+ * org.cometgui.domain.secrets.SessionCredentialStore} is the in-memory store that always works. The
+ * OS-keychain store lives in {@code org.cometgui.tools.credentials}, because it starts a process.
+ * They are here, beside the registry, rather than in {@code org.cometgui.domain.ports}, because
+ * every one of them touches a credential's value and this package is where the rules for that value
+ * live.
+ *
  * <p>Filled by phase 04 (hashing and provenance core), work unit 3.
  */
 package org.cometgui.domain.secrets;

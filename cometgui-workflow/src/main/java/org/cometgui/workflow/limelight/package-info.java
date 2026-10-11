@@ -43,8 +43,18 @@
  *       org.cometgui.workflow.storage.LimelightSettingsStore}, apart from the display filters;
  *       {@link org.cometgui.workflow.limelight.LimelightConversions#saveSettings} refuses a decoy
  *       import the run's own Percolator output cannot honour.
+ *   <li>{@link org.cometgui.workflow.limelight.LimelightUploads} is <strong>the one way an upload
+ *       is started</strong> (phase 12, work unit 5; {@code R-SEC-04}): {@link
+ *       org.cometgui.workflow.limelight.LimelightUploads#destination} checks and returns the {@link
+ *       org.cometgui.workflow.limelight.LimelightDestination} the interface shows -- the exact
+ *       server and project, and a file one of the run's own conversions recorded, unchanged -- and
+ *       {@link org.cometgui.workflow.limelight.LimelightUploads#upload} sends it only on the {@link
+ *       org.cometgui.workflow.limelight.LimelightUploadConfirmation} that destination makes,
+ *       logging to {@code logs/limelight-upload.log} and recording {@code limelight.uploading}
+ *       before the first byte and {@code limelight.uploaded} or {@code limelight.unuploaded} after.
+ *       The key is in neither.
  * </ul>
  *
- * <p>Written by phase 12, work unit 3.
+ * <p>Written by phase 12, work units 3 and 5.
  */
 package org.cometgui.workflow.limelight;

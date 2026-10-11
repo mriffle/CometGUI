@@ -33,5 +33,14 @@
  * the output only when {@link org.cometgui.tools.limelight.LimelightXmlJudge} finds it a valid
  * Limelight XML file against the schema inside the converter JAR ({@link
  * org.cometgui.tools.limelight.LimelightSchema}).
+ *
+ * <p><strong>Phase 12 unit 5 landed the upload client</strong> (design decisions P12-14, P12-15):
+ * {@link org.cometgui.tools.limelight.LimelightUploadClient} speaks the submit-import protocol of
+ * {@code limelight-core} v8.3.1 in this JVM -- authentication test, initialisation, the file as one
+ * streamed body, final submit -- to a {@link org.cometgui.tools.limelight.LimelightServer} whose
+ * address has been checked and normalised, and returns a typed {@link
+ * org.cometgui.tools.limelight.LimelightUploadOutcome}. The key travels only in the request bodies
+ * and the file's parameters header. Only {@code org.cometgui.workflow.limelight}'s upload service
+ * may use the client; an architecture rule holds that.
  */
 package org.cometgui.tools.limelight;

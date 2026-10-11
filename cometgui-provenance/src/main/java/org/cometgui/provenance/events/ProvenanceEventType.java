@@ -159,7 +159,43 @@ public enum ProvenanceEventType {
      * <p>Added by phase 12. The payload repeats {@link #LIMELIGHT_CONVERTING}'s and adds the named
      * failure and its reason; it carries no output checksum, because there is no output.
      */
-    LIMELIGHT_CONVERSION_FAILED("limelight.unconverted");
+    LIMELIGHT_CONVERSION_FAILED("limelight.unconverted"),
+
+    /**
+     * An upload of a run's Limelight XML to a Limelight server is about to start: written
+     * <em>before</em> the first byte is sent, after the scientist confirmed the destination it
+     * names, so that an upload that never ends still leaves its record.
+     *
+     * <p>Added by phase 12 ({@code R-SEC-04}; design decisions P12-10 and P12-15). The payload
+     * names the server's normalised address, the project id and the project page, and the file's
+     * path, size and SHA-256 as re-verified against the run's {@code limelight.converted} record;
+     * the keys are pinned by {@code org.cometgui.workflow.limelight}, the one path through which an
+     * upload is started. <strong>It never carries the key</strong>, in any form. Exactly one of
+     * {@link #LIMELIGHT_UPLOADED} and {@link #LIMELIGHT_UPLOAD_FAILED} follows it, unless the
+     * application stopped first. Like {@link #LIMELIGHT_CONVERTED} it follows {@link
+     * #RUN_FINISHED}.
+     */
+    LIMELIGHT_UPLOADING("limelight.uploading"),
+
+    /**
+     * The server took the file and queued its import.
+     *
+     * <p>Added by phase 12. The payload repeats {@link #LIMELIGHT_UPLOADING}'s and adds the
+     * server's own identifiers -- its {@code uploadKey} (the import's tracking id) and {@code
+     * importerSubDir} -- the program version it reported, the bytes sent, and the upload log's path
+     * and checksums.
+     */
+    LIMELIGHT_UPLOADED("limelight.uploaded"),
+
+    /**
+     * An upload that was started ended without the server queuing an import: the server refused a
+     * step, or no answer came.
+     *
+     * <p>Added by phase 12. The payload repeats {@link #LIMELIGHT_UPLOADING}'s and adds the step,
+     * the server's own flags and message (after redaction) or the transport failure, and the upload
+     * log's path and checksums. The wire name mirrors {@link #LIMELIGHT_CONVERSION_FAILED}'s.
+     */
+    LIMELIGHT_UPLOAD_FAILED("limelight.unuploaded");
 
     private final String wireName;
 
@@ -205,6 +241,7 @@ public enum ProvenanceEventType {
                         + "\"; expected one of [run.started, stage.started, stage.finished,"
                         + " tool.invoked, file.hashed, warning.raised, run.finished,"
                         + " export.written, pdv.launched, mztab.written, limelight.converting,"
-                        + " limelight.converted, limelight.unconverted]");
+                        + " limelight.converted, limelight.unconverted, limelight.uploading,"
+                        + " limelight.uploaded, limelight.unuploaded]");
     }
 }

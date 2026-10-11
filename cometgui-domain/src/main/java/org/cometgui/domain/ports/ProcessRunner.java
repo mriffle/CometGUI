@@ -17,6 +17,7 @@
 package org.cometgui.domain.ports;
 
 import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Starts an external tool.
@@ -44,4 +45,37 @@ public interface ProcessRunner {
      * @throws NullPointerException if either argument is {@code null}
      */
     RunningProcess start(ToolCommand command, ProcessListener listener) throws IOException;
+
+    /**
+     * Starts the command with a few bytes written to its standard input, which is then closed.
+     *
+     * <p>Added by phase 12 (design decisions P12-12 and P12-17) for the one kind of tool that must
+     * be handed a secret: an OS keychain's command-line tool, such as {@code secret-tool store},
+     * which reads the secret from standard input so that it never appears on an argument array --
+     * where {@code /proc/<pid>/cmdline}, {@code ps} and a provenance record's argv would all show
+     * it. The bytes are not part of the {@link ToolCommand}, so nothing that renders, records or
+     * redacts a command ever sees them.
+     *
+     * <p>The default refuses: a runner that has not been written to feed standard input must not
+     * pretend it did. The process service overrides it.
+     *
+     * @param command the validated argument array, working directory and environment
+     * @param standardInput the bytes to write before standard input is closed
+     * @param listener receives output lines and the exit code
+     * @return a handle on the started process
+     * @throws IOException if the process cannot be started or its input cannot be written; the
+     *     message never contains the input
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    default RunningProcess startWithInput(
+            ToolCommand command, byte[] standardInput, ProcessListener listener)
+            throws IOException {
+        Objects.requireNonNull(command, "command");
+        Objects.requireNonNull(standardInput, "standardInput");
+        Objects.requireNonNull(listener, "listener");
+        throw new IOException(
+                "this process runner cannot write to a process's standard input, so it did not"
+                        + " start "
+                        + command.argv().get(0));
+    }
 }

@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xs:schema version="1.0" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <xs:element name="submitImport_AuthTest_Request_Base" type="submitImportAuthTestRequestBase"/>
+
+  <xs:element name="submitImport_AuthTest_Request_PgmXML" type="submitImportAuthTestRequestPgmXML"/>
+
+  <xs:element name="submitImport_AuthTest_Response_PgmXML" type="submitImportAuthTestResponsePgmXML"/>
+
+  <xs:element name="submitImport_FinalSubmit_Request_PgmXML" type="submitImportFinalSubmitRequestPgmXML"/>
+
+  <xs:element name="submitImport_FinalSubmit_Response_PgmXML" type="submitImportFinalSubmitResponsePgmXML"/>
+
+  <xs:element name="submitImport_Get_FASTAFileUploadAccepted_Request_Base" type="submitImportGetFASTAFileUploadAcceptedRequestBase"/>
+
+  <xs:element name="submitImport_Get_FASTAFileUploadAccepted_Request_PgmXML" type="submitImportGetFASTAFileUploadAcceptedRequestPgmXML"/>
+
+  <xs:element name="submitImport_Get_FASTAFileUploadAccepted_Response_Base" type="submitImportGetFASTAFileUploadAcceptedResponseBase"/>
+
+  <xs:element name="submitImport_Get_FASTAFileUploadAccepted_Response_PgmXML" type="submitImportGetFASTAFileUploadAcceptedResponsePgmXML"/>
+
+  <xs:element name="submitImport_Init_Request_Base" type="submitImportInitRequestBase"/>
+
+  <xs:element name="submitImport_Init_Request_PgmXML" type="submitImportInitRequestPgmXML"/>
+
+  <xs:element name="submitImport_Init_Response_Base" type="submitImportInitResponseBase"/>
+
+  <xs:element name="submitImport_Init_Response_PgmXML" type="submitImportInitResponsePgmXML"/>
+
+  <xs:element name="submitImport_UploadFile_Request_Common" type="submitImportUploadFileRequestCommon"/>
+
+  <xs:element name="submitImport_UploadFile_Response_Base" type="submitImportUploadFileResponseBase"/>
+
+  <xs:element name="submitImport_UploadFile_Response_PgmXML" type="submitImportUploadFileResponsePgmXML"/>
+
+  <xs:complexType name="submitImportAuthTestRequestPgmXML">
+    <xs:complexContent>
+      <xs:extension base="submitImportAuthTestRequestBase">
+        <xs:sequence/>
+        <xs:attribute name="userSubmitImportProgramKey" type="xs:string"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportAuthTestRequestBase" abstract="true">
+    <xs:complexContent>
+      <xs:extension base="baseSubmitImportWebserviceRequest">
+        <xs:sequence/>
+        <xs:attribute name="submitProgramVersionNumber" type="xs:int"/>
+        <xs:attribute name="projectIdentifier" type="xs:string"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="baseSubmitImportWebserviceRequest" abstract="true">
+    <xs:sequence/>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportAuthTestResponsePgmXML">
+    <xs:complexContent>
+      <xs:extension base="submitImportInitResponsePgmXML">
+        <xs:sequence/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportInitResponsePgmXML">
+    <xs:complexContent>
+      <xs:extension base="submitImportInitResponseBase">
+        <xs:sequence/>
+        <xs:attribute name="projectIdNotFound" type="xs:boolean" use="required"/>
+        <xs:attribute name="projectMarkedForDeletion" type="xs:boolean" use="required"/>
+        <xs:attribute name="projectNotEnabled" type="xs:boolean" use="required"/>
+        <xs:attribute name="userSubmitImportProgramKeyNotFound" type="xs:boolean" use="required"/>
+        <xs:attribute name="userNotAuthorizedForProject" type="xs:boolean" use="required"/>
+        <xs:attribute name="userNotAcceptLatestTermsOfService" type="xs:boolean" use="required"/>
+        <xs:attribute name="uploadTempSubdir" type="xs:string"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportInitResponseBase" abstract="true">
+    <xs:complexContent>
+      <xs:extension base="baseSubmitImportWebserviceResponse">
+        <xs:sequence>
+          <xs:element name="accepted_ScanFilename_Suffix_List" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+          <xs:element name="fastaFileSubmit_Configured" type="xs:boolean" minOccurs="0"/>
+          <xs:element name="files_InSubmitImport" minOccurs="0">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="file_InSubmitImport" type="submitImportInitResponseSubPartSingleFileUploadEntry" minOccurs="0" maxOccurs="unbounded"/>
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+        <xs:attribute name="submitProgramVersionNumberNotAccepted" type="xs:boolean" use="required"/>
+        <xs:attribute name="submitProgramVersionNumberCurrentPerWebapp" type="xs:int"/>
+        <xs:attribute name="uploadKey" type="xs:string"/>
+        <xs:attribute name="projectLocked" type="xs:boolean" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="baseSubmitImportWebserviceResponse" abstract="true">
+    <xs:sequence/>
+    <xs:attribute name="statusSuccess" type="xs:boolean" use="required"/>
+    <xs:attribute name="statusFailErrorMessage" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportInitResponseSubPartSingleFileUploadEntry">
+    <xs:sequence/>
+    <xs:attribute name="fileIndex" type="xs:int" use="required"/>
+    <xs:attribute name="id" type="xs:int" use="required"/>
+    <xs:attribute name="fileRejected" type="xs:boolean" use="required"/>
+    <xs:attribute name="fileRejectedTooLarge" type="xs:boolean" use="required"/>
+    <xs:attribute name="fileSizeMaxNumber" type="xs:long" use="required"/>
+    <xs:attribute name="fileSizeMaxString" type="xs:string"/>
+    <xs:attribute name="fileRejectedFilenameSuffixNotAccepted" type="xs:boolean" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportGetFASTAFileUploadAcceptedRequestPgmXML">
+    <xs:complexContent>
+      <xs:extension base="submitImportGetFASTAFileUploadAcceptedRequestBase">
+        <xs:sequence/>
+        <xs:attribute name="userSubmitImportProgramKey" type="xs:string"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportGetFASTAFileUploadAcceptedRequestBase" abstract="true">
+    <xs:complexContent>
+      <xs:extension base="baseSubmitImportWebserviceRequest">
+        <xs:sequence/>
+        <xs:attribute name="submitProgramVersionNumber" type="xs:int"/>
+        <xs:attribute name="projectIdentifier" type="xs:string"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportGetFASTAFileUploadAcceptedResponsePgmXML">
+    <xs:complexContent>
+      <xs:extension base="submitImportGetFASTAFileUploadAcceptedResponseBase">
+        <xs:sequence/>
+        <xs:attribute name="projectIdNotFound" type="xs:boolean" use="required"/>
+        <xs:attribute name="projectMarkedForDeletion" type="xs:boolean" use="required"/>
+        <xs:attribute name="projectNotEnabled" type="xs:boolean" use="required"/>
+        <xs:attribute name="userSubmitImportProgramKeyNotFound" type="xs:boolean" use="required"/>
+        <xs:attribute name="userNotAuthorizedForProject" type="xs:boolean" use="required"/>
+        <xs:attribute name="userNotAcceptLatestTermsOfService" type="xs:boolean" use="required"/>
+        <xs:attribute name="uploadTempSubdir" type="xs:string"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportGetFASTAFileUploadAcceptedResponseBase" abstract="true">
+    <xs:complexContent>
+      <xs:extension base="baseSubmitImportWebserviceResponse">
+        <xs:sequence/>
+        <xs:attribute name="submitProgramVersionNumberNotAccepted" type="xs:boolean" use="required"/>
+        <xs:attribute name="fastaFileSubmitConfigured" type="xs:boolean" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportInitRequestPgmXML">
+    <xs:complexContent>
+      <xs:extension base="submitImportInitRequestBase">
+        <xs:sequence/>
+        <xs:attribute name="userSubmitImportProgramKey" type="xs:string"/>
+        <xs:attribute name="submitterSameMachine" type="xs:boolean"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportInitRequestBase" abstract="true">
+    <xs:complexContent>
+      <xs:extension base="baseSubmitImportWebserviceRequest">
+        <xs:sequence>
+          <xs:element name="files_InSubmitImport" minOccurs="0">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="file_InSubmitImport" type="submitImportInitRequestSubPartSingleFileUploadEntry" minOccurs="0" maxOccurs="unbounded"/>
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+        <xs:attribute name="submitProgramVersionNumber" type="xs:int"/>
+        <xs:attribute name="projectIdentifier" type="xs:string"/>
+        <xs:attribute name="searchName" type="xs:string"/>
+        <xs:attribute name="searchShortName" type="xs:string"/>
+        <xs:attribute name="searchPath" type="xs:string"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportInitRequestSubPartSingleFileUploadEntry">
+    <xs:sequence/>
+    <xs:attribute name="fileIndex" type="xs:int"/>
+    <xs:attribute name="fileType" type="xs:int"/>
+    <xs:attribute name="filename" type="xs:string"/>
+    <xs:attribute name="uploadFileSize" type="xs:long"/>
+    <xs:attribute name="canonicalFilenameWPathOnSubmitMachine" type="xs:string"/>
+    <xs:attribute name="absoluteFilenameWPathOnSubmitMachine" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportUploadFileRequestCommon">
+    <xs:sequence/>
+    <xs:attribute name="projectIdentifier" type="xs:string"/>
+    <xs:attribute name="uploadKey" type="xs:string"/>
+    <xs:attribute name="fileIndex" type="xs:int"/>
+    <xs:attribute name="fileType" type="xs:int"/>
+    <xs:attribute name="filename" type="xs:string"/>
+    <xs:attribute name="fileSHA256Hash" type="xs:string"/>
+    <xs:attribute name="userSubmitImportProgramKey" type="xs:string"/>
+    <xs:attribute name="canonicalFilenameWPathOnSubmitMachine" type="xs:string"/>
+    <xs:attribute name="absoluteFilenameWPathOnSubmitMachine" type="xs:string"/>
+    <xs:attribute name="submitProgramVersion" type="xs:int"/>
+    <xs:attribute name="newHeaderParamsFormatVersion" type="xs:int"/>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportUploadFileResponsePgmXML">
+    <xs:complexContent>
+      <xs:extension base="submitImportUploadFileResponseBase">
+        <xs:sequence/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportUploadFileResponseBase" abstract="true">
+    <xs:complexContent>
+      <xs:extension base="baseSubmitImportWebserviceResponse">
+        <xs:sequence/>
+        <xs:attribute name="fileSizeLimitExceeded" type="xs:boolean" use="required"/>
+        <xs:attribute name="maxSize" type="xs:long" use="required"/>
+        <xs:attribute name="maxSizeFormatted" type="xs:string"/>
+        <xs:attribute name="uploadFileFieldNameInvalid" type="xs:boolean" use="required"/>
+        <xs:attribute name="moreThanOneuploadedFile" type="xs:boolean" use="required"/>
+        <xs:attribute name="filenameInFormNotMatchFilenameInQueryString" type="xs:boolean" use="required"/>
+        <xs:attribute name="noUploadedFile" type="xs:boolean" use="required"/>
+        <xs:attribute name="uploadKeyNotValid" type="xs:boolean" use="required"/>
+        <xs:attribute name="limelightXMLFileFailsInitialParse" type="xs:boolean" use="required"/>
+        <xs:attribute name="limelightXMLFilerootXMLNodeIncorrect" type="xs:boolean" use="required"/>
+        <xs:attribute name="fastaFileInvalidContents" type="xs:boolean"/>
+        <xs:attribute name="fastaFileNotAllowed" type="xs:boolean"/>
+        <xs:attribute name="scanFileNotAllowed" type="xs:boolean" use="required"/>
+        <xs:attribute name="scanFilenameSuffixNotValid" type="xs:boolean" use="required"/>
+        <xs:attribute name="scanFileFailsInitialParse" type="xs:boolean" use="required"/>
+        <xs:attribute name="scanFilerootXMLNodeIncorrect" type="xs:boolean" use="required"/>
+        <xs:attribute name="genericOtherFileNotAllowed" type="xs:boolean"/>
+        <xs:attribute name="projectLocked" type="xs:boolean" use="required"/>
+        <xs:attribute name="uploadedFileSHA256HashNotMatchParamFileSHA256Hash" type="xs:boolean" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportFinalSubmitRequestPgmXML">
+    <xs:complexContent>
+      <xs:extension base="submitImportFinalSubmitRequestBase">
+        <xs:sequence/>
+        <xs:attribute name="userSubmitImportProgramKey" type="xs:string"/>
+        <xs:attribute name="submitterSameMachine" type="xs:boolean" use="required"/>
+        <xs:attribute name="submitterKey" type="xs:string"/>
+        <xs:attribute name="searchPath" type="xs:string"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportFinalSubmitRequestBase" abstract="true">
+    <xs:sequence>
+      <xs:element name="fileItems" type="submitImportFinalSubmitSingleFileItem" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="searchTagList" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="searchTagCategoryAndItsSearchTagsList" type="submitImportFinalSubmitRequestSubPartSearchTagCategoryAndItsSearchTagsEntry" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="submitProgramVersionNumber" type="xs:int"/>
+    <xs:attribute name="projectIdentifier" type="xs:string"/>
+    <xs:attribute name="uploadKey" type="xs:string"/>
+    <xs:attribute name="searchName" type="xs:string"/>
+    <xs:attribute name="searchShortName" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportFinalSubmitSingleFileItem">
+    <xs:sequence/>
+    <xs:attribute name="uploadedFilename" type="xs:string"/>
+    <xs:attribute name="fileType" type="xs:int"/>
+    <xs:attribute name="fileIndex" type="xs:int"/>
+    <xs:attribute name="isLimelightXMLFile" type="xs:boolean"/>
+    <xs:attribute name="filenameOnDiskWithPathSubSameMachine" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportFinalSubmitRequestSubPartSearchTagCategoryAndItsSearchTagsEntry">
+    <xs:sequence>
+      <xs:element name="searchTagList" type="xs:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="searchTagCategoryLabel" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportFinalSubmitResponsePgmXML">
+    <xs:complexContent>
+      <xs:extension base="submitImportFinalSubmitResponseBase">
+        <xs:sequence/>
+        <xs:attribute name="importerSubDir" type="xs:string"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="submitImportFinalSubmitResponseBase" abstract="true">
+    <xs:complexContent>
+      <xs:extension base="baseSubmitImportWebserviceResponse">
+        <xs:sequence/>
+        <xs:attribute name="submitProgramVersionNumberNotAccepted" type="xs:boolean" use="required"/>
+        <xs:attribute name="submitProgramVersionNumberCurrentPerWebapp" type="xs:int"/>
+        <xs:attribute name="projectLocked" type="xs:boolean" use="required"/>
+        <xs:attribute name="submittedScanFileNotAllowed" type="xs:boolean" use="required"/>
+        <xs:attribute name="submittedFASTAFileNotAllowed" type="xs:boolean"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+</xs:schema>
+
