@@ -173,7 +173,12 @@ public final class LimelightPane extends ScrollPane {
         decoys.accessibleHelpProperty().bind(limelight.decoyTextProperty());
         decoys.setSelected(limelight.importDecoysProperty().get());
         decoys.disableProperty().bind(limelight.decoyEnabledProperty().not());
-        decoys.setOnAction(event -> limelight.setImportDecoys(decoys.isSelected()));
+        decoys.setOnAction(
+                event -> {
+                    limelight.setImportDecoys(decoys.isSelected());
+                    // the box shows what the section holds, never only what was clicked
+                    decoys.setSelected(limelight.importDecoysProperty().get());
+                });
         limelight
                 .importDecoysProperty()
                 .addListener((observable, before, after) -> decoys.setSelected(after));
@@ -198,7 +203,11 @@ public final class LimelightPane extends ScrollPane {
         named(openMod, "Open-modification mode");
         openMod.setSelected(limelight.openModProperty().get());
         openMod.disableProperty().bind(limelight.settingsEnabledProperty().not());
-        openMod.setOnAction(event -> limelight.setOpenMod(openMod.isSelected()));
+        openMod.setOnAction(
+                event -> {
+                    limelight.setOpenMod(openMod.isSelected());
+                    openMod.setSelected(limelight.openModProperty().get());
+                });
         limelight
                 .openModProperty()
                 .addListener((observable, before, after) -> openMod.setSelected(after));

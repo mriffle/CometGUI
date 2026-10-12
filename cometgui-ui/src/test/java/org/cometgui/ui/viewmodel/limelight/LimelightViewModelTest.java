@@ -45,6 +45,7 @@ import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
+import org.cometgui.domain.tools.InstallProgressListener;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolVersion;
@@ -905,6 +906,8 @@ class LimelightViewModelTest {
                 .listener()
                 .onInstallProgress(
                         progress(ToolName.LIMELIGHT_CONVERTER, "2.8.1", InstallPhase.CANCELLED, 0));
+        ui.drain();
+        assertTrue(section.convertEnabledProperty().get(), "free before the state is read again");
         settle();
         assertAll(
                 () ->
@@ -1236,6 +1239,376 @@ class LimelightViewModelTest {
     }
 
     @Test
+    @DisplayName(
+            "an install the port refuses: Convert and the rerun say so, return false and leave"
+                    + " nothing running")
+    void installsThePortRefuses() {
+        open(notInstalled(), ready(RUN, "0.01"));
+        port.refuseNextInstall(new IOException("the cache is read-only"));
+        assertFalse(section.convert());
+        assertAll(
+                () ->
+                        assertEquals(
+                                notInstalled().explanation(),
+                                section.converterTextProperty().get()),
+                () -> assertEquals(0.0, section.installProgressProperty().get()),
+                () -> assertFalse(section.installingProperty().get()),
+                () -> assertTrue(section.convertEnabledProperty().get()));
+
+        open(installed(), incompatible(rerunAction(ToolOffers.percolatorAvailable())));
+        port.refuseNextInstall(new IOException("no Tool Manager"));
+        assertFalse(section.act());
+        assertAll(
+                () ->
+                        assertEquals(
+                                "Percolator could not be installed, so it was not rerun: no Tool"
+                                        + " Manager",
+                                section.actionOutcomeProperty().get()),
+                () -> assertTrue(section.actionEnabledProperty().get()),
+                () -> assertEquals(List.of(), port.reruns()));
+    }
+
+    @Test
+    @DisplayName(
+            "the install's words: starting, its progress -- unknown and zero totals are"
+                    + " indeterminate -- and a refresh during it does not overwrite them")
+    void installProgressInWords() {
+        open(notInstalled(), ready(RUN, "0.01"));
+        section.convert();
+        assertEquals(
+                "Installing the Limelight converter 2.8.1: starting.",
+                section.converterTextProperty().get());
+        InstallProgressListener listener = port.installs().get(0).listener();
+        listener.onInstallProgress(
+                new InstallProgress(
+                        ToolName.LIMELIGHT_CONVERTER, CONVERTER, InstallPhase.DOWNLOADING, 5, 10));
+        settle();
+        assertEquals(0.5, section.installProgressProperty().get(), 1e-9);
+        listener.onInstallProgress(
+                new InstallProgress(
+                        ToolName.LIMELIGHT_CONVERTER, CONVERTER, InstallPhase.DOWNLOADING, 10, -1));
+        settle();
+        assertEquals(-1.0, section.installProgressProperty().get());
+        listener.onInstallProgress(
+                new InstallProgress(
+                        ToolName.LIMELIGHT_CONVERTER, CONVERTER, InstallPhase.DOWNLOADING, 0, 0));
+        settle();
+        assertEquals(
+                -1.0, section.installProgressProperty().get(), "a zero total is not divided by");
+        String shown = section.converterTextProperty().get();
+        port.converter(LimelightConverterStatus.installing(CONVERTER));
+        section.refresh();
+        settle();
+        assertEquals(shown, section.converterTextProperty().get(), "the progress stays shown");
+        int checks = port.checks().size();
+        listener.onInstallProgress(
+                new InstallProgress(
+                        ToolName.LIMELIGHT_CONVERTER, CONVERTER, InstallPhase.FAILED, 0, 0));
+        settle();
+        assertAll(
+                () -> assertEquals(0.0, section.installProgressProperty().get()),
+                () -> assertTrue(port.checks().size() > checks, "read again after it ended"),
+                () ->
+                        assertEquals(
+                                LimelightConverterStatus.installing(CONVERTER).explanation(),
+                                section.converterTextProperty().get()));
+    }
+
+    @Test
+    @DisplayName(
+            "the Percolator install's words are the action's, and a refresh updates the converter")
+    void percolatorInstallWords() {
+        open(installed(), incompatible(rerunAction(ToolOffers.percolatorAvailable())));
+        section.act();
+        port.installs()
+                .get(0)
+                .listener()
+                .onInstallProgress(
+                        new InstallProgress(
+                                ToolName.PERCOLATOR,
+                                ToolVersion.parse("3.07.1"),
+                                InstallPhase.DOWNLOADING,
+                                500,
+                                1000));
+        settle();
+        assertEquals(
+                "Installing Percolator 3.07.1: Downloading: 500 of 1,000 bytes.",
+                section.actionOutcomeProperty().get());
+        port.converter(LimelightConverterStatus.unavailable("No converter now."));
+        section.refresh();
+        settle();
+        assertEquals("No converter now.", section.converterTextProperty().get());
+    }
+
+    @Test
+    @DisplayName(
+            "the steps between an install's end and what it was for are said, and nothing can"
+                    + " start meanwhile")
+    void betweenTheInstallAndWhatItWasFor() {
+        open(notInstalled(), ready(RUN, "0.01"));
+        port.convert(run -> result(defaultOutput(RUN)));
+        section.convert();
+        port.installs()
+                .get(0)
+                .listener()
+                .onInstallProgress(
+                        progress(ToolName.LIMELIGHT_CONVERTER, "2.8.1", InstallPhase.DONE, 1));
+        ui.drain();
+        assertAll(
+                () ->
+                        assertEquals(
+                                "The Limelight converter is installed; converting run run-1.",
+                                section.outcomeProperty().get()),
+                () -> assertFalse(section.convertEnabledProperty().get()),
+                () ->
+                        assertEquals(
+                                "A conversion is running; the next can start when it has"
+                                        + " finished.",
+                                section.convertRefusalProperty().get()));
+        settle();
+        assertEquals(
+                "Nothing was converted: " + notInstalled().explanation(),
+                section.outcomeProperty().get(),
+                "the converter is still not installed after the install, so nothing converts");
+        assertEquals(List.of(), port.conversions());
+        assertTrue(section.convertEnabledProperty().get(), "Convert is free again");
+
+        open(installed(), incompatible(rerunAction(ToolOffers.percolatorAvailable())));
+        section.act();
+        port.installs()
+                .get(1)
+                .listener()
+                .onInstallProgress(progress(ToolName.PERCOLATOR, "3.07.1", InstallPhase.DONE, 1));
+        ui.drain();
+        assertAll(
+                () ->
+                        assertEquals(
+                                "Percolator is installed; checking run run-1 again before the"
+                                        + " rerun.",
+                                section.actionOutcomeProperty().get()),
+                () -> assertFalse(section.actionEnabledProperty().get()),
+                () ->
+                        assertEquals(
+                                "A Percolator rerun is running; convert when it has finished.",
+                                section.convertRefusalProperty().get()));
+        port.check(
+                run -> {
+                    throw new IOException("unreadable");
+                });
+        settle();
+        assertTrue(section.actionEnabledProperty().get(), "free again after the check failed");
+    }
+
+    @Test
+    @DisplayName(
+            "after the Percolator install, the run is read again: its new action is shown -- unless"
+                    + " another run was chosen meanwhile")
+    void theRunIsReadAgainAfterTheInstall() {
+        CompatibilityAction first = rerunAction(ToolOffers.percolatorAvailable());
+        CompatibilityAction installed =
+                rerunAction(Percolators.managed3071(Path.of("p/percolator").toAbsolutePath()));
+        assertFalse(first.explanation().equals(installed.explanation()));
+        open(installed(), incompatible(first));
+        section.act();
+        port.check(run -> incompatible(installed));
+        port.installs()
+                .get(0)
+                .listener()
+                .onInstallProgress(progress(ToolName.PERCOLATOR, "3.07.1", InstallPhase.DONE, 1));
+        settle();
+        assertEquals(installed.explanation(), section.actionExplanationProperty().get());
+        port.reruns().get(0).observer().onRunFinished(result(AttemptOutcome.CANCELLED, Map.of()));
+        settle();
+
+        open(installed(), incompatible(first));
+        section.act();
+        runs.add(DERIVED);
+        results.refresh();
+        settle();
+        port.check(run -> ready(run.id().value(), "0.01"));
+        results.choose(DERIVED);
+        settle();
+        port.check(run -> incompatible(installed));
+        port.installs()
+                .get(1)
+                .listener()
+                .onInstallProgress(progress(ToolName.PERCOLATOR, "3.07.1", InstallPhase.DONE, 1));
+        settle();
+        assertAll(
+                () -> assertEquals(2, port.reruns().size()),
+                () -> assertEquals(RUN, port.reruns().get(1).run().id().value()),
+                () -> assertTrue(section.convertibleProperty().get(), "the derived run is shown"),
+                () -> assertFalse(section.actionVisibleProperty().get()));
+    }
+
+    @Test
+    @DisplayName(
+            "a rerun: its plan said, Cancel only while it runs, the run checked again when it ends,"
+                    + " and an unexpected failure to start said")
+    void rerunLifecycle() {
+        ToolOffer build = Percolators.managed3071(Path.of("p/percolator").toAbsolutePath());
+        open(installed(), incompatible(rerunAction(build)));
+        assertFalse(section.cancelRerun(), "nothing to cancel");
+        section.act();
+        settle();
+        ScriptedLimelight.Rerun rerun = port.reruns().get(0);
+        rerun.observer().planned(PLAN, "run run-derived, rescoring the merged PIN of run run-1");
+        settle();
+        assertEquals(
+                "Rerunning Percolator: run run-derived, rescoring the merged PIN of run run-1.",
+                section.actionOutcomeProperty().get());
+        assertTrue(section.cancelRerun());
+        assertAll(
+                () -> assertFalse(section.rerunCancelEnabledProperty().get()),
+                () ->
+                        assertEquals(
+                                "Cancelling the Percolator rerun: run run-derived, rescoring the"
+                                        + " merged PIN of run run-1.",
+                                section.actionOutcomeProperty().get()));
+        settle();
+        assertEquals(1, port.rerunCancels());
+        rerun.observer().onRunFinished(result(AttemptOutcome.CANCELLED, Map.of()));
+        settle();
+
+        section.act();
+        settle();
+        int checks = port.checks().size();
+        assertTrue(section.rerunCancelEnabledProperty().get());
+        port.reruns().get(1).observer().onRunFinished(result(AttemptOutcome.FAILED, Map.of()));
+        ui.drain();
+        assertAll(
+                () ->
+                        assertEquals(
+                                "The Percolator rerun failed: run run-derived in "
+                                        + Path.of("project/runs/run-derived").toAbsolutePath()
+                                        + ".",
+                                section.actionOutcomeProperty().get()),
+                () -> assertFalse(section.rerunCancelEnabledProperty().get()),
+                () -> assertTrue(section.actionEnabledProperty().get()),
+                () -> assertEquals(1, background.pending(), "the run is read again"));
+        background.drain();
+        assertEquals(checks + 1, port.checks().size());
+        settle();
+        port.failNextRerun(new IllegalStateException("the engine is gone"));
+        section.act();
+        settle();
+        assertEquals(
+                "The Percolator rerun did not start: the engine is gone",
+                section.actionOutcomeProperty().get());
+    }
+
+    @Test
+    @DisplayName(
+            "a second conversion starts from nothing: the last log, file and checksum are cleared,"
+                    + " and Convert is free again as soon as it has ended")
+    void aSecondConversionStartsClean() {
+        open(installed(), ready(RUN, "0.01"));
+        port.convert(run -> result(defaultOutput(RUN)), "first");
+        section.convert();
+        settle();
+        assertTrue(section.validProperty().get());
+        port.convert(
+                run -> {
+                    throw new IOException("judged invalid");
+                },
+                "second");
+        section.convert();
+        assertAll(
+                () -> assertEquals("", section.logProperty().get()),
+                () -> assertFalse(section.validProperty().get()),
+                () -> assertEquals("", section.resultFileProperty().get()),
+                () -> assertEquals("", section.resultPsmsProperty().get()),
+                () -> assertEquals("", section.resultSha256Property().get()));
+        background.drain();
+        ui.drain();
+        assertAll(
+                () -> assertEquals("second", section.logProperty().get()),
+                () -> assertTrue(section.convertEnabledProperty().get(), "free before the re-read"),
+                () -> assertEquals(1, background.pending(), "the run is read again"));
+    }
+
+    @Test
+    @DisplayName(
+            "choosing another run clears what was typed and said for the last one until it is"
+                    + " read")
+    void anotherRunStartsClean() {
+        open(installed(), ready(RUN, "0.01"));
+        port.save(
+                run -> {
+                    throw new IOException("refused");
+                });
+        section.editCutoff("9");
+        section.editOutput("/x.xml");
+        settle();
+        runs.add(DERIVED);
+        results.refresh();
+        settle();
+        port.check(run -> ready(run.id().value(), "0.02"));
+        results.choose(DERIVED);
+        assertAll(
+                () -> assertEquals("", section.outputTextProperty().get()),
+                () -> assertEquals("", section.settingsStatusProperty().get()),
+                () -> assertEquals("", section.qCutoffTextProperty().get()),
+                () ->
+                        assertEquals(
+                                LimelightViewModel.CHECKING,
+                                section.compatibilityTextProperty().get()));
+        settle();
+        assertEquals("0.02", section.qCutoffTextProperty().get());
+    }
+
+    @Test
+    @DisplayName("a run read before the converter's state is not yet convertible, and says why")
+    void converterNotYetRead() {
+        port.check(run -> ready(RUN, "0.01"));
+        results.refresh();
+        settle();
+        assertEquals(LimelightViewModel.NOT_READ, section.convertRefusalProperty().get());
+        assertFalse(section.convertEnabledProperty().get());
+    }
+
+    @Test
+    @DisplayName("the prefix is saved only when it changed, or when the settings shown are refused")
+    void thePrefixIsSavedWhenItMatters() {
+        open(installed(), ready(RUN, "0.01"));
+        section.editDecoyPrefix("");
+        settle();
+        assertEquals(List.of(), port.saves());
+        port.save(
+                run -> {
+                    throw new IOException("refused");
+                });
+        section.editCutoff("2");
+        settle();
+        port.save(run -> ready(RUN, "0.01"));
+        section.editDecoyPrefix("");
+        settle();
+        assertEquals(2, port.saves().size(), "retried with the prefix unchanged");
+        assertEquals(
+                new LimelightResult(JAR, 0, 0, "m", "s", "0.01", Optional.empty()).psms(),
+                0,
+                "zero PSMs is a count, not a refusal");
+    }
+
+    @Test
+    @DisplayName(
+            "the converter's state answered after the run's is still applied: whichever answer"
+                    + " comes last, Convert follows both")
+    void answersInEitherOrder() {
+        open(installed(), ready(RUN, "0.01"));
+        assertTrue(section.convertEnabledProperty().get());
+        port.converter(LimelightConverterStatus.unavailable("Gone."));
+        section.refresh();
+        assertEquals(2, background.pending());
+        background.runLast();
+        background.runFirst();
+        ui.drain();
+        assertAll(
+                () -> assertFalse(section.convertEnabledProperty().get()),
+                () -> assertEquals("Gone.", section.convertRefusalProperty().get()));
+    }
+
+    @Test
     @DisplayName("the records refuse what cannot be")
     void theRecords() {
         assertAll(
@@ -1329,6 +1702,10 @@ class LimelightViewModelTest {
 
         void runFirst() {
             tasks.pollFirst().run();
+        }
+
+        void runLast() {
+            tasks.pollLast().run();
         }
 
         void drain() {

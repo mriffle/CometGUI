@@ -49,12 +49,15 @@ import org.cometgui.domain.run.AttemptOutcome;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.secrets.SecretRedactor;
+import org.cometgui.domain.tools.CapabilityEvidence;
+import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallProgressListener;
 import org.cometgui.domain.tools.NoManagedBuild;
+import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
@@ -66,6 +69,11 @@ import org.cometgui.params.percolator.PercolatorSettings;
 import org.cometgui.params.percolator.resolution.CompatibilityAction;
 import org.cometgui.params.percolator.resolution.DownstreamStage;
 import org.cometgui.provenance.hashing.StreamingHashService;
+import org.cometgui.provenance.manifest.ApplicationRecord;
+import org.cometgui.provenance.manifest.ManifestWriter;
+import org.cometgui.provenance.manifest.ProvenanceManifest;
+import org.cometgui.provenance.manifest.ProvenanceStatus;
+import org.cometgui.provenance.manifest.RunRecord;
 import org.cometgui.results.filtering.store.TableKind;
 import org.cometgui.tools.api.JavaRuntime;
 import org.cometgui.ui.viewmodel.limelight.LimelightOptions;
@@ -419,6 +427,114 @@ class ProjectLimelightPortTest {
     }
 
     @Test
+    @DisplayName(
+            "a run whose provenance records no Percolator XML: the rerun starts only with the very"
+                    + " action the workflow offers now, with an installed build -- never another,"
+                    + " never one that must be installed first, never registration")
+    void aRerunIsStartedOnlyForTheActionOfferedNow() throws IOException, RunNotStartedException {
+        Files.createDirectories(run.provenanceDirectory());
+        Instant at = CREATED.plusSeconds(60);
+        ManifestWriter.redactingWith(SecretRedactor.patternsOnly())
+                .writeTo(
+                        run.provenanceJsonFile(),
+                        ProvenanceManifest.current(
+                                new RunRecord(
+                                        new RunId(RUN),
+                                        ResultRuns.PROJECT_ID,
+                                        ProvenanceStatus.COMPLETED,
+                                        at,
+                                        Optional.of(at)),
+                                ApplicationRecord.capture("0.0.0-test", "unknown"),
+                                Map.of(),
+                                List.of(),
+                                List.of()));
+        Path executable = scratch.toRealPath().resolve("bin/percolator");
+        ToolOffer installed = percolator("3.07.1", ToolInstallState.INSTALLED, executable);
+        tools.percolators = List.of(installed);
+        ProjectLimelightPort port = port();
+        CompatibilityAction offered =
+                port.check(listed(), "").readiness().compatibility().action().orElseThrow();
+        assertAll(
+                () -> assertTrue(offered.offersRerun()),
+                () -> assertFalse(offered.installFirst()),
+                () -> assertEquals("Rerun Percolator with 3.07.1 for Limelight", offered.label()));
+        LimelightRerun started =
+                port.rerun(listed(), offered, PercolatorSettings.defaults(), engine.observer);
+        assertAll(
+                () -> assertEquals(1, engine.reruns),
+                () -> assertEquals(offered, engine.rerunWith),
+                () -> assertEquals(run.root(), started.directory()));
+
+        CompatibilityAction another =
+                CompatibilityAction.forStage(
+                        List.of(percolator("3.08.2", ToolInstallState.INSTALLED, executable)),
+                        DownstreamStage.LIMELIGHT_CONVERSION);
+        RunNotStartedException stale =
+                assertThrows(
+                        RunNotStartedException.class,
+                        () ->
+                                port.rerun(
+                                        listed(),
+                                        another,
+                                        PercolatorSettings.defaults(),
+                                        engine.observer));
+        assertEquals(
+                "The action offered for run "
+                        + RUN
+                        + " is no longer \""
+                        + another.label()
+                        + "\" with an installed build: "
+                        + offered.label()
+                        + ". Check again.",
+                stale.getMessage());
+
+        tools.percolators = List.of(percolator("3.07.1", ToolInstallState.NOT_INSTALLED, null));
+        CompatibilityAction installFirst =
+                port.check(listed(), "").readiness().compatibility().action().orElseThrow();
+        assertTrue(installFirst.installFirst());
+        assertThrows(
+                RunNotStartedException.class,
+                () ->
+                        port.rerun(
+                                listed(),
+                                installFirst,
+                                PercolatorSettings.defaults(),
+                                engine.observer));
+
+        tools.percolators = List.of();
+        CompatibilityAction register =
+                port.check(listed(), "").readiness().compatibility().action().orElseThrow();
+        assertFalse(register.offersRerun());
+        assertThrows(
+                RunNotStartedException.class,
+                () ->
+                        port.rerun(
+                                listed(), offered, PercolatorSettings.defaults(), engine.observer));
+        assertEquals(1, engine.reruns, "only the first was started");
+    }
+
+    private static ToolOffer percolator(String version, ToolInstallState state, Path executable) {
+        return new ToolOffer(
+                ToolName.PERCOLATOR,
+                ToolVersion.parse(version),
+                ToolOrigin.MANAGED,
+                state,
+                List.of(
+                        new DeclaredCapability(
+                                ToolCapability.XML_OUTPUT,
+                                CapabilityEvidence.OBSERVED_BY_EXECUTION,
+                                "a test"),
+                        new DeclaredCapability(
+                                ToolCapability.XML_DECOY_OUTPUT,
+                                CapabilityEvidence.OBSERVED_BY_EXECUTION,
+                                "a test")),
+                List.of(),
+                Optional.empty(),
+                Optional.ofNullable(executable),
+                OptionalLong.of(1L));
+    }
+
+    @Test
     @DisplayName("the converter's state and both installs are the Tool Manager's")
     void theToolManager() throws IOException {
         ProjectLimelightPort port = port();
@@ -619,9 +735,12 @@ class ProjectLimelightPortTest {
 
         private boolean refuse;
 
+        private List<ToolOffer> percolators = List.of();
+
         @Override
         public List<ToolOffer> offers() {
-            return List.of(
+            List<ToolOffer> all = new ArrayList<>(percolators);
+            all.add(
                     new ToolOffer(
                             ToolName.LIMELIGHT_CONVERTER,
                             ToolVersion.parse("2.8.1"),
@@ -632,6 +751,7 @@ class ProjectLimelightPortTest {
                             Optional.empty(),
                             Optional.empty(),
                             OptionalLong.of(2_762_075L)));
+            return List.copyOf(all);
         }
 
         @Override
@@ -662,6 +782,8 @@ class ProjectLimelightPortTest {
         private final Set<RunId> executing = new HashSet<>();
 
         private int reruns;
+
+        private CompatibilityAction rerunWith;
 
         private final RunObserver observer =
                 new RunObserver() {
@@ -720,6 +842,7 @@ class ProjectLimelightPortTest {
                 PercolatorSettings settings,
                 RunObserver runObserver) {
             reruns++;
+            rerunWith = action;
             return new LimelightRerun(new RunId("derived"), source.root(), () -> {});
         }
     }

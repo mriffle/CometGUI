@@ -29,8 +29,10 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -44,14 +46,22 @@ import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.project.ProjectId;
 import org.cometgui.domain.project.ProjectLayout;
 import org.cometgui.domain.run.RunId;
+import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.tools.CapabilityEvidence;
+import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.ToolCapability;
+import org.cometgui.domain.tools.ToolInstallState;
+import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolRegistrationException;
+import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ValueOrigin;
 import org.cometgui.params.comet.validation.Finding;
+import org.cometgui.params.percolator.PercolatorSettings;
+import org.cometgui.params.percolator.resolution.CompatibilityAction;
+import org.cometgui.params.percolator.resolution.DownstreamStage;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.RunEnginePort;
@@ -395,6 +405,124 @@ class WorkflowRunPortTest {
                 problems.stream().anyMatch(problem -> problem.contains("PSM_TSV_OUTPUT")),
                 () -> "the builder's refusal is among the problems: " + problems);
         assertTrue(check.report().orElseThrow().blocked());
+    }
+
+    @Test
+    @DisplayName(
+            "the Limelight section's compatible rerun of a chosen run goes through the one rerun:"
+                    + " no rerun offered, a build not installed, and a source that is no run are"
+                    + " each refused in the rerun's own words, and nothing is planned")
+    void theCompatibleRerunOfAChosenRun() throws IOException {
+        Path root = scratch.toRealPath();
+        SessionEngine port =
+                port(Optional.of(InstalledComet.at("2026.03.0", fakeComet(root))), project(root));
+        RunLayout source = new RunLayout(root.resolve("project/runs/not-a-run"));
+        List<String> planned = new ArrayList<>();
+        RunObserver watching =
+                new RunObserver() {
+                    @Override
+                    public void planned(Plan plan, String description) {
+                        planned.add(description);
+                    }
+
+                    @Override
+                    public void onTransition(StepTransition transition) {}
+
+                    @Override
+                    public void onRunFinished(RunResult result) {}
+                };
+        CompatibilityAction register =
+                CompatibilityAction.forStage(List.of(), DownstreamStage.LIMELIGHT_CONVERSION);
+        RunNotStartedException none =
+                assertThrows(
+                        RunNotStartedException.class,
+                        () ->
+                                port.rerunCompatible(
+                                        source, register, PercolatorSettings.defaults(), watching));
+        assertTrue(
+                none.getMessage().startsWith("No Percolator rerun is offered for "),
+                none.getMessage());
+        CompatibilityAction notInstalled =
+                CompatibilityAction.forStage(
+                        List.of(xmlPercolator(ToolInstallState.NOT_INSTALLED, null)),
+                        DownstreamStage.LIMELIGHT_CONVERSION);
+        RunNotStartedException install =
+                assertThrows(
+                        RunNotStartedException.class,
+                        () ->
+                                port.rerunCompatible(
+                                        source,
+                                        notInstalled,
+                                        PercolatorSettings.defaults(),
+                                        watching));
+        assertTrue(
+                install.getMessage()
+                        .startsWith(
+                                "Percolator 3.07.1 is not installed, and the rerun runs only an"
+                                        + " installed build"),
+                install.getMessage());
+        CompatibilityAction installed =
+                CompatibilityAction.forStage(
+                        List.of(xmlPercolator(ToolInstallState.INSTALLED, fakePercolator(root))),
+                        DownstreamStage.LIMELIGHT_CONVERSION);
+        assertThrows(
+                RunNotStartedException.class,
+                () ->
+                        port.rerunCompatible(
+                                source, installed, PercolatorSettings.defaults(), watching));
+        assertAll(
+                () -> assertEquals(List.of(), planned, "nothing was planned"),
+                () -> assertEquals(Set.of(), port.executingRuns()),
+                () -> assertFalse(Files.exists(root.resolve("project/runs/not-a-run"))));
+        ApplicationServices host = ApplicationServices.forThisHost();
+        SessionEngine unavailable =
+                RunWiring.port(
+                        new ApplicationServices(
+                                host.clock(),
+                                host.environment(),
+                                host.fileSystem(),
+                                host.runIds(),
+                                host.glibcVersions(),
+                                null,
+                                null,
+                                null),
+                        new BoundedMessageLog(),
+                        Optional.empty(),
+                        "",
+                        project(root),
+                        BUILD);
+        assertEquals(
+                RunWiring.NO_PROCESS_SERVICE,
+                assertThrows(
+                                RunNotStartedException.class,
+                                () ->
+                                        unavailable.rerunCompatible(
+                                                source,
+                                                installed,
+                                                PercolatorSettings.defaults(),
+                                                watching))
+                        .getMessage());
+    }
+
+    private static ToolOffer xmlPercolator(ToolInstallState state, Path executable) {
+        return new ToolOffer(
+                ToolName.PERCOLATOR,
+                ToolVersion.parse("3.07.1"),
+                ToolOrigin.MANAGED,
+                state,
+                List.of(
+                        new DeclaredCapability(
+                                ToolCapability.XML_OUTPUT,
+                                CapabilityEvidence.OBSERVED_BY_EXECUTION,
+                                "a test"),
+                        new DeclaredCapability(
+                                ToolCapability.XML_DECOY_OUTPUT,
+                                CapabilityEvidence.OBSERVED_BY_EXECUTION,
+                                "a test")),
+                List.of(),
+                Optional.empty(),
+                Optional.ofNullable(executable),
+                OptionalLong.of(1L));
     }
 
     @Test

@@ -426,15 +426,14 @@ public final class LimelightViewModel {
     }
 
     /**
-     * Switches open-modification mode.
+     * Switches open-modification mode. Ignored while the settings cannot be edited; {@link
+     * #openModProperty()} keeps saying what is saved.
      *
      * @param on whether to convert in open-modification mode
      */
     public void setOpenMod(boolean on) {
         if (editable() && on != options.openMod()) {
             save(options.withOpenMod(on));
-        } else {
-            openMod.set(options != null && options.openMod());
         }
     }
 
@@ -448,7 +447,6 @@ public final class LimelightViewModel {
      */
     public boolean setImportDecoys(boolean on) {
         if (!editable() || (on && !decoyEnabled.get())) {
-            importDecoys.set(options != null && options.importDecoys());
             if (on && readiness != null) {
                 settingsStatus.set(
                         "Decoy import was not selected: "

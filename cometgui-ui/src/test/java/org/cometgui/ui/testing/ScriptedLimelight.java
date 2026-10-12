@@ -90,6 +90,8 @@ public class ScriptedLimelight implements LimelightPort {
 
     private final Deque<RunNotStartedException> rerunRefusals = new ArrayDeque<>();
 
+    private final Deque<IllegalStateException> rerunFailures = new ArrayDeque<>();
+
     private final Deque<IOException> installRefusals = new ArrayDeque<>();
 
     private final List<Install> installs = new ArrayList<>();
@@ -180,6 +182,15 @@ public class ScriptedLimelight implements LimelightPort {
         rerunRefusals.add(refusal);
     }
 
+    /**
+     * Makes the next rerun fail unexpectedly.
+     *
+     * @param failure what it throws
+     */
+    public void failNextRerun(IllegalStateException failure) {
+        rerunFailures.add(failure);
+    }
+
     @Override
     public LimelightConverterStatus converter() {
         return converter;
@@ -241,6 +252,10 @@ public class ScriptedLimelight implements LimelightPort {
         RunNotStartedException refusal = rerunRefusals.pollFirst();
         if (refusal != null) {
             throw refusal;
+        }
+        IllegalStateException failure = rerunFailures.pollFirst();
+        if (failure != null) {
+            throw failure;
         }
         reruns.add(new Rerun(run, action, settings, observer));
         return new LimelightRerun(
