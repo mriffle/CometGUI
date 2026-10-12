@@ -91,6 +91,7 @@ readonly -a ALL_GATES=(
     percolator
     results
     pdv
+    limelight
 )
 
 PASSED=0
@@ -145,7 +146,8 @@ declare -a COVERED=()
 #                added controls A1-A3 (--no-analytics).  results: 100 on
 #                2026-10-09, phase 10 unit 11's first shipping count.
 #                pdv: 107 on 2026-10-11, phase 11 unit 9's first shipping
-#                count.)
+#                count.  limelight: 130 on 2026-10-12, phase 12 unit 9's
+#                first shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -375,6 +377,20 @@ gate_spec() {
             GATE_FLOOR=107
             GATE_UNIT="controls"
             ;;
+        limelight)
+            GATE_PHASE="12"
+            GATE_ITEMS="1,2,3,4,5,6,7,8"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-12-worklog.rst (and new ones, each marked so), each into production code of cometgui-domain, cometgui-params-percolator, cometgui-tools, cometgui-workflow, cometgui-ui or cometgui-app in a git-archive sandbox, each built with its upstream modules in one reactor (-pl TOP -am, nothing installed), proved to have reached the compiled classes and graded on the failing assertion's own words in the named testcase, with every process left under the sandbox ended after each run: the output judge's root check reduced to 'has a name', (NEW) its schema validation skipped (Phase 00's two schema-invalid corruptions accepted), and (NEW) the conversion's output.sha256 recorded as the MD5 (red against the real Comet, Percolator 3.07.1 and converter run); (NEW) the converter adapter trusting exit 0 with a missing or empty file, (NEW) the judge's existence check removed (red against the real converter exiting 0 on an unknown option), and (NEW) its emptiness check removed; CompatibilityAction.forStage offering the rerun whenever any build is selected (R-LL-02's branch), the action's label from the literal 3.07.1 (red only for the hypothetical 3.08.2 and the unreleased 3.10, the real Linux set green), and the conversion controls enabled for an incompatible run (the pane and the headless GUI against the real 3.09 run); the conversion of a run that is not ready no longer refused (the real 3.09 run's), (NEW) the compatible rerun's choice enabling no downstream stage (the headless GUI's real rerun), and (NEW) the derived run no longer recording the Percolator its source ran (the real rerun's provenance); (NEW) the q cutoff's default 0.05, (NEW) -q not emitted (red against the real converter only where the cutoff is not its own default 0.01), and (NEW) saving the cutoff also writing the display filters; (NEW) the workflow's upload confirmation reusable, the port's single-send check always passing, a changed server no longer withdrawing the destination, (NEW) Upload sending as soon as the destination is shown (the view-model and the headless GUI against the fake), (NEW) the upload client given no proxy so the test guard's sinkhole is bypassed (graded ONLY against this machine's own non-loopback address, nothing leaving the machine), and plain http accepted to any host; (NEW) the upload no longer adding the key to the redactor it writes with, (NEW) the key written unredacted to the upload log (the leak test's walk of every file), (NEW) a credential admitted without being registered with the redactor, and (NEW) the key field not emptied (the pane and the headless GUI's gate-7 test); saveSettings' decoy refusal unreachable, decoy import enabled whenever the settings are (view-model and pane), (NEW) a pout XML without decoys judged able to import them (the request and the workflow), and the 'decoys present but not imported' refusal unreachable; and, as controls on the harness itself, an unchanged file, a missing anchor, an injection that reached the source but not the bytecode, a test method renamed so its selection ran zero tests, a green run graded as red and a red without its diagnostic"
+            GATE_SCRIPT="scripts/verify-limelight-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-12 exit gate items 1 to 8 were proved here"
+                "bytecode as a HARNESS ERROR, not as a pass, and a selection that ran zero"
+            )
+            GATE_FLOOR=130
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -421,6 +437,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         pdv)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        limelight)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -429,8 +447,8 @@ usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
 that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07,
-PHASE-08, PHASE-09, PHASE-10 and PHASE-11 gate still fails on the defect it
-exists to catch.
+PHASE-08, PHASE-09, PHASE-10, PHASE-11 and PHASE-12 gate still fails on the
+defect it exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -507,7 +525,7 @@ list_gates() {
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
     printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06, 07:n of\n'
     printf '  PHASE-07, 08:n of PHASE-08, 09:n of PHASE-09, 10:n of PHASE-10, 11:n of\n'
-    printf '  PHASE-11.\n'
+    printf '  PHASE-11, 12:n of PHASE-12.\n'
     printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
@@ -582,13 +600,23 @@ list_gates() {
     printf '  source files; 7 spectra_ref resolving to the producing spectrum where file\n'
     printf '  position and scan number differ; 8 an unrepresentable PSM failing the\n'
     printf '  export loudly, by name.\n'
+    printf '  PHASE-12 items: 1 a real conversion structurally validated and\n'
+    printf '  checksummed into provenance; 2 a converter exit 0 with a missing or empty\n'
+    printf '  XML failing the stage; 3 without an XML-capable Percolator, the controls\n'
+    printf '  disabled and explained before any attempt, the action what the platform\n'
+    printf '  can do; 4 the compatible rerun converting without rerunning Comet, both\n'
+    printf '  Percolator executions in provenance; 5 the Limelight q cutoff 0.01 and\n'
+    printf '  independent of the display filters; 6 upload only on an explicit action,\n'
+    printf '  the destination first, the fake in tests; 7 a seeded credential in no\n'
+    printf '  log, provenance record or export; 8 decoy import against a run without\n'
+    printf '  decoys prevented at configuration time.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
     printf '  phases/PHASE-05-tool-registry.rst, phases/PHASE-06-comet-param-model.rst,\n'
     printf '  phases/PHASE-07-comet-param-ui.rst, phases/PHASE-08-workflow-comet.rst,\n'
-    printf '  phases/PHASE-09-percolator.rst, phases/PHASE-10-results.rst and\n'
-    printf '  phases/PHASE-11-pdv.rst.\n\n'
+    printf '  phases/PHASE-09-percolator.rst, phases/PHASE-10-results.rst,\n'
+    printf '  phases/PHASE-11-pdv.rst and phases/PHASE-12-limelight.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -750,7 +778,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09, PHASE-10 and PHASE-11 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09, PHASE-10, PHASE-11 and PHASE-12 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -788,7 +816,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05 06 07 08 09 10 11; do
+    for phase in 01 02 04 05 06 07 08 09 10 11 12; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"
