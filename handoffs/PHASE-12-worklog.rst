@@ -391,7 +391,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        Convert; validation shown. GUI tests: gate 3, 5, 8, and a real
        conversion and the compatible rerun through the interface.
      - R-LL-01..05; gate 1, 3, 4, 5, 8 (GUI); AC-LL-02..05
-     -
+     - Accepted, ``cfd605a`` ``8958735``
    * - 7
      - **The Limelight section, upload half.** Server and project, the
        credential (masked, never echoed), the destination shown and
@@ -685,6 +685,72 @@ proxy or choose its own, and to use the client outside the upload service.
   checked at the phase-end ``--only tests`` run.
 
 Unit 6 sign-off
+---------------
+
+**Accepted 2026-10-12.** Commits ``cfd605a`` (32 files) and ``8958735``.
+``ui.viewmodel.limelight`` (``LimelightViewModel``, ``LimelightPort`` and four
+records), ``ui.controls.limelight.LimelightPane``, ``cometgui-app``
+``ProjectLimelightPort``, ``ProjectRuns`` (moved out of
+``ProjectVisualisationPort``), ``RunWiring.limelight``,
+``WorkflowRunPort.rerunFrom`` split out of the Percolator section's rerun and
+``SessionEngine.rerunCompatible`` (``compatibleChoice`` then ``rerunFrom`` --
+still one rerun path); 31 ``UiIds`` (pins 514 -> 545); the accessible-name
+walk's floor 117 -> 147 (raised, not lowered); ``SectionArrivals``.
+
+* **Diff read**: the view-model publishes compatibility first and enables
+  the settings only when the run's own compatibility is convertible and the
+  run has ended; decoy import additionally only when
+  ``decoyImportUnavailable`` is empty; the action text is
+  ``CompatibilityAction.label()``. The register action calls the existing
+  ``PercolatorViewModel.register()`` (the file chooser and Tool Manager
+  registration). Test support lives in ``src/test``. No POM, gate script or
+  record touched; no module edge (the cutoff crosses the port as text,
+  because ``cometgui-ui`` may not depend on ``org.cometgui.tools``).
+* **Tests, run by me** (``install`` of ``cometgui-ui`` and ``cometgui-app``
+  with tests, 20 min 39 s): ui **735, 0 failures, 0 skipped**; app **279, 0
+  failures, 1 skipped** (``UpstreamInstallUiTest``, skipped before this
+  unit). Among them ``LimelightConversionUiTest`` 3 (43 s) and
+  ``LimelightRerunUiTest`` 4 (42 s), real Comet, Percolator 3.07.1/3.09 and
+  the converter.
+* **My injections** (``LimelightViewModel``; anchor unique and gone; ui jar
+  reinstalled with the injected class -- its hash changed -- before the app
+  test; restored, ``sha256sum -c`` OK, reinstalled):
+
+  - Q1 the conversion controls enabled for any run with a readiness answer,
+    compatible or not: ``LimelightPaneTest.incompatible`` and
+    ``LimelightRerunUiTest.gate3`` red. (Two earlier forms did not land: one
+    crashed with a NullPointerException, and in both the ui install was
+    stopped by the view-model coverage check, so the app test ran the old
+    jar and stayed green -- found by comparing the jar's hash. The install
+    now skips ``cometgui.coverage.*`` for the injected build only.)
+  - Q2 decoy import enabled whenever the settings are:
+    ``LimelightPaneTest.convertible`` and ``LimelightConversionUiTest.aRealRunAndGate8`` red.
+
+* **Targeted PIT, by me** (``ui.viewmodel.limelight.*``, its tests): **396
+  mutations, 388 KILLED** -- the agent's eight survivors (seven
+  generation-counter increment/decrement mutants, equivalent because the
+  counters are only compared for equality; one ``publish()`` after a refused
+  install). ``ProjectLimelightPort`` (agent): 34, 31 killed, the rest reached
+  only by GUI tests. The PIT run leaves a ``cometgui-ui/target/pit-reports``
+  that ``build.sh`` never produces: removed before the phase-end ``tests``
+  run.
+* **Harnesses**: the agent ran ``quality`` 42, ``shell`` 30, ``paramui`` 87,
+  ``results`` 100, ``pdv`` 107, ``percolator`` 109 on ``8958735``, all PASS.
+  **I re-run them at unit 7's sign-off**, which changes the same modules, so
+  that my run covers the final tree once rather than twice.
+* **Files outside the modules the tests read**: ``scratch/fixture``,
+  ``scratch/phase05/artefacts`` (Comet 2026.03.0, Percolator 3.07.1 zip and
+  ``.deb``, converter JAR), ``scratch/percolator/3.09``,
+  ``manifests/tools.json`` (class path), the project JDK under ``tools/``.
+* **Residue and escalations**: the rerun uses the Percolator section's
+  current settings (as Phase 09's does; no reader of a run's archived
+  settings); **``ToolManagerViewModel.refresh()`` starts processes on the
+  JavaFX thread** -- pre-existing, and once the converter is installed every
+  refresh runs ``java -jar ... --version`` there (escalated, not this
+  phase's code); ``ProjectLimelightPort``'s fallback to the requested cutoff
+  when the file carries none is unreachable (the judge refuses such a file).
+
+Unit 7 sign-off
 ---------------
 
 Pending.
