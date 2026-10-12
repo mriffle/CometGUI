@@ -401,7 +401,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        interface, found in no file under the project, the run, the
        application's logs or any export).
      - R-SEC-03, R-SEC-04; gate 6, 7 (GUI); AC-LL-06
-     -
+     - Accepted, ``23713c9`` ``81fd7c6`` (+ repair ``48adabc``)
    * - 8
      - **Documentation and traceability.** ``docs/limelight.rst``, a
        developer page, ``docs/citations.rst`` if the importer is used, stale
@@ -751,6 +751,80 @@ walk's floor 117 -> 147 (raised, not lowered); ``SectionArrivals``.
   when the file carries none is unreachable (the judge refuses such a file).
 
 Unit 7 sign-off
+---------------
+
+**Accepted 2026-10-12**, with one orchestrator repair. Commits ``23713c9``
+(39 files) and ``81fd7c6``; repair ``48adabc``.
+``ui.viewmodel.limelight.LimelightUploadViewModel`` with its own
+``LimelightUploadPort`` and two records; ``ui.controls.limelight.LimelightUploadPane``
+in unit 6's slot through ``ShellView``; ``cometgui-app``
+``ProjectLimelightUploadPort`` over ``LimelightUploads`` with one
+``SessionSecrets`` from the composition root and ``CredentialStores.forThisComputer``
+chosen once, off the FX thread; 30 ``UiIds`` (545 -> 575); the accessible-name
+floor 147 -> 174; byte-identical copies of the fake, guard, wire XSD and
+extension registration in ``cometgui-ui`` and ``cometgui-app``.
+
+* **Diff read**: Upload calls ``prepare`` only and shows server, project,
+  page, file, size and SHA-256; only Send calls the port's ``send``, which
+  confirms and refuses a second send; any change withdraws the destination;
+  the key is in an unbound ``PasswordField``, handed over once, admitted, and
+  the field emptied; the view-model hears only "non-empty". Upload is not
+  cancellable once sent (``LimelightUploads.upload`` takes no cancellation;
+  the screen says so). Test seams in ``src/test`` (``ParameterEditorApp``
+  hides the session bus; the UI driver types ``:``). No POM, gate script or
+  record touched; no module edge.
+* **Repair ``48adabc`` (mine):** the guard copied into ``cometgui-app`` would
+  stop the opt-in ``UpstreamInstallUiTest`` (``-Dcometgui.install.upstream=true``,
+  which downloads from GitHub). That test now adds
+  ``github.com|*.githubusercontent.com`` to ``http.nonProxyHosts`` while it
+  runs, only when opted in, and restores the guard's value. Checked with
+  ``ProxySelector`` on the project JDK: GitHub hosts ``DIRECT``;
+  ``limelight.yeastrc.org`` and ``notgithub.com`` to the sinkhole. Not run
+  opted in (it downloads 123 MB from GitHub); tier 1's nightly runs it.
+* **Tests, run by me** (``install`` of ``cometgui-ui`` and ``cometgui-app``
+  with tests, after the repair, 22 min 38 s): ui **781, 0 failures, 0
+  skipped**; app **296, 0 failures, 1 skipped** (``UpstreamInstallUiTest``'s
+  opt-in test). ``LimelightUploadUiTest`` 4 (59 s), ``ProjectLimelightUploadPortTest``
+  11, ``LimelightUploadViewModelTest`` 38, ``LimelightUploadPaneTest`` 6;
+  ``FakeCopiesAreIdenticalTest`` (tools) 2, 0 failures.
+* **Gate 7 walk** (agent's run, reported): seeded ``CGSEED-`` + 48 random
+  characters; after a refused and two successful uploads (one with the kept
+  key) and two Results exports: project 15 dirs/32 files, tool cache 10/3,
+  the test's temp root 3/5, and every file written since the start under
+  ``/tmp`` (2) and the home directory (0) -- no match in any form, the
+  window's >1000 texts and the console clean; the control finds every form
+  planted.
+* **My injections** (restored, ``sha256sum -c`` OK; the ui jar reinstalled
+  with the injected class, its hash changed):
+
+  - R1 a changed server no longer withdrawing the shown destination:
+    ``LimelightUploadViewModelTest.aChangeWithdrawsTheDestination`` red
+    (the GUI test changes the project, not the server, so it stays green).
+  - R2 the port's single-use check always passing: ``ProjectLimelightUploadPortTest.prepareThenSend``
+    red. (First form stopped by Checkstyle; did not land.)
+
+* **Targeted PIT, by me** (``LimelightUpload*`` view-model, its tests):
+  **308, 301 KILLED**, the seven generation-counter survivors the agent
+  argued (one, the files counter, could apply a stale list if a run is
+  deselected and reselected during one read -- recorded as residue).
+  ``ProjectLimelightUploadPort`` 36/36 (agent).
+* **Harnesses, run by me on ``48adabc``** (covering units 6 and 7 and the
+  repair): ``quality`` 42 (141 s), ``shell`` 30 (512 s), ``results`` 100
+  (656 s), ``pdv`` 107 (888 s), ``percolator`` 109 (802 s), ``paramui`` 87
+  (2083 s) -- **all PASS**. (The agent saw ``paramui`` fail its baseline once
+  in ``VariableModificationEditorUiTest``, the flaky test STATUS already
+  lists; passed on its re-run and on mine.)
+* **Files outside the modules the tests read**: every module's ``src/test``
+  (the drift test, ui and app); ``scratch/fixture``, ``scratch/phase05/artefacts``,
+  ``scratch/scientific-path/limelight/limelight.xml``, ``manifests/``; the
+  gate-7 walk reads the JVM temp directory and the home directory, files
+  written since the class started only.
+* **Residue and escalations**: no cancel once sent; the rest of the
+  application redacts with ``SecretRedactor.patternsOnly()`` and does not
+  know a typed key (no other writer receives it today); the files-counter
+  equivalent-mutant caveat above.
+
+Unit 8 sign-off
 ---------------
 
 Pending.
