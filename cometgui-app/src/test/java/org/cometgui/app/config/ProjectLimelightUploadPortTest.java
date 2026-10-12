@@ -398,6 +398,26 @@ class ProjectLimelightUploadPortTest {
     }
 
     @Test
+    @DisplayName("a connection cut part-way is a failure with no answer, at the file step")
+    void aFailure() throws IOException {
+        fake.cutUploadAfter(1000);
+        ProjectLimelightUploadPort port = port();
+        LimelightUploadPreview preview = port.prepare(listed(), first, fake.baseUrl(), "7");
+        LimelightUploaded failed =
+                port.send(preview, Optional.of(port.admit(KEY)), true, new Lines());
+        assertAll(
+                () -> assertEquals(LimelightUploaded.Kind.FAILED, failed.kind()),
+                () -> assertEquals("upload-file", failed.step()),
+                () -> assertFalse(failed.message().isEmpty()),
+                () -> assertEquals(0, failed.httpStatus()),
+                () -> assertEquals(List.of(), failed.flags()),
+                () -> assertEquals("", failed.trackingId()),
+                () -> assertEquals(fake.baseUrl() + "/d/pg/project/7", failed.projectPage()),
+                () -> assertEquals("", failed.keyNote(), "a failed upload keeps no key"),
+                () -> assertFalse(store.find(fake.baseUrl()).isPresent()));
+    }
+
+    @Test
     @DisplayName("a destination this port did not check is refused before anything is sent")
     void aForeignDestination() {
         LimelightUploadPreview foreign =

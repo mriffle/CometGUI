@@ -321,8 +321,10 @@ class LimelightUploadViewModelTest {
         assertTrue(upload.chooseFile(OLDER.toString()));
         assertFalse(upload.chooseFile("/not/offered.xml"));
         assertEquals(OLDER.toString(), upload.chosenFileProperty().get());
+        int before = port.fileReads();
         upload.refresh();
         settle();
+        assertEquals(before + 1, port.fileReads(), "a refresh reads the files again");
         assertEquals(
                 OLDER.toString(),
                 upload.chosenFileProperty().get(),
@@ -650,6 +652,108 @@ class LimelightUploadViewModelTest {
     }
 
     @Test
+    @DisplayName("a newer conversion withdraws a destination shown for an older file")
+    void aNewerConversionWithdraws() {
+        shown();
+        Path newest = ROOT.resolve("runs/run-1/outputs/limelight/limelight-3.xml");
+        port.files(RUN, List.of(newest, NEWER, OLDER));
+        converted.set(newest.toString());
+        settle();
+        assertAll(
+                () -> assertEquals(newest.toString(), upload.chosenFileProperty().get()),
+                () -> assertFalse(upload.destinationShownProperty().get()),
+                () ->
+                        assertEquals(
+                                LimelightUploadViewModel.DESTINATION_CHANGED,
+                                upload.outcomeProperty().get()),
+                () -> assertFalse(upload.send()),
+                () -> assertEquals(List.of(), port.sends()));
+    }
+
+    @Test
+    @DisplayName("Upload pressed again withdraws the destination shown until the new one arrives")
+    void uploadAgain() {
+        shown();
+        port.prepare(() -> preview(NEWER));
+        assertTrue(upload.prepare());
+        assertAll(
+                () -> assertFalse(upload.destinationShownProperty().get()),
+                () -> assertEquals("", upload.confirmServerProperty().get()),
+                () -> assertFalse(upload.sendEnabledProperty().get()),
+                () -> assertFalse(upload.send()));
+        settle();
+        assertTrue(upload.destinationShownProperty().get());
+        assertEquals(List.of(), port.sends());
+    }
+
+    @Test
+    @DisplayName("a key the session refuses withdraws the destination shown")
+    void aRefusedKeyWithdraws() {
+        shown();
+        assertFalse(upload.takeKey("short"));
+        assertAll(
+                () -> assertFalse(upload.destinationShownProperty().get()),
+                () ->
+                        assertEquals(
+                                LimelightUploadViewModel.DESTINATION_CHANGED,
+                                upload.outcomeProperty().get()));
+    }
+
+    @Test
+    @DisplayName("the same run listed again keeps the file chosen")
+    void theSameRunAgain() {
+        open(NEWER, OLDER);
+        assertTrue(upload.chooseFile(OLDER.toString()));
+        runs.executing(true);
+        results.refresh();
+        settle();
+        assertEquals(OLDER.toString(), upload.chosenFileProperty().get());
+    }
+
+    @Test
+    @DisplayName(
+            "a second upload starts with nothing of the first shown: no tracking id, log, progress,"
+                    + " page or log path")
+    void aSecondUploadStartsClean() {
+        shown();
+        port.send(
+                () -> {
+                    port.sends().get(0).watcher().line("first upload's line");
+                    port.sends().get(0).watcher().bytesSent(5, 10);
+                    return submitted("");
+                });
+        upload.send();
+        settle();
+        assertEquals("4100", upload.trackingIdProperty().get());
+        upload.takeKey(KEY);
+        port.prepare(() -> preview(NEWER));
+        upload.prepare();
+        settle();
+        port.send(
+                () -> {
+                    port.sends().get(1).watcher().line("second upload's line");
+                    return submitted("");
+                });
+        upload.send();
+        assertAll(
+                "while the second is sent",
+                () -> assertEquals("", upload.trackingIdProperty().get()),
+                () -> assertEquals("", upload.importerSubDirProperty().get()),
+                () -> assertEquals("", upload.logProperty().get()),
+                () -> assertEquals(0.0, upload.progressProperty().get()),
+                () -> assertEquals("", upload.projectPageProperty().get()),
+                () -> assertEquals("", upload.logPathProperty().get()));
+        background.drain();
+        ui.drain();
+        assertAll(
+                "the moment the second has ended",
+                () -> assertFalse(upload.sendingProperty().get()),
+                () -> assertTrue(upload.inputsEnabledProperty().get()),
+                () -> assertEquals("second upload's line", upload.logProperty().get()));
+        settle();
+    }
+
+    @Test
     @DisplayName("the bytes sent move the progress bar while the upload runs")
     void progress() {
         shown();
@@ -660,6 +764,7 @@ class LimelightUploadViewModelTest {
                     watcher.bytesSent(10, 0);
                     watcher.bytesSent(300, 200);
                     watcher.bytesSent(20, 200);
+                    watcher.bytesSent(0, 0);
                     return submitted("");
                 });
         upload.send();
@@ -672,6 +777,8 @@ class LimelightUploadViewModelTest {
         ui.runFirst();
         ui.runFirst();
         assertEquals(0.1, upload.progressProperty().get());
+        ui.runFirst();
+        assertEquals(1.0, upload.progressProperty().get(), "nothing of nothing is all of it");
         ui.runFirst();
         assertEquals(1.0, upload.progressProperty().get(), "submitted: all of it");
     }
@@ -1063,6 +1170,7 @@ class LimelightUploadViewModelTest {
         upload.prepare();
         settle();
         assertTrue(upload.forgetKey());
+        assertFalse(upload.destinationShownProperty().get(), "withdrawn at once");
         settle();
         assertAll(
                 () -> assertEquals(List.of(SERVER), port.forgotten()),

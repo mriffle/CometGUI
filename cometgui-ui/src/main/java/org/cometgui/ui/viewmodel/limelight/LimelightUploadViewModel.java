@@ -616,7 +616,7 @@ public final class LimelightUploadViewModel {
         progress.set(0);
         trackingId.set("");
         importerSubDir.set("");
-        projectPage.set(confirmed.projectPage());
+        projectPage.set("");
         logPath.set("");
         outcome.set(
                 "Sending "
@@ -959,9 +959,7 @@ public final class LimelightUploadViewModel {
 
     /** The Results section chose another run, or none, or the same run's state changed. */
     private void runChanged(Optional<ResultsRun> chosen) {
-        boolean another =
-                !chosen.map(ResultsRun::id).equals(run.map(ResultsRun::id))
-                        || !chosen.map(ResultsRun::created).equals(run.map(ResultsRun::created));
+        boolean another = !chosen.map(ResultsRun::id).equals(run.map(ResultsRun::id));
         run = chosen;
         if (another) {
             files = List.of();
@@ -1297,21 +1295,15 @@ public final class LimelightUploadViewModel {
                     + run.get().id().value()
                     + " is executing: its results are not final. Upload when it has ended.";
         }
-        if (!filesRead || filesFailure != null || files.isEmpty()) {
+        if (!filesRead || filesFailure != null || file == null) {
+            // a file is chosen whenever the run has any: none chosen means none converted
             return filesWords();
         }
-        if (file == null) {
-            return "Choose the Limelight XML file to upload.";
-        }
         if (server == null) {
-            return serverTyped.isBlank() || !serverProblem.isEmpty()
-                    ? serverWords()
-                    : "Checking the server address.";
+            return serverWords();
         }
         if (project == null) {
-            return projectTyped.isBlank() || !projectProblem.isEmpty()
-                    ? projectWords()
-                    : "Checking the project id.";
+            return projectWords();
         }
         if (typedKey == null && !keyKept && !keyFieldFilled) {
             return NO_KEY;
