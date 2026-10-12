@@ -46,6 +46,7 @@ import org.cometgui.domain.tools.ToolName;
 import org.cometgui.install.probe.HostRuntimeVersions;
 import org.cometgui.install.registry.ArtefactRecord;
 import org.cometgui.ui.controls.UiIds;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -135,9 +136,41 @@ class UpstreamInstallUiTest {
 
     private static Stage window;
 
+    /**
+     * The upstream hosts this opt-in test downloads from: GitHub's release pages and the storage
+     * hosts they redirect to. Nothing else.
+     */
+    private static final String UPSTREAM_HOSTS = "github.com|*.githubusercontent.com";
+
+    /** {@code http.nonProxyHosts} as the module's loopback guard set it, restored afterwards. */
+    private static String guardedNonProxyHosts;
+
     @BeforeAll
     static void startTheToolkit() throws TimeoutException {
         window = FxToolkit.registerPrimaryStage();
+    }
+
+    /**
+     * Lets this test, and only while it runs, through the module's {@code LoopbackGuard} (Phase
+     * 12), which sends every non-loopback connection of the test JVM to a sinkhole so that no test
+     * can reach a Limelight server. Only when the network was explicitly opted in to, and only for
+     * GitHub's release hosts: a Limelight server -- or any other host -- still lands in the
+     * sinkhole, and the guard's own after-each check still fails the test if one does.
+     */
+    @BeforeAll
+    static void letTheOptedInDownloadsThroughTheGuard() {
+        guardedNonProxyHosts = System.getProperty("http.nonProxyHosts");
+        if (Boolean.getBoolean(OPT_IN) && guardedNonProxyHosts != null) {
+            System.setProperty("http.nonProxyHosts", guardedNonProxyHosts + "|" + UPSTREAM_HOSTS);
+        }
+    }
+
+    /** Puts the guard back exactly as it was. */
+    @AfterAll
+    static void restoreTheGuard() {
+        if (guardedNonProxyHosts != null) {
+            System.setProperty("http.nonProxyHosts", guardedNonProxyHosts);
+        }
     }
 
     private static Map<String, Long> upstreamTransfer() {
