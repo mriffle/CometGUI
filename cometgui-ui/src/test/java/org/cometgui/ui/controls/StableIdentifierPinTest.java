@@ -183,8 +183,16 @@ class StableIdentifierPinTest {
      *
      * <p>Raised from 509 to 514 by phase 11 unit 7, the live PDV window: 5 constants (the open
      * action, its refusal, the close action, the window's state and the last selection's answer).
+     *
+     * <p>Raised from 514 to 545 by phase 12 unit 6, the Limelight section's conversion half: 31
+     * constants (its pane; the run and Check again; the compatibility, the offered action, its
+     * explanation and outcome and the rerun's Cancel; the converter's state, the install's progress
+     * bar and Cancel; the q-value cutoff, the output path and where it writes, decoy import and
+     * why, the independent-decoy prefix, open-modification mode, the settings' state, the resolved
+     * FASTA and pepXML directory; the refusals, Convert and why not, the log, the outcome, the
+     * file, the PSM count and the SHA-256; and the upload area and its note).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 514;
+    private static final int PINNED_IDENTIFIER_COUNT = 545;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -388,7 +396,38 @@ class StableIdentifierPinTest {
                     Map.entry("VISUALISATION_OPEN_REFUSAL", "visualisation-open-refusal"),
                     Map.entry("VISUALISATION_CLOSE", "visualisation-close"),
                     Map.entry("VISUALISATION_WINDOW", "visualisation-window"),
-                    Map.entry("VISUALISATION_SELECTION", "visualisation-selection"));
+                    Map.entry("VISUALISATION_SELECTION", "visualisation-selection"),
+                    Map.entry("LIMELIGHT_PANE", "limelight-pane"),
+                    Map.entry("LIMELIGHT_RUN", "limelight-run"),
+                    Map.entry("LIMELIGHT_REFRESH", "limelight-refresh"),
+                    Map.entry("LIMELIGHT_COMPATIBILITY", "limelight-compatibility"),
+                    Map.entry("LIMELIGHT_ACTION", "limelight-action"),
+                    Map.entry("LIMELIGHT_ACTION_EXPLANATION", "limelight-action-explanation"),
+                    Map.entry("LIMELIGHT_ACTION_OUTCOME", "limelight-action-outcome"),
+                    Map.entry("LIMELIGHT_RERUN_CANCEL", "limelight-rerun-cancel"),
+                    Map.entry("LIMELIGHT_CONVERTER_STATUS", "limelight-converter-status"),
+                    Map.entry("LIMELIGHT_INSTALL_PROGRESS", "limelight-install-progress"),
+                    Map.entry("LIMELIGHT_INSTALL_CANCEL", "limelight-install-cancel"),
+                    Map.entry("LIMELIGHT_Q_CUTOFF", "limelight-q-cutoff"),
+                    Map.entry("LIMELIGHT_OUTPUT", "limelight-output"),
+                    Map.entry("LIMELIGHT_OUTPUT_STATUS", "limelight-output-status"),
+                    Map.entry("LIMELIGHT_IMPORT_DECOYS", "limelight-import-decoys"),
+                    Map.entry("LIMELIGHT_DECOY_STATUS", "limelight-decoy-status"),
+                    Map.entry("LIMELIGHT_DECOY_PREFIX", "limelight-decoy-prefix"),
+                    Map.entry("LIMELIGHT_OPEN_MOD", "limelight-open-mod"),
+                    Map.entry("LIMELIGHT_SETTINGS_STATUS", "limelight-settings-status"),
+                    Map.entry("LIMELIGHT_FASTA", "limelight-fasta"),
+                    Map.entry("LIMELIGHT_PEPXML_DIRECTORY", "limelight-pepxml-directory"),
+                    Map.entry("LIMELIGHT_REFUSALS", "limelight-refusals"),
+                    Map.entry("LIMELIGHT_CONVERT", "limelight-convert"),
+                    Map.entry("LIMELIGHT_CONVERT_REFUSAL", "limelight-convert-refusal"),
+                    Map.entry("LIMELIGHT_LOG", "limelight-log"),
+                    Map.entry("LIMELIGHT_OUTCOME", "limelight-outcome"),
+                    Map.entry("LIMELIGHT_RESULT_FILE", "limelight-result-file"),
+                    Map.entry("LIMELIGHT_RESULT_PSMS", "limelight-result-psms"),
+                    Map.entry("LIMELIGHT_RESULT_SHA256", "limelight-result-sha256"),
+                    Map.entry("LIMELIGHT_UPLOAD", "limelight-upload"),
+                    Map.entry("LIMELIGHT_UPLOAD_PENDING", "limelight-upload-pending"));
 
     // -----------------------------------------------------------------------------------------
     // The parameter editor (Phase 07). A parameter's identifiers are built from its own name, so

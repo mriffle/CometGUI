@@ -94,7 +94,7 @@ final class SectionArrivals {
                         + " Advanced settings, and the rerun of Percolator alone from the last run"
                         + " are below. The same two filters are in the Results section, where they"
                         + " change the tables shown (phase 10). The Limelight converter itself"
-                        + " arrives in phase 12.");
+                        + " is in the Limelight section (phase 12).");
         notes.put(
                 SectionId.RESULTS,
                 "This section is live: phase 10 (Results Model and UI) filled it. A run's PSMs and"
@@ -116,7 +116,16 @@ final class SectionArrivals {
                         + " another run is chosen there and when CometGUI exits.");
         notes.put(
                 SectionId.LIMELIGHT,
-                "This section arrives in phase 12 (Limelight Conversion and Upload).");
+                "This section is being filled by phase 12 (Limelight Conversion and Upload)."
+                        + " Live now: for the run chosen in the Results section, whether it can be"
+                        + " converted -- said before anything can be attempted, with the"
+                        + " compatible Percolator rerun or local-binary registration offered when"
+                        + " its Percolator wrote no XML -- the converter's install on first use,"
+                        + " the Limelight q-value cutoff (its own value, never a display filter),"
+                        + " the output path, decoy import, the independent-decoy prefix,"
+                        + " open-modification mode, the resolved FASTA and pepXML directory, and"
+                        + " the conversion with its live log and its validated result. Uploading"
+                        + " to a Limelight server is not live yet.");
         notes.put(
                 SectionId.PROVENANCE,
                 "This section arrives in phase 13 (Provenance UI and Reports).");

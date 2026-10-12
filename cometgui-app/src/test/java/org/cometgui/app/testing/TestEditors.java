@@ -18,6 +18,7 @@ package org.cometgui.app.testing;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -28,14 +29,19 @@ import java.util.function.Consumer;
 import javafx.beans.property.SimpleObjectProperty;
 import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.config.ParameterEditorWiring;
+import org.cometgui.app.config.ProjectSession;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.config.SessionEngine;
 import org.cometgui.domain.build.BuildIdentity;
+import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.run.RunId;
+import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallProgressListener;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.percolator.PercolatorSettings;
+import org.cometgui.params.percolator.resolution.CompatibilityAction;
 import org.cometgui.results.export.TableExport;
 import org.cometgui.results.export.WeightsExport;
 import org.cometgui.results.filtering.DisplayFilters;
@@ -49,6 +55,8 @@ import org.cometgui.ui.viewmodel.HostBaselineViewModel;
 import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.limelight.LimelightRerun;
+import org.cometgui.ui.viewmodel.limelight.LimelightViewModel;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
@@ -159,7 +167,25 @@ public final class TestEditors {
                 weights,
                 filters,
                 new VisualisationViewModel(
-                        new NoPdv(), results, table, Runnable::run, Runnable::run, () -> {}));
+                        new NoPdv(), results, table, Runnable::run, Runnable::run, () -> {}),
+                new LimelightViewModel(
+                        RunWiring.limelight(
+                                ApplicationServices.forThisHost(),
+                                new BoundedMessageLog(),
+                                new ProjectSession(
+                                        Path.of("no-project").toAbsolutePath(),
+                                        Clock.systemUTC(),
+                                        ApplicationServices.forThisHost().runIds()),
+                                RunWiring.hasher(),
+                                engine,
+                                Optional.empty(),
+                                NoEngine.REASON),
+                        results,
+                        percolator.requestProperty(),
+                        percolator::register,
+                        Runnable::run,
+                        Runnable::run,
+                        () -> {}));
     }
 
     /** A Visualisation port with no PDV, which says so. */
@@ -284,6 +310,16 @@ public final class TestEditors {
         @Override
         public Set<RunId> executingRuns() {
             return Set.of();
+        }
+
+        @Override
+        public LimelightRerun rerunCompatible(
+                RunLayout source,
+                CompatibilityAction action,
+                PercolatorSettings settings,
+                RunObserver observer)
+                throws RunNotStartedException {
+            throw new RunNotStartedException(REASON, null);
         }
     }
 }

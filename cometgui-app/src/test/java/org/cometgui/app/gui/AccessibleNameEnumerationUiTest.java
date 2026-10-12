@@ -110,9 +110,11 @@ class AccessibleNameEnumerationUiTest {
      * which takes one navigation entry and three pane labels out of the derivation (65 - 4 = 61).
      * Rather than lower the floor to 61, the arrows -- which were always there and always counted
      * by the walk -- were added to the derivation, and the floor was raised to 68. Phase 10 unit 8
-     * raised it to 117 for the Results section, as derived above.
+     * raised it to 117 for the Results section, as derived above. Phase 12 unit 6 raised it to 147
+     * for the Limelight section's 30 identified controls with no run open ({@link
+     * #LIMELIGHT_IDENTIFIED}): 117 + 30 = 147.
      */
-    private static final int MINIMUM_CONTROLS = 117;
+    private static final int MINIMUM_CONTROLS = 147;
 
     /**
      * The Results section's identified controls with no run open, typed out (P7-5). Every one must
@@ -170,6 +172,50 @@ class AccessibleNameEnumerationUiTest {
                     "weights-sort-standard-deviation",
                     "weights-sort-sign-consistency",
                     "weights-sort-rank");
+
+    /**
+     * The Limelight section's identified controls with no run open, typed out (P7-5): its pane, the
+     * run and Check again, the compatibility, the offered action, its explanation and outcome and
+     * the rerun's Cancel, the converter's state with the install's progress bar and Cancel, the
+     * q-value cutoff, the output path and where it writes, decoy import and why, the
+     * independent-decoy prefix, open-modification mode, the settings' state, the resolved FASTA and
+     * pepXML directory, the refusals, Convert and why not, the log, the outcome, the file, the PSM
+     * count, the SHA-256, and the upload area's note. Every one is in the scene whether or not it
+     * is shown -- the action and the progress bar are hidden with nothing to show -- so every one
+     * must carry a name of its own.
+     */
+    static final List<String> LIMELIGHT_IDENTIFIED =
+            List.of(
+                    "limelight-pane",
+                    "limelight-run",
+                    "limelight-refresh",
+                    "limelight-compatibility",
+                    "limelight-action",
+                    "limelight-action-explanation",
+                    "limelight-action-outcome",
+                    "limelight-rerun-cancel",
+                    "limelight-converter-status",
+                    "limelight-install-progress",
+                    "limelight-install-cancel",
+                    "limelight-q-cutoff",
+                    "limelight-output",
+                    "limelight-output-status",
+                    "limelight-import-decoys",
+                    "limelight-decoy-status",
+                    "limelight-decoy-prefix",
+                    "limelight-open-mod",
+                    "limelight-settings-status",
+                    "limelight-fasta",
+                    "limelight-pepxml-directory",
+                    "limelight-refusals",
+                    "limelight-convert",
+                    "limelight-convert-refusal",
+                    "limelight-log",
+                    "limelight-outcome",
+                    "limelight-result-file",
+                    "limelight-result-psms",
+                    "limelight-result-sha256",
+                    "limelight-upload-pending");
 
     /**
      * The identifiers JavaFX's own skins give the controls they build. Every control this project
@@ -293,6 +339,25 @@ class AccessibleNameEnumerationUiTest {
     }
 
     @Test
+    @DisplayName("the Limelight section's 30 identified controls with no run open, each named")
+    void theLimelightSectionIsEnumerated() {
+        assertEquals(30, LIMELIGHT_IDENTIFIED.size(), "the derivation of MINIMUM_CONTROLS");
+        assertEquals(
+                LIMELIGHT_IDENTIFIED.size(),
+                Set.copyOf(LIMELIGHT_IDENTIFIED).size(),
+                "no identifier is listed twice");
+        List<String> limelightIds =
+                controls.stream()
+                        .map(control -> driver.callOnFxThread(control::getId))
+                        .filter(id -> id != null && id.startsWith("limelight-"))
+                        .toList();
+        assertEquals(
+                Set.copyOf(LIMELIGHT_IDENTIFIED),
+                Set.copyOf(limelightIds),
+                "the Limelight section's identified controls with no run open");
+    }
+
+    @Test
     @DisplayName("the walk saw the whole interface, not a corner of it")
     void theWalkSawTheWholeInterface() {
         List<String> identified =
@@ -319,6 +384,7 @@ class AccessibleNameEnumerationUiTest {
             expected.add(UiIds.consoleSeverityFilter(severity));
         }
         expected.addAll(RESULTS_IDENTIFIED);
+        expected.addAll(LIMELIGHT_IDENTIFIED);
 
         assertAll(
                 () ->

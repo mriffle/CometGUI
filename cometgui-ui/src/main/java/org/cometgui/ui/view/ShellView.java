@@ -38,6 +38,7 @@ import org.cometgui.ui.controls.StageStepper;
 import org.cometgui.ui.controls.ToolManagerPane;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
+import org.cometgui.ui.controls.limelight.LimelightPane;
 import org.cometgui.ui.controls.params.RunControl;
 import org.cometgui.ui.controls.percolator.PercolatorPane;
 import org.cometgui.ui.controls.results.ResultsPane;
@@ -49,6 +50,7 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.limelight.LimelightViewModel;
 import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
@@ -170,6 +172,7 @@ public final class ShellView extends BorderPane {
      *     shows too
      * @param visualisation the Visualisation section: PDV's state and drawing the PSM selected in
      *     {@code resultTable}
+     * @param limelight the Limelight section: converting the run chosen in {@code results}
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
@@ -191,7 +194,8 @@ public final class ShellView extends BorderPane {
             ResultTableViewModel resultTable,
             WeightsViewModel weights,
             DisplayFiltersViewModel displayFilters,
-            VisualisationViewModel visualisation) {
+            VisualisationViewModel visualisation,
+            LimelightViewModel limelight) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
@@ -278,6 +282,17 @@ public final class ShellView extends BorderPane {
                 new VisualisationPane(Objects.requireNonNull(visualisation, "visualisation"));
         panes.get(SectionId.VISUALISATION).addContent(visualisationPane);
         VBox.setVgrow(visualisationPane, Priority.ALWAYS);
+
+        /*
+         * The Limelight section (phase 12): the conversion of the run chosen in the Results
+         * section above -- that section's choice, not one of its own -- with the upload area below
+         * it. The pane reads nothing on construction; LimelightViewModel.refresh() asks the port,
+         * and the composition root calls it.
+         */
+        LimelightPane limelightPane =
+                new LimelightPane(Objects.requireNonNull(limelight, "limelight"));
+        panes.get(SectionId.LIMELIGHT).addContent(limelightPane);
+        VBox.setVgrow(limelightPane, Priority.ALWAYS);
 
         ToolManagerPane toolManagerPane = new ToolManagerPane(toolManager);
         panes.get(SectionId.TOOL_MANAGER).addContent(toolManagerPane);

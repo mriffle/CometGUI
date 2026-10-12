@@ -54,6 +54,7 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
 import org.cometgui.ui.viewmodel.ToolRowViewModel;
+import org.cometgui.ui.viewmodel.limelight.LimelightViewModel;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
@@ -418,6 +419,32 @@ public final class CometGuiApplication extends Application {
                         Platform::runLater,
                         toolManager::refresh);
 
+        /*
+         * The Limelight section (phase 12): the run chosen in the Results section -- that
+         * section's choice, not one of its own -- converted through the one conversion path over
+         * the one process service, hasher and Tool Manager; its compatible rerun is the session
+         * engine's, Phase 09's one rerun; its local-binary registration is the Percolator
+         * section's. The port is called on the Run section's daemon threads, never this one; an
+         * install it starts runs on the Tool Manager's own threads, and when it ends the Tool
+         * Manager's rows are read again.
+         */
+        LimelightViewModel limelight =
+                new LimelightViewModel(
+                        RunWiring.limelight(
+                                services,
+                                messageLog,
+                                project,
+                                hashes,
+                                engine,
+                                tools,
+                                toolsUnavailable),
+                        results,
+                        percolator.requestProperty(),
+                        percolator::register,
+                        runThreads,
+                        Platform::runLater,
+                        toolManager::refresh);
+
         ShellView shell =
                 new ShellView(
                         new NavigationViewModel(),
@@ -438,7 +465,8 @@ public final class CometGuiApplication extends Application {
                         resultTable,
                         weights,
                         displayFilters,
-                        visualisation);
+                        visualisation,
+                        limelight);
 
         /*
          * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds
@@ -465,6 +493,7 @@ public final class CometGuiApplication extends Application {
                                     run.recheck();
                                     percolator.refresh();
                                     visualisation.refresh();
+                                    limelight.refresh();
                                 });
         run.runningProperty()
                 .addListener(
@@ -487,6 +516,7 @@ public final class CometGuiApplication extends Application {
         percolatorRerun.refresh();
         results.refresh();
         visualisation.refresh();
+        limelight.refresh();
 
         primaryStage.setTitle(WINDOW_TITLE);
         primaryStage.setScene(new Scene(shell, INITIAL_WIDTH, INITIAL_HEIGHT));

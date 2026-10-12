@@ -17,7 +17,6 @@
 package org.cometgui.app.config;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,8 +26,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.cometgui.domain.run.RunId;
-import org.cometgui.domain.run.RunIdentity;
-import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallProgressListener;
 import org.cometgui.domain.tools.ToolManager;
@@ -137,7 +134,7 @@ final class ProjectVisualisationPort implements VisualisationPort {
         refuseExecuting(run, "Draw when the run has ended.");
         PsmFigures drawing = figures.orElseThrow(() -> new IOException(noFigures));
         PdvInstallation pdv = installed();
-        Located located = locate(run);
+        ProjectRuns.Located located = locate(run);
         project.lock();
         return drawing.draw(
                 new PsmFigureRequest(
@@ -158,7 +155,7 @@ final class ProjectVisualisationPort implements VisualisationPort {
         refuseExecuting(run, "Open it in PDV when the run has ended.");
         PdvWindows open = windows.orElseThrow(() -> new IOException(noFigures));
         PdvInstallation pdv = installed();
-        Located located = locate(run);
+        ProjectRuns.Located located = locate(run);
         project.lock();
         return open.open(
                 new PdvWindowRequest(
@@ -216,32 +213,7 @@ final class ProjectVisualisationPort implements VisualisationPort {
                         () -> new IOException("PDV is not installed: " + status.explanation()));
     }
 
-    /** A run's directory, its recorded identity, and the run whose pepXML it shows. */
-    private record Located(RunLayout layout, RunIdentity identity, RunLayout searched) {}
-
-    private Located locate(ResultsRun run) throws IOException {
-        Path runs = project.layout().runsDirectory();
-        RunLayout layout =
-                new RunLayout(
-                        runs.resolve(RunLayout.directoryName(run.created(), run.id()))
-                                .toAbsolutePath());
-        RunIdentity identity = project.readRun(layout).identity();
-        if (!identity.runId().equals(run.id())) {
-            throw new IOException(
-                    layout.root()
-                            + " records run "
-                            + identity.runId().value()
-                            + ", not run "
-                            + run.id().value());
-        }
-        RunLayout searched =
-                identity.derivedFrom()
-                        .map(
-                                source ->
-                                        new RunLayout(
-                                                runs.resolve(source.directoryName())
-                                                        .toAbsolutePath()))
-                        .orElse(layout);
-        return new Located(layout, identity, searched);
+    private ProjectRuns.Located locate(ResultsRun run) throws IOException {
+        return ProjectRuns.locate(project, run);
     }
 }

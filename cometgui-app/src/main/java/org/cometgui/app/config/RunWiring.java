@@ -16,6 +16,7 @@
 
 package org.cometgui.app.config;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -32,15 +33,22 @@ import org.cometgui.domain.ports.EnvironmentReader;
 import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.domain.run.RunId;
+import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.secrets.SecretRedactor;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.percolator.PercolatorSettings;
+import org.cometgui.params.percolator.resolution.CompatibilityAction;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
+import org.cometgui.tools.api.JavaRuntime;
+import org.cometgui.tools.limelight.LimelightConverter;
 import org.cometgui.tools.pdv.PdvFigures;
 import org.cometgui.tools.pdv.derived.PdvController;
+import org.cometgui.ui.viewmodel.limelight.LimelightPort;
+import org.cometgui.ui.viewmodel.limelight.LimelightRerun;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
@@ -52,6 +60,8 @@ import org.cometgui.ui.viewmodel.results.ResultsPort;
 import org.cometgui.ui.viewmodel.visualisation.VisualisationPort;
 import org.cometgui.workflow.engine.EngineServices;
 import org.cometgui.workflow.engine.WorkflowEngine;
+import org.cometgui.workflow.limelight.LimelightConversions;
+import org.cometgui.workflow.limelight.LimelightProvisioning;
 import org.cometgui.workflow.pdv.PdvLaunches;
 import org.cometgui.workflow.pdv.PdvMzTabs;
 import org.cometgui.workflow.pdv.PdvWindows;
@@ -382,6 +392,79 @@ public final class RunWiring {
     }
 
     /**
+     * The Limelight section's port (phase 12): the converter's state and install through the Tool
+     * Manager, a run's readiness, settings and conversion through {@link LimelightConversions} --
+     * the one conversion path, over the composition root's one process service, the session's one
+     * hasher, the one secret rule set and the bundled Java runtime -- and Phase 09's compatible
+     * rerun through the session's engine. The converter's log lines go to the console and to the
+     * conversion the section is waiting on.
+     *
+     * @param services the composition root: its process service, clock and environment
+     * @param messageLog the console's log, which the converter's lines are appended to
+     * @param project the session's project
+     * @param hashes the session's one hasher
+     * @param engine the session's engine: its executing runs and the compatible rerun
+     * @param tools the Tool Manager, or empty
+     * @param toolsUnavailable why there is no Tool Manager, when {@code tools} is empty
+     * @return the port
+     */
+    public static LimelightPort limelight(
+            ApplicationServices services,
+            BoundedMessageLog messageLog,
+            ProjectSession project,
+            HashService hashes,
+            SessionEngine engine,
+            Optional<ToolManager> tools,
+            String toolsUnavailable) {
+        Objects.requireNonNull(services, "services");
+        Objects.requireNonNull(messageLog, "messageLog");
+        Objects.requireNonNull(hashes, "hashes");
+        Objects.requireNonNull(engine, "engine");
+        Objects.requireNonNull(tools, "tools");
+        Optional<HostPlatform> host =
+                HostPlatform.of(
+                        services.environment().osName().orElse(""),
+                        services.environment().osArch().orElse(""));
+        ProjectLimelightPort.ConverterLines lines =
+                new ProjectLimelightPort.ConverterLines(messageLog::append);
+        Optional<LimelightConversions> conversions = Optional.empty();
+        String none = NO_PROCESS_SERVICE;
+        if (tools.isEmpty()) {
+            none = "No run can be converted to Limelight XML: " + toolsUnavailable;
+        } else if (host.isEmpty()) {
+            none =
+                    "No run can be converted to Limelight XML: this machine's operating system and"
+                            + " architecture are not ones CometGUI recognises.";
+        } else if (services.processRunner().isPresent()) {
+            Optional<JavaRuntime> java = Optional.empty();
+            try {
+                java = Optional.of(JavaRuntime.ofThisApplication());
+            } catch (IOException noLauncher) {
+                none =
+                        "No run can be converted to Limelight XML: the Java runtime CometGUI runs"
+                                + " on cannot start the converter: "
+                                + noLauncher.getMessage();
+            }
+            conversions =
+                    java.map(
+                            runtime ->
+                                    new LimelightConversions(
+                                            new LimelightProvisioning(tools.get()),
+                                            services.processRunner().get(),
+                                            hashes,
+                                            SecretRedactor.patternsOnly(),
+                                            lines,
+                                            services.clock(),
+                                            host.get(),
+                                            runtime,
+                                            LimelightConverter.DEFAULT_TIMEOUT,
+                                            engine::executingRuns));
+        }
+        return new ProjectLimelightPort(
+                project, () -> tools, toolsUnavailable, conversions, none, engine, lines);
+    }
+
+    /**
      * Where the Run section calls the engine: daemon threads, made as needed, so that a check, a
      * start and a cancel never wait for one another and none keeps the JVM alive.
      *
@@ -445,6 +528,16 @@ public final class RunWiring {
         @Override
         public Set<RunId> executingRuns() {
             return Set.of();
+        }
+
+        @Override
+        public LimelightRerun rerunCompatible(
+                RunLayout source,
+                CompatibilityAction action,
+                PercolatorSettings settings,
+                RunObserver observer)
+                throws RunNotStartedException {
+            throw new RunNotStartedException(reason, null);
         }
     }
 }

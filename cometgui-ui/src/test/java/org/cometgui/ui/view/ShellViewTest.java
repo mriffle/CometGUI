@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -49,6 +50,7 @@ import org.cometgui.ui.testing.EmptyResults;
 import org.cometgui.ui.testing.FxToolkit;
 import org.cometgui.ui.testing.Percolators;
 import org.cometgui.ui.testing.ScriptedEngine;
+import org.cometgui.ui.testing.ScriptedLimelight;
 import org.cometgui.ui.testing.ScriptedToolManager;
 import org.cometgui.ui.testing.ScriptedVisualisation;
 import org.cometgui.ui.testing.ToolOffers;
@@ -58,10 +60,12 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.limelight.LimelightViewModel;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSearchViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterSession;
+import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
@@ -177,6 +181,14 @@ class ShellViewTest {
                                             new ScriptedVisualisation(),
                                             results,
                                             resultTable,
+                                            Runnable::run,
+                                            Runnable::run,
+                                            () -> {}),
+                                    new LimelightViewModel(
+                                            new ScriptedLimelight("no Limelight in this test"),
+                                            results,
+                                            percolatorSection.requestProperty(),
+                                            () -> false,
                                             Runnable::run,
                                             Runnable::run,
                                             () -> {}));
@@ -574,6 +586,16 @@ class ShellViewTest {
                                                         new ScriptedVisualisation(),
                                                         otherResults,
                                                         otherTable,
+                                                        Runnable::run,
+                                                        Runnable::run,
+                                                        () -> {}),
+                                                new LimelightViewModel(
+                                                        new ScriptedLimelight("no Limelight"),
+                                                        otherResults,
+                                                        new SimpleObjectProperty<>(
+                                                                PercolatorRequest.blocked(
+                                                                        List.of("none"))),
+                                                        () -> false,
                                                         Runnable::run,
                                                         Runnable::run,
                                                         () -> {})),

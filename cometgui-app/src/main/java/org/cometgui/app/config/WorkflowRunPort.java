@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.domain.run.RunId;
+import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
@@ -35,9 +36,12 @@ import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.percolator.PercolatorSettings;
+import org.cometgui.params.percolator.resolution.CompatibilityAction;
 import org.cometgui.params.percolator.resolution.PercolatorResolution;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
+import org.cometgui.ui.viewmodel.limelight.LimelightRerun;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
@@ -98,7 +102,9 @@ import org.cometgui.workflow.storage.ProjectLock;
  * PercolatorRequest)}, {@link #start(PercolatorRequest, RunObserver)}; design decision P9-11): a
  * new, derived run with the Percolator half as it is now, reusing the last run's merged PIN through
  * {@link PercolatorRerun}, executing no Comet. Whether it can be made, and what it executes, are
- * the workflow's answers, shown as they are.
+ * the workflow's answers, shown as they are. The Limelight section's compatible rerun ({@link
+ * #rerunCompatible}, phase 12) is the same rerun from a run the scientist chose, with the build the
+ * run's {@link CompatibilityAction} names: one path, two callers.
  *
  * <h2>Retry or new run</h2>
  *
@@ -319,12 +325,45 @@ public final class WorkflowRunPort implements SessionEngine {
             throw new RunNotStartedException(NO_RUN_TO_RERUN, null);
         }
         PercolatorChoice choice = requireChoice(percolator);
+        return rerunFrom(source.layout(), choice, observer).handle();
+    }
+
+    @Override
+    public LimelightRerun rerunCompatible(
+            RunLayout source,
+            CompatibilityAction action,
+            PercolatorSettings settings,
+            RunObserver observer)
+            throws RunNotStartedException {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(settings, "settings");
+        Objects.requireNonNull(observer, "observer");
+        PercolatorChoice choice;
+        try {
+            choice = rerun.compatibleChoice(action, settings);
+        } catch (RerunRefusedException refused) {
+            throw new RunNotStartedException(refused.getMessage(), refused);
+        } catch (IOException unreadable) {
+            throw new RunNotStartedException(
+                    "the Percolator the rerun would use cannot be read: " + unreadable.getMessage(),
+                    unreadable);
+        }
+        return rerunFrom(source, choice, observer);
+    }
+
+    /**
+     * The one compatible-version rerun: records the derived run from a source run and starts it,
+     * held as executing until the engine reports it finished.
+     */
+    private LimelightRerun rerunFrom(
+            RunLayout source, PercolatorChoice choice, RunObserver observer)
+            throws RunNotStartedException {
         try {
             ProjectLock lock = project.lock();
             synchronized (this) {
                 DerivedRun derived =
-                        rerun.prepare(
-                                project.store(), lock, source.layout(), choice, application.get());
+                        rerun.prepare(project.store(), lock, source, choice, application.get());
                 observer.planned(
                         derived.plan(),
                         "run "
@@ -336,7 +375,7 @@ public final class WorkflowRunPort implements SessionEngine {
                 RunId id = derived.identity().runId();
                 RunHandle handle =
                         tracked(id, () -> rerun.start(engine, derived, ended(id, observer)));
-                return handle::cancel;
+                return new LimelightRerun(id, derived.layout().root(), handle::cancel);
             }
         } catch (RerunRefusedException refused) {
             throw new RunNotStartedException(refused.getMessage(), refused);

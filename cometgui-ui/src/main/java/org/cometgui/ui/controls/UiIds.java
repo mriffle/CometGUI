@@ -657,6 +657,108 @@ public final class UiIds {
     /** What PDV answered when the last selected PSM was sent to its window. */
     public static final String VISUALISATION_SELECTION = "visualisation-selection";
 
+    /** The Limelight section's content. */
+    public static final String LIMELIGHT_PANE = "limelight-pane";
+
+    /** The run chosen in the Results section, which the Limelight section converts. */
+    public static final String LIMELIGHT_RUN = "limelight-run";
+
+    /** Reads the converter's state and the chosen run's again. */
+    public static final String LIMELIGHT_REFRESH = "limelight-refresh";
+
+    /** Whether the chosen run can be converted, or the workflow's explanation of why it cannot. */
+    public static final String LIMELIGHT_COMPATIBILITY = "limelight-compatibility";
+
+    /**
+     * The action offered for a run whose Percolator wrote no XML: the compatible rerun or
+     * local-binary registration, labelled as the workflow labels it.
+     */
+    public static final String LIMELIGHT_ACTION = "limelight-action";
+
+    /** Why that is the action offered. */
+    public static final String LIMELIGHT_ACTION_EXPLANATION = "limelight-action-explanation";
+
+    /** What the action is doing, or how it ended. */
+    public static final String LIMELIGHT_ACTION_OUTCOME = "limelight-action-outcome";
+
+    /** Cancels the compatible rerun the Limelight section started. */
+    public static final String LIMELIGHT_RERUN_CANCEL = "limelight-rerun-cancel";
+
+    /** The Limelight converter's state, or the running install's progress, in words. */
+    public static final String LIMELIGHT_CONVERTER_STATUS = "limelight-converter-status";
+
+    /** The progress bar of an install the Limelight section started. */
+    public static final String LIMELIGHT_INSTALL_PROGRESS = "limelight-install-progress";
+
+    /** Cancels the install the Limelight section started. */
+    public static final String LIMELIGHT_INSTALL_CANCEL = "limelight-install-cancel";
+
+    /** The Limelight q-value cutoff: the converter's own value, never a display filter. */
+    public static final String LIMELIGHT_Q_CUTOFF = "limelight-q-cutoff";
+
+    /** The output Limelight XML path; empty for a new file in the run's outputs. */
+    public static final String LIMELIGHT_OUTPUT = "limelight-output";
+
+    /** Where the next conversion writes, or why it cannot write there. */
+    public static final String LIMELIGHT_OUTPUT_STATUS = "limelight-output-status";
+
+    /** Whether to import decoys: enabled only when the run's own Percolator output allows it. */
+    public static final String LIMELIGHT_IMPORT_DECOYS = "limelight-import-decoys";
+
+    /** Why decoy import cannot be selected, or that it can. */
+    public static final String LIMELIGHT_DECOY_STATUS = "limelight-decoy-status";
+
+    /** The optional independent-decoy prefix. */
+    public static final String LIMELIGHT_DECOY_PREFIX = "limelight-decoy-prefix";
+
+    /** Whether to convert in open-modification mode. */
+    public static final String LIMELIGHT_OPEN_MOD = "limelight-open-mod";
+
+    /** Whether the run's Limelight settings were saved, or the rule that refused them. */
+    public static final String LIMELIGHT_SETTINGS_STATUS = "limelight-settings-status";
+
+    /** The resolved FASTA, shown read-only. */
+    public static final String LIMELIGHT_FASTA = "limelight-fasta";
+
+    /** The resolved pepXML directory, shown read-only. */
+    public static final String LIMELIGHT_PEPXML_DIRECTORY = "limelight-pepxml-directory";
+
+    /** Every conversion prerequisite not met, each by its name. */
+    public static final String LIMELIGHT_REFUSALS = "limelight-refusals";
+
+    /**
+     * Converts the chosen run to Limelight XML, installing the converter first if it is not
+     * installed.
+     */
+    public static final String LIMELIGHT_CONVERT = "limelight-convert";
+
+    /** Why the run cannot be converted now; empty when it can. */
+    public static final String LIMELIGHT_CONVERT_REFUSAL = "limelight-convert-refusal";
+
+    /** The converter's log lines of the last conversion, as they arrived. */
+    public static final String LIMELIGHT_LOG = "limelight-log";
+
+    /**
+     * What the last conversion did: valid Limelight XML, every refusal by name, or the output
+     * judge's reason.
+     */
+    public static final String LIMELIGHT_OUTCOME = "limelight-outcome";
+
+    /** The last valid Limelight XML file. */
+    public static final String LIMELIGHT_RESULT_FILE = "limelight-result-file";
+
+    /** How many PSMs the last valid Limelight XML file holds. */
+    public static final String LIMELIGHT_RESULT_PSMS = "limelight-result-psms";
+
+    /** The last valid Limelight XML file's SHA-256, as its conversion recorded it. */
+    public static final String LIMELIGHT_RESULT_SHA256 = "limelight-result-sha256";
+
+    /** The Limelight section's upload area, below the conversion. */
+    public static final String LIMELIGHT_UPLOAD = "limelight-upload";
+
+    /** What the upload area says while uploading is not available. */
+    public static final String LIMELIGHT_UPLOAD_PENDING = "limelight-upload-pending";
+
     /**
      * The two surfaces a parameter's control appears on. A parameter shown in Essentials is shown
      * in Advanced too, so the surface is part of every parameter identifier and the two controls
