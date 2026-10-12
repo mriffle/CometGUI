@@ -30,8 +30,8 @@ reaches an argument array, a URL, a log or a record.
    sign-off, in ``handoffs/PHASE-12-worklog.rst``. **Everything here has run
    on Linux x86-64 only** (see `What has only run on Linux`_), and **no test
    has contacted a real Limelight server**. The phase's falsifiability harness
-   (work unit 9) is not described here; it did not exist when this page was
-   written.
+   (work unit 9), ``scripts/verify-limelight-gates.sh``, is described in
+   :ref:`dev-limelight-falsifiability`.
 
 .. contents:: Contents
    :depth: 2

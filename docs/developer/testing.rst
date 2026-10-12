@@ -603,6 +603,18 @@ pass is worse than no aggregator at all.
        seen: [PDVOBS displayed row=1 ...`` from the in-JVM observer of the
        real PDV, which answered ``200 selected``.
 
+   * - Limelight conversion and upload (Phase 12, ``limelight``)
+     - ``scripts/verify-limelight-gates.sh``: twenty-nine injections into
+       ``cometgui-domain``, ``cometgui-params-percolator``,
+       ``cometgui-tools``, ``cometgui-workflow``, ``cometgui-ui`` and
+       ``cometgui-app`` -- at least two per exit gate item; items 1, 2, 4 and
+       5 also against the real converter, Comet and Percolator, items 3, 4, 6
+       and 7 through the headless GUI. See :ref:`dev-limelight-falsifiability`.
+     - Each failing assertion's own words, e.g. the label built from the
+       literal 3.07.1 -- ``expected: <Rerun Percolator with 3.08.2 for
+       Limelight> but was: <Rerun Percolator with 3.07.1 for Limelight>``,
+       while the real Linux set stays green.
+
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs
 from the pristine state -- and reports a control whose defect was *not*
@@ -1693,6 +1705,241 @@ controls 8-15 s each, 5c 39 s (the fake's ten-second shutdown deadline), 5b
 77 s (the observer's one-minute draw bound), the GUI controls 1b 111 s and
 5e 56 s, and control H 15 s. No process was left for the script to end. The
 floor in ``verify-all-gates.sh`` is 107.
+
+.. _dev-limelight-falsifiability:
+
+The Limelight harness (Phase 12, ``limelight``)
+-----------------------------------------------
+
+``bash scripts/verify-limelight-gates.sh`` proves that each of Phase 12's
+eight exit gate items fails on a defect it exists to catch. It is registered
+in ``scripts/verify-all-gates.sh`` as ``limelight`` and takes its shape from
+``pdv`` (:ref:`dev-pdv-falsifiability`): a ``git archive HEAD`` sandbox,
+anchors that must match exactly once, bytecode digests proving each injection
+reached the compiled class, red read from surefire's XML by testcase and
+message, siblings required to stay green, ``mvn -o -pl TOP -am test`` with
+nothing installed (so the coverage checks, bound to ``verify``, never run and
+no ``cometgui.coverage.*.skip`` is passed), processes left under the sandbox
+ended after every run, and one batched clean re-run. The differences:
+
+* **The module sets are not one chain.** ``cometgui-domain`` and
+  ``cometgui-params-percolator`` are siblings below ``cometgui-workflow``, so
+  the baseline and the clean run use the first of domain, params-percolator,
+  tools, workflow, ui, app whose set *holds* every selected control's set --
+  computed from the sandbox's own POMs and checked, not assumed.
+* **A preflight refuses to start**, naming what is missing, without the
+  converter JAR, Comet 2026.03.0, the Percolator 3.07.1 zip and ``.deb``
+  under ``scratch/phase05/artefacts/``, ``scratch/percolator/3.09``, the K562
+  fixture and Phase 00's outputs and corruptions under
+  ``scratch/scientific-path/``, the project-local X11 and font stacks, the
+  xkbcomp shim source, ``gcc`` and ``/usr/bin/timeout``.
+  ``scratch/limelight-upload-spike/`` is not needed: no selected test runs the
+  real importer.
+* **No host but this one.** Control 6e gives the upload client no proxy,
+  which bypasses the test guard's loopback sinkhole -- the defect that would
+  let a test reach a real server. It runs **only**
+  ``LoopbackGuardTest.theMachinesOwnAddressIsCaught``, which aims at this
+  machine's own non-loopback address and port 9; the guard tests aimed at
+  TEST-NET and at a ``.invalid`` name are never run under it.
+* **A red in ``@BeforeAll``.** ``RealLimelightCompatibleRerunTest`` does its
+  whole real run in ``@BeforeAll``; control 4a's defect fails it there, so
+  surefire reports the class's own testcase (no method name), and the control
+  grades that line.
+
+.. list-table:: The controls ("recorded" names the unit of ``handoffs/PHASE-12-worklog.rst`` whose sign-off made the injection)
+   :header-rows: 1
+   :widths: 6 6 42 46
+
+   * - Control
+     - Item
+     - Injected defect
+     - Diagnostic required
+   * - 1a
+     - 1
+     - Recorded (unit 2, K1): the judge's root check reduced to "the element
+       has a name".
+     - ``LimelightXmlJudgeTest.wrongRoot``: ``expected: <WRONG_ROOT> but was:
+       <SCHEMA_INVALID>``; the real output still accepted.
+   * - 1b
+     - 1
+     - New: the judge's schema validation skipped.
+     - ``phase00BogusElement`` and ``phase00MissingAttribute``: ``Expected
+       ...LimelightConversionException to be thrown, but nothing was
+       thrown``; the truncated file still refused.
+   * - 1c
+     - 1
+     - New: ``output.sha256`` of ``limelight.converted`` recorded as the MD5.
+     - *Real*, ``RealLimelightConversionTest.gate1ARealConversion``: a
+       64-digit SHA-256 expected, a 32-digit MD5 found.
+   * - 2a
+     - 2
+     - New: the adapter trusting exit 0 when the staging file is missing or
+       empty (judge bypassed, move skipped).
+     - ``LimelightConverterTest.exitZeroWithNoFile`` and
+       ``exitZeroWithAnEmptyFile``: nothing thrown; a malformed file and a
+       non-zero exit still fail.
+   * - 2b
+     - 2
+     - New: the judge's existence check removed.
+     - *Real converter*, ``anUnknownOptionExitsZero``: ``expected:
+       <...LimelightConversionException> but was:
+       <java.nio.file.NoSuchFileException>``; a real conversion still kept.
+   * - 2c
+     - 2
+     - New: the judge's emptiness check removed.
+     - ``absentEmptyUnreadable``: ``expected: <EMPTY_OUTPUT> but was:
+       <NOT_WELL_FORMED>``.
+   * - 3a
+     - 3
+     - Recorded (unit 4, N1): ``CompatibilityAction.forStage`` offering the
+       rerun whenever resolution selects any build.
+     - ``CompatibilityActionTest$NoRerun``: ``expected:
+       <REGISTER_LOCAL_BINARY> but was: <RERUN_PERCOLATOR>``; ``linuxSet``
+       green.
+   * - 3b
+     - 3
+     - Recorded (unit 4, N2): the label from the literal ``3.07.1``.
+     - ``whateverResolutionReturns`` (3.08.2) and ``aFutureBuild`` (3.10) red;
+       ``linuxSet`` green -- 3.07.1 is what resolution returns today.
+   * - 3c
+     - 3
+     - Recorded (unit 6, Q1): the conversion controls enabled for any run with
+       a readiness answer.
+     - ``LimelightPaneTest.incompatible``; *GUI*,
+       ``LimelightRerunUiTest.gate3`` against the real 3.09 run: ``the section
+       before anything is attempted (4 failures)``.
+   * - 4a
+     - 4
+     - Recorded (unit 4, N3): a run that is not ready no longer refused.
+     - *Real*, ``RealLimelightCompatibleRerunTest`` (``@BeforeAll``):
+       ``expected: <...LimelightConversionRefusedException> but was:
+       <java.util.NoSuchElementException>``.
+   * - 4b
+     - 4
+     - New: the compatible rerun's choice enabling no downstream stage.
+     - *GUI*, ``LimelightRerunUiTest.gate4``: no derived run appears -- ``the
+       runs: [<one run>] ==> expected: <true> but was: <false>``.
+   * - 4c
+     - 4
+     - New: the derived run no longer recording the Percolator its source
+       ran.
+     - *Real*, ``gate4BothExecutionsInProvenance``: ``expected: <3.09> but
+       was: <none>``; ``gate4TheRerunConverts`` green.
+   * - 5a
+     - 5
+     - New: the cutoff's default 0.05.
+     - ``LimelightConversionsTest.gate5TheDefault``: ``expected:
+       <LimelightQValueCutoff[value=0.01]> but was: <...[value=0.05]>``.
+   * - 5b
+     - 5
+     - New: ``-q`` not emitted.
+     - *Real converter*, ``theCutoffReachesTheFile``: ``carries the
+       Percolator PSM q-value filter 0.01, not the cutoff 0.05 the conversion
+       asked for``; the real 0.01 conversion cannot see it and stays green.
+   * - 5c
+     - 5
+     - New: saving the cutoff also writes the display filters' view state.
+     - ``gate5ChangingTheLimelightCutoff``: ``expected:
+       <[results/limelight-settings.json]> but was:
+       <[results/limelight-settings.json, results/view-state.json]>``.
+   * - 6a
+     - 6
+     - New: the workflow's upload confirmation reusable.
+     - ``LimelightUploadsTest.aConfirmationIsUsedOnce``: nothing thrown.
+   * - 6b
+     - 6
+     - Recorded (unit 7, R2): the port's single-send check always passing.
+     - ``ProjectLimelightUploadPortTest.prepareThenSend``: nothing thrown.
+   * - 6c
+     - 6
+     - Recorded (unit 7, R1): a changed server no longer withdrawing the
+       destination.
+     - ``aChangeWithdrawsTheDestination``: ``expected: <The destination shown
+       was withdrawn because ...``.
+   * - 6d
+     - 6
+     - New: Upload sending as soon as the destination is shown.
+     - ``LimelightUploadViewModelTest.uploadSendsNothing``; *GUI*,
+       ``LimelightUploadUiTest.gate6`` against the fake: ``limelight.uploading``
+       recorded before Send.
+   * - 6e
+     - 6
+     - New: the upload client given ``NO_PROXY``, bypassing the guard.
+     - ``LoopbackGuardTest.theMachinesOwnAddressIsCaught`` only:
+       ``expected: <[CONNECT <own address>:9 HTTP/1.1]> but was: <[]>``.
+   * - 6f
+     - 6
+     - Recorded (unit 5, P1): plain http accepted to any host.
+     - ``LimelightServerTest.plainHttpOnlyToLoopback``: nothing thrown.
+   * - 7a
+     - 7
+     - New: the upload no longer adds the key to the redactor it writes with.
+     - ``theServersWordsAreRedacted``: ``expected: <Optional[no such key:
+       [REDACTED]]> but was: <Optional[no such key: LLworkflow-seeded-...``.
+   * - 7b
+     - 7
+     - New: the key written to the upload log, unredacted (two anchors: a
+       line carrying it, and the log's own redaction off).
+     - ``LimelightUploadLeakTest`` walk: ``the seeded credential was written
+       to a file ==> expected: <{}> but was: <{.../limelight-upload.log=utf-8``.
+   * - 7c
+     - 7
+     - New: ``SessionSecrets.admit`` no longer registering the credential.
+     - ``SessionSecretsTest.admittingRegisters``: ``expected: <1> but was:
+       <0>``.
+   * - 7d
+     - 7
+     - New: the key field not emptied once its key is taken.
+     - ``LimelightUploadPaneTest.theKeyField``; *GUI*,
+       ``LimelightUploadUiTest.gate7``: ``the window and the console (2
+       failures)``, the seeded ``CGSEED-`` key read back from the window.
+   * - 8a
+     - 8
+     - Recorded (unit 3, L3): ``saveSettings``' decoy refusal unreachable.
+     - ``gate8DecoyImportAgainstANoDecoyRun``: nothing thrown;
+       ``gate8ARunWithDecoys`` green.
+   * - 8b
+     - 8
+     - Recorded (unit 6, Q2): decoy import enabled whenever the settings are.
+     - ``LimelightViewModelTest.aConvertibleRun``: ``gate 8: refused at
+       configuration time ==> expected: <false> but was: <true>``; the pane's
+       ``convertible`` red.
+   * - 8c
+     - 8
+     - New: a pout XML without decoy PSMs judged able to import them.
+     - ``LimelightConversionRequestTest``: ``expected:
+       <java.lang.IllegalArgumentException> but was:
+       <...LimelightConversionException>``; the workflow's gate 8 red.
+   * - 8d
+     - 8
+     - Recorded (unit 2, K3): "decoys present but not imported" unreachable.
+     - ``decoysWithoutImportAreRefused``: nothing thrown.
+   * - H
+     - --
+     - The harness itself.
+     - An unchanged file, a missing anchor, a comment-only injection (a real
+       Maven run) and a test method renamed so its selection runs zero tests
+       are each a ``HARNESS ERROR``; a green run graded as red and a red
+       without its diagnostic are each a recorded failure.
+
+What it does not cover: Windows and macOS; a real Limelight server (never
+contacted); item 1's GUI test (item 1 is graded on the judge and the real
+workflow conversion); Q2's GUI grade (8b is graded on the view-model and the
+pane); R1 in the GUI, which unit 7 saw stay green (the GUI test changes the
+project, not the server). The two defensive layers the work log records as
+untestable from outside (L2, P2) are not controls; 7b grades P2's layer only
+together with a line that carries the key.
+
+Measured on 2026-10-12 through ``bash scripts/verify-all-gates.sh --only
+limelight`` at ``35413e5``: 130 controls passed in 1129 s (18 m 49 s) -- the
+baseline 239 s and the final clean run 221 s (each compiles the
+``cometgui-app`` reactor and runs every graded selection: 71 tests, among them
+the real conversion, the real compatible rerun and three headless GUI
+classes), the ``cometgui-domain``, ``cometgui-params-percolator``,
+``cometgui-tools`` and ``cometgui-workflow`` controls 5-33 s each, the
+``cometgui-ui`` and ``cometgui-app`` unit controls 19-27 s, the GUI controls
+3c 44 s, 4b 49 s, 6d 66 s and 7d 65 s, and control H 18 s. No process was left
+for the script to end. The floor in ``verify-all-gates.sh`` is 130.
 
 Traps
 =====
