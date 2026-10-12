@@ -413,7 +413,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        registered additively as ``limelight``: every gate item graded on a
        production injection; cost stated.
      - all eight gate items
-     -
+     - Accepted, ``35413e5`` ``c203451``
 
 Unit sign-offs
 ==============
@@ -862,4 +862,34 @@ to named tests (automated criteria 31 -> 37, named tests 120 -> 139).
 Unit 9 sign-off
 ---------------
 
-Pending.
+**Accepted 2026-10-12.** Commits ``35413e5`` (``scripts/verify-limelight-gates.sh``,
+additive registration in ``scripts/verify-all-gates.sh`` as ``limelight``,
+floor **130**) and ``c203451`` (``docs/developer/testing.rst`` row and
+section, a pointer from the integration page).
+
+* **Diff read**: the registration adds one case per dispatch, the floor,
+  the ``--list`` and banner text; no other harness, floor or POM changed.
+  29 injections into production code over the eight items (14 recorded in
+  this log's sign-offs, 15 new) plus the harness self-controls H (unchanged
+  file, missing anchor, source changed but bytecode not, a renamed test
+  running zero tests, a green graded as red, a red without its diagnostic).
+  Every dirty build proves the injected class's bytecode differs and every
+  other class is identical; nothing is installed (``-pl TOP -am test``).
+  Control 6e (the proxy bypass) selects only the guard's own-address test,
+  so a bypass cannot leave the machine.
+* **Run by me**: ``bash scripts/verify-all-gates.sh --only limelight`` ->
+  **PASS, 130 controls in 1130 s** on ``c203451``.
+* **My falsification of the harness**: a throw-away copy with control 2c's
+  expected diagnostic changed (``NOT_WELL_FORMED`` -> ``SCHEMA_INVALID``),
+  ``--only 2c`` -> exit 1, ``FAIL an empty file not named empty: failed, but
+  without the expected diagnostic``; the copy deleted, tree clean.
+* ``docs-build.sh`` PASS; ``--only docs`` PASS; ``--only traceability``
+  PASS.
+* **Weaker grades, recorded** (the agent's list): 6a, 6b, 6f, 8a, 8d graded
+  on "nothing was thrown" in the named testcase; 7c on a registry count; 8b
+  on a message-less assertion placed by the stack trace; 4a fails in the
+  real rerun test's ``@BeforeAll`` so its class-level testcase is graded;
+  4b is caught as a refused rerun, not a converted one; 7b needs two anchors
+  (the upload log's own redaction cannot fail alone -- unit 5's P2). Item
+  1's GUI grade and Q2's GUI grade are not in the harness, for cost.
+* **Cost**: about 19 minutes added to the full gate run.
