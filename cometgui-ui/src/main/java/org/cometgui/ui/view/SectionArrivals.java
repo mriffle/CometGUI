@@ -116,16 +116,20 @@ final class SectionArrivals {
                         + " another run is chosen there and when CometGUI exits.");
         notes.put(
                 SectionId.LIMELIGHT,
-                "This section is being filled by phase 12 (Limelight Conversion and Upload)."
-                        + " Live now: for the run chosen in the Results section, whether it can be"
+                "This section is live: phase 12 (Limelight Conversion and Upload) filled it."
+                        + " For the run chosen in the Results section, whether it can be"
                         + " converted -- said before anything can be attempted, with the"
                         + " compatible Percolator rerun or local-binary registration offered when"
                         + " its Percolator wrote no XML -- the converter's install on first use,"
                         + " the Limelight q-value cutoff (its own value, never a display filter),"
                         + " the output path, decoy import, the independent-decoy prefix,"
                         + " open-modification mode, the resolved FASTA and pepXML directory, and"
-                        + " the conversion with its live log and its validated result. Uploading"
-                        + " to a Limelight server is not live yet.");
+                        + " the conversion with its live log and its validated result; and the"
+                        + " upload of a converted file to a Limelight server's project -- the"
+                        + " server, the project and the file shown, with the file's size and"
+                        + " SHA-256, before anything is sent, and sent only when you press Send,"
+                        + " with the submit key never shown or written -- with its live log and"
+                        + " the server's tracking id.");
         notes.put(
                 SectionId.PROVENANCE,
                 "This section arrives in phase 13 (Provenance UI and Reports).");

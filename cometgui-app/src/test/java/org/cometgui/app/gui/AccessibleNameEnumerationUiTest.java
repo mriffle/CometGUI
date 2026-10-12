@@ -112,9 +112,11 @@ class AccessibleNameEnumerationUiTest {
      * by the walk -- were added to the derivation, and the floor was raised to 68. Phase 10 unit 8
      * raised it to 117 for the Results section, as derived above. Phase 12 unit 6 raised it to 147
      * for the Limelight section's 30 identified controls with no run open ({@link
-     * #LIMELIGHT_IDENTIFIED}): 117 + 30 = 147.
+     * #LIMELIGHT_IDENTIFIED}): 117 + 30 = 147. Phase 12 unit 7 raised it to 174: the upload half
+     * fills the upload area, so its note ({@code limelight-upload-pending}) is no longer in the
+     * scene, and its 28 identified controls are: 147 - 1 + 28 = 174.
      */
-    private static final int MINIMUM_CONTROLS = 147;
+    private static final int MINIMUM_CONTROLS = 174;
 
     /**
      * The Results section's identified controls with no run open, typed out (P7-5). Every one must
@@ -180,9 +182,13 @@ class AccessibleNameEnumerationUiTest {
      * q-value cutoff, the output path and where it writes, decoy import and why, the
      * independent-decoy prefix, open-modification mode, the settings' state, the resolved FASTA and
      * pepXML directory, the refusals, Convert and why not, the log, the outcome, the file, the PSM
-     * count, the SHA-256, and the upload area's note. Every one is in the scene whether or not it
-     * is shown -- the action and the progress bar are hidden with nothing to show -- so every one
-     * must carry a name of its own.
+     * count and the SHA-256; and the upload half's 28 (phase 12 unit 7): the file and why, the
+     * server, the project and the key each with its state, remember, forget, the store's
+     * explanation, Upload and why not, the destination's server, project, page, file, size and
+     * SHA-256, Send and Cancel, the progress bar, the log, the outcome, the tracking id, the
+     * importer directory, the project page and the log's path. Every one is in the scene whether or
+     * not it is shown -- the action, the progress bar and the destination are hidden with nothing
+     * to show -- so every one must carry a name of its own.
      */
     static final List<String> LIMELIGHT_IDENTIFIED =
             List.of(
@@ -215,7 +221,34 @@ class AccessibleNameEnumerationUiTest {
                     "limelight-result-file",
                     "limelight-result-psms",
                     "limelight-result-sha256",
-                    "limelight-upload-pending");
+                    "limelight-upload-file",
+                    "limelight-upload-files-status",
+                    "limelight-upload-server",
+                    "limelight-upload-server-status",
+                    "limelight-upload-project",
+                    "limelight-upload-project-status",
+                    "limelight-upload-key",
+                    "limelight-upload-key-status",
+                    "limelight-upload-remember",
+                    "limelight-upload-forget",
+                    "limelight-upload-store",
+                    "limelight-upload-prepare",
+                    "limelight-upload-refusal",
+                    "limelight-upload-confirm-server",
+                    "limelight-upload-confirm-project",
+                    "limelight-upload-confirm-page",
+                    "limelight-upload-confirm-file",
+                    "limelight-upload-confirm-size",
+                    "limelight-upload-confirm-sha256",
+                    "limelight-upload-send",
+                    "limelight-upload-cancel",
+                    "limelight-upload-progress",
+                    "limelight-upload-log",
+                    "limelight-upload-outcome",
+                    "limelight-upload-tracking-id",
+                    "limelight-upload-importer-subdir",
+                    "limelight-upload-project-page",
+                    "limelight-upload-log-path");
 
     /**
      * The identifiers JavaFX's own skins give the controls they build. Every control this project
@@ -339,9 +372,9 @@ class AccessibleNameEnumerationUiTest {
     }
 
     @Test
-    @DisplayName("the Limelight section's 30 identified controls with no run open, each named")
+    @DisplayName("the Limelight section's 57 identified controls with no run open, each named")
     void theLimelightSectionIsEnumerated() {
-        assertEquals(30, LIMELIGHT_IDENTIFIED.size(), "the derivation of MINIMUM_CONTROLS");
+        assertEquals(57, LIMELIGHT_IDENTIFIED.size(), "the derivation of MINIMUM_CONTROLS");
         assertEquals(
                 LIMELIGHT_IDENTIFIED.size(),
                 Set.copyOf(LIMELIGHT_IDENTIFIED).size(),

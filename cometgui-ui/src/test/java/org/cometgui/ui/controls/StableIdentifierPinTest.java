@@ -191,8 +191,15 @@ class StableIdentifierPinTest {
      * why, the independent-decoy prefix, open-modification mode, the settings' state, the resolved
      * FASTA and pepXML directory; the refusals, Convert and why not, the log, the outcome, the
      * file, the PSM count and the SHA-256; and the upload area and its note).
+     *
+     * <p>Raised from 545 to 575 by phase 12 unit 7, the Limelight section's upload half: 30
+     * constants (its content box; the file and why; the server, the project and the key, each with
+     * its state; remember, forget and the store's explanation; Upload and why not; the destination
+     * box with its server, project, page, file, size and SHA-256; Send and Cancel; the progress
+     * bar, the log and the outcome; and the tracking id, the importer directory, the project page
+     * and the log's path).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 545;
+    private static final int PINNED_IDENTIFIER_COUNT = 575;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -427,7 +434,39 @@ class StableIdentifierPinTest {
                     Map.entry("LIMELIGHT_RESULT_PSMS", "limelight-result-psms"),
                     Map.entry("LIMELIGHT_RESULT_SHA256", "limelight-result-sha256"),
                     Map.entry("LIMELIGHT_UPLOAD", "limelight-upload"),
-                    Map.entry("LIMELIGHT_UPLOAD_PENDING", "limelight-upload-pending"));
+                    Map.entry("LIMELIGHT_UPLOAD_PENDING", "limelight-upload-pending"),
+                    Map.entry("LIMELIGHT_UPLOAD_CONTENT", "limelight-upload-content"),
+                    Map.entry("LIMELIGHT_UPLOAD_FILE", "limelight-upload-file"),
+                    Map.entry("LIMELIGHT_UPLOAD_FILES_STATUS", "limelight-upload-files-status"),
+                    Map.entry("LIMELIGHT_UPLOAD_SERVER", "limelight-upload-server"),
+                    Map.entry("LIMELIGHT_UPLOAD_SERVER_STATUS", "limelight-upload-server-status"),
+                    Map.entry("LIMELIGHT_UPLOAD_PROJECT", "limelight-upload-project"),
+                    Map.entry("LIMELIGHT_UPLOAD_PROJECT_STATUS", "limelight-upload-project-status"),
+                    Map.entry("LIMELIGHT_UPLOAD_KEY", "limelight-upload-key"),
+                    Map.entry("LIMELIGHT_UPLOAD_KEY_STATUS", "limelight-upload-key-status"),
+                    Map.entry("LIMELIGHT_UPLOAD_REMEMBER", "limelight-upload-remember"),
+                    Map.entry("LIMELIGHT_UPLOAD_FORGET", "limelight-upload-forget"),
+                    Map.entry("LIMELIGHT_UPLOAD_STORE", "limelight-upload-store"),
+                    Map.entry("LIMELIGHT_UPLOAD_PREPARE", "limelight-upload-prepare"),
+                    Map.entry("LIMELIGHT_UPLOAD_REFUSAL", "limelight-upload-refusal"),
+                    Map.entry("LIMELIGHT_UPLOAD_DESTINATION", "limelight-upload-destination"),
+                    Map.entry("LIMELIGHT_UPLOAD_CONFIRM_SERVER", "limelight-upload-confirm-server"),
+                    Map.entry(
+                            "LIMELIGHT_UPLOAD_CONFIRM_PROJECT", "limelight-upload-confirm-project"),
+                    Map.entry("LIMELIGHT_UPLOAD_CONFIRM_PAGE", "limelight-upload-confirm-page"),
+                    Map.entry("LIMELIGHT_UPLOAD_CONFIRM_FILE", "limelight-upload-confirm-file"),
+                    Map.entry("LIMELIGHT_UPLOAD_CONFIRM_SIZE", "limelight-upload-confirm-size"),
+                    Map.entry("LIMELIGHT_UPLOAD_CONFIRM_SHA256", "limelight-upload-confirm-sha256"),
+                    Map.entry("LIMELIGHT_UPLOAD_SEND", "limelight-upload-send"),
+                    Map.entry("LIMELIGHT_UPLOAD_CANCEL", "limelight-upload-cancel"),
+                    Map.entry("LIMELIGHT_UPLOAD_PROGRESS", "limelight-upload-progress"),
+                    Map.entry("LIMELIGHT_UPLOAD_LOG", "limelight-upload-log"),
+                    Map.entry("LIMELIGHT_UPLOAD_OUTCOME", "limelight-upload-outcome"),
+                    Map.entry("LIMELIGHT_UPLOAD_TRACKING_ID", "limelight-upload-tracking-id"),
+                    Map.entry(
+                            "LIMELIGHT_UPLOAD_IMPORTER_SUBDIR", "limelight-upload-importer-subdir"),
+                    Map.entry("LIMELIGHT_UPLOAD_PROJECT_PAGE", "limelight-upload-project-page"),
+                    Map.entry("LIMELIGHT_UPLOAD_LOG_PATH", "limelight-upload-log-path"));
 
     // -----------------------------------------------------------------------------------------
     // The parameter editor (Phase 07). A parameter's identifiers are built from its own name, so

@@ -759,6 +759,98 @@ public final class UiIds {
     /** What the upload area says while uploading is not available. */
     public static final String LIMELIGHT_UPLOAD_PENDING = "limelight-upload-pending";
 
+    /** The upload half's controls, in the upload area. */
+    public static final String LIMELIGHT_UPLOAD_CONTENT = "limelight-upload-content";
+
+    /** Which of the chosen run's converted Limelight XML files to upload, newest first. */
+    public static final String LIMELIGHT_UPLOAD_FILE = "limelight-upload-file";
+
+    /** How many converted files the run has, or why none is offered. */
+    public static final String LIMELIGHT_UPLOAD_FILES_STATUS = "limelight-upload-files-status";
+
+    /** The Limelight server's address, as typed. */
+    public static final String LIMELIGHT_UPLOAD_SERVER = "limelight-upload-server";
+
+    /** The server's normalised address, or why it cannot be used. */
+    public static final String LIMELIGHT_UPLOAD_SERVER_STATUS = "limelight-upload-server-status";
+
+    /** The Limelight project's id, as typed. */
+    public static final String LIMELIGHT_UPLOAD_PROJECT = "limelight-upload-project";
+
+    /** The project id, or why it cannot be used. */
+    public static final String LIMELIGHT_UPLOAD_PROJECT_STATUS = "limelight-upload-project-status";
+
+    /** The submit-import key: a password field, never echoed. */
+    public static final String LIMELIGHT_UPLOAD_KEY = "limelight-upload-key";
+
+    /** Which key the next upload uses, without showing it. */
+    public static final String LIMELIGHT_UPLOAD_KEY_STATUS = "limelight-upload-key-status";
+
+    /** Whether to keep the typed key for this server after a submitted upload. */
+    public static final String LIMELIGHT_UPLOAD_REMEMBER = "limelight-upload-remember";
+
+    /** Forgets the key kept for this server. */
+    public static final String LIMELIGHT_UPLOAD_FORGET = "limelight-upload-forget";
+
+    /** Where a kept key is held, and why there. */
+    public static final String LIMELIGHT_UPLOAD_STORE = "limelight-upload-store";
+
+    /** Checks the destination and shows it; sends nothing. */
+    public static final String LIMELIGHT_UPLOAD_PREPARE = "limelight-upload-prepare";
+
+    /** Why the destination cannot be checked now; empty when it can. */
+    public static final String LIMELIGHT_UPLOAD_REFUSAL = "limelight-upload-refusal";
+
+    /** The destination shown before anything is sent. */
+    public static final String LIMELIGHT_UPLOAD_DESTINATION = "limelight-upload-destination";
+
+    /** The destination's normalised server address. */
+    public static final String LIMELIGHT_UPLOAD_CONFIRM_SERVER = "limelight-upload-confirm-server";
+
+    /** The destination's project id. */
+    public static final String LIMELIGHT_UPLOAD_CONFIRM_PROJECT =
+            "limelight-upload-confirm-project";
+
+    /** The destination project's page. */
+    public static final String LIMELIGHT_UPLOAD_CONFIRM_PAGE = "limelight-upload-confirm-page";
+
+    /** The file that would be sent. */
+    public static final String LIMELIGHT_UPLOAD_CONFIRM_FILE = "limelight-upload-confirm-file";
+
+    /** Its size in bytes. */
+    public static final String LIMELIGHT_UPLOAD_CONFIRM_SIZE = "limelight-upload-confirm-size";
+
+    /** Its SHA-256. */
+    public static final String LIMELIGHT_UPLOAD_CONFIRM_SHA256 = "limelight-upload-confirm-sha256";
+
+    /** Sends the file to the destination shown: the one action that uploads. */
+    public static final String LIMELIGHT_UPLOAD_SEND = "limelight-upload-send";
+
+    /** Withdraws the destination shown; nothing is sent. */
+    public static final String LIMELIGHT_UPLOAD_CANCEL = "limelight-upload-cancel";
+
+    /** How much of the file has been sent. */
+    public static final String LIMELIGHT_UPLOAD_PROGRESS = "limelight-upload-progress";
+
+    /** The upload's log lines, as written, already redacted. */
+    public static final String LIMELIGHT_UPLOAD_LOG = "limelight-upload-log";
+
+    /** What the last upload, or the last check of a destination, did. */
+    public static final String LIMELIGHT_UPLOAD_OUTCOME = "limelight-upload-outcome";
+
+    /** The server's tracking id (uploadKey) of the last submitted upload. */
+    public static final String LIMELIGHT_UPLOAD_TRACKING_ID = "limelight-upload-tracking-id";
+
+    /** The server's importerSubDir of the last submitted upload. */
+    public static final String LIMELIGHT_UPLOAD_IMPORTER_SUBDIR =
+            "limelight-upload-importer-subdir";
+
+    /** Where the last upload's import can be followed. */
+    public static final String LIMELIGHT_UPLOAD_PROJECT_PAGE = "limelight-upload-project-page";
+
+    /** The last upload's log file. */
+    public static final String LIMELIGHT_UPLOAD_LOG_PATH = "limelight-upload-log-path";
+
     /**
      * The two surfaces a parameter's control appears on. A parameter shown in Essentials is shown
      * in Advanced too, so the surface is part of every parameter identifier and the two controls

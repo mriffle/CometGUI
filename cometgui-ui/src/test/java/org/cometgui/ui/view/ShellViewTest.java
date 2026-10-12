@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -51,6 +52,7 @@ import org.cometgui.ui.testing.FxToolkit;
 import org.cometgui.ui.testing.Percolators;
 import org.cometgui.ui.testing.ScriptedEngine;
 import org.cometgui.ui.testing.ScriptedLimelight;
+import org.cometgui.ui.testing.ScriptedLimelightUpload;
 import org.cometgui.ui.testing.ScriptedToolManager;
 import org.cometgui.ui.testing.ScriptedVisualisation;
 import org.cometgui.ui.testing.ToolOffers;
@@ -60,6 +62,7 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.limelight.LimelightUploadViewModel;
 import org.cometgui.ui.viewmodel.limelight.LimelightViewModel;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
@@ -191,7 +194,13 @@ class ShellViewTest {
                                             () -> false,
                                             Runnable::run,
                                             Runnable::run,
-                                            () -> {}));
+                                            () -> {}),
+                                    new LimelightUploadViewModel(
+                                            new ScriptedLimelightUpload(),
+                                            results,
+                                            new SimpleStringProperty(""),
+                                            Runnable::run,
+                                            Runnable::run));
                     scene = new Scene(shell, 1280, 800);
                     scene.getRoot().applyCss();
                     scene.getRoot().layout();
@@ -598,7 +607,13 @@ class ShellViewTest {
                                                         () -> false,
                                                         Runnable::run,
                                                         Runnable::run,
-                                                        () -> {})),
+                                                        () -> {}),
+                                                new LimelightUploadViewModel(
+                                                        new ScriptedLimelightUpload(),
+                                                        otherResults,
+                                                        new SimpleStringProperty(""),
+                                                        Runnable::run,
+                                                        Runnable::run)),
                                         800,
                                         600));
         Label banner = (Label) other.lookup("#" + UiIds.HOST_BASELINE_BANNER);

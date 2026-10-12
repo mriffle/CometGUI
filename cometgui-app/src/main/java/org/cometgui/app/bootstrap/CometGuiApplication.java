@@ -45,6 +45,7 @@ import org.cometgui.domain.log.MessageSeverity;
 import org.cometgui.domain.platform.GlibcVersion;
 import org.cometgui.domain.platform.HostBaselineReport;
 import org.cometgui.domain.platform.HostBaselineVerifier;
+import org.cometgui.domain.secrets.SessionSecrets;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.ui.view.ShellView;
@@ -54,6 +55,7 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
 import org.cometgui.ui.viewmodel.ToolRowViewModel;
+import org.cometgui.ui.viewmodel.limelight.LimelightUploadViewModel;
 import org.cometgui.ui.viewmodel.limelight.LimelightViewModel;
 import org.cometgui.ui.viewmodel.params.FileChooserPort;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
@@ -445,6 +447,23 @@ public final class CometGuiApplication extends Application {
                         Platform::runLater,
                         toolManager::refresh);
 
+        /*
+         * The Limelight section's upload half (phase 12, work unit 7): one of the chosen run's
+         * converted files, sent to a Limelight server only after the destination is shown and Send
+         * is pressed. The session's ONE SessionSecrets is made here: every submit key typed is
+         * admitted to it the moment it is taken, and the upload service writes its log and events
+         * through its redactor. The credential store is chosen on first use, on the Run section's
+         * daemon threads, never this one.
+         */
+        SessionSecrets secrets = new SessionSecrets();
+        LimelightUploadViewModel limelightUpload =
+                new LimelightUploadViewModel(
+                        RunWiring.limelightUpload(services, project, hashes, engine, secrets),
+                        results,
+                        limelight.resultFileProperty(),
+                        runThreads,
+                        Platform::runLater);
+
         ShellView shell =
                 new ShellView(
                         new NavigationViewModel(),
@@ -466,7 +485,8 @@ public final class CometGuiApplication extends Application {
                         weights,
                         displayFilters,
                         visualisation,
-                        limelight);
+                        limelight,
+                        limelightUpload);
 
         /*
          * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds
@@ -517,6 +537,7 @@ public final class CometGuiApplication extends Application {
         results.refresh();
         visualisation.refresh();
         limelight.refresh();
+        limelightUpload.refresh();
 
         primaryStage.setTitle(WINDOW_TITLE);
         primaryStage.setScene(new Scene(shell, INITIAL_WIDTH, INITIAL_HEIGHT));

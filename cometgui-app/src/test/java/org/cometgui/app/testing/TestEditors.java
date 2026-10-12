@@ -36,6 +36,7 @@ import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunLayout;
+import org.cometgui.domain.secrets.SessionSecrets;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallProgressListener;
 import org.cometgui.domain.tools.ToolVersion;
@@ -56,6 +57,7 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
 import org.cometgui.ui.viewmodel.limelight.LimelightRerun;
+import org.cometgui.ui.viewmodel.limelight.LimelightUploadViewModel;
 import org.cometgui.ui.viewmodel.limelight.LimelightViewModel;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
@@ -137,6 +139,27 @@ public final class TestEditors {
         ResultsViewModel results =
                 new ResultsViewModel(
                         new NoResults(), filters, table, weights, Runnable::run, Runnable::run);
+        ProjectSession noProject =
+                new ProjectSession(
+                        Path.of("no-project").toAbsolutePath(),
+                        Clock.systemUTC(),
+                        ApplicationServices.forThisHost().runIds());
+        LimelightViewModel limelight =
+                new LimelightViewModel(
+                        RunWiring.limelight(
+                                ApplicationServices.forThisHost(),
+                                new BoundedMessageLog(),
+                                noProject,
+                                RunWiring.hasher(),
+                                engine,
+                                Optional.empty(),
+                                NoEngine.REASON),
+                        results,
+                        percolator.requestProperty(),
+                        percolator::register,
+                        Runnable::run,
+                        Runnable::run,
+                        () -> {});
         return new ShellView(
                 navigation,
                 hostBaseline,
@@ -168,24 +191,18 @@ public final class TestEditors {
                 filters,
                 new VisualisationViewModel(
                         new NoPdv(), results, table, Runnable::run, Runnable::run, () -> {}),
-                new LimelightViewModel(
-                        RunWiring.limelight(
+                limelight,
+                new LimelightUploadViewModel(
+                        RunWiring.limelightUpload(
                                 ApplicationServices.forThisHost(),
-                                new BoundedMessageLog(),
-                                new ProjectSession(
-                                        Path.of("no-project").toAbsolutePath(),
-                                        Clock.systemUTC(),
-                                        ApplicationServices.forThisHost().runIds()),
+                                noProject,
                                 RunWiring.hasher(),
                                 engine,
-                                Optional.empty(),
-                                NoEngine.REASON),
+                                new SessionSecrets()),
                         results,
-                        percolator.requestProperty(),
-                        percolator::register,
+                        limelight.resultFileProperty(),
                         Runnable::run,
-                        Runnable::run,
-                        () -> {}));
+                        Runnable::run));
     }
 
     /** A Visualisation port with no PDV, which says so. */

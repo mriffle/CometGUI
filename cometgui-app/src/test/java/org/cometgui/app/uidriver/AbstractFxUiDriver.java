@@ -286,6 +286,7 @@ abstract class AbstractFxUiDriver implements FxUiDriver {
             case '_' -> new KeyStroke(KeyCode.MINUS, true);
             case '.' -> new KeyStroke(KeyCode.PERIOD, false);
             case '/' -> new KeyStroke(KeyCode.SLASH, false);
+            case ':' -> new KeyStroke(KeyCode.SEMICOLON, true);
             case ',' -> new KeyStroke(KeyCode.COMMA, false);
             case '+' -> new KeyStroke(KeyCode.EQUALS, true);
             case '=' -> new KeyStroke(KeyCode.EQUALS, false);

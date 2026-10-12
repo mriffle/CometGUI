@@ -39,6 +39,7 @@ import org.cometgui.ui.controls.ToolManagerPane;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.derived.ConsolePane;
 import org.cometgui.ui.controls.limelight.LimelightPane;
+import org.cometgui.ui.controls.limelight.LimelightUploadPane;
 import org.cometgui.ui.controls.params.RunControl;
 import org.cometgui.ui.controls.percolator.PercolatorPane;
 import org.cometgui.ui.controls.results.ResultsPane;
@@ -50,6 +51,7 @@ import org.cometgui.ui.viewmodel.NavigationViewModel;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
 import org.cometgui.ui.viewmodel.ToolManagerViewModel;
+import org.cometgui.ui.viewmodel.limelight.LimelightUploadViewModel;
 import org.cometgui.ui.viewmodel.limelight.LimelightViewModel;
 import org.cometgui.ui.viewmodel.params.ExpertViewModel;
 import org.cometgui.ui.viewmodel.params.ParameterEditorViewModel;
@@ -173,6 +175,8 @@ public final class ShellView extends BorderPane {
      * @param visualisation the Visualisation section: PDV's state and drawing the PSM selected in
      *     {@code resultTable}
      * @param limelight the Limelight section: converting the run chosen in {@code results}
+     * @param limelightUpload the Limelight section's upload half: uploading one of that run's
+     *     converted files, only after its destination was shown and Send pressed
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
@@ -195,7 +199,8 @@ public final class ShellView extends BorderPane {
             WeightsViewModel weights,
             DisplayFiltersViewModel displayFilters,
             VisualisationViewModel visualisation,
-            LimelightViewModel limelight) {
+            LimelightViewModel limelight,
+            LimelightUploadViewModel limelightUpload) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
@@ -285,12 +290,15 @@ public final class ShellView extends BorderPane {
 
         /*
          * The Limelight section (phase 12): the conversion of the run chosen in the Results
-         * section above -- that section's choice, not one of its own -- with the upload area below
-         * it. The pane reads nothing on construction; LimelightViewModel.refresh() asks the port,
-         * and the composition root calls it.
+         * section above -- that section's choice, not one of its own -- with the upload half in the
+         * upload area below it. Neither pane reads anything on construction; the view-models'
+         * refresh() asks their ports, and the composition root calls them.
          */
         LimelightPane limelightPane =
                 new LimelightPane(Objects.requireNonNull(limelight, "limelight"));
+        limelightPane.showUpload(
+                new LimelightUploadPane(
+                        Objects.requireNonNull(limelightUpload, "limelightUpload")));
         panes.get(SectionId.LIMELIGHT).addContent(limelightPane);
         VBox.setVgrow(limelightPane, Priority.ALWAYS);
 

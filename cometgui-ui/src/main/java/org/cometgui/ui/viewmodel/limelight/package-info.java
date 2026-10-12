@@ -31,10 +31,21 @@
  *       org.cometgui.ui.viewmodel.limelight.LimelightRunState}, {@link
  *       org.cometgui.ui.viewmodel.limelight.LimelightResult} and {@link
  *       org.cometgui.ui.viewmodel.limelight.LimelightRerun} -- what crosses the port.
+ *   <li>{@link org.cometgui.ui.viewmodel.limelight.LimelightUploadViewModel} (work unit 7) -- the
+ *       upload half: one of the chosen run's converted files, the server, the project and the
+ *       submit key; the destination checked and shown before anything is sent, and sent only on the
+ *       scientist's Send; the live log and the server's identifiers. {@link
+ *       org.cometgui.ui.viewmodel.limelight.LimelightUploadPort} is what the composition root
+ *       implements over {@code org.cometgui.workflow.limelight.LimelightUploads} and this
+ *       computer's credential store; {@link
+ *       org.cometgui.ui.viewmodel.limelight.LimelightUploadPreview} and {@link
+ *       org.cometgui.ui.viewmodel.limelight.LimelightUploaded} cross it. The key is held only as a
+ *       {@code Credential}, admitted to the session the moment it is typed, and never published.
  * </ul>
  *
- * <p>Nothing here hashes, downloads, parses, validates a setting or starts a process: whether a run
- * can convert, every refusal, the q-value cutoff's rule, the checksums and the conversion are the
- * workflow's, reached through the port.
+ * <p>Nothing here hashes, downloads, parses, validates a setting, starts a process or opens a
+ * connection: whether a run can convert, every refusal, the q-value cutoff's rule, the server's and
+ * project's rules, the checksums, the conversion and the upload are the workflow's, reached through
+ * the ports.
  */
 package org.cometgui.ui.viewmodel.limelight;

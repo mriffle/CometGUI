@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import java.util.function.UnaryOperator;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.ComboBox;
@@ -43,6 +44,7 @@ import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.RunningApplication;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
+import org.cometgui.domain.ports.EnvironmentReader;
 import org.cometgui.domain.ports.FileSystemAccess;
 import org.cometgui.domain.ports.ProcessRunner;
 import org.testfx.api.FxToolkit;
@@ -116,12 +118,35 @@ final class ParameterEditorApp {
             BoundedMessageLog log,
             RunWiring.Setup runSetup,
             Path... present) {
+        return launch(build, processes, log, runSetup, UnaryOperator.identity(), present);
+    }
+
+    /**
+     * Starts the application as {@link #launch(BuildIdentity, ProcessRunner, BoundedMessageLog,
+     * RunWiring.Setup, Path...)} does, with the environment it reads chosen by the test: the real
+     * one, passed through {@code environment}.
+     *
+     * @param build the build a saved file's header names
+     * @param processes the process runner; {@code null} for none
+     * @param log the console's log
+     * @param runSetup the Tool Manager and the project directory
+     * @param environment what the application sees of the real environment
+     * @param present the paths to report as readable files
+     * @return the running application
+     */
+    static ParameterEditorApp launch(
+            BuildIdentity build,
+            ProcessRunner processes,
+            BoundedMessageLog log,
+            RunWiring.Setup runSetup,
+            UnaryOperator<EnvironmentReader> environment,
+            Path... present) {
         ScriptedChooser chooser = new ScriptedChooser();
         ApplicationServices real = ApplicationServices.forThisHost();
         ApplicationServices services =
                 new ApplicationServices(
                         real.clock(),
-                        real.environment(),
+                        environment.apply(real.environment()),
                         new PresentFiles(real.fileSystem(), Set.of(present)),
                         real.runIds(),
                         real.glibcVersions(),

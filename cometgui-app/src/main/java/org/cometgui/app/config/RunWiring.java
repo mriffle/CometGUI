@@ -35,6 +35,8 @@ import org.cometgui.domain.ports.ProcessRunner;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.secrets.SecretRedactor;
+import org.cometgui.domain.secrets.SessionCredentialStore;
+import org.cometgui.domain.secrets.SessionSecrets;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.params.comet.model.CometParameters;
@@ -44,11 +46,14 @@ import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
 import org.cometgui.tools.api.JavaRuntime;
+import org.cometgui.tools.credentials.CredentialStores;
 import org.cometgui.tools.limelight.LimelightConverter;
+import org.cometgui.tools.limelight.LimelightUploadClient;
 import org.cometgui.tools.pdv.PdvFigures;
 import org.cometgui.tools.pdv.derived.PdvController;
 import org.cometgui.ui.viewmodel.limelight.LimelightPort;
 import org.cometgui.ui.viewmodel.limelight.LimelightRerun;
+import org.cometgui.ui.viewmodel.limelight.LimelightUploadPort;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
@@ -62,6 +67,7 @@ import org.cometgui.workflow.engine.EngineServices;
 import org.cometgui.workflow.engine.WorkflowEngine;
 import org.cometgui.workflow.limelight.LimelightConversions;
 import org.cometgui.workflow.limelight.LimelightProvisioning;
+import org.cometgui.workflow.limelight.LimelightUploads;
 import org.cometgui.workflow.pdv.PdvLaunches;
 import org.cometgui.workflow.pdv.PdvMzTabs;
 import org.cometgui.workflow.pdv.PdvWindows;
@@ -462,6 +468,76 @@ public final class RunWiring {
         }
         return new ProjectLimelightPort(
                 project, () -> tools, toolsUnavailable, conversions, none, engine, lines);
+    }
+
+    /**
+     * The Limelight section's upload port (phase 12, work unit 7): the run's converted files, the
+     * destination checked and the confirmed upload through {@link LimelightUploads} -- the one
+     * upload path, over the session's one hasher and the in-JVM submit-import client -- with every
+     * typed key admitted to the session's one {@link SessionSecrets}, and kept, when the scientist
+     * asks, in the credential store {@link CredentialStores#forThisComputer} chooses for this
+     * computer. The store is chosen on first use, off the interface thread, because choosing it may
+     * start {@code secret-tool}; without a process service or a recognised platform it is the
+     * session store, and the scientist is told why.
+     *
+     * @param services the composition root: its process service, clock and environment
+     * @param project the session's project
+     * @param hashes the session's one hasher
+     * @param engine the session's engine: an executing run is not uploaded
+     * @param secrets the session's one set of admitted credentials
+     * @return the port
+     */
+    public static LimelightUploadPort limelightUpload(
+            ApplicationServices services,
+            ProjectSession project,
+            HashService hashes,
+            SessionEngine engine,
+            SessionSecrets secrets) {
+        Objects.requireNonNull(services, "services");
+        Objects.requireNonNull(project, "project");
+        Objects.requireNonNull(hashes, "hashes");
+        Objects.requireNonNull(engine, "engine");
+        Objects.requireNonNull(secrets, "secrets");
+        LimelightUploads uploads =
+                new LimelightUploads(
+                        new LimelightUploadClient(),
+                        hashes,
+                        secrets,
+                        services.clock(),
+                        engine::executingRuns);
+        return new ProjectLimelightUploadPort(
+                project, uploads, secrets, () -> credentialStore(services, project, secrets));
+    }
+
+    /** This computer's credential store, and why it is that one. */
+    static CredentialStores.Choice credentialStore(
+            ApplicationServices services, ProjectSession project, SessionSecrets secrets) {
+        Optional<HostPlatform> host =
+                HostPlatform.of(
+                        services.environment().osName().orElse(""),
+                        services.environment().osArch().orElse(""));
+        if (host.isEmpty()) {
+            return new CredentialStores.Choice(
+                    new SessionCredentialStore(),
+                    "The key is kept for this session only: this machine's operating system and"
+                            + " architecture are not ones CometGUI recognises.");
+        }
+        if (services.processRunner().isEmpty()) {
+            return new CredentialStores.Choice(
+                    new SessionCredentialStore(),
+                    "The key is kept for this session only: this application was composed without"
+                            + " a process service, so no keyring tool can be started.");
+        }
+        // secret-tool is started in the user's home, which exists; the project's may not yet
+        Path home =
+                services.environment()
+                        .systemProperty("user.home")
+                        .filter(value -> !value.isBlank())
+                        .map(Path::of)
+                        .filter(Path::isAbsolute)
+                        .orElse(project.directory());
+        return CredentialStores.forThisComputer(
+                host.get(), services.environment(), services.processRunner().get(), secrets, home);
     }
 
     /**
