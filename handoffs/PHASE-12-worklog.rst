@@ -280,6 +280,35 @@ P12-18 -- the converter reads a copy of the pout XML without the pepXML director
     ``<command_line>`` loses the directory too); a run directory containing
     an XML-special character is refused.
 
+Design decisions from unit 5 (2026-10-12)
+=========================================
+
+P12-19 -- plain http only to this computer
+    The submit key travels inside every request body, so the client refuses
+    an ``http://`` server that is not loopback; ``https`` is required
+    elsewhere. An http-only Limelight instance is therefore unreachable;
+    relaxing it is a one-line change and the owner's to ask for. Flagged to
+    tier 1.
+
+P12-20 -- what the client sends and keeps
+    The local file path is **not** sent (the real importer sends absolute
+    and canonical paths; the server stores them only as nullable tracking
+    columns, and they disclose the user's name and directory layout);
+    ``submitterSameMachine="false"``. Redirects are never followed. The real
+    server's wrong-key message quotes the key's first two characters and is
+    passed through as the server's words; the full key is always redacted.
+
+P12-21 -- the process service accepts standard input
+    ``ProcessRunner.startWithInput`` (a default method on the port) and
+    ``ProcessService`` absorbing a broken pipe on standard input, so the
+    Secret Service store passes the secret on stdin. Credentials:
+    ``domain.secrets.SessionSecrets.admit`` is the only way to make a
+    ``Credential`` and registers it with the redactor first;
+    ``CredentialStore`` port in ``domain.secrets``; ``SessionCredentialStore``
+    the default; ``tools.credentials.SecretToolCredentialStore`` on Linux
+    where ``secret-tool``, a session bus and a clean probe exist (proved only
+    against a scripted stand-in); macOS and Windows session-only.
+
 Work units
 ==========
 
@@ -351,7 +380,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        the fake's schema check and reported, a seeded credential absent from
        every file written.
      - R-SEC-03, R-SEC-04; gate 6, 7 (model); AC-LL-06
-     -
+     - Accepted, ``41edbf4`` ``76dcfdd`` ``692b67b``
    * - 6
      - **The Limelight section, conversion half.** View-model, pane, the
        app's port. Compatibility first: disabled controls and the
@@ -594,6 +623,68 @@ Unit 4 sign-off
   interface's (unit 6).
 
 Unit 5 sign-off
+---------------
+
+**Accepted 2026-10-12.** Commits ``41edbf4`` (55 files), ``76dcfdd``,
+``692b67b``. Client ``tools.limelight.LimelightUploadClient`` with
+``LimelightServer``, ``SubmitImportWire``, typed outcomes;
+``tools.credentials``; ``domain.secrets`` ``Credential``, ``CredentialStore``,
+``SessionCredentialStore``, ``SessionSecrets``; ``workflow.limelight.LimelightUploads``
+with ``LimelightDestination`` -> single-use ``LimelightUploadConfirmation``;
+three event types ``limelight.uploading``/``uploaded``/``unuploaded``; the
+fake ``FakeLimelightServer``, ``LoopbackGuard`` (auto-registered JUnit
+extension: the test JVM's http(s) proxy is a loopback sinkhole, loopback
+exempt, and a test fails if the sinkhole caught anything) and
+``FakeCopiesAreIdenticalTest`` in ``cometgui-tools`` with a byte-identical
+copy in ``cometgui-workflow``; archtests forbidding a product class to set a
+proxy or choose its own, and to use the client outside the upload service.
+
+* **Diff read**: the key is read (``reveal()``) only in the client's request
+  bodies/upload header and in the upload service's redactor; no URL, argv
+  or ``toString`` carries it; ``.proxy(ProxySelector.getDefault())``. No POM
+  (no test-jar), gate script or record touched; no module edge.
+  ``junit-platform.properties`` turns on extension auto-registration for the
+  two modules' tests.
+* **Tests, run by me** (``install`` with tests, nine modules): domain 1180,
+  provenance 677 (2 skipped, pre-existing), process 281, tools and the
+  other modules through workflow (917) -- **0 failures** in every module;
+  archtests **40, 0 failures**.
+* **My injections** (production code, anchor unique and gone, restored and
+  ``sha256sum -c`` OK):
+
+  - P1 ``LimelightServer`` accepting plain http to any host: 1 failure,
+    ``LimelightServerTest.plainHttpOnlyToLoopback`` (146 limelight tests run).
+  - P3 the client ignoring the initialise step's refusal: 1 failure,
+    ``LimelightUploadClientTest.laterStepsAnswerForThemselves``.
+  - P2 ``UploadLog`` writing lines without its own redaction: **green** (15
+    upload tests). Every line it receives is already redacted (the outcome
+    is redacted before it is logged; the client's progress lines carry no
+    secret), so this layer is redundant and untestable from outside.
+    Recorded as residue; the leak test's walk of every file still proves
+    the gate-7 property.
+
+* **Targeted PIT, by me**: tools (credentials, server, client, wire) 186,
+  175 KILLED, 4 TIMED_OUT, 4 SURVIVED (a describe branch, ``Arrays.fill``
+  zeroing, a cancellation after a ``secret-tool`` timeout, the stderr cap
+  boundary), 3 NO_COVERAGE (interrupt and ``onError`` paths); workflow
+  (``LimelightUpload*``, ``LimelightDestination*``) 80, 76 KILLED, 3
+  SURVIVED (a progress boundary, ``Writer.flush``/``close``), 1
+  NO_COVERAGE. The same as the agent's.
+* **Harnesses, run by me**: ``quality`` 42 PASS (141 s), ``provenance`` 24
+  PASS (235 s), ``workflow`` 110 PASS (503 s).
+* **Files outside the modules the tests read**: tools --
+  ``scratch/phase05/artefacts/v2.8.1__cometPercolator2LimelightXML.jar``,
+  ``scratch/limelight-upload-spike/artefacts/v8.3.1__limelightSubmitImport.jar``
+  (the real importer against the fake), ``scratch/scientific-path/limelight/limelight.xml``,
+  ``scratch/scientific-path/corrupt/*.xml``,
+  ``scripts/spikes/limelight_upload_spike/submit-import-wire-v16.xsd``,
+  other modules' ``src/test`` (the drift test), ``/bin/bash`` and
+  ``/bin/sleep``; workflow -- the converter JAR, ``scratch/scientific-path``,
+  ``cometgui-tools/src/test`` (drift). **The ``tests`` sandbox must carry
+  ``scratch/limelight-upload-spike/`` and every module's ``src/test``** --
+  checked at the phase-end ``--only tests`` run.
+
+Unit 6 sign-off
 ---------------
 
 Pending.
