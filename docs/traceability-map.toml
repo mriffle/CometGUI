@@ -402,13 +402,13 @@ note = "Phase 08. Scenario (a): changing only the PSM and peptide display filter
 kind = "test"
 class = "org.cometgui.workflow.state.RerunPreviewTest"
 method = "percolatorParametersRerunPercolatorAndDownstream"
-note = "Phase 08. Scenario (b): Percolator parameters re-execute Percolator and downstream, never Comet, with hand-typed sets. Computed over the declared graph; the Percolator and Limelight steps are not yet implemented (phases 09-12)."
+note = "Phase 08. Scenario (b): Percolator parameters re-execute Percolator and downstream, never Comet, with hand-typed sets. Computed over the declared graph. The Percolator steps were implemented in phase 09; convert-limelight and upload-limelight stay declared and are never planned, because phase 12 made conversion and upload actions the scientist starts on a finished run."
 
 [[ac."AC-WF-04".evidence]]
 kind = "test"
 class = "org.cometgui.workflow.state.RerunPreviewTest"
 method = "xmlCapablePercolatorRerunsFromThePreservedMergedPin"
-note = "Phase 08. Scenario (c): an XML-capable Percolator re-runs Percolator from the preserved merged PIN, then conversion; Comet and the merge are reused. Computed over the declared graph; the Percolator and Limelight steps are not yet implemented (phases 09-12)."
+note = "Phase 08. Scenario (c): an XML-capable Percolator re-runs Percolator from the preserved merged PIN, then conversion; Comet and the merge are reused. Computed over the declared graph. The Percolator steps were implemented in phase 09; convert-limelight and upload-limelight stay declared and are never planned, because phase 12 made conversion and upload actions the scientist starts on a finished run."
 
 [[ac."AC-WF-04".evidence]]
 kind = "test"
@@ -420,7 +420,7 @@ note = "Phase 08. Scenario (d): changed Comet parameters re-execute Comet and ev
 kind = "test"
 class = "org.cometgui.workflow.state.RerunPreviewTest"
 method = "limelightCutoffRerunsConversionAndUpload"
-note = "Phase 08. Scenario (e): changing only the Limelight q cutoff re-executes conversion and upload (and the provenance append), nothing else. Computed over the declared graph; the Percolator and Limelight steps are not yet implemented (phases 09-12)."
+note = "Phase 08. Scenario (e): changing only the Limelight q cutoff re-executes conversion and upload (and the provenance append), nothing else. Computed over the declared graph. The Percolator steps were implemented in phase 09; convert-limelight and upload-limelight stay declared and are never planned, because phase 12 made conversion and upload actions the scientist starts on a finished run."
 
 [[ac."AC-WF-04".evidence]]
 kind = "test"
@@ -764,28 +764,118 @@ note = "Phase 11 unit 6. The run-level path the product uses (PdvMzTabs.prepare 
 # --- AC-LL ------------------------------------------------------------------
 
 [[ac."AC-LL-01".evidence]]
-kind = "planned"
-phase = "12"
+kind = "test"
+class = "org.cometgui.app.config.LimelightFirstUseInstallTest"
+method = "firstUseInstallsThePinnedConverter"
+note = "Phase 12 unit 3. From an EMPTY tool cache the Limelight converter v2.8.1 installs on first use through the product's own Tool Manager over the shipped manifest -- the real downloader, SHA-256 check, atomic install and identity probe -- fetching the real pinned JAR through a loopback artefact server, reached through LimelightProvisioning; the installed JAR's SHA-256 is the pinned one and the converter is usable, and an installed JAR that no longer verifies is not offered as installed. theInstallIsCancellable: a cancelled install leaves nothing installed and can be started again. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-01".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.LimelightConversionUiTest"
+method = "gate1"
+note = "Phase 12 unit 6, gate item 1 through the interface. In the launched application, Convert installs the converter from an empty cache and then converts the real run; the file is valid against the schema inside the installed JAR, holds the run's PSMs, and hashes to the SHA-256 the section shows. Real Comet 2026.03.0, Percolator 3.07.1 and converter v2.8.1. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
 
 [[ac."AC-LL-02".evidence]]
-kind = "planned"
-phase = "12"
+kind = "test"
+class = "org.cometgui.workflow.steps.RealLimelightConversionTest"
+method = "gate1ARealConversion"
+note = "Phase 12 unit 3, gate item 1. A real CometGUI run (Comet 2026.03.0 on the D-006 K562 fixture, then Percolator 3.07.1 with Limelight conversion on) converted through LimelightConversions by the real converter v2.8.1: a valid Limelight XML (root limelight_input, valid against the XSD read from the installed JAR) holding every target PSM of the run's own Percolator table, recorded in a limelight.converted event with this test's own MD5 and SHA-256, -q 0.01 and -d <run>/outputs/comet in the recorded argv. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-02".evidence]]
+kind = "test"
+class = "org.cometgui.tools.limelight.LimelightConverterRealTest"
+method = "aRealConversion"
+note = "Phase 12 unit 2, the adapter alone. The real converter v2.8.1 converts Phase 00's K562 run at the default cutoff; the output is kept, schema-valid, and matches Phase 00's counts. The same class shows the exit status cannot be trusted (noArgumentsExitZero, anUnknownOptionExitsZero) and that a real failure leaves nothing (aRealFailure). Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-02".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.LimelightConversionUiTest"
+method = "aRealRunAndGate8"
+note = "Phase 12 unit 6. A real search with Percolator 3.07.1 and Limelight on, run through the interface, is shown convertible in the Limelight section, with the default cutoff 0.01 and decoy import disabled with its explanation; gate1 in the same class then converts it. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
 
 [[ac."AC-LL-03".evidence]]
-kind = "planned"
-phase = "12"
+kind = "test"
+class = "org.cometgui.workflow.limelight.LimelightCompatibilityTest"
+method = "noXmlCapability"
+note = "Phase 12 unit 4. A 3.09 run with Limelight enabled is not convertible, explained in Phase 09's recorded words before any attempt, with the rerun offered labelled with what resolution returns. notFromTheSelection: a 3.09 run stays not convertible even when an XML-capable 3.07.1 is selected and installed now (read from the run, not the selection); capableButLimelightOff, poutMissing and poutNotComplete cover the other reasons. No binary is run."
+
+[[ac."AC-LL-03".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealLimelightCompatibleRerunTest"
+method = "gate3TheExplanationAndTheOfferedAction"
+note = "Phase 12 unit 4, gate item 3 (model). A real run with Percolator 3.09 registered as a local binary is not convertible, in Phase 09's recorded words, and the offered action is the rerun with the version resolution returns here, 3.07.1; aConversionOfTheOriginalIsRefusedFirst shows a conversion attempt is refused before any converter process starts. Real Comet 2026.03.0, Percolator 3.09 and 3.07.1. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-03".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.LimelightRerunUiTest"
+method = "gate3"
+note = "Phase 12 unit 6, gate item 3 through the interface. For a real 3.09 run, before any attempt, the explanation is shown, every conversion control is disabled, and the action is labelled as resolution labels it; nothing is launched. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
 
 [[ac."AC-LL-04".evidence]]
-kind = "planned"
-phase = "12"
+kind = "test"
+class = "org.cometgui.workflow.steps.RealLimelightCompatibleRerunTest"
+method = "gate4TheRerunConverts"
+note = "Phase 12 unit 4, gate item 4. The compatible rerun of a real 3.09 run uses Percolator 3.07.1, which writes pout XML; the derived run is convertible and its real conversion is a valid Limelight XML holding every target PSM of its own table; Comet was launched zero more times. gate4BothExecutionsInProvenance: both Percolator executions are recorded with distinct version, binary SHA-256 and argv, the original's provenance.json byte for byte unchanged, the derived run naming it in derivedFrom, and the merged PIN at its recorded SHA-256. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-04".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.LimelightRerunUiTest"
+method = "gate4"
+note = "Phase 12 unit 6, gate item 4 through the interface. The offered rerun installs 3.07.1 only when chosen, reruns Percolator alone in a new run, and that run converts to valid Limelight XML; provenance shows both Percolator executions. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-04".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.LimelightRerunUiTest"
+method = "noManagedBuild"
+note = "Phase 12 unit 6, R-LL-02 through the interface. Where no XML-capable build can be obtained, registration is offered and no rerun, and the action starts the Percolator section's local-binary registration. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-04".evidence]]
+kind = "test"
+class = "org.cometgui.params.percolator.resolution.CompatibilityActionTest"
+method = "noManagedBuildForThisPlatform"
+note = "Phase 12 unit 4, R-LL-02. When no managed build for this platform claims XML_OUTPUT, local-binary registration is offered, no rerun, and the explanation says plainly that no managed build exists for this platform. whateverResolutionReturns and aFutureBuild show the rerun's label names the resolved version (3.08.2, 3.10), never a literal 3.07.1; aLocalClaimIsNotAManagedBuild, anInferredManagedClaim and aFailedManagedBuild grade the boundary. No binary is run."
 
 [[ac."AC-LL-05".evidence]]
-kind = "planned"
-phase = "12"
+kind = "test"
+class = "org.cometgui.workflow.limelight.LimelightConversionsTest"
+method = "gate5TheDefault"
+note = "Phase 12 unit 3, gate item 5. With nothing saved the Limelight cutoff is 0.01 and reaches -q and the file. gate5ChangingTheLimelightCutoff: changing it writes only results/limelight-settings.json and changes the next conversion's -q and the file's PSM q-value filter, and no display filter; gate5ChangingTheDisplayFilters: changing the display filters writes only the view state and changes no Limelight cutoff. Run against a scripted converter; Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-05".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.storage.LimelightSettingsTest"
+method = "defaults"
+note = "Phase 12 unit 3. The settings' defaults are q 0.01 and every option off; theStore: nothing saved reads as the defaults."
+
+[[ac."AC-LL-05".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.steps.RealLimelightConversionTest"
+method = "gate5TheCutoffReachesTheRealFile"
+note = "Phase 12 unit 3, gate item 5 with the real converter. A changed Limelight cutoff reaches the next real conversion's -q and its file's PSM q-value filter, filters no PSM, and leaves the display filters alone. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.LimelightConversionUiTest"
+method = "gate5"
+note = "Phase 12 unit 6, gate item 5 through the interface. The PSM and peptide display filters read 0.01; the Limelight cutoff is set to 0.05 in the Limelight section and saved, the display filters and the result counts do not move, the next real conversion's file carries 0.05 and the first still 0.01, and moving the PSM display filter afterwards leaves the cutoff at 0.05. (aRealRunAndGate8 in the same class asserts the section shows 0.01 by default.) Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
 
 [[ac."AC-LL-06".evidence]]
-kind = "planned"
-phase = "12"
+kind = "test"
+class = "org.cometgui.workflow.limelight.LimelightUploadLeakTest"
+method = "theSeededCredentialIsInNoFile"
+note = "Phase 12 unit 5, gate item 7 (model). After a conversion, an upload to the loopback fake and an upload the fake refuses, a seeded credential admitted through SessionSecrets is found in no file under the test's root -- the project with its run (logs, events, provenance, outputs, results), the inputs, the converter's cache and the application's log and configuration directories, found by walking the tree -- in UTF-8, Base64 (standard and URL-safe), URL-encoded or UTF-16 form. theSearchFindsAPlantedCredential is the control: a credential planted in any form is found, in that file. The fake is the D-007 local endpoint; nothingLeftTheMachine asserts the loopback guard caught nothing. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-06".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.LimelightUploadUiTest"
+method = "gate7"
+note = "Phase 12 unit 7, gate item 7 through the interface. After a refused upload, two successful uploads to the loopback fake (one with the kept key) and two Results exports, the seeded key is in no text of the window (more than 1000 read, the password field empty), no console message, and no file under the project, the tool cache and the test's temporary root, nor any file written since the class started under the JVM temporary directory and the home directory, in any form; theSearchFindsEveryForm is the control. Linux only (@EnabledOnOs(LINUX)), Windows and macOS not run."
+
+[[ac."AC-LL-06".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.limelight.LimelightUploadsTest"
+method = "theServersWordsAreRedacted"
+note = "Phase 12 unit 5. A server message that quotes the key is written [REDACTED] in the upload log, the events and the outcome."
 
 # --- AC-PRV -----------------------------------------------------------------
 

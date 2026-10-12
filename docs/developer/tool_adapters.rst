@@ -17,7 +17,9 @@ Tool adapters
    controller derived from CasanovoGUI, and the mzTab exporter -- is described
    on :doc:`pdv_integration`; every PDV launch goes through the service
    described here, by way of the one recording launch path. The Limelight
-   converter adapter is owned by phase 12 and is not written yet.
+   converter adapter (Phase 12) -- its command, output judge and schema --
+   is described on :doc:`limelight_integration`; every conversion is started
+   through the service described here, by way of the one conversion path.
    Everything a tool adapter does with a subprocess, it does through the
    service described here.
 
@@ -313,9 +315,12 @@ to running a process:
   ``"`` arrives in the rendered text as ``\"`` and a literal search for the
   registered value no longer matches it -- the secret would then be printed,
   escaped, in full.
-* **A run with no registered secret pays nothing per line.** Comet, Percolator
-  and PDV take no credential; the Limelight upload is the only tool that will
-  ever register one. With an empty registry the per-line path returns its
+* **A run with no registered secret pays nothing per line.** Comet,
+  Percolator, PDV and the Limelight converter take no credential. The one
+  credential the application holds, the Limelight submit-import key (Phase
+  12), never reaches a process's arguments: the upload is made in the JVM,
+  and the Linux keyring store hands it to ``secret-tool`` on standard input
+  (``ProcessRunner.startWithInput``; see :doc:`limelight_integration`). With an empty registry the per-line path returns its
   argument by reference and scans nothing, so a stage emitting 500 MB does not
   pay for a feature no tool in the workflow uses.
 

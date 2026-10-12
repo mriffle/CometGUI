@@ -22,9 +22,9 @@ not the newest one and why, and records the choice.**
    CometGUI on Windows or macOS yet, so on those platforms this page describes
    what the application is built to do. The results tables and the learned
    weights view, built in Phase 10, have their own pages (:doc:`results`,
-   :doc:`learned_feature_weights`); Limelight conversion is not built yet
-   (:doc:`limelight`). This page says only what the Percolator section itself
-   does.
+   :doc:`learned_feature_weights`), and so, since Phase 12, has Limelight
+   conversion (:doc:`limelight`). This page says only what the Percolator
+   section itself does.
 
 .. contents:: Contents
    :depth: 2
@@ -109,7 +109,8 @@ the capability "writes Percolator XML" (the full list is on
 :doc:`reference/percolator_options`).
 
 The switch only decides which Percolator runs and whether it is asked for XML.
-The conversion itself is a later part of CometGUI (:doc:`limelight`).
+The conversion itself is done in the Limelight section (:doc:`limelight`), and
+only a run whose Percolator wrote XML can be converted there.
 
 When a newer version was passed over
 ------------------------------------
@@ -320,7 +321,9 @@ rerun will do before it starts, and then:
 The same button reruns Percolator with other settings or another build in
 general; it is refused when nothing that Percolator depends on has changed. It
 works from the last run of the current session. A rerun cannot itself be
-rerun; rerun the original instead.
+rerun; rerun the original instead. The Limelight section offers the same rerun
+for the run chosen in Results, labelled with the version it will use (for
+example **Rerun Percolator with 3.07.1 for Limelight**; :doc:`limelight`).
 
 What is kept, and what is recorded
 ==================================

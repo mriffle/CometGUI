@@ -48,10 +48,13 @@ A project holds mutable user intent and immutable run records
                     comet/<base>.pin
                     percolator/      Percolator's raw outputs, read-only once it
                                      succeeded (a run with Percolator only)
+                    limelight/       one Limelight XML per conversion, read-only
                 logs/
                     comet-01.log     one log per Comet invocation (see below)
                     comet-02.log
                     percolator.log   the Percolator invocation's log
+                    limelight-converter.log   a conversion's log (see below)
+                    limelight-upload.log      an upload's log (see below)
                 provenance/
                     provenance.json  the provenance manifest
                     provenance.rst   the provenance report
@@ -59,6 +62,9 @@ A project holds mutable user intent and immutable run records
                 results/             what CometGUI derives from the results (see below)
                     index/           the result stores' index files
                     view-state.json  the run's display-filter values
+                    limelight-settings.json
+                                     the run's Limelight conversion settings
+                    limelight/       the converter's input, only while it runs
                 exports/             filtered exports, new files, never overwritten
                 pdv/                 PDV's working files (see below)
                     mztab/           the mzTab and MGFs PDV's window is given
@@ -347,6 +353,31 @@ spectrum files, because PDV writes beside its own inputs:
 Every PDV launch is recorded in ``provenance/events.log`` as a
 ``pdv.launched`` event before PDV starts. The formats and the rules are in
 :ref:`user-pdv` and :ref:`dev-pdv-integration`.
+
+What the Limelight section writes (phase 12), only when the scientist converts
+or uploads a finished run:
+
+* ``outputs/limelight/limelight-<n>.xml`` -- one new file per conversion,
+  ``n`` one more than any used before, made read-only once it has passed
+  validation; never overwritten. (The scientist may name an absolute path
+  elsewhere instead.) While the converter runs it writes
+  ``<output>.partial`` beside the output, which is moved into place only after
+  validation and deleted otherwise.
+* ``results/limelight-settings.json`` -- the Limelight q-value cutoff and the
+  converter's options for the run's next conversion, schema version 1, kept
+  apart from ``view-state.json``. A file this build cannot read is refused,
+  never replaced; removing it restores the defaults.
+* ``results/limelight/`` -- a copy of the Percolator XML the converter is
+  given, with the pepXML directory removed from its PSM ids, for the length of
+  one conversion; deleted afterwards.
+* ``logs/limelight-converter.log``, ``limelight-converter.1.log``, ... and
+  ``logs/limelight-upload.log``, ``limelight-upload.1.log``, ... -- one log
+  per conversion and per upload, never overwritten.
+
+Each conversion and each upload is recorded in ``provenance/events.log`` by
+``limelight.*`` events (:ref:`ref-provenance-format-event-types`). Nothing the
+section writes holds the submit key. The rules are in :ref:`user-limelight`
+and :ref:`dev-limelight-integration`.
 
 .. _ref-project-format-exports:
 

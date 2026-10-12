@@ -68,7 +68,9 @@ deliberately does not.
        ``-N`` base names, the run descriptor), ``project`` (the project
        descriptor, lock owner, schema-version policy) and ``params`` (the
        pre-run facts: ``FastaDecoyCensus``, ``CometIndexDescription``,
-       ``PreRunFacts``). ``provenance`` and ``results`` are empty.
+       ``PreRunFacts``). Since Phase 12 ``secrets`` also holds the session's
+       credentials (``SessionSecrets``, ``Credential``, the
+       ``CredentialStore`` port). ``provenance`` and ``results`` are empty.
 
    * - ``cometgui-process``
      - ``org.cometgui.tools.process``
@@ -95,8 +97,10 @@ deliberately does not.
        gate, the MGF re-encoding, the CLI figure command and the mzTab
        exporter, with ``pdv.derived`` holding the ``denovo-gui`` command and
        controller derived from CasanovoGUI (Phase 11; see
-       :doc:`pdv_integration`). The Limelight adapter (Phase 12) is not
-       built.
+       :doc:`pdv_integration`) -- and since Phase 12 ``limelight`` -- the
+       converter command, the output judge and schema, and the in-JVM upload
+       client -- and ``credentials``, the Linux keyring store (see
+       :doc:`limelight_integration`).
 
    * - ``cometgui-install``
      - ``org.cometgui.install``
@@ -141,7 +145,10 @@ deliberately does not.
        :doc:`workflow_engine`. Since Phase 11 ``pdv``: PDV through the Tool
        Manager, the one recording launch path (``PdvLaunches``), a PSM's
        figure, a run's mzTab and the live windows; see
-       :doc:`pdv_integration`.
+       :doc:`pdv_integration`. Since Phase 12 ``limelight``: the one
+       conversion path (``LimelightConversions``) and the one upload path
+       (``LimelightUploads``), and in ``storage`` a run's Limelight settings;
+       see :doc:`limelight_integration`.
 
    * - ``cometgui-ui``
      - ``org.cometgui.ui``
@@ -154,9 +161,11 @@ deliberately does not.
        (``viewmodel.percolator``, ``controls.percolator``) behind
        ``PercolatorPort`` and ``PercolatorRerunPort``, since Phase 10 the
        Results section (``viewmodel.results``, ``controls.results``) behind
-       ``ResultsPort``, and since Phase 11 the Visualisation section
+       ``ResultsPort``, since Phase 11 the Visualisation section
        (``viewmodel.visualisation``, ``controls.visualisation``) behind
-       ``VisualisationPort``. ``dialogs`` is empty.
+       ``VisualisationPort``, and since Phase 12 the Limelight section
+       (``viewmodel.limelight``, ``controls.limelight``) behind
+       ``LimelightPort`` and ``LimelightUploadPort``. ``dialogs`` is empty.
 
    * - ``cometgui-app``
      - ``org.cometgui.app``
@@ -165,9 +174,11 @@ deliberately does not.
        Phase 08 ``config`` wires the engine to the Run section
        (``RunWiring``, ``WorkflowRunPort``, ``ProjectSession``), since
        Phase 09 the Percolator section (``ToolManagerPercolatorPort``),
-       since Phase 10 the Results section (``ProjectResultsPort``), and since
+       since Phase 10 the Results section (``ProjectResultsPort``), since
        Phase 11 the Visualisation section (``ProjectVisualisationPort``,
-       ``PdvDisplay``).
+       ``PdvDisplay``), and since Phase 12 the Limelight section
+       (``ProjectLimelightPort``, ``ProjectLimelightUploadPort``, with
+       ``ProjectRuns`` shared by the run-based ports).
 
    * - ``cometgui-archtests``
      - ``org.cometgui.archtests``

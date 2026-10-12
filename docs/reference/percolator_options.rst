@@ -209,9 +209,11 @@ What is never passed
        -Z`` without the converter's ``--import-decoys`` fails; and
        ``--import-decoys`` cannot work with Comet's internal decoys, which is
        the product's configuration. Decoy results are kept in the decoy tables
-       instead. The probe still establishes ``XML_DECOY_OUTPUT``, so if Phase 12
-       finds a configuration that needs decoys in the XML, the option already
-       has a capability to be checked against.
+       instead. The probe still establishes ``XML_DECOY_OUTPUT``, so a later
+       configuration that needs decoys in the XML has a capability to be
+       checked against. Phase 12 did not add one: the Limelight section keeps
+       decoy import disabled, with this reason, for every run whose pout XML
+       holds no decoys (:doc:`../limelight`).
    * - ``--xml-in`` and the other XML *input* options (``--stdinput-xml``,
        ``--no-schema-validation``)
      - ``--xml-in`` is the pin-XML *reader*, which is what a ``noxml`` build

@@ -71,7 +71,9 @@ Where the code is
        ``DownstreamStage``, ``PercolatorResolver``, ``PercolatorResolution``,
        ``SkippedVersion``, ``MissingCapability``, ``StageAvailability``,
        ``StageRemedy``, ``ResolutionChange``, ``ResolutionMessages``,
-       ``AdvisoryRendering``. PIT and coverage gates on.
+       ``AdvisoryRendering``, and since Phase 12 ``CompatibilityAction``
+       (`The action offered for a run that cannot feed a stage (Phase 12)`_).
+       PIT and coverage gates on.
 
    * - ``org.cometgui.results.parser``, ``.filtering`` (``cometgui-results``)
      - The PSM/peptide table reader and the weights reader (the parsers' one
@@ -313,6 +315,37 @@ Skipped versions, availability and change notices
 (``forSelection``) and records them under ``percolator.advisory.<id>``
 (``forProvenance``); nothing decides in code which version has which
 advisory.
+
+.. _dev-version-capabilities-compatibility-action:
+
+The action offered for a run that cannot feed a stage (Phase 12)
+-----------------------------------------------------------------
+
+``CompatibilityAction.forStage(offers, stage)`` answers what a scientist is
+offered when a *finished* run's Percolator wrote nothing a stage reads -- for
+the Limelight section, a run without pout XML (``R-LL-01``, ``R-LL-02``). It
+resolves a run with only that stage enabled over the offers given, and never
+looks at a platform name or a version number:
+
+* stage available -> ``Kind.RERUN_PERCOLATOR`` with the build resolution
+  selected, labelled by ``ResolutionMessages.rerunLabel``: "Rerun Percolator
+  with " + the build as resolution names it + " for " +
+  ``DownstreamStage.purpose()`` -- "Rerun Percolator with 3.07.1 for
+  Limelight" on the Linux set today, a hypothetical 3.08.2 or an unreleased
+  3.10 by the same code (``CompatibilityActionTest``). The action is Phase
+  09's compatible rerun, reached through ``PercolatorRerun.compatibleChoice``;
+  a build that is not installed is installed when the rerun is chosen;
+* otherwise -> ``Kind.REGISTER_LOCAL_BINARY`` and no build, labelled "Register
+  a local Percolator binary for Limelight". Its explanation opens with "No
+  managed Percolator build that can write XML_OUTPUT exists for this
+  platform" when no **managed** offer here claims the capability (a
+  registered local binary's claim does not count), or with
+  ``ResolutionMessages.notObtainable`` when a managed build claims it but
+  failed, cannot be used here or has not been observed to have it, followed
+  by the resolver's own explanation.
+
+Which run is compatible is decided from the run's record, not here; see
+:doc:`limelight_integration`.
 
 Settings and the command
 ========================

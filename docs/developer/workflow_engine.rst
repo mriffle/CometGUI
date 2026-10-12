@@ -37,6 +37,17 @@ the authority on what is required; where the build differs, this page says so.
    (`The results step: finalise-results`_). Every later step remains
    unimplemented (Phases 11 and 12).
 
+   **Amended in Phase 12** (2026-10-12, work unit 8): ``launch-pdv``,
+   ``convert-limelight`` and ``upload-limelight`` are still declared and are
+   never planned. PDV (Phase 11) and Limelight conversion and upload (Phase
+   12) are started by the scientist from a *finished* run, outside the
+   engine, and recorded as events in the run's ``events.log``; see
+   :doc:`pdv_integration` and :doc:`limelight_integration`. The rerun
+   scenarios below that name those steps are computed over the declared graph
+   only. The Limelight section's compatible rerun is the derived run described
+   in `Derived runs: the compatible-version Percolator rerun`_, reached through
+   ``PercolatorRerun.compatibleChoice``.
+
 The on-disk formats this page refers to have their own references:
 :doc:`../reference/project_format` (the project, ``run.json``, the lock and the
 index cache) and :doc:`../reference/provenance_format` (``provenance.json`` and

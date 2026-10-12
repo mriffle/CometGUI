@@ -1123,7 +1123,7 @@ members always in this order.
 
    * - ``type``
      - string
-     - What happened; one of the ten
+     - What happened; one of the sixteen
        :ref:`event types <ref-provenance-format-event-types>`.
 
    * - ``payload``
@@ -1221,6 +1221,65 @@ Event types
        ``decoy-pepxml`` or ``spectra``), ``.path``, ``.md5`` and ``.sha256``;
        and ``psms.target``, ``psms.decoy``, ``psms.in`` and ``psms.out``. An
        mzTab that is reused unchanged is not recorded again.
+
+   * - ``limelight.converting``
+     - A Limelight conversion of the run is about to start (added in phase
+       12), written **before** the converter process is started. The payload
+       holds ``run.id``, ``tool`` (``limelight-converter``), ``tool.version``
+       (as the converter reports it), ``converter.jar.path``,
+       ``converter.jar.md5``, ``converter.jar.sha256``, ``converter.java``,
+       ``argv.count`` and ``argv.0`` .. ``argv.<n-1>`` (redacted),
+       ``process.working-directory``, ``process.environment``,
+       ``limelight.q-cutoff``, ``limelight.import-decoys``,
+       ``limelight.independent-decoy-prefix`` (only when set),
+       ``limelight.open-mod``, ``input.count`` and per input
+       ``input.<n>.role`` (``comet-params``, ``percolator-xml``,
+       ``percolator-xml-for-converter``, ``pepxml`` or ``fasta``), ``.path``,
+       ``.md5`` and ``.sha256``, and ``output.path``.
+
+   * - ``limelight.converted``
+     - The conversion produced a Limelight XML that passed every check and is
+       at its final path, read-only (phase 12; ``R-LL-04``). The
+       ``limelight.converting`` payload plus ``output.size``, ``output.md5``,
+       ``output.sha256``, ``output.psms``, ``output.reported-peptides``,
+       ``output.q-cutoff`` (read back from the file), ``process.exit-code``,
+       ``log.path``, ``log.md5`` and ``log.sha256``.
+
+   * - ``limelight.unconverted``
+     - A conversion that was started kept nothing (phase 12). The
+       ``limelight.converting`` payload plus ``limelight.failure`` (a
+       lower-case hyphenated name), ``message`` and, when there is a log, its
+       three keys. No output checksum, because there is no output.
+
+   * - ``limelight.uploading``
+     - An upload of one of the run's Limelight XML files is about to start
+       (phase 12; ``R-SEC-04``), written after the scientist confirmed the
+       destination and **before** the first byte is sent. The payload holds
+       ``run.id``, ``limelight.server``, ``limelight.project-id``,
+       ``limelight.project-page``, ``upload.file.path``,
+       ``upload.file.size``, ``upload.file.md5`` and ``upload.file.sha256``.
+       It never holds the submit key, in any form.
+
+   * - ``limelight.uploaded``
+     - The server took the file and queued its import (phase 12). The
+       ``limelight.uploading`` payload plus ``limelight.upload-key`` (the
+       server's import tracking id), ``limelight.importer-sub-dir``,
+       ``limelight.server-program-version``, ``upload.bytes-sent``, and the
+       upload log's ``log.path``, ``log.md5`` and ``log.sha256``.
+
+   * - ``limelight.unuploaded``
+     - An upload that was started queued no import (phase 12). The
+       ``limelight.uploading`` payload plus ``upload.step``,
+       ``upload.failure`` (``refused-by-server``, with ``upload.http-status``,
+       ``limelight.server-flags`` and, when sent, ``limelight.server-message``;
+       or ``no-answer``, with ``message``) and the upload log's three keys.
+
+Like ``pdv.launched``, the six Limelight events are written from a finished
+run, so they normally follow ``run.finished``. Exactly one of
+``limelight.converted`` and ``limelight.unconverted`` follows each
+``limelight.converting``, and one of ``limelight.uploaded`` and
+``limelight.unuploaded`` each ``limelight.uploading``, unless the application
+stopped first.
 
 Reading a damaged log
 ---------------------
@@ -1321,9 +1380,15 @@ open namespaces and are written by the stage that owns them.
    * - Percolator scientific settings including the effective seed
      - ``settings``, under ``percolator.seed`` and the stage's own keys.
 
-   * - Result-view q filters for a derived export, Limelight conversion
-       parameters
+   * - Result-view q filters for a derived export
      - ``settings``, under keys the exporting and converting stages pin.
+
+   * - Limelight conversion parameters, the converter's version and checksum,
+       the Limelight XML's checksums, and upload identifiers
+     - **Not in the manifest.** Conversion and upload are started by the
+       scientist from a finished run, after ``provenance.json`` is sealed, so
+       each is recorded by ``limelight.*`` events in the run's
+       ``events.log`` (phase 12).
 
    * - PDV launch and version
      - **Not in the manifest.** PDV is launched by the scientist from a
