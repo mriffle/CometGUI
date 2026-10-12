@@ -407,7 +407,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        developer page, ``docs/citations.rst`` if the importer is used, stale
        statements, traceability for ``AC-LL-01..06``.
      - R-DOC; AC-LL-*
-     -
+     - Accepted, ``51d1ba7``
    * - 9
      - **The phase harness** ``scripts/verify-limelight-gates.sh``,
        registered additively as ``limelight``: every gate item graded on a
@@ -825,6 +825,41 @@ extension registration in ``cometgui-ui`` and ``cometgui-app``.
   equivalent-mutant caveat above.
 
 Unit 8 sign-off
+---------------
+
+**Accepted 2026-10-12.** Commit ``51d1ba7`` (14 files): ``docs/limelight.rst``
+rewritten from the stub; new ``docs/developer/limelight_integration.rst`` in
+the developer toctree; stale statements corrected in ``architecture``,
+``tool_adapters``, ``security``, ``version_capabilities`` (``CompatibilityAction``),
+``workflow_engine``, ``percolator``, ``percolator_options``,
+``provenance_format`` (six event types added), ``project_format``;
+``citations.rst`` (Limelight, the converter, limelight-core's submit-import
+protocol, Apache-2.0); ``traceability-map.toml`` AC-LL-01..06 from planned
+to named tests (automated criteria 31 -> 37, named tests 120 -> 139).
+
+* **Diff read**: the user page's structure and its credential and platform
+  claims checked against the code (session-only without a keyring and on
+  macOS/Windows; Linux only verified). The agent corrected one wording of my
+  brief: a non-zero exit or a timeout does fail a conversion; exit 0 is
+  never the reason a file passes. No code, POM, gate script or record
+  touched.
+* **Run by me**: ``scripts/ci/docs-build.sh`` PASS; ``--only docs`` PASS
+  (68 s); ``--only traceability`` 8 controls PASS (16 s).
+* **My injection**: ``method = "gate4TheRerunConverts"`` changed to a
+  method that does not exist in the map -> ``scripts/ci/traceability.sh``
+  exit 1, ``[TEST-MISSING] AC-LL-04 ... declares no such method``; restored,
+  ``sha256sum -c`` OK. (A first form whose replacement contained the anchor
+  was refused by my own injection script and never ran.)
+* **Specification-versus-code points the agent listed**, all already in
+  this log or escalated: checksums in ``events.log`` rather than
+  ``provenance.json`` (P12-5); "server and project selection" and "import
+  logs" (unit 1 escalation); the OS keychain preferred but macOS/Windows
+  session-only; **P12-17 named ``security -i`` for macOS, which unit 5
+  deliberately did not implement** (P12-21 records what was built);
+  http refused except loopback (P12-19); R-LL-01's "unless the PIN fails
+  checksum" -- Phase 09's rerun refuses rather than rerunning Comet.
+
+Unit 9 sign-off
 ---------------
 
 Pending.
