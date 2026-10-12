@@ -161,8 +161,24 @@ class LimelightUploadsTest {
         try (FakeLimelightServer fake = FakeLimelightServer.start(KEY, PROJECT)) {
             LimelightDestination destination = destination(world, fake);
 
+            List<Long> bytes = Collections.synchronizedList(new ArrayList<>());
             LimelightUploadAttempt attempt =
-                    uploads(secrets).upload(destination.confirm(), secrets.admit(KEY), live::add);
+                    uploads(secrets)
+                            .upload(
+                                    destination.confirm(),
+                                    secrets.admit(KEY),
+                                    new LimelightUploadWatcher() {
+                                        @Override
+                                        public void line(String line) {
+                                            live.add(line);
+                                        }
+
+                                        @Override
+                                        public void bytesSent(long sent, long total) {
+                                            assertEquals(size, total);
+                                            bytes.add(sent);
+                                        }
+                                    });
 
             FakeLimelightServer.Upload received = fake.uploads().get(0);
             assertEquals(sha256, received.receivedSha256());
@@ -220,6 +236,12 @@ class LimelightUploadsTest {
             assertTrue(lines.contains("Sending auth-test."), lines.toString());
             assertTrue(lines.contains("The server accepted final-submit."));
             assertTrue(lines.contains("Sent " + size + " of " + size + " bytes (100%)."));
+            assertEquals(
+                    10,
+                    lines.stream().filter(line -> line.startsWith("Sent ")).count(),
+                    "one progress line per tenth of the file");
+            assertEquals(size, bytes.get(bytes.size() - 1));
+            assertTrue(bytes.size() > 10, "the watcher heard the bytes once");
             assertEquals(
                     "Submitted. The server queued the import: uploadKey (tracking id) 4100,"
                             + " importerSubDir import_dir_for_id_0004100, server program version"
@@ -477,6 +499,7 @@ class LimelightUploadsTest {
 
             assertInstanceOf(Refused.class, wrongKey.outcome());
             assertInstanceOf(Refused.class, wrongProject.outcome());
+            assertFalse(wrongKey.submitted());
             List<ProvenanceEvent> failed =
                     events(world, ProvenanceEventType.LIMELIGHT_UPLOAD_FAILED);
             assertEquals(2, failed.size());

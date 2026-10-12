@@ -89,6 +89,34 @@ class StandardInputTest {
     }
 
     @Test
+    @DisplayName("start without input: a tool that reads standard input sees end of file at once")
+    void withoutInputTheToolSeesEndOfFile(@TempDir Path tmp)
+            throws IOException, InterruptedException {
+        Path source = Files.writeString(tmp.resolve("Copier.java"), COPIER);
+        Path copy = tmp.resolve("copy.bin");
+        RecordingListener listener = new RecordingListener();
+
+        StartedProcess started =
+                new ProcessService(Clock.systemUTC())
+                        .start(
+                                new ToolCommand(
+                                        List.of(
+                                                FakeTools.javaExecutable().toString(),
+                                                source.toString(),
+                                                copy.toString()),
+                                        tmp,
+                                        Map.of()),
+                                listener);
+
+        boolean ended = listener.exited().await(60, TimeUnit.SECONDS);
+        if (!ended) {
+            started.requestCancellation();
+        }
+        assertTrue(ended, "the tool waited on a standard input nobody closed");
+        assertEquals(List.of("read 0 bytes then end of file"), listener.standardOutput());
+    }
+
+    @Test
     @DisplayName("more than 4096 bytes is refused before anything starts")
     void tooMuchInputIsRefused(@TempDir Path tmp) {
         ToolCommand command =

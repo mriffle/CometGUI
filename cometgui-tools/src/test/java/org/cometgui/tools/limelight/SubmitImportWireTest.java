@@ -172,6 +172,11 @@ class SubmitImportWireTest {
                                 + "<r statusFailErrorMessage=\"&x;\"/>"));
         assertEquals("the server answered with <q>, not <r>", refusal("<q/>"));
         assertTrue(refusal("<r>").startsWith("the server's answer is not well-formed XML: "));
+        byte[] exactly = new byte[1 << 20];
+        java.util.Arrays.fill(exactly, (byte) ' ');
+        byte[] element = bytes("<r statusSuccess=\"true\"/>");
+        System.arraycopy(element, 0, exactly, 0, element.length);
+        assertTrue(assertDoesNotThrowRead(exactly).success(), "an answer of exactly 1 MiB is read");
         IOException large =
                 assertThrows(
                         IOException.class,
@@ -182,6 +187,14 @@ class SubmitImportWireTest {
     private static String refusal(String document) {
         return assertThrows(IOException.class, () -> SubmitImportWire.read(bytes(document), "r"))
                 .getMessage();
+    }
+
+    private static SubmitImportWire.Answer assertDoesNotThrowRead(byte[] body) {
+        try {
+            return SubmitImportWire.read(body, "r");
+        } catch (IOException refused) {
+            throw new AssertionError("refused: " + refused.getMessage(), refused);
+        }
     }
 
     private static byte[] bytes(String text) {

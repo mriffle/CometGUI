@@ -58,6 +58,8 @@ class LimelightServerTest {
         assertEquals(one, two);
         assertEquals(one.hashCode(), two.hashCode());
         assertNotEquals(one, LimelightServer.parse("https://ll.example/other"));
+        assertNotEquals(
+                one.hashCode(), LimelightServer.parse("https://ll.example/other").hashCode());
         assertFalse(one.equals("https://ll.example/limelight"));
     }
 

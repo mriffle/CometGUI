@@ -511,6 +511,82 @@ class LimelightUploadClientTest {
     }
 
     @Test
+    @DisplayName("a scripted server: init refused, no usable uploadKey, submit refused")
+    void laterStepsAnswerForThemselves(@TempDir Path tmp) throws IOException {
+        Path file = Files.writeString(tmp.resolve("x.xml"), "<limelight_input/>");
+        String ok = "statusSuccess=\"true\"";
+
+        Refused init =
+                assertInstanceOf(
+                        Refused.class,
+                        scripted(
+                                file,
+                                ok,
+                                "statusSuccess=\"false\" projectLocked=\"true\"",
+                                ok,
+                                ok));
+        Failed noKey = assertInstanceOf(Failed.class, scripted(file, ok, ok, ok, ok));
+        Failed badKey =
+                assertInstanceOf(
+                        Failed.class, scripted(file, ok, ok + " uploadKey=\"41 00\"", ok, ok));
+        Refused submit =
+                assertInstanceOf(
+                        Refused.class,
+                        scripted(
+                                file,
+                                ok,
+                                ok + " uploadKey=\"77\"",
+                                ok,
+                                "statusSuccess=\"false\" statusFailErrorMessage=\"no\""));
+        Submitted noDirectory =
+                assertInstanceOf(
+                        Submitted.class, scripted(file, ok, ok + " uploadKey=\"78\"", ok, ok));
+
+        assertEquals(LimelightUploadStep.INITIALIZE, init.step());
+        assertEquals(Map.of("projectLocked", "true"), init.flags());
+        assertEquals(LimelightUploadStep.INITIALIZE, noKey.step());
+        assertEquals(
+                "the server accepted the initialisation but sent no usable uploadKey",
+                noKey.reason());
+        assertEquals(noKey.reason(), badKey.reason());
+        assertEquals(LimelightUploadStep.FINAL_SUBMIT, submit.step());
+        assertEquals(Optional.of("no"), submit.message());
+        assertEquals("78", noDirectory.uploadKey());
+        assertEquals("", noDirectory.importerSubDir());
+        assertEquals(0, noDirectory.serverProgramVersion(), "no version given is version 0");
+    }
+
+    private LimelightUploadOutcome scripted(
+            Path file, String auth, String init, String upload, String submit) throws IOException {
+        Map<String, String> answers =
+                Map.of(
+                        "/limelight" + AUTH,
+                        "<submitImport_AuthTest_Response_PgmXML " + auth + "/>",
+                        "/limelight" + INIT,
+                        "<submitImport_Init_Response_PgmXML " + init + "/>",
+                        "/limelight" + FILE,
+                        "<submitImport_UploadFile_Response_PgmXML " + upload + "/>",
+                        "/limelight" + SUBMIT,
+                        "<submitImport_FinalSubmit_Response_PgmXML " + submit + "/>");
+        try (LoopbackHttp server =
+                LoopbackHttp.serve(
+                        0,
+                        request ->
+                                new LoopbackHttp.Response(
+                                        200, answers.getOrDefault(request.path(), "")))) {
+            return client().upload(
+                            new LimelightUploadRequest(
+                                    LimelightServer.parse(
+                                            "http://127.0.0.1:" + server.port() + "/limelight"),
+                                    PROJECT,
+                                    file,
+                                    "a".repeat(64)),
+                            secrets.admit(KEY),
+                            LimelightUploadListener.NONE);
+        }
+    }
+
+    @Test
     @DisplayName("a server that never answers: failed when the call's timeout runs out")
     void aSilentServerTimesOut(@TempDir Path tmp) throws IOException {
         Path file = Files.writeString(tmp.resolve("x.xml"), "<limelight_input/>");
