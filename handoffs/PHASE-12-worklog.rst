@@ -893,3 +893,18 @@ section, a pointer from the integration page).
   (the upload log's own redaction cannot fail alone -- unit 5's P2). Item
   1's GUI grade and Q2's GUI grade are not in the harness, for cost.
 * **Cost**: about 19 minutes added to the full gate run.
+
+Phase-end runs
+==============
+
+* **PIT regenerated** at the root exactly as ``scripts/build.sh`` does
+  (``mvn -B -o -Dcometgui.pit.threads=16 test-compile
+  org.pitest:pitest-maven:mutationCoverage``): BUILD SUCCESS in 5943 s.
+  KILLED-only: domain 688/692, provenance 772/775, process 167/185,
+  tools 2039/2169, install 1398/1415, params-comet 1768/1775,
+  params-percolator 176/176, results 887/943, workflow 242/242.
+* ``verify-test-gates.sh --preflight``: every precondition holds.
+* ``bash scripts/verify-all-gates.sh --only tests`` on ``9d8e045``, detached,
+  watched to its exit line: **PASS, 37 assertions in 18 961 s** (the
+  ``HARNESS ERROR`` lines in its log are control S's deliberate
+  un-injected and unmodified cases, reported as required).

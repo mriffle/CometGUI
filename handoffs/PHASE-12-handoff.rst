@@ -234,7 +234,33 @@ harness`_.
 The deferred tests harness
 ==========================
 
-PENDING -- filled in when the run ends.
+Before it, every module's PIT report was regenerated exactly as
+``scripts/build.sh`` does (``mvn -B -o -Dcometgui.pit.threads=16 test-compile
+org.pitest:pitest-maven:mutationCoverage`` at the root; BUILD SUCCESS in 5943
+s), because the units' targeted PIT runs had overwritten several reports
+(Phase 08's trap); the stray ``cometgui-ui`` reports the units' view-model PIT
+runs leave were removed. KILLED-only per module: domain 688/692, provenance
+772/775, process 167/185 (90.3 %), **tools 2039/2169 (94.0 %; 1832 at Phase
+11)**, install 1398/1415, params-comet 1768/1775, params-percolator 176/176,
+results 887/943, workflow 242/242.
+
+``bash scripts/verify-test-gates.sh --preflight`` held; then ``bash
+scripts/verify-all-gates.sh --only tests``, run detached on ``9d8e045`` (code
+unchanged since ``48adabc``) and watched to its exit line: **PASS, 37
+assertions in 18 961 s (316 minutes)** -- up from 16 221 s at Phase 11, the
+growth being this phase's tests (real converter, real reruns, the GUI
+upload and leak tests) inside the sandbox's two ``build.sh`` runs and their
+PIT.
+
+Tests that read outside their module read only under ``scratch/``
+(``phase05/artefacts``, ``fixture``, ``scientific-path``, ``percolator/3.09``,
+``limelight-upload-spike/artefacts``), ``manifests/``, ``tools/``,
+``scripts/spikes/limelight_upload_spike/submit-import-wire-v16.xsd``, other
+modules' ``src/test`` (the fake's drift test) and, for the gate-7 walk, files
+written under the JVM temp and home directories since the test started; none
+reads a project document. **The ``tests`` preflight does not check
+``scratch/limelight-upload-spike/artefacts``** (the importer JAR
+``FakeLimelightServerTest`` needs); it was present here.
 
 Incomplete, deferred, residue
 =============================
@@ -331,9 +357,12 @@ Escalated (none answered here)
 #. **PIT targets**: add ``org.cometgui.workflow.limelight.*`` (a POM change).
 #. **``EngineStep.CONVERT_LIMELIGHT``/``UPLOAD_LIMELIGHT``**: keep declared
    and unplanned, or remove (with ``LAUNCH_PDV``).
-#. **Cost**: ``limelight`` adds about 19 minutes to the full gate run; the
-   phase's real-binary and GUI tests add a few minutes to ``build.sh``
-   outside PIT (see `The deferred tests harness`_ for ``tests``).
+#. **The ``tests`` preflight** should check ``scratch/limelight-upload-spike/artefacts``
+   (tests fail, not skip, without the pinned importer JAR).
+#. **Cost**: ``limelight`` adds about 19 minutes to the full gate run;
+   ``tests`` grew from 270 to 316 minutes; the whole-tree PIT run took 99
+   minutes (``tools`` now 2169 mutations). The full gate run is now roughly
+   ten hours.
 
 First thing the next agent should do
 ====================================
