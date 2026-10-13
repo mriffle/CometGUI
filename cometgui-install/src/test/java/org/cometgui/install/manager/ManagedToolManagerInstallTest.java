@@ -271,6 +271,70 @@ class ManagedToolManagerInstallTest {
     }
 
     @Test
+    @DisplayName(
+            "every manifest claim the probe missed is carried, not just the first: Comet's three"
+                    + " claims, one confirmed, two unconfirmed in manifest order, read back from"
+                    + " the marker the install wrote")
+    void everyUnconfirmedClaimIsCarriedInManifestOrder() throws IOException, InterruptedException {
+        ArtefactRecord record =
+                ToolManagerFixtures.record(ToolName.COMET, "2026.03.0", ToolManagerFixtures.LINUX);
+        FixedProbe probe = FixedProbe.answering(ToolCapability.PEPXML_OUTPUT);
+        RecordingListener listener = new RecordingListener();
+        try (ServedArtefacts served =
+                new ServedArtefacts()
+                        .serve(
+                                record.url(),
+                                ToolManagerFixtures.artefact("v2026.03.0__comet.linux.exe"))) {
+            ToolManagerHarness harness =
+                    ToolManagerHarness.at(temporary.resolve("cache"))
+                            .fetching(served)
+                            .probing(probe)
+                            .build();
+            harness.manager().install(ToolName.COMET, ToolVersion.parse("2026.03.0"), listener);
+            assertEquals(InstallPhase.DONE, listener.awaitTerminal().phase());
+
+            ToolOffer row =
+                    harness.manager().offers().stream()
+                            .filter(offer -> offer.tool() == ToolName.COMET)
+                            .filter(offer -> offer.version().text().equals("2026.03.0"))
+                            .findFirst()
+                            .orElseThrow();
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    List.of("PEPXML_OUTPUT", "PIN_OUTPUT", "COMPLETE_PARAMS_QUERY"),
+                                    record.capabilities().stream()
+                                            .map(declared -> declared.capability().id())
+                                            .toList(),
+                                    "the manifest claims three"),
+                    () -> assertEquals(ToolInstallState.INSTALLED, row.state()),
+                    () ->
+                            assertEquals(
+                                    List.of("PEPXML_OUTPUT"),
+                                    row.capabilities().stream()
+                                            .map(declared -> declared.capability().id())
+                                            .toList(),
+                                    "the probe confirmed one"),
+                    () ->
+                            assertEquals(
+                                    List.of("PIN_OUTPUT", "COMPLETE_PARAMS_QUERY"),
+                                    row.unconfirmedClaims().stream()
+                                            .map(declared -> declared.capability().id())
+                                            .toList(),
+                                    "and both it missed are carried, in manifest order"),
+                    () ->
+                            assertEquals(
+                                    List.of(
+                                            CapabilityEvidence.OBSERVED_BY_EXECUTION,
+                                            CapabilityEvidence.OBSERVED_BY_EXECUTION),
+                                    row.unconfirmedClaims().stream()
+                                            .map(DeclaredCapability::evidence)
+                                            .toList(),
+                                    "with the evidence the manifest gave"));
+        }
+    }
+
+    @Test
     @DisplayName("a corrupted artefact is rejected and nothing is executed")
     void aCorruptedArtefactIsRejectedAndNothingIsExecuted()
             throws IOException, InterruptedException {
