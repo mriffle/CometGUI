@@ -5,7 +5,8 @@ Between Phases 12 and 13 -- the tier-1 repair, work log
 :Brief: ``handoffs/FIX-P12-P13-BRIEF.rst`` (tier 1's; not edited)
 :Agent: a single fix agent, dispatched directly by tier 1
 :Started: 2026-10-13, from ``4b548c3`` on ``main``, ``git status`` clean
-:Commits: ``a79f9f2`` (repair 1), ``37d2421`` (repair 2), and this log
+:Commits: ``a79f9f2`` (repair 1), ``37d2421`` (repair 2), ``04b39bd`` and the
+   commit that adds the gate results (this log)
 
 Kept by the fix agent as the work ran. Every number below was read off a run
 made in this session; every injection was made in **production** code (or in
@@ -299,7 +300,49 @@ everything else the preflight reads symlinked).
 Gates
 =====
 
-*Pending at the time of writing; filled in when they finish.*
+``bash scripts/verify-all-gates.sh --only shell --only install --only quality
+--only docs --only traceability --only paramui``, on ``04b39bd`` (both repairs
+and this log committed; ``git status`` clean), 2026-10-13 06:59 -> 08:00 UTC,
+exit 0:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 16 68
+
+   * - Gate
+     - Result
+     - Why it was run
+   * - ``docs``
+     - PASS, 1, 70 s
+     - this log
+   * - ``traceability``
+     - PASS, 8, 16 s
+     - documentation changed
+   * - ``quality``
+     - PASS, 42, 141 s
+     - brief; Java changed
+   * - ``shell``
+     - PASS, 30, 521 s
+     - brief; its harness runs ``CometGuiApplicationStartupTest`` and
+       ``AccessibleNameEnumerationUiTest``, both changed
+   * - ``install``
+     - PASS, 95, 385 s
+     - brief; control 4 injects into ``ToolManagerViewModel`` and greps
+       ``ProgressReachesTheInterfaceThreadTest`` -- its second assertion, "a
+       terminal report reaches the pane's row list off the interface thread
+       too", PASS with the test's own words (see :ref:`fixp12-fallout`)
+   * - ``paramui``
+     - PASS, 87, 2081 s
+     - its control T7 grades ``AccessibleNameEnumerationUiTest``, changed
+
+``tests`` was not run (brief); ``bash scripts/verify-test-gates.sh
+--preflight`` on the committed tree: ``PREFLIGHT: every precondition holds``,
+exit 0. No other harness reads a changed file: of the gate scripts, only
+``verify-install-gates.sh`` names ``ToolManagerViewModel`` or
+``ManagedToolManager``, and only ``verify-shell-gates.sh`` and
+``verify-param-ui-gates.sh`` name a changed test. No floor, threshold, POM or
+PIT setting changed; no test removed or disabled; the pinned survivor set is
+untouched.
 
 Escalated
 =========
