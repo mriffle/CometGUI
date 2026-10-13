@@ -131,8 +131,11 @@ bash scripts/build.sh first), the project-local toolchain in tools/, the
 font stack in tools/fontstack-bookworm-20260829, and the gitignored inputs the
 sandbox build's tests read and fail without: scratch/phase05/artefacts,
 scratch/phase06/artefacts, scratch/fixture, scratch/phase10/large (held to the
-SHA-256s LargeFixture.java pins) and scratch/scientific-path/percolator-3.07.1.
-It writes only under _build/.
+SHA-256s LargeFixture.java pins), scratch/scientific-path/percolator-3.07.1 and
+the Limelight importer JAR in scratch/limelight-upload-spike/artefacts (held
+to the SHA-256 FakeLimelightServerTest.java pins) -- and, on the host, gcc
+(which must build the xkbcomp shim) and timeout on PATH, for the real-PDV
+tests.  It writes only under _build/.
 USAGE
 }
 
@@ -1179,6 +1182,25 @@ preflight() {
     . "${ROOT}/tools/env.sh"
     command -v mvn >/dev/null || die "mvn is not on PATH after sourcing tools/env.sh."
     [ -d "${M2REPO}" ] || die "${M2REPO#"${ROOT}/"} does not exist; run bash scripts/build.sh first."
+    # Two HOST programs the real-PDV tests need (Phase 11): ProjectXvfb, in
+    # cometgui-tools and cometgui-app, compiles the xkbcomp path shim with gcc
+    # and caps the project-local Xvfb with timeout, finding both on PATH --
+    # this PATH, the one the sandbox build inherits -- and the tests fail
+    # rather than skip without them.  Nothing installs either: the project puts
+    # nothing on the host, so a host without them is told so and stops here.
+    # gcc is not merely looked for: the shim is compiled, as the tests compile
+    # it, because a gcc that cannot link a shared object is as missing as none.
+    command -v timeout >/dev/null \
+        || die "no timeout on PATH (${PATH}). The real-PDV tests (ProjectXvfb in cometgui-tools) cap the project-local Xvfb with it and fail rather than skip without it, so the sandbox build would die before any control ran. It is GNU coreutils' /usr/bin/timeout on every supported Linux; the project installs nothing on the host, so put a PATH that includes it in front of this script, or have the host's administrator install coreutils."
+    command -v gcc >/dev/null \
+        || die "no gcc on PATH (${PATH}). The real-PDV tests (ProjectXvfb in cometgui-tools and cometgui-app) compile scripts/feasibility/gui-spike/xkbcomp-path-shim.c with it and fail rather than skip without it, so the sandbox build would die before any control ran. The project installs nothing on the host: put a PATH that includes the host's gcc in front of this script, or have the host's administrator install gcc (Debian: the gcc package)."
+    local shim_dir="${ROOT}/_build/test-gate-preflight"
+    mkdir -p -- "${shim_dir}"
+    rm -f -- "${shim_dir}/xkbcomp-path-shim.so"
+    gcc -shared -fPIC -O1 -o "${shim_dir}/xkbcomp-path-shim.so" \
+        "${ROOT}/scripts/feasibility/gui-spike/xkbcomp-path-shim.c" >"${shim_dir}/gcc.log" 2>&1 \
+        && [ -s "${shim_dir}/xkbcomp-path-shim.so" ] \
+        || die "gcc ($(command -v gcc)) is on PATH but did not build the xkbcomp path shim the real-PDV tests compile (see ${shim_dir#"${ROOT}/"}/gcc.log), so those tests would fail inside the sandbox build. Repair the host's gcc and binutils; the project installs nothing on the host."
     # Checked here rather than discovered as 13 test failures inside a sandbox
     # build, which is how it presented the first time and cost a diagnosis.
     [ -d "${ROOT}/scratch/phase05/artefacts" ] \
@@ -1234,6 +1256,25 @@ preflight() {
         [ -f "${ROOT}/${k562}/${file}" ] \
             || die "${k562}/${file} does not exist. The results suites read it and fail rather than skip without it. ${k562_remake}"
     done
+    # The pinned Limelight importer JAR (Phase 12 unit 1): cometgui-tools'
+    # FakeLimelightServerTest runs the REAL importer against the loopback fake
+    # to prove the fake credible, and fails rather than skips without it.  Held
+    # to the SHA-256 that test pins, read from there so the pin lives in one
+    # place -- a different JAR is present and wrong.
+    local importer="scratch/limelight-upload-spike/artefacts/v8.3.1__limelightSubmitImport.jar"
+    local importer_pins="cometgui-tools/src/test/java/org/cometgui/tools/limelight/FakeLimelightServerTest.java"
+    local importer_refill="Refill it with . tools/env.sh && python3 scripts/spikes/limelight_upload_spike.py --only artefacts, which fetches it once from the limelight-core v8.3.1 GitHub release and refuses a JAR whose SHA-256 differs from the pin, as docs/developer/limelight_upload_spike.rst describes."
+    [ -f "${ROOT}/${importer_pins}" ] \
+        || die "HARNESS ERROR: ${importer_pins} is missing, so the importer JAR's pinned SHA-256 cannot be read."
+    pinned="$(grep -A1 "static final String IMPORTER_SHA256 =" "${ROOT}/${importer_pins}" \
+        | grep -oE '"[0-9a-f]{64}"' | tr -d '"' || true)"
+    [ "${#pinned}" -eq 64 ] \
+        || die "HARNESS ERROR: no 64-hex-digit IMPORTER_SHA256 could be read from ${importer_pins}; the pin moved or changed shape."
+    [ -f "${ROOT}/${importer}" ] \
+        || die "${importer} does not exist. cometgui-tools' FakeLimelightServerTest runs the real Limelight importer from there and fails rather than skips without it, so the sandbox build would die before any control ran. ${importer_refill}"
+    actual="$(sha256sum -- "${ROOT}/${importer}" | cut -d' ' -f1)"
+    [ "${actual}" = "${pinned}" ] \
+        || die "${importer} has SHA-256 ${actual}, not the ${pinned} pinned as IMPORTER_SHA256 in ${importer_pins}. A different or damaged JAR would fail FakeLimelightServerTest inside the sandbox build. Delete it, then: ${importer_refill}"
     bash "${ROOT}/scripts/fetch-fontstack.sh" --verify >/dev/null \
         || die "the font stack is missing; run bash scripts/fetch-fontstack.sh first."
 }
