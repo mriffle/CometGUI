@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import org.cometgui.domain.tools.CapabilityEvidence;
+import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
 import org.cometgui.domain.tools.ToolCapability;
@@ -169,6 +170,21 @@ class ManagedToolManagerInstallTest {
                                     row.capabilities().get(0).evidence()),
                     () ->
                             assertEquals(
+                                    List.of(
+                                            new DeclaredCapability(
+                                                    ToolCapability.XML_DECOY_OUTPUT,
+                                                    CapabilityEvidence.OBSERVED_BY_EXECUTION,
+                                                    "run on linux-x86-64 by phase 05 unit 0:"
+                                                            + " percolator -X -Z over the same"
+                                                            + " fixture exited 0 and wrote 128 psm"
+                                                            + " elements with both p:decoy=true"
+                                                            + " and p:decoy=false")),
+                                    row.unconfirmedClaims(),
+                                    "the probe won, and the manifest's claim it did not confirm is"
+                                            + " carried on, word for word, so a run can record"
+                                            + " the discrepancy (R-TOOL-07)"),
+                    () ->
+                            assertEquals(
                                     OptionalLong.of(2_798_963L),
                                     row.downloadSizeBytes(),
                                     "an installed build still says how large the transfer was:"
@@ -214,6 +230,44 @@ class ManagedToolManagerInstallTest {
             }
         }
         return collapsed;
+    }
+
+    @Test
+    @DisplayName(
+            "a probe that confirms every manifest claim leaves no unconfirmed claim, read back from"
+                    + " the marker the install wrote")
+    void aProbeThatAgreesLeavesNoUnconfirmedClaim() throws IOException, InterruptedException {
+        ArtefactRecord record = percolator();
+        /*
+         * More than the manifest claims, as the real probe answers: the manifest is silent about
+         * the tab-separated outputs, and silence is not a disagreement.
+         */
+        FixedProbe probe =
+                FixedProbe.answering(
+                        ToolCapability.XML_OUTPUT,
+                        ToolCapability.XML_DECOY_OUTPUT,
+                        ToolCapability.PSM_TSV_OUTPUT);
+        RecordingListener listener = new RecordingListener();
+        try (ServedArtefacts served = servingPercolator(record)) {
+            ToolManagerHarness harness =
+                    ToolManagerHarness.at(temporary.resolve("cache"))
+                            .fetching(served)
+                            .probing(probe)
+                            .build();
+            harness.manager().install(ToolName.PERCOLATOR, PERCOLATOR_3_07_1, listener);
+            assertEquals(InstallPhase.DONE, listener.awaitTerminal().phase());
+
+            ToolOffer row = rowFor(harness.manager().offers(), PERCOLATOR_3_07_1);
+            assertAll(
+                    () -> assertEquals(ToolInstallState.INSTALLED, row.state()),
+                    () ->
+                            assertEquals(
+                                    List.of("XML_OUTPUT", "XML_DECOY_OUTPUT", "PSM_TSV_OUTPUT"),
+                                    row.capabilities().stream()
+                                            .map(declared -> declared.capability().id())
+                                            .toList()),
+                    () -> assertEquals(List.of(), row.unconfirmedClaims()));
+        }
     }
 
     @Test

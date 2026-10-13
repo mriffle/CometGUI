@@ -66,6 +66,8 @@ import org.cometgui.params.percolator.PercolatorSettings;
 import org.cometgui.params.percolator.resolution.CompatibilityAction;
 import org.cometgui.params.percolator.resolution.DownstreamStage;
 import org.cometgui.provenance.manifest.ManifestReader;
+import org.cometgui.provenance.manifest.ProvenanceManifest;
+import org.cometgui.provenance.manifest.ToolRecord;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.RunEnginePort;
@@ -735,6 +737,115 @@ class WorkflowRunPortTest {
                         assertEquals(
                                 "database_name decoy_search", settings.get("comet.origin.user")));
         project.close();
+    }
+
+    @Test
+    @DisplayName(
+            "a registered local Comet's advisory reaches its tool record and the settings, and a"
+                    + " Comet offered without one records none")
+    void theCometOffersAdvisoryIsRecorded()
+            throws IOException,
+                    RunNotStartedException,
+                    InterruptedException,
+                    ExecutionException,
+                    TimeoutException {
+        String unverified =
+                "This Comet was registered from a file on this machine. CometGUI did not download"
+                        + " it and cannot check it against a pinned checksum, so its provenance is"
+                        + " whatever you know about where it came from. Its capabilities below"
+                        + " were probed by running it here.";
+        Path root = scratch.toRealPath();
+        Path comet = fakeComet(root);
+        ToolOffer registered =
+                new ToolOffer(
+                        ToolName.COMET,
+                        ToolVersion.parse("2026.03.0"),
+                        ToolOrigin.LOCAL,
+                        ToolInstallState.INSTALLED,
+                        List.of(),
+                        List.of(LocalCometRegistration.UNMANAGED_ADVISORY),
+                        Optional.empty(),
+                        Optional.of(comet),
+                        OptionalLong.empty());
+        ProvenanceManifest with =
+                ranWith(root.resolve("with"), InstalledComet.nothing().with(registered));
+        ProvenanceManifest without =
+                ranWith(root.resolve("without"), InstalledComet.at("2026.03.0", comet));
+        Map<String, String> settings = with.settings();
+        List<List<String>> warnings =
+                with.tools().stream()
+                        .filter(tool -> tool.name().equals("comet"))
+                        .map(ToolRecord::warnings)
+                        .toList();
+        assertAll(
+                () -> assertEquals(List.of(List.of(unverified)), warnings),
+                () ->
+                        assertEquals(
+                                unverified,
+                                settings.get("comet.advisory.comet.local-binary-is-unverified")),
+                () ->
+                        assertEquals(
+                                List.of(List.of()),
+                                without.tools().stream()
+                                        .filter(tool -> tool.name().equals("comet"))
+                                        .map(ToolRecord::warnings)
+                                        .toList()),
+                () ->
+                        assertFalse(
+                                without.settings().keySet().stream()
+                                        .anyMatch(key -> key.startsWith("comet.advisory.")),
+                                () -> without.settings().toString()));
+    }
+
+    /** Runs one search with the given Tool Manager in a project under {@code root}; its record. */
+    private ProvenanceManifest ranWith(Path root, InstalledComet tools)
+            throws IOException,
+                    RunNotStartedException,
+                    InterruptedException,
+                    ExecutionException,
+                    TimeoutException {
+        ProjectSession project = project(root);
+        Path fasta = fasta(root);
+        Path spectrum =
+                Files.writeString(
+                        root.resolve("inputs").resolve("sample.mzML"),
+                        "<mzML/>\n",
+                        StandardCharsets.US_ASCII);
+        CompletableFuture<RunResult> finished = new CompletableFuture<>();
+        port(Optional.of(tools), project)
+                .start(
+                        model(fasta).withText("decoy_search", "1", ValueOrigin.USER),
+                        List.of(),
+                        List.of(spectrum),
+                        TestPercolators.ready(
+                                TestPercolators.installed(
+                                        "3.07.1",
+                                        ToolOrigin.MANAGED,
+                                        fakePercolator(root),
+                                        TestPercolators.ALL,
+                                        List.of())),
+                        new RunObserver() {
+                            @Override
+                            public void planned(Plan plan, String description) {}
+
+                            @Override
+                            public void onTransition(StepTransition transition) {}
+
+                            @Override
+                            public void onRunFinished(RunResult result) {
+                                finished.complete(result);
+                            }
+                        });
+        finished.get(2, TimeUnit.MINUTES);
+        project.close();
+        Path runs = root.resolve("project").resolve("runs");
+        List<Path> made;
+        try (var listed = Files.list(runs)) {
+            made = listed.toList();
+        }
+        assertEquals(1, made.size(), made::toString);
+        return ManifestReader.readFrom(
+                made.get(0).resolve("provenance").resolve("provenance.json"));
     }
 
     @Test

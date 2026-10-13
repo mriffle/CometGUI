@@ -42,7 +42,6 @@ import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ParameterValue;
 import org.cometgui.params.comet.writer.CanonicalParamsWriter;
 import org.cometgui.params.comet.writer.WrittenParams;
-import org.cometgui.params.percolator.resolution.AdvisoryRendering;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.manifest.ApplicationRecord;
 import org.cometgui.tools.comet.PinDecoyConfiguration;
@@ -285,7 +284,7 @@ public final class CometWorkflow {
                         comet.managed(),
                         comet.artefactIdentity(),
                         Set.of(),
-                        List.of());
+                        ToolWarnings.comet(comet));
         CometRun run =
                 new CometRun(
                         project, layout, identity, model, comet, tool, entry, build, hashes,
@@ -296,6 +295,7 @@ public final class CometWorkflow {
         settings.put(DELIVERY_SETTING, identity.databaseDelivery().wireName());
         settings.put(PARAMS_SHA256_SETTING, written.hashes().sha256());
         settings.putAll(origins);
+        settings.putAll(ToolWarnings.cometSettings(comet));
         entry.ifPresent(
                 cached ->
                         settings.put(
@@ -327,9 +327,10 @@ public final class CometWorkflow {
     /**
      * The Percolator half of a run being prepared: {@code parameters/percolator-settings.json}
      * written once and hashed, the command built from the selection's probed capabilities, and the
-     * tool as provenance records it -- its observed capabilities, and as warnings its advisories
-     * and, without a weights file, {@code R-PERC-08}'s. A derived run ({@link PercolatorRerun})
-     * prepares its Percolator half here too, so the two cannot differ.
+     * tool as provenance records it -- its observed capabilities, and as warnings its advisories,
+     * its manifest/probe discrepancies ({@link ToolWarnings}) and, without a weights file, {@code
+     * R-PERC-08}'s. A derived run ({@link PercolatorRerun}) prepares its Percolator half here too,
+     * so the two cannot differ.
      *
      * @param layout the run's directory, already reserved
      * @param hashes the one hasher
@@ -363,7 +364,7 @@ public final class CometWorkflow {
             // The pre-run check built the same command from the same capabilities and passed.
             throw new IllegalStateException(refused.getMessage(), refused);
         }
-        List<String> warnings = new ArrayList<>(AdvisoryRendering.forSelection(selection.offer()));
+        List<String> warnings = new ArrayList<>(ToolWarnings.percolator(selection.offer()));
         PercolatorProvenance.weightsWarning(command).ifPresent(warnings::add);
         Set<String> capabilities = new TreeSet<>();
         for (ToolCapability capability : selection.capabilities()) {

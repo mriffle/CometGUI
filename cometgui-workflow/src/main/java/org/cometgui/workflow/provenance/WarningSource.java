@@ -49,8 +49,17 @@ public enum WarningSource {
     /** A file the record lists with a status other than {@code completed}, such as partial. */
     PARTIAL_FILE("partial file"),
 
-    /** A version advisory recorded for the Percolator build ({@code percolator.advisory.*}). */
+    /**
+     * A version advisory recorded for the Percolator or the Comet build ({@code
+     * percolator.advisory.*}, {@code comet.advisory.*}).
+     */
     VERSION_ADVISORY("version advisory"),
+
+    /**
+     * A capability the artefact manifest claims and the install's probe did not find ({@code
+     * R-TOOL-07}; {@code comet.probe-discrepancy.*}, {@code percolator.probe-discrepancy.*}).
+     */
+    MANIFEST_PROBE_DISCREPANCY("manifest/probe discrepancy"),
 
     /** A newer Percolator skipped by resolution, and why ({@code percolator.skipped.*}). */
     SKIPPED_VERSION("skipped version"),
@@ -62,8 +71,9 @@ public enum WarningSource {
     WEIGHTS_FALLBACK("weights fallback"),
 
     /**
-     * A warning a tool record carries: advisories active for that version, a log that could not be
-     * hashed, and any manifest/probe discrepancy a phase records against the tool.
+     * A warning a tool record carries that no more specific source names: for example a log that
+     * could not be hashed. An advisory or a manifest/probe discrepancy the settings also record is
+     * shown once, under its own source.
      */
     TOOL_WARNING("tool warning"),
 

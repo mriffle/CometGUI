@@ -543,7 +543,11 @@ invocation list and declarations -- never in completion order:
   ``comet.index-cache-key`` (with an index mode), the parameters' origins and
   the presets still in place (``comet.origin.<origin>``, ``comet.preset.<nn>.*``,
   held in ``CometParameterProvenance``; parameter names are in the values, never
-  the keys), and the engine's own ``workflow.attempt`` and ``workflow.plan``.
+  the keys), the selected Comet's advisories and the manifest claims its install
+  probe did not confirm (``comet.advisory.<id>``, ``comet.probe-discrepancy.<nn>``,
+  held in ``ToolWarnings``; ``R-TOOL-07``) -- the same sentences are the warnings
+  on each Comet tool record -- and the engine's own ``workflow.attempt`` and
+  ``workflow.plan``.
 
 Bounded concurrency
 -------------------

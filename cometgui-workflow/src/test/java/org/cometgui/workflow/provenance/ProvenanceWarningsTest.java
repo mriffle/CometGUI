@@ -30,11 +30,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import org.cometgui.domain.run.RunLayout;
 import org.cometgui.domain.secrets.SecretRedactor;
 import org.cometgui.provenance.events.ProvenanceEventType;
+import org.cometgui.provenance.manifest.ProvenanceManifest;
 import org.cometgui.provenance.manifest.ProvenanceStatus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -161,6 +164,74 @@ class ProvenanceWarningsTest {
                                 "the Limelight upload did not succeed (refused-by-server):"
                                         + " project 12 is closed")),
                 of(warnings, WarningSource.LIMELIGHT_FAILURE));
+    }
+
+    /** The Comet advisory and the two discrepancies, typed out. */
+    private static final String COMET_ADVISORY =
+            "This Comet was registered from a file on this machine.";
+
+    private static final String COMET_DISCREPANCY =
+            "Comet 2026.03.0: the artefact manifest claims PIN_OUTPUT (unverified evidence), but"
+                    + " the probe run when this build was installed did not find it";
+
+    private static final String PERCOLATOR_DISCREPANCY =
+            "Percolator 3.07.1: the artefact manifest claims XML_DECOY_OUTPUT"
+                    + " (inferred-from-artefact-bytes evidence), but the probe did not find it";
+
+    /**
+     * A complete run re-sealed with a Comet advisory and a Comet and a Percolator manifest/probe
+     * discrepancy in its settings, as {@code ToolWarnings} records them.
+     */
+    private static ProvenanceView withToolWarningSettings(RunDirectories dirs) throws IOException {
+        CompleteRun run = CompleteRun.create(dirs, SecretRedactor.patternsOnly());
+        ProvenanceManifest sealed = run.manifest();
+        Map<String, String> settings = new TreeMap<>(sealed.settings());
+        settings.put("comet.advisory.comet.local-binary-is-unverified", COMET_ADVISORY);
+        settings.put("comet.probe-discrepancy.01", COMET_DISCREPANCY);
+        settings.put("percolator.probe-discrepancy.01", PERCOLATOR_DISCREPANCY);
+        RunDirectories.seal(
+                run.layout(),
+                ProvenanceManifest.current(
+                        sealed.run(),
+                        sealed.application(),
+                        settings,
+                        sealed.tools(),
+                        sealed.files()),
+                SecretRedactor.patternsOnly());
+        return LoadedRunViewTest.reader().load(run.layout()).view();
+    }
+
+    @Test
+    @DisplayName(
+            "a Comet advisory is a version advisory; a Comet or Percolator discrepancy is a"
+                    + " manifest/probe discrepancy, subject its key, in key order")
+    void toolWarningSettings() throws IOException {
+        List<ProvenanceView.Warning> warnings = withToolWarningSettings(dirs).warnings();
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(
+                                        new ProvenanceView.Warning(
+                                                WarningSource.VERSION_ADVISORY,
+                                                "comet.local-binary-is-unverified",
+                                                COMET_ADVISORY),
+                                        new ProvenanceView.Warning(
+                                                WarningSource.VERSION_ADVISORY,
+                                                "xml-final",
+                                                CompleteRun.ADVISORY)),
+                                of(warnings, WarningSource.VERSION_ADVISORY)),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        new ProvenanceView.Warning(
+                                                WarningSource.MANIFEST_PROBE_DISCREPANCY,
+                                                "comet.probe-discrepancy.01",
+                                                COMET_DISCREPANCY),
+                                        new ProvenanceView.Warning(
+                                                WarningSource.MANIFEST_PROBE_DISCREPANCY,
+                                                "percolator.probe-discrepancy.01",
+                                                PERCOLATOR_DISCREPANCY)),
+                                of(warnings, WarningSource.MANIFEST_PROBE_DISCREPANCY)));
     }
 
     private static ProvenanceView withChangedParameterFiles(RunDirectories dirs)
@@ -293,6 +364,7 @@ class ProvenanceWarningsTest {
         views.add(
                 LoadedRunViewTest.reader().load(ProvenanceStatesTest.unsealed(fresh("e"))).view());
         views.add(failedWithUnreadableRecordAndRunJson(fresh("f")));
+        views.add(withToolWarningSettings(fresh("g")));
         for (ProvenanceView view : views) {
             for (ProvenanceView.Warning warning : view.warnings()) {
                 seen.add(warning.source());
@@ -345,6 +417,7 @@ class ProvenanceWarningsTest {
                         "step failure",
                         "partial file",
                         "version advisory",
+                        "manifest/probe discrepancy",
                         "skipped version",
                         "option not emitted",
                         "weights fallback",

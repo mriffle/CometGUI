@@ -45,6 +45,7 @@ import org.cometgui.provenance.manifest.ToolRecord;
 import org.cometgui.workflow.limelight.LimelightConversions;
 import org.cometgui.workflow.limelight.LimelightUploads;
 import org.cometgui.workflow.steps.PercolatorProvenance;
+import org.cometgui.workflow.steps.ToolWarnings;
 
 /**
  * Builds every part of a {@link ProvenanceView} but the parameters, from what a load found.
@@ -472,13 +473,31 @@ final class ViewBuilder {
         Set<String> said = new LinkedHashSet<>();
         for (Map.Entry<String, String> setting : settings.entrySet()) {
             String key = setting.getKey();
-            if (key.startsWith(PercolatorProvenance.ADVISORY_PREFIX)) {
-                said.add(setting.getValue());
-                warnings.add(
-                        warning(
-                                WarningSource.VERSION_ADVISORY,
-                                key.substring(PercolatorProvenance.ADVISORY_PREFIX.length()),
-                                setting.getValue()));
+            for (String prefix :
+                    List.of(
+                            PercolatorProvenance.ADVISORY_PREFIX,
+                            ToolWarnings.COMET_ADVISORY_PREFIX)) {
+                if (key.startsWith(prefix)) {
+                    said.add(setting.getValue());
+                    warnings.add(
+                            warning(
+                                    WarningSource.VERSION_ADVISORY,
+                                    key.substring(prefix.length()),
+                                    setting.getValue()));
+                }
+            }
+            for (String prefix :
+                    List.of(
+                            ToolWarnings.COMET_DISCREPANCY_PREFIX,
+                            ToolWarnings.PERCOLATOR_DISCREPANCY_PREFIX)) {
+                if (key.startsWith(prefix)) {
+                    said.add(setting.getValue());
+                    warnings.add(
+                            warning(
+                                    WarningSource.MANIFEST_PROBE_DISCREPANCY,
+                                    key,
+                                    setting.getValue()));
+                }
             }
         }
         for (int number = 1; settings.containsKey(skipped(number, "version")); number++) {

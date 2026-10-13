@@ -17,10 +17,15 @@
 package org.cometgui.workflow.steps;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.cometgui.domain.tools.DeclaredCapability;
+import org.cometgui.domain.tools.ToolAdvisory;
+import org.cometgui.domain.tools.ToolName;
+import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolVersion;
 
 /**
@@ -31,6 +36,11 @@ import org.cometgui.domain.tools.ToolVersion;
  * resolve-comet} step both re-hash the executable and refuse a mismatch naming both digests, so a
  * binary replaced after it was selected never runs under the selected identity.
  *
+ * <p>The advisories and the unconfirmed claims are the Tool Manager's offer's, carried so that the
+ * run's Comet tool record warns what the offer warned ({@link ToolWarnings}): an advisory active
+ * for the build -- a registered local binary is unverified, a release needs a runtime -- and each
+ * capability the manifest claims that the install's probe did not find ({@code R-TOOL-07}).
+ *
  * @param executable the Comet executable; absolute, normalised by this constructor
  * @param release the release the executable is, which must be the release the parameter model is
  *     for
@@ -39,13 +49,18 @@ import org.cometgui.domain.tools.ToolVersion;
  * @param managed whether CometGUI installed it, rather than the user registering a local copy
  * @param artefactIdentity the upstream or managed artefact identity, when known (for a managed
  *     install, the manifest artefact it came from)
+ * @param advisories the offer's advisories ({@link ToolOffer#advisories()}), in its order
+ * @param unconfirmedClaims the offer's unconfirmed claims ({@link ToolOffer#unconfirmedClaims()}),
+ *     in its order; each a Comet capability
  */
 public record CometSelection(
         Path executable,
         ToolVersion release,
         String sha256,
         boolean managed,
-        Optional<String> artefactIdentity) {
+        Optional<String> artefactIdentity,
+        List<ToolAdvisory> advisories,
+        List<DeclaredCapability> unconfirmedClaims) {
 
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 
@@ -53,8 +68,8 @@ public record CometSelection(
      * Validates and normalises.
      *
      * @throws NullPointerException naming a component that is {@code null}
-     * @throws IllegalArgumentException if the executable is not absolute or the digest is not 64
-     *     hexadecimal characters, quoting it
+     * @throws IllegalArgumentException if the executable is not absolute, the digest is not 64
+     *     hexadecimal characters, quoting it, or an unconfirmed claim is not a Comet capability
      */
     public CometSelection {
         Objects.requireNonNull(executable, "executable");
@@ -72,5 +87,41 @@ public record CometSelection(
         }
         sha256 = lower;
         Objects.requireNonNull(artefactIdentity, "artefactIdentity");
+        advisories = List.copyOf(Objects.requireNonNull(advisories, "advisories"));
+        unconfirmedClaims =
+                List.copyOf(Objects.requireNonNull(unconfirmedClaims, "unconfirmedClaims"));
+        for (DeclaredCapability claim : unconfirmedClaims) {
+            claim.capability().requireBelongsTo(ToolName.COMET);
+        }
+    }
+
+    /**
+     * A selection with no advisory and no unconfirmed claim.
+     *
+     * @param executable the Comet executable; absolute
+     * @param release the release the executable is
+     * @param sha256 the executable's SHA-256 when it was selected
+     * @param managed whether CometGUI installed it
+     * @param artefactIdentity the upstream or managed artefact identity, when known
+     * @throws NullPointerException naming a component that is {@code null}
+     * @throws IllegalArgumentException as the canonical constructor
+     */
+    public CometSelection(
+            Path executable,
+            ToolVersion release,
+            String sha256,
+            boolean managed,
+            Optional<String> artefactIdentity) {
+        this(executable, release, sha256, managed, artefactIdentity, List.of(), List.of());
+    }
+
+    @Override
+    public List<ToolAdvisory> advisories() {
+        return List.copyOf(advisories);
+    }
+
+    @Override
+    public List<DeclaredCapability> unconfirmedClaims() {
+        return List.copyOf(unconfirmedClaims);
     }
 }

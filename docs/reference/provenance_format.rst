@@ -495,6 +495,15 @@ Lists inside a value are separated by single spaces.
    * - ``percolator.advisory.<id>``
      - Each advisory of the build that runs, as shown at selection
        (``R-PERC-11``), keyed by the manifest's advisory identifier.
+   * - ``percolator.probe-discrepancy.<nn>``
+     - Each capability the artefact manifest claims for the build that runs
+       and the probe run when it was installed did not find, ``nn`` from
+       ``01`` in manifest order: the sentence naming the version, the
+       capability and the manifest's evidence (``R-TOOL-07``: the probe wins,
+       and the disagreement is recorded). The same sentence is a warning on the
+       Percolator tool record. Absent when the probe confirmed every claim.
+       This key alone is made in ``ToolWarnings``, where Comet's and
+       Percolator's warning sentences are both worded.
    * - ``percolator.not-emitted.<nn>.option``, ``.reason``
      - Each option the run asked for and the command does not pass, because the
        build was not observed to accept it (``R-PERC-06``), in command order:

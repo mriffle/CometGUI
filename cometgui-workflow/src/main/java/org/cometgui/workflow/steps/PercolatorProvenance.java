@@ -162,6 +162,7 @@ public final class PercolatorProvenance {
                 AdvisoryRendering.forProvenance(selection.offer()).entrySet()) {
             settings.put(ADVISORY_PREFIX + advisory.getKey(), advisory.getValue());
         }
+        settings.putAll(ToolWarnings.percolatorSettings(selection.offer()));
         List<NotEmitted> left = command.notEmitted();
         for (int index = 0; index < left.size(); index++) {
             String prefix = NOT_EMITTED_PREFIX + number(index) + ".";

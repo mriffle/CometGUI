@@ -65,6 +65,15 @@ import java.util.Set;
  * Nothing in this record lets a capability be attached to a tool it does not belong to: the
  * constructor rejects that outright.
  *
+ * <p><strong>A claim the probe did not confirm is kept, beside the capabilities and apart from
+ * them.</strong> {@code R-TOOL-07} makes the probe the authority on an installed build -- so a
+ * capability the manifest claims and the install's probe did not find is <em>not</em> among the
+ * capabilities -- and it also requires the disagreement to be recorded as a warning in provenance.
+ * A disagreement nobody can see cannot be recorded, so the manifest's claim travels on as an {@link
+ * #unconfirmedClaims() unconfirmed claim}. It is one-directional on purpose: a capability the probe
+ * found and the manifest does not list is the manifest being silent, not the two disagreeing --
+ * Percolator's manifest rows list only the two XML capabilities, and its probe establishes a dozen.
+ *
  * @param tool which tool
  * @param version which version of it, as upstream names the release
  * @param origin whether CometGUI installed it or the user pointed at it
@@ -80,6 +89,10 @@ import java.util.Set;
  *     every companion the manifest names with it, added up, and not the size of the installed
  *     files; present exactly when this host has an artefact to fetch, and positive when it is
  *     present
+ * @param unconfirmedClaims the manifest's capability claims that the probe of this installed build
+ *     did not find ({@code R-TOOL-07}), each with the evidence the manifest gave for it, in
+ *     manifest order; never a capability among {@code capabilities}, and empty unless the build is
+ *     {@link ToolInstallState#INSTALLED}, because only an installed build has been probed
  */
 public record ToolOffer(
         ToolName tool,
@@ -90,15 +103,18 @@ public record ToolOffer(
         List<ToolAdvisory> advisories,
         Optional<LoaderDiagnostic> loaderDiagnostic,
         Optional<Path> installedPath,
-        OptionalLong downloadSizeBytes) {
+        OptionalLong downloadSizeBytes,
+        List<DeclaredCapability> unconfirmedClaims) {
 
     /**
-     * Validates the offer and takes defensive, immutable copies of both lists.
+     * Validates the offer and takes defensive, immutable copies of its three lists.
      *
      * @throws NullPointerException if any component is {@code null}
-     * @throws IllegalArgumentException if a capability belongs to another tool, if a capability or
-     *     an advisory identifier appears twice, if a present installed path is relative, or if an
-     *     installed offer names no path -- with a message naming the field and the rejected value
+     * @throws IllegalArgumentException if a capability or an unconfirmed claim belongs to another
+     *     tool, if a capability, an unconfirmed claim or an advisory identifier appears twice, if a
+     *     capability is both offered and unconfirmed, if an offer that is not installed carries an
+     *     unconfirmed claim, if a present installed path is relative, or if an installed offer
+     *     names no path -- with a message naming the field and the rejected value
      */
     public ToolOffer {
         Objects.requireNonNull(tool, "tool");
@@ -112,6 +128,92 @@ public record ToolOffer(
         Objects.requireNonNull(downloadSizeBytes, "downloadSizeBytes");
         checkInstalledPath(state, installedPath);
         checkDownloadSize(origin, state, downloadSizeBytes);
+        unconfirmedClaims = checkedUnconfirmed(unconfirmedClaims, tool, state, capabilities);
+    }
+
+    /**
+     * An offer with no unconfirmed claim: every offer that has not been through an install's probe,
+     * and every installed one whose probe found everything the manifest claims.
+     *
+     * @param tool which tool
+     * @param version which version of it, as upstream names the release
+     * @param origin whether CometGUI installed it or the user pointed at it
+     * @param state what can be done with it on this machine
+     * @param capabilities what it can do, each with the evidence behind the claim
+     * @param advisories the caveats to show at selection time and record in provenance
+     * @param loaderDiagnostic why the build will not run here, when it will not
+     * @param installedPath where the executable or JAR is, absolute, when installed
+     * @param downloadSizeBytes how many bytes this host fetches to install the build
+     * @throws NullPointerException if any component is {@code null}
+     * @throws IllegalArgumentException as the canonical constructor
+     */
+    public ToolOffer(
+            ToolName tool,
+            ToolVersion version,
+            ToolOrigin origin,
+            ToolInstallState state,
+            List<DeclaredCapability> capabilities,
+            List<ToolAdvisory> advisories,
+            Optional<LoaderDiagnostic> loaderDiagnostic,
+            Optional<Path> installedPath,
+            OptionalLong downloadSizeBytes) {
+        this(
+                tool,
+                version,
+                origin,
+                state,
+                capabilities,
+                advisories,
+                loaderDiagnostic,
+                installedPath,
+                downloadSizeBytes,
+                List.of());
+    }
+
+    /*
+     * AN UNCONFIRMED CLAIM IS A FACT ABOUT A PROBE, so it exists only where a probe ran -- an
+     * installed build -- and it can never also be a capability: the probe won, and an offer that
+     * listed the capability as both present and unconfirmed would say two things at once.
+     */
+    private static List<DeclaredCapability> checkedUnconfirmed(
+            List<DeclaredCapability> unconfirmed,
+            ToolName tool,
+            ToolInstallState state,
+            List<DeclaredCapability> capabilities) {
+        List<DeclaredCapability> copy =
+                new ArrayList<>(Objects.requireNonNull(unconfirmed, "unconfirmedClaims"));
+        Set<ToolCapability> offered = EnumSet.noneOf(ToolCapability.class);
+        for (DeclaredCapability declared : capabilities) {
+            offered.add(declared.capability());
+        }
+        Set<ToolCapability> seen = EnumSet.noneOf(ToolCapability.class);
+        for (int index = 0; index < copy.size(); index++) {
+            DeclaredCapability claim = copy.get(index);
+            if (claim == null) {
+                throw new IllegalArgumentException(
+                        "unconfirmedClaims[" + index + "] must not be null");
+            }
+            claim.capability().requireBelongsTo(tool);
+            if (!seen.add(claim.capability())) {
+                throw new IllegalArgumentException(
+                        "unconfirmedClaims names " + claim.capability().id() + " more than once");
+            }
+            if (offered.contains(claim.capability())) {
+                throw new IllegalArgumentException(
+                        "unconfirmedClaims names "
+                                + claim.capability().id()
+                                + ", which capabilities also names: the probe either found it or"
+                                + " did not");
+            }
+        }
+        if (!copy.isEmpty() && state != ToolInstallState.INSTALLED) {
+            throw new IllegalArgumentException(
+                    "unconfirmedClaims must be empty for an offer in state "
+                            + state
+                            + ", because only an installed build has been probed, but names "
+                            + copy.get(0).capability().id());
+        }
+        return List.copyOf(copy);
     }
 
     private static List<DeclaredCapability> checkedCapabilities(
@@ -234,5 +336,16 @@ public record ToolOffer(
      */
     public List<ToolAdvisory> advisories() {
         return List.copyOf(advisories);
+    }
+
+    /**
+     * The manifest's claims the probe of this installed build did not confirm ({@code R-TOOL-07}).
+     *
+     * <p>Immutable, in manifest order, and copied for the same reason as {@link #capabilities()}.
+     *
+     * @return the unconfirmed claims, immutable and usually empty
+     */
+    public List<DeclaredCapability> unconfirmedClaims() {
+        return List.copyOf(unconfirmedClaims);
     }
 }

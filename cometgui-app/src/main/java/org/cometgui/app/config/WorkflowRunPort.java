@@ -85,8 +85,10 @@ import org.cometgui.workflow.storage.ProjectLock;
  * Comet at that version which the Tool Manager reports {@link ToolInstallState#INSTALLED} with a
  * path -- a managed install before a registered local binary, in the Tool Manager's own order. Its
  * SHA-256 is taken by hashing that file through the one hasher when it is selected, and the pre-run
- * check and the run's {@code resolve-comet} step re-hash it and refuse a mismatch. No index mode is
- * offered by the interface yet, so every search is {@link IndexMode#NONE}.
+ * check and the run's {@code resolve-comet} step re-hash it and refuse a mismatch. The offer's
+ * advisories and unconfirmed claims ride with the selection, so the run's Comet tool record warns
+ * what the offer warns ({@code R-TOOL-07}). No index mode is offered by the interface yet, so every
+ * search is {@link IndexMode#NONE}.
  *
  * <h2>Which Percolator</h2>
  *
@@ -607,7 +609,9 @@ public final class WorkflowRunPort implements SessionEngine {
                                     release,
                                     hashes.hash(executable).sha256(),
                                     installed.get().origin() == ToolOrigin.MANAGED,
-                                    Optional.empty())),
+                                    Optional.empty(),
+                                    installed.get().advisories(),
+                                    installed.get().unconfirmedClaims())),
                     Optional.empty());
         } catch (IOException unreadable) {
             return Selected.none(

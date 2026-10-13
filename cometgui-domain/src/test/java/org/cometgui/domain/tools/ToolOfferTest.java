@@ -18,6 +18,7 @@ package org.cometgui.domain.tools;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Path;
@@ -776,6 +777,161 @@ class ToolOfferTest {
                             List.of(XML_OBSERVED),
                             List.of(PEP_REGRESSOR),
                             Optional.empty()));
+        }
+    }
+
+    @Nested
+    @DisplayName("the manifest claims the probe did not confirm (R-TOOL-07)")
+    class UnconfirmedClaims {
+
+        private ToolOffer installed(
+                List<DeclaredCapability> capabilities, List<DeclaredCapability> unconfirmed) {
+            return new ToolOffer(
+                    ToolName.PERCOLATOR,
+                    PERCOLATOR_3_07_1,
+                    ToolOrigin.MANAGED,
+                    ToolInstallState.INSTALLED,
+                    capabilities,
+                    List.of(PEP_REGRESSOR),
+                    Optional.empty(),
+                    pathFor(ToolInstallState.INSTALLED),
+                    OptionalLong.of(946303L),
+                    unconfirmed);
+        }
+
+        @Test
+        @DisplayName("an installed offer keeps them, in order, apart from its capabilities")
+        void kept() {
+            List<DeclaredCapability> unconfirmed = new ArrayList<>(List.of(XML_DECOY_OBSERVED));
+            ToolOffer offer = installed(List.of(XML_OBSERVED), unconfirmed);
+            unconfirmed.add(XML_OBSERVED);
+            assertAll(
+                    () -> assertEquals(List.of(XML_DECOY_OBSERVED), offer.unconfirmedClaims()),
+                    () -> assertEquals(List.of(XML_OBSERVED), offer.capabilities()),
+                    () ->
+                            assertThrows(
+                                    UnsupportedOperationException.class,
+                                    () -> offer.unconfirmedClaims().add(XML_OBSERVED)));
+        }
+
+        @ParameterizedTest
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("the nine-part constructor carries none, in every state")
+        void noneByDefault(ToolInstallState state) {
+            assertEquals(
+                    List.of(),
+                    offer(state, List.of(XML_OBSERVED), List.of(), pathFor(state))
+                            .unconfirmedClaims());
+        }
+
+        @Test
+        @DisplayName("an offer with one is not equal to the same offer without")
+        void partOfEquality() {
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    installed(List.of(XML_OBSERVED), List.of(XML_DECOY_OBSERVED)),
+                                    installed(List.of(XML_OBSERVED), List.of(XML_DECOY_OBSERVED))),
+                    () ->
+                            assertNotEquals(
+                                    installed(List.of(XML_OBSERVED), List.of(XML_DECOY_OBSERVED)),
+                                    installed(List.of(XML_OBSERVED), List.of())));
+        }
+
+        @Test
+        @DisplayName("a claim that is also a capability is refused: the probe found it or not")
+        void notAlsoACapability() {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    installed(
+                                            List.of(XML_OBSERVED, XML_DECOY_OBSERVED),
+                                            List.of(XML_DECOY_OBSERVED)));
+            assertEquals(
+                    "unconfirmedClaims names XML_DECOY_OUTPUT, which capabilities also names: the"
+                            + " probe either found it or did not",
+                    refused.getMessage());
+        }
+
+        @Test
+        @DisplayName("the same claim twice is refused")
+        void notTwice() {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    installed(
+                                            List.of(),
+                                            List.of(XML_DECOY_OBSERVED, XML_DECOY_OBSERVED)));
+            assertEquals(
+                    "unconfirmedClaims names XML_DECOY_OUTPUT more than once",
+                    refused.getMessage());
+        }
+
+        @Test
+        @DisplayName("a claim of another tool's capability is refused")
+        void notAnotherTools() {
+            DeclaredCapability comets =
+                    new DeclaredCapability(
+                            ToolCapability.PIN_OUTPUT,
+                            CapabilityEvidence.OBSERVED_BY_EXECUTION,
+                            "run on linux-x86-64 by phase 00");
+            assertThrows(
+                    IllegalArgumentException.class,
+                    () -> installed(List.of(XML_OBSERVED), List.of(comets)));
+        }
+
+        @Test
+        @DisplayName("a null claim is refused naming its index")
+        void notNull() {
+            List<DeclaredCapability> withNull = Arrays.asList(XML_DECOY_OBSERVED, null);
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> installed(List.of(XML_OBSERVED), withNull));
+            assertEquals("unconfirmedClaims[1] must not be null", refused.getMessage());
+        }
+
+        @ParameterizedTest
+        @EnumSource(
+                value = ToolInstallState.class,
+                names = "INSTALLED",
+                mode = EnumSource.Mode.EXCLUDE)
+        @DisplayName("an offer that is not installed was never probed, so it carries none")
+        void onlyWhenInstalled(ToolInstallState state) {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    new ToolOffer(
+                                            ToolName.PERCOLATOR,
+                                            PERCOLATOR_3_07_1,
+                                            ToolOrigin.MANAGED,
+                                            state,
+                                            List.of(XML_OBSERVED),
+                                            List.of(),
+                                            Optional.empty(),
+                                            pathFor(state),
+                                            sizeFor(state),
+                                            List.of(XML_DECOY_OBSERVED)));
+            assertEquals(
+                    "unconfirmedClaims must be empty for an offer in state "
+                            + state
+                            + ", because only an installed build has been probed, but names"
+                            + " XML_DECOY_OUTPUT",
+                    refused.getMessage());
+        }
+
+        @Test
+        @DisplayName("a null list is refused naming the component")
+        void nullList() {
+            List<DeclaredCapability> absent = Nulls.of(List.class);
+            NullPointerException refused =
+                    assertThrows(
+                            NullPointerException.class,
+                            () -> installed(List.of(XML_OBSERVED), absent));
+            assertEquals("unconfirmedClaims", refused.getMessage());
         }
     }
 }

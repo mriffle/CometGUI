@@ -557,12 +557,17 @@ public final class ManagedToolManager implements ToolManager {
         }
         if (verified != null) {
             InstallationMarker marker = verified.requireMarker();
-            return managedOffer(
-                    record,
+            return new ToolOffer(
+                    record.tool(),
+                    record.version(),
+                    ToolOrigin.MANAGED,
                     ToolInstallState.INSTALLED,
                     probed(marker),
+                    record.advisories(),
                     Optional.empty(),
-                    Optional.of(verified.directory().resolve(record.executablePath())));
+                    Optional.of(verified.directory().resolve(record.executablePath())),
+                    OptionalLong.of(wholeDownloadOf(record)),
+                    unconfirmed(record, marker));
         }
         if (attempt == ToolInstallState.FAILED) {
             return managedOffer(
@@ -618,6 +623,31 @@ public final class ManagedToolManager implements ToolManager {
             bytes += companion.sizeBytes();
         }
         return bytes;
+    }
+
+    /*
+     * R-TOOL-07: WHERE MANIFEST AND PROBE DISAGREE, THE PROBE WINS -- AND THE DISAGREEMENT IS NOT
+     * SILENT.  The offer carries each manifest claim the probe recorded in the marker did not
+     * confirm, so the run that uses the build can record it as a warning in provenance, which is
+     * the rule's other half.  Both sides are already held here: the manifest is this class's, and
+     * the marker is the one ToolCache.verify just checked, so nothing is re-probed and nothing is
+     * added to the marker.  The claim is judged against the manifest this CometGUI ships, which is
+     * the manifest that would make the claim today.
+     *
+     * One direction only.  A capability the probe found and the manifest does not list is the
+     * manifest being silent rather than wrong: Percolator's rows claim the two XML capabilities and
+     * its probe establishes a dozen, and a warning for each would bury the one that matters.
+     */
+    private static List<DeclaredCapability> unconfirmed(
+            ArtefactRecord record, InstallationMarker marker) {
+        List<ToolCapability> found = marker.capabilities();
+        List<DeclaredCapability> unconfirmed = new ArrayList<>();
+        for (DeclaredCapability claim : record.capabilities()) {
+            if (!found.contains(claim.capability())) {
+                unconfirmed.add(claim);
+            }
+        }
+        return unconfirmed;
     }
 
     /*
