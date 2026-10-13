@@ -81,7 +81,7 @@ authoritative for its own scope and exit gate.
      - Limelight Conversion and Upload
      - 09, 10
      - none open; D-002 and D-007 both DECIDED
-     - IN PROGRESS (dispatched 2026-10-11)
+     - PARTIAL (signed off 2026-10-13; Linux only)
    * - `13 <PHASE-13-provenance-ui.rst>`_
      - Provenance UI and Reports
      - 04, 08, 09, 12

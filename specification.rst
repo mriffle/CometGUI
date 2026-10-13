@@ -5,8 +5,8 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 18
-:Revision date: 2026-10-11
+:Revision: 19
+:Revision date: 2026-10-13
 :Supersedes: Revision 16, 2026-10-08
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
@@ -33,6 +33,15 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 19
+     - 2026-10-13
+     - Limelight text brought into line with what Phase 12 measured: a submit
+       key cannot read the server's import log or list projects, so the upload
+       shows live upload progress and the import status the API returns, and
+       the project is entered by its identifier; the compatible rerun refuses,
+       never reruns Comet, when the merged PIN fails its checks; conversion
+       provenance is recorded in the run's ``events.log``; where no OS
+       keychain is used the key is held for the session only.
    * - 18
      - 2026-10-11
      - PDV text brought into line with what Phase 11 measured: PDV 2.7.0's
@@ -2446,8 +2455,10 @@ directory is writable.
     ``Rerun Percolator with 3.07.1 for Limelight``, never a literal baked into
     the message. The action shall preserve the original Percolator
     run and create a distinct Percolator-stage execution and provenance record.
-    It shall reuse the merged PIN and shall not rerun Comet unless the PIN
-    fails checksum or prerequisite validation.
+    It shall reuse the merged PIN and shall never rerun Comet: if the PIN
+    fails checksum or prerequisite validation, the action is refused with the
+    reason, and a fresh search is the user's own choice (revision 19, from
+    Phase 12).
 
 ``R-LL-02``
     Where no XML-capable Percolator is available for the host platform at all
@@ -2481,20 +2492,26 @@ Conversion validation
     also validate that the Limelight XML exists, is non-empty, is readable, has
     the expected top-level XML structure, and passes any locally runnable
     converter or schema validation. The output shall be checksummed and
-    recorded in provenance.
+    recorded in provenance -- as an event in the run's ``events.log``, since
+    ``provenance.json`` is the run's sealed record.
 
 Upload
 ------
 
 The upload UI shall provide server and project selection as required by the
-Limelight API, show live upload and import logs, and retain the final
-server-side identifier or URL metadata when available.
+Limelight API, show live upload progress and the import status the API
+returns, and retain the final server-side identifier or URL metadata when
+available. Phase 12 measured the limits of a submit key: it cannot read the
+server's import log and no endpoint lists the projects it may write to, so the
+project is entered by its identifier and the import log is not shown.
 
 ``R-SEC-03``
     Credentials, tokens and passwords shall never be written to provenance or
     ordinary logs. OS credential/keychain storage is preferred. At minimum,
     secrets shall be held separately from project files and redacted from
-    command display, process environment capture and exported reports.
+    command display, process environment capture and exported reports. Where
+    no keychain is used (today macOS and Windows), the key is held in memory
+    for the session only and never written.
 
 ``R-SEC-04``
     Upload is the only outward-facing action in the product. It shall require

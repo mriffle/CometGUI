@@ -3,21 +3,21 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-11
-:Updated by: Main orchestrator, session 10 (**Phase 11 signed off PARTIAL** --
-   :ref:`status-p11-signed`; specification revision 18; ``main`` pushed;
-   **Phase 12 dispatched**)
-:Current phase: **Phase 12 -- Limelight Conversion and Upload**, dispatched
-   2026-10-11 with ``handoffs/PHASE-12-BRIEF.rst``, after Phase 11 was signed
-   off (:ref:`status-p11-signed`). Standing owner instruction (2026-10-08):
+:Updated: 2026-10-13
+:Updated by: Main orchestrator, session 10 (**Phase 12 signed off PARTIAL** --
+   :ref:`status-p12-signed`; specification revision 19; ``main`` pushed; a
+   between-phase repair dispatched)
+:Current phase: **between Phases 12 and 13** -- a short tier-1 repair (the
+   Tool Manager's interface-thread processes; the ``tests`` preflight), then
+   **Phase 13 -- Provenance UI and Reports**. Standing owner instruction (2026-10-08):
    *"When all is green with the current phase, push, then move on to the
    next phase."*
-:Overall: Twelve phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
-   05, 08, 09, 10 and 11 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
+:Overall: Thirteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
+   05, 08, 09, 10, 11 and 12 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (**about 9 hours since Phase 11** -- build
-   120 min, ``tests`` 268, the other seventeen 142 -- run detached; raised
+   ``scripts/verify-all-gates.sh`` (**about 10 hours since Phase 12** -- build
+   135 min, ``tests`` 312, the other eighteen 152 -- run detached; raised
    with the owner, :ref:`status-p10-signed`) runs once
    per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
@@ -272,8 +272,10 @@ Phase board
        platform alone.
    * - 12
      - Limelight conversion and upload
-     - IN PROGRESS
-     - Dispatched 2026-10-11 (``handoffs/PHASE-12-BRIEF.rst``).
+     - PARTIAL
+     - **Signed off 2026-10-13** at ``3d6723a``: build 11/11, gates 19/19 (new
+       ``limelight``, 130 controls), three tier-1 injections
+       (:ref:`status-p12-signed`). PARTIAL on platform.
    * - 13
      - Provenance UI and reports
      - NOT STARTED
@@ -3273,6 +3275,96 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-fix-p12-p13:
+
+Between Phases 12 and 13: the Tool Manager's thread, the ``tests`` preflight (dispatched 2026-10-13)
+=====================================================================================================
+
+One tier-1 fix agent, brief ``handoffs/FIX-P12-P13-BRIEF.rst``:
+
+* ``ToolManagerViewModel.refresh()`` starts tool processes -- each installed
+  tool's version check, now including ``java -jar`` for the Limelight
+  converter -- on the JavaFX application thread, so the window can stall on
+  every refresh. They move off it, with a test that fails if a process is
+  started there.
+* ``scripts/verify-test-gates.sh``'s preflight refuses to start without the
+  host ``gcc`` and ``/usr/bin/timeout`` (the real-PDV tests need both) and the
+  pinned importer JAR under ``scratch/limelight-upload-spike/artefacts``.
+
+Not yet signed off.
+
+.. _status-p12-signed:
+
+Phase 12 signed off PARTIAL (2026-10-13)
+========================================
+
+Nine units, all accepted by the phase orchestrator; one sent back once (it had
+added a second Percolator XML reader), and one repair of the orchestrator's
+own. Record: ``handoffs/PHASE-12-worklog.rst`` and
+``handoffs/PHASE-12-handoff.rst``.
+
+**What exists.** The pinned Limelight converter, run through the one process
+service and judged by its output alone -- it exits 0 with no arguments --
+against the XSD read from its own JAR, with the PSM count compared and the
+checksums recorded in ``events.log``. A Limelight section that says, before
+any attempt, when the run's Percolator wrote no XML and offers Phase 09's
+compatible rerun (Comet is never rerun) or, where no managed build exists,
+local registration. Upload through CometGUI's own client of Limelight's
+submit-import protocol, so the key is never on a command line: the
+destination shown first, nothing sent until Send, plain http refused except
+to this computer, the key in the OS keychain or held for the session. Tests
+talk only to a local fake that validates uploads against the converter's
+schema, behind a JVM-wide guard that keeps them on loopback. New harness
+``scripts/verify-limelight-gates.sh`` (``limelight``, 130 controls, floor
+130).
+
+**Tier 1's exit-gate run**, at ``3d6723a`` on a quiet tree, every
+prerequisite present: ``scripts/build.sh`` 11/11 in 8090 s; the other
+eighteen controls in 152 minutes, ``limelight`` 130, ``pdv`` 107,
+``results`` 100, ``percolator`` 109, ``workflow`` 110, ``paramui`` 87,
+``params`` 109, ``install`` 95, ``pipeline`` 24; ``--only tests`` 37
+assertions in 18 716 s. **19 of 19**, about 10 hours in all.
+
+**Nothing weakened:** no test deleted or disabled, no assumption added, no
+POM or PIT configuration changed; the two assertions removed were count
+updates (event types 10 to 16); ``verify-all-gates.sh`` changed additively.
+
+**Tier 1's own injections**, upstream modules installed fresh, tests counted,
+each restored and verified with ``sha256sum -c``:
+
+* plain http allowed to any host -- **1 of 1122** tools tests failed,
+  ``LimelightServerTest.plainHttpOnlyToLoopback``;
+* the Limelight XML's PSM count capped at 101 -- **4 of 1122** failed, among
+  them ``LimelightConverterRealTest.aRealConversion`` on the real converter;
+* the configuration-time decoy-import check skipped -- **1 of 917** workflow
+  tests failed, ``LimelightConversionsTest.gate8DecoyImportAgainstANoDecoyRun``.
+
+**Grade: PARTIAL**, on platform: all eight items met on Linux; nothing ran on
+macOS or Windows, and the Linux keychain path was tested against a stand-in
+for ``secret-tool``.
+
+**Settled by tier 1:** design decisions P12-5 (conversion and upload are
+user-started and recorded in ``events.log``), P12-14 (our own upload client),
+P12-18 (the converter reads a copy of the Percolator XML with the run's
+directory removed from its PSM ids, both files hashed), P12-19 (http only to
+this computer) and P12-20 accepted. **Specification revision 19** records
+the submit key's limits (no import log, project by identifier), that the
+rerun refuses rather than rerunning Comet, provenance in ``events.log``, and
+session-only keys where there is no keychain.
+
+**Found, and fixed next** (:ref:`status-fix-p12-p13`): the Tool Manager
+starts processes on the interface thread on every refresh -- older than this
+phase, made worse by it; and the ``tests`` preflight does not check for the
+host ``gcc``, ``/usr/bin/timeout`` or the pinned importer JAR.
+
+**Residue carried forward:** ``org.cometgui.workflow.limelight`` (and
+``workflow.pdv``) are not PIT targets -- part of the owner's build-time
+question; an upload cannot be cancelled once sent; the rerun takes the
+Percolator section's current settings, as no reader for a run's archived
+settings exists yet; the opt-in ``UpstreamInstallUiTest`` (123 MB from
+GitHub) should run in the nightly; two injections stayed green on redundant
+second layers (a decoy recount, the upload log's own redaction).
+
 .. _status-p11-signed:
 
 Phase 11 signed off PARTIAL (2026-10-11)
@@ -4149,6 +4241,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-13
+     - 12
+     - **Phase 12 signed off PARTIAL** at ``3d6723a`` (build 11/11, gates
+       19/19, three tier-1 injections). Specification revision 19. ``main``
+       pushed; a between-phase repair dispatched before Phase 13. See
+       :ref:`status-p12-signed`.
    * - 2026-10-11
      - 11, 12
      - **Phase 11 signed off PARTIAL** at ``2770967`` (build 11/11, gates
