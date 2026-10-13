@@ -19,6 +19,7 @@ package org.cometgui.ui.viewmodel.params;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -289,6 +290,31 @@ class RunViewModelTest {
     class Running {
 
         @Test
+        @DisplayName(
+                "Run hands the port the presets the session applied, with the model they were"
+                        + " applied to (P13-4)")
+        void runCarriesThePresetsApplied() {
+            PresetsViewModel presets = new PresetsViewModel(session, List.of());
+            presets.preview(
+                    presets.presets().stream()
+                            .filter(p -> "low-low".equals(p.id()))
+                            .findFirst()
+                            .orElseThrow());
+            assertEquals(EditOutcome.applied(), presets.applyAll());
+            assertEquals(1, session.appliedPresets().size());
+            ready();
+            assertTrue(run.start());
+            engine.background().drain();
+            assertEquals(1, engine.started().size());
+            assertSame(session.model(), engine.started().get(0).model());
+            assertEquals(session.appliedPresets(), engine.started().get(0).presets());
+            assertEquals("low-low", engine.started().get(0).presets().get(0).id());
+            assertEquals(
+                    "1.0005",
+                    engine.started().get(0).presets().get(0).values().get("fragment_bin_tol"));
+        }
+
+        @Test
         @DisplayName("Run does nothing while the readiness has a reason")
         void runRefusedWhenNotReady() {
             run.recheck();
@@ -550,6 +576,7 @@ class RunViewModelTest {
                         @Override
                         public ActiveRun start(
                                 org.cometgui.params.comet.model.CometParameters model,
+                                List<org.cometgui.params.comet.presets.PresetApplication> presets,
                                 List<Path> spectra,
                                 PercolatorRequest percolator,
                                 RunObserver observer) {

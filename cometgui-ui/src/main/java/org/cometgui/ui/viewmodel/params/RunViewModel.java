@@ -29,6 +29,7 @@ import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.value.ObservableValue;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.comet.presets.PresetApplication;
 import org.cometgui.params.comet.validation.Finding;
 import org.cometgui.ui.viewmodel.NonNullProperty;
 import org.cometgui.ui.viewmodel.StageStepperViewModel;
@@ -324,13 +325,14 @@ public final class RunViewModel {
         preview.set(PREVIEW_RUNNING);
         outcome.set("Starting the run: recording it and writing its parameter file.");
         CometParameters model = session.model();
+        List<PresetApplication> presets = session.appliedPresets();
         List<Path> spectra = inputs.spectrumPaths();
         PercolatorRequest half = Objects.requireNonNull(percolator.getValue(), "percolator");
         RunObserver observer = new Marshalled(this, mine);
         background.execute(
                 () -> {
                     try {
-                        ActiveRun started = port.start(model, spectra, half, observer);
+                        ActiveRun started = port.start(model, presets, spectra, half, observer);
                         ui.execute(() -> guarded(() -> started(mine, started)));
                     } catch (RunNotStartedException refused) {
                         ui.execute(

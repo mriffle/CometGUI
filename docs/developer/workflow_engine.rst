@@ -540,8 +540,10 @@ invocation list and declarations -- never in completion order:
   once as an output and once as an input;
 * **settings** under pinned keys: ``comet.release``, ``comet.index-mode``,
   ``comet.database-delivery``, ``comet.params-sha256``,
-  ``comet.index-cache-key`` (with an index mode), and the engine's own
-  ``workflow.attempt`` and ``workflow.plan``.
+  ``comet.index-cache-key`` (with an index mode), the parameters' origins and
+  the presets still in place (``comet.origin.<origin>``, ``comet.preset.<nn>.*``,
+  held in ``CometParameterProvenance``; parameter names are in the values, never
+  the keys), and the engine's own ``workflow.attempt`` and ``workflow.plan``.
 
 Bounded concurrency
 -------------------

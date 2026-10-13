@@ -36,6 +36,7 @@ import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.comet.presets.PresetApplication;
 import org.cometgui.params.percolator.PercolatorSettings;
 import org.cometgui.params.percolator.resolution.CompatibilityAction;
 import org.cometgui.params.percolator.resolution.PercolatorResolution;
@@ -112,8 +113,10 @@ import org.cometgui.workflow.storage.ProjectLock;
  * database, parameter file, index mode, Comet -- digest exactly as that run recorded them, Run is a
  * retry of it: another attempt in the same run directory, which reuses every step that succeeded
  * (re-hashed against the record, P8-14) and, if a recorded result no longer matches, takes the plan
- * the engine offers. Otherwise Run prepares a new run ({@code R-RUN-06}). The rerun preview the
- * check returns describes exactly that choice ({@link RerunOutlook}).
+ * the engine offers. The presets applied are not an input: a retry records the settings its run was
+ * prepared with ({@code CometParameterProvenance}). Otherwise Run prepares a new run ({@code
+ * R-RUN-06}). The rerun preview the check returns describes exactly that choice ({@link
+ * RerunOutlook}).
  *
  * <h2>Which runs are executing</h2>
  *
@@ -235,11 +238,13 @@ public final class WorkflowRunPort implements SessionEngine {
     @Override
     public ActiveRun start(
             CometParameters model,
+            List<PresetApplication> presets,
             List<Path> spectra,
             PercolatorRequest percolator,
             RunObserver observer)
             throws RunNotStartedException {
         Objects.requireNonNull(model, "model");
+        Objects.requireNonNull(presets, "presets");
         Objects.requireNonNull(spectra, "spectra");
         Objects.requireNonNull(percolator, "percolator");
         Objects.requireNonNull(observer, "observer");
@@ -250,7 +255,8 @@ public final class WorkflowRunPort implements SessionEngine {
         PercolatorChoice choice = requireChoice(percolator);
         SearchRequest request =
                 new SearchRequest(model, spectra, selected.comet().orElseThrow(), IndexMode.NONE)
-                        .withPercolator(choice);
+                        .withPercolator(choice)
+                        .withPresets(presets);
         try {
             ProjectLock lock = project.lock();
             synchronized (this) {

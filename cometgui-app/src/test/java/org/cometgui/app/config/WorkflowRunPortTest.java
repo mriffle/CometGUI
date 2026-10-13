@@ -31,6 +31,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -58,10 +59,13 @@ import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.ValueOrigin;
+import org.cometgui.params.comet.presets.Preset;
+import org.cometgui.params.comet.presets.PresetApplication;
 import org.cometgui.params.comet.validation.Finding;
 import org.cometgui.params.percolator.PercolatorSettings;
 import org.cometgui.params.percolator.resolution.CompatibilityAction;
 import org.cometgui.params.percolator.resolution.DownstreamStage;
+import org.cometgui.provenance.manifest.ManifestReader;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.RunEnginePort;
@@ -168,7 +172,13 @@ class WorkflowRunPortTest {
                 reason,
                 assertThrows(
                                 RunNotStartedException.class,
-                                () -> port.start(model(fasta(root)), List.of(), BLOCKED, NOBODY))
+                                () ->
+                                        port.start(
+                                                model(fasta(root)),
+                                                List.of(),
+                                                List.of(),
+                                                BLOCKED,
+                                                NOBODY))
                         .getMessage());
         assertFalse(Files.exists(project.directory()), "nothing written for a run that cannot be");
     }
@@ -229,7 +239,7 @@ class WorkflowRunPortTest {
                 port.check(model(fasta(root)), List.of(), BLOCKED).reasons());
         assertThrows(
                 RunNotStartedException.class,
-                () -> port.start(model(fasta(root)), List.of(), BLOCKED, NOBODY));
+                () -> port.start(model(fasta(root)), List.of(), List.of(), BLOCKED, NOBODY));
     }
 
     @Test
@@ -276,7 +286,7 @@ class WorkflowRunPortTest {
         RunNotStartedException refused =
                 assertThrows(
                         RunNotStartedException.class,
-                        () -> port.start(model(fasta), List.of(), ready, NOBODY));
+                        () -> port.start(model(fasta), List.of(), List.of(), ready, NOBODY));
         assertTrue(
                 refused.getMessage()
                         .startsWith(
@@ -343,7 +353,13 @@ class WorkflowRunPortTest {
                         + " this computer have not been read yet.",
                 assertThrows(
                                 RunNotStartedException.class,
-                                () -> port.start(model(fasta), List.of(), BLOCKED, NOBODY))
+                                () ->
+                                        port.start(
+                                                model(fasta),
+                                                List.of(),
+                                                List.of(),
+                                                BLOCKED,
+                                                NOBODY))
                         .getMessage());
     }
 
@@ -378,7 +394,7 @@ class WorkflowRunPortTest {
         RunNotStartedException refused =
                 assertThrows(
                         RunNotStartedException.class,
-                        () -> port.start(model(fasta(root)), List.of(), gone, NOBODY));
+                        () -> port.start(model(fasta(root)), List.of(), List.of(), gone, NOBODY));
         assertEquals(check.reasons().get(0), refused.getMessage());
     }
 
@@ -656,7 +672,17 @@ class WorkflowRunPortTest {
                 };
         assertEquals(Set.of(), port.executingRuns(), "nothing has started");
         port.start(
-                model(fasta).withText("decoy_search", "1", ValueOrigin.USER),
+                model(fasta)
+                        .withText("decoy_search", "1", ValueOrigin.USER)
+                        .withText("fragment_bin_tol", "1.0005", ValueOrigin.PRESET),
+                List.of(
+                        new PresetApplication(
+                                "wide-bins",
+                                "Wide bins",
+                                Preset.Origin.USER,
+                                ToolVersion.parse("2026.03.0"),
+                                1,
+                                Map.of("fragment_bin_tol", "1.0005"))),
                 List.of(spectrum),
                 ready,
                 observer);
@@ -688,6 +714,26 @@ class WorkflowRunPortTest {
                                 () -> "the executing run is the run made: " + runDirectories),
                 () -> assertEquals(Set.of(), atTheEnd, "ended before its observer is told"),
                 () -> assertEquals(Set.of(), port.executingRuns()));
+        Map<String, String> settings =
+                ManifestReader.readFrom(
+                                project.directory()
+                                        .resolve("runs")
+                                        .resolve(runDirectories.get(0))
+                                        .resolve("provenance")
+                                        .resolve("provenance.json"))
+                        .settings();
+        assertAll(
+                "the presets the port was handed reach the run's provenance (P13-4)",
+                () -> assertEquals("wide-bins", settings.get("comet.preset.01.id")),
+                () -> assertEquals("Wide bins", settings.get("comet.preset.01.name")),
+                () ->
+                        assertEquals(
+                                "fragment_bin_tol = 1.0005",
+                                settings.get("comet.preset.01.applied.01")),
+                () -> assertEquals("fragment_bin_tol", settings.get("comet.origin.preset")),
+                () ->
+                        assertEquals(
+                                "database_name decoy_search", settings.get("comet.origin.user")));
         project.close();
     }
 

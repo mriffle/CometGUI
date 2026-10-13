@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.comet.presets.PresetApplication;
 
 /**
  * A Comet search as the user configured it, before it is a run: what Run readiness checks and what
@@ -39,13 +40,18 @@ import org.cometgui.params.comet.model.CometParameters;
  * @param indexMode whether the search builds (or reuses) a Comet index first, and which kind
  * @param percolator the Percolator half, when the run rescores the merged PIN with Percolator;
  *     empty for a Comet-only run, which ends with the merged PIN as Phase 08's did
+ * @param presets every preset applied to the configuration since it last started afresh, in the
+ *     order applied; provenance names those that still describe {@code model} ({@link
+ *     CometParameterProvenance}). Never an input of any step: no fingerprint and no rerun preview
+ *     depends on it
  */
 public record SearchRequest(
         CometParameters model,
         List<Path> spectra,
         CometSelection comet,
         IndexMode indexMode,
-        Optional<PercolatorChoice> percolator) {
+        Optional<PercolatorChoice> percolator,
+        List<PresetApplication> presets) {
 
     /**
      * Requires every component and copies the list.
@@ -62,6 +68,30 @@ public record SearchRequest(
         Objects.requireNonNull(comet, "comet");
         Objects.requireNonNull(indexMode, "indexMode");
         Objects.requireNonNull(percolator, "percolator");
+        Objects.requireNonNull(presets, "presets");
+        for (PresetApplication preset : presets) {
+            Objects.requireNonNull(preset, "presets contains null");
+        }
+        presets = List.copyOf(presets);
+    }
+
+    /**
+     * A search with no preset applied.
+     *
+     * @param model the Comet parameters
+     * @param spectra the spectrum files, in order
+     * @param comet the selected Comet
+     * @param indexMode the index mode
+     * @param percolator the Percolator half, or empty
+     * @throws NullPointerException naming a component or a spectrum file that is {@code null}
+     */
+    public SearchRequest(
+            CometParameters model,
+            List<Path> spectra,
+            CometSelection comet,
+            IndexMode indexMode,
+            Optional<PercolatorChoice> percolator) {
+        this(model, spectra, comet, indexMode, percolator, List.of());
     }
 
     /**
@@ -75,7 +105,7 @@ public record SearchRequest(
      */
     public SearchRequest(
             CometParameters model, List<Path> spectra, CometSelection comet, IndexMode indexMode) {
-        this(model, spectra, comet, indexMode, Optional.empty());
+        this(model, spectra, comet, indexMode, Optional.empty(), List.of());
     }
 
     /**
@@ -86,11 +116,31 @@ public record SearchRequest(
      */
     public SearchRequest withPercolator(PercolatorChoice choice) {
         return new SearchRequest(
-                model, spectra, comet, indexMode, Optional.of(Objects.requireNonNull(choice)));
+                model,
+                spectra,
+                comet,
+                indexMode,
+                Optional.of(Objects.requireNonNull(choice)),
+                presets);
+    }
+
+    /**
+     * This search with the presets applied to its configuration.
+     *
+     * @param applied every preset applied since the configuration last started afresh, in order
+     * @return a new request; this one is unchanged
+     */
+    public SearchRequest withPresets(List<PresetApplication> applied) {
+        return new SearchRequest(model, spectra, comet, indexMode, percolator, applied);
     }
 
     @Override
     public List<Path> spectra() {
         return List.copyOf(spectra);
+    }
+
+    @Override
+    public List<PresetApplication> presets() {
+        return List.copyOf(presets);
     }
 }

@@ -19,6 +19,7 @@ package org.cometgui.ui.viewmodel.params;
 import java.nio.file.Path;
 import java.util.List;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.comet.presets.PresetApplication;
 
 /**
  * The workflow engine, as the Run section's view-models see it (decision P8-16): the pre-run check
@@ -59,6 +60,9 @@ public interface RunEnginePort {
      * on the observer from engine threads.
      *
      * @param model the parameters, which become the run's immutable parameter file
+     * @param presets the presets applied to the configuration since it last started afresh, in
+     *     order ({@link ParameterSession#appliedPresets()}); a new run's provenance names those
+     *     still describing {@code model}. Never a reason to prepare a new run rather than retry
      * @param spectra the spectrum files, in order
      * @param percolator the Percolator half: the build, its settings and the enabled downstream
      *     stages; the run rescores the merged PIN with it
@@ -69,6 +73,7 @@ public interface RunEnginePort {
      */
     ActiveRun start(
             CometParameters model,
+            List<PresetApplication> presets,
             List<Path> spectra,
             PercolatorRequest percolator,
             RunObserver observer)

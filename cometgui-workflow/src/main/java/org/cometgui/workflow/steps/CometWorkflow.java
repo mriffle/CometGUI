@@ -85,7 +85,8 @@ import org.cometgui.workflow.storage.RunStore;
  *       reaches Comet ({@code R-CMT-04}). With Percolator, {@code
  *       parameters/percolator-settings.json} is written once too, the command is built from the
  *       selection's probed capabilities, and the run's provenance settings ({@link
- *       PercolatorProvenance}) are fixed.
+ *       PercolatorProvenance}) are fixed. Where each parameter value came from and which presets
+ *       still describe the configuration are fixed too ({@link CometParameterProvenance}).
  *   <li>{@link #start} -- an attempt through {@code WorkflowEngine.start}. The plan is {@code
  *       validate-configuration}, {@code resolve-comet}, {@code serialise-comet-params}, {@code
  *       hash-inputs}, [{@code build-comet-index}], {@code run-comet}, {@code
@@ -241,6 +242,7 @@ public final class CometWorkflow {
         CometParameters model = request.model();
         CometSelection comet = request.comet();
         IndexMode mode = request.indexMode();
+        Map<String, String> origins = CometParameterProvenance.settings(model, request.presets());
 
         ReservedRun reserved = store.reserve(lock);
         RunLayout layout = reserved.layout();
@@ -293,6 +295,7 @@ public final class CometWorkflow {
         settings.put(INDEX_MODE_SETTING, mode.wireName());
         settings.put(DELIVERY_SETTING, identity.databaseDelivery().wireName());
         settings.put(PARAMS_SHA256_SETTING, written.hashes().sha256());
+        settings.putAll(origins);
         entry.ifPresent(
                 cached ->
                         settings.put(

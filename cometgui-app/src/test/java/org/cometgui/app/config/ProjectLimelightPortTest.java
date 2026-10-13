@@ -812,6 +812,7 @@ class ProjectLimelightPortTest {
         @Override
         public ActiveRun start(
                 CometParameters model,
+                List<org.cometgui.params.comet.presets.PresetApplication> presets,
                 List<Path> spectra,
                 PercolatorRequest percolator,
                 RunObserver runObserver)

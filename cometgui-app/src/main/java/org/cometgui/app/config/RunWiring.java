@@ -40,6 +40,7 @@ import org.cometgui.domain.secrets.SessionSecrets;
 import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.comet.presets.PresetApplication;
 import org.cometgui.params.percolator.PercolatorSettings;
 import org.cometgui.params.percolator.resolution.CompatibilityAction;
 import org.cometgui.provenance.hashing.CachingHashService;
@@ -583,6 +584,7 @@ public final class RunWiring {
         @Override
         public ActiveRun start(
                 CometParameters model,
+                List<PresetApplication> presets,
                 List<Path> spectra,
                 PercolatorRequest percolator,
                 RunObserver observer)

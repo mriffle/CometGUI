@@ -26,6 +26,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.cometgui.params.comet.model.CometParameters;
+import org.cometgui.params.comet.presets.PresetApplication;
 import org.cometgui.ui.viewmodel.params.ActiveRun;
 import org.cometgui.ui.viewmodel.params.EngineCheck;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
@@ -47,13 +48,20 @@ public final class ScriptedEngine implements RunEnginePort {
     /** A start that the test has seen and may drive. */
     public record Started(
             CometParameters model,
+            List<PresetApplication> presets,
             List<Path> spectra,
             PercolatorRequest percolator,
             RunObserver observer) {
 
-        /** Copies the files. */
+        /** Copies the files and the presets. */
         public Started {
+            presets = List.copyOf(presets);
             spectra = List.copyOf(spectra);
+        }
+
+        @Override
+        public List<PresetApplication> presets() {
+            return List.copyOf(presets);
         }
 
         @Override
@@ -145,6 +153,7 @@ public final class ScriptedEngine implements RunEnginePort {
     @Override
     public ActiveRun start(
             CometParameters model,
+            List<PresetApplication> presets,
             List<Path> spectra,
             PercolatorRequest percolator,
             RunObserver observer)
@@ -154,7 +163,7 @@ public final class ScriptedEngine implements RunEnginePort {
         if (refusal != null) {
             throw refusal;
         }
-        started.add(new Started(model, List.copyOf(spectra), percolator, observer));
+        started.add(new Started(model, presets, List.copyOf(spectra), percolator, observer));
         if (plan != null) {
             observer.planned(plan, description);
         }

@@ -16,6 +16,7 @@
 
 package org.cometgui.workflow.steps;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,15 +28,26 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import org.cometgui.domain.run.AttemptOutcome;
 import org.cometgui.domain.run.DatabaseDelivery;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.domain.run.RunLayout;
+import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.params.comet.model.CometParameters;
 import org.cometgui.params.comet.model.DecoySource;
 import org.cometgui.params.comet.model.ValueOrigin;
+import org.cometgui.params.comet.presets.AppliedPreset;
+import org.cometgui.params.comet.presets.Preset;
+import org.cometgui.params.comet.presets.PresetApplication;
+import org.cometgui.params.comet.presets.PresetDelta;
+import org.cometgui.params.comet.presets.PresetDiff;
+import org.cometgui.params.comet.writer.CanonicalParamsWriter;
 import org.cometgui.provenance.manifest.FileDirection;
 import org.cometgui.provenance.manifest.FileRecord;
+import org.cometgui.provenance.manifest.ManifestReader;
 import org.cometgui.provenance.manifest.ProvenanceManifest;
 import org.cometgui.provenance.manifest.ProvenanceStatus;
 import org.cometgui.provenance.manifest.ToolRecord;
@@ -68,6 +80,18 @@ import org.junit.jupiter.api.io.TempDir;
         disabledReason =
                 "only the linux/x86-64 Comet binary has ever been executed in this project")
 class RealCometRunTest {
+
+    /** A CONSTRUCTED user preset setting the threads the search always ran with. */
+    private static final Preset FOUR_THREADS =
+            new Preset(
+                    "four-threads",
+                    "Four threads",
+                    "A constructed user preset.",
+                    Preset.Origin.USER,
+                    ToolVersion.parse(RealComet.NEWER),
+                    1,
+                    Optional.empty(),
+                    List.of(new PresetDelta("num_threads", "4", Optional.empty())));
 
     @TempDir private static Path scratch;
 
@@ -105,13 +129,32 @@ class RealCometRunTest {
         fasta = RealComet.subset(inputs.resolve("subset.fasta"));
         RealComet.makeReadOnly(inputs);
         project = RealProject.create(root.resolve("project"));
+        CometParameters typed =
+                RealComet.model(RealComet.NEWER, fasta, DecoySource.COMET_INTERNAL_CONCATENATED, 4);
+        // The same values, but num_threads = 4 set by a user preset (P13-4): the parameter file
+        // is byte for byte the one the search always ran with, and the provenance names the
+        // preset. A second application none of whose values is in place must not be named.
+        AppliedPreset applied =
+                PresetDiff.of(typed.resetToDefault("num_threads"), FOUR_THREADS).applyAll();
+        assertArrayEquals(
+                new CanonicalParamsWriter(RealComet.BUILD).bytes(typed),
+                new CanonicalParamsWriter(RealComet.BUILD).bytes(applied.model()));
         request =
                 new SearchRequest(
-                        RealComet.model(
-                                RealComet.NEWER, fasta, DecoySource.COMET_INTERNAL_CONCATENATED, 4),
-                        spectra,
-                        RealComet.selection(RealComet.NEWER, comet),
-                        IndexMode.NONE);
+                                applied.model(),
+                                spectra,
+                                RealComet.selection(RealComet.NEWER, comet),
+                                IndexMode.NONE)
+                        .withPresets(
+                                List.of(
+                                        new PresetApplication(
+                                                "eight-threads",
+                                                "Eight threads",
+                                                Preset.Origin.USER,
+                                                ToolVersion.parse(RealComet.NEWER),
+                                                1,
+                                                Map.of("num_threads", "8")),
+                                        PresetApplication.of(FOUR_THREADS, applied)));
         before = RealComet.snapshot(root);
         long started = System.nanoTime();
         prepared = project.prepare(request);
@@ -320,6 +363,37 @@ class RealCometRunTest {
                 RunEvidence.finished(layout(), EngineStep.FINALISE_PROVENANCE),
                 "comet.params-sha256",
                 independent);
+    }
+
+    @Test
+    @DisplayName(
+            "P13-4: provenance.json, read back with ManifestReader, says where every value that is"
+                    + " not Comet's default came from, and names the preset still in place")
+    void originsAndPresetInTheRecord() throws IOException {
+        ProvenanceManifest manifest = ManifestReader.readFrom(layout().provenanceJsonFile());
+        assertEquals(ProvenanceStatus.COMPLETED, manifest.run().status());
+        Map<String, String> recorded = new TreeMap<>();
+        for (Map.Entry<String, String> setting : manifest.settings().entrySet()) {
+            if (setting.getKey().startsWith("comet.origin.")
+                    || setting.getKey().startsWith("comet.preset.")) {
+                recorded.put(setting.getKey(), setting.getValue());
+            }
+        }
+        assertEquals(
+                Map.of(
+                        "comet.origin.cometgui-default", "spectral_library_name",
+                        "comet.origin.user", "database_name decoy_search",
+                        "comet.origin.preset", "num_threads",
+                        "comet.origin.workflow-enforced", "output_pepxmlfile output_percolatorfile",
+                        "comet.preset.01.id", "four-threads",
+                        "comet.preset.01.name", "Four threads",
+                        "comet.preset.01.origin", "user",
+                        "comet.preset.01.comet-version", "2026.03.0",
+                        "comet.preset.01.schema-version", "1",
+                        "comet.preset.01.applied.01", "num_threads = 4"),
+                recorded);
+        String archived = Files.readString(layout().cometParamsFile(), StandardCharsets.UTF_8);
+        assertTrue(archived.contains("\nnum_threads = 4"), "the archived file holds the value");
     }
 
     @Test

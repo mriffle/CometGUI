@@ -37,8 +37,9 @@ import org.cometgui.ui.viewmodel.NonNullProperty;
  * <p>The model does the work. {@link PresetDiff#of} makes the rows and runs the compatibility check
  * against the configuration's release; {@link PresetDiff#applySelected} makes the new set, in which
  * exactly the applied rows hold the preset's text with origin {@code PRESET}; the session adopts it
- * as {@link Adoption#PRESET_APPLIED}, so the workflow's outputs stay enforced and a migration under
- * review stays under review. The applied set's findings are the session's one report.
+ * as {@link Adoption#PRESET_APPLIED} ({@link ParameterSession#adoptPreset}), so the workflow's
+ * outputs stay enforced, a migration under review stays under review, and the application is
+ * remembered for the run's provenance. The applied set's findings are the session's one report.
  *
  * <p>Cancelling, applying nothing, and a preview the configuration has moved on from all leave the
  * configuration exactly as it was: the same model object, every origin unchanged.
@@ -204,7 +205,7 @@ public final class PresetsViewModel {
                             : "No change is selected, so nothing was applied.");
         }
         AppliedPreset applied = shown.diff().applySelected(names);
-        session.adopt(applied.model(), Adoption.PRESET_APPLIED);
+        session.adoptPreset(shown.diff().preset(), applied);
         lastApplied.set(Optional.of(applied));
         preview.set(Optional.empty());
         return EditOutcome.applied();

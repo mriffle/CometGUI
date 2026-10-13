@@ -36,6 +36,9 @@ import org.cometgui.params.comet.model.ParameterEntry;
 import org.cometgui.params.comet.model.ParameterValue;
 import org.cometgui.params.comet.model.ValueOrigin;
 import org.cometgui.params.comet.parser.ReleaseDefaults;
+import org.cometgui.params.comet.presets.AppliedPreset;
+import org.cometgui.params.comet.presets.Preset;
+import org.cometgui.params.comet.presets.PresetApplication;
 import org.cometgui.params.comet.schema.CuratedMetadata;
 import org.cometgui.params.comet.schema.ParameterCategory;
 import org.cometgui.params.comet.schema.ParameterDefinition;
@@ -83,6 +86,15 @@ import org.cometgui.ui.viewmodel.NonNullProperty;
  * -- changes nothing, origin included. Only a value the scientist actually changed on that
  * parameter is marked {@code USER}.
  *
+ * <h2>The presets applied are remembered with the configuration</h2>
+ *
+ * <p>Every preset applied through {@link #adoptPreset} is kept, in order, with the configuration it
+ * was applied to ({@link #appliedPresets()}), so that a run can record which presets it was
+ * configured from. A configuration that starts afresh -- a new configuration, an imported file --
+ * and a migration, including a release change, forget them all; an edit, a reset or an Expert raw
+ * apply keeps them, and the run records only those whose values are still in place ({@code
+ * PresetApplication.describes}).
+ *
  * <p>Toolkit-free and single-threaded: every call is made on the interface thread, and nothing here
  * runs in the background.
  */
@@ -111,16 +123,22 @@ public final class ParameterSession {
     private List<FieldViewModel> fieldList = List.of();
 
     /**
-     * The configuration, its report and the migration under review, as one value: what every getter
-     * answers from. It is replaced before any property of a change is published, so a listener of
-     * any property -- whichever fires first -- reads a model, a report, a release, a review and
-     * fields that belong together.
+     * The configuration, its report, the migration under review and the presets applied, as one
+     * value: what every getter answers from. It is replaced before any property of a change is
+     * published, so a listener of any property -- whichever fires first -- reads a model, a report,
+     * a release, a review and fields that belong together.
      */
     private State state;
 
-    /** One consistent configuration: the model, its report, and the migration under review. */
+    /**
+     * One consistent configuration: the model, its report, the migration under review, and the
+     * presets applied since it started afresh.
+     */
     private record State(
-            CometParameters model, ValidationReport report, Optional<MigrationReview> review) {}
+            CometParameters model,
+            ValidationReport report,
+            Optional<MigrationReview> review,
+            List<PresetApplication> presets) {}
 
     /**
      * A session holding a new configuration of the first offered release.
@@ -169,7 +187,7 @@ public final class ParameterSession {
         this.report = new NonNullProperty<>(this, "report", validate(start, Optional.empty()));
         this.fields = new NonNullProperty<>(this, "fields", List.of());
         this.pendingRefusals = new NonNullProperty<>(this, "pendingRefusals", List.of());
-        this.state = new State(start, report.get(), Optional.empty());
+        this.state = new State(start, report.get(), Optional.empty(), List.of());
         buildFields(start);
         showFields(start, report.get());
         fields.set(fieldList);
@@ -264,6 +282,16 @@ public final class ParameterSession {
      */
     public Optional<MigrationReview> review() {
         return state.review();
+    }
+
+    /**
+     * Every preset applied to the configuration since it last started afresh or was migrated, in
+     * the order applied, each with the values it set.
+     *
+     * @return the applications, immutable; empty when none was applied
+     */
+    public List<PresetApplication> appliedPresets() {
+        return state.presets();
     }
 
     /**
@@ -586,6 +614,27 @@ public final class ParameterSession {
     public void adopt(CometParameters adopted, Adoption source) {
         Objects.requireNonNull(adopted, "adopted");
         Objects.requireNonNull(source, "source");
+        adopt(adopted, source, source.startsAfresh() ? List.of() : appliedPresets());
+    }
+
+    /**
+     * Adopts the set a preset's applied rows made ({@link Adoption#PRESET_APPLIED}) and remembers
+     * the application after those already applied.
+     *
+     * @param preset the preset the rows came from
+     * @param applied what applying them produced, from the configuration of the selected release
+     * @throws IllegalArgumentException if the set is not of the selected release, or no row was
+     *     applied
+     */
+    public void adoptPreset(Preset preset, AppliedPreset applied) {
+        Objects.requireNonNull(applied, "applied");
+        PresetApplication application = PresetApplication.of(preset, applied);
+        List<PresetApplication> presets = new ArrayList<>(appliedPresets());
+        presets.add(application);
+        adopt(applied.model(), Adoption.PRESET_APPLIED, List.copyOf(presets));
+    }
+
+    private void adopt(CometParameters adopted, Adoption source, List<PresetApplication> presets) {
         ToolVersion version = adopted.version();
         Optional<MigrationReview> kept = review();
         if (source.startsAfresh()) {
@@ -598,7 +647,7 @@ public final class ParameterSession {
                             + " cannot be applied to a configuration of Comet "
                             + release().text());
         }
-        replace(adopted.withWorkflowEnforcedOutputs(), kept);
+        replace(adopted.withWorkflowEnforcedOutputs(), kept, presets);
     }
 
     /**
@@ -612,7 +661,8 @@ public final class ParameterSession {
         requireOffered(migration.model().version());
         replace(
                 migration.model().withWorkflowEnforcedOutputs(),
-                Optional.of(MigrationReview.of(migration)));
+                Optional.of(MigrationReview.of(migration)),
+                List.of());
     }
 
     /**
@@ -664,7 +714,7 @@ public final class ParameterSession {
                                         new IllegalStateException(
                                                 "no migration is under review, so there is nothing"
                                                         + " to resolve"));
-        publish(model(), Optional.of(current.resolve(name)), false);
+        publish(model(), Optional.of(current.resolve(name)), appliedPresets(), false);
     }
 
     /**
@@ -786,16 +836,22 @@ public final class ParameterSession {
     }
 
     /**
-     * Replaces the whole configuration and the migration under review: new fields if the release
-     * changed, no refusal pending.
+     * Replaces the whole configuration, the migration under review and the presets applied: new
+     * fields if the release changed, no refusal pending.
      */
-    private void replace(CometParameters next, Optional<MigrationReview> nextReview) {
-        publish(next, nextReview, true);
+    private void replace(
+            CometParameters next,
+            Optional<MigrationReview> nextReview,
+            List<PresetApplication> presets) {
+        publish(next, nextReview, presets, true);
     }
 
-    /** Makes a configuration of the same release current, the migration under review kept. */
+    /**
+     * Makes a configuration of the same release current, the migration under review and the presets
+     * applied kept.
+     */
     private void commit(CometParameters next) {
-        publish(next, review(), false);
+        publish(next, review(), appliedPresets(), false);
     }
 
     /**
@@ -810,17 +866,21 @@ public final class ParameterSession {
      *
      * @param next the configuration
      * @param nextReview the migration under review with it
+     * @param presets the presets applied with it
      * @param clearRefusals whether every pending refusal is dropped (a whole set adopted)
      */
     private void publish(
-            CometParameters next, Optional<MigrationReview> nextReview, boolean clearRefusals) {
+            CometParameters next,
+            Optional<MigrationReview> nextReview,
+            List<PresetApplication> presets,
+            boolean clearRefusals) {
         ValidationReport nextReport = validate(next, nextReview);
         boolean newRelease = !next.version().equals(release());
         List<FieldViewModel> previous = fieldList;
         if (newRelease) {
             buildFields(next);
         }
-        state = new State(next, nextReport, nextReview);
+        state = new State(next, nextReport, nextReview, presets);
 
         if (clearRefusals && !newRelease) {
             for (FieldViewModel field : previous) {

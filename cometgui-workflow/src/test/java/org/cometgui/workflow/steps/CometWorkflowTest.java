@@ -35,6 +35,11 @@ import org.cometgui.domain.run.RunIdentity;
 import org.cometgui.domain.run.SpectrumInput;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.model.DecoySource;
+import org.cometgui.params.comet.presets.AppliedPreset;
+import org.cometgui.params.comet.presets.Preset;
+import org.cometgui.params.comet.presets.PresetApplication;
+import org.cometgui.params.comet.presets.PresetDelta;
+import org.cometgui.params.comet.presets.PresetDiff;
 import org.cometgui.params.comet.validation.ValidationReport;
 import org.cometgui.params.comet.writer.CanonicalParamsWriter;
 import org.cometgui.workflow.engine.ReuseCheck;
@@ -112,7 +117,11 @@ class CometWorkflowTest {
                             "comet.release", "2026.03.0",
                             "comet.index-mode", "none",
                             "comet.database-delivery", "parameter-file",
-                            "comet.params-sha256", RealComet.sha256(params)),
+                            "comet.params-sha256", RealComet.sha256(params),
+                            "comet.origin.cometgui-default", "spectral_library_name",
+                            "comet.origin.user", "database_name decoy_search num_threads",
+                            "comet.origin.workflow-enforced",
+                                    "output_pepxmlfile output_percolatorfile"),
                     prepared.settings());
             assertEquals(CometWorkflow.planFor(IndexMode.NONE).steps(), prepared.plan().steps());
             assertEquals(Set.copyOf(prepared.plan().steps()), prepared.actions().keySet());
@@ -146,6 +155,84 @@ class CometWorkflowTest {
                     fresh.preview().reExecuted(),
                     "nothing is recorded yet, so everything runs");
             assertEquals(List.of(), project.runner().launches());
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "prepare records the presets still describing the configuration; the presets change"
+                    + " no input, so the rerun preview and the inputs are those of the same"
+                    + " configuration without them")
+    void prepareRecordsThePresets(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
+        FakeSearch fake = FakeSearch.create(directory);
+        try (RealProject project = RealProject.create(fake.project())) {
+            SearchRequest plain =
+                    fake.request(DecoySource.COMET_INTERNAL_CONCATENATED, IndexMode.NONE);
+            Preset bins =
+                    new Preset(
+                            "wide-bins",
+                            "Wide bins",
+                            "A constructed user preset.",
+                            Preset.Origin.USER,
+                            ToolVersion.parse(RealComet.NEWER),
+                            1,
+                            Optional.empty(),
+                            List.of(
+                                    new PresetDelta(
+                                            "fragment_bin_tol", "1.0005", Optional.empty())));
+            AppliedPreset applied = PresetDiff.of(plain.model(), bins).applyAll();
+            PresetApplication gone =
+                    new PresetApplication(
+                            "eight-threads",
+                            "Eight threads",
+                            Preset.Origin.USER,
+                            ToolVersion.parse(RealComet.NEWER),
+                            1,
+                            Map.of("num_threads", "8"));
+            SearchRequest request =
+                    new SearchRequest(
+                                    applied.model(), plain.spectra(), plain.comet(), IndexMode.NONE)
+                            .withPresets(List.of(gone, PresetApplication.of(bins, applied)));
+            SearchRequest withoutPresets =
+                    new SearchRequest(
+                            applied.model(), plain.spectra(), plain.comet(), IndexMode.NONE);
+            PreparedRun prepared = project.prepare(request);
+
+            Map<String, String> recorded = new java.util.TreeMap<>();
+            for (Map.Entry<String, String> setting : prepared.settings().entrySet()) {
+                if (setting.getKey().startsWith("comet.preset.")
+                        || setting.getKey().startsWith("comet.origin.")) {
+                    recorded.put(setting.getKey(), setting.getValue());
+                }
+            }
+            assertEquals(
+                    Map.of(
+                            "comet.origin.cometgui-default", "spectral_library_name",
+                            "comet.origin.user", "database_name decoy_search num_threads",
+                            "comet.origin.preset", "fragment_bin_tol",
+                            "comet.origin.workflow-enforced",
+                                    "output_pepxmlfile output_percolatorfile",
+                            "comet.preset.01.id", "wide-bins",
+                            "comet.preset.01.name", "Wide bins",
+                            "comet.preset.01.origin", "user",
+                            "comet.preset.01.comet-version", "2026.03.0",
+                            "comet.preset.01.schema-version", "1",
+                            "comet.preset.01.applied.01", "fragment_bin_tol = 1.0005"),
+                    recorded);
+            assertEquals(prepared.settings(), prepared.request().settings());
+
+            assertEquals(
+                    project.workflow().inputsOf(withoutPresets).values(),
+                    project.workflow().inputsOf(request).values());
+            assertEquals(prepared.inputs().values(), project.workflow().inputsOf(request).values());
+            ReuseCheck with = project.workflow().preview(project.engine(), prepared, request);
+            ReuseCheck without =
+                    project.workflow().preview(project.engine(), prepared, withoutPresets);
+            assertTrue(with.accepted(), with::message);
+            assertEquals(without.preview().reExecuted(), with.preview().reExecuted());
+            assertEquals(without.preview().reused(), with.preview().reused());
+            assertEquals(without.preview().prepared(), with.preview().prepared());
         }
     }
 

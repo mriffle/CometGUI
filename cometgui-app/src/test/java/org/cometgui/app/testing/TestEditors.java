@@ -306,6 +306,7 @@ public final class TestEditors {
         @Override
         public ActiveRun start(
                 CometParameters model,
+                List<org.cometgui.params.comet.presets.PresetApplication> presets,
                 List<Path> spectra,
                 PercolatorRequest percolator,
                 RunObserver observer)
