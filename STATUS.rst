@@ -4,12 +4,11 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-10-13
-:Updated by: Main orchestrator, session 10 (**Phase 12 signed off PARTIAL** --
-   :ref:`status-p12-signed`; specification revision 19; ``main`` pushed; a
-   between-phase repair dispatched)
-:Current phase: **between Phases 12 and 13** -- a short tier-1 repair (the
-   Tool Manager's interface-thread processes; the ``tests`` preflight), then
-   **Phase 13 -- Provenance UI and Reports**. Standing owner instruction (2026-10-08):
+:Updated by: Main orchestrator, session 10 (between-phase repair signed off --
+   :ref:`status-fix-p12-p13`; ``main`` pushed; **Phase 13 dispatched**)
+:Current phase: **Phase 13 -- Provenance UI and Reports**, IN PROGRESS (brief
+   ``handoffs/PHASE-13-BRIEF.rst``; it settles the Windows ``ATOMIC_MOVE``
+   question by design before building the viewer). Standing owner instruction (2026-10-08):
    *"When all is green with the current phase, push, then move on to the
    next phase."*
 :Overall: Thirteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
@@ -278,8 +277,9 @@ Phase board
        (:ref:`status-p12-signed`). PARTIAL on platform.
    * - 13
      - Provenance UI and reports
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-10-13 after the between-phase repair
+       (:ref:`status-fix-p12-p13`).
    * - 14
      - GUI automation and packaged end-to-end harness
      - NOT STARTED
@@ -3277,7 +3277,7 @@ revision-11 history row was added.
 
 .. _status-fix-p12-p13:
 
-Between Phases 12 and 13: the Tool Manager's thread, the ``tests`` preflight (dispatched 2026-10-13)
+Between Phases 12 and 13: the Tool Manager's thread, the ``tests`` preflight (signed off 2026-10-13)
 =====================================================================================================
 
 One tier-1 fix agent, brief ``handoffs/FIX-P12-P13-BRIEF.rst``:
@@ -3291,7 +3291,39 @@ One tier-1 fix agent, brief ``handoffs/FIX-P12-P13-BRIEF.rst``:
   host ``gcc`` and ``/usr/bin/timeout`` (the real-PDV tests need both) and the
   pinned importer JAR under ``scratch/limelight-upload-spike/artefacts``.
 
-Not yet signed off.
+**Signed off by tier 1 on 2026-10-13 at** ``a50ce58``. Work log:
+``handoffs/FIX-P12-P13-worklog.rst``.
+
+* **What changed.** ``refresh()`` reads the port on the background executor
+  and applies the answer on the interface thread; a row keeps its identity and
+  any running install, an older read that finishes last is dropped, and a read
+  that fails leaves the rows and says why. The ``ToolManager`` port's javadoc,
+  which had promised ``offers()`` was safe on the JavaFX thread, was corrected.
+  The preflight now refuses, naming what is missing, without ``timeout`` or
+  ``gcc`` on ``PATH``, when ``gcc`` cannot build the xkbcomp shim, or when the
+  importer JAR is missing or differs from the SHA-256 pinned in
+  ``FakeLimelightServerTest.java``. ``PATH`` rather than ``/usr/bin/timeout``,
+  because that is how the tests find it.
+* **Diff read.** No POM, floor, PIT setting, survivor or harness changed.
+  Four tests were adjusted to the asynchronous refresh with their assertions
+  unchanged; one (``ProgressReachesTheInterfaceThreadTest``) was strengthened
+  because it had gone blind to ``install`` control 4's defect after the fix.
+* **Gates, re-run by tier 1:** ``--preflight`` passes; ``docs`` 1,
+  ``traceability`` 8, ``quality`` 42, ``shell`` 30, ``install`` 95 and
+  ``paramui`` 87 -- 6/6 PASS in 53m29s. ``paramui`` because it grades
+  ``AccessibleNameEnumerationUiTest``, which now waits for the tool list.
+* **Tier-1 injection:** the read put back on the calling thread. cometgui-ui:
+  7 of 787 failed (all six ``ToolManagerRefreshThreadTest`` and one
+  ``NoManagedBuildViewModelTest``); cometgui-app's
+  ``ToolManagerRefreshThreadUiTest`` failed naming the converter's ``java
+  -jar ... --version`` started on the JavaFX application thread, 2 of 3
+  launches. Restored, ``sha256sum -c`` OK, clean module reinstalled. The agent's
+  own three injections and targeted PIT (60 of 63 killed, every mutant in new
+  code) are in its work log.
+* Also corrected by tier 1: ``docs/developer/results_model.rst`` said
+  ``--preflight`` ran only the large-fixture checks.
+* **Not run:** ``build.sh`` and ``--only tests``, by the brief; both run at
+  Phase 13's exit gate.
 
 .. _status-p12-signed:
 
@@ -4241,6 +4273,13 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-13
+     - 12+, 13
+     - Between-phase repair signed off (the Tool Manager reads its tools off
+       the interface thread; the ``tests`` preflight checks ``gcc``,
+       ``timeout`` and the importer JAR; 6/6 affected gates, a tier-1
+       injection). ``main`` pushed; **Phase 13 dispatched**. See
+       :ref:`status-fix-p12-p13`.
    * - 2026-10-13
      - 12
      - **Phase 12 signed off PARTIAL** at ``3d6723a`` (build 11/11, gates

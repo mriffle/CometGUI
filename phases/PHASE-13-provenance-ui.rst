@@ -3,7 +3,7 @@ PHASE-13: Provenance UI and Reports
 ===================================
 
 :Phase: 13
-:Status: NOT STARTED
+:Status: IN PROGRESS (dispatched 2026-10-13)
 :Depends on: 04, 08, 09, 12
 :Blocked by decisions: none
 :Delivers: no rules owned -- presentation of the provenance model

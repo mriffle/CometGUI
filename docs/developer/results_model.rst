@@ -629,8 +629,11 @@ naming the command, when a file is absent or differs. Its record is
 ``LargeFixture.java``, so the pin lives in one place -- and the presence of
 the real K562 Percolator 3.07.1 outputs below, **before** it builds anything,
 and refuses to start with a message naming the missing or changed file and
-how to remake it; ``bash scripts/verify-test-gates.sh --preflight`` runs only
-those checks. Without them the run would die inside its sandbox build as a
+how to remake it. ``bash scripts/verify-test-gates.sh --preflight`` runs
+these checks together with the harness's other preconditions (the toolchain,
+the other gitignored fixtures, the pinned Limelight importer JAR, and the
+host ``gcc`` and ``timeout`` the real-PDV tests need) and runs no control.
+Without them the run would die inside its sandbox build as a
 pile of results-suite failures after many minutes.
 
 **The real fixtures.** Phase 00's K562 search (Comet 2026.02.2 over the two
