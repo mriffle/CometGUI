@@ -44,6 +44,8 @@ import org.cometgui.domain.secrets.SecretRedactor;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.provenance.manifest.ExecutionRecord;
+import org.cometgui.provenance.manifest.FileDirection;
+import org.cometgui.provenance.manifest.FileRecord;
 import org.cometgui.provenance.manifest.LogRecord;
 import org.cometgui.provenance.manifest.ProvenanceManifest;
 import org.cometgui.provenance.manifest.ProvenanceStatus;
@@ -250,6 +252,147 @@ class DiskVerificationTest {
                         stderr,
                         ProvenanceStatus.COMPLETED),
                 List.of());
+    }
+
+    /** MD5 and SHA-256 of "abc" (RFC 1321, FIPS 180-2), typed here. */
+    private static final String ABC_MD5 = "900150983cd24fb0d6963f7d28e17f72";
+
+    private static final String ABC_SHA256 =
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
+    /** MD5 and SHA-256 of "message digest", typed here: the wrong half of each record. */
+    private static final String OTHER_MD5 = "f96b697d7cb7938d525a2f31aaf161d0";
+
+    private static final String OTHER_SHA256 =
+            "f7846f55cf23e14eebeab5b4e1550cad5b509e3348fbc4efa3a1413d393cb650";
+
+    @Test
+    @DisplayName("one digest wrong, the other right: differs, for files, a tool and a log")
+    void eitherDigestAloneDiffers() throws IOException {
+        RunDirectories other = RunDirectories.create(Files.createDirectory(tmp.resolve("half")));
+        try {
+            RunLayout layout =
+                    other.recordedRun(
+                            "run-0008", RunDirectories.CREATED, RunDirectories.cometParams());
+            Path md5Wrong = RunDirectories.write(layout, "outputs/a.pin", "abc");
+            Path shaWrong = RunDirectories.write(layout, "outputs/b.pin", "abc");
+            Path exe = RunDirectories.write(layout, "bin/tool", "abc");
+            Path stdout = RunDirectories.write(layout, "logs/out.log", "abc");
+            Path stderr = RunDirectories.write(layout, "logs/err.log", "abc");
+            FileHashes md5Off = new FileHashes(OTHER_MD5, ABC_SHA256);
+            FileHashes shaOff = new FileHashes(ABC_MD5, OTHER_SHA256);
+            ToolRecord tool =
+                    new ToolRecord(
+                            "tool",
+                            "1.0",
+                            Optional.empty(),
+                            exe,
+                            md5Off,
+                            false,
+                            Optional.empty(),
+                            Set.of(),
+                            Optional.of("tool-01"),
+                            new ExecutionRecord(
+                                    new ToolCommand(
+                                            List.of(exe.toString()), layout.root(), Map.of()),
+                                    RunDirectories.STARTED,
+                                    RunDirectories.ENDED,
+                                    0,
+                                    Optional.of(new LogRecord(stdout, shaOff)),
+                                    Optional.of(new LogRecord(stderr, md5Off)),
+                                    ProvenanceStatus.COMPLETED),
+                            List.of());
+            ProvenanceManifest manifest =
+                    ProvenanceManifest.current(
+                            RunDirectories.runRecord(layout, ProvenanceStatus.COMPLETED),
+                            RunDirectories.application(),
+                            Map.of(),
+                            List.of(tool),
+                            List.of(
+                                    new FileRecord(
+                                            FileDirection.OUTPUT,
+                                            "pin",
+                                            md5Wrong,
+                                            3L,
+                                            RunDirectories.STARTED,
+                                            md5Off,
+                                            ProvenanceStatus.COMPLETED),
+                                    new FileRecord(
+                                            FileDirection.INPUT,
+                                            "spectrum",
+                                            shaWrong,
+                                            3L,
+                                            RunDirectories.STARTED,
+                                            shaOff,
+                                            ProvenanceStatus.COMPLETED)));
+            RunDirectories.seal(layout, manifest, SecretRedactor.patternsOnly());
+
+            DiskVerification result =
+                    LoadedRunViewTest.reader().load(layout).verifyAgainstDisk(() -> false);
+
+            assertEquals(
+                    List.of(
+                            new DiskVerification.Check(
+                                    "output",
+                                    "pin",
+                                    md5Wrong.toString(),
+                                    md5Wrong,
+                                    DiskOutcome.DIFFERS,
+                                    OTHER_MD5,
+                                    ABC_SHA256,
+                                    Optional.of(ABC_MD5),
+                                    Optional.of(ABC_SHA256),
+                                    Optional.empty()),
+                            new DiskVerification.Check(
+                                    "input",
+                                    "spectrum",
+                                    shaWrong.toString(),
+                                    shaWrong,
+                                    DiskOutcome.DIFFERS,
+                                    ABC_MD5,
+                                    OTHER_SHA256,
+                                    Optional.of(ABC_MD5),
+                                    Optional.of(ABC_SHA256),
+                                    Optional.empty()),
+                            new DiskVerification.Check(
+                                    "log",
+                                    "tool-01",
+                                    stdout.toString(),
+                                    stdout,
+                                    DiskOutcome.DIFFERS,
+                                    ABC_MD5,
+                                    OTHER_SHA256,
+                                    Optional.of(ABC_MD5),
+                                    Optional.of(ABC_SHA256),
+                                    Optional.empty()),
+                            new DiskVerification.Check(
+                                    "log",
+                                    "tool-01",
+                                    stderr.toString(),
+                                    stderr,
+                                    DiskOutcome.DIFFERS,
+                                    OTHER_MD5,
+                                    ABC_SHA256,
+                                    Optional.of(ABC_MD5),
+                                    Optional.of(ABC_SHA256),
+                                    Optional.empty()),
+                            new DiskVerification.Check(
+                                    "tool",
+                                    "tool",
+                                    exe.toString(),
+                                    exe,
+                                    DiskOutcome.DIFFERS,
+                                    OTHER_MD5,
+                                    ABC_SHA256,
+                                    Optional.of(ABC_MD5),
+                                    Optional.of(ABC_SHA256),
+                                    Optional.empty())),
+                    result.checks());
+            assertEquals(5L, result.count(DiskOutcome.DIFFERS));
+            assertFalse(result.allMatch());
+        } finally {
+            other.close();
+        }
     }
 
     @Test
