@@ -215,7 +215,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        written into ``docs/developer/provenance_schema.rst`` (*Atomic
        finalisation*, *Platform divergence*).
      - R-PROV-05; Phase 04 gate 5 kept
-     - Pending
+     - Accepted after one rework, ``eb256cb`` ``97e444d``
    * - 2
      - **Parameter origin recorded** (P13-4): each non-default
        ``ValueOrigin`` and the applied preset identity as settings keys at
@@ -282,4 +282,58 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
 Unit sign-offs
 ==============
 
-(None yet.)
+Unit 1 sign-off
+---------------
+
+**Accepted 2026-10-13 after one rework.** Commits ``eb256cb`` (retry,
+``RetryWaiter`` seam, ``AtomicDocumentWriterRetryTest`` 22 tests,
+``ReadersHoldNoDescriptorTest`` 10 tests, the developer page) and ``97e444d``
+(rework).
+
+* **Diff read.** Only ``Durability.moveIntoPlace`` is retried, only for
+  ``AccessDeniedException`` or an exception whose class is exactly
+  ``FileSystemException``; ``MOVE_ATTEMPTS`` 10, pauses 10, 20, 40, 80, 160,
+  320, 500, 500, 500 ms (2130 ms) through a package-private ``RetryWaiter``
+  (``Thread::sleep`` in production); exhaustion rethrows the last refusal with
+  the earlier ones suppressed and the existing ``deleteTemporary`` path runs;
+  an interrupt in a pause re-sets the status and throws
+  ``InterruptedIOException`` (cause: the refusal). No operating-system
+  branch. ``FileSystemDurability`` and ``Durability`` changed in Javadoc only;
+  ``verify-provenance-gates.sh`` control 5's anchor untouched. Neither reader
+  needed changing. The two cited precedents were checked against my own
+  knowledge of both projects (robustio's two-second ``arbitraryTimeout``;
+  graceful-fs's 60 s Windows rename retry on ``EACCES``/``EPERM``/``EBUSY``).
+* **Rejected once.** ``mvn -pl cometgui-provenance -am install`` -- which the
+  agent had not run -- failed SpotBugs with four findings in the two new test
+  classes (a huge shared string constant, two ``throws Exception``, a
+  ``RuntimeException`` rethrow). Fixed in the tests without any exclusion or
+  suppression (``97e444d``).
+* **Tests, run by me**: ``install`` BUILD SUCCESS -- domain 1180, provenance
+  709 (0 failures, 2 skipped, pre-existing), ``BugInstance size is 0``, "All
+  coverage checks have been met".
+* **My injections** (production code, anchor matched once, restored and
+  ``sha256sum -c`` OK, 52 tests run in the two writer classes each time):
+
+  - O1 one attempt fewer (``attempt >= MOVE_ATTEMPTS - 1``): 3 failures, 1
+    error, e.g. ``expected: <refusal #10> but was: <refusal #9>``.
+  - O2 ``AccessDeniedException`` no longer retried: 6 failures, 2 errors,
+    e.g. ``expected: <10> but was: <1>``.
+  - O3 interrupt status not re-set: 3 failures, ``interrupt status
+    swallowed``.
+  - O4 earlier refusals not attached on exhaustion: 3 failures (the
+    suppressed list compared as a literal).
+  - O5 ``ManifestReader.readFrom`` opening and keeping a ``FileChannel``: 4 of
+    10 ``ReadersHoldNoDescriptorTest`` tests red, ``expected: <0> but was:
+    <1>``.
+
+* **Targeted PIT, by me** (``-DtargetClasses=org.cometgui.provenance.io.*``):
+  40 mutations, 39 KILLED, 1 TIMED_OUT (``attempt++`` to ``attempt--`` at
+  line 382, a genuine endless loop), 0 SURVIVED, 0 NO_COVERAGE.
+  ``RetryWaiter`` is an interface and yields none.
+* **Harnesses, run by me**: ``provenance`` 24 controls PASS (239 s),
+  ``docs`` PASS, ``traceability`` 8 PASS.
+* **Files outside the module the tests read**: ``/proc/self/fd`` only.
+* **Surprise, for the record**: two tests with one method name in different
+  ``@Nested`` classes made surefire's XML report one test fewer than ran; the
+  agent renamed them. Harnesses that count tests from that XML can
+  under-count elsewhere -- not this phase's to fix; noted for tier 1.
