@@ -78,10 +78,14 @@ class ReadersHoldNoDescriptorTest {
 
     /**
      * A running run's manifest, hand-typed, carrying no path so that it is valid on any platform.
-     * It is the same document {@code ManifestReaderTest} reads, typed again rather than shared.
+     * It is the same document {@code ManifestReaderTest} reads, typed again rather than shared. A
+     * method rather than a constant, so the text is not copied into every nested class that uses
+     * it.
+     *
+     * @return the document
      */
-    private static final String MANIFEST =
-            """
+    private static String manifest() {
+        return """
             {
               "schemaVersion": 1,
               "run": {
@@ -108,6 +112,7 @@ class ReadersHoldNoDescriptorTest {
               "files": []
             }
             """;
+    }
 
     private static final String LINE_ONE =
             "{\"seq\":1,\"time\":\"2026-08-31T09:15:00.000Z\",\"type\":\"run.started\","
@@ -127,7 +132,7 @@ class ReadersHoldNoDescriptorTest {
         @DisplayName("a channel held open is counted once, and not after it is closed")
         void anOpenChannelIsSeen() throws IOException {
             Path file = directory.resolve("provenance.json");
-            Files.writeString(file, MANIFEST, UTF_8);
+            Files.writeString(file, manifest(), UTF_8);
 
             long whileOpen;
             try (FileChannel held = FileChannel.open(file, StandardOpenOption.READ)) {
@@ -180,7 +185,7 @@ class ReadersHoldNoDescriptorTest {
         @DisplayName("holds nothing after reading a valid manifest")
         void afterAValidRead() throws IOException {
             Path file = directory.resolve("provenance.json");
-            Files.writeString(file, MANIFEST, UTF_8);
+            Files.writeString(file, manifest(), UTF_8);
 
             ProvenanceManifest manifest = ManifestReader.readFrom(file);
 
@@ -193,7 +198,7 @@ class ReadersHoldNoDescriptorTest {
         @DisplayName("holds nothing after refusing a document that is not JSON")
         void afterAnUnparsableDocument() throws IOException {
             Path file = directory.resolve("provenance.json");
-            Files.writeString(file, MANIFEST.substring(0, 120), UTF_8);
+            Files.writeString(file, manifest().substring(0, 120), UTF_8);
 
             assertThrows(InvalidManifestException.class, () -> ManifestReader.readFrom(file));
 
@@ -204,7 +209,7 @@ class ReadersHoldNoDescriptorTest {
         @DisplayName("holds nothing after refusing bytes that are not UTF-8")
         void afterBytesThatAreNotUtf8() throws IOException {
             Path file = directory.resolve("provenance.json");
-            byte[] document = MANIFEST.getBytes(UTF_8);
+            byte[] document = manifest().getBytes(UTF_8);
             document[10] = (byte) 0xff;
             Files.write(file, document);
 

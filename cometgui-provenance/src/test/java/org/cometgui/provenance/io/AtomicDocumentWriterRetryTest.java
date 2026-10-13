@@ -433,7 +433,8 @@ class AtomicDocumentWriterRetryTest {
 
         @Test
         @DisplayName("an interrupt during the first pause stops at once and is reported")
-        void interruptedDuringTheFirstPause(@TempDir Path dir) throws Exception {
+        void interruptedDuringTheFirstPause(@TempDir Path dir)
+                throws IOException, InterruptedException {
             Outcome outcome = interruptDuringPause(dir, 1);
 
             assertAll(
@@ -461,7 +462,8 @@ class AtomicDocumentWriterRetryTest {
 
         @Test
         @DisplayName("an interrupt during the third pause carries the earlier refusals")
-        void interruptedDuringTheThirdPause(@TempDir Path dir) throws Exception {
+        void interruptedDuringTheThirdPause(@TempDir Path dir)
+                throws IOException, InterruptedException {
             Outcome outcome = interruptDuringPause(dir, 3);
             Throwable cause = outcome.thrown().getCause();
 
@@ -481,7 +483,8 @@ class AtomicDocumentWriterRetryTest {
 
         @Test
         @DisplayName("the production pause is a real, interruptible sleep")
-        void theProductionPauseIsInterruptible(@TempDir Path dir) throws Exception {
+        void theProductionPauseIsInterruptible(@TempDir Path dir)
+                throws IOException, InterruptedException {
             // The three-argument overload is the production path, whose pause is Thread.sleep.
             // Setting the interrupt flag inside the refused attempt makes that sleep throw at once,
             // so this proves the real waiter honours an interrupt without the test sleeping.
@@ -528,7 +531,8 @@ class AtomicDocumentWriterRetryTest {
          * Runs a write on its own thread whose every rename is refused, and interrupts it while it
          * is blocked in pause number {@code pauseToInterrupt}.
          */
-        private Outcome interruptDuringPause(Path dir, int pauseToInterrupt) throws Exception {
+        private Outcome interruptDuringPause(Path dir, int pauseToInterrupt)
+                throws IOException, InterruptedException {
             Path target = dir.resolve(TARGET_NAME);
             Files.writeString(target, OLD_DOCUMENT, UTF_8);
             List<IOException> refusals = Collections.synchronizedList(new ArrayList<>());
@@ -709,11 +713,19 @@ class AtomicDocumentWriterRetryTest {
             if (failure instanceof IOException io) {
                 throw io;
             }
-            if (failure instanceof RuntimeException unchecked) {
-                throw unchecked;
+            // Each scripted type is rethrown under its own static type: the exact instance must
+            // reach the writer, and nothing here should throw a bare RuntimeException.
+            if (failure instanceof IllegalStateException illegalState) {
+                throw illegalState;
+            }
+            if (failure instanceof UncheckedIOException uncheckedIo) {
+                throw uncheckedIo;
             }
             if (failure instanceof Error error) {
                 throw error;
+            }
+            if (failure != null) {
+                throw new AssertionError("the script returned an unsupported type: " + failure);
             }
             real.moveIntoPlace(temporary, destination);
         }
