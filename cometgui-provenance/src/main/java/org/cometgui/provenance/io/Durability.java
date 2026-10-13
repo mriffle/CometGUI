@@ -73,10 +73,16 @@ interface Durability {
      * there is no third state, which is why both paths must be in the same directory and therefore
      * on the same filesystem.
      *
+     * <p>One call is one attempt. An implementation does not retry: whether a refusal is worth
+     * retrying, how often and for how long is policy, and it belongs to {@link
+     * AtomicDocumentWriter}, which may call this method several times for one write when the
+     * platform refuses the rename because another process holds the target. Every such call renames
+     * the same temporary file, and a refused call must leave both files as they were.
+     *
      * @param temporary the fully written, synced and closed temporary file
      * @param target where it must appear
-     * @throws IOException if the rename fails; the temporary file is then removed and the target is
-     *     left exactly as it was
+     * @throws IOException if the rename fails; once the caller stops retrying, the temporary file
+     *     is removed and the target is left exactly as it was
      */
     void moveIntoPlace(Path temporary, Path target) throws IOException;
 

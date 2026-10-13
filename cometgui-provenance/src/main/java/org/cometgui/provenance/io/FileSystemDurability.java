@@ -102,6 +102,12 @@ final class FileSystemDurability implements Durability {
      * exists to prevent. It is honoured for a rename within one directory on every filesystem this
      * product supports, and refused -- loudly, with an {@code AtomicMoveNotSupportedException} --
      * rather than silently downgraded when it is not.
+     *
+     * <p>A refusal is thrown as the JDK reports it and is not retried here. On Windows, replacing a
+     * file another process holds open is refused with an {@code AccessDeniedException} or a bare
+     * {@code FileSystemException}; {@link AtomicDocumentWriter} decides whether and how long to
+     * retry that, for the same reason {@link #syncDirectory(Path)} leaves its failure to the
+     * caller: a policy buried in the mechanism is a policy no test can reach.
      */
     @Override
     public void moveIntoPlace(Path temporary, Path target) throws IOException {

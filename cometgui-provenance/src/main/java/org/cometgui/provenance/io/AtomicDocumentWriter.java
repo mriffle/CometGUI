@@ -18,14 +18,19 @@ package org.cometgui.provenance.io;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -57,7 +62,9 @@ import java.util.UUID;
  *   <li><b>The rename happens next, and only next.</b> A sync after the rename protects nothing: by
  *       then the operation it was meant to make durable is already done. This ordering is the
  *       property {@link Durability} exists to make observable, because no inspection of the
- *       resulting file can distinguish a correct order from a wrong one.
+ *       resulting file can distinguish a correct order from a wrong one. A rename the platform
+ *       <em>refuses</em> because another process holds the target is retried, briefly and
+ *       boundedly; see below.
  *   <li><b>The directory is forced afterwards, best effort.</b> Forcing the file makes the contents
  *       durable; forcing the directory makes the <em>name</em> durable. This step, alone among the
  *       four, is allowed to fail (see below).
@@ -75,6 +82,28 @@ import java.util.UUID;
  * assert both outcomes instead of trusting this paragraph. The three earlier steps have no such
  * licence: any failure in them abandons the write.
  *
+ * <p><strong>A refused rename is retried, briefly and boundedly, and nothing else is.</strong> On
+ * Windows, replacing a file that another process has open can be refused -- {@code MoveFileEx}
+ * fails with an access-denied or sharing-violation error -- and the processes that do that to a
+ * freshly written document are exactly the ones this product does not control: a virus scanner
+ * opening the file to scan it, a synchronisation client copying it. They let go within
+ * milliseconds. So {@link Durability#moveIntoPlace} is attempted up to {@link #MOVE_ATTEMPTS}
+ * times, with an exponentially growing pause between attempts capped at {@link
+ * #LONGEST_RETRY_PAUSE_MILLIS}, for a bounded total wait of 2130 ms. Only the rename is retried,
+ * and only when it throws {@link java.nio.file.AccessDeniedException} or an {@code IOException}
+ * whose class is <em>exactly</em> {@link java.nio.file.FileSystemException}, which is how the JDK
+ * reports {@code ERROR_SHARING_VIOLATION}; every other failure -- {@link
+ * java.nio.file.AtomicMoveNotSupportedException}, {@link NoSuchFileException}, any other {@code
+ * FileSystemException} subclass, any other {@code IOException}, a {@code RuntimeException}, an
+ * {@code Error} -- describes something waiting cannot fix and ends the write on the first attempt.
+ * The guarantee is unchanged by the retry: every attempt renames the same complete, forced
+ * temporary file, and a refused rename leaves the target untouched, so a reader still sees the
+ * whole old document or the whole new one. When the bound is exhausted the write fails exactly as
+ * any other failed rename does, with the <em>last</em> refusal thrown and the earlier ones attached
+ * to it as suppressed exceptions. The same code runs on every platform; on POSIX a refused rename
+ * is a permanent permission problem, and it costs at most the bound before the same failure is
+ * reported.
+ *
  * <p><strong>What a failure leaves behind: nothing.</strong> An {@code IOException}, a {@code
  * RuntimeException}, an {@code Error} or a thread interruption anywhere between opening the
  * temporary file and completing the rename removes the temporary file and rethrows. The target is
@@ -83,12 +112,21 @@ import java.util.UUID;
  * {@link java.nio.channels.FileChannel} is interruptible, so an interrupt during the write closes
  * the channel and surfaces as {@link java.nio.channels.ClosedByInterruptException} with the
  * thread's interrupt status still set, and this class rethrows it unchanged rather than converting
- * it into a plain failure that the caller cannot recognise as a cancellation.
+ * it into a plain failure that the caller cannot recognise as a cancellation. An interrupt during a
+ * pause between two rename attempts stops the retrying at once and surfaces as an {@link
+ * java.io.InterruptedIOException} -- the {@code IOException} whose meaning is "an I/O operation was
+ * interrupted", and the nearest equivalent of {@code ClosedByInterruptException} for a wait that
+ * holds no channel -- again with the interrupt status still set. Its cause is the refusal that was
+ * being retried, and the {@link InterruptedException} is attached as suppressed, so the caller
+ * learns both that it was cancelled and what it was waiting out.
  *
  * <p><strong>Concurrency.</strong> The class holds no state, and every call generates its own
  * temporary name, so any number of threads may write -- even to the same target -- without
- * interfering. Readers of the target are never blocked and never see an intermediate state: a
- * reader observes the whole old document or the whole new one.
+ * interfering. Readers of the target never see an intermediate state: a reader observes the whole
+ * old document or the whole new one. On POSIX no reader can obstruct the rename. On Windows a
+ * process that holds the target open without delete sharing can make the rename be refused, which
+ * is what the bounded retry is for; this product's own readers are not such a process, because they
+ * read the document whole and close it before parsing.
  *
  * @see ContentWriter
  * @see Durability
@@ -116,8 +154,47 @@ public final class AtomicDocumentWriter {
      */
     private static final String TEMPORARY_INFIX = ".tmp-";
 
+    /**
+     * How many times the rename is attempted before a refusal is reported: 10, which is one attempt
+     * and nine retries.
+     *
+     * <p>The number is chosen together with the two pause constants below so that the total wait is
+     * about two seconds -- the pauses are 10, 20, 40, 80, 160, 320, 500, 500 and 500 ms, 2130 ms in
+     * all. Two seconds is the bound Go's {@code cmd/go/internal/robustio} uses for exactly this
+     * failure (it retries a Windows rename on {@code ERROR_ACCESS_DENIED} and {@code
+     * ERROR_SHARING_VIOLATION} for up to two seconds). npm's {@code graceful-fs} retries the same
+     * Windows refusals ({@code EACCES}, {@code EPERM}, {@code EBUSY}) far longer, up to a minute;
+     * the shorter bound is chosen deliberately. The holders this exists for -- a virus scanner or a
+     * synchronisation client looking at a file that was closed a moment ago -- release it in
+     * milliseconds, so the early, short pauses absorb the common case and the capped ones absorb a
+     * slow one. Longer would only delay the report of a refusal that is not going away: on POSIX a
+     * refused rename is a permission problem, and the end of a run must not hang on it.
+     */
+    static final int MOVE_ATTEMPTS = 10;
+
+    /**
+     * The pause before the first retry: 10 ms. Each later pause doubles it, up to {@link
+     * #LONGEST_RETRY_PAUSE_MILLIS}.
+     *
+     * <p>Short, because the typical holder has already let go by then, and a finalise that succeeds
+     * on its second attempt should not cost the run a noticeable delay.
+     */
+    static final long FIRST_RETRY_PAUSE_MILLIS = 10L;
+
+    /**
+     * The longest single pause: 500 ms.
+     *
+     * <p>The cap keeps the doubling from spending the whole budget on one or two long waits, so a
+     * holder that lets go at any moment within the bound is noticed within half a second of doing
+     * so.
+     */
+    static final long LONGEST_RETRY_PAUSE_MILLIS = 500L;
+
     /** The platform's real {@code fsync} and {@code rename}. Stateless, so one instance serves. */
     private static final Durability FILE_SYSTEM = new FileSystemDurability();
+
+    /** The real pause between two rename attempts: the thread sleeps. */
+    private static final RetryWaiter SLEEP = Thread::sleep;
 
     /**
      * Never instantiated: this is a set of static operations over a path, with no state of its own
@@ -139,9 +216,12 @@ public final class AtomicDocumentWriter {
      *
      * @param target the file to create or replace
      * @param content produces the document's bytes; called exactly once
+     * @throws java.io.InterruptedIOException if the thread is interrupted while waiting to retry a
+     *     refused rename, with its interrupt status still set; see the class Javadoc
      * @throws IOException if the target is an existing directory, if its parent directory does not
-     *     exist, if the document cannot be written, or if {@code content} throws -- in every case
-     *     the target is left exactly as it was and no temporary file remains
+     *     exist, if the document cannot be written, if {@code content} throws, or if replacing the
+     *     target was refused on every one of {@code MOVE_ATTEMPTS} attempts -- in every case the
+     *     target is left exactly as it was and no temporary file remains
      * @throws NullPointerException if {@code target} or {@code content} is {@code null}
      */
     public static void write(Path target, ContentWriter content) throws IOException {
@@ -210,9 +290,37 @@ public final class AtomicDocumentWriter {
      */
     static boolean write(Path target, ContentWriter content, Durability durability)
             throws IOException {
+        return write(target, content, durability, SLEEP);
+    }
+
+    /**
+     * Writes a document atomically through a given {@link Durability}, pausing between refused
+     * rename attempts through a given {@link RetryWaiter}.
+     *
+     * <p>Package-private for the same reason as the overload above: the waiter is a seam for tests,
+     * so that the retry schedule is an assertion rather than a stopwatch reading, and never a
+     * configuration point.
+     *
+     * @param target the file to create or replace
+     * @param content produces the document's bytes; called exactly once
+     * @param durability the sync-move-sync mechanism, {@link FileSystemDurability} in production
+     * @param waiter how to pause between rename attempts, {@link Thread#sleep(long)} in production
+     * @return {@code true} if the containing directory was synced; see {@link #write(Path,
+     *     ContentWriter, Durability)}
+     * @throws java.io.InterruptedIOException if the thread was interrupted while pausing between
+     *     two rename attempts; the interrupt status is then still set
+     * @throws IOException if the target is an existing directory, if its parent directory does not
+     *     exist, if the document cannot be written, if {@code content} throws, or if the rename
+     *     failed in a way that is not retried or was refused {@link #MOVE_ATTEMPTS} times
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    static boolean write(
+            Path target, ContentWriter content, Durability durability, RetryWaiter waiter)
+            throws IOException {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(content, "content");
         Objects.requireNonNull(durability, "durability");
+        Objects.requireNonNull(waiter, "waiter");
         if (Files.isDirectory(target)) {
             // Left to itself this surfaces from the rename, as the operating system's own text
             // about a path the caller never chose -- the temporary file. A caller that hands us a
@@ -235,16 +343,123 @@ public final class AtomicDocumentWriter {
                         absoluteTarget.getFileName() + TEMPORARY_INFIX + UUID.randomUUID());
         try {
             fill(temporary, content, durability);
-            durability.moveIntoPlace(temporary, absoluteTarget);
+            moveIntoPlace(temporary, absoluteTarget, durability, waiter);
         } catch (Throwable failure) {
             // Throwable, not IOException: a serialiser that throws IllegalStateException, or a
             // thread that is interrupted, or an OutOfMemoryError, must leave the target as
             // untouched as a failed write does. Precise rethrow keeps the declared throws clause
-            // honest -- nothing here converts, wraps or swallows the failure.
+            // honest -- nothing here converts, wraps or swallows the failure. (The one conversion
+            // in this class, an interrupted retry pause, happens in moveIntoPlace and arrives here
+            // already as the InterruptedIOException the caller is given.)
             deleteTemporary(temporary, failure);
             throw failure;
         }
         return syncDirectoryIfPossible(directory, durability);
+    }
+
+    /**
+     * Renames the temporary file over the target, retrying a refusal that waiting can cure.
+     *
+     * <p>See the class Javadoc for the policy. Every attempt renames the same complete, forced
+     * temporary file, and a refused attempt has not touched the target, so retrying can neither
+     * expose a partial document nor lose the old one.
+     *
+     * @param temporary the fully written, synced and closed temporary file
+     * @param target where it must appear
+     * @param durability performs each rename attempt
+     * @param waiter pauses between attempts
+     * @throws java.io.InterruptedIOException if interrupted during a pause; the interrupt status is
+     *     set again before it is thrown, its cause is the refusal being retried, and the {@link
+     *     InterruptedException} is attached as suppressed
+     * @throws IOException the first failure that is not retried, or the last refusal once {@link
+     *     #MOVE_ATTEMPTS} attempts have been refused; earlier refusals are attached to it as
+     *     suppressed exceptions
+     */
+    private static void moveIntoPlace(
+            Path temporary, Path target, Durability durability, RetryWaiter waiter)
+            throws IOException {
+        List<IOException> refusals = new ArrayList<>();
+        for (int attempt = 1; ; attempt++) {
+            try {
+                durability.moveIntoPlace(temporary, target);
+                return;
+            } catch (IOException failure) {
+                if (!isTransientRefusal(failure) || attempt >= MOVE_ATTEMPTS) {
+                    attachEarlier(failure, refusals);
+                    throw failure;
+                }
+                try {
+                    waiter.pause(pauseBeforeRetry(attempt));
+                } catch (InterruptedException interrupted) {
+                    // Thread.sleep clears the status as it throws. Leaving it cleared would tell
+                    // every caller above us that nobody asked this thread to stop.
+                    Thread.currentThread().interrupt();
+                    attachEarlier(failure, refusals);
+                    InterruptedIOException cancelled =
+                            new InterruptedIOException(
+                                    "Interrupted while waiting to retry replacing "
+                                            + target
+                                            + " after "
+                                            + attempt
+                                            + " refused attempt(s)");
+                    cancelled.initCause(failure);
+                    cancelled.addSuppressed(interrupted);
+                    throw cancelled;
+                }
+                refusals.add(failure);
+            }
+        }
+    }
+
+    /**
+     * Whether a failed rename is the kind of refusal that another process holding the file
+     * produces, and that therefore may succeed if tried again shortly.
+     *
+     * <p>{@link AccessDeniedException} is how the JDK reports Windows' {@code ERROR_ACCESS_DENIED};
+     * a bare {@link FileSystemException} -- the class itself, not a subclass -- is how it reports
+     * {@code ERROR_SHARING_VIOLATION} and the other Windows errors it has no more specific type
+     * for. The exact-class test is deliberate: every subclass of {@code FileSystemException} other
+     * than {@code AccessDeniedException} names a specific condition -- the source is gone, the
+     * target is a non-empty directory, an atomic move is impossible here -- that no amount of
+     * waiting changes.
+     *
+     * @param failure the failure of one rename attempt
+     * @return {@code true} if the rename should be attempted again
+     */
+    private static boolean isTransientRefusal(IOException failure) {
+        return failure instanceof AccessDeniedException
+                || failure.getClass() == FileSystemException.class;
+    }
+
+    /**
+     * The pause before attempt {@code attempt + 1}: {@link #FIRST_RETRY_PAUSE_MILLIS}, doubled for
+     * every earlier retry, never more than {@link #LONGEST_RETRY_PAUSE_MILLIS}.
+     *
+     * @param attempt the attempt that has just been refused, from 1
+     * @return the pause in milliseconds
+     */
+    private static long pauseBeforeRetry(int attempt) {
+        return Math.min(FIRST_RETRY_PAUSE_MILLIS << (attempt - 1), LONGEST_RETRY_PAUSE_MILLIS);
+    }
+
+    /**
+     * Attaches the earlier refusals of one rename to the failure that ends it.
+     *
+     * <p>The caller is given the failure that actually ended the write, and can still see what came
+     * before. One exception instance can be thrown more than once by a misbehaving implementation,
+     * and {@link Throwable#addSuppressed} refuses to suppress an exception into itself with an
+     * {@code IllegalArgumentException} that would replace the real failure, so an instance is never
+     * attached to itself.
+     *
+     * @param failure the failure that ends, or may end, the rename
+     * @param refusals the refusals of the earlier attempts, oldest first
+     */
+    private static void attachEarlier(IOException failure, List<IOException> refusals) {
+        for (IOException earlier : refusals) {
+            if (earlier != failure) {
+                failure.addSuppressed(earlier);
+            }
+        }
     }
 
     /**

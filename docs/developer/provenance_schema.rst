@@ -433,7 +433,9 @@ The sequence, and every step of it is load-bearing:
    back to copy-then-delete, and it is refused loudly rather than silently
    downgraded where it is not supported. A sync *after* the rename protects
    nothing, because by then the operation it was meant to make durable has
-   already happened.
+   already happened. A rename refused because another process holds the target
+   is retried, briefly and boundedly
+   (:ref:`dev-provenance-schema-rename-retry`).
 #. **Then the directory is forced, best effort.** Forcing the file makes the
    contents durable; forcing the directory makes the *name* durable.
 
@@ -455,6 +457,66 @@ Interruption is never swallowed: a ``FileChannel`` is interruptible, so an
 interrupt surfaces as ``ClosedByInterruptException`` with the thread's status
 still set, and it is rethrown unchanged rather than converted into a plain
 failure a caller cannot recognise as a cancellation.
+
+.. _dev-provenance-schema-rename-retry:
+
+A refused rename is retried, briefly and boundedly
+--------------------------------------------------
+
+On Windows, replacing a file that another process has open can be **refused**:
+``MoveFileEx`` fails with an access-denied or sharing-violation error. The
+processes that do that to a freshly written document are exactly the ones the
+product does not control -- a virus scanner opening the file to scan it, a
+synchronisation client copying it -- and they let go within milliseconds. So
+the rename, and only the rename, is retried (Phase 13 design decision P13-1):
+
+* **What is retried.** ``Durability.moveIntoPlace`` throwing
+  ``AccessDeniedException``, or an ``IOException`` whose class is *exactly*
+  ``FileSystemException`` -- which is how the JDK reports
+  ``ERROR_SHARING_VIOLATION``. Nothing else: ``AtomicMoveNotSupportedException``,
+  ``NoSuchFileException``, every other ``FileSystemException`` subclass, every
+  other ``IOException``, a ``RuntimeException`` and an ``Error`` each describe
+  something waiting cannot fix, and end the write on the first attempt.
+* **The bound.** ``AtomicDocumentWriter.MOVE_ATTEMPTS`` is 10 attempts, with
+  pauses of 10, 20, 40, 80, 160, 320, 500, 500 and 500 ms between them -- a
+  doubling from ``FIRST_RETRY_PAUSE_MILLIS`` capped at
+  ``LONGEST_RETRY_PAUSE_MILLIS`` -- for a total wait of 2130 ms.
+* **Why that bound.** Go's ``cmd/go/internal/robustio`` retries a Windows rename
+  on exactly these errors for up to two seconds; npm's ``graceful-fs`` retries
+  the same refusals for up to a minute. The shorter bound is deliberate: the
+  holders this exists for release a file in milliseconds, and a refusal that
+  outlasts two seconds is not going away -- on POSIX a refused rename is a
+  permission problem -- so waiting longer would only hold up the end of a run.
+* **What it cannot change.** Every attempt renames the *same* complete, forced
+  temporary file, and a refused rename leaves the target untouched, so the
+  whole-document guarantee is exactly what it was: a reader sees the whole old
+  document or the whole new one. When the bound is exhausted the ordinary
+  failure path runs -- temporary file removed, the **last** refusal thrown with
+  the earlier ones attached as suppressed exceptions, the target byte-identical
+  or still absent. The success-path order is ``[syncFile, move,
+  syncDirectory]``; a retried success is ``[syncFile, move, move, ...,
+  syncDirectory]``.
+* **Interruption.** An interrupt during a pause stops the retrying at once,
+  removes the temporary file, sets the thread's interrupt status again (a
+  sleeping thread's status is cleared when it is woken) and throws
+  ``InterruptedIOException`` -- the ``IOException`` that means "an I/O operation
+  was interrupted", the counterpart of ``ClosedByInterruptException`` for a wait
+  that holds no channel. Its cause is the refusal being retried, and the
+  ``InterruptedException`` is attached as suppressed.
+* **One code path everywhere.** There is no operating-system branch, so the
+  retry adds no platform divergence: it runs, and is mutation-tested, here. The
+  pause goes through a package-private ``RetryWaiter`` seam (``Thread.sleep`` in
+  production, a recorder in tests), so the exact schedule is an assertion rather
+  than a stopwatch reading -- like ``Durability``, a seam and not a
+  configuration point.
+
+**The product's own readers are never a holder.** ``ManifestReader.readFrom``
+reads ``provenance.json`` whole and closes it before parsing, and
+``ProvenanceEventLogReader.recover`` closes ``events.log`` before it returns,
+on success and on failure alike. ``ReadersHoldNoDescriptorTest`` proves it on
+Linux by listing ``/proc/self/fd`` after each call -- including after each has
+thrown -- and requires that no descriptor refers to the file, with a control in
+the same class that holds the file open and requires the scan to see it.
 
 Why ``Durability`` is a seam
 ----------------------------
@@ -613,15 +675,33 @@ Tier B -- never executed in any form
 
 This is the residue.
 
-**ATOMIC_MOVE under contention, and this is the one that matters.** The
-atomic-finalisation gate item is proved by a concurrent reader observing only
-whole documents, and that proof is POSIX-only. On Windows a rename over a file
-another process holds open can fail with ``AccessDeniedException`` -- and the
-Provenance UI, a virus scanner and a sync client are all exactly such
-processes. **If Windows cannot replace an open file the repair is a retry policy
-or a different finalisation strategy: a design change, not a test.** It is
-routed into Phase 13 so that the viewer is not built first and the problem
-discovered second.
+**ATOMIC_MOVE under contention -- settled by design in Phase 13, with a
+residue.** The atomic-finalisation gate item is proved by a concurrent reader
+observing only whole documents, and that proof is POSIX-only. On Windows a
+rename over a file another process holds open can be refused. Phase 13 settled
+it by design before building the viewer (decision P13-1), in two halves:
+
+* **The product is never a holder.** The Provenance viewer reads the record
+  only through ``ManifestReader.readFrom`` and
+  ``ProvenanceEventLogReader.recover``, which keep no handle once they return or
+  throw -- proved on Linux through ``/proc/self/fd`` -- and keeps no channel,
+  memory map or watch on the file or its directory.
+* **A refused replace is retried boundedly** (see
+  :ref:`dev-provenance-schema-rename-retry`), in code that runs identically on
+  every platform and is exercised and mutation-tested here through the
+  ``Durability`` and ``RetryWaiter`` seams. It therefore adds no new divergence
+  of its own.
+
+**What remains UNVERIFIED on Windows**, because none of it has run there: that
+Windows reports a scanner's or sync client's hold with exactly
+``AccessDeniedException`` or a bare ``FileSystemException``; that such holders
+release the file within the 2130 ms bound; and that a JDK reader -- which opens
+files with read, write *and delete* sharing -- does not block the replace,
+which is reasoned from the JDK's behaviour rather than observed. The residue is
+smaller rather than closed, and its **worst case is now a clean failure, never
+a torn file**: the finalise reports that ``provenance.json`` could not be
+written, the target holds the whole previous document or is still absent, and
+the run keeps its ``events.log``.
 
 **Absolute-path validation.** ``Path.isAbsolute()`` is false for ``/var/...``
 on Windows, so records valid here are rejected there. That is the actual reason
