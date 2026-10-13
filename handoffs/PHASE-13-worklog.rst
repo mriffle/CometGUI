@@ -262,6 +262,19 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        and RST from one loaded model. Hand-typed expectations; failed,
        cancelled, unsealed and unparsable records.
      - R-PROV-01..05; AC-PRV-06, 07; gate 4, 5, 6 (model)
+     - Accepted after one rework, ``c330b0a`` ``b957f4a``
+   * - 3b
+     - **The warnings the read model found nobody writes** (added after unit
+       3): ``R-TOOL-07``'s manifest/probe capability disagreement is not
+       recorded anywhere (the probe silently wins in
+       ``ManagedToolManager.probed``), and Comet's tool record carries no
+       advisories (its identity is built with an empty warnings list), so the
+       Provenance section's "manifest/probe discrepancies" and Comet
+       advisories would always be empty. Record both as ``ToolRecord``
+       warnings at run time, from the facts the installation already holds;
+       no schema change. Tests through a real installation marker and a run's
+       ``provenance.json``.
+     - R-TOOL-07; spec *Provenance UI: Warnings*
      - Pending
    * - 4
      - **The gate on real runs** (P13-7): a real Comet + Percolator run of
@@ -404,3 +417,53 @@ names; I chose option A (P13-4, amended, above).
   ``traceability`` (one line in ``docs/developer/workflow_engine.rst``).
 * **Files outside the modules the tests read**: none new (the real-run test
   uses the existing ``scratch/`` fixtures).
+
+Unit 3 sign-off
+---------------
+
+**Accepted 2026-10-13 after one rework.** Commits ``c330b0a`` (28 files: the
+package ``org.cometgui.workflow.provenance`` -- ``ProvenanceReader``
+``list``/``load``, ``LoadedRun`` with ``exportJson``/``exportRst``/``verifyAgainstDisk``,
+``ProvenanceView`` with the seven parts, ``ViewBuilder``, ``ParametersBuilder``,
+``DiskVerifier``, ``DisplayText``, ``ExportRenderer``; two role constants in
+``RunResultFiles``) and ``b957f4a`` (rework, one test).
+
+* **Diff read.** One reader (``ManifestReader.readFrom``, event-log
+  ``recover``), one redactor (every displayed string through
+  ``DisplayText``), one command rendering
+  (``ProcessRedactor.redactedDisplayCommand``, already reachable -- no new
+  module edge), one hasher (``CachingHashService.rehash``). Exports render the
+  one loaded ``ProvenanceManifest`` through ``ManifestWriter`` and
+  ``ProvenanceReportWriter`` and write atomically; an existing file is refused
+  unless replacement is confirmed, the run's own ``provenance.json``/``.rst``
+  always. No JavaFX, no POM, no schema change.
+* **Rejected once.** My injection K1 -- ``DiskVerifier`` comparing SHA-256
+  only -- left all 55 package tests green: a record whose MD5 alone is wrong
+  would have verified as matching. Rework ``b957f4a`` adds
+  ``eitherDigestAloneDiffers`` (MD5 wrong / SHA-256 wrong, for files, logs
+  and an executable, hand-typed RFC 1321 / FIPS 180-2 vectors); K1 re-run:
+  red, 1 of 56.
+* **Tests, run by me**: ``mvn -pl cometgui-workflow install`` BUILD SUCCESS,
+  987 tests (988 after the rework), ``BugInstance size is 0``.
+* **My other injections** (anchor once, restored, ``sha256sum -c`` OK):
+
+  - K2 tool executables left out of verification: 4 of 55 red
+    (``10 files, 3 logs, 2 executables ==> expected: <15> but was: <13>``).
+  - K3 a warning's message not redacted: ``SeededSecretTest.absentEverywhere``
+    red, naming the leaked string.
+  - K4 only FAILED (not PARTIAL/CANCELLED) files warned about: 3 red
+    (``census``, ``failedRun``, ``cancelledRun``).
+
+* **Targeted PIT, by me** (``org.cometgui.workflow.provenance.*`` with its
+  tests and ``ProvenanceReaderOnEngineRunsTest``): 234 mutations, 231 KILLED,
+  3 TIMED_OUT (negated loop conditions), 0 SURVIVED, 0 NO_COVERAGE; 13 of the
+  16 compiled top-level classes carry mutations, the other three being
+  ``package-info`` and two enums. **The package is not a POM PIT target**
+  (the owner's build-time question, like ``workflow.pdv``/``.limelight``).
+* **Harnesses, run by me**: ``workflow`` 110 PASS (518 s), ``quality`` 42 PASS.
+* **Files outside the module the tests read**: ``/proc/self/fd`` only.
+* **Found by the unit, acted on**: ``R-TOOL-07``'s discrepancy warning is
+  written by nothing, and Comet's tool record carries no advisories -- unit
+  3b added above. A file replaced between hashing and display could be shown
+  with the other file's digest check (accepted; a second hasher would be
+  worse).
