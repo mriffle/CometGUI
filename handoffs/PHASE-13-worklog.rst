@@ -275,7 +275,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        no schema change. Tests through a real installation marker and a run's
        ``provenance.json``.
      - R-TOOL-07; spec *Provenance UI: Warnings*
-     - Pending
+     - Accepted after one rework, ``8007dc0`` ``8140fd0``
    * - 4
      - **The gate on real runs** (P13-7): a real Comet + Percolator run of
        the pinned fixture, a real failed run and a real cancelled run,
@@ -467,3 +467,50 @@ package ``org.cometgui.workflow.provenance`` -- ``ProvenanceReader``
   3b added above. A file replaced between hashing and display could be shown
   with the other file's digest check (accepted; a second hasher would be
   worse).
+
+Unit 3b sign-off
+----------------
+
+**Accepted 2026-10-13 after one rework.** Commits ``8007dc0`` (18 files) and
+``8140fd0`` (one test). **A change to Phase 05's and Phase 08/09's code,
+reported to tier 1.**
+
+* **Diff read.** ``domain.tools.ToolOffer`` gains ``unconfirmedClaims``
+  (only on an installed offer; never also a capability; old constructor
+  kept); ``ManagedToolManager`` fills it from the shipped manifest record and
+  the verified completion marker -- **no re-probe, no marker or format
+  change**; ``workflow.steps.ToolWarnings`` is the one place the sentences
+  and keys are made; Comet's tool records now carry advisories then
+  discrepancies (they carried nothing), Percolator's advisories, discrepancies,
+  then the R-PERC-08 warning; settings ``comet.advisory.<id>``,
+  ``comet.probe-discrepancy.<nn>``, ``percolator.probe-discrepancy.<nn>``;
+  read model ``WarningSource.MANIFEST_PROBE_DISCREPANCY``. Two hand-updated
+  expectations (``ProvenanceWarningsTest.words``, ``census``). Docs: one
+  clause in ``workflow_engine.rst``, one row in ``provenance_format.rst``.
+* **Decision accepted (P13-9):** a discrepancy is one direction only -- the
+  manifest claims a capability the install's probe did not find. A capability
+  the probe found that the manifest does not list is the manifest being
+  silent; counting it would put about ten warnings on every Percolator run.
+* **Rejected once.** My injection L3 (``break`` after the first unconfirmed
+  claim, so only one is ever reported) left all 28 ``ManagedToolManager*``
+  tests green. Rework adds an install-path test with three claims, one
+  confirmed; L3 re-run: red (1 of 29, ``and both it missed are carried, in
+  manifest order``).
+* **Tests, run by me**: ``mvn -pl cometgui-domain,cometgui-install,
+  cometgui-workflow,cometgui-app -am install`` BUILD SUCCESS: domain 1198,
+  install 1045 (2 skipped), workflow 1001, ui 796, app 299 (1 skipped), every
+  module 0 failures, SpotBugs 0.
+* **My other injections**: L1 Comet's discrepancies dropped from its tool
+  record: 2 red (``cometWarnings``, ``cometAdvisoryAndDiscrepancy``); L2
+  discrepancies before advisories: 3 red.
+* **Targeted PIT, by me**: ``ToolWarnings`` and ``CometSelection`` 16/16
+  KILLED; the agent's ``ManagedToolManager`` 61/61 and ``ToolOffer`` 35/35.
+* **Harnesses, run by me**: ``install`` 95, ``workflow`` 110, ``percolator``
+  109, ``quality`` 42, ``docs``, ``traceability`` 8 -- all PASS.
+* **Files outside the modules the tests read**:
+  ``scratch/phase05/artefacts/v2026.03.0__comet.linux.exe`` (already read by
+  other app tests).
+* **Carried into unit 4**: Comet's tool record is written with an empty
+  capability set (``CometWorkflow`` passes ``Set.of()``). Nit, not acted on:
+  ``ToolWarnings`` repeats ``AdvisoryRendering.forSelection``'s one-line loop
+  rather than calling it.
