@@ -105,11 +105,12 @@ import org.cometgui.install.registry.ArtefactSelection;
  *
  * <h2>Threads</h2>
  *
- * <p>Safe to call from the JavaFX application thread, as the port requires. {@link #offers()} reads
- * the manifest and the cache and runs no download; {@link #install} hands the work to an {@link
- * Executor} and returns the handle at once. The only mutable state is the map of installs this
- * process has started, which is a {@link ConcurrentHashMap} because it is written from the install
- * threads and read from the thread that draws the rows.
+ * <p>{@link #offers()} reads the manifest and the cache and runs no download, but it does start
+ * every installed build to check that it still loads here, so -- as the port says -- it is called
+ * on a background thread, never the JavaFX application thread. {@link #install} hands the work to
+ * an {@link Executor} and returns the handle at once. The only mutable state is the map of installs
+ * this process has started, which is a {@link ConcurrentHashMap} because it is written from the
+ * install threads and read from the thread that draws the rows.
  */
 public final class ManagedToolManager implements ToolManager {
 

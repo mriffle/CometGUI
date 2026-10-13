@@ -213,6 +213,9 @@ class NoManagedBuildViewModelTest {
         ToolManagerViewModel viewModel =
                 new ToolManagerViewModel(manager, Runnable::run, queued::add, chooser);
         viewModel.refresh();
+        /* The read of the port is queued on the same background executor; run it, alone. */
+        assertEquals(1, queued.size(), "a refresh reads the port on the background executor");
+        queued.remove(0).run();
         NoManagedBuildViewModel gap = viewModel.noManagedBuild().get(0);
 
         boolean first = viewModel.register(gap);

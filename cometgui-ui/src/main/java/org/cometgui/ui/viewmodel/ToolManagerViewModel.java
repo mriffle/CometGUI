@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicLong;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -79,6 +80,16 @@ import org.cometgui.ui.viewmodel.params.FileChooserPort;
  * {@link #cancel} all touch the observable row list, which is the toolkit's to read while it
  * paints.
  *
+ * <p><strong>Reading the port is not done on the interface thread.</strong> {@link
+ * ToolManager#offers()} checks that every installed build still starts on this host, which means
+ * starting it -- for the Limelight converter, a second Java virtual machine running {@code java
+ * -jar ... --version} -- so a refresh that read the port where it was called would stall the window
+ * for as long as those processes take, every time the rows are read again. {@link #refresh()}
+ * therefore reads the port on the {@code background} executor and applies the answer on the {@code
+ * uiThread} one, and a refresh asked for while another is still reading supersedes it: only the
+ * newest answer is applied, so an older read that happens to finish last cannot put a stale list
+ * back on screen.
+ *
  * <p><strong>What the executor is in the running application, and what it is in tests.</strong> The
  * composition root passes the toolkit's own "run this later on the interface thread" call, and an
  * install's reports arrive on one of the installer's own background threads -- named {@code
@@ -112,8 +123,18 @@ public final class ToolManagerViewModel {
     /** How work gets back onto the interface thread from an install thread. */
     private final Executor uiThread;
 
-    /** Where a local-binary registration runs, because it runs the binary and can take seconds. */
+    /**
+     * Where the port is read and a local-binary registration runs, because both start processes and
+     * can take seconds.
+     */
     private final Executor background;
+
+    /**
+     * The newest refresh asked for. A read whose number is not this one when its answer reaches the
+     * interface thread was superseded, and its answer is dropped. Atomic because {@link #refresh()}
+     * may be asked for from whichever thread a caller's callback runs on.
+     */
+    private final AtomicLong refreshes = new AtomicLong();
 
     /** How the user picks the binary to register; {@code null} exactly when {@link #tools} is. */
     private final FileChooserPort chooser;
@@ -135,8 +156,9 @@ public final class ToolManagerViewModel {
      *     passes {@code Runnable::run} for a deterministic sequence -- which applies reports on
      *     whatever thread raised them, so anything with a live scene in front of it must pass the
      *     real one
-     * @param background where a local-binary registration runs; it runs the binary, so it must not
-     *     be the interface thread in production, and a test passes {@code Runnable::run}
+     * @param background where the port is read and a local-binary registration runs; both start
+     *     processes, so it must not be the interface thread in production, and a test passes {@code
+     *     Runnable::run}
      * @param chooser how the user picks a binary of their own to register
      * @throws NullPointerException if any argument is {@code null}
      */
@@ -250,10 +272,18 @@ public final class ToolManagerViewModel {
     /**
      * Reads the port and puts the rows in step with it.
      *
+     * <p>Returns at once. The port is read on the background executor -- reading it starts each
+     * installed tool to check that it still runs here, which must never happen on the interface
+     * thread -- and the answer is applied on the interface thread. Only the newest refresh's answer
+     * is applied; an older one still reading when a newer one is asked for is dropped when it
+     * arrives.
+     *
      * <p>A row whose key is still offered keeps its identity, its running install and its last
      * progress report; only the offer it shows is replaced. That is what lets a view watch one row
      * rather than be rebuilt every time a state moves, and it is why an install started from a row
      * can still be cancelled from that row after the state has changed to installing.
+     *
+     * <p>If the port cannot be read, the rows are left as they were and the summary says why.
      */
     public void refresh() {
         if (tools == null) {
@@ -262,14 +292,45 @@ public final class ToolManagerViewModel {
             summary.set(unavailableReason);
             return;
         }
-        refreshNoManagedBuild();
+        long mine = refreshes.incrementAndGet();
+        background.execute(
+                () -> {
+                    List<ToolOffer> offers;
+                    List<NoManagedBuild> missing;
+                    try {
+                        offers = tools.offers();
+                        missing = tools.noManagedBuild();
+                    } catch (RuntimeException failed) {
+                        String said = "The tool list could not be read: " + failed;
+                        uiThread.execute(() -> unreadable(mine, said));
+                        return;
+                    }
+                    List<ToolOffer> read = offers;
+                    List<NoManagedBuild> gaps = missing;
+                    uiThread.execute(() -> apply(mine, read, gaps));
+                });
+    }
+
+    /**
+     * Puts one read of the port on screen, on the interface thread, unless a newer read was asked
+     * for after it.
+     *
+     * @param answered the number of the refresh that read it
+     * @param offers what the port offered
+     * @param missing the tools with no managed build here
+     */
+    private void apply(long answered, List<ToolOffer> offers, List<NoManagedBuild> missing) {
+        if (answered != refreshes.get()) {
+            return;
+        }
+        refreshNoManagedBuild(missing);
         Map<String, ToolRowViewModel> existing = new LinkedHashMap<>();
         for (ToolRowViewModel row : rows) {
             existing.put(row.key(), row);
         }
         Map<String, Integer> seen = new LinkedHashMap<>();
         List<ToolRowViewModel> next = new ArrayList<>();
-        for (ToolOffer offer : tools.offers()) {
+        for (ToolOffer offer : offers) {
             String key = keyFor(offer, seen);
             ToolRowViewModel row = existing.get(key);
             if (row == null) {
@@ -284,14 +345,27 @@ public final class ToolManagerViewModel {
     }
 
     /**
+     * Says the port could not be read, on the interface thread, unless a newer read was asked for.
+     *
+     * @param answered the number of the refresh that failed
+     * @param said the sentence to show
+     */
+    private void unreadable(long answered, String said) {
+        if (answered != refreshes.get()) {
+            return;
+        }
+        summary.set(said);
+    }
+
+    /**
      * Starts installing the build a row is showing.
      *
      * <p>Returns as soon as the install is under way, which is the port's own promise. The rows are
-     * read again immediately, because the manager reports the build as installing from the moment
-     * this call returns, and again when the install reaches a terminal phase -- and at no point in
-     * between, because reading the rows verifies every installed entry against its recorded
-     * checksums and doing that once per transferred chunk would freeze the interface it is supposed
-     * to be updating.
+     * read again at once (off the interface thread, as every {@link #refresh()} is), because the
+     * manager reports the build as installing from the moment this call returns, and again when the
+     * install reaches a terminal phase -- and at no point in between, because reading the rows
+     * verifies every installed entry against its recorded checksums and doing that once per
+     * transferred chunk would freeze the interface it is supposed to be updating.
      *
      * @param row the row to install
      * @throws NullPointerException if {@code row} is {@code null}
@@ -431,13 +505,13 @@ public final class ToolManagerViewModel {
      * An entry for a tool still missing keeps its identity and its status, so a refusal stays on
      * screen after the refresh that follows it; the port's order is kept.
      */
-    private void refreshNoManagedBuild() {
+    private void refreshNoManagedBuild(List<NoManagedBuild> missing) {
         Map<ToolName, NoManagedBuildViewModel> existing = new LinkedHashMap<>();
         for (NoManagedBuildViewModel gap : noManagedBuild) {
             existing.put(gap.tool(), gap);
         }
         List<NoManagedBuildViewModel> next = new ArrayList<>();
-        for (NoManagedBuild fact : tools.noManagedBuild()) {
+        for (NoManagedBuild fact : missing) {
             NoManagedBuildViewModel gap = existing.get(fact.tool());
             if (gap == null || !gap.fact().equals(fact)) {
                 gap = new NoManagedBuildViewModel(fact);

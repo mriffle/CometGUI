@@ -89,9 +89,12 @@ class ProgressReachesTheInterfaceThreadTest {
 
         private final AtomicReference<Boolean> interfaceThread = new AtomicReference<>();
 
-        void record() {
+        private final AtomicReference<String> firstChange = new AtomicReference<>();
+
+        synchronized void record(String change) {
             threadName.compareAndSet(null, Thread.currentThread().getName());
             interfaceThread.compareAndSet(null, Platform.isFxApplicationThread());
+            firstChange.compareAndSet(null, change);
             arrived.countDown();
         }
 
@@ -129,7 +132,10 @@ class ProgressReachesTheInterfaceThreadTest {
                                     + threadName.get()
                                     + "\". JavaFX raises no exception for this and never will:"
                                     + " mutating a property or a list a live scene is watching from"
-                                    + " another thread is undefined, not refused.");
+                                    + " another thread is undefined, not refused. The first change"
+                                    + " seen was to "
+                                    + firstChange.get()
+                                    + ".");
         }
     }
 
@@ -145,7 +151,9 @@ class ProgressReachesTheInterfaceThreadTest {
         ArrivedOn arrived = new ArrivedOn();
         FxToolkit.onFxThread(
                 () -> {
-                    row.progressProperty().addListener((property, was, now) -> arrived.record());
+                    row.progressProperty()
+                            .addListener(
+                                    (property, was, now) -> arrived.record("the row's progress"));
                     viewModel.install(row);
                 });
 
@@ -174,22 +182,45 @@ class ProgressReachesTheInterfaceThreadTest {
         ObservableList<ToolRowViewModel> rows = viewModel.rows();
         ToolRowViewModel row = rows.get(0);
         ArrivedOn arrived = new ArrivedOn();
+        CountDownLatch rebuilt = new CountDownLatch(1);
         FxToolkit.onFxThread(
                 () -> {
                     viewModel.install(row);
-                    /*
-                     * Registered AFTER the install has started, because install() reads the port
-                     * and replaces the list itself.  What this listener must see is the rebuild the
-                     * TERMINAL report causes, on whichever thread that report was delivered to.
-                     */
+                });
+        /*
+         * Registered AFTER the install has started AND after the read install() asks for has been
+         * applied -- that read's answer is put on the interface thread behind the call above, so
+         * this second round trip runs after it -- because install() replaces the list itself. What
+         * these listeners must see is what the TERMINAL report changes, on whichever thread that
+         * report was delivered to.
+         *
+         * Both the row the pane draws and the pane's row list are watched, and the FIRST change
+         * is graded. The list itself can no longer change off the interface thread: every
+         * refresh() applies its answer through the interface-thread executor, which is what moved
+         * the port read off that thread. So the change a missing hop now puts on the install thread
+         * is the terminal report reaching the row -- its progress -- before the list is rebuilt,
+         * and a listener on the list alone would stay green with the hop removed.
+         */
+        FxToolkit.onFxThread(
+                () -> {
+                    row.progressProperty()
+                            .addListener(
+                                    (property, was, now) -> arrived.record("the row's progress"));
                     rows.addListener(
-                            (ListChangeListener<ToolRowViewModel>) change -> arrived.record());
+                            (ListChangeListener<ToolRowViewModel>)
+                                    change -> {
+                                        arrived.record("the row list");
+                                        rebuilt.countDown();
+                                    });
                 });
 
         reportFromAnInstallThread(manager, InstallPhase.DONE, 2_798_963L);
 
         arrived.awaitArrival("row-list rebuild");
         arrived.assertOnInterfaceThread("the pane's row list");
+        assertTrue(
+                rebuilt.await(TIMEOUT_SECONDS, TimeUnit.SECONDS),
+                "the terminal report never rebuilt the pane's row list");
         /*
          * Not decoration: a use of the view after the wait is what keeps it strongly reachable
          * for the whole wait, which a local variable the compiler can see is dead would not.
@@ -211,6 +242,11 @@ class ProgressReachesTheInterfaceThreadTest {
                     scene.getRoot().layout();
                     viewModel.refresh();
                 });
+        /*
+         * The refresh's answer is applied on the interface thread after the call above returns;
+         * one more round trip there is what puts the rows in place before the caller reads them.
+         */
+        FxToolkit.onFxThread(() -> {});
     }
 
     /**

@@ -268,6 +268,11 @@ class AccessibleNameEnumerationUiTest {
     @BeforeAll
     static void launchTheApplicationAndWalkTheScene() {
         application = RunningApplication.launchedByMain();
+        /*
+         * The Tool Manager's rows are read off the interface thread and arrive after the window:
+         * walk the scene once they are in it, so every row's controls are among those graded.
+         */
+        application.awaitToolListRead();
         driver = new TestFxUiDriver(application);
         Parent root = (Parent) driver.node(UiIds.SHELL_ROOT);
         controls =

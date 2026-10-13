@@ -27,10 +27,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import javafx.application.Platform;
+import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Label;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.cometgui.app.bootstrap.CometGuiLauncher;
+import org.cometgui.ui.controls.UiIds;
+import org.cometgui.ui.viewmodel.ToolManagerViewModel;
 
 /**
  * The application a GUI test drives: started for real, headless, and handed to a driver.
@@ -177,6 +181,48 @@ public final class RunningApplication {
      */
     Scene scene() {
         return scene;
+    }
+
+    /**
+     * Waits until the Tool Manager section has read its tool list, and returns what its summary
+     * then says.
+     *
+     * <p>The application asks for the list as it starts, but the list is read off the interface
+     * thread -- reading it starts every installed tool -- and arrives a moment after the window
+     * does. A test that walks or reads the Tool Manager's rows waits for that first, or it walks a
+     * section that has not been filled yet and proves less than it says.
+     *
+     * @return the summary line once it no longer says the list has not been read
+     * @throws AssertionError if the summary is missing, or still says the list has not been read
+     *     after {@link #STARTUP_TIMEOUT_SECONDS}
+     */
+    public String awaitToolListRead() {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(STARTUP_TIMEOUT_SECONDS);
+        String said = toolManagerSummary();
+        while (ToolManagerViewModel.NOT_READ_YET.equals(said) && System.nanoTime() < deadline) {
+            pause();
+            said = toolManagerSummary();
+        }
+        String last = said;
+        assertTrue(
+                !ToolManagerViewModel.NOT_READ_YET.equals(last),
+                () ->
+                        "the Tool Manager still said \""
+                                + last
+                                + "\" "
+                                + STARTUP_TIMEOUT_SECONDS
+                                + "s after the window appeared: the application never read its"
+                                + " tool list");
+        return last;
+    }
+
+    private String toolManagerSummary() {
+        return onFxThread(
+                () -> {
+                    Node summary = scene.lookup("#" + UiIds.TOOL_MANAGER_SUMMARY);
+                    assertNotNull(summary, "the Tool Manager section has no summary line");
+                    return ((Label) summary).getText();
+                });
     }
 
     /** Ends the application, so that a JVM shared by nothing still exits promptly. */

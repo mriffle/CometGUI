@@ -36,9 +36,12 @@ import java.util.List;
  * behind this interface -- the manifest and its reader, the downloader, the extractors, the atomic
  * install, the probes and local-binary registration -- and unit 9 builds the view that consumes it.
  *
- * <p>Implementations are expected to be safe to call from the JavaFX application thread: {@link
- * #offers()} answers from what is already known, and {@link #install} returns as soon as the
- * install has started.
+ * <p><strong>{@link #offers()} is not to be called on the JavaFX application thread.</strong> It
+ * checks that every installed build still starts on this host, which means starting it through the
+ * process service -- for a JAR tool, a second Java virtual machine -- so it can take seconds, and a
+ * caller reads it on a background thread and applies the answer on the interface thread. {@link
+ * #install} returns as soon as the install has started, and is safe to call from the interface
+ * thread.
  */
 public interface ToolManager {
 

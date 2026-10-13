@@ -220,6 +220,17 @@ class CometGuiApplicationStartupTest {
         Scene scene = onFxThread(stage::getScene);
         Node pane = onFxThread(() -> scene.lookup("#" + UiIds.TOOL_MANAGER_PANE));
         Label summary = onFxThread(() -> (Label) scene.lookup("#" + UiIds.TOOL_MANAGER_SUMMARY));
+        assertNotNull(summary, "the Tool Manager states nothing about what it holds");
+        /*
+         * The list is read off the interface thread (reading it starts every installed tool), so
+         * it arrives a moment after the window. Wait for it, bounded; a list never read still
+         * fails below, with the summary it was left saying.
+         */
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
+        while ("The tool list has not been read yet.".equals(onFxThread(summary::getText))
+                && System.nanoTime() < deadline) {
+            Thread.sleep(25);
+        }
         Node percolator =
                 onFxThread(() -> scene.lookup("#" + UiIds.toolRowName("percolator-3_07_1-1")));
 
