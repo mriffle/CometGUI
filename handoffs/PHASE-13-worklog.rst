@@ -188,6 +188,29 @@ P13-8 -- nothing slow on the JavaFX thread
     A GUI test asserts the thread, as the FIX-P12-P13 repair did for the Tool
     Manager.
 
+Design decision from unit 2 (2026-10-13)
+========================================
+
+P13-4, amended -- parameter names go in settings VALUES, never in keys
+    *The orchestrator's call.* Unit 2 checked every name in the bundled
+    metadata (releases 2026.03.0, 2026.02.2, 2024.01.0, 118 names) before
+    writing code and stopped: **39 Comet parameter names contain upper-case
+    letters** (``use_A_ions`` ... ``use_Z_ions``, ``equal_I_and_L``,
+    ``add_Cterm_peptide``, every ``add_<X>_<residue>``), so no per-parameter
+    key can satisfy ``[a-z0-9]+(\.[a-z0-9-]+)+`` without a lossy mapping or a
+    schema change. Chosen (option A): ``comet.origin.<origin word>`` = the
+    parameter names with that origin, space-separated in schema order (five
+    hand-typed words; ``COMET_DEFAULT`` absent); ``comet.preset.<nn>.<field>``
+    for each applied preset's identity, and ``comet.preset.<nn>.applied.<mm>``
+    = ``<name> = <value text>`` in ``comet.params`` line syntax. A test over
+    every bundled schema pins what this relies on (no name holds whitespace or
+    ``=``). Rejected: lower-casing the name into the key (relies on no two
+    names colliding by case, which a future release could break) and an
+    escape code (unreadable). Accepted limits, documented in the code: a
+    value carried across a release change keeps its ``preset`` origin while
+    the preset list is cleared; a retry of an unchanged configuration records
+    the first preparation's origins. Origins never enter a fingerprint.
+
 Work units
 ==========
 
@@ -224,7 +247,8 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        not already in the request; existing pinned provenance expectations
        updated by hand, never regenerated.
      - R-PROV (application provenance); spec *Provenance UI: Parameters*
-     - Pending
+     - Accepted, ``fdb1cfc`` (after a stop for a design decision, P13-4
+       amended)
    * - 3
      - **The read model** ``workflow.provenance`` (P13-2, P13-3, P13-5,
        P13-7): load a run (closed read), summary, tools (version, managed or
@@ -337,3 +361,46 @@ Unit 1 sign-off
   ``@Nested`` classes made surefire's XML report one test fewer than ran; the
   agent renamed them. Harnesses that count tests from that XML can
   under-count elsewhere -- not this phase's to fix; noted for tier 1.
+
+Unit 2 sign-off
+---------------
+
+**Accepted 2026-10-13.** Commit ``fdb1cfc`` (21 files). The agent first
+stopped before writing code, as briefed, on finding 39 upper-case parameter
+names; I chose option A (P13-4, amended, above).
+
+* **Diff read.** ``params.comet.presets.PresetApplication`` (identity plus the
+  values it set; ``describes(model)`` true only while one of its values is in
+  place with origin ``PRESET``); ``ParameterSession`` remembers applications
+  (``adoptPreset``), cleared by a new configuration, import, migration or
+  release change, kept by edits; ``RunEnginePort.start`` carries them;
+  ``WorkflowRunPort`` -> ``SearchRequest.withPresets`` (old constructors
+  kept); ``workflow.steps.CometParameterProvenance`` holds the keys and the
+  hand-typed wire words; ``CometWorkflow.prepare`` merges its settings before
+  the run is reserved. Presets and origins feed no input and no fingerprint.
+  One hand-typed expectation updated by hand
+  (``CometWorkflowTest.prepareRecordsTheRun``). No POM, no module edge.
+* **Tests, run by me**: ``mvn -pl cometgui-params-comet,cometgui-workflow,
+  cometgui-ui,cometgui-app -am install`` BUILD SUCCESS (36 min): workflow 929,
+  ui 796, app 297 (1 skipped, the opt-in upstream test), params-comet 2123,
+  every upstream module green, ``BugInstance size is 0`` in every module.
+* **My injections** (anchor once, restored, ``sha256sum -c`` OK):
+
+  - J1 preset origin word ``builtin`` for ``built-in``: 3 of 19 red
+    (``wireWords``, ``aPresetApplied``, ``aPresetThenAnEdit``).
+  - J2 applied values numbered from 00: 5 of 19 red, e.g.
+    ``twoPresetsInOrder: expected: <num_threads = 8> but was: <null>``.
+  - J3 ``describes`` ignoring whether the value is still the preset's: 1 of 6
+    red, ``another preset's value ==> expected: <false> but was: <true>``.
+
+* **Targeted PIT, by me**: ``CometParameterProvenance`` and ``SearchRequest``
+  with the three workflow test classes: 17 KILLED, 1 NO_COVERAGE
+  (``SearchRequest.withPercolator``, reached by tests I did not include; the
+  agent's run with every test was 18/18). The agent's runs: params-comet
+  8/8, ui 270/272 (two pre-existing ``generation++`` survivors in
+  ``RunViewModel``), app not PIT-gated.
+* **Harnesses, run by me**: ``workflow`` 110 PASS (511 s), ``quality`` 42
+  PASS, ``paramui`` 87 PASS (2079 s). The agent ran ``docs`` and
+  ``traceability`` (one line in ``docs/developer/workflow_engine.rst``).
+* **Files outside the modules the tests read**: none new (the real-run test
+  uses the existing ``scratch/`` fixtures).
