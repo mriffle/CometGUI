@@ -1113,7 +1113,7 @@ class RealProvenanceGateTest {
                             SecretSweep.walk(root, forms, Optional.empty(), Set.of());
                     assertEquals(List.of(), walk.unreadable(), walk.summary());
                     for (String hit : walk.hits()) {
-                        hits.put(hit, seed.getKey());
+                        hits.put(hit + ", seeded as " + seed.getKey(), seed.getKey());
                     }
                     reached.addAll(walk.searchedFiles());
                 }
