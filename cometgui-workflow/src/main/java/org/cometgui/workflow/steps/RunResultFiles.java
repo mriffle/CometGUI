@@ -47,6 +47,19 @@ public final class RunResultFiles {
      */
     public static final String POUT_XML_ROLE = PercolatorDeclarations.POUT_XML;
 
+    /**
+     * The provenance role of the archived {@code parameters/comet.params}, as {@code
+     * provenance.json} records it (phase 13's Provenance section reads the exact file by it).
+     */
+    public static final String COMET_PARAMS_ROLE = RunDeclarations.PARAMS;
+
+    /**
+     * The provenance role of the archived {@code parameters/percolator-settings.json}, as {@code
+     * provenance.json} records it among the inputs (phase 13's Provenance section reads the exact
+     * file by it).
+     */
+    public static final String PERCOLATOR_SETTINGS_ROLE = PercolatorDeclarations.SETTINGS;
+
     private RunResultFiles() {}
 
     /**
