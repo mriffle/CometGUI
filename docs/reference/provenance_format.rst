@@ -639,9 +639,13 @@ version, what it could do, and what it did.
    * - ``artefactIdentity``
      - string
      - **yes**
-     - The upstream or managed artefact this binary came from. ``null`` for a
-       local binary the application did not install and therefore cannot
-       attribute.
+     - The upstream or managed artefact this binary came from. For a build
+       CometGUI installed, the pinned URL it was downloaded from, a space,
+       ``sha256:`` and the downloaded artefact's SHA-256, as the install's
+       completion marker records them -- for example
+       ``https://github.com/UWPR/Comet/releases/download/v2026.03.0/comet.linux.exe
+       sha256:ad93b4cf...``. ``null`` for a local binary the application did
+       not install and therefore cannot attribute.
 
    * - ``capabilities``
      - array of strings

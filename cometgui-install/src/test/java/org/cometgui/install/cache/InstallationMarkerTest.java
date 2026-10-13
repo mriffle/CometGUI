@@ -125,6 +125,16 @@ class InstallationMarkerTest {
     }
 
     @Test
+    @DisplayName("a marker names the artefact it came from: its URL and the download's SHA-256")
+    void aMarkerNamesItsArtefact() {
+        assertEquals(
+                "https://example.invalid/percolator-noxml-ubuntu-portable.zip"
+                        + " sha256:4d0e94af851884ff8ab6a2223e73cf28"
+                        + "ba3ced28f6af863d4a76d541009b9dd1",
+                marker().artefactIdentity());
+    }
+
+    @Test
     @DisplayName("a marker that does not record the executable is refused")
     void aMarkerMustRecordTheExecutable() {
         IllegalArgumentException refused =

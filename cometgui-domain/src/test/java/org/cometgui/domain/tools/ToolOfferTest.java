@@ -934,4 +934,146 @@ class ToolOfferTest {
             assertEquals("unconfirmedClaims", refused.getMessage());
         }
     }
+
+    @Nested
+    @DisplayName("the artefact an installed managed build came from")
+    class ArtefactIdentity {
+
+        private static final String IDENTITY =
+                "https://github.com/percolator/percolator/releases/download/rel-3-07-01/"
+                        + "percolator-noxml-ubuntu-portable.zip sha256:"
+                        + "4d0e94af851884ff8ab6a2223e73cf28ba3ced28f6af863d4a76d541009b9dd1";
+
+        private ToolOffer with(
+                ToolOrigin origin, ToolInstallState state, Optional<String> identity) {
+            return new ToolOffer(
+                    ToolName.PERCOLATOR,
+                    PERCOLATOR_3_07_1,
+                    origin,
+                    state,
+                    List.of(XML_OBSERVED),
+                    List.of(),
+                    Optional.empty(),
+                    pathFor(state),
+                    origin == ToolOrigin.MANAGED ? sizeFor(state) : OptionalLong.empty(),
+                    List.of(),
+                    identity);
+        }
+
+        @Test
+        @DisplayName("an installed managed offer keeps it, and it is part of equality")
+        void kept() {
+            ToolOffer offer =
+                    with(ToolOrigin.MANAGED, ToolInstallState.INSTALLED, Optional.of(IDENTITY));
+            assertAll(
+                    () -> assertEquals(Optional.of(IDENTITY), offer.artefactIdentity()),
+                    () ->
+                            assertEquals(
+                                    offer,
+                                    with(
+                                            ToolOrigin.MANAGED,
+                                            ToolInstallState.INSTALLED,
+                                            Optional.of(IDENTITY))),
+                    () ->
+                            assertNotEquals(
+                                    offer,
+                                    with(
+                                            ToolOrigin.MANAGED,
+                                            ToolInstallState.INSTALLED,
+                                            Optional.empty())));
+        }
+
+        @ParameterizedTest
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("the nine- and ten-part constructors carry none, in every state")
+        void noneByDefault(ToolInstallState state) {
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    Optional.empty(),
+                                    offer(state, List.of(XML_OBSERVED), List.of(), pathFor(state))
+                                            .artefactIdentity()),
+                    () ->
+                            assertEquals(
+                                    Optional.empty(),
+                                    new ToolOffer(
+                                                    ToolName.PERCOLATOR,
+                                                    PERCOLATOR_3_07_1,
+                                                    ToolOrigin.MANAGED,
+                                                    state,
+                                                    List.of(XML_OBSERVED),
+                                                    List.of(),
+                                                    Optional.empty(),
+                                                    pathFor(state),
+                                                    sizeFor(state),
+                                                    List.of())
+                                            .artefactIdentity()));
+        }
+
+        @ParameterizedTest
+        @EnumSource(
+                value = ToolInstallState.class,
+                names = "INSTALLED",
+                mode = EnumSource.Mode.EXCLUDE)
+        @DisplayName("a managed offer that is not installed has no install to name, so none")
+        void onlyWhenInstalled(ToolInstallState state) {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> with(ToolOrigin.MANAGED, state, Optional.of(IDENTITY)));
+            assertEquals(
+                    "artefactIdentity must be absent for a MANAGED offer in state "
+                            + state
+                            + ", because only an installed managed build came from an artefact"
+                            + " CometGUI installed, but was: "
+                            + IDENTITY,
+                    refused.getMessage());
+        }
+
+        @Test
+        @DisplayName("a registered local binary cannot be attributed, so it carries none")
+        void neverForALocalBinary() {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    with(
+                                            ToolOrigin.LOCAL,
+                                            ToolInstallState.INSTALLED,
+                                            Optional.of(IDENTITY)));
+            assertEquals(
+                    "artefactIdentity must be absent for a LOCAL offer in state INSTALLED,"
+                            + " because only an installed managed build came from an artefact"
+                            + " CometGUI installed, but was: "
+                            + IDENTITY,
+                    refused.getMessage());
+        }
+
+        @Test
+        @DisplayName("a blank identity is refused, quoted")
+        void notBlank() {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    with(
+                                            ToolOrigin.MANAGED,
+                                            ToolInstallState.INSTALLED,
+                                            Optional.of(" ")));
+            assertEquals(
+                    "artefactIdentity must not be blank when present, but was: \" \"",
+                    refused.getMessage());
+        }
+
+        @Test
+        @DisplayName("a null identity is refused naming the component")
+        void nullIdentity() {
+            Optional<String> absent = Nulls.of(Optional.class);
+            NullPointerException refused =
+                    assertThrows(
+                            NullPointerException.class,
+                            () -> with(ToolOrigin.MANAGED, ToolInstallState.INSTALLED, absent));
+            assertEquals("artefactIdentity", refused.getMessage());
+        }
+    }
 }

@@ -567,7 +567,8 @@ public final class ManagedToolManager implements ToolManager {
                     Optional.empty(),
                     Optional.of(verified.directory().resolve(record.executablePath())),
                     OptionalLong.of(wholeDownloadOf(record)),
-                    unconfirmed(record, marker));
+                    unconfirmed(record, marker),
+                    Optional.of(marker.artefactIdentity()));
         }
         if (attempt == ToolInstallState.FAILED) {
             return managedOffer(

@@ -93,6 +93,11 @@ import java.util.Set;
  *     did not find ({@code R-TOOL-07}), each with the evidence the manifest gave for it, in
  *     manifest order; never a capability among {@code capabilities}, and empty unless the build is
  *     {@link ToolInstallState#INSTALLED}, because only an installed build has been probed
+ * @param artefactIdentity the upstream artefact a {@link ToolOrigin#MANAGED} build that is {@link
+ *     ToolInstallState#INSTALLED} was installed from, as the completion marker of its install
+ *     records it -- what provenance records as the tool's artefact identity; absent for every other
+ *     offer, and in particular for a {@link ToolOrigin#LOCAL} binary, which CometGUI did not
+ *     install and therefore cannot attribute
  */
 public record ToolOffer(
         ToolName tool,
@@ -104,7 +109,8 @@ public record ToolOffer(
         Optional<LoaderDiagnostic> loaderDiagnostic,
         Optional<Path> installedPath,
         OptionalLong downloadSizeBytes,
-        List<DeclaredCapability> unconfirmedClaims) {
+        List<DeclaredCapability> unconfirmedClaims,
+        Optional<String> artefactIdentity) {
 
     /**
      * Validates the offer and takes defensive, immutable copies of its three lists.
@@ -113,8 +119,9 @@ public record ToolOffer(
      * @throws IllegalArgumentException if a capability or an unconfirmed claim belongs to another
      *     tool, if a capability, an unconfirmed claim or an advisory identifier appears twice, if a
      *     capability is both offered and unconfirmed, if an offer that is not installed carries an
-     *     unconfirmed claim, if a present installed path is relative, or if an installed offer
-     *     names no path -- with a message naming the field and the rejected value
+     *     unconfirmed claim, if a present installed path is relative, if an installed offer names
+     *     no path, or if an artefact identity is blank or present on an offer that is not an
+     *     installed managed build -- with a message naming the field and the rejected value
      */
     public ToolOffer {
         Objects.requireNonNull(tool, "tool");
@@ -129,6 +136,48 @@ public record ToolOffer(
         checkInstalledPath(state, installedPath);
         checkDownloadSize(origin, state, downloadSizeBytes);
         unconfirmedClaims = checkedUnconfirmed(unconfirmedClaims, tool, state, capabilities);
+        checkArtefactIdentity(origin, state, artefactIdentity);
+    }
+
+    /**
+     * An offer with no artefact identity: every offer but an installed managed build's.
+     *
+     * @param tool which tool
+     * @param version which version of it, as upstream names the release
+     * @param origin whether CometGUI installed it or the user pointed at it
+     * @param state what can be done with it on this machine
+     * @param capabilities what it can do, each with the evidence behind the claim
+     * @param advisories the caveats to show at selection time and record in provenance
+     * @param loaderDiagnostic why the build will not run here, when it will not
+     * @param installedPath where the executable or JAR is, absolute, when installed
+     * @param downloadSizeBytes how many bytes this host fetches to install the build
+     * @param unconfirmedClaims the manifest's claims the install's probe did not confirm
+     * @throws NullPointerException if any component is {@code null}
+     * @throws IllegalArgumentException as the canonical constructor
+     */
+    public ToolOffer(
+            ToolName tool,
+            ToolVersion version,
+            ToolOrigin origin,
+            ToolInstallState state,
+            List<DeclaredCapability> capabilities,
+            List<ToolAdvisory> advisories,
+            Optional<LoaderDiagnostic> loaderDiagnostic,
+            Optional<Path> installedPath,
+            OptionalLong downloadSizeBytes,
+            List<DeclaredCapability> unconfirmedClaims) {
+        this(
+                tool,
+                version,
+                origin,
+                state,
+                capabilities,
+                advisories,
+                loaderDiagnostic,
+                installedPath,
+                downloadSizeBytes,
+                unconfirmedClaims,
+                Optional.empty());
     }
 
     /**
@@ -168,6 +217,37 @@ public record ToolOffer(
                 installedPath,
                 downloadSizeBytes,
                 List.of());
+    }
+
+    /*
+     * AN ARTEFACT IDENTITY IS A FACT ABOUT AN INSTALL.  Only a build CometGUI installed came from
+     * an artefact CometGUI can name, and only an installed one has a completion marker that says
+     * which artefact that was -- so the identity exists exactly there.  A LOCAL binary was already
+     * on the machine and provenance records it as unattributable (an absent artefactIdentity),
+     * which an offer carrying one would contradict.
+     */
+    private static void checkArtefactIdentity(
+            ToolOrigin origin, ToolInstallState state, Optional<String> artefactIdentity) {
+        Objects.requireNonNull(artefactIdentity, "artefactIdentity");
+        if (artefactIdentity.isEmpty()) {
+            return;
+        }
+        if (artefactIdentity.get().isBlank()) {
+            throw new IllegalArgumentException(
+                    "artefactIdentity must not be blank when present, but was: \""
+                            + artefactIdentity.get()
+                            + "\"");
+        }
+        if (origin != ToolOrigin.MANAGED || state != ToolInstallState.INSTALLED) {
+            throw new IllegalArgumentException(
+                    "artefactIdentity must be absent for a "
+                            + origin
+                            + " offer in state "
+                            + state
+                            + ", because only an installed managed build came from an artefact"
+                            + " CometGUI installed, but was: "
+                            + artefactIdentity.get());
+        }
     }
 
     /*

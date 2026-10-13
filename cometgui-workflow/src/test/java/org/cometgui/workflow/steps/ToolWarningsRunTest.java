@@ -92,7 +92,7 @@ import org.junit.jupiter.api.io.TempDir;
 class ToolWarningsRunTest {
 
     /** Does nothing and declares nothing: stands in for a Comet step. */
-    private record Nothing() implements StepAction {
+    record Nothing() implements StepAction {
 
         @Override
         public StepDeclaration declaration() {
@@ -104,7 +104,7 @@ class ToolWarningsRunTest {
     }
 
     /** Stands in for {@code merge-pin}: writes the synthetic merged PIN, declared as its output. */
-    private record WriteMergedPin(Path merged) implements StepAction {
+    record WriteMergedPin(Path merged) implements StepAction {
 
         @Override
         public StepDeclaration declaration() {
@@ -127,7 +127,7 @@ class ToolWarningsRunTest {
     }
 
     /** A Comet that runs, says nothing and writes nothing: exit 0. */
-    private static void exitZero(Path executable) throws IOException {
+    static void exitZero(Path executable) throws IOException {
         Files.writeString(executable, "#!/bin/sh\nexit 0\n", StandardCharsets.US_ASCII);
         Files.setPosixFilePermissions(executable, PosixFilePermissions.fromString("rwx------"));
     }
@@ -272,7 +272,8 @@ class ToolWarningsRunTest {
         }
     }
 
-    private static ToolOffer percolatorOffer(Path executable, List<DeclaredCapability> claims) {
+    private static ToolOffer percolatorOffer(
+            Path executable, List<DeclaredCapability> claims, Optional<String> identity) {
         Set<ToolCapability> probed = EnumSet.copyOf(FakePercolator.EVERY);
         for (DeclaredCapability claim : claims) {
             probed.remove(claim.capability());
@@ -289,16 +290,30 @@ class ToolWarningsRunTest {
                 Optional.empty(),
                 Optional.of(executable),
                 OptionalLong.of(1000),
-                claims);
+                claims,
+                identity);
     }
 
     private static PreparedRun percolatorRun(
             FakeSearch search, RealProject project, List<DeclaredCapability> claims)
             throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
+        return percolatorRun(search, project, claims, Optional.empty());
+    }
+
+    /**
+     * A run whose Comet steps are replaced and whose Percolator is {@link FakePercolator}, offered
+     * as an installed managed 3.07.1 with these unconfirmed claims and this artefact identity.
+     */
+    static PreparedRun percolatorRun(
+            FakeSearch search,
+            RealProject project,
+            List<DeclaredCapability> claims,
+            Optional<String> identity)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Path percolator =
                 FakePercolator.write(
                         search.root().resolve("bin/percolator"), FakePercolator.Behaviour.normal());
-        ToolOffer offer = percolatorOffer(percolator, claims);
+        ToolOffer offer = percolatorOffer(percolator, claims, identity);
         PercolatorChoice choice =
                 FakePercolator.choice(
                         offer, List.of(offer), Set.of(), PercolatorSettings.defaults());

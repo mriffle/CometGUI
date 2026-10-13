@@ -29,6 +29,8 @@ import java.util.function.Supplier;
 import org.cometgui.domain.run.IndexMode;
 import org.cometgui.domain.run.RunId;
 import org.cometgui.domain.run.RunLayout;
+import org.cometgui.domain.tools.DeclaredCapability;
+import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
@@ -601,6 +603,13 @@ public final class WorkflowRunPort implements SessionEngine {
                             + " already on this computer there.");
         }
         Path executable = installed.get().installedPath().orElseThrow();
+        // R-TOOL-07: what the install's probe established, never a manifest claim from bytes
+        Set<ToolCapability> probed = EnumSet.noneOf(ToolCapability.class);
+        for (DeclaredCapability declared : installed.get().capabilities()) {
+            if (declared.isObserved()) {
+                probed.add(declared.capability());
+            }
+        }
         try {
             return new Selected(
                     Optional.of(
@@ -609,9 +618,10 @@ public final class WorkflowRunPort implements SessionEngine {
                                     release,
                                     hashes.hash(executable).sha256(),
                                     installed.get().origin() == ToolOrigin.MANAGED,
-                                    Optional.empty(),
+                                    installed.get().artefactIdentity(),
                                     installed.get().advisories(),
-                                    installed.get().unconfirmedClaims())),
+                                    installed.get().unconfirmedClaims(),
+                                    probed)),
                     Optional.empty());
         } catch (IOException unreadable) {
             return Selected.none(

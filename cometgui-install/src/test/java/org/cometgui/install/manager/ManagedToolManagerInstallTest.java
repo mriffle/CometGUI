@@ -197,6 +197,18 @@ class ManagedToolManagerInstallTest {
                                     served.requested(),
                                     "the artefact and its companion, both fetched by the URL the"
                                             + " manifest pins"),
+                    () ->
+                            assertEquals(
+                                    Optional.of(
+                                            "https://github.com/percolator/percolator/releases/"
+                                                    + "download/rel-3-07-01/"
+                                                    + "percolator-noxml-ubuntu-portable.zip"
+                                                    + " sha256:4d0e94af851884ff8ab6a2223e73cf28"
+                                                    + "ba3ced28f6af863d4a76d541009b9dd1"),
+                                    row.artefactIdentity(),
+                                    "the artefact the completion marker says was installed: the"
+                                            + " pinned URL and the SHA-256 it was verified"
+                                            + " against, which provenance records"),
                     () -> assertEquals(1, probe.callCount()),
                     () -> assertTrue(harness.verify(record).installed()),
                     () -> assertEquals(List.of(), harness.stagingDirectories(record)));

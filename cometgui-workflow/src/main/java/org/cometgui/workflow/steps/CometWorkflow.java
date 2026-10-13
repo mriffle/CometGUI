@@ -283,7 +283,7 @@ public final class CometWorkflow {
                         hashes.hash(comet.executable()),
                         comet.managed(),
                         comet.artefactIdentity(),
-                        Set.of(),
+                        capabilityIds(comet.capabilities()),
                         ToolWarnings.comet(comet));
         CometRun run =
                 new CometRun(
@@ -366,10 +366,6 @@ public final class CometWorkflow {
         }
         List<String> warnings = new ArrayList<>(ToolWarnings.percolator(selection.offer()));
         PercolatorProvenance.weightsWarning(command).ifPresent(warnings::add);
-        Set<String> capabilities = new TreeSet<>();
-        for (ToolCapability capability : selection.capabilities()) {
-            capabilities.add(capability.id());
-        }
         ToolIdentity tool =
                 new ToolIdentity(
                         PERCOLATOR_TOOL_NAME,
@@ -378,10 +374,19 @@ public final class CometWorkflow {
                         selection.executable(),
                         hashes.hash(selection.executable()),
                         selection.managed(),
-                        Optional.empty(),
-                        capabilities,
+                        selection.offer().artefactIdentity(),
+                        capabilityIds(selection.capabilities()),
                         warnings);
         return new PercolatorRun(layout, hashes, decoys, choice, tool, command, archived);
+    }
+
+    /** A build's probed capabilities as provenance records them: their identifiers, sorted. */
+    private static Set<String> capabilityIds(Set<ToolCapability> capabilities) {
+        Set<String> ids = new TreeSet<>();
+        for (ToolCapability capability : capabilities) {
+            ids.add(capability.id());
+        }
+        return ids;
     }
 
     /**

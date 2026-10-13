@@ -17,13 +17,17 @@
 package org.cometgui.workflow.steps;
 
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.ToolAdvisory;
+import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolVersion;
@@ -41,6 +45,10 @@ import org.cometgui.domain.tools.ToolVersion;
  * for the build -- a registered local binary is unverified, a release needs a runtime -- and each
  * capability the manifest claims that the install's probe did not find ({@code R-TOOL-07}).
  *
+ * <p>The capabilities are the offer's observed ones -- what the install's probe established and the
+ * completion marker recorded -- carried so that the run's Comet tool record holds the probed set
+ * the specification's tool provenance requires, as Percolator's does.
+ *
  * @param executable the Comet executable; absolute, normalised by this constructor
  * @param release the release the executable is, which must be the release the parameter model is
  *     for
@@ -52,6 +60,8 @@ import org.cometgui.domain.tools.ToolVersion;
  * @param advisories the offer's advisories ({@link ToolOffer#advisories()}), in its order
  * @param unconfirmedClaims the offer's unconfirmed claims ({@link ToolOffer#unconfirmedClaims()}),
  *     in its order; each a Comet capability
+ * @param capabilities the offer's observed capabilities (evidence {@code observed-by-execution});
+ *     each a Comet capability
  */
 public record CometSelection(
         Path executable,
@@ -60,7 +70,8 @@ public record CometSelection(
         boolean managed,
         Optional<String> artefactIdentity,
         List<ToolAdvisory> advisories,
-        List<DeclaredCapability> unconfirmedClaims) {
+        List<DeclaredCapability> unconfirmedClaims,
+        Set<ToolCapability> capabilities) {
 
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 
@@ -93,10 +104,48 @@ public record CometSelection(
         for (DeclaredCapability claim : unconfirmedClaims) {
             claim.capability().requireBelongsTo(ToolName.COMET);
         }
+        Set<ToolCapability> probed = EnumSet.noneOf(ToolCapability.class);
+        for (ToolCapability capability : Objects.requireNonNull(capabilities, "capabilities")) {
+            capability.requireBelongsTo(ToolName.COMET);
+            probed.add(capability);
+        }
+        capabilities = Collections.unmodifiableSet(probed);
     }
 
     /**
-     * A selection with no advisory and no unconfirmed claim.
+     * A selection with no probed capability recorded.
+     *
+     * @param executable the Comet executable; absolute
+     * @param release the release the executable is
+     * @param sha256 the executable's SHA-256 when it was selected
+     * @param managed whether CometGUI installed it
+     * @param artefactIdentity the upstream or managed artefact identity, when known
+     * @param advisories the offer's advisories, in its order
+     * @param unconfirmedClaims the offer's unconfirmed claims, in its order
+     * @throws NullPointerException naming a component that is {@code null}
+     * @throws IllegalArgumentException as the canonical constructor
+     */
+    public CometSelection(
+            Path executable,
+            ToolVersion release,
+            String sha256,
+            boolean managed,
+            Optional<String> artefactIdentity,
+            List<ToolAdvisory> advisories,
+            List<DeclaredCapability> unconfirmedClaims) {
+        this(
+                executable,
+                release,
+                sha256,
+                managed,
+                artefactIdentity,
+                advisories,
+                unconfirmedClaims,
+                Set.of());
+    }
+
+    /**
+     * A selection with no advisory, no unconfirmed claim and no probed capability recorded.
      *
      * @param executable the Comet executable; absolute
      * @param release the release the executable is
@@ -112,7 +161,15 @@ public record CometSelection(
             String sha256,
             boolean managed,
             Optional<String> artefactIdentity) {
-        this(executable, release, sha256, managed, artefactIdentity, List.of(), List.of());
+        this(
+                executable,
+                release,
+                sha256,
+                managed,
+                artefactIdentity,
+                List.of(),
+                List.of(),
+                Set.of());
     }
 
     @Override
@@ -123,5 +180,10 @@ public record CometSelection(
     @Override
     public List<DeclaredCapability> unconfirmedClaims() {
         return List.copyOf(unconfirmedClaims);
+    }
+
+    @Override
+    public Set<ToolCapability> capabilities() {
+        return Collections.unmodifiableSet(capabilities);
     }
 }

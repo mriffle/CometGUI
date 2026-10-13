@@ -305,6 +305,18 @@ public record InstallationMarker(
     }
 
     /**
+     * The artefact this install came from, as provenance records it ({@code artefactIdentity}): the
+     * pinned URL it was downloaded from, a space, {@code sha256:} and the download's SHA-256 -- the
+     * two facts that together name exactly one upstream artefact ({@code D-008}: nothing is
+     * redistributed, so the URL is the provenance, and the digest is what was verified).
+     *
+     * @return for example {@code https://github.com/.../comet.linux.exe sha256:ad93b4cf...}
+     */
+    public String artefactIdentity() {
+        return artefactUrl + " sha256:" + artefactHashes.sha256();
+    }
+
+    /**
      * Renders the marker as the JSON document that is written to disk.
      *
      * <p>Through the project's one {@link JsonWriter}, with the secret rule set applied, because a
