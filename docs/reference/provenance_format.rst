@@ -672,9 +672,16 @@ version, what it could do, and what it did.
    * - ``warnings``
      - array of strings
      - no
-     - The advisories that were active for this version at the time of the run,
-       in the order they were raised. May be ``[]``. The order is information:
-       the first advisory is the one that mattered most when it was raised.
+     - The warnings recorded against this tool for the run, in the order they
+       were raised. May be ``[]``. The advisories active for this version at
+       the time of the run come first -- the first is the one that mattered
+       most when it was raised -- then each capability the artefact manifest
+       claims for the build and its install's probe did not find
+       (``R-TOOL-07``, the same sentence as the ``comet.probe-discrepancy.<nn>``
+       or ``percolator.probe-discrepancy.<nn>`` setting), then, for
+       Percolator, ``R-PERC-08``'s warning that no weights file was written.
+       Last, the engine adds a note when a log of the invocation could not be
+       hashed.
 
 ``tools[].execution``
 ---------------------

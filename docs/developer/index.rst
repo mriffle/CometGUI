@@ -10,12 +10,13 @@ pages describe the implementation that satisfies them.
 
 .. note::
 
-   **Every page below except** :doc:`testing` **and** :doc:`architecture`
-   **is a stub created by Phase 01.** Each stub names the phase that owns its
-   content. This index and the strict documentation build exist first on
-   purpose: a documentation gate added at the end of a project measures
-   nothing. :doc:`architecture` was written by Phase 02 and describes the
-   layering as it is actually built.
+   **Three pages below are still stubs created by Phase 01**: :doc:`security`
+   (Phase 12 added its credentials and upload section), :doc:`e2e_harness`
+   and :doc:`releasing`. Each names the phase that owns its content. Every
+   other page has been written by a phase that built what it describes. This
+   index and the strict documentation build existed
+   first on purpose: a documentation gate added at the end of a project
+   measures nothing.
 
 .. toctree::
    :maxdepth: 2
@@ -33,6 +34,7 @@ pages describe the implementation that satisfies them.
    limelight_integration
    limelight_upload_spike
    provenance_schema
+   provenance_ui
    security
    testing
    e2e_harness

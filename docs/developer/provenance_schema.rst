@@ -6,11 +6,14 @@ Provenance schema
 
 .. note::
 
-   **This page is written and current** (Phase 04). It describes the model, not
+   **This page is written and current** (Phase 04; brought in step with the
+   Provenance section by Phase 13 on 2026-10-14). It describes the model, not
    the file: the on-disk format is :doc:`../reference/provenance_format`, and
-   the two must be changed together. **Phase 13** owns the Provenance UI and is
-   required to keep this page in sync with it -- the UI renders this model and
-   nothing else.
+   the two must be changed together. The Provenance section renders this model
+   and nothing else: :ref:`dev-provenance-schema-read-model` below is the one
+   place that reads it back for display, and :doc:`provenance_ui` describes the
+   section built on top of that. A change here that the read model does not
+   follow is a defect in both.
 
 Provenance is a primary feature of CometGUI rather than a side effect of
 running one, and the model was built before any stage that emits events,
@@ -21,9 +24,13 @@ that changing them is a format change.
 
 Everything here lives in ``org.cometgui.provenance`` (Maven module
 ``cometgui-provenance``), in five packages: ``manifest``, ``json``, ``events``,
-``hashing`` and ``io``, plus ``report``. The rules that remove credentials are
-not here: they are in ``org.cometgui.domain.secrets`` and are shared with the
-process service, for the reason given under
+``hashing`` and ``io``, plus ``report`` -- except the **read model**, which turns
+a run directory back into what the Provenance section shows and lives in
+``org.cometgui.workflow.provenance`` (module ``cometgui-workflow``), because it
+needs the run layout, ``run.json`` and the Comet parameter parser as well as
+this model (:ref:`dev-provenance-schema-read-model`). The rules that remove
+credentials are not here: they are in ``org.cometgui.domain.secrets`` and are
+shared with the process service, for the reason given under
 :ref:`dev-provenance-schema-redaction`.
 
 .. contents:: Contents
@@ -634,6 +641,262 @@ member path and the rule, member names being literals in this repository, and
 an underlying rejection is deliberately not attached as a cause, because those
 messages quote the value they rejected and a document read from disk may
 contain anything.
+
+.. _dev-provenance-schema-read-model:
+
+Reading a run back: the read model
+==================================
+
+Phase 13 added the one place that turns a run directory back into what the
+Provenance section shows: ``org.cometgui.workflow.provenance`` (design decision
+P13-2). It is a *consumer* of this model, not a second model -- the view it
+builds is display text, and the only document it ever writes is an export the
+scientist asked for.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 74
+
+   * - Type
+     - What it is
+
+   * - ``ProvenanceReader``
+     - ``list(project, executing)`` names every directory under ``runs/`` with
+       what its ``run.json`` says (``RunListing``, ``RunCondition``) and
+       whether ``provenance.json`` exists, parsing no record;
+       ``load(run)`` reads one run and builds its view. Both block.
+
+   * - ``LoadedRun``
+     - One loaded run: its ``RecordState``, the ``ProvenanceManifest`` exactly
+       as read (when there is one), the reader's message when it could not be
+       read, the ``RecoveredEventLog``, the ``ProvenanceView``, and the three
+       actions -- ``exportJson``, ``exportRst``, ``verifyAgainstDisk``.
+
+   * - ``ProvenanceView``
+     - The seven parts the specification's *Provenance UI* names -- summary,
+       tools, inputs and outputs, parameters, timeline, logs, warnings -- as
+       immutable records of display text.
+
+   * - ``DiskVerification``, ``DiskOutcome``
+     - What *Verify against disk* found: one check per file, each
+       ``matches``, ``differs``, ``missing`` or ``unreadable``.
+
+   * - ``WarningSource``
+     - The census of warning sources; see `Where each warning comes from`_.
+
+   * - ``ViewBuilder``, ``ParametersBuilder``, ``DiskVerifier``,
+       ``DisplayText``, ``ExportRenderer``
+     - Package-private: building the view and the Parameters part, the
+       verification, the one route by which text is redacted for display, and
+       the seam over phase 04's two writers.
+
+The rules it keeps
+------------------
+
+**One of everything.** It reads the record with ``ManifestReader.readFrom``,
+the event log with ``ProvenanceEventLogReader.recover`` and ``run.json`` with
+``RunStore.read``; hashes with the product's ``CachingHashService``, always
+through ``rehash``; redacts with the session's ``SecretRedactor``; renders a
+command with the process service's ``ProcessRedactor.redactedDisplayCommand``;
+parses the archived ``comet.params`` with ``CometParamsParser`` for the
+recorded release; and renders exports with ``ManifestWriter`` and
+``ProvenanceReportWriter``. Nothing in the package validates, hashes, redacts,
+renders a command or a document, or parses parameters on its own. A second
+reader would agree with the writer about its own mistakes; a second hasher
+would be a value the gate cannot trust; a second redactor is the defect
+described under :ref:`dev-provenance-schema-redaction`.
+
+**The viewer is never a holder (P13-1).** Every file is read whole and closed
+before a method returns, and nothing keeps a channel, a stream, a memory map or
+a ``WatchService`` on a run directory. ``ReadersHoldNoDescriptorTest``
+(``cometgui-provenance``) and ``ProvenanceStatesTest.holdsNoDescriptor``
+(``cometgui-workflow``) prove it on Linux through ``/proc/self/fd``. This is
+half of the Windows answer in :ref:`dev-provenance-schema-platform`.
+
+**Every displayed string has been through the session's redactor**, asked
+afresh for every load and every action, so a credential admitted to the
+session after a run is redacted from then on. Paths, commands, environments,
+settings, warnings, event payloads and the archived parameter text are all
+display text. A row that names a file carries the path twice: redacted, as
+``path``, for showing and copying; and as a ``java.nio.file.Path``,
+``location``, for acting on -- *Open file location* and verification -- which
+is never shown.
+
+**A run without a sealed record still opens (P13-5).** ``load`` throws only
+when the run directory itself is gone. An absent ``provenance.json`` is
+``NO_SEALED_RECORD`` and the run is shown from ``run.json`` and ``events.log``;
+one that does not read or parse is ``RECORD_UNREADABLE``, with the reader's
+message (which names the member and the rule, never a value from the
+document); an unreadable ``run.json``, a missing or unreadable event log and
+each event-log defect are warnings. Never an empty run.
+
+Exports from one loaded model (P13-3)
+-------------------------------------
+
+``exportJson`` is ``ManifestWriter`` over the ``ProvenanceManifest`` the load
+read; ``exportRst`` is ``ProvenanceReportWriter`` over **the same object**,
+both redacting with the session's redactor as it is at the moment of the
+export, both written with ``AtomicDocumentWriter``. Neither copies bytes. A
+copy would export whatever is on disk, unredacted by today's rules and
+unchecked by the reader; ``SeededSecretTest`` plants a value in a record on
+disk that the session's redactor knows and requires it in no export and no
+display text. A record written by the same writers with the same rules
+therefore exports two documents byte-identical to the two on disk, which
+``RealProvenanceGateTest`` asserts on a real run.
+
+Two refusals: an existing target is replaced only when the caller passes
+``replaceExisting`` (the section's *Replace* button), and **the run's own
+sealed** ``provenance.json`` **and** ``provenance.rst`` **are never a target**,
+whatever the flag -- an export re-rendered under today's redaction must not
+quietly rewrite the sealed record. A run with no sealed, readable record has
+nothing to export or verify: ``NothingToExportException``, saying which.
+
+An export holds the sealed manifest only. Events appended to ``events.log``
+after the seal are not in it, and writing an export appends no event.
+
+Verification, with the cache bypassed (P13-7, the product half)
+----------------------------------------------------------------
+
+``verifyAgainstDisk`` hashes every input and output record, every distinct
+archived log and every distinct tool executable the record lists, in that
+order, through ``CachingHashService.rehash`` -- a verification answered from a
+remembered digest would compare the record with the cache, not with the disk --
+and compares **both** digests. It stops between files when asked, and says the
+result is incomplete. ``DiskVerificationTest.eitherDigestAloneDiffers`` holds
+a record whose MD5 alone, then SHA-256 alone, is wrong.
+
+This is the product's check. **The phase's gate tests do not use it** to prove
+the record: they compute their own digests (:ref:`dev-provenance-gate-test`).
+
+Where each warning comes from
+-----------------------------
+
+``WarningSource`` is a census: each constant has a test in
+``ProvenanceWarningsTest.census`` that plants its source and finds the
+warning. Where each is written:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 72
+
+   * - Source (shown as)
+     - Read from, and written by
+
+   * - ``NO_SEALED_RECORD``, ``RECORD_UNREADABLE``
+     - The state of ``provenance/provenance.json``, found by the read model.
+   * - ``RUN_JSON_UNREADABLE``, ``EVENT_LOG_UNREADABLE``
+     - ``run.json`` or ``provenance/events.log`` missing or unreadable, found
+       by the read model.
+   * - ``EVENT_LOG_DEFECT``
+     - Each ``EventLogDefect`` of the recovered log: ``TORN_FINAL_LINE``,
+       ``MALFORMED_LINE``, ``SEQUENCE_GAP`` (`What a torn file yields`_).
+   * - ``RUN_OUTCOME``
+     - ``run.status`` ``failed`` or ``cancelled`` in the record; for an
+       unsealed run, the latest attempt in ``run.json``.
+   * - ``STEP_FAILURE``
+     - A ``stage.finished`` event carrying a ``message``, written by the
+       engine (``RunExecution``) when a step fails or is cancelled.
+   * - ``PARTIAL_FILE``
+     - A ``files[]`` record whose status is not ``completed``.
+   * - ``VERSION_ADVISORY``
+     - Settings ``percolator.advisory.<id>`` (``PercolatorProvenance``) and
+       ``comet.advisory.<id>`` (``ToolWarnings``).
+   * - ``MANIFEST_PROBE_DISCREPANCY``
+     - Settings ``comet.probe-discrepancy.<nn>`` and
+       ``percolator.probe-discrepancy.<nn>`` (``ToolWarnings``), filled from
+       ``ToolOffer.unconfirmedClaims``, which ``ManagedToolManager`` computes
+       from the shipped manifest record and the installation's verified
+       completion marker -- no re-probe. **One direction only (P13-9):** a
+       capability the manifest claims and the install's probe did not find.
+       A capability the probe found that the manifest does not list is the
+       manifest being silent, not a disagreement; counting it would put about
+       ten warnings on every Percolator run.
+   * - ``SKIPPED_VERSION``
+     - Settings ``percolator.skipped.<nn>.version``, ``.missing``, ``.reason``.
+   * - ``OPTION_NOT_EMITTED``
+     - Settings ``percolator.not-emitted.<nn>.option``, ``.reason``.
+   * - ``WEIGHTS_FALLBACK``
+     - Setting ``percolator.weights-warning`` (``R-PERC-08``).
+   * - ``TOOL_WARNING``
+     - A ``tools[].warnings`` text no more specific source already showed --
+       for example the engine's note that a log could not be hashed
+       (``StepContext``).
+   * - ``WARNING_EVENT``
+     - A ``warning.raised`` event.
+   * - ``LIMELIGHT_FAILURE``
+     - A ``limelight.unconverted`` or ``limelight.unuploaded`` event, written
+       after the seal by ``LimelightConversions`` or ``LimelightUploads``.
+   * - ``PARAMETER_FILE_CHANGED``
+     - An archived ``comet.params`` or ``percolator-settings.json`` that is
+       gone, or whose digests computed now (``rehash``) are not its record's,
+       found by ``ParametersBuilder`` at load.
+
+An advisory, a manifest/probe discrepancy and the weights warning are recorded
+twice -- in the settings and on the tool record -- and are shown once, under
+the specific source; the comparison is by text.
+
+The settings keys Phase 13 added
+--------------------------------
+
+Additive, under the pattern `The record types`_ pins, and **no schema change**.
+Each key is a constant in the class that writes it and is asserted against
+``ProvenanceSchema.SETTINGS_KEY_PATTERN`` in that class's tests.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 36 64
+
+   * - Key
+     - Value, and where it is made
+
+   * - ``comet.origin.<word>``
+     - For each value origin a parameter of the run has -- ``cometgui-default``,
+       ``preset``, ``user``, ``imported``, ``workflow-enforced`` -- the names
+       of those parameters, space-separated, in the release's schema order. A
+       parameter at Comet's own default is in no list, so ``comet-default``
+       never appears as a key. ``CometParameterProvenance``.
+   * - ``comet.preset.<nn>.id``, ``.name``, ``.origin``, ``.comet-version``,
+       ``.schema-version``
+     - Each applied preset still describing the configuration, ``nn`` from
+       ``01`` in the order applied: its identity; ``origin`` is ``built-in``
+       or ``user``. ``CometParameterProvenance``.
+   * - ``comet.preset.<nn>.applied.<mm>``
+     - Each value that preset set, ``mm`` from ``01`` in schema order, as one
+       ``comet.params`` line: ``<name> = <value text>``.
+       ``CometParameterProvenance``.
+   * - ``comet.advisory.<id>``
+     - Each advisory of the Comet build that ran, keyed by the manifest's
+       advisory identifier. ``ToolWarnings``.
+   * - ``comet.probe-discrepancy.<nn>``, ``percolator.probe-discrepancy.<nn>``
+     - Each capability the artefact manifest claims for the build that ran and
+       its install's probe did not find (``R-TOOL-07``), ``nn`` from ``01`` in
+       manifest order, as the sentence also put on the tool record.
+       ``ToolWarnings``.
+
+**Why the parameter names are in the values, never in the keys** (P13-4, as
+amended). A key per parameter would have been the obvious shape, and it cannot
+be built: 39 of Comet's parameter names contain upper-case letters
+(``use_A_ions`` ... ``use_Z_ions``, ``equal_I_and_L``, ``add_Cterm_peptide``,
+every ``add_<X>_<residue>``), and the key pattern admits none. Lower-casing a
+name into a key relies on no two names ever colliding by case, which a future
+Comet release could break silently; an escape code would make the record
+unreadable by eye; widening the pattern is a schema change. So a name is
+recorded exactly as Comet spells it, in a value. A test over every bundled
+release's schema pins what that relies on: no name holds whitespace or ``=``.
+
+Two accepted limits, documented in ``CometParameterProvenance``: a value
+carried across a release change keeps its ``preset`` origin while the applied
+presets are forgotten, so it is recorded under ``comet.origin.preset`` with no
+preset named; and a retry of an unchanged run records the origins fixed when
+that run was first prepared. None of these settings is an input of any step:
+they change no fingerprint and no rerun preview. The read model reads them back
+through the same constants, never a second spelling, and shows each parameter's
+origin as ``comet-default`` when the run recorded origins and did not list it,
+and as not recorded when the run recorded none (a run made before Phase 13).
+
+The other keys a search records -- ``comet.release``, ``comet.params-sha256``
+and the rest -- are listed in :doc:`workflow_engine`; Percolator's in
+:ref:`ref-provenance-format-percolator-settings`.
 
 .. _dev-provenance-schema-platform:
 

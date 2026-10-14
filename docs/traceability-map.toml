@@ -892,13 +892,34 @@ method = "allEightComponentsComeBack"
 note = "Phase 04. A recorded file carries both digests; FileHashes cannot represent a file hashed one way only."
 
 [[ac."AC-PRV-01".evidence]]
-kind = "planned"
-phase = "13"
-note = "Foundations are laid earlier, in phase 04. What phase 04 proves is the model and the format; that every file a real run touches is in the list is a stage-level claim."
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "everyListedFileMatchesTheDisk"
+note = "Phase 13 unit 4, gate item 1. Every one of the 28 file records of a real two-file run has an MD5 and a SHA-256 equal to the test's own MessageDigest digests of the file on disk, against a hand-typed census. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-01".evidence]]
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "everyOutputOnDiskIsListed"
+note = "Phase 13 unit 4, gate item 1. Every regular file the real run wrote under outputs/, enumerated from disk, is listed in the record; the one written after the seal (the Limelight conversion) is named with its SHA-256 by its limelight.converted event. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
 
 [[ac."AC-PRV-02".evidence]]
-kind = "planned"
-phase = "13"
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "comet"
+note = "Phase 13 unit 4, gate item 2. Both Comet tool records: version, release tag, artefact identity (URL and artefact SHA-256), probed capabilities, path inside the tool cache, and MD5/SHA-256 equal to the test's own digests and to the completion marker found by walking the cache, and to hand-typed values. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-02".evidence]]
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "percolator"
+note = "Phase 13 unit 4, gate item 2. The Percolator 3.07.1 tool record against its install in the tool cache, as for Comet. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-02".evidence]]
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "converter"
+note = "Phase 13 unit 4, gate item 2. The Limelight converter 2.8.1, recorded in events.log after the seal: version and JAR digests against the test's own digests and its install's marker. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
 
 [[ac."AC-PRV-03".evidence]]
 kind = "test"
@@ -913,9 +934,22 @@ method = "differOnlyInInputAndBase"
 note = "Phase 08. Two commands of one run differ only in the -N base and the input (R-CMT-04)."
 
 [[ac."AC-PRV-03".evidence]]
-kind = "planned"
-phase = "13"
-note = "Foundations are laid earlier, in phase 08. Phase 08 proves the recorded argument arrays of a real run; showing and copying each command in the Provenance tab is phase 13's."
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "onePerSpectrumFile"
+note = "Phase 13 unit 4, gate item 3. One Comet argument array per spectrum file in a real run's record, executable first, each with exactly its own input, its own -N base and -P naming the archived comet.params. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-03".evidence]]
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "displayedIsRecorded"
+note = "Phase 13 unit 4, gate item 3. The read model's displayed command, split by the test's own tokenizer, is each invocation's recorded argument array element by element, in the Tools part and in the timeline. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-03".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.ProvenanceSectionUiTest"
+method = "aCompletedRun"
+note = "Phase 13 unit 5. Through the running application after a real run: Copy command puts exactly the recorded argument array's display form on the clipboard, read back. Linux only, headless JavaFX."
 
 [[ac."AC-PRV-04".evidence]]
 kind = "test"
@@ -930,9 +964,16 @@ method = "finaliseRefusesAParameterFileChangedDuringTheRun"
 note = "Phase 08. A parameter file changed after Comet ran fails finalise-provenance, so a run cannot record a hash of a file other than the one executed. Real Comet 2026.03.0, Linux only (@EnabledOnOs(LINUX))."
 
 [[ac."AC-PRV-04".evidence]]
-kind = "planned"
-phase = "13"
-note = "Foundations are laid earlier, in phase 08. Phase 08 proves the archive, its hash and that it is the executed file; presenting and exporting it in the Provenance tab is phase 13's."
+kind = "test"
+class = "org.cometgui.workflow.provenance.LoadedRunViewTest"
+method = "parameters"
+note = "Phase 13 unit 3. The Parameters part shows the archived comet.params exactly as on disk, its recorded SHA-256 and that the file on disk still matches it."
+
+[[ac."AC-PRV-04".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.provenance.ProvenanceWarningsTest"
+method = "parameterFilesChanged"
+note = "Phase 13 unit 3. An archived parameter file changed or removed after the run is a 'parameter file changed' warning in the Provenance section."
 
 [[ac."AC-PRV-05".evidence]]
 kind = "test"
@@ -953,9 +994,16 @@ method = "reportsARecomputableDuration"
 note = "Phase 04. The generated report records a duration a reader can recompute from the two timestamps beside it."
 
 [[ac."AC-PRV-05".evidence]]
-kind = "planned"
-phase = "13"
-note = "Foundations are laid earlier, in phase 04. Phase 04 proves the record and both artefacts; that every process of a real run is recorded is a stage-level claim."
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "everyFactIsInTheReport"
+note = "Phase 13 unit 4, gate item 5. For every execution of a real run (two Comet, one Percolator), start, end, durationMillis and exitCode read from the exported JSON by the test's own reader are in the exported RST where the report puts them. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-05".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.provenance.LoadedRunViewTest"
+method = "timeline"
+note = "Phase 13 unit 3. The Timeline part shows each execution in start order with its command, start, end, duration and exit status."
 
 [[ac."AC-PRV-06".evidence]]
 kind = "test"
@@ -970,17 +1018,58 @@ method = "aCancelledStageLeavesAPartialOutput"
 note = "Phase 04. A file left behind by a cancelled stage is representable and is marked partial, as R-PROV-01 requires."
 
 [[ac."AC-PRV-06".evidence]]
-kind = "planned"
-phase = "13"
-note = "Foundations are laid earlier, in phase 04. Phase 04 proves the model and the recovery; what a user sees of a failed run is phase 13's."
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "failedRun"
+note = "Phase 13 unit 4, gate item 4. A real run Comet aborts on a damaged spectrum file (exit 134) opens sealed through the read model: failed in the record and the summary, the stage and its exit status in the timeline, exactly the incomplete stages' outputs marked partial in the record, the view and the warnings. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-06".evidence]]
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "cancelledRun"
+note = "Phase 13 unit 4, gate item 4. A real run cancelled while Comet searches opens sealed and shows what happened, its begun outputs marked partial with the test's own digests. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-06".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.provenance.ProvenanceStatesTest"
+method = "unsealedRun"
+note = "Phase 13 unit 3. A run with no provenance.json (a crash) still opens, from run.json and events.log, and says it has no sealed record."
+
+[[ac."AC-PRV-06".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.ProvenanceSectionUiTest"
+method = "aFailedRun"
+note = "Phase 13 unit 5. Through the running application: a real failed run listed as failed, its stage failed with exit status 134, its outputs PARTIAL. Linux only, headless JavaFX."
 
 [[ac."AC-PRV-07".evidence]]
-kind = "planned"
-phase = "13"
+kind = "test"
+class = "org.cometgui.app.gui.ProvenanceSectionUiTest"
+method = "aCompletedRun"
+note = "Phase 13 unit 5. Through the running application after a real run: the record on screen, Copy MD5/SHA-256/command exact on the clipboard, Export JSON and Export RST byte-identical to the run's provenance.json and provenance.rst, every file verified against disk. Linux only, headless JavaFX."
+
+[[ac."AC-PRV-07".evidence]]
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "exportsAreTheRunsOwn"
+note = "Phase 13 unit 4, gate item 5. Both exports, rendered through the read model from one loaded record, equal the real run's provenance.json and provenance.rst byte for byte. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-07".evidence]]
+kind = "test"
+class = "org.cometgui.workflow.provenance.ProvenanceExportTest"
+method = "renderedNotCopied"
+note = "Phase 13 unit 3. An export is rendered from the loaded model, never copied: it is written after the record file has been removed."
 
 [[ac."AC-PRV-08".evidence]]
-kind = "planned"
-phase = "13"
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "everyListedFileMatchesTheDisk"
+note = "Phase 13 unit 4, gate item 1. Every listed input and output of a real run recomputed from disk by the test's own MessageDigest loop, never the product's hasher, equals the record's MD5, SHA-256 and size. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-08".evidence]]
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "everyListedLogMatchesTheDisk"
+note = "Phase 13 unit 4, gate item 1. Every archived log the record lists, recomputed from disk the same way. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
 
 [[ac."AC-PRV-09".evidence]]
 kind = "test"
@@ -989,9 +1078,22 @@ method = "notOneSecretReachesAnyFileInTheRunDirectory"
 note = "Phase 04. Thirteen seeded secrets, three generated artefacts, and a grep of the bytes on disk; guarded against a vacuous sweep by five further tests in the same class."
 
 [[ac."AC-PRV-09".evidence]]
-kind = "planned"
-phase = "13"
-note = "Foundations are laid earlier, in phase 04. The sweep covers the provenance artefacts; the export paths phase 13 adds are not yet swept."
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "noSeededSecretAnywhere"
+note = "Phase 13 unit 4, gate item 6. Five secrets, each entered by its own path (the Limelight submit key in a refused and a submitted upload, a password in a Limelight server address, a URL password and an api_key= value in a preset name, a URL password in a preset name over 256 characters), are in no form in any file of the project or either export. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-09".evidence]]
+kind = "test"
+class = "org.cometgui.app.config.RealProvenanceGateTest"
+method = "theSearchFindsEveryPlantedForm"
+note = "Phase 13 unit 4, gate item 6. The sweep's control: every form of each seeded secret, planted into a copy of the record, is found and named. Linux only (@EnabledOnOs(LINUX)), real Comet 2026.03.0 and Percolator 3.07.1 installed by the product's installer into an empty cache."
+
+[[ac."AC-PRV-09".evidence]]
+kind = "test"
+class = "org.cometgui.app.config.ProvenanceSessionRedactionTest"
+method = "theSessionsRedactor"
+note = "Phase 13 unit 5. Through the production composition: a value only the session's registry knows is redacted from every displayed text, copy and both exports once the session admits it."
 
 [[ac."AC-PRV-10".evidence]]
 kind = "test"

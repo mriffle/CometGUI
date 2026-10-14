@@ -81,7 +81,8 @@ deliberately does not.
      - ``org.cometgui.provenance``
      - ``domain``
      - Real: hashing, the JSON reader and writer, the manifest, the event log
-       and the report (Phase 04).
+       and the report (Phase 04). Since Phase 13 the atomic writer retries a
+       refused rename, briefly and boundedly (see :doc:`provenance_schema`).
 
    * - ``cometgui-tools``
      - ``org.cometgui.tools`` (minus ``.process``)
@@ -148,7 +149,9 @@ deliberately does not.
        :doc:`pdv_integration`. Since Phase 12 ``limelight``: the one
        conversion path (``LimelightConversions``) and the one upload path
        (``LimelightUploads``), and in ``storage`` a run's Limelight settings;
-       see :doc:`limelight_integration`.
+       see :doc:`limelight_integration`. Since Phase 13 ``provenance``: the
+       provenance read model (``ProvenanceReader``, ``LoadedRun``,
+       ``ProvenanceView``); see :doc:`provenance_ui`.
 
    * - ``cometgui-ui``
      - ``org.cometgui.ui``
@@ -165,7 +168,10 @@ deliberately does not.
        (``viewmodel.visualisation``, ``controls.visualisation``) behind
        ``VisualisationPort``, and since Phase 12 the Limelight section
        (``viewmodel.limelight``, ``controls.limelight``) behind
-       ``LimelightPort`` and ``LimelightUploadPort``. ``dialogs`` is empty.
+       ``LimelightPort`` and ``LimelightUploadPort``, and since Phase 13 the
+       Provenance section (``viewmodel.provenance``,
+       ``controls.provenance``) behind ``ProvenancePort``. ``dialogs`` is
+       empty.
 
    * - ``cometgui-app``
      - ``org.cometgui.app``
@@ -178,7 +184,9 @@ deliberately does not.
        Phase 11 the Visualisation section (``ProjectVisualisationPort``,
        ``PdvDisplay``), and since Phase 12 the Limelight section
        (``ProjectLimelightPort``, ``ProjectLimelightUploadPort``, with
-       ``ProjectRuns`` shared by the run-based ports).
+       ``ProjectRuns`` shared by the run-based ports), and since Phase 13 the
+       Provenance section (``ProjectProvenancePort``,
+       ``FileManagerLauncher``).
 
    * - ``cometgui-archtests``
      - ``org.cometgui.archtests``

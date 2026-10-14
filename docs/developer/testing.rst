@@ -1941,6 +1941,142 @@ classes), the ``cometgui-domain``, ``cometgui-params-percolator``,
 3c 44 s, 4b 49 s, 6d 66 s and 7d 65 s, and control H 18 s. No process was left
 for the script to end. The floor in ``verify-all-gates.sh`` is 130.
 
+.. _dev-provenance-gate-test:
+
+Phase 13's gate test on real runs (``RealProvenanceGateTest``)
+---------------------------------------------------------------
+
+``cometgui-app``'s ``org.cometgui.app.config.RealProvenanceGateTest`` proves
+Phase 13's six exit gate items on real runs, **against the files on disk and
+never against the record itself** (design decisions P13-7 and P13-10 in
+``handoffs/PHASE-13-worklog.rst``). It lives in ``cometgui-app`` because item
+2's "match the files in the tool cache" needs a real cache with real
+completion markers, which only ``cometgui-install`` makes and
+``cometgui-workflow`` cannot reach (P13-10).
+
+**The world** (``GateWorld``, built once for the class): Comet 2026.03.0,
+Percolator 3.07.1 and the Limelight converter 2.8.1 installed by the product's
+own installer -- ``ToolManagerWiring.toolManager`` over an **empty** cache,
+the real artefacts fetched from the mirror through a loopback server, with the
+real probe and the real completion markers; a completed Comet and Percolator
+run of the two K562 files against the 1000-record subset through the
+product's own run port (``RunWiring.port``); its Limelight conversion; a
+refused and a submitted upload to the loopback fake; and both exports
+rendered through the read model from one loaded record.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 8 30 62
+
+   * - Item
+     - Tests (nested class)
+     - What is proved
+   * - 1
+     - ``ListedFiles``: ``everyListedFileMatchesTheDisk``,
+       ``everyListedLogMatchesTheDisk``, ``everyOutputOnDiskIsListed``
+     - Every one of the 28 file records has an MD5 and a SHA-256 equal to the
+       test's own digests and size of the file on disk, against a hand-typed
+       census of the records; the 6 archived logs likewise; every regular file
+       under ``outputs/`` at the seal, enumerated from disk, is listed, and the
+       one written after it (the conversion) is named by its
+       ``limelight.converted`` event with its SHA-256.
+   * - 2
+     - ``Tools``: ``comet``, ``percolator``, ``converter``, ``threeInstalls``
+     - Each tool record's version, path (inside the cache), MD5, SHA-256,
+       artefact identity, probed capabilities and release tag equal both the
+       test's own digest of the executable and the completion marker the test
+       found by walking the cache -- and a hand-typed expectation. The
+       converter, recorded in ``events.log`` after the seal, the same way.
+       The walk finds exactly the three installs.
+   * - 3
+     - ``Commands``: ``onePerSpectrumFile``, ``percolatorReadsTheMergedPin``,
+       ``displayedIsRecorded``
+     - One Comet argument array per spectrum file, executable first, each with
+       exactly its own input, its own ``-N`` base and ``-P`` naming the
+       archived ``comet.params``; Percolator's names the merged PIN once; the
+       read model's displayed command, split by the test's own tokenizer, is
+       the recorded array element by element, in the Tools part and in the
+       timeline.
+   * - 4
+     - ``FailedAndCancelled``: ``failedRun``, ``cancelledRun``
+     - A real run Comet aborts on a damaged spectrum file (exit 134) and a real
+       run cancelled while Comet searches the whole proteome each open through
+       the read model, sealed, with the status in the record and the summary,
+       the stage's status and exit in the timeline, and exactly the outputs of
+       the stages that did not complete marked partial -- in the record, in
+       the view and in the warnings -- with the test's own digests of each.
+   * - 5
+     - ``Exports``: ``exportsAreTheRunsOwn``, ``everyFactIsInTheReport``
+     - Both exports equal the run's own ``provenance.json`` and
+       ``provenance.rst`` byte for byte; every fact of the exported JSON --
+       summary, application, every setting in order, every tool and execution
+       field including start, end, duration and exit code, every log, every
+       file row -- is in the exported RST where the report puts it.
+   * - 6
+     - ``Secrets``: ``noSeededSecretAnywhere``, ``theEnvironmentIsTheProductsOwn``,
+       ``theSearchFindsEveryPlantedForm``
+     - Five secrets, each entered by its own path -- the Limelight submit key
+       in a refused and a submitted upload, a password in a Limelight server
+       address, a URL password and an ``api_key=`` value in an applied preset's
+       name, and a URL password in a preset name over 256 characters (a long
+       carrier, its length asserted) -- are in no form in any file of the
+       project or either export, every file enumerated from disk by Phase
+       12's ``SecretSweep``; a control plants every form of each into a copy
+       of the record and requires the sweep to find it.
+
+**Its independence rules**, each the answer to a way a gate test can end up
+testing the product against itself:
+
+* **Its own digests.** Every digest it compares with the record is
+  ``OwnDigests`` (``org.cometgui.app.testing``): a streaming loop over
+  ``java.security.MessageDigest``, never the product's ``StreamingHashService``
+  or ``CachingHashService``, and never the product's *Verify against disk*.
+* **Its own readers.** The record is read with ``IndependentJson``, an RFC 8259
+  reader sharing no code with the product's JSON reader or ``ManifestReader``;
+  the report with ``IndependentRst``, written from the layout
+  ``ProvenanceReportWriter`` documents and sharing no code with it. A reader and
+  a writer that agree on a wrong member name agree with each other.
+* **The cache, not the record, says where a tool is.** Each tool is matched to
+  the completion marker the test finds by walking the tool cache, read with the
+  same independent JSON reader -- never located from the record's path alone.
+* **Hand-typed expectations** beside every comparison: the file census, the
+  outputs at the seal, versions, tags, artefacts and capabilities.
+
+The injections it was seen red under at unit 4's sign-off (the database
+recorded as an input by no step; the RST printing a log's MD5 under
+"SHA-256"; redaction skipped for values over 200 characters) are in the work
+log.
+
+**What it does not prove, and why.** A run killed before it sealed its record
+needs an engine that dies mid-run, which neither the product nor the test
+support can make honestly; the reading of such a directory is
+``ProvenanceStatesTest`` (``cometgui-workflow``) over a constructed one. The
+only environment variable the product gives a tool is ``LANG=C.UTF-8``
+(asserted), so no secret can be seeded there. A secret typed as a Comet
+parameter value is written verbatim into the archived ``comet.params``, which
+``AC-PRV-04`` requires to be the exact executed file, so the seeds enter the
+settings through preset names instead.
+
+Linux only (``@EnabledOnOs(LINUX)``): 17 tests, about 26 s. Files it reads
+outside its module: ``scratch/fixture/`` (both K562 mzML files and the UniProt
+proteome) and, under ``scratch/phase05/artefacts/``,
+``v2026.03.0__comet.linux.exe``,
+``rel-3-07-01__percolator-noxml-ubuntu-portable.zip``,
+``rel-3-07-01__percolator-noxml-v3-07-linux-amd64.deb`` and
+``v2.8.1__cometPercolator2LimelightXML.jar``; and ``manifests/tools.json`` on
+the class path.
+
+The same section through the running application is
+``org.cometgui.app.gui.ProvenanceSectionUiTest``: a real run through the Run
+section, then its record on screen -- tool digests equal ``OwnDigests``, Copy
+MD5, Copy SHA-256 and Copy command read back from the clipboard as exact
+values, both exports byte-identical to the run's documents, an existing target
+refused and Replace offered, every file verifying, Open file location
+recorded as exactly ``xdg-open <folder>`` by a recording runner -- and a
+cancelled and a failed real run opened from the list, their partial outputs
+shown as ``PARTIAL``; and no port call on the JavaFX thread. See
+:doc:`provenance_ui`.
+
 Traps
 =====
 
