@@ -146,6 +146,24 @@ final class GateWorld {
     /** The value of a secret-named assignment inside the same preset name. */
     static final String PRESET_ASSIGNED = seed("CGSEED-PRESETKV-");
 
+    /**
+     * The password in a URL inside a second applied preset's LONG name: a carrier of more than 256
+     * characters, so that a redaction rule skipped for long values (Phase 04's shape #6, a
+     * size-conditioned leak) is seen by this real run too.
+     */
+    static final String LONG_PRESET_PASSWORD = seed("CGSEED-LONGPW-");
+
+    /** The second preset's name: well over 256 characters, the seeded URL in its middle. */
+    static final String LONG_PRESET_NAME =
+            "Shared lab thread count, as agreed at the group meeting and recorded here so that"
+                    + " every run made with it can be traced back to the decision and to the"
+                    + " page where the reasoning is written down, which lives at"
+                    + " https://scientist:"
+                    + LONG_PRESET_PASSWORD
+                    + "@presets.example.org/lab/threads -- please do not change it without"
+                    + " asking first, because the comparison between this month's runs and last"
+                    + " month's depends on it staying the same";
+
     /** Every seeded secret, by where it entered. */
     static final Map<String, String> SEEDS = seeds();
 
@@ -267,7 +285,7 @@ final class GateWorld {
         Ended ended =
                 run(
                         searchModel(subset, "4", ValueOrigin.PRESET),
-                        List.of(seededPreset()),
+                        List.of(seededPreset(), longPreset()),
                         spectra,
                         Optional.empty());
         completed = ended.directory();
@@ -469,7 +487,21 @@ final class GateWorld {
         seeds.put("the password of a Limelight server address with user information", URL_PASSWORD);
         seeds.put("the password of a URL in an applied preset's name", PRESET_URL_PASSWORD);
         seeds.put("the value of api_key= in an applied preset's name", PRESET_ASSIGNED);
+        seeds.put(
+                "the password of a URL in a long (> 256 characters) applied preset's name",
+                LONG_PRESET_PASSWORD);
         return Collections.unmodifiableMap(seeds);
+    }
+
+    /** The second applied preset, whose long name carries one seeded secret. */
+    static PresetApplication longPreset() {
+        return new PresetApplication(
+                "lab-threads-agreed",
+                LONG_PRESET_NAME,
+                Preset.Origin.USER,
+                ToolVersion.parse("2026.03.0"),
+                1,
+                Map.of("num_threads", "4"));
     }
 
     /** The applied preset whose name carries two seeded secrets into the run's settings. */

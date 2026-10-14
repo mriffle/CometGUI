@@ -1087,32 +1087,6 @@ class RealProvenanceGateTest {
                         + " file of the project or in either export")
         void noSeededSecretAnywhere() throws IOException {
             Map<String, Object> settings = object(recordOf(world.completed()).get("settings"));
-            assertAll(
-                    "each secret really travelled its path",
-                    () ->
-                            assertEquals(
-                                    LimelightUploaded.Kind.REFUSED,
-                                    world.refusedUpload().kind(),
-                                    "the key was sent, and refused"),
-                    () ->
-                            assertEquals(
-                                    LimelightUploaded.Kind.SUBMITTED,
-                                    world.submittedUpload().kind(),
-                                    "the key was sent, and accepted"),
-                    () ->
-                            assertEquals(
-                                    "This address cannot be used as a Limelight server: it carries"
-                                            + " a user name or password; Limelight takes its"
-                                            + " submit key separately, never in the address.",
-                                    world.refusedServerMessage(),
-                                    "the address with a password was typed, and refused"),
-                    () ->
-                            assertEquals(
-                                    "Lab threads, shared from https://scientist:[REDACTED]"
-                                            + "@presets.example.org/lab with api_key=[REDACTED]",
-                                    settings.get("comet.preset.01.name"),
-                                    "the preset's name reached the settings, redacted"));
-
             Map<String, String> hits = new TreeMap<>();
             Map<String, Integer> searched = new TreeMap<>();
             Set<Path> reached = new HashSet<>();
@@ -1138,6 +1112,46 @@ class RealProvenanceGateTest {
                 searched.merge(kind, 1, Integer::sum);
             }
             assertEquals(Map.of(), hits, "a seeded secret was written to a file");
+            assertAll(
+                    "each secret really travelled its path",
+                    () ->
+                            assertEquals(
+                                    LimelightUploaded.Kind.REFUSED,
+                                    world.refusedUpload().kind(),
+                                    "the key was sent, and refused"),
+                    () ->
+                            assertEquals(
+                                    LimelightUploaded.Kind.SUBMITTED,
+                                    world.submittedUpload().kind(),
+                                    "the key was sent, and accepted"),
+                    () ->
+                            assertEquals(
+                                    "This address cannot be used as a Limelight server: it carries"
+                                            + " a user name or password; Limelight takes its"
+                                            + " submit key separately, never in the address.",
+                                    world.refusedServerMessage(),
+                                    "the address with a password was typed, and refused"),
+                    () ->
+                            assertEquals(
+                                    "Lab threads, shared from https://scientist:[REDACTED]"
+                                            + "@presets.example.org/lab with api_key=[REDACTED]",
+                                    settings.get("comet.preset.01.name"),
+                                    "the preset's name reached the settings, redacted"),
+                    () ->
+                            assertTrue(
+                                    GateWorld.LONG_PRESET_NAME.length() > 256,
+                                    "the long carrier is long: "
+                                            + GateWorld.LONG_PRESET_NAME.length()),
+                    () ->
+                            assertEquals(
+                                    GateWorld.LONG_PRESET_NAME.replace(
+                                            GateWorld.LONG_PRESET_PASSWORD, "[REDACTED]"),
+                                    settings.get("comet.preset.02.name"),
+                                    "the long preset name reached the settings, redacted"),
+                    () ->
+                            assertTrue(
+                                    ((String) settings.get("comet.preset.02.name")).length() > 256,
+                                    "and is still a long carrier in the record"));
             for (String kind :
                     List.of(
                             "exports",
@@ -1229,7 +1243,7 @@ class RealProvenanceGateTest {
                     planted++;
                 }
             }
-            assertTrue(planted >= 4 * 12, "forms planted: " + planted);
+            assertTrue(planted >= 5 * 12, "forms planted: " + planted);
             Files.write(control.resolve("provenance.json"), record);
             for (String seed : GateWorld.SEEDS.values()) {
                 assertEquals(
