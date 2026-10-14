@@ -335,7 +335,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        (the arrival placeholder, any "Phase 13 will" text), traceability for
        ``AC-PRV-01..09``.
      - R-DOC; AC-PRV-*
-     - Pending
+     - Accepted, ``fcb499e``
    * - 7
      - **The phase harness**, registered additively in
        ``scripts/verify-all-gates.sh``: every gate item graded on a
@@ -676,3 +676,32 @@ Unit 5 sign-off
   it shows the read model's refusal and nothing is written (a distinct
   exception type in the read model would remove the offer). The run list does
   not refresh on a Limelight compatible rerun ("Read the runs again" does).
+
+Unit 6 sign-off
+---------------
+
+**Accepted 2026-10-14.** Commit ``fcb499e`` (8 files, documentation and the
+traceability map only).
+
+* **Read.** ``docs/provenance.rst`` (the user page, replacing the Phase 01
+  stub), ``docs/developer/provenance_ui.rst`` (new, in the developer index), a
+  read-model section and the Phase 13 settings keys in
+  ``docs/developer/provenance_schema.rst``, ``RealProvenanceGateTest`` in
+  ``testing.rst``, stale statements in ``architecture.rst``, the developer
+  index and ``provenance_format.rst``'s ``tools[].warnings`` row. Spot-checked
+  against code: the 1 MiB parameter-text limit
+  (``ProvenanceReader.PARAMETER_TEXT_LIMIT``), the ``PARTIAL -- `` prefix
+  (``ProvenanceTexts``), "not recorded" origins. The user page states the two
+  known ways a secret can reach a file (a Comet parameter value typed as one;
+  a Limelight refusal quoting two characters) rather than claiming none can.
+* **Traceability**: every "planned phase 13" entry for ``AC-PRV-01..09`` now
+  names a test; the map moved from 37 automated / 13 partial / 22 planned to
+  46 / 7 / 19.
+* **Gates, run by me**: ``docs`` PASS, ``traceability`` 8 PASS.
+* **My injection**: ``RealProvenanceGateTest.everyListedFileMatchesTheDisk``
+  renamed in the test source -> ``scripts/ci/traceability.sh`` exit 1,
+  ``[TEST-MISSING] AC-PRV-01`` and ``AC-PRV-08``; restored, ``sha256sum -c``
+  OK.
+* **Left for tier 1** (wider than the phase): ``docs/index.rst``'s warning that
+  every page is a stub; ``testing.rst``'s Phase 01-era tables; the
+  2026-08-29 header comment of ``traceability-map.toml``.
