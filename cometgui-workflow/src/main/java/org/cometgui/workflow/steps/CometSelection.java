@@ -62,6 +62,8 @@ import org.cometgui.domain.tools.ToolVersion;
  *     in its order; each a Comet capability
  * @param capabilities the offer's observed capabilities (evidence {@code observed-by-execution});
  *     each a Comet capability
+ * @param releaseTag the upstream release tag the offer's install recorded ({@link
+ *     ToolOffer#releaseTag()}); absent for a registered local binary, whose tag is not known
  */
 public record CometSelection(
         Path executable,
@@ -71,7 +73,8 @@ public record CometSelection(
         Optional<String> artefactIdentity,
         List<ToolAdvisory> advisories,
         List<DeclaredCapability> unconfirmedClaims,
-        Set<ToolCapability> capabilities) {
+        Set<ToolCapability> capabilities,
+        Optional<String> releaseTag) {
 
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 
@@ -110,6 +113,48 @@ public record CometSelection(
             probed.add(capability);
         }
         capabilities = Collections.unmodifiableSet(probed);
+        Objects.requireNonNull(releaseTag, "releaseTag");
+        if (releaseTag.isPresent() && releaseTag.get().isBlank()) {
+            throw new IllegalArgumentException(
+                    "a release tag is not blank when present, but was: \""
+                            + releaseTag.get()
+                            + "\"");
+        }
+    }
+
+    /**
+     * A selection with no release tag recorded.
+     *
+     * @param executable the Comet executable; absolute
+     * @param release the release the executable is
+     * @param sha256 the executable's SHA-256 when it was selected
+     * @param managed whether CometGUI installed it
+     * @param artefactIdentity the upstream or managed artefact identity, when known
+     * @param advisories the offer's advisories, in its order
+     * @param unconfirmedClaims the offer's unconfirmed claims, in its order
+     * @param capabilities the offer's observed capabilities
+     * @throws NullPointerException naming a component that is {@code null}
+     * @throws IllegalArgumentException as the canonical constructor
+     */
+    public CometSelection(
+            Path executable,
+            ToolVersion release,
+            String sha256,
+            boolean managed,
+            Optional<String> artefactIdentity,
+            List<ToolAdvisory> advisories,
+            List<DeclaredCapability> unconfirmedClaims,
+            Set<ToolCapability> capabilities) {
+        this(
+                executable,
+                release,
+                sha256,
+                managed,
+                artefactIdentity,
+                advisories,
+                unconfirmedClaims,
+                capabilities,
+                Optional.empty());
     }
 
     /**

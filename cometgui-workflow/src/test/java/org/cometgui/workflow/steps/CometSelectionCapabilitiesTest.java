@@ -113,4 +113,57 @@ class CometSelectionCapabilitiesTest {
         NullPointerException refused = assertThrows(NullPointerException.class, () -> with(absent));
         assertEquals("capabilities", refused.getMessage());
     }
+
+    @Test
+    @DisplayName("the release tag: kept when given, absent by default, never blank or null")
+    void releaseTag() {
+        CometSelection tagged =
+                new CometSelection(
+                        COMET,
+                        ToolVersion.parse("2026.03.0"),
+                        SHA256,
+                        true,
+                        Optional.empty(),
+                        List.of(),
+                        List.of(),
+                        Set.of(),
+                        Optional.of("v2026.03.0"));
+        IllegalArgumentException blank =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                new CometSelection(
+                                        COMET,
+                                        ToolVersion.parse("2026.03.0"),
+                                        SHA256,
+                                        true,
+                                        Optional.empty(),
+                                        List.of(),
+                                        List.of(),
+                                        Set.of(),
+                                        Optional.of(" ")));
+        Optional<String> absent = Nulls.of(Optional.class);
+        NullPointerException missing =
+                assertThrows(
+                        NullPointerException.class,
+                        () ->
+                                new CometSelection(
+                                        COMET,
+                                        ToolVersion.parse("2026.03.0"),
+                                        SHA256,
+                                        true,
+                                        Optional.empty(),
+                                        List.of(),
+                                        List.of(),
+                                        Set.of(),
+                                        absent));
+        assertAll(
+                () -> assertEquals(Optional.of("v2026.03.0"), tagged.releaseTag()),
+                () -> assertEquals(Optional.empty(), with(Set.of()).releaseTag()),
+                () ->
+                        assertEquals(
+                                "a release tag is not blank when present, but was: \" \"",
+                                blank.getMessage()),
+                () -> assertEquals("releaseTag", missing.getMessage()));
+    }
 }

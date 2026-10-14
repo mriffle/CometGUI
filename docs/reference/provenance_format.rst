@@ -611,9 +611,11 @@ version, what it could do, and what it did.
    * - ``releaseTag``
      - string
      - **yes**
-     - The upstream release tag or commit. ``null`` when the binary does not
-       reveal one. Never an empty string: an empty tag is an absent tag
-       recorded as present.
+     - The upstream release tag or commit. For a build CometGUI installed, the
+       tag its install's completion marker records (``v2026.03.0``,
+       ``rel-3-07-01``); ``null`` for a registered local binary, whose tag
+       CometGUI does not know. Never an empty string: an empty tag is an
+       absent tag recorded as present.
 
    * - ``executablePath``
      - string

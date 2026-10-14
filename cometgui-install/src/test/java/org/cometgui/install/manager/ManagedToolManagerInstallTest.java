@@ -209,6 +209,11 @@ class ManagedToolManagerInstallTest {
                                     "the artefact the completion marker says was installed: the"
                                             + " pinned URL and the SHA-256 it was verified"
                                             + " against, which provenance records"),
+                    () ->
+                            assertEquals(
+                                    Optional.of("rel-3-07-01"),
+                                    row.releaseTag(),
+                                    "the release tag the completion marker records"),
                     () -> assertEquals(1, probe.callCount()),
                     () -> assertTrue(harness.verify(record).installed()),
                     () -> assertEquals(List.of(), harness.stagingDirectories(record)));

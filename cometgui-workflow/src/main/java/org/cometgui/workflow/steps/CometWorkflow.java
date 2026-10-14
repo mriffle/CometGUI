@@ -278,7 +278,7 @@ public final class CometWorkflow {
                 new ToolIdentity(
                         TOOL_NAME,
                         comet.release().text(),
-                        Optional.of("v" + comet.release().text()),
+                        comet.releaseTag(),
                         comet.executable(),
                         hashes.hash(comet.executable()),
                         comet.managed(),
@@ -370,7 +370,7 @@ public final class CometWorkflow {
                 new ToolIdentity(
                         PERCOLATOR_TOOL_NAME,
                         selection.version().text(),
-                        Optional.empty(),
+                        selection.offer().releaseTag(),
                         selection.executable(),
                         hashes.hash(selection.executable()),
                         selection.managed(),

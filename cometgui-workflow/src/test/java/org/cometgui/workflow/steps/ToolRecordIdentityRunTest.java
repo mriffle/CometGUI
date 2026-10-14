@@ -89,7 +89,8 @@ class ToolRecordIdentityRunTest {
                         EnumSet.of(
                                 ToolCapability.PIN_OUTPUT,
                                 ToolCapability.PEPXML_OUTPUT,
-                                ToolCapability.COMPLETE_PARAMS_QUERY));
+                                ToolCapability.COMPLETE_PARAMS_QUERY),
+                        Optional.of("v2026.03.0"));
         try (RealProject project = RealProject.create(search.project())) {
             PreparedRun prepared =
                     project.prepare(
@@ -118,12 +119,14 @@ class ToolRecordIdentityRunTest {
                                     Optional.of(COMET_ARTEFACT), comets.get(0).artefactIdentity()),
                     () ->
                             assertEquals(
-                                    Optional.of(COMET_ARTEFACT), comets.get(1).artefactIdentity()));
+                                    Optional.of(COMET_ARTEFACT), comets.get(1).artefactIdentity()),
+                    () -> assertEquals(Optional.of("v2026.03.0"), comets.get(0).releaseTag()),
+                    () -> assertEquals(Optional.of("v2026.03.0"), comets.get(1).releaseTag()));
         }
     }
 
     @Test
-    @DisplayName("Comet: a selection with no artefact identity records none")
+    @DisplayName("Comet: a selection with no artefact identity or release tag records neither")
     void cometWithoutArtefact(@TempDir Path directory)
             throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         FakeSearch search = FakeSearch.create(directory);
@@ -141,19 +144,28 @@ class ToolRecordIdentityRunTest {
             assertAll(
                     () -> assertEquals(2, comets.size()),
                     () -> assertEquals(Optional.empty(), comets.get(0).artefactIdentity()),
+                    () ->
+                            assertEquals(
+                                    Optional.empty(),
+                                    comets.get(0).releaseTag(),
+                                    "a tag nobody recorded is not guessed from the version"),
                     () -> assertEquals(List.of(), List.copyOf(comets.get(0).capabilities())));
         }
     }
 
     @Test
-    @DisplayName("Percolator: its record holds the offer's artefact identity")
+    @DisplayName("Percolator: its record holds the offer's artefact identity and release tag")
     void percolatorArtefact(@TempDir Path directory)
             throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         FakeSearch search = FakeSearch.create(directory);
         try (RealProject project = RealProject.create(search.project())) {
             PreparedRun prepared =
                     ToolWarningsRunTest.percolatorRun(
-                            search, project, List.of(), Optional.of(PERCOLATOR_ARTEFACT));
+                            search,
+                            project,
+                            List.of(),
+                            Optional.of(PERCOLATOR_ARTEFACT),
+                            Optional.of("rel-3-07-01"));
             List<ToolRecord> percolators =
                     toolsNamed(
                             ManifestReader.readFrom(prepared.layout().provenanceJsonFile()),
@@ -163,7 +175,10 @@ class ToolRecordIdentityRunTest {
                     () ->
                             assertEquals(
                                     Optional.of(PERCOLATOR_ARTEFACT),
-                                    percolators.get(0).artefactIdentity()));
+                                    percolators.get(0).artefactIdentity()),
+                    () ->
+                            assertEquals(
+                                    Optional.of("rel-3-07-01"), percolators.get(0).releaseTag()));
         }
     }
 
@@ -174,12 +189,15 @@ class ToolRecordIdentityRunTest {
         FakeSearch search = FakeSearch.create(directory);
         try (RealProject project = RealProject.create(search.project())) {
             PreparedRun prepared =
-                    ToolWarningsRunTest.percolatorRun(search, project, List.of(), Optional.empty());
+                    ToolWarningsRunTest.percolatorRun(
+                            search, project, List.of(), Optional.empty(), Optional.empty());
             List<ToolRecord> percolators =
                     toolsNamed(
                             ManifestReader.readFrom(prepared.layout().provenanceJsonFile()),
                             "percolator");
-            assertEquals(Optional.empty(), percolators.get(0).artefactIdentity());
+            assertAll(
+                    () -> assertEquals(Optional.empty(), percolators.get(0).artefactIdentity()),
+                    () -> assertEquals(Optional.empty(), percolators.get(0).releaseTag()));
         }
     }
 }

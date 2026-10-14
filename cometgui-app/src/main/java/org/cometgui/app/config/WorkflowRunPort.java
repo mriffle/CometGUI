@@ -621,7 +621,8 @@ public final class WorkflowRunPort implements SessionEngine {
                                     installed.get().artefactIdentity(),
                                     installed.get().advisories(),
                                     installed.get().unconfirmedClaims(),
-                                    probed)),
+                                    probed,
+                                    installed.get().releaseTag())),
                     Optional.empty());
         } catch (IOException unreadable) {
             return Selected.none(

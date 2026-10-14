@@ -273,7 +273,10 @@ class ToolWarningsRunTest {
     }
 
     private static ToolOffer percolatorOffer(
-            Path executable, List<DeclaredCapability> claims, Optional<String> identity) {
+            Path executable,
+            List<DeclaredCapability> claims,
+            Optional<String> identity,
+            Optional<String> releaseTag) {
         Set<ToolCapability> probed = EnumSet.copyOf(FakePercolator.EVERY);
         for (DeclaredCapability claim : claims) {
             probed.remove(claim.capability());
@@ -291,29 +294,32 @@ class ToolWarningsRunTest {
                 Optional.of(executable),
                 OptionalLong.of(1000),
                 claims,
-                identity);
+                identity,
+                releaseTag);
     }
 
     private static PreparedRun percolatorRun(
             FakeSearch search, RealProject project, List<DeclaredCapability> claims)
             throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
-        return percolatorRun(search, project, claims, Optional.empty());
+        return percolatorRun(search, project, claims, Optional.empty(), Optional.empty());
     }
 
     /**
      * A run whose Comet steps are replaced and whose Percolator is {@link FakePercolator}, offered
-     * as an installed managed 3.07.1 with these unconfirmed claims and this artefact identity.
+     * as an installed managed 3.07.1 with these unconfirmed claims, this artefact identity and this
+     * release tag.
      */
     static PreparedRun percolatorRun(
             FakeSearch search,
             RealProject project,
             List<DeclaredCapability> claims,
-            Optional<String> identity)
+            Optional<String> identity,
+            Optional<String> releaseTag)
             throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         Path percolator =
                 FakePercolator.write(
                         search.root().resolve("bin/percolator"), FakePercolator.Behaviour.normal());
-        ToolOffer offer = percolatorOffer(percolator, claims, identity);
+        ToolOffer offer = percolatorOffer(percolator, claims, identity, releaseTag);
         PercolatorChoice choice =
                 FakePercolator.choice(
                         offer, List.of(offer), Set.of(), PercolatorSettings.defaults());

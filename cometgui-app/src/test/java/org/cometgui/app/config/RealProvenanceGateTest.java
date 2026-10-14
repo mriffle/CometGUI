@@ -566,6 +566,11 @@ class RealProvenanceGateTest {
                                         name + " capabilities"),
                         () ->
                                 assertEquals(
+                                        string(marker, "releaseTag"),
+                                        stringOrNull(tool, "releaseTag"),
+                                        name + ": the release tag its install recorded"),
+                        () ->
+                                assertEquals(
                                         releaseTag,
                                         stringOrNull(tool, "releaseTag"),
                                         name + " release tag"));
@@ -583,7 +588,12 @@ class RealProvenanceGateTest {
         @DisplayName("Percolator: one record, matching its install in the tool cache")
         void percolator() throws IOException {
             assertToolMatchesItsInstall(
-                    "percolator", 1, "3.07.1", null, PERCOLATOR_ARTEFACT, PERCOLATOR_CAPABILITIES);
+                    "percolator",
+                    1,
+                    "3.07.1",
+                    "rel-3-07-01",
+                    PERCOLATOR_ARTEFACT,
+                    PERCOLATOR_CAPABILITIES);
         }
 
         @Test

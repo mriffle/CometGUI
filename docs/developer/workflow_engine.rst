@@ -535,9 +535,10 @@ invocation list and declarations -- never in completion order:
   `The run directory`_). Its ``capabilities`` are the selected build's probed
   set -- the Tool Manager offer's observed capabilities, which for a managed
   install are what its completion marker recorded -- for Comet as for
-  Percolator, and its ``artefactIdentity`` is the offer's: for an installed
-  managed build, the pinned artefact URL and its SHA-256 as the completion
-  marker records them; absent for a registered local binary;
+  Percolator, and its ``artefactIdentity`` and ``releaseTag`` are the offer's:
+  for an installed managed build, the pinned artefact URL and its SHA-256, and
+  the release tag, as the completion marker records them; absent for a
+  registered local binary;
 * **one file record per declared file**, with role (``spectrum``, ``fasta``,
   ``comet-index``, ``comet-params``, ``pepxml``, ``decoy-pepxml``, ``pin``,
   ``merged-pin``) and both digests. An output of a step that did not finish is

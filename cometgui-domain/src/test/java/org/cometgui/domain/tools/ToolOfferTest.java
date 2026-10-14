@@ -1076,4 +1076,114 @@ class ToolOfferTest {
             assertEquals("artefactIdentity", refused.getMessage());
         }
     }
+
+    @Nested
+    @DisplayName("the release tag an installed managed build came from")
+    class ReleaseTag {
+
+        private ToolOffer with(ToolOrigin origin, ToolInstallState state, Optional<String> tag) {
+            return new ToolOffer(
+                    ToolName.PERCOLATOR,
+                    PERCOLATOR_3_07_1,
+                    origin,
+                    state,
+                    List.of(XML_OBSERVED),
+                    List.of(),
+                    Optional.empty(),
+                    pathFor(state),
+                    origin == ToolOrigin.MANAGED ? sizeFor(state) : OptionalLong.empty(),
+                    List.of(),
+                    Optional.empty(),
+                    tag);
+        }
+
+        @Test
+        @DisplayName("an installed managed offer keeps it, and it is part of equality")
+        void kept() {
+            ToolOffer offer =
+                    with(
+                            ToolOrigin.MANAGED,
+                            ToolInstallState.INSTALLED,
+                            Optional.of("rel-3-07-01"));
+            assertAll(
+                    () -> assertEquals(Optional.of("rel-3-07-01"), offer.releaseTag()),
+                    () ->
+                            assertNotEquals(
+                                    offer,
+                                    with(
+                                            ToolOrigin.MANAGED,
+                                            ToolInstallState.INSTALLED,
+                                            Optional.empty())));
+        }
+
+        @ParameterizedTest
+        @EnumSource(ToolInstallState.class)
+        @DisplayName("the shorter constructors carry none, in every state")
+        void noneByDefault(ToolInstallState state) {
+            assertEquals(
+                    Optional.empty(),
+                    offer(state, List.of(XML_OBSERVED), List.of(), pathFor(state)).releaseTag());
+        }
+
+        @ParameterizedTest
+        @EnumSource(
+                value = ToolInstallState.class,
+                names = "INSTALLED",
+                mode = EnumSource.Mode.EXCLUDE)
+        @DisplayName("a managed offer that is not installed has no install to name, so none")
+        void onlyWhenInstalled(ToolInstallState state) {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> with(ToolOrigin.MANAGED, state, Optional.of("rel-3-07-01")));
+            assertEquals(
+                    "releaseTag must be absent for a MANAGED offer in state "
+                            + state
+                            + ", because only an installed managed build came from an artefact"
+                            + " CometGUI installed, but was: rel-3-07-01",
+                    refused.getMessage());
+        }
+
+        @Test
+        @DisplayName("a registered local binary's tag is not known, so it carries none")
+        void neverForALocalBinary() {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    with(
+                                            ToolOrigin.LOCAL,
+                                            ToolInstallState.INSTALLED,
+                                            Optional.of("rel-3-07-01")));
+            assertEquals(
+                    "releaseTag must be absent for a LOCAL offer in state INSTALLED, because only"
+                            + " an installed managed build came from an artefact CometGUI"
+                            + " installed, but was: rel-3-07-01",
+                    refused.getMessage());
+        }
+
+        @Test
+        @DisplayName("a blank tag is refused, quoted, and a null one by name")
+        void notBlankNotNull() {
+            IllegalArgumentException blank =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () ->
+                                    with(
+                                            ToolOrigin.MANAGED,
+                                            ToolInstallState.INSTALLED,
+                                            Optional.of(" ")));
+            Optional<String> absent = Nulls.of(Optional.class);
+            NullPointerException missing =
+                    assertThrows(
+                            NullPointerException.class,
+                            () -> with(ToolOrigin.MANAGED, ToolInstallState.INSTALLED, absent));
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    "releaseTag must not be blank when present, but was: \" \"",
+                                    blank.getMessage()),
+                    () -> assertEquals("releaseTag", missing.getMessage()));
+        }
+    }
 }
