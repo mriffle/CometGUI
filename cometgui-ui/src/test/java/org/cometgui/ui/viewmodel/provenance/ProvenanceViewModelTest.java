@@ -1076,6 +1076,12 @@ class ProvenanceViewModelTest {
                                             "MATCHES -- output pin: /run/a.pin"),
                                     section.verificationProperty().get()),
                     () -> assertFalse(section.cancelVerification(), "nothing left to cancel"));
+            section.verify();
+            assertEquals(
+                    List.of(),
+                    section.verificationProperty().get(),
+                    "a new verification clears the last one's rows at once");
+            settle();
         }
 
         @Test
@@ -1202,6 +1208,97 @@ class ProvenanceViewModelTest {
             assertEquals(ProvenanceViewModel.NOT_VERIFIED, section.verifyStatusProperty().get());
             settle();
         }
+    }
+
+    @Test
+    @DisplayName(
+            "choosing another run clears every part and every action's state at once, before its"
+                    + " answer arrives; an export in flight no longer holds the exports")
+    void choosingAnotherRunClearsEverything() {
+        openSealed();
+        section.copyToolMd5(0);
+        chooser.saveTo(Path.of("exports", "r1.json"));
+        port.exports(
+                () -> {
+                    throw new FileAlreadyExistsException("exports/r1.json");
+                });
+        section.exportJson();
+        settle();
+        port.verifies(
+                () ->
+                        new DiskVerification(
+                                List.of(check("pin", "/run/a.pin", DiskOutcome.MATCHES, "bb")),
+                                true));
+        section.verify();
+        settle();
+        assertTrue(section.replaceOfferedProperty().get(), "the fixture offers Replace");
+
+        section.choose(1);
+        assertAll(
+                "everything of the run before is gone at once",
+                () -> assertFalse(section.recordShownProperty().get()),
+                () -> assertEquals(ProvenanceViewModel.OPENING, section.recordTextProperty().get()),
+                () -> assertEquals("", section.summaryTextProperty().get()),
+                () -> assertEquals(List.of(), section.toolsProperty().get()),
+                () -> assertEquals(List.of(), section.filesProperty().get()),
+                () -> assertEquals("", section.cometParamsTextProperty().get()),
+                () -> assertEquals("", section.cometParamsStatusProperty().get()),
+                () -> assertEquals("", section.percolatorSettingsTextProperty().get()),
+                () -> assertEquals(List.of(), section.parametersProperty().get()),
+                () -> assertEquals("", section.presetsTextProperty().get()),
+                () -> assertEquals("", section.parameterNotesProperty().get()),
+                () -> assertEquals(List.of(), section.executionsProperty().get()),
+                () -> assertEquals(List.of(), section.eventsProperty().get()),
+                () -> assertEquals(List.of(), section.logsProperty().get()),
+                () -> assertEquals(List.of(), section.warningsProperty().get()),
+                () -> assertEquals("", section.actionStatusProperty().get()),
+                () -> assertEquals("", section.exportStatusProperty().get()),
+                () -> assertFalse(section.replaceOfferedProperty().get()),
+                () ->
+                        assertEquals(
+                                ProvenanceViewModel.NOT_VERIFIED,
+                                section.verifyStatusProperty().get()),
+                () -> assertEquals(List.of(), section.verificationProperty().get()),
+                () -> assertFalse(section.exportEnabledProperty().get()),
+                () -> assertFalse(section.verifyEnabledProperty().get()));
+        settle();
+    }
+
+    @Test
+    @DisplayName(
+            "an export in flight for the run chosen before neither holds the exports nor reports")
+    void anExportInFlightHoldsNothing() {
+        openSealed();
+        chooser.saveTo(Path.of("exports", "r1.rst"));
+        port.exports(() -> Path.of("exports", "r1.rst"));
+        section.exportRst();
+        assertFalse(section.exportEnabledProperty().get(), "an export is in flight");
+        section.choose(1);
+        settle();
+        assertAll(
+                "the run now shown can be exported: the old export holds nothing",
+                () -> assertTrue(section.recordShownProperty().get()),
+                () -> assertTrue(section.exportEnabledProperty().get()),
+                () -> assertEquals("", section.exportStatusProperty().get()));
+    }
+
+    @Test
+    @DisplayName("with no run shown, an export and a verification say so")
+    void nothingShown() {
+        assertAll(
+                () -> assertFalse(section.exportJson()),
+                () ->
+                        assertEquals(
+                                "Nothing was exported: no run's provenance is shown.",
+                                section.exportStatusProperty().get()),
+                () -> assertFalse(section.verify()),
+                () ->
+                        assertEquals(
+                                "Nothing was verified: no run's provenance is shown.",
+                                section.verifyStatusProperty().get()),
+                () -> assertFalse(section.replaceExisting()),
+                () -> assertEquals(List.of(), port.calls()),
+                () -> assertEquals(List.of(), chooser.asked()));
     }
 
     @Test

@@ -387,9 +387,13 @@ public final class ProvenanceViewModel {
      * @return {@code true} if the file manager is being started
      */
     public boolean openToolLocation(int index) {
-        return tool(index)
-                .map(tool -> openLocation(tool.location(), tool.name() + "'s executable"))
-                .orElseGet(() -> nothingAt("tool"));
+        Optional<ProvenanceView.Tool> tool = tool(index);
+        if (tool.isEmpty()) {
+            nothingAt("tool");
+            return false;
+        }
+        openLocation(tool.get().location(), tool.get().name() + "'s executable");
+        return true;
     }
 
     /**
@@ -399,13 +403,15 @@ public final class ProvenanceViewModel {
      * @return {@code true} if the file manager is being started
      */
     public boolean openFileLocation(int index) {
-        return file(index)
-                .map(
-                        file ->
-                                openLocation(
-                                        file.location(),
-                                        "the " + file.direction() + " " + file.role() + " file"))
-                .orElseGet(() -> nothingAt("file"));
+        Optional<ProvenanceView.File> file = file(index);
+        if (file.isEmpty()) {
+            nothingAt("file");
+            return false;
+        }
+        openLocation(
+                file.get().location(),
+                "the " + file.get().direction() + " " + file.get().role() + " file");
+        return true;
     }
 
     /**
@@ -415,13 +421,14 @@ public final class ProvenanceViewModel {
      * @return {@code true} if the file manager is being started
      */
     public boolean openLogLocation(int index) {
-        return log(index)
-                .map(
-                        log ->
-                                openLocation(
-                                        log.location(),
-                                        "the log of " + log.stageId().orElse(log.tool())))
-                .orElseGet(() -> nothingAt("log"));
+        Optional<ProvenanceView.Log> log = log(index);
+        if (log.isEmpty()) {
+            nothingAt("log");
+            return false;
+        }
+        openLocation(
+                log.get().location(), "the log of " + log.get().stageId().orElse(log.get().tool()));
+        return true;
     }
 
     /**
@@ -526,7 +533,7 @@ public final class ProvenanceViewModel {
                                 ? "This project has 1 run."
                                 : "This project has " + answer.size() + " runs.");
         if (chosen.isEmpty()) {
-            chosenIndex.set(-1);
+            // nothing chosen: the position is already -1
             return;
         }
         RunListing before = chosen.get();
@@ -633,9 +640,8 @@ public final class ProvenanceViewModel {
         if (mine != openGeneration.get()) {
             return;
         }
+        // write() withdrew any Replace offer and pending file when this export started
         exporting.set(false);
-        pending = null;
-        replaceOffered.set(false);
         exportStatus.set("Exported " + format.words + " to " + written + ".");
         publishEnablement();
     }
@@ -647,8 +653,7 @@ public final class ProvenanceViewModel {
         }
         exporting.set(false);
         if (replacing) {
-            pending = null;
-            replaceOffered.set(false);
+            // refused again: no second offer (write() withdrew the first)
             exportStatus.set("Nothing was exported to " + target + ": " + reason + ".");
         } else {
             pending = new PendingExport(format, target);
@@ -670,8 +675,6 @@ public final class ProvenanceViewModel {
             return;
         }
         exporting.set(false);
-        pending = null;
-        replaceOffered.set(false);
         exportStatus.set("Nothing was exported to " + target + ": " + why);
         publishEnablement();
     }
@@ -752,7 +755,7 @@ public final class ProvenanceViewModel {
                 });
     }
 
-    private boolean openLocation(Path location, String what) {
+    private void openLocation(Path location, String what) {
         long mine = openGeneration.get();
         actionStatus.set("Starting the file manager to show " + what + ".");
         background.execute(
@@ -767,12 +770,10 @@ public final class ProvenanceViewModel {
                     }
                     ui.execute(() -> located(mine, said));
                 });
-        return true;
     }
 
-    private boolean nothingAt(String what) {
+    private void nothingAt(String what) {
         actionStatus.set("Nothing was done: no " + what + " is selected.");
-        return false;
     }
 
     private <T> Optional<String> copy(
