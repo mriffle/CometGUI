@@ -211,6 +211,31 @@ P13-4, amended -- parameter names go in settings VALUES, never in keys
     the preset list is cleared; a retry of an unchanged configuration records
     the first preparation's origins. Origins never enter a fingerprint.
 
+Design decisions from units 3b and 4 (2026-10-13)
+=================================================
+
+P13-9 -- a manifest/probe discrepancy is one direction only
+    The manifest claims a capability the install's probe did not find. A
+    capability the probe found that the manifest does not list is the
+    manifest being silent, not a disagreement; counting it would put about
+    ten warnings on every Percolator run. Computed from the shipped manifest
+    record and the verified marker, with no re-probe and no format change.
+
+P13-10 -- the real-run gate lives in ``cometgui-app``
+    *The orchestrator's call.* Unit 4 stopped before code: gate item 2's
+    "match the files in the tool cache" needs a real cache and real markers,
+    which only ``cometgui-install`` makes, and ``cometgui-workflow`` does not
+    depend on it; the workflow module's real-run support copies binaries and
+    builds selections by hand, so a capability or identity check there would
+    compare the test's input with its own output. So the gate tests install
+    Comet and Percolator with the product's installer from the loopback
+    mirror into an empty cache, and run through the product's own run port.
+    Rejected: a test-scope module edge (duplicated wiring) and checking item 2
+    against ``manifests/tools.json`` alone (a weakened item). The same unit
+    records the Comet tool's probed capabilities and the managed artefact
+    identity of both tools, which the specification's tool provenance
+    requires and both records left empty.
+
 Work units
 ==========
 
@@ -289,7 +314,8 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        Limelight key and URL credentials included, then every export and
        every file the run directory holds, enumerated from disk, grepped).
      - Gate 1-6; AC-PRV-01..09
-     - Pending
+     - Accepted after one rework, ``0821f8e`` ``aac5827`` ``2f97f34``
+       ``ae4b06f`` (in ``cometgui-app``, P13-10)
    * - 5
      - **The Provenance section** (P13-6, P13-8): view-model, pane, the
        app's port and wiring; the run list including failed and cancelled
@@ -514,3 +540,81 @@ reported to tier 1.**
   capability set (``CometWorkflow`` passes ``Set.of()``). Nit, not acted on:
   ``ToolWarnings`` repeats ``AdvisoryRendering.forSelection``'s one-line loop
   rather than calling it.
+
+Unit 4 sign-off
+---------------
+
+**Accepted 2026-10-14 after one rework.** Commits ``0821f8e`` (the gate test
+and two production changes), ``aac5827`` (a sweep hit names its seed),
+``2f97f34`` (release tags, asked for at sign-off), ``ae4b06f`` (rework). The
+agent first stopped before code on where gate item 2 can be proved; I ruled
+P13-10.
+
+* **What the gate test is.** ``cometgui-app`` ``RealProvenanceGateTest`` (17
+  tests, about 26 s) over ``GateWorld``: Comet 2026.03.0, Percolator 3.07.1
+  and the converter 2.8.1 installed by the product's installer from the
+  loopback mirror into an empty cache; a two-file K562 run through
+  ``RunWiring.port``; a conversion, a refused and a submitted upload to the
+  fake server; both exports through the read model. Digests from the test's
+  own ``MessageDigest`` loop (``OwnDigests``); the record read by the test's
+  own JSON reader (``IndependentJson``), the report by its own RST reader
+  (``IndependentRst``); tool records compared with markers the test finds by
+  walking the cache. Item 1: 28 files and 6 logs against the disk, and all 10
+  files under ``outputs/`` at seal in the record. Item 4: a damaged spectrum
+  file (Comet exit 134) and a cancel mid-search on the whole proteome.
+  Item 6: five seeds (Limelight key in a refused and a submitted upload; a
+  password in a Limelight URL; a URL password and an ``api_key=`` in a preset
+  name; a URL password in a preset name over 256 characters), every file under
+  the project plus both exports swept by Phase 12's ``SecretSweep``, a control
+  planting every form.
+* **Production changes (P13-10, reported to tier 1 as changes to Phase 05/08
+  code).** ``ToolOffer`` gains ``artefactIdentity`` and ``releaseTag`` (only on
+  an installed managed build), filled by ``ManagedToolManager`` from the
+  verified marker (``InstallationMarker.artefactIdentity()`` =
+  ``<artefactUrl> sha256:<artefactSha256>``); ``CometSelection`` gains the
+  offer's probed capabilities, identity and tag (``WorkflowRunPort.select``);
+  Comet's tool record now carries capabilities, identity and the marker's tag
+  -- **replacing the old ``"v" + release`` guess**, which also tagged
+  registered local binaries -- and Percolator's carries identity and tag
+  (``rel-3-07-01``; it was empty). No pinned expectation moved.
+* **Rejected once.** My injection M1 -- ``JsonWriter.value`` skipping
+  redaction for values over 200 characters (Phase 04's shape #6) -- left all
+  17 gate tests green: every seed rode a short carrier. (Phase 04's own corpus
+  tests in ``cometgui-provenance`` do catch it: 3 red, confirmed.) Rework
+  ``ae4b06f`` adds a seed in a carrier over 256 characters with its length
+  asserted; M1 replayed: 3 of 17 red (``noSeededSecretAnywhere``,
+  ``theSearchFindsEveryPlantedForm``, ``everyFactIsInTheReport``).
+* **Tests, run by me**: ``mvn -pl cometgui-domain,cometgui-install,
+  cometgui-workflow,cometgui-app -am install`` BUILD SUCCESS: domain 1227,
+  install 1047 (2 skipped), workflow 1010, ui 796, app 316 (1 skipped), 0
+  failures, SpotBugs 0; ``RealProvenanceGateTest`` 17/17 (surefire XML).
+* **My other injections**: M3 the database recorded as an input by neither
+  ``hash-inputs`` nor ``run-comet``: gate 1 red
+  (``everyListedFileMatchesTheDisk``); M4 the RST printing a log's MD5 under
+  "SHA-256": gate 5 red (``everyFactIsInTheReport``) -- while the byte
+  comparison of export and on-disk RST stays green, as it must, since one
+  writer produced both. M2 (database dropped from ``run-comet`` only) stayed
+  green **correctly**: ``hash-inputs`` still records it.
+* **Targeted PIT**: mine, ``ToolOffer`` 41/41 KILLED; the agent's
+  ``ManagedToolManager`` 61/61, ``CometSelection``+``CometWorkflow`` 32/33 (one
+  NO_COVERAGE in the untouched ``inputsOf`` under a restricted test set).
+* **Harnesses, run by me**: ``install`` 95, ``workflow`` 110, ``percolator``
+  109, ``provenance`` 24, ``quality`` 42, ``docs``, ``traceability`` 8 -- all
+  PASS.
+* **Files outside the module the tests read**: ``scratch/fixture/`` (both K562
+  mzML, the UniProt proteome) and ``scratch/phase05/artefacts/``
+  (``v2026.03.0__comet.linux.exe``, ``rel-3-07-01__percolator-noxml-ubuntu-portable.zip``,
+  ``rel-3-07-01__percolator-noxml-v3-07-linux-amd64.deb``,
+  ``v2.8.1__cometPercolator2LimelightXML.jar``) -- all already read by
+  existing app tests.
+* **Not proved, and why**: a run killed before sealing on a real engine --
+  nothing in the product or the test support can crash one honestly; unit 3
+  proves the reading of such a directory over a constructed one. Two seeding
+  paths do not exist: the only environment variable the product gives a tool
+  is ``LANG=C.UTF-8``; and a secret typed into a Comet parameter value is
+  written verbatim into the archived ``comet.params`` that ``AC-PRV-04``
+  requires to be the exact executed file (escalated, below).
+* **For tier 1**: the Limelight server's wrong-key refusal quotes the key's
+  first two characters, which lands in the upload log and ``events.log``
+  (Phase 12's P12-20 chose to pass the server's words through; a whole-secret
+  sweep cannot see a two-character prefix).
