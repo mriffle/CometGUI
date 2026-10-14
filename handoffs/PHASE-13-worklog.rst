@@ -326,7 +326,8 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        a failed and a cancelled run opened, the exports written and equal
        to the read model's, nothing slow on the FX thread.
      - Spec *Provenance UI*; AC-PRV-07; gate 3, 4 (GUI)
-     - Pending
+     - Accepted after one rework, ``842a654`` ``efa58d5`` ``1364904``
+       ``278fa4c``
    * - 6
      - **Documentation and traceability**: ``docs/provenance.rst`` (the
        user page), ``docs/developer/provenance_schema.rst`` in sync with the
@@ -618,3 +619,60 @@ P13-10.
   first two characters, which lands in the upload log and ``events.log``
   (Phase 12's P12-20 chose to pass the server's words through; a whole-secret
   sweep cannot see a two-character prefix).
+
+Unit 5 sign-off
+---------------
+
+**Accepted 2026-10-14 after one rework.** Commits ``842a654`` (the section),
+``efa58d5`` (PIT survivors), ``1364904`` (test documentation), ``278fa4c``
+(rework).
+
+* **Diff read.** ``ui.viewmodel.provenance`` (``ProvenancePort``,
+  ``OpenedRecord``, ``ProvenanceViewModel``, ``ProvenanceTexts``): every port
+  call on the background executor, answers applied on the FX thread,
+  generations drop stale answers. ``ui.controls.provenance.ProvenancePane``:
+  run selector, the seven parts, Copy MD5/SHA-256/command, Open file
+  location, Export JSON/RST with Replace, Verify with Cancel; PARTIAL in text.
+  35 new ``UiIds`` (575 -> 610); the accessible-name walk's floor **raised**
+  174 -> 209; the phase-13 placeholder replaced. App:
+  ``ProjectProvenancePort`` over ``ProvenanceReader`` with the session's
+  redactor; ``FileManagerLauncher`` (P13-6: ``xdg-open <folder>``, ``open -R
+  <file>``, ``explorer.exe /select,<file>`` through the one process service;
+  a missing launcher, a vanished folder or a non-zero exit within 5 s is a
+  stated failure; Windows' exit status ignored because Explorer returns 1;
+  macOS and Windows argv unverified, said in the code). ``FileChooserPort``
+  gains ``chooseExportTarget``. ``OwnDigests`` moved to ``app.testing``.
+* **Rejected once.** My injection N3 -- ``RunWiring.provenance`` building the
+  reader over ``SecretRedactor::patternsOnly`` instead of the session's
+  redactor -- left every test green (9). Rework ``278fa4c`` adds
+  ``ProvenanceSessionRedactionTest`` through the production composition: a
+  registry-only value (proved invisible to the patterns) in an argv element,
+  a setting and a path; visible before the session admits it, absent after
+  from every displayed text, copy and both exports. N3 replayed: red, 5
+  assertions (``once admitted, nowhere (5 failures)``).
+* **Tests, run by me**: ``mvn -pl cometgui-ui,cometgui-app install`` BUILD
+  SUCCESS: ui 832 (coverage checks met), app 334 (1 skipped), SpotBugs 0;
+  ``cometgui-app`` again after the rework by the agent (335). Archtests 40, 0
+  failures.
+* **My other injections**: N1 every export passing ``replaceExisting=true``:
+  2 red (``anExistingFileAndReplace``, ``exportJson``); N2 a non-zero
+  ``xdg-open`` status ignored on Linux: ``FileManagerLauncherTest.aNonZeroStatus``
+  red.
+* **Targeted PIT, by me** (``ui.viewmodel.provenance.*``): 312 mutations,
+  312 KILLED (``ProvenanceTexts``, ``ProvenanceViewModel``). Stray
+  ``cometgui-ui`` PIT report removed afterwards.
+* **Harnesses, run by me**: ``shell`` 30 PASS (595 s), ``quality`` 42 PASS.
+  The agent ran ``paramui`` 87, ``results`` 100 and ``pdv`` 107 (both read
+  ``CometGuiApplication.java``, which changed); ``pdv`` failed once on control
+  5b -- the injected defect went red but the real-PDV observer logged a
+  partial ``row=0`` line first, so the expected-text regex missed -- and
+  passed alone and on a full rerun. Recorded as a flake in Phase 11's harness.
+* **Files outside the module the tests read**: ``scratch/fixture/``,
+  ``scratch/phase05/artefacts/v2026.03.0__comet.linux.exe``,
+  ``scratch/phase05/artefacts/rel-3-07-01__percolator-noxml-ubuntu-portable.zip``
+  -- already read by existing app tests.
+* **Residue accepted**: Replace is offered after any refused export,
+  including one aimed at the run's own ``provenance.json``/``.rst``; pressing
+  it shows the read model's refusal and nothing is written (a distinct
+  exception type in the read model would remove the offer). The run list does
+  not refresh on a Limelight compatible rerun ("Read the runs again" does).
