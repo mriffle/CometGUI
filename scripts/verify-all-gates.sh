@@ -92,6 +92,7 @@ readonly -a ALL_GATES=(
     results
     pdv
     limelight
+    provenanceui
 )
 
 PASSED=0
@@ -147,7 +148,8 @@ declare -a COVERED=()
 #                2026-10-09, phase 10 unit 11's first shipping count.
 #                pdv: 107 on 2026-10-11, phase 11 unit 9's first shipping
 #                count.  limelight: 130 on 2026-10-12, phase 12 unit 9's
-#                first shipping count.)
+#                first shipping count.  provenanceui: 96 on 2026-10-14,
+#                phase 13 unit 7's first shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -391,6 +393,20 @@ gate_spec() {
             GATE_FLOOR=130
             GATE_UNIT="controls"
             ;;
+        provenanceui)
+            GATE_PHASE="13"
+            GATE_ITEMS="1,2,3,4,5,6"
+            GATE_DEFECT="from the injections recorded in handoffs/PHASE-13-worklog.rst (and new ones, each marked so), each into production code of cometgui-provenance, cometgui-workflow, cometgui-ui or cometgui-app in a git-archive sandbox, each built with its upstream modules in one reactor (-pl TOP -am, nothing installed), proved to have reached the compiled classes and graded on the failing assertion's own words in the named testcase, with every process left under the sandbox ended after each run, items 1 to 6 against the real Comet, Percolator and converter run whose digests the gate test computes itself: the database recorded as an input by neither hash-inputs nor run-comet, and (NEW) the product's one hasher wrong in the MD5 alone (red only because the gate's digests are its own); (NEW) Comet's tool record without its probed capabilities, (NEW) Percolator's without its artefact identity, and (NEW) Comet's without its release tag; (NEW) one Comet execution of a two-file run dropped from the record; (NEW) a failed or cancelled stage's outputs recorded as completed (the real failed and cancelled runs), and the read model warning only of FAILED files; the RST printing a log's MD5 under SHA-256 (the export still byte-identical to the run's own report), and (NEW) Export JSON copying the sealed file instead of rendering the loaded model; the JSON writer skipping redaction over 200 characters, (NEW) the RST writer redacting nothing, a read-model warning not redacted, and the app's read model built over the pattern rules instead of the session's redactor; P13-1's AccessDeniedException no longer retried, one rename attempt fewer, and ManifestReader keeping a FileChannel open; P13-7's verification comparing the SHA-256 only; (NEW) P13-8's record opened on the interface thread (the view-model and the headless GUI's thread test); (NEW) Copy SHA-256 copying the MD5 (the view-model and the headless GUI's clipboard); and, as controls on the harness itself, an unchanged file, a missing anchor, an injection that reached the source but not the bytecode, a test method renamed so its selection ran zero tests, a green run graded as red, a red without its diagnostic, a run counted at zero tests, and an XML report holding fewer testcases than Maven ran"
+            GATE_SCRIPT="scripts/verify-provenance-ui-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-13 exit gate items 1 to 6 were proved here"
+                "bytecode as a HARNESS ERROR, not as a pass, and a selection that ran zero"
+            )
+            GATE_FLOOR=96
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -439,6 +455,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         limelight)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        provenanceui)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -447,8 +465,8 @@ usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
 that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07,
-PHASE-08, PHASE-09, PHASE-10, PHASE-11 and PHASE-12 gate still fails on the
-defect it exists to catch.
+PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12 and PHASE-13 gate still fails
+on the defect it exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -525,7 +543,7 @@ list_gates() {
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
     printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06, 07:n of\n'
     printf '  PHASE-07, 08:n of PHASE-08, 09:n of PHASE-09, 10:n of PHASE-10, 11:n of\n'
-    printf '  PHASE-11, 12:n of PHASE-12.\n'
+    printf '  PHASE-11, 12:n of PHASE-12, 13:n of PHASE-13.\n'
     printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
@@ -610,13 +628,21 @@ list_gates() {
     printf '  the destination first, the fake in tests; 7 a seeded credential in no\n'
     printf '  log, provenance record or export; 8 decoy import against a run without\n'
     printf '  decoys prevented at configuration time.\n'
+    printf '  PHASE-13 items: 1 every input and output of a completed real run with both\n'
+    printf '  digests, recomputed independently from disk; 2 every tool'"'"'s version, path\n'
+    printf '  and both digests matching the files in the tool cache; 3 every process'"'"'s\n'
+    printf '  argument array, one per spectrum file, present and displayable; 4 a failed\n'
+    printf '  and a cancelled run opening with partial outputs marked; 5 JSON and RST\n'
+    printf '  from one model, the RST'"'"'s facts asserted against the JSON; 6 no secret in\n'
+    printf '  either export.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
     printf '  phases/PHASE-05-tool-registry.rst, phases/PHASE-06-comet-param-model.rst,\n'
     printf '  phases/PHASE-07-comet-param-ui.rst, phases/PHASE-08-workflow-comet.rst,\n'
     printf '  phases/PHASE-09-percolator.rst, phases/PHASE-10-results.rst,\n'
-    printf '  phases/PHASE-11-pdv.rst and phases/PHASE-12-limelight.rst.\n\n'
+    printf '  phases/PHASE-11-pdv.rst, phases/PHASE-12-limelight.rst and\n'
+    printf '  phases/PHASE-13-provenance-ui.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -778,7 +804,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09, PHASE-10, PHASE-11 and PHASE-12 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12 and PHASE-13 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -816,7 +842,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05 06 07 08 09 10 11 12; do
+    for phase in 01 02 04 05 06 07 08 09 10 11 12 13; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"

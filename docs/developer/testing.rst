@@ -615,6 +615,19 @@ pass is worse than no aggregator at all.
        Limelight> but was: <Rerun Percolator with 3.07.1 for Limelight>``,
        while the real Linux set stays green.
 
+   * - Provenance UI and reports (Phase 13, ``provenanceui``)
+     - ``scripts/verify-provenance-ui-gates.sh``: twenty injections into
+       ``cometgui-provenance``, ``cometgui-workflow``, ``cometgui-ui`` and
+       ``cometgui-app`` -- at least one per exit gate item, items 1 to 6
+       against the real Comet, Percolator and converter run whose digests the
+       gate test computes itself, and the design obligations P13-1, P13-7 and
+       P13-8, P13-8 also through the headless GUI. See
+       :ref:`dev-provenance-ui-falsifiability`.
+     - Each failing assertion's own words, e.g. the product's hasher wrong in
+       the MD5 alone -- ``.../parameters/comet.params: MD5 recomputed from
+       disk ==> expected: <...> but was: <...>``, which a gate comparing the
+       record with the product's own digests could not see.
+
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs
 from the pristine state -- and reports a control whose defect was *not*
@@ -2076,6 +2089,199 @@ recorded as exactly ``xdg-open <folder>`` by a recording runner -- and a
 cancelled and a failed real run opened from the list, their partial outputs
 shown as ``PARTIAL``; and no port call on the JavaFX thread. See
 :doc:`provenance_ui`.
+
+.. _dev-provenance-ui-falsifiability:
+
+The provenance UI harness (Phase 13, ``provenanceui``)
+------------------------------------------------------
+
+``bash scripts/verify-provenance-ui-gates.sh`` proves that each of Phase 13's
+six exit gate items, and the phase's design obligations P13-1 (the bounded
+rename retry and a viewer that holds no descriptor), P13-7 (the product's
+*Verify against disk* comparing both digests) and P13-8 (nothing slow on the
+JavaFX thread), fails on a defect it exists to catch. It is registered in
+``scripts/verify-all-gates.sh`` as ``provenanceui`` and is **not** a stage of
+``scripts/build.sh``. It takes its shape and its plumbing from ``limelight``
+(:ref:`dev-limelight-falsifiability`): a ``git archive HEAD`` sandbox, anchors
+that must match exactly once, bytecode digests proving each injection reached
+the compiled class, red read from surefire's XML by testcase and message,
+siblings required to stay green, ``mvn -o -pl TOP -am test`` with nothing
+installed, processes left under the sandbox ended after every run, a clean
+re-run of every selection the dirty runs used, and a control H on itself. The
+differences:
+
+* **Two test counts, which must agree.** Surefire runs each ``@Nested`` class
+  a selection names as a test set of its own, and writes each set's report
+  under the *outer* class's name, so a selection naming two nested classes of
+  ``RealProvenanceGateTest`` keeps only the last one's testcases in the XML;
+  two tests of one name fold the same way (unit 1's finding). Every run
+  therefore also sums Maven's module summary lines (``Tests run: N, ...``
+  without ``-- in``), and a run whose XML holds fewer testcases than Maven ran
+  is a ``HARNESS ERROR``, as is either count at zero. A red is a failed
+  testcase by either count.
+* **Batched baseline and clean run.** The baseline and the final clean run
+  split the union of the selections into as few Maven runs as keep every
+  report whole -- no run names two classes of one test class -- and compare
+  every run's bytecode with the first's. Each nested class of
+  ``RealProvenanceGateTest`` rebuilds its shared world (three installs, a real
+  run, a conversion, two uploads), about 20 s, so the two cost about four
+  minutes each.
+* **The expected words are read only from the failure section** the XML
+  wrote into the log, never from what the build printed, so a test that only
+  prints the words cannot pass a control.
+
+.. list-table:: The controls ("recorded" names the unit of ``handoffs/PHASE-13-worklog.rst`` whose sign-off made the injection)
+   :header-rows: 1
+   :widths: 6 8 40 46
+
+   * - Control
+     - Item
+     - Injected defect
+     - Diagnostic required
+   * - 1a
+     - 1
+     - Recorded (unit 4, M3): the database declared by neither
+       ``hash-inputs`` nor ``run-comet``.
+     - *Real*, ``everyListedFileMatchesTheDisk``: ``the files the record
+       lists ==> expected: <[... input fasta subset.fasta, ...``; the logs
+       green.
+   * - 1b
+     - 1
+     - New: the product's one hasher digesting a byte short, for the MD5
+       alone.
+     - *Real*, ``everyListedFileMatchesTheDisk`` and
+       ``everyListedLogMatchesTheDisk``: ``MD5 recomputed from disk ==>
+       expected: <...> but was: <...>``, and no SHA-256 red. The record agrees
+       with the product; only a gate with digests of its own (P13-7) sees it.
+   * - 2a
+     - 2
+     - New: Comet's tool record without its probed capabilities.
+     - *Real*, ``Tools.comet``: ``comet: the capabilities its install probed
+       ==> expected: <[COMPLETE_PARAMS_QUERY, PEPXML_OUTPUT, PIN_OUTPUT]> but
+       was: <[]>``; ``percolator`` green.
+   * - 2b
+     - 2
+     - New: Percolator's tool record without its artefact identity.
+     - *Real*, ``Tools.percolator``: ``the artefact its install came from ==>
+       expected: <https://.../percolator-noxml-ubuntu-portable.zip sha256:...>
+       but was: <null>``; ``comet`` green.
+   * - 2c
+     - 2
+     - New: Comet's tool record without its release tag.
+     - *Real*, ``Tools.comet``: ``expected: <v2026.03.0> but was: <null>``.
+   * - 3a
+     - 3
+     - New: the last of a step's several invocations not recorded.
+     - *Real*, ``onePerSpectrumFile``: ``two spectrum files, two Comet
+       invocations ==> expected: <2> but was: <1>``; Percolator's argument
+       array green.
+   * - 4a
+     - 4
+     - New: the engine recording a failed or cancelled stage's outputs as
+       completed.
+     - *Real*, ``failedRun`` and ``cancelledRun``: ``partial in the record:
+       [k562_3 cancelled] ==> expected: <[output pepxml k562_3.pep.xml, output
+       pin k562_3.pin]> but was: <[]>``.
+   * - 4b
+     - 4
+     - Recorded (unit 3, K4): the read model warning only of ``FAILED``
+       files.
+     - ``ProvenanceStatesTest.failedRun``: ``expected:
+       <Warning[source=PARTIAL_FILE, ...k562_2.pin ... is recorded as
+       partial]>``; ``cancelledRun`` and the census red.
+   * - 5a
+     - 5
+     - Recorded (unit 4, M4): the RST printing a log's MD5 under "SHA-256".
+     - *Real*, ``everyFactIsInTheReport``: ``Tools/Tool 1, comet ==>
+       expected: <{...``; ``exportsAreTheRunsOwn`` stays green, as it must --
+       one writer made both.
+   * - 5b
+     - 5
+     - New: Export JSON copying the sealed file instead of rendering the
+       loaded model.
+     - ``ProvenanceExportTest.renderedNotCopied``: ``NoSuchFileException``;
+       ``oneObject``: ``expected: <2> but was: <0>``; ``byteIdentical`` green.
+   * - 6a
+     - 6
+     - Recorded (unit 4, M1): the JSON writer skipping redaction over 200
+       characters.
+     - *Real*, ``noSeededSecretAnywhere``: ``...provenance.json holds the
+       secret as [...], seeded as the password of a URL in a long (> 256
+       characters) ...``.
+   * - 6b
+     - 6
+     - New: the RST writer redacting nothing.
+     - *Real*, ``noSeededSecretAnywhere``: ``.../provenance/provenance.rst
+       holds the secret``, and no JSON among the hits.
+   * - 6c
+     - 6
+     - Recorded (unit 3, K3): a read-model warning's message not redacted.
+     - ``SeededSecretTest.absentEverywhere``: ``expected: <[]> but was:
+       <[failed reading Zq7Kx-limelight-91xW, ...``.
+   * - 6d
+     - 6
+     - Recorded (unit 5, N3): the app's read model built over
+       ``SecretRedactor::patternsOnly``.
+     - ``ProvenanceSessionRedactionTest``: ``once admitted, nowhere (5
+       failures)``.
+   * - d1
+     - P13-1
+     - Recorded (unit 1, O2): ``AccessDeniedException`` no longer retried.
+     - ``AtomicDocumentWriterRetryTest``: ``expected: <10> but was: <1>``; a
+       bare ``FileSystemException`` still retried.
+   * - d2
+     - P13-1
+     - Recorded (unit 1, O1): one rename attempt fewer.
+     - ``successOnTheLastAttempt``: ``expected: <refusal #10> but was:
+       <refusal #9>``.
+   * - d3
+     - P13-1
+     - Recorded (unit 1, O5): ``ManifestReader.readFrom`` keeping a
+       ``FileChannel``.
+     - ``ReadersHoldNoDescriptorTest$Manifest``: ``expected: <0> but was:
+       <1>``; the event-log reader green.
+   * - d4
+     - P13-7
+     - Recorded (unit 3, K1): *Verify against disk* comparing the SHA-256
+       only.
+     - ``eitherDigestAloneDiffers``: a record whose MD5 alone is wrong
+       verified ``MATCHES``.
+   * - d5
+     - P13-8
+     - New: the view-model opening a record on the interface thread.
+     - ``ProvenanceViewModelTest``: the port called outside the background
+       executor; *GUI*, ``noPortCallOnTheFxThread``: ``a port call on the
+       JavaFX application thread stalls the window``.
+   * - d6
+     - unit 5
+     - New: Copy SHA-256 of a tool copying its MD5.
+     - ``ProvenanceViewModelTest$Copies.exactValues``; *GUI*,
+       ``aCompletedRun``: ``Copy SHA-256 of Comet ==> expected: <64 hex> but
+       was: <32 hex>``.
+   * - H
+     - --
+     - The harness itself.
+     - An unchanged file, a missing anchor, a comment-only injection (a real
+       Maven run), a test method renamed so its selection runs zero tests, a
+       run counted at zero tests and an XML report holding fewer testcases
+       than Maven ran are each a ``HARNESS ERROR``; a green run graded as red
+       and a red without its diagnostic are each a recorded failure.
+
+What it does not cover: Windows and macOS (P13-1's retry is exercised through
+its seam only, P13-6's macOS and Windows argv are not graded); a run killed
+before it seals, on a real engine; the parameter-origin settings (unit 2) and
+the discrepancy warnings (unit 3b), which are not exit gate items; unit 5's
+Replace offer and ``xdg-open`` status (N1, N2). Their injections are in the
+work log.
+
+Measured on 2026-10-14 by ``bash scripts/verify-provenance-ui-gates.sh`` at
+``44c4617``: 96 controls passed in 1241 s (20 m 41 s) -- the baseline 251 s and
+the final clean run 236 s (each six Maven runs over the ``cometgui-app``
+reactor, 64 tests, every nested class of ``RealProvenanceGateTest`` rebuilding
+its world and the headless GUI's three real runs), the thirteen
+``cometgui-app`` controls 33-69 s each, the ``cometgui-provenance`` and
+``cometgui-workflow`` controls 7-17 s, and control H 14 s. No process was left
+for the script to end. The floor in ``verify-all-gates.sh`` is 96.
 
 Traps
 =====
