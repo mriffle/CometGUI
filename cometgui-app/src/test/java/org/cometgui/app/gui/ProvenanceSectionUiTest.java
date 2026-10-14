@@ -119,8 +119,12 @@ import org.junit.jupiter.api.io.TempDir;
  *       the application's threads, and every action is pressed.
  * </ol>
  *
- * <p>Files read outside this module: those of {@link RealSearch} and {@link RealPercolators}
- * ({@code scratch/fixture/}, {@code scratch/phase05/artefacts/}, {@code scratch/scientific-path/}).
+ * <p>Files read outside this module: those of {@link RealSearch} and {@link RealPercolators} --
+ * {@code scratch/fixture/} (both K562 mzML files and the UniProt proteome), {@code
+ * scratch/phase05/artefacts/v2026.03.0__comet.linux.exe} and {@code
+ * scratch/phase05/artefacts/rel-3-07-01__percolator-noxml-ubuntu-portable.zip}; all already read by
+ * the existing GUI tests. Wall time about 45 seconds: one real search of the 1000-record subset,
+ * one cancelled while loading spectra, one that fails on the damaged file.
  */
 @EnabledOnOs(
         value = OS.LINUX,
