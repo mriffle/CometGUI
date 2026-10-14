@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
-package org.cometgui.app.config;
+package org.cometgui.app.testing;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,11 +30,15 @@ import java.util.HexFormat;
  * CachingHashService}, so that a digest the product records is compared with one the product did
  * not compute (design decision P13-7).
  *
+ * <p>Shared by the phase's gate tests on real runs ({@code RealProvenanceGateTest}) and the
+ * Provenance section's GUI test ({@code ProvenanceSectionUiTest}), so that both compare the record
+ * with one independent hasher.
+ *
  * @param size the bytes read
  * @param md5 lower-case hexadecimal
  * @param sha256 lower-case hexadecimal
  */
-record OwnDigests(long size, String md5, String sha256) {
+public record OwnDigests(long size, String md5, String sha256) {
 
     /**
      * Reads a file once, in 64 KiB chunks, feeding both digests.
@@ -43,7 +47,7 @@ record OwnDigests(long size, String md5, String sha256) {
      * @return what was read
      * @throws IOException if it cannot be read
      */
-    static OwnDigests of(Path file) throws IOException {
+    public static OwnDigests of(Path file) throws IOException {
         MessageDigest md5;
         MessageDigest sha256;
         try {

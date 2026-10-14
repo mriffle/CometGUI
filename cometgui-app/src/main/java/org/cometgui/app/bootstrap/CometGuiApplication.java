@@ -66,6 +66,7 @@ import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
+import org.cometgui.ui.viewmodel.provenance.ProvenanceViewModel;
 import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
 import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
 import org.cometgui.ui.viewmodel.results.ResultsViewModel;
@@ -464,6 +465,21 @@ public final class CometGuiApplication extends Application {
                         runThreads,
                         Platform::runLater);
 
+        /*
+         * The Provenance section (phase 13): every run of the session's project and the chosen
+         * run's record, through the read model over the session's ONE SessionSecrets' redactor and
+         * the one hasher; Open file location through the one process service. Every port call --
+         * listing, loading, exporting, verifying, starting the file manager -- is made on the Run
+         * section's daemon threads, never this one (P13-8); the exports' save dialog is the one
+         * chooser.
+         */
+        ProvenanceViewModel provenance =
+                new ProvenanceViewModel(
+                        RunWiring.provenance(services, project, hashes, engine, secrets),
+                        chooser,
+                        runThreads,
+                        Platform::runLater);
+
         ShellView shell =
                 new ShellView(
                         new NavigationViewModel(),
@@ -486,7 +502,8 @@ public final class CometGuiApplication extends Application {
                         displayFilters,
                         visualisation,
                         limelight,
-                        limelightUpload);
+                        limelightUpload,
+                        provenance);
 
         /*
          * READ AFTER THE SHELL IS BUILT, NOT INSIDE IT.  Asking the port for the offered builds
@@ -531,6 +548,14 @@ public final class CometGuiApplication extends Application {
         percolatorRerun
                 .runningProperty()
                 .addListener((observable, before, after) -> results.refresh());
+        /*
+         * The Provenance section lists every run, whatever became of it, and whether each is
+         * executing: so it reads again whenever a run or a Percolator rerun starts or ends.
+         */
+        run.runningProperty().addListener((observable, before, after) -> provenance.refresh());
+        percolatorRerun
+                .runningProperty()
+                .addListener((observable, before, after) -> provenance.refresh());
         percolator.refresh();
         run.recheck();
         percolatorRerun.refresh();
@@ -538,6 +563,7 @@ public final class CometGuiApplication extends Application {
         visualisation.refresh();
         limelight.refresh();
         limelightUpload.refresh();
+        provenance.refresh();
 
         primaryStage.setTitle(WINDOW_TITLE);
         primaryStage.setScene(new Scene(shell, INITIAL_WIDTH, INITIAL_HEIGHT));

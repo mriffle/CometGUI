@@ -177,6 +177,14 @@ public final class FxFileChooser implements FileChooserPort {
         return Optional.ofNullable(dialogs.save(chooser, owner.get())).map(File::toPath);
     }
 
+    @Override
+    public Optional<Path> chooseExportTarget(String title, String suggestedName) {
+        FileChooser chooser = chooser(Objects.requireNonNull(title, "title"));
+        chooser.setInitialFileName(Objects.requireNonNull(suggestedName, "suggestedName"));
+        chooser.getExtensionFilters().add(allFiles());
+        return Optional.ofNullable(dialogs.save(chooser, owner.get())).map(File::toPath);
+    }
+
     private static FileChooser chooser(String title) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(title);

@@ -65,4 +65,16 @@ public interface FileChooserPort {
      * @return the path to write, or empty if cancelled; the file is never overwritten if it exists
      */
     Optional<Path> chooseSaveTarget();
+
+    /**
+     * Asks where to write an export, such as a run's provenance record (phase 13).
+     *
+     * <p>An existing file chosen here is not replaced by this call: the caller writes the export,
+     * refuses an existing file and asks again before replacing it.
+     *
+     * @param title what the dialog says it is for
+     * @param suggestedName the file name offered
+     * @return the path to write, or empty if cancelled
+     */
+    Optional<Path> chooseExportTarget(String title, String suggestedName);
 }

@@ -62,6 +62,7 @@ import org.cometgui.ui.viewmodel.params.RunNotStartedException;
 import org.cometgui.ui.viewmodel.params.RunObserver;
 import org.cometgui.ui.viewmodel.percolator.PercolatorPort;
 import org.cometgui.ui.viewmodel.percolator.RerunCheck;
+import org.cometgui.ui.viewmodel.provenance.ProvenancePort;
 import org.cometgui.ui.viewmodel.results.ResultsPort;
 import org.cometgui.ui.viewmodel.visualisation.VisualisationPort;
 import org.cometgui.workflow.engine.EngineServices;
@@ -73,6 +74,7 @@ import org.cometgui.workflow.pdv.PdvLaunches;
 import org.cometgui.workflow.pdv.PdvMzTabs;
 import org.cometgui.workflow.pdv.PdvWindows;
 import org.cometgui.workflow.pdv.PsmFigures;
+import org.cometgui.workflow.provenance.ProvenanceReader;
 import org.cometgui.workflow.steps.CometWorkflow;
 import org.cometgui.workflow.steps.PercolatorRerun;
 
@@ -508,6 +510,54 @@ public final class RunWiring {
                         engine::executingRuns);
         return new ProjectLimelightUploadPort(
                 project, uploads, secrets, () -> credentialStore(services, project, secrets));
+    }
+
+    /**
+     * The Provenance section's port (phase 13, work unit 5): the session project's runs and records
+     * through the read model, over the session's redactor and the product's one hasher, and Open
+     * file location through the one process service.
+     *
+     * @param services the application's services: its process service and this computer's operating
+     *     system
+     * @param project the session's project
+     * @param hashes the product's one hasher; the read model always bypasses its cache
+     * @param engine the session's engine, whose executing runs the run list names as running
+     * @param secrets the session's secrets, whose redactor every displayed text and export passes
+     * @return the port
+     */
+    public static ProvenancePort provenance(
+            ApplicationServices services,
+            ProjectSession project,
+            CachingHashService hashes,
+            SessionEngine engine,
+            SessionSecrets secrets) {
+        Objects.requireNonNull(services, "services");
+        Objects.requireNonNull(project, "project");
+        Objects.requireNonNull(hashes, "hashes");
+        Objects.requireNonNull(engine, "engine");
+        Objects.requireNonNull(secrets, "secrets");
+        Optional<HostPlatform> host =
+                HostPlatform.of(
+                        services.environment().osName().orElse(""),
+                        services.environment().osArch().orElse(""));
+        String unavailable =
+                services.processRunner().isEmpty()
+                        ? "this application was composed without a process service, so no file"
+                                + " manager can be started"
+                        : "this computer's operating system and architecture are not ones"
+                                + " CometGUI recognises, so it does not know which file manager"
+                                + " to start";
+        FileManagerLauncher files =
+                new FileManagerLauncher(
+                        host.map(HostPlatform::operatingSystem),
+                        services.processRunner(),
+                        unavailable,
+                        secrets::redactor);
+        return new ProjectProvenancePort(
+                project,
+                engine::executingRuns,
+                new ProvenanceReader(secrets::redactor, hashes),
+                files);
     }
 
     /** This computer's credential store, and why it is that one. */

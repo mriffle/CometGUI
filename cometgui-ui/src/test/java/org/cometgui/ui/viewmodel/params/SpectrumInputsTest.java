@@ -71,6 +71,11 @@ class SpectrumInputsTest {
         public Optional<Path> chooseSaveTarget() {
             throw new AssertionError("the inputs never ask where to save");
         }
+
+        @Override
+        public Optional<Path> chooseExportTarget(String title, String suggestedName) {
+            throw new AssertionError("the inputs never ask where to export");
+        }
     }
 
     /** What the file system says, per path; anything not listed does not exist. */

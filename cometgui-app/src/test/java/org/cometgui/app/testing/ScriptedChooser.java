@@ -45,6 +45,8 @@ public final class ScriptedChooser implements FileChooserPort {
 
     private final Deque<Path> parameterFiles = new ArrayDeque<>();
 
+    private final Deque<Path> exports = new ArrayDeque<>();
+
     private final List<String> asked = new ArrayList<>();
 
     /** A lock of this object's own, so that no caller can hold it. */
@@ -116,8 +118,22 @@ public final class ScriptedChooser implements FileChooserPort {
     }
 
     /**
+     * Scripts the next export target.
+     *
+     * @param chosen the path
+     * @return this chooser
+     */
+    public ScriptedChooser exportTo(Path chosen) {
+        synchronized (lock) {
+            exports.add(chosen);
+            return this;
+        }
+    }
+
+    /**
      * Every question asked so far, in order: {@code spectra}, {@code database}, {@code
-     * file:<what>}, {@code parameter file} or {@code save}.
+     * file:<what>}, {@code parameter file}, {@code save} or {@code export:<title>:<suggested
+     * name>}.
      *
      * @return a copy of the questions
      */
@@ -164,6 +180,14 @@ public final class ScriptedChooser implements FileChooserPort {
         synchronized (lock) {
             asked.add("save");
             return Optional.ofNullable(targets.pollFirst());
+        }
+    }
+
+    @Override
+    public Optional<Path> chooseExportTarget(String title, String suggestedName) {
+        synchronized (lock) {
+            asked.add("export:" + title + ":" + suggestedName);
+            return Optional.ofNullable(exports.pollFirst());
         }
     }
 }

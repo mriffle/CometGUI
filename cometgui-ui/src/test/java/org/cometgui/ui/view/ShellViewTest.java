@@ -53,6 +53,7 @@ import org.cometgui.ui.testing.Percolators;
 import org.cometgui.ui.testing.ScriptedEngine;
 import org.cometgui.ui.testing.ScriptedLimelight;
 import org.cometgui.ui.testing.ScriptedLimelightUpload;
+import org.cometgui.ui.testing.ScriptedProvenance;
 import org.cometgui.ui.testing.ScriptedToolManager;
 import org.cometgui.ui.testing.ScriptedVisualisation;
 import org.cometgui.ui.testing.ToolOffers;
@@ -72,6 +73,7 @@ import org.cometgui.ui.viewmodel.params.PercolatorRequest;
 import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
+import org.cometgui.ui.viewmodel.provenance.ProvenanceViewModel;
 import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
 import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
 import org.cometgui.ui.viewmodel.results.ResultsViewModel;
@@ -199,6 +201,11 @@ class ShellViewTest {
                                             new ScriptedLimelightUpload(),
                                             results,
                                             new SimpleStringProperty(""),
+                                            Runnable::run,
+                                            Runnable::run),
+                                    new ProvenanceViewModel(
+                                            new ScriptedProvenance(),
+                                            chooser,
                                             Runnable::run,
                                             Runnable::run));
                     scene = new Scene(shell, 1280, 800);
@@ -612,6 +619,11 @@ class ShellViewTest {
                                                         new ScriptedLimelightUpload(),
                                                         otherResults,
                                                         new SimpleStringProperty(""),
+                                                        Runnable::run,
+                                                        Runnable::run),
+                                                new ProvenanceViewModel(
+                                                        new ScriptedProvenance(),
+                                                        new Editors.ScriptedChooser(),
                                                         Runnable::run,
                                                         Runnable::run)),
                                         800,

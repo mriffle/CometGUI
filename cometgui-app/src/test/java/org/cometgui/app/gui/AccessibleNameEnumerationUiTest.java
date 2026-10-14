@@ -114,9 +114,12 @@ class AccessibleNameEnumerationUiTest {
      * for the Limelight section's 30 identified controls with no run open ({@link
      * #LIMELIGHT_IDENTIFIED}): 117 + 30 = 147. Phase 12 unit 7 raised it to 174: the upload half
      * fills the upload area, so its note ({@code limelight-upload-pending}) is no longer in the
-     * scene, and its 28 identified controls are: 147 - 1 + 28 = 174.
+     * scene, and its 28 identified controls are: 147 - 1 + 28 = 174. Phase 13 unit 5 raised it to
+     * 209 for the Provenance section's 35 identified controls ({@link #PROVENANCE_IDENTIFIED}),
+     * every one in the scene with no run open: 174 + 35 = 209. The section's arrival note stays
+     * (its words changed), so nothing it had is gone.
      */
-    private static final int MINIMUM_CONTROLS = 174;
+    private static final int MINIMUM_CONTROLS = 209;
 
     /**
      * The Results section's identified controls with no run open, typed out (P7-5). Every one must
@@ -249,6 +252,55 @@ class AccessibleNameEnumerationUiTest {
                     "limelight-upload-importer-subdir",
                     "limelight-upload-project-page",
                     "limelight-upload-log-path");
+
+    /**
+     * The Provenance section's identified controls with no run open, typed out (P7-5): its pane;
+     * the run selector, Read the runs again and the runs' state; the record's state and the
+     * summary; the tools with Copy MD5, Copy SHA-256 and Open file location; the files with the
+     * same three; the archived Comet parameter file and its state, the Percolator settings, the
+     * parameter rows, the presets and the notes; the executions with Copy command, and the event
+     * log; the logs with Open file location; the warnings; the actions' state; Export JSON, Export
+     * RST, Replace and the exports' state; Verify against disk, its Cancel, its state and its rows.
+     * Every one is in the scene whether or not a run is shown, so every one must carry a name of
+     * its own.
+     */
+    static final List<String> PROVENANCE_IDENTIFIED =
+            List.of(
+                    "provenance-pane",
+                    "provenance-run",
+                    "provenance-refresh",
+                    "provenance-runs-status",
+                    "provenance-record",
+                    "provenance-summary",
+                    "provenance-tools",
+                    "provenance-tool-copy-md5",
+                    "provenance-tool-copy-sha256",
+                    "provenance-tool-open-location",
+                    "provenance-files",
+                    "provenance-file-copy-md5",
+                    "provenance-file-copy-sha256",
+                    "provenance-file-open-location",
+                    "provenance-comet-params",
+                    "provenance-comet-params-status",
+                    "provenance-percolator-settings",
+                    "provenance-parameters",
+                    "provenance-presets",
+                    "provenance-parameter-notes",
+                    "provenance-executions",
+                    "provenance-execution-copy-command",
+                    "provenance-events",
+                    "provenance-logs",
+                    "provenance-log-open-location",
+                    "provenance-warnings",
+                    "provenance-action-status",
+                    "provenance-export-json",
+                    "provenance-export-rst",
+                    "provenance-export-replace",
+                    "provenance-export-status",
+                    "provenance-verify",
+                    "provenance-verify-cancel",
+                    "provenance-verify-status",
+                    "provenance-verification");
 
     /**
      * The identifiers JavaFX's own skins give the controls they build. Every control this project
@@ -396,6 +448,25 @@ class AccessibleNameEnumerationUiTest {
     }
 
     @Test
+    @DisplayName("the Provenance section's 35 identified controls with no run open, each named")
+    void theProvenanceSectionIsEnumerated() {
+        assertEquals(35, PROVENANCE_IDENTIFIED.size(), "the derivation of MINIMUM_CONTROLS");
+        assertEquals(
+                PROVENANCE_IDENTIFIED.size(),
+                Set.copyOf(PROVENANCE_IDENTIFIED).size(),
+                "no identifier is listed twice");
+        List<String> provenanceIds =
+                controls.stream()
+                        .map(control -> driver.callOnFxThread(control::getId))
+                        .filter(id -> id != null && id.startsWith("provenance-"))
+                        .toList();
+        assertEquals(
+                Set.copyOf(PROVENANCE_IDENTIFIED),
+                Set.copyOf(provenanceIds),
+                "the Provenance section's identified controls with no run open");
+    }
+
+    @Test
     @DisplayName("the walk saw the whole interface, not a corner of it")
     void theWalkSawTheWholeInterface() {
         List<String> identified =
@@ -423,6 +494,7 @@ class AccessibleNameEnumerationUiTest {
         }
         expected.addAll(RESULTS_IDENTIFIED);
         expected.addAll(LIMELIGHT_IDENTIFIED);
+        expected.addAll(PROVENANCE_IDENTIFIED);
 
         assertAll(
                 () ->

@@ -213,7 +213,8 @@ public final class Editors {
         private final List<String> asked = new ArrayList<>();
 
         /**
-         * What a single-file choice was asked for, oldest first: {@code "file:" + what}.
+         * What a single-file choice was asked for, oldest first: {@code "file:" + what}, or {@code
+         * "export:" + title + ":" + suggestedName}.
          *
          * @return the questions
          */
@@ -288,6 +289,12 @@ public final class Editors {
 
         @Override
         public Optional<Path> chooseSaveTarget() {
+            return Optional.ofNullable(targets.pollFirst());
+        }
+
+        @Override
+        public Optional<Path> chooseExportTarget(String title, String suggestedName) {
+            asked.add("export:" + title + ":" + suggestedName);
             return Optional.ofNullable(targets.pollFirst());
         }
     }

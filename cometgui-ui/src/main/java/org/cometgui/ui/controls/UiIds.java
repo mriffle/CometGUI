@@ -851,6 +851,112 @@ public final class UiIds {
     /** The last upload's log file. */
     public static final String LIMELIGHT_UPLOAD_LOG_PATH = "limelight-upload-log-path";
 
+    /** The Provenance section's content. */
+    public static final String PROVENANCE_PANE = "provenance-pane";
+
+    /** The run whose provenance is shown: every run of the project. */
+    public static final String PROVENANCE_RUN = "provenance-run";
+
+    /** Reads the project's runs again. */
+    public static final String PROVENANCE_REFRESH = "provenance-refresh";
+
+    /** Whether the runs were read, how many there are, or why they could not be. */
+    public static final String PROVENANCE_RUNS_STATUS = "provenance-runs-status";
+
+    /** Whether the chosen run has a sealed record, has none, or has one that cannot be read. */
+    public static final String PROVENANCE_RECORD = "provenance-record";
+
+    /** The Summary part. */
+    public static final String PROVENANCE_SUMMARY = "provenance-summary";
+
+    /** The Tools part, one row per tool record. */
+    public static final String PROVENANCE_TOOLS = "provenance-tools";
+
+    /** Copies the selected tool's MD5. */
+    public static final String PROVENANCE_TOOL_COPY_MD5 = "provenance-tool-copy-md5";
+
+    /** Copies the selected tool's SHA-256. */
+    public static final String PROVENANCE_TOOL_COPY_SHA256 = "provenance-tool-copy-sha256";
+
+    /** Shows the selected tool's executable in the file manager. */
+    public static final String PROVENANCE_TOOL_OPEN_LOCATION = "provenance-tool-open-location";
+
+    /** The Inputs/outputs part, one row per file record. */
+    public static final String PROVENANCE_FILES = "provenance-files";
+
+    /** Copies the selected file's MD5. */
+    public static final String PROVENANCE_FILE_COPY_MD5 = "provenance-file-copy-md5";
+
+    /** Copies the selected file's SHA-256. */
+    public static final String PROVENANCE_FILE_COPY_SHA256 = "provenance-file-copy-sha256";
+
+    /** Shows the selected file in the file manager. */
+    public static final String PROVENANCE_FILE_OPEN_LOCATION = "provenance-file-open-location";
+
+    /** The exact archived Comet parameter file. */
+    public static final String PROVENANCE_COMET_PARAMS = "provenance-comet-params";
+
+    /** The archived Comet parameter file's path and whether it is still the recorded one. */
+    public static final String PROVENANCE_COMET_PARAMS_STATUS = "provenance-comet-params-status";
+
+    /** The Percolator settings the record carries. */
+    public static final String PROVENANCE_PERCOLATOR_SETTINGS = "provenance-percolator-settings";
+
+    /** Each Comet parameter with its origin, release default and preset value. */
+    public static final String PROVENANCE_PARAMETERS = "provenance-parameters";
+
+    /** The presets the run records as applied. */
+    public static final String PROVENANCE_PRESETS = "provenance-presets";
+
+    /** What the Parameters part could not show, and why. */
+    public static final String PROVENANCE_PARAMETER_NOTES = "provenance-parameter-notes";
+
+    /** The Timeline part's process executions. */
+    public static final String PROVENANCE_EXECUTIONS = "provenance-executions";
+
+    /** Copies the selected execution's command. */
+    public static final String PROVENANCE_EXECUTION_COPY_COMMAND =
+            "provenance-execution-copy-command";
+
+    /** The Timeline part's event log. */
+    public static final String PROVENANCE_EVENTS = "provenance-events";
+
+    /** The Logs part, one row per archived log. */
+    public static final String PROVENANCE_LOGS = "provenance-logs";
+
+    /** Shows the selected log in the file manager. */
+    public static final String PROVENANCE_LOG_OPEN_LOCATION = "provenance-log-open-location";
+
+    /** The Warnings part, grouped by source. */
+    public static final String PROVENANCE_WARNINGS = "provenance-warnings";
+
+    /** What the last copy or Open file location did. */
+    public static final String PROVENANCE_ACTION_STATUS = "provenance-action-status";
+
+    /** Exports the record as JSON. */
+    public static final String PROVENANCE_EXPORT_JSON = "provenance-export-json";
+
+    /** Exports the record as the RST report. */
+    public static final String PROVENANCE_EXPORT_RST = "provenance-export-rst";
+
+    /** Replaces the file an export was refused for, once confirmed. */
+    public static final String PROVENANCE_EXPORT_REPLACE = "provenance-export-replace";
+
+    /** What the last export did. */
+    public static final String PROVENANCE_EXPORT_STATUS = "provenance-export-status";
+
+    /** Verifies every file the record lists against the disk. */
+    public static final String PROVENANCE_VERIFY = "provenance-verify";
+
+    /** Stops the running verification. */
+    public static final String PROVENANCE_VERIFY_CANCEL = "provenance-verify-cancel";
+
+    /** What the last verification found, in one sentence. */
+    public static final String PROVENANCE_VERIFY_STATUS = "provenance-verify-status";
+
+    /** What the last verification found, one row per file. */
+    public static final String PROVENANCE_VERIFICATION = "provenance-verification";
+
     /**
      * The two surfaces a parameter's control appears on. A parameter shown in Essentials is shown
      * in Advanced too, so the surface is part of every parameter identifier and the two controls

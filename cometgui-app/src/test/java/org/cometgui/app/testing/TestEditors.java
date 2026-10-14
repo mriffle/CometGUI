@@ -73,6 +73,7 @@ import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
 import org.cometgui.ui.viewmodel.percolator.RerunCheck;
+import org.cometgui.ui.viewmodel.provenance.ProvenanceViewModel;
 import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
 import org.cometgui.ui.viewmodel.results.OpenedResults;
 import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
@@ -201,6 +202,16 @@ public final class TestEditors {
                                 new SessionSecrets()),
                         results,
                         limelight.resultFileProperty(),
+                        Runnable::run,
+                        Runnable::run),
+                new ProvenanceViewModel(
+                        RunWiring.provenance(
+                                ApplicationServices.forThisHost(),
+                                noProject,
+                                RunWiring.hasher(),
+                                engine,
+                                new SessionSecrets()),
+                        chooser,
                         Runnable::run,
                         Runnable::run));
     }

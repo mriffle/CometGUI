@@ -198,8 +198,16 @@ class StableIdentifierPinTest {
      * box with its server, project, page, file, size and SHA-256; Send and Cancel; the progress
      * bar, the log and the outcome; and the tracking id, the importer directory, the project page
      * and the log's path).
+     *
+     * <p>Raised from 575 to 610 by phase 13 unit 5, the Provenance section: 35 constants (its pane;
+     * the run, Read the runs again and the runs' state; the record's state and the summary; the
+     * tools with Copy MD5, Copy SHA-256 and Open file location; the files with the same three; the
+     * archived Comet parameter file and its state, the Percolator settings, the parameter rows, the
+     * presets and the notes; the executions with Copy command and the event log; the logs with Open
+     * file location; the warnings; the actions' state; Export JSON, Export RST, Replace and the
+     * exports' state; Verify against disk, its Cancel, its state and its rows).
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 575;
+    private static final int PINNED_IDENTIFIER_COUNT = 610;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -466,7 +474,44 @@ class StableIdentifierPinTest {
                     Map.entry(
                             "LIMELIGHT_UPLOAD_IMPORTER_SUBDIR", "limelight-upload-importer-subdir"),
                     Map.entry("LIMELIGHT_UPLOAD_PROJECT_PAGE", "limelight-upload-project-page"),
-                    Map.entry("LIMELIGHT_UPLOAD_LOG_PATH", "limelight-upload-log-path"));
+                    Map.entry("LIMELIGHT_UPLOAD_LOG_PATH", "limelight-upload-log-path"),
+                    Map.entry("PROVENANCE_PANE", "provenance-pane"),
+                    Map.entry("PROVENANCE_RUN", "provenance-run"),
+                    Map.entry("PROVENANCE_REFRESH", "provenance-refresh"),
+                    Map.entry("PROVENANCE_RUNS_STATUS", "provenance-runs-status"),
+                    Map.entry("PROVENANCE_RECORD", "provenance-record"),
+                    Map.entry("PROVENANCE_SUMMARY", "provenance-summary"),
+                    Map.entry("PROVENANCE_TOOLS", "provenance-tools"),
+                    Map.entry("PROVENANCE_TOOL_COPY_MD5", "provenance-tool-copy-md5"),
+                    Map.entry("PROVENANCE_TOOL_COPY_SHA256", "provenance-tool-copy-sha256"),
+                    Map.entry("PROVENANCE_TOOL_OPEN_LOCATION", "provenance-tool-open-location"),
+                    Map.entry("PROVENANCE_FILES", "provenance-files"),
+                    Map.entry("PROVENANCE_FILE_COPY_MD5", "provenance-file-copy-md5"),
+                    Map.entry("PROVENANCE_FILE_COPY_SHA256", "provenance-file-copy-sha256"),
+                    Map.entry("PROVENANCE_FILE_OPEN_LOCATION", "provenance-file-open-location"),
+                    Map.entry("PROVENANCE_COMET_PARAMS", "provenance-comet-params"),
+                    Map.entry("PROVENANCE_COMET_PARAMS_STATUS", "provenance-comet-params-status"),
+                    Map.entry("PROVENANCE_PERCOLATOR_SETTINGS", "provenance-percolator-settings"),
+                    Map.entry("PROVENANCE_PARAMETERS", "provenance-parameters"),
+                    Map.entry("PROVENANCE_PRESETS", "provenance-presets"),
+                    Map.entry("PROVENANCE_PARAMETER_NOTES", "provenance-parameter-notes"),
+                    Map.entry("PROVENANCE_EXECUTIONS", "provenance-executions"),
+                    Map.entry(
+                            "PROVENANCE_EXECUTION_COPY_COMMAND",
+                            "provenance-execution-copy-command"),
+                    Map.entry("PROVENANCE_EVENTS", "provenance-events"),
+                    Map.entry("PROVENANCE_LOGS", "provenance-logs"),
+                    Map.entry("PROVENANCE_LOG_OPEN_LOCATION", "provenance-log-open-location"),
+                    Map.entry("PROVENANCE_WARNINGS", "provenance-warnings"),
+                    Map.entry("PROVENANCE_ACTION_STATUS", "provenance-action-status"),
+                    Map.entry("PROVENANCE_EXPORT_JSON", "provenance-export-json"),
+                    Map.entry("PROVENANCE_EXPORT_RST", "provenance-export-rst"),
+                    Map.entry("PROVENANCE_EXPORT_REPLACE", "provenance-export-replace"),
+                    Map.entry("PROVENANCE_EXPORT_STATUS", "provenance-export-status"),
+                    Map.entry("PROVENANCE_VERIFY", "provenance-verify"),
+                    Map.entry("PROVENANCE_VERIFY_CANCEL", "provenance-verify-cancel"),
+                    Map.entry("PROVENANCE_VERIFY_STATUS", "provenance-verify-status"),
+                    Map.entry("PROVENANCE_VERIFICATION", "provenance-verification"));
 
     // -----------------------------------------------------------------------------------------
     // The parameter editor (Phase 07). A parameter's identifiers are built from its own name, so

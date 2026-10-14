@@ -132,7 +132,21 @@ final class SectionArrivals {
                         + " the server's tracking id.");
         notes.put(
                 SectionId.PROVENANCE,
-                "This section arrives in phase 13 (Provenance UI and Reports).");
+                "This section is live: phase 13 (Provenance UI and Reports) filled it. Every run"
+                        + " of the project is listed -- completed, failed, cancelled, running,"
+                        + " interrupted, and one whose records cannot be read -- and for the run"
+                        + " chosen: its summary; the tools with their versions, paths and"
+                        + " checksums; every input and output file with both checksums, partial"
+                        + " files marked in words; the exact Comet parameter file, the Percolator"
+                        + " settings and each parameter's origin, release default and preset"
+                        + " value; the timeline of commands and events; the archived logs; and"
+                        + " every warning, grouped by where it came from. Copy MD5, Copy SHA-256"
+                        + " and Copy command put the recorded value on the clipboard; Open file"
+                        + " location shows a file in this computer's file manager; Export writes"
+                        + " the record as JSON or as the RST report, never over an existing file"
+                        + " without asking; and Verify against disk hashes every listed file"
+                        + " again. A run without a sealed record says so, and is shown from what"
+                        + " its run directory still holds.");
         notes.put(
                 SectionId.CONSOLE,
                 "This section arrives in phase 03 (Process Service): the messages a running tool"

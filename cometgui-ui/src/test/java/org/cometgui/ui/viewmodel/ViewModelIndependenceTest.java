@@ -90,7 +90,7 @@ class ViewModelIndependenceTest {
     @Test
     @DisplayName(
             "the scan reads the package's classes and those of its limelight, params, percolator,"
-                    + " results and visualisation subpackages")
+                    + " provenance, results and visualisation subpackages")
     void theScanIsNotVacuous() {
         Map<String, String> sources = ViewModelSources.all();
         assertEquals(
@@ -183,6 +183,11 @@ class ViewModelIndependenceTest {
                         "percolator/SettingState.java",
                         "percolator/VersionChoice.java",
                         "percolator/package-info.java",
+                        "provenance/OpenedRecord.java",
+                        "provenance/ProvenancePort.java",
+                        "provenance/ProvenanceTexts.java",
+                        "provenance/ProvenanceViewModel.java",
+                        "provenance/package-info.java",
                         "results/ColumnState.java",
                         "results/CopyOutcome.java",
                         "results/DisplayFiltersViewModel.java",
@@ -216,6 +221,8 @@ class ViewModelIndependenceTest {
                 expected = "package org.cometgui.ui.viewmodel.results;";
             } else if (source.getKey().startsWith("limelight/")) {
                 expected = "package org.cometgui.ui.viewmodel.limelight;";
+            } else if (source.getKey().startsWith("provenance/")) {
+                expected = "package org.cometgui.ui.viewmodel.provenance;";
             } else if (source.getKey().startsWith("visualisation/")) {
                 expected = "package org.cometgui.ui.viewmodel.visualisation;";
             } else {

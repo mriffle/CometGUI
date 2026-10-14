@@ -42,6 +42,7 @@ import org.cometgui.ui.controls.limelight.LimelightPane;
 import org.cometgui.ui.controls.limelight.LimelightUploadPane;
 import org.cometgui.ui.controls.params.RunControl;
 import org.cometgui.ui.controls.percolator.PercolatorPane;
+import org.cometgui.ui.controls.provenance.ProvenancePane;
 import org.cometgui.ui.controls.results.ResultsPane;
 import org.cometgui.ui.controls.visualisation.VisualisationPane;
 import org.cometgui.ui.view.params.CometParametersView;
@@ -63,6 +64,7 @@ import org.cometgui.ui.viewmodel.params.SpectrumInputsViewModel;
 import org.cometgui.ui.viewmodel.params.VariableModsViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorRerunViewModel;
 import org.cometgui.ui.viewmodel.percolator.PercolatorViewModel;
+import org.cometgui.ui.viewmodel.provenance.ProvenanceViewModel;
 import org.cometgui.ui.viewmodel.results.DisplayFiltersViewModel;
 import org.cometgui.ui.viewmodel.results.ResultTableViewModel;
 import org.cometgui.ui.viewmodel.results.ResultsViewModel;
@@ -177,6 +179,8 @@ public final class ShellView extends BorderPane {
      * @param limelight the Limelight section: converting the run chosen in {@code results}
      * @param limelightUpload the Limelight section's upload half: uploading one of that run's
      *     converted files, only after its destination was shown and Send pressed
+     * @param provenance the Provenance section: every run of the project and the chosen run's
+     *     record, its copies, exports and verification
      * @throws NullPointerException if any argument is {@code null}
      */
     public ShellView(
@@ -200,7 +204,8 @@ public final class ShellView extends BorderPane {
             DisplayFiltersViewModel displayFilters,
             VisualisationViewModel visualisation,
             LimelightViewModel limelight,
-            LimelightUploadViewModel limelightUpload) {
+            LimelightUploadViewModel limelightUpload,
+            ProvenanceViewModel provenance) {
         this.navigation = Objects.requireNonNull(navigation, "navigation");
         Objects.requireNonNull(hostBaseline, "hostBaseline");
         Objects.requireNonNull(stepper, "stepper");
@@ -301,6 +306,16 @@ public final class ShellView extends BorderPane {
                         Objects.requireNonNull(limelightUpload, "limelightUpload")));
         panes.get(SectionId.LIMELIGHT).addContent(limelightPane);
         VBox.setVgrow(limelightPane, Priority.ALWAYS);
+
+        /*
+         * The Provenance section (phase 13): every run of the project and the chosen run's record.
+         * The pane reads nothing on construction; ProvenanceViewModel.refresh() asks the port, and
+         * the composition root calls it.
+         */
+        ProvenancePane provenancePane =
+                new ProvenancePane(Objects.requireNonNull(provenance, "provenance"));
+        panes.get(SectionId.PROVENANCE).addContent(provenancePane);
+        VBox.setVgrow(provenancePane, Priority.ALWAYS);
 
         ToolManagerPane toolManagerPane = new ToolManagerPane(toolManager);
         panes.get(SectionId.TOOL_MANAGER).addContent(toolManagerPane);

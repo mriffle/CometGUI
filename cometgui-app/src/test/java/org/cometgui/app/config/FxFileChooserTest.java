@@ -133,7 +133,11 @@ class FxFileChooserTest {
                 () -> assertEquals(Optional.empty(), chooser.chooseParameterFile()),
                 () ->
                         assertEquals(
-                                List.of("open multiple", "open", "open", "save", "open"),
+                                Optional.empty(),
+                                chooser.chooseExportTarget("Export provenance JSON", "p.json")),
+                () ->
+                        assertEquals(
+                                List.of("open multiple", "open", "open", "save", "open", "save"),
                                 dialogs.asked));
     }
 
@@ -184,6 +188,22 @@ class FxFileChooserTest {
                         assertEquals(
                                 List.of("Comet parameter files [*.params]", "All files [*]"),
                                 filters(dialogs.last())));
+    }
+
+    @Test
+    @DisplayName("exporting: a save dialog with the caller's title and suggested name")
+    void export() {
+        RecordingDialogs dialogs = new RecordingDialogs();
+        dialogs.single = file("exports", "run-1.json");
+        FxFileChooser chooser = new FxFileChooser(() -> null, dialogs);
+        assertEquals(
+                Optional.of(path("exports", "run-1.json")),
+                chooser.chooseExportTarget("Export provenance JSON", "provenance-r1.json"));
+        assertAll(
+                () -> assertEquals(List.of("save"), dialogs.asked),
+                () -> assertEquals("Export provenance JSON", dialogs.last().getTitle()),
+                () -> assertEquals("provenance-r1.json", dialogs.last().getInitialFileName()),
+                () -> assertEquals(List.of("All files [*]"), filters(dialogs.last())));
     }
 
     @Test

@@ -49,6 +49,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.cometgui.app.testing.OwnDigests;
 import org.cometgui.app.testing.RealSearch;
 import org.cometgui.app.testing.SecretSweep;
 import org.cometgui.domain.run.AttemptOutcome;
