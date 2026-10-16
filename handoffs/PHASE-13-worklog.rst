@@ -740,3 +740,15 @@ stop.
 * **For tier 1**: the surefire nested-report overwrite likely affects older
   harnesses that select several nested classes of one test class (Phase 12's
   ``CompatibilityActionTest$Rerun``/``$NoRerun`` was named); not checked here.
+
+Phase end
+---------
+
+* PIT reports regenerated at the root as ``build.sh`` does (BUILD SUCCESS,
+  94 min); stray ``cometgui-ui``/``cometgui-app`` reports removed.
+* ``verify-test-gates.sh --preflight``: every precondition holds.
+* ``bash scripts/verify-all-gates.sh --only tests`` on ``c77b338``, detached
+  and watched: **PASS, 37 assertions in 18 644 s**.
+* ``--only provenanceui`` on ``04742c9``: PASS, 96 controls in 1238 s (unit 7
+  sign-off).
+* ``handoffs/PHASE-13-handoff.rst`` written.
