@@ -341,7 +341,7 @@ Serial, in this order; no two units are live at once (owner, 2026-08-31).
        ``scripts/verify-all-gates.sh``: every gate item graded on a
        production injection, lean, cost stated.
      - Gate 1-6
-     - Pending
+     - Accepted, ``04742c9``
 
 Unit sign-offs
 ==============
@@ -705,3 +705,38 @@ traceability map only).
 * **Left for tier 1** (wider than the phase): ``docs/index.rst``'s warning that
   every page is a stub; ``testing.rst``'s Phase 01-era tables; the
   2026-08-29 header comment of ``traceability-map.toml``.
+
+Unit 7 sign-off
+---------------
+
+**Accepted 2026-10-16.** Commit ``04742c9`` (``scripts/verify-provenance-ui-gates.sh``,
+registered additively as ``provenanceui`` in ``scripts/verify-all-gates.sh``,
+gate items 13:1-6, **floor 96**; a section and a table row in
+``docs/developer/testing.rst``). The agent was stopped by an API usage limit
+on 2026-10-14 after committing; resumed on 2026-10-16 for its report only --
+its full run and the aggregate run had both completed on ``04742c9`` before the
+stop.
+
+* **Read.** ``git archive`` sandbox; anchors matched exactly once; the damaged
+  class's bytecode proved changed and nothing else's; red read from the
+  failure section of surefire's XML with siblings required green; counts from
+  the XML **and** Maven's per-module summary, zero or a shortfall a harness
+  error (surefire writes every ``@Nested`` set's report under the outer
+  class's name, so a selection naming several nested classes keeps only the
+  last -- 9 testcases in the XML against 28 run, found by the agent). Twenty
+  controls: 1a, 1b, 2a-2c, 3a, 4a, 4b, 5a, 5b, 6a-6d (one or more per gate
+  item), d1-d3 (P13-1), d4 (P13-7), d5 (P13-8), d6 (Copy SHA-256), plus
+  harness controls H1-H8. Control 1b read in full: the product's hasher made
+  wrong in the MD5 alone, so the record and the product agree with each other
+  and not with the file; the gate goes red on "MD5 recomputed from disk" and no
+  SHA-256 line may go red.
+* **Run by me**: ``bash scripts/verify-all-gates.sh --only provenanceui``:
+  ``PASS provenanceui: 96 controls in 1238s``. ``--self-test``: 12 controls
+  passed, 0 failed, 31 s.
+* **Cost**: about 20.6 minutes, slightly over the brief's "well under 20"; the
+  real-run world is rebuilt per nested class (about 20 s each, 22 times).
+* **Not graded by it, by choice**: parameter origin (unit 2), the
+  discrepancy warnings (3b), Replace and ``xdg-open``'s status (N1, N2).
+* **For tier 1**: the surefire nested-report overwrite likely affects older
+  harnesses that select several nested classes of one test class (Phase 12's
+  ``CompatibilityActionTest$Rerun``/``$NoRerun`` was named); not checked here.
