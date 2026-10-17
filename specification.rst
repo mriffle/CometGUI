@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 19
-:Revision date: 2026-10-13
-:Supersedes: Revision 16, 2026-10-08
+:Revision: 20
+:Revision date: 2026-10-17
+:Supersedes: Revision 19, 2026-10-13
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,13 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 20
+     - 2026-10-17
+     - Provenance finalisation (``R-PROV-05``) as Phase 13 settled it for
+       Windows: a rename refused because another process holds the file is
+       retried a bounded number of times, each attempt renaming the same
+       complete document, so a reader still sees only a whole document; and
+       the viewer reads ``provenance.json`` whole and holds no handle on it.
    * - 19
      - 2026-10-13
      - Limelight text brought into line with what Phase 12 measured: a submit
@@ -2580,7 +2587,13 @@ Provenance event model
     Provenance shall be written incrementally as appendable events, or as
     atomically updated state, so that a crash still leaves useful history. The
     final ``provenance.json`` shall carry a schema version, and finalisation
-    shall be atomic (write-temp-then-rename).
+    shall be atomic (write-temp-then-rename). A rename refused because another
+    process holds the target open -- as Windows can refuse it to a virus
+    scanner or a sync client -- may be retried a bounded number of times;
+    every attempt renames the same complete document, so a retry can never
+    expose a partial one, and a rename still refused at the bound fails the
+    write cleanly. CometGUI's own readers of ``provenance.json`` read it whole
+    and hold no handle on it.
 
 The human-readable ``provenance.rst`` report shall be generated from the same
 machine-readable model, never maintained independently.

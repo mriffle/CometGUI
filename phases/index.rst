@@ -86,7 +86,7 @@ authoritative for its own scope and exit gate.
      - Provenance UI and Reports
      - 04, 08, 09, 12
      - --
-     - IN PROGRESS (dispatched 2026-10-13)
+     - PARTIAL (signed off 2026-10-17; Linux only)
    * - `14 <PHASE-14-e2e.rst>`_
      - GUI Automation and Packaged End-to-End Harness
      - 07, 10, 11, 12, 13

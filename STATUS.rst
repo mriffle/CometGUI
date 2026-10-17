@@ -3,20 +3,21 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-13
-:Updated by: Main orchestrator, session 10 (between-phase repair signed off --
-   :ref:`status-fix-p12-p13`; ``main`` pushed; **Phase 13 dispatched**)
-:Current phase: **Phase 13 -- Provenance UI and Reports**, IN PROGRESS (brief
-   ``handoffs/PHASE-13-BRIEF.rst``; it settles the Windows ``ATOMIC_MOVE``
-   question by design before building the viewer). Standing owner instruction (2026-10-08):
+:Updated: 2026-10-17
+:Updated by: Main orchestrator, session 10 (**Phase 13 signed off PARTIAL** --
+   :ref:`status-p13-signed`; specification revision 20; ``main`` pushed)
+:Current phase: **PAUSED by the owner after Phase 13** (2026-10-13: *"Pause
+   after phase 13 is green. I'll ask you to resume later."*). Phase 14 -- GUI
+   Automation and Packaged End-to-End Harness -- is next and is not
+   dispatched; no brief is written. Standing owner instruction (2026-10-08):
    *"When all is green with the current phase, push, then move on to the
    next phase."*
-:Overall: Thirteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
-   05, 08, 09, 10, 11 and 12 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
+:Overall: Fourteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
+   05, 08, 09, 10, 11, 12 and 13 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (**about 10 hours since Phase 12** -- build
-   135 min, ``tests`` 312, the other eighteen 152 -- run detached; raised
+   ``scripts/verify-all-gates.sh`` (**about 11 hours at Phase 13** -- build
+   130 min, ``tests`` 309, the other nineteen 223 -- run detached; raised
    with the owner, :ref:`status-p10-signed`) runs once
    per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
@@ -277,9 +278,11 @@ Phase board
        (:ref:`status-p12-signed`). PARTIAL on platform.
    * - 13
      - Provenance UI and reports
-     - IN PROGRESS
-     - Dispatched 2026-10-13 after the between-phase repair
-       (:ref:`status-fix-p12-p13`).
+     - PARTIAL
+     - **Signed off 2026-10-17** at ``0a289a3``: build 11/11, gates 20/20 (new
+       ``provenanceui``, 96 controls), three tier-1 injections
+       (:ref:`status-p13-signed`). PARTIAL on platform. Then **paused by the
+       owner**.
    * - 14
      - GUI automation and packaged end-to-end harness
      - NOT STARTED
@@ -3275,6 +3278,112 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-p13-signed:
+
+Phase 13 signed off PARTIAL (2026-10-17)
+========================================
+
+Eight units (1, 2, 3, 3b, 4, 5, 6, 7), all accepted by the phase orchestrator;
+five sent back once when one of its own injections stayed green, and each
+returned with the test that catches it. The orchestrator was stopped midway by
+an API usage limit on 2026-10-14 and resumed on 2026-10-16 without loss.
+Record: ``handoffs/PHASE-13-worklog.rst`` and ``handoffs/PHASE-13-handoff.rst``.
+
+**What exists.** A Provenance section that opens any run -- finished, failed
+or cancelled -- and shows its summary, tools (version, path, both digests,
+capabilities, artefact identity, release tag), every input and output with
+both digests and a fresh comparison against the file on disk, one command per
+process (one Comet command per spectrum file), parameters with their origin
+and the presets applied, the timeline, logs and warnings, with partial outputs
+marked. Copy MD5, SHA-256 or command; open a file's folder; export JSON or
+RST, both rendered from the one loaded model. New warnings in the record: a
+capability the manifest claims and the probe did not find, and Comet's known
+advisories. New harness ``scripts/verify-provenance-ui-gates.sh``
+(``provenanceui``, 96 controls, floor 96, about 21 minutes).
+
+**The Windows question** (design decision P13-1, accepted). The viewer reads
+``provenance.json`` whole and closes it before parsing, holding no watcher or
+handle (proved here through ``/proc/self/fd``). Phase 04's
+``AtomicDocumentWriter`` now retries a rename refused with
+``AccessDeniedException`` or a bare ``FileSystemException`` -- 10 attempts,
+2130 ms in all -- and nothing else; every attempt renames the same complete
+file, so a reader still sees only a whole document, and the worst case is a
+clean failure to write, never a torn file. The same code runs on every
+platform and is tested here; **which exceptions Windows raises, and whether
+its holders let go within the bound, remain unverified.** Specification
+revision 20 writes this into ``R-PROV-05``.
+
+**Gate items, proved on real runs** (Comet 2026.03.0, Percolator 3.07.1 and
+the converter installed by the product into an empty cache;
+``RealProvenanceGateTest`` computes its own digests and reads both exports
+with its own readers): 1 -- 28 files and 6 logs recomputed from disk match,
+and every file under ``outputs/`` is listed; 2 -- every tool matches the tool
+cache's install records and an independent hash; 3 -- one Comet command per
+spectrum file, the displayed command equal to the argument array, Copy read
+back from the clipboard; 4 -- a real failed run (Comet exit 134 on a damaged
+spectrum file) and a real cancelled run both open with partial outputs marked
+(a run killed before sealing was proved on a hand-built directory only); 5 --
+every JSON fact asserted in its place in the RST; 6 -- five seeded secrets, the
+Limelight key among them, in no file under the project and neither export, in
+six encodings.
+
+**Tier 1's exit-gate run**, at ``0a289a3`` on a quiet tree:
+``scripts/build.sh`` 11/11 in 7794 s; the other nineteen controls in 223
+minutes -- ``provenanceui`` 96, ``limelight`` 130, ``pdv`` 107, ``results``
+100, ``percolator`` 109, ``workflow`` 110, ``paramui`` 87, ``params`` 109,
+``install`` 95, ``provenance`` 24, ``shell`` 30, ``quality`` 42,
+``pipeline`` 24 (3900 s, its link check slow); ``--only tests`` 37 assertions
+in 18 530 s. **20 of 20**, about 11 hours in all.
+
+**Nothing weakened:** no test assertion removed, no test disabled, no
+assumption added, no POM, PIT configuration, module edge or schema changed;
+the traceability map lost only ``planned`` entries now answered by tests;
+``verify-all-gates.sh`` changed additively; the accessible-name floor rose
+from 174 to 209.
+
+**Tier 1's own injections**, upstream modules installed fresh, tests counted,
+each restored and verified with ``sha256sum -c``, none of them among the
+harness's own:
+
+* a file missing from disk reported as matching the record -- **2 of 1010**
+  workflow tests failed, in ``DiskVerificationTest``;
+* a parameter set by a preset recorded as set by the user -- **9 of 1010**
+  failed, among them ``RealCometRunTest.originsAndPresetInTheRecord`` on the
+  real Comet run;
+* the rename retried on every file-system error, including those waiting
+  cannot fix -- **7 of 709** provenance tests failed,
+  ``AtomicDocumentWriterRetryTest.nonRetryableIsAttemptedOnce`` in each case.
+
+**Grade: PARTIAL**, on platform: all six items met on Linux x86-64; nothing
+ran on macOS or Windows, and the Windows rename behaviour above is reasoned,
+not observed.
+
+**Settled by tier 1:** design decisions P13-1 (above), P13-4 as amended
+(parameter names travel in settings values, since 39 Comet names hold
+upper-case letters settings keys cannot), P13-9 (a manifest/probe
+disagreement is a claimed capability the probe did not find, one direction
+only) and P13-10 (the real-run gate tests live in ``cometgui-app``) accepted.
+
+**For the owner** (no ``D-`` item; nothing blocks):
+
+* **A secret typed as a Comet parameter value** goes verbatim into the
+  archived ``comet.params``, because ``AC-PRV-04`` requires that archive to be
+  the exact file Comet ran, which ``R-SEC-03`` would otherwise forbid. Tier 1
+  recommends keeping the exact archive; the user page says so.
+* The build-time question, which now also covers ``workflow.provenance`` as a
+  PIT target.
+
+**Residue carried forward:** the Limelight server's wrong-key refusal quotes
+the key's first two characters, which reach the upload log and ``events.log``
+-- redact that one message (Phase 12's P12-20 passes the server's words
+through); surefire writes nested test classes' reports under the outer
+class's name, so older harnesses that select several nested classes of one
+class may grade an overwritten report (``CompatibilityActionTest`` is one) --
+to be audited; ``pdv`` control 5b failed once on observer timing and passed on
+rerun and in this run; Replace is offered after any refused export, though
+pressing it writes nothing; the run list does not refresh after a Limelight
+compatible rerun.
+
 .. _status-fix-p12-p13:
 
 Between Phases 12 and 13: the Tool Manager's thread, the ``tests`` preflight (signed off 2026-10-13)
@@ -4273,6 +4382,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-17
+     - 13
+     - **Phase 13 signed off PARTIAL** at ``0a289a3`` (build 11/11, gates
+       20/20, three tier-1 injections). Specification revision 20. ``main``
+       pushed; **paused by the owner** before Phase 14. See
+       :ref:`status-p13-signed`.
    * - 2026-10-13
      - 12+, 13
      - Between-phase repair signed off (the Tool Manager reads its tools off
