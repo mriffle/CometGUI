@@ -265,6 +265,35 @@ collide exists, so none is offered.
        0.01, 0.005 (PSM only changes) and 0.02 (peptides), learned weights.
        Tier-neutral scenario steps (P14-3).
      - items 1, 5; R-TEST-03, -05; AC-TST-06
+     - **Accepted 2026-10-22**, ``f8b80c2`` (agent 2), **with a workaround
+       to be removed by unit 2b**: the test relaunches the application after
+       the installs because of defect E3 (below). Diff read (17 files, test
+       code only; composition = ``FreshHome.services()`` + the real
+       ``CometGuiApplication`` over ``Setup.forThisApplication``; the
+       loopback guard widened only to ``github.com|*.githubusercontent.com``,
+       as ``UpstreamInstallUiTest`` does). Ran myself:
+       ``TierACanonicalScenarioTest`` with ``-am`` under ``LC_ALL=C.UTF-8``,
+       19 run, 0 failures, 73 s. My injection: ``PinMerger`` silently
+       dropping the second file's first row -- red, 1 failure, 6 later steps
+       skipped: "the summed row count of its sources ==> expected: <6657> but
+       was: <6656>"; restored, ``sha256sum -c`` OK. Agent's injections (read,
+       not re-run): results ``<=`` to ``<`` (red only on an added step at a
+       cutoff equal to a q-value in the file -- the spec's own cutoffs 0.01,
+       0.005, 0.02 hit no row exactly), a parameter written differently from
+       the screen, Percolator skipped (caught by the product's own guard, so
+       not a silent bypass). Numbers: merged PIN 6657 rows; 3934 target
+       PSMs, 1024 at 0.01, 998 at 0.005; 3018 peptides, 599 at 0.01, 623 at
+       0.02; downloads 9 875 971 bytes. Reads outside the module (opt-in
+       class only): ``manifests/tools.json``, ``scratch/fixture`` (both mzML,
+       the proteome), GitHub. ``paramui``/``provenanceui`` (driver gained
+       ``isSelected``): agent's run PASS 87/96; mine deferred to after 2b,
+       which changes product code those harnesses read.
+   * - 2b
+     - **Repair of E3**: the listener on the Tool Manager's rows held
+       through a field; a test that fails on the old code; every other
+       listener on a per-call wrapper audited; the relaunch workaround
+       removed from unit 2's test.
+     - E3; items 1, 2
      - pending
    * - 3
      - **Tier A canonical, steps 25--30**: PDV figure for a known PSM, real
@@ -341,6 +370,17 @@ E1 -- automatic installation on Run
     same states the Tool Manager shows), or a specification amendment if the
     explicit install is the intended design. Not changed here: it is a product
     feature outside this phase's scope.
+
+E3 -- sections never learn of an install (found by unit 2, being repaired)
+    ``CometGuiApplication.start`` adds its listener to
+    ``toolManager.rows()``, a fresh unmodifiable wrapper per call that
+    observes the backing list weakly; nothing keeps the wrapper, so after a
+    garbage collection Run, Percolator, Visualisation and Limelight are never
+    refreshed after an install (``ToolManagerViewModel.rows()``'s own
+    documentation warns of it). Observed: Run still saying "Comet 2026.03.0
+    is not installed" ten minutes after the Tool Manager showed it installed.
+    A defect in approved work, so repaired in this phase (unit 2b) under the
+    owner's fix-red-and-continue rule, and reported.
 
 E2 -- no project chooser
     See P14-6. Scenario step 5 has no control. Recommendation: amend the step
