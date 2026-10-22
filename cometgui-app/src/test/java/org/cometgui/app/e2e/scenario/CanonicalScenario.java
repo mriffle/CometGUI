@@ -70,10 +70,9 @@ import org.cometgui.app.uidriver.RemotableUiDriver;
  *       ChooserScript} and an {@link OracleProcesses}.
  *   <li>Call {@link #freshHomeHoldsNoTool()} before the application starts (steps 1 and 2).
  *   <li>Start the application, then {@link #attach(RemotableUiDriver)} a driver to it.
- *   <li>Call {@link #applicationIsReady()} and {@link
- *       #installCometAndPercolatorFromTheToolManager()}, relaunch the application over the same
- *       home, attach its driver and call {@link #relaunchedApplicationSeesTheInstalledTools()} --
- *       see "Install, then relaunch" below for why.
+ *   <li>Call {@link #applicationIsReady()}, then {@link
+ *       #installCometAndPercolatorFromTheToolManager()} -- in the same application, which
+ *       configures and runs the search afterwards with no relaunch in between.
  *   <li>Call the remaining step methods in their numbered order; each asserts values, never "did
  *       not throw", and each builds on the state the one before left -- the run directory, the
  *       counts.
@@ -88,23 +87,20 @@ import org.cometgui.app.uidriver.RemotableUiDriver;
  * <ul>
  *   <li><strong>Step 5</strong> (P14-6): the product has no project chooser. Its project is the
  *       default one under the application data directory, created by the first pre-run check that
- *       finds a Comet; the scenario asserts it absent before and present after, at the place {@link
- *       ScenarioLayout#projectDirectory()} says.
+ *       finds a Comet -- the check the Run section makes again when the Comet install finishes. So
+ *       the scenario asserts it absent when the application is ready and present, with no run in
+ *       it, once the installs have reached the Run section and before Run is pressed, at the place
+ *       {@link ScenarioLayout#projectDirectory()} says.
  *   <li><strong>Step 15</strong> (P14-5, escalated as E1): Run does not install Comet or
  *       Percolator. They are installed through the Tool Manager section's own Install controls,
- *       from an empty cache, before Run -- and the download, checksum and probe states are asserted
- *       there.
- *   <li><strong>Install, then relaunch</strong> (found by Phase 14 unit 2, reported as a product
- *       defect): once an install through the Tool Manager has finished, the other sections do not
- *       learn of it. {@code CometGuiApplication.start} listens to {@code toolManager.rows()}, a
- *       wrapper built per call that the backing list observes only weakly, and keeps no reference
- *       to it, so after a garbage collection the listener that re-checks Run and re-reads the
- *       Percolator section is gone; measured, the Run section still said "Comet 2026.03.0 is not
- *       installed" ten minutes after the Tool Manager said installed. So the scenario installs
- *       right after the application is ready, records what the Run section then says, and the tier
- *       relaunches the application over the same home -- the start-up reads every section afresh --
- *       before the search is configured. When the defect is fixed, the relaunch can go and the
- *       installs can move back to where the specification puts them.
+ *       from an empty cache, right after the application is ready -- and the download, checksum and
+ *       probe states are asserted there. They come before the configuration rather than at step
+ *       15's place because steps 8 and 9 read the selected builds, which only installed builds can
+ *       be. The rest of the scenario runs in the same application: the Run and Percolator sections
+ *       must learn of the installs as they finish, which the scenario asserts on screen. (Phase 14
+ *       unit 2 found that they did not -- defect E3, a listener held only weakly -- and worked
+ *       around it with a relaunch; unit 2b repaired the product and removed the relaunch, and
+ *       {@code InstallReachesTheSectionsUiTest} is the defect's own test.)
  * </ul>
  *
  * <h2>Designed to go red</h2>
@@ -134,6 +130,17 @@ public final class CanonicalScenario {
      * How long the real search of the whole proteome and Percolator may take. A bound, not a delay.
      */
     public static final Duration RUN_BOUND = Duration.ofMinutes(180);
+
+    /**
+     * What the Run section's engine says once Comet and Percolator are installed and nothing else
+     * is chosen yet: neither tool is named any more, only the inputs -- no spectrum file, and the
+     * database Comet's own defaults name.
+     */
+    static final String RUN_AFTER_THE_INSTALLS =
+            "The workflow engine cannot start this search:\n"
+                    + "there is no spectrum file to search\n"
+                    + "the database /some/path/db.fasta (database_name) does not exist or cannot be"
+                    + " read";
 
     /** How long one query of the Results section may take. */
     public static final Duration QUERY_BOUND = Duration.ofMinutes(2);
@@ -349,9 +356,9 @@ public final class CanonicalScenario {
 
     /**
      * Step 5 (P14-6): the product's project is its default one, created and locked by the first
-     * pre-run check that finds a Comet -- here the relaunched application's start-up check -- in
-     * the fresh home's application data directory; it holds no run yet. (Before any Comet was
-     * installed, {@link #applicationIsReady()} saw it absent.)
+     * pre-run check that finds a Comet -- here the check the Run section made again when the Comet
+     * install finished -- in the fresh home's application data directory; it holds no run yet.
+     * (Before any Comet was installed, {@link #applicationIsReady()} saw it absent.)
      */
     private void assertNoRunYet() throws IOException {
         Path runs = layout.projectDirectory().resolve("runs");
@@ -580,42 +587,12 @@ public final class CanonicalScenario {
             }
         }
         screen.show("run");
-        observations.add(
-                "the Run section right after both installs (the defect the relaunch works around): "
-                        + screen.ui().textOf("run-engine").replace('\n', ' '));
-    }
-
-    /**
-     * After the tier has relaunched the application over the same home (the workaround described in
-     * the class comment): the new application reads its Tool Manager, which lists both builds as
-     * installed from the start, at the paths step 15 found.
-     */
-    public void relaunchedApplicationSeesTheInstalledTools() {
-        screen.show("tool-manager");
-        String builds = manifest.toolBuilds() + " tool builds on this host.";
         screen.await(
-                "tool-manager-summary",
-                "the relaunched Tool Manager to read its list",
-                builds::equals,
-                READY_BOUND);
-        assertAll(
-                "the relaunched application's Tool Manager",
-                () ->
-                        assertEquals(
-                                "CometGUI-managed: installed",
-                                screen.ui().textOf(rowOf(comet) + "-state")),
-                () ->
-                        assertEquals(
-                                "Installed at: " + cometExecutable,
-                                screen.ui().textOf(rowOf(comet) + "-path")),
-                () ->
-                        assertEquals(
-                                "CometGUI-managed: installed",
-                                screen.ui().textOf(rowOf(percolator) + "-state")),
-                () ->
-                        assertEquals(
-                                "Installed at: " + percolatorExecutable,
-                                screen.ui().textOf(rowOf(percolator) + "-path")));
+                "run-engine",
+                "the Run section to learn of both installs (defect E3)",
+                RUN_AFTER_THE_INSTALLS::equals,
+                CHECK_BOUND);
+        assertNoRunYet();
     }
 
     private static String lastOf(Set<String> shown) {

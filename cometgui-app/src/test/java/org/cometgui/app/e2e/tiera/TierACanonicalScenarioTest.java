@@ -95,9 +95,9 @@ import org.testfx.api.FxToolkit;
  *
  * <p>The steps are ordered and each builds on the last; once one fails, the rest are skipped with
  * that step named, rather than failing on the state it left. The installs (P14-5) come straight
- * after the application is ready and are followed by a relaunch over the same home: the sections do
- * not learn of an install the running application made (a product defect, described in {@link
- * CanonicalScenario}), and the relaunch is how the scenario proceeds past it until it is fixed.
+ * after the application is ready, and the same application then configures and runs the search:
+ * there is no relaunch between them. (Unit 2 relaunched here, to get past defect E3 -- the sections
+ * never learned of an install -- which unit 2b repaired; see {@link CanonicalScenario}.)
  */
 @EndToEnd
 @EnabledOnOs(
@@ -206,10 +206,9 @@ class TierACanonicalScenarioTest {
     }
 
     /**
-     * Starts the real application over a new production composition root for the fresh home -- the
-     * first time, and again for the relaunch (P14-4: a new {@code CometGuiApplication} over a new
-     * composition root, built from the same home, in the same JVM) -- and attaches the scenario to
-     * it.
+     * Starts the real application over a new production composition root for the fresh home and
+     * attaches the scenario to it. Step 30's relaunch (unit 3) calls it again (P14-4: a new {@code
+     * CometGuiApplication} over a new composition root, built from the same home, in the same JVM).
      */
     private static void start() throws TimeoutException {
         ApplicationServices services = home.services();
@@ -230,7 +229,8 @@ class TierACanonicalScenarioTest {
     @Order(3)
     @DisplayName(
             "steps 14-15: Comet and Percolator installed from the empty cache through the Tool"
-                    + " Manager (P14-5): downloaded, checksum-verified, probed")
+                    + " Manager (P14-5): downloaded, checksum-verified, probed; the Run section"
+                    + " learns of them and the default project appears, with no run")
     void install() throws Exception {
         step("14-15", scenario::installCometAndPercolatorFromTheToolManager);
     }
@@ -238,42 +238,28 @@ class TierACanonicalScenarioTest {
     @Test
     @Order(4)
     @DisplayName(
-            "after the installs, the application closed through its own stop() and relaunched over"
-                    + " the same home (the workaround for the sections not learning of an install)")
-    void relaunch() throws Exception {
-        step(
-                "relaunch",
-                () -> {
-                    FxToolkit.cleanupApplication(application);
-                    application = null;
-                    start();
-                    scenario.relaunchedApplicationSeesTheInstalledTools();
-                });
-    }
-
-    @Test
-    @Order(5)
-    @DisplayName("steps 5-7: no project yet; two spectrum files and the FASTA through the controls")
+            "steps 5-7: the default project, no run in it yet; two spectrum files and the FASTA"
+                    + " through the controls")
     void inputs() throws Exception {
         step("5-7", scenario::chooseSpectraAndDatabase);
     }
 
     @Test
-    @Order(6)
+    @Order(5)
     @DisplayName("step 8: the default Comet, 2026.03.0")
     void defaultComet() throws Exception {
         step("8", scenario::defaultCometIsSelected);
     }
 
     @Test
-    @Order(7)
+    @Order(6)
     @DisplayName("step 9: the default XML-capable Percolator, resolved from the shipped manifest")
     void defaultPercolator() throws Exception {
         step("9", scenario::defaultXmlCapablePercolatorIsSelected);
     }
 
     @Test
-    @Order(8)
+    @Order(7)
     @DisplayName(
             "steps 10-12: a precursor and a variable modification changed; the summary says so")
     void parameters() throws Exception {
@@ -281,28 +267,28 @@ class TierACanonicalScenarioTest {
     }
 
     @Test
-    @Order(9)
+    @Order(8)
     @DisplayName("step 13: both q filters show 0.01")
     void defaultFilters() throws Exception {
         step("13", scenario::bothFiltersAreOnePercent);
     }
 
     @Test
-    @Order(10)
+    @Order(9)
     @DisplayName("steps 14, 16: Run, waiting on observable workflow state; the run succeeds")
     void run() throws Exception {
         step("14,16", scenario::run);
     }
 
     @Test
-    @Order(11)
+    @Order(10)
     @DisplayName("step 17: comet.params holds exactly the GUI-selected values, outputs forced on")
     void cometParams() throws Exception {
         step("17", scenario::cometParamsHoldExactlyTheChosenValues);
     }
 
     @Test
-    @Order(12)
+    @Order(11)
     @DisplayName(
             "step 18: one Comet per file, distinct -N, nothing beside the inputs, outputs parse")
     void cometOutputs() throws Exception {
@@ -310,49 +296,49 @@ class TierACanonicalScenarioTest {
     }
 
     @Test
-    @Order(13)
+    @Order(12)
     @DisplayName("step 19: the merged PIN has one header and the summed rows of its sources")
     void mergedPin() throws Exception {
         step("19", scenario::mergedPinHasOneHeaderAndEveryRow);
     }
 
     @Test
-    @Order(14)
+    @Order(13)
     @DisplayName("step 20: Percolator exited 0; PSM, peptide, weights and XML artefacts parse")
     void percolatorArtefacts() throws Exception {
         step("20", scenario::percolatorRanAndItsArtefactsParse);
     }
 
     @Test
-    @Order(15)
+    @Order(14)
     @DisplayName("step 21: PSM and peptide counts at q <= 0.01 equal the raw files' own counts")
     void countsAtOnePercent() throws Exception {
         step("21", scenario::countsAtOnePercentMatchTheRawFiles);
     }
 
     @Test
-    @Order(16)
+    @Order(15)
     @DisplayName("step 22: the PSM filter at 0.005 changes only the PSM count, to the raw count")
     void psmFilter() throws Exception {
         step("22", scenario::psmFilterAtHalfAPercentChangesOnlyThePsms);
     }
 
     @Test
-    @Order(17)
+    @Order(16)
     @DisplayName("step 23: the peptide filter at 0.02 gives the raw file's peptide count")
     void peptideFilter() throws Exception {
         step("23", scenario::peptideFilterAtTwoPercent);
     }
 
     @Test
-    @Order(18)
+    @Order(17)
     @DisplayName("steps 21-23: a cutoff equal to a q-value in the file passes (<=, never <)")
     void inclusiveCutoff() throws Exception {
         step("21-23 boundary", scenario::aCutoffEqualToAQValuePasses);
     }
 
     @Test
-    @Order(19)
+    @Order(18)
     @DisplayName("step 24: the learned feature weights and their ranking equal the artefact's")
     void learnedWeights() throws Exception {
         step("24", scenario::learnedWeightsMatchTheArtefact);

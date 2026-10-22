@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
+import javafx.collections.ObservableList;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -179,6 +180,18 @@ public final class CometGuiApplication extends Application {
 
     /** The Visualisation section, whose PDV windows are shut down when the application stops. */
     private VisualisationViewModel visualisation;
+
+    /**
+     * The Tool Manager's row list, held in a field on purpose; set by {@link #start}.
+     *
+     * <p>{@link ToolManagerViewModel#rows()} builds a fresh unmodifiable view on each call, and
+     * that view observes the list behind it <em>weakly</em>. The listener that tells the Run,
+     * Percolator, Visualisation and Limelight sections about an install is registered on this view;
+     * were nothing to keep it, the listener would stop firing at the next garbage collection and
+     * those sections would never learn that a tool had been installed. {@code ToolManagerPane} and
+     * {@code StageStepper} carry the same field for the same reason.
+     */
+    private ObservableList<ToolRowViewModel> toolRows;
 
     /**
      * The constructor JavaFX itself calls: the real services for this host and a fresh run message
@@ -522,16 +535,15 @@ public final class CometGuiApplication extends Application {
          * Run again by itself. When a run ends, the rerun action asks again whether Percolator can
          * be rerun from it.
          */
-        toolManager
-                .rows()
-                .addListener(
-                        (ListChangeListener<ToolRowViewModel>)
-                                change -> {
-                                    run.recheck();
-                                    percolator.refresh();
-                                    visualisation.refresh();
-                                    limelight.refresh();
-                                });
+        toolRows = toolManager.rows();
+        toolRows.addListener(
+                (ListChangeListener<ToolRowViewModel>)
+                        change -> {
+                            run.recheck();
+                            percolator.refresh();
+                            visualisation.refresh();
+                            limelight.refresh();
+                        });
         run.runningProperty()
                 .addListener(
                         (observable, before, after) -> {
