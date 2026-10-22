@@ -19,6 +19,8 @@ package org.cometgui.app.uidriver;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -29,8 +31,13 @@ import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Labeled;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.input.KeyCode;
 
@@ -170,6 +177,116 @@ abstract class AbstractFxUiDriver implements FxUiDriver {
     }
 
     @Override
+    public final boolean exists(String id) {
+        return Boolean.TRUE.equals(callOnFxThread(() -> lookup(id) != null));
+    }
+
+    @Override
+    public final boolean isDisabled(String id) {
+        Node found = node(id);
+        return Boolean.TRUE.equals(callOnFxThread(found::isDisabled));
+    }
+
+    @Override
+    public final void pressKey(String key) {
+        press(keyNamed(key));
+    }
+
+    @Override
+    public final void pressKeyWith(String modifier, String key) {
+        pressWith(keyNamed(modifier), keyNamed(key));
+    }
+
+    @Override
+    public final void select(String id, String item) {
+        Objects.requireNonNull(item, "item");
+        ComboBox<?> box = comboBox(id);
+        List<String> items = itemsOf(id);
+        int target = items.indexOf(item);
+        if (target < 0) {
+            fail("#" + id + " offers no item shown as \"" + item + "\"; it offers " + items);
+        }
+        if (items.lastIndexOf(item) != target) {
+            fail("#" + id + " offers more than one item shown as \"" + item + "\": " + items);
+        }
+        if (Boolean.TRUE.equals(callOnFxThread(box::isEditable))) {
+            fail("#" + id + " is an editable combo box; select chooses from a closed list");
+        }
+        if (isDisabled(id)) {
+            fail("#" + id + " is disabled, so a user cannot choose \"" + item + "\" in it");
+        }
+        clickOn(id);
+        if (!Boolean.TRUE.equals(callOnFxThread(box::isShowing))) {
+            fail("a click on #" + id + " did not open its list");
+        }
+        // one keystroke moves one item, so the list's own length bounds the walk
+        for (int step = 0; step <= items.size() && !item.equals(selectedTextOf(id)); step++) {
+            int current = items.indexOf(selectedTextOf(id));
+            press(current < target ? KeyCode.DOWN : KeyCode.UP);
+        }
+        press(KeyCode.ENTER);
+        String shown = selectedTextOf(id);
+        if (!item.equals(shown)) {
+            fail("#" + id + " shows \"" + shown + "\" after choosing \"" + item + "\"");
+        }
+        if (Boolean.TRUE.equals(callOnFxThread(box::isShowing))) {
+            fail("#" + id + "'s list is still open after Enter");
+        }
+    }
+
+    @Override
+    public final String selectedTextOf(String id) {
+        ComboBox<?> box = comboBox(id);
+        return callOnFxThread(() -> shownBy(box, box.getValue()));
+    }
+
+    @Override
+    public final List<String> itemsOf(String id) {
+        ComboBox<?> box = comboBox(id);
+        return callOnFxThread(
+                () -> {
+                    List<String> shown = new ArrayList<>();
+                    for (Object item : box.getItems()) {
+                        shown.add(shownBy(box, item));
+                    }
+                    return List.copyOf(shown);
+                });
+    }
+
+    @Override
+    public final List<String> columnsOf(String id) {
+        TableView<?> table = tableView(id);
+        return callOnFxThread(
+                () -> {
+                    List<String> headings = new ArrayList<>();
+                    for (TableColumn<?, ?> column : table.getVisibleLeafColumns()) {
+                        headings.add(headingOf(column));
+                    }
+                    return List.copyOf(headings);
+                });
+    }
+
+    @Override
+    public final List<String> rowsOf(String id) {
+        Node found = node(id);
+        return callOnFxThread(
+                () -> {
+                    if (found instanceof TableView<?> table) {
+                        return tableRows(id, table);
+                    }
+                    if (found instanceof ListView<?> list) {
+                        return listRows(id, list);
+                    }
+                    return fail(
+                            "#"
+                                    + id
+                                    + " is a "
+                                    + found.getClass().getName()
+                                    + ", neither a TableView nor a ListView");
+                });
+    }
+
+    @Override
     public final void onFxThread(Runnable work) {
         Objects.requireNonNull(work, "work");
         if (Platform.isFxApplicationThread()) {
@@ -208,6 +325,10 @@ abstract class AbstractFxUiDriver implements FxUiDriver {
                         + TIMEOUT_SECONDS
                         + "s");
         Throwable thrown = failure.get();
+        if (thrown instanceof AssertionError failed) {
+            // a check made on the application thread failed: that is the test's failure, as is
+            throw failed;
+        }
         if (thrown != null) {
             throw new IllegalStateException("work on the FX application thread failed", thrown);
         }
@@ -297,6 +418,129 @@ abstract class AbstractFxUiDriver implements FxUiDriver {
 
     /** One key, with or without Shift held. */
     record KeyStroke(KeyCode code, boolean shift) {}
+
+    /**
+     * The key a {@code KeyCode} constant name names.
+     *
+     * @param name the constant's name, for example {@code ENTER}
+     * @return the key
+     * @throws AssertionError if no {@code KeyCode} has that name
+     */
+    static KeyCode keyNamed(String name) {
+        Objects.requireNonNull(name, "name");
+        try {
+            return KeyCode.valueOf(name);
+        } catch (IllegalArgumentException unknown) {
+            return fail("there is no KeyCode named \"" + name + "\"");
+        }
+    }
+
+    private ComboBox<?> comboBox(String id) {
+        Node found = node(id);
+        if (!(found instanceof ComboBox<?> box)) {
+            return fail("#" + id + " is a " + found.getClass().getName() + ", not a combo box");
+        }
+        return box;
+    }
+
+    private TableView<?> tableView(String id) {
+        Node found = node(id);
+        if (!(found instanceof TableView<?> table)) {
+            return fail("#" + id + " is a " + found.getClass().getName() + ", not a TableView");
+        }
+        return table;
+    }
+
+    /**
+     * What a combo box shows for an item: its converter's text, which is what its default cells
+     * display. Called on the JavaFX application thread.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static String shownBy(ComboBox box, Object item) {
+        if (box.getCellFactory() != null) {
+            return fail(
+                    "#"
+                            + box.getId()
+                            + " has its own cell factory, so its converter is not what it shows");
+        }
+        if (item == null) {
+            return "";
+        }
+        return box.getConverter() == null ? item.toString() : box.getConverter().toString(item);
+    }
+
+    /** A column's heading: its text, or the text of the control that is its heading. */
+    private static String headingOf(TableColumn<?, ?> column) {
+        String text = column.getText();
+        if ((text == null || text.isEmpty()) && column.getGraphic() instanceof Labeled heading) {
+            return heading.getText() == null ? "" : heading.getText();
+        }
+        return text == null ? "" : text;
+    }
+
+    /** Every item of a table as its cells' text. Called on the JavaFX application thread. */
+    private static List<String> tableRows(String id, TableView<?> table) {
+        List<TableColumn<?, ?>> columns = new ArrayList<>(table.getVisibleLeafColumns());
+        for (TableColumn<?, ?> column : columns) {
+            if (column.getCellFactory() != TableColumn.DEFAULT_CELL_FACTORY) {
+                fail(
+                        "#"
+                                + id
+                                + "'s column \""
+                                + headingOf(column)
+                                + "\" has its own cell factory, so its cell value is not"
+                                + " necessarily what it shows");
+            }
+        }
+        List<String> rows = new ArrayList<>();
+        for (int row = 0; row < table.getItems().size(); row++) {
+            List<String> cells = new ArrayList<>();
+            for (TableColumn<?, ?> column : columns) {
+                cells.add(defaultCellText(id, headingOf(column), column.getCellData(row)));
+            }
+            rows.add(String.join("\t", cells));
+        }
+        return List.copyOf(rows);
+    }
+
+    /**
+     * Every item of a list as the text its cell shows. Called on the JavaFX application thread.
+     *
+     * <p>A list with its own cell factory is read by making one of its cells and pointing it at
+     * each item in turn -- {@code updateListView}, then {@code updateIndex}, which is what the
+     * list's virtual flow does to the cells it shows -- so the text is the cell's own, whatever the
+     * cell does to an item.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static List<String> listRows(String id, ListView list) {
+        List<String> rows = new ArrayList<>();
+        if (list.getCellFactory() == null) {
+            for (Object item : list.getItems()) {
+                rows.add(defaultCellText(id, "the list", item));
+            }
+            return List.copyOf(rows);
+        }
+        ListCell cell = (ListCell) list.getCellFactory().call(list);
+        cell.updateListView(list);
+        for (int index = 0; index < list.getItems().size(); index++) {
+            cell.updateIndex(index);
+            String text = cell.getText();
+            if (text == null && cell.getGraphic() != null) {
+                fail("#" + id + "'s cell shows item " + index + " as a graphic, not as text");
+            }
+            rows.add(text == null ? "" : text);
+        }
+        cell.updateIndex(-1);
+        return List.copyOf(rows);
+    }
+
+    /** What a default table or list cell shows for a value. */
+    private static String defaultCellText(String id, String where, Object value) {
+        if (value instanceof Node) {
+            return fail("#" + id + " shows a node in " + where + ", not text");
+        }
+        return value == null ? "" : value.toString();
+    }
 
     /**
      * The centre of a node in screen coordinates. Called on the JavaFX application thread.

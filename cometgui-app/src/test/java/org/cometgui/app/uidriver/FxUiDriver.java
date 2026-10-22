@@ -51,9 +51,19 @@ import javafx.scene.input.KeyCode;
  * directly, because a test that could only read through the same robot it typed with would be
  * asserting its own echo.
  *
- * <p>It is small on purpose. Every method here is used by a test in this work unit; a driver method
- * that no test calls is a method whose behaviour on the fallback implementation is unproved, and an
- * unproved fallback is exactly the thing this interface exists to avoid.
+ * <p>It is small on purpose. Every method here is used by a test; a driver method that no test
+ * calls is a method whose behaviour on the fallback implementation is unproved, and an unproved
+ * fallback is exactly the thing this interface exists to avoid.
+ *
+ * <h2>Two layers</h2>
+ *
+ * <p>Everything that can be said in strings, booleans, integers and lists of strings -- clicking,
+ * typing, reading text, choosing an item, reading a table -- is declared by {@link
+ * RemotableUiDriver}, which this interface extends, so that an end-to-end scenario written against
+ * that subset runs unchanged in-process and, through a loopback bridge, against a packaged
+ * application in another process (Phase 14, P14-3). What is declared here in addition cannot cross
+ * a process boundary: a scene-graph {@link Node}, a {@link KeyCode}, work to run on the application
+ * thread.
  *
  * <h2>Threading</h2>
  *
@@ -64,7 +74,7 @@ import javafx.scene.input.KeyCode;
  * processed, so that an assertion made on the next line sees their effect: the waiting is on
  * observable state, never on a sleep.
  */
-public interface FxUiDriver {
+public interface FxUiDriver extends RemotableUiDriver {
 
     /**
      * The node with the given stable identifier.
@@ -77,57 +87,11 @@ public interface FxUiDriver {
     Node node(String id);
 
     /**
-     * Whether the node with the given identifier is being shown to the user.
-     *
-     * <p>Not merely {@code Node.isVisible()}, which is a local flag: this answers the question a
-     * test actually asks, which is whether the thing is on screen. A node inside an invisible
-     * ancestor is not showing however visible it says it is, and the shell hides eight of its nine
-     * section panes exactly that way.
-     *
-     * @param id the stable identifier
-     * @return {@code true} if the node exists, is in a scene, and neither it nor any ancestor is
-     *     invisible
-     */
-    boolean isVisible(String id);
-
-    /**
-     * Clicks the node with the given identifier with the primary mouse button, using synthetic
-     * input.
-     *
-     * <p>A real pointer movement to the node's own screen bounds and a real button press, not a
-     * fired {@code ActionEvent}: exit-gate item 1 is about reachability by mouse, and firing the
-     * handler would prove only that the handler works.
-     *
-     * @param id the stable identifier of the node to click
-     * @throws AssertionError if no node carries that identifier
-     */
-    void clickOn(String id);
-
-    /**
      * Presses and releases one key, using synthetic input.
      *
      * @param code the key to press
      */
     void press(KeyCode code);
-
-    /**
-     * Types text into whatever has the keyboard focus, one character at a time, using synthetic
-     * input: what a scientist typing would produce, and nothing else -- no text is set directly.
-     *
-     * @param text the characters to type: letters, digits, space and {@code - _ . / , + = ^ :}
-     * @throws AssertionError if the text holds a character this driver cannot type, naming it
-     */
-    void type(String text);
-
-    /**
-     * Clicks a text control, selects everything it holds with the keyboard (Ctrl+A), and types text
-     * in its place. Does not commit: the test presses Enter or Tab when it means to.
-     *
-     * @param id the stable identifier of the text control
-     * @param text what to type
-     * @throws AssertionError if no node carries that identifier, or a character cannot be typed
-     */
-    void typeInto(String id, String text);
 
     /**
      * Presses a key while holding a modifier, using synthetic input.
@@ -137,48 +101,14 @@ public interface FxUiDriver {
      */
     void pressWith(KeyCode modifier, KeyCode code);
 
-    /** Presses and releases Tab, moving the focus to the next focus stop. */
-    void tab();
-
-    /** Presses and releases Shift+Tab, moving the focus to the previous focus stop. */
-    void shiftTab();
-
-    /**
-     * The identifier of the node that currently has the keyboard focus.
-     *
-     * @return the focus owner's identifier, or {@code null} if nothing is focused or the focused
-     *     node has no identifier -- both of which are failures worth reporting as themselves rather
-     *     than as an exception
-     */
-    String focusedNodeId();
-
-    /**
-     * What a control says: the text of a {@code Labeled} or of a text input control.
-     *
-     * @param id the stable identifier
-     * @return the control's text, never {@code null}
-     * @throws AssertionError if no node carries that identifier, or if it is not a control with
-     *     text
-     */
-    String textOf(String id);
-
-    /**
-     * What a screen reader would say for a control.
-     *
-     * @param id the stable identifier
-     * @return the node's accessible text, or {@code null} if it has none -- which is the failure
-     *     exit-gate item 4 exists to catch, so it is reported as a value rather than as an
-     *     exception
-     * @throws AssertionError if no node carries that identifier
-     */
-    String accessibleTextOf(String id);
-
     /**
      * Runs work on the JavaFX application thread and waits for it.
      *
      * @param work what to run
-     * @throws AssertionError if the work does not finish within the driver's timeout
-     * @throws IllegalStateException if the work threw, with the cause attached
+     * @throws AssertionError if the work does not finish within the driver's timeout, or if the
+     *     work itself failed an assertion -- rethrown as it was thrown, so that a check made on the
+     *     application thread reads as the test failure it is
+     * @throws IllegalStateException if the work threw anything else, with the cause attached
      */
     void onFxThread(Runnable work);
 

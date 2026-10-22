@@ -20,10 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import javafx.application.Platform;
@@ -53,8 +55,10 @@ import org.cometgui.ui.viewmodel.ToolManagerViewModel;
  * facts in order: whether the toolkit accepts work at all, and whether a showing stage exists. It
  * never asserts that startup took less than some time; the deadline exists so that a hung toolkit
  * fails with a diagnostic instead of hanging the build, and if it is ever hit the message says
- * which of the two facts was missing. This mirrors {@code CometGuiApplicationStartupTest}, which
- * landed with unit 7 and is the pattern this project already accepted for "the application starts".
+ * which of the two facts was missing. The polling is {@link Await}'s, the harness's one wait
+ * primitive (P14-8), so this class holds no pause of its own. This mirrors {@code
+ * CometGuiApplicationStartupTest}, which landed with unit 7 and is the pattern this project already
+ * accepted for "the application starts".
  *
  * <h2>Or attached to an application a test started itself</h2>
  *
@@ -79,8 +83,8 @@ public final class RunningApplication {
     /** How long to wait for one round trip to the application thread. */
     private static final long FX_TIMEOUT_SECONDS = 30;
 
-    /** How often to ask whether the toolkit is up yet, in milliseconds. */
-    private static final long POLL_MILLIS = 25;
+    /** How often to look again, through {@link Await}: the class's one poll interval. */
+    private static final Duration POLL_INTERVAL = Duration.ofMillis(25);
 
     private final Stage stage;
 
@@ -108,25 +112,55 @@ public final class RunningApplication {
         launcher.setUncaughtExceptionHandler((thread, thrown) -> launchFailure.set(thrown));
         launcher.start();
 
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(STARTUP_TIMEOUT_SECONDS);
-        boolean toolkitAnswered = false;
-        while (System.nanoTime() < deadline) {
+        AtomicBoolean toolkitAnswered = new AtomicBoolean();
+        Startup started;
+        try {
+            started =
+                    Await.until(
+                            "the application to show a window after CometGuiLauncher.main was"
+                                    + " called",
+                            () -> {
+                                failIfTheLauncherDied(launchFailure);
+                                Optional<Stage> showing = findShowingStage();
+                                if (showing.isEmpty() && toolkitIsUp()) {
+                                    toolkitAnswered.set(true);
+                                }
+                                return new Startup(showing, toolkitAnswered.get());
+                            },
+                            Startup::isShowing,
+                            Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS),
+                            POLL_INTERVAL);
+        } catch (AssertionError notShown) {
             failIfTheLauncherDied(launchFailure);
-            Optional<Stage> showing = findShowingStage();
-            if (showing.isPresent()) {
-                return showing(showing.orElseThrow());
-            }
-            toolkitAnswered |= toolkitIsUp();
-            pause();
+            return fail(
+                    notShown.getMessage()
+                            + ". Check the patch-module Monocle argument and the font stack in"
+                            + " cometgui-app/pom.xml.",
+                    notShown);
         }
-        failIfTheLauncherDied(launchFailure);
-        return fail(
-                "the application did not show a window within "
-                        + STARTUP_TIMEOUT_SECONDS
-                        + "s of CometGuiLauncher.main being called. The JavaFX toolkit "
-                        + (toolkitAnswered ? "did start" : "never started")
-                        + ". Check the patch-module Monocle argument and the font stack in"
-                        + " cometgui-app/pom.xml.");
+        return showing(started.stage().orElseThrow());
+    }
+
+    /**
+     * What one look at a starting application found: the showing stage, if any, and whether the
+     * toolkit has ever accepted work. Its text is what a failed wait reports as the last value.
+     *
+     * @param stage the first showing stage, or empty
+     * @param toolkitAnswered whether {@code Platform.runLater} has accepted work at least once
+     */
+    private record Startup(Optional<Stage> stage, boolean toolkitAnswered) {
+
+        boolean isShowing() {
+            return stage.isPresent();
+        }
+
+        @Override
+        public String toString() {
+            return isShowing()
+                    ? "a window is showing"
+                    : "no window is showing, and the JavaFX toolkit "
+                            + (toolkitAnswered ? "did start" : "never started");
+        }
     }
 
     /**
@@ -197,23 +231,15 @@ public final class RunningApplication {
      *     after {@link #STARTUP_TIMEOUT_SECONDS}
      */
     public String awaitToolListRead() {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(STARTUP_TIMEOUT_SECONDS);
-        String said = toolManagerSummary();
-        while (ToolManagerViewModel.NOT_READ_YET.equals(said) && System.nanoTime() < deadline) {
-            pause();
-            said = toolManagerSummary();
-        }
-        String last = said;
-        assertTrue(
-                !ToolManagerViewModel.NOT_READ_YET.equals(last),
-                () ->
-                        "the Tool Manager still said \""
-                                + last
-                                + "\" "
-                                + STARTUP_TIMEOUT_SECONDS
-                                + "s after the window appeared: the application never read its"
-                                + " tool list");
-        return last;
+        return Await.until(
+                "the Tool Manager's summary to stop saying \""
+                        + ToolManagerViewModel.NOT_READ_YET
+                        + "\" after the window appeared (if it never does, the application never"
+                        + " read its tool list)",
+                this::toolManagerSummary,
+                said -> !ToolManagerViewModel.NOT_READ_YET.equals(said),
+                Duration.ofSeconds(STARTUP_TIMEOUT_SECONDS),
+                POLL_INTERVAL);
     }
 
     private String toolManagerSummary() {
@@ -316,15 +342,6 @@ public final class RunningApplication {
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("interrupted waiting for the FX thread", interrupted);
-        }
-    }
-
-    private static void pause() {
-        try {
-            Thread.sleep(POLL_MILLIS);
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("interrupted waiting for the application", interrupted);
         }
     }
 }
