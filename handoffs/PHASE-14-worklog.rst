@@ -241,7 +241,23 @@ collide exists, so none is offered.
        remotable driver subset (P14-3), and the no-fixed-sleep check with a
        ``--self-test`` that sees each injected form go red.
      - item 6; R-TEST-05
-     - pending
+     - **Accepted 2026-10-22**, ``85f0f19`` (agent 1). Diff read (32 files,
+       test code and ``scripts/e2e/`` only; no ``src/main``, POM or ``.rst``).
+       Ran: the unit's tests plus ``RemotableDriverUiTest`` and
+       ``SectionNavigationUiTest`` -- 75 run, 0 failures, 2 skipped (the
+       canary without the property). Canary with ``-Dcometgui.e2e=true``:
+       under ``LC_ALL=C.UTF-8`` 2/2 pass; with no locale exported the class
+       fails, naming ``sun.jnu.encoding=ANSI_X3.4-1968``.
+       ``check-no-fixed-sleep.sh`` PASSED (47 classes, 361 methods, 34
+       sources); ``--self-test`` 14/14 caught. My injections: ``<=`` to ``<``
+       in ``IndependentCounts`` (``QValueCountsTest`` red, "a strict < would
+       give 2 ==> expected: <5>"); an ``Object.wait(5)`` in
+       ``PinFile.read`` (check exit 1, found in bytecode and source); both
+       restored, ``sha256sum -c`` OK. Gates on this tree, run by me:
+       ``quality`` 42, ``paramui`` 87 (2228 s), ``provenanceui`` 96 (1490 s),
+       all PASS. No test reads outside ``cometgui-app``. Change to shared
+       code: ``AbstractFxUiDriver.onFxThread`` rethrows an ``AssertionError``
+       unwrapped. Not proved on the real app: ``rowsOf`` for a list (unit 3).
    * - 2
      - **Tier A canonical, steps 1--24**: fresh home and empty cache through
        install, parameters, run, ``comet.params``, ``-N``, nothing beside the
