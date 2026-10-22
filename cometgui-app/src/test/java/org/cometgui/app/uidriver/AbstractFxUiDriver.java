@@ -31,6 +31,7 @@ import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.ListCell;
@@ -39,6 +40,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.control.Toggle;
 import javafx.scene.input.KeyCode;
 
 /**
@@ -264,6 +266,34 @@ abstract class AbstractFxUiDriver implements FxUiDriver {
                     }
                     return List.copyOf(headings);
                 });
+    }
+
+    @Override
+    public final boolean isSelected(String id) {
+        Node found = node(id);
+        return Boolean.TRUE.equals(
+                callOnFxThread(
+                        () -> {
+                            if (found instanceof CheckBox box) {
+                                if (box.isIndeterminate()) {
+                                    return fail(
+                                            "#"
+                                                    + id
+                                                    + " is a check box in its indeterminate state,"
+                                                    + " neither selected nor not");
+                                }
+                                return box.isSelected();
+                            }
+                            if (found instanceof Toggle toggle) {
+                                return toggle.isSelected();
+                            }
+                            return fail(
+                                    "#"
+                                            + id
+                                            + " is a "
+                                            + found.getClass().getName()
+                                            + ", neither a check box nor a toggle");
+                        }));
     }
 
     @Override

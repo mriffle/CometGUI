@@ -233,4 +233,20 @@ public interface RemotableUiDriver {
      *     or a cell's text cannot be read without rendering a graphic (naming the column)
      */
     List<String> rowsOf(String id);
+
+    /**
+     * Whether a check box, a toggle button or a radio button is selected: what a user sees as
+     * ticked or pressed in.
+     *
+     * <p>Added by Phase 14 unit 2: a switch such as the Percolator section's Limelight conversion
+     * says nothing about its state in its text, so without this a scenario could only click it and
+     * hope. A check box in its third, indeterminate state is neither, and is reported as a failure
+     * rather than as either answer.
+     *
+     * @param id the stable identifier of the check box or toggle
+     * @return {@code true} if it is selected
+     * @throws AssertionError if no node carries that identifier, it is neither a check box nor a
+     *     toggle, or it is a check box in its indeterminate state
+     */
+    boolean isSelected(String id);
 }

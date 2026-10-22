@@ -35,6 +35,7 @@ import java.util.stream.Stream;
 import javafx.collections.FXCollections;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.layout.VBox;
@@ -64,8 +65,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * The remotable driver methods Phase 14 unit 1 added (P14-3) -- {@code exists}, {@code isDisabled},
  * {@code pressKey}, {@code pressKeyWith}, {@code select}, {@code selectedTextOf}, {@code itemsOf},
- * {@code columnsOf} and {@code rowsOf} -- proved against the real application through both drivers,
- * as the navigation tests prove the original ones.
+ * {@code columnsOf} and {@code rowsOf} -- and the one unit 2 added, {@code isSelected}, proved
+ * against the real application through both drivers, as the navigation tests prove the original
+ * ones.
  *
  * <p><strong>The application</strong> is the real {@code CometGuiApplication}, started as the other
  * Results GUI tests start it ({@link ParameterEditorApp}), over a constructed project with one
@@ -453,6 +455,63 @@ class RemotableDriverUiTest {
         } finally {
             main.onFxThread(second::hide);
         }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("drivers")
+    @Order(9)
+    @DisplayName(
+            "isSelected (unit 2): the shown section's navigation toggle is selected and another is"
+                    + " not; a check box ticks and unticks with a click, as the node says; a"
+                    + " label is refused")
+    void isSelected(FxUiDriver driver) {
+        driver.clickOn("nav-comet-parameters");
+        Node modifiedOnly = driver.node("param-search-filter-modified");
+        assertAll(
+                driver.toString() + ", before",
+                () -> assertTrue(driver.isSelected("nav-comet-parameters")),
+                () -> assertFalse(driver.isSelected("nav-results")),
+                () -> assertFalse(driver.isSelected("param-search-filter-modified")),
+                () ->
+                        assertEquals(
+                                "Type to find a parameter, or tick a filter.",
+                                driver.textOf("param-search-headline")));
+
+        driver.clickOn("param-search-filter-modified");
+        assertAll(
+                driver.toString() + ", ticked",
+                () -> assertTrue(driver.isSelected("param-search-filter-modified")),
+                () ->
+                        assertEquals(
+                                driver.callOnFxThread(() -> ((CheckBox) modifiedOnly).isSelected()),
+                                driver.isSelected("param-search-filter-modified"),
+                                "what the node itself says"),
+                () ->
+                        assertEquals(
+                                "1 parameter found.",
+                                driver.textOf("param-search-headline"),
+                                "the tick took effect: output_percolatorfile, which the workflow"
+                                        + " switches on, is the one modified parameter"));
+
+        driver.clickOn("param-search-filter-modified");
+        assertAll(
+                driver.toString() + ", unticked",
+                () -> assertFalse(driver.isSelected("param-search-filter-modified")),
+                () ->
+                        assertEquals(
+                                "Type to find a parameter, or tick a filter.",
+                                driver.textOf("param-search-headline")),
+                () ->
+                        assertEquals(
+                                "#param-search-headline is a javafx.scene.control.Label, neither a"
+                                        + " check box nor a toggle",
+                                assertThrows(
+                                                AssertionError.class,
+                                                () -> driver.isSelected("param-search-headline"))
+                                        .getMessage()));
+        driver.clickOn("nav-results");
+        assertTrue(driver.isSelected("nav-results"));
+        assertFalse(driver.isSelected("nav-comet-parameters"));
     }
 
     /** A cell that shows its item upper-cased and numbered: not what {@code toString} says. */

@@ -78,6 +78,7 @@ class RemotableUiDriverShapeTest {
                                 "exists",
                                 "focusedNodeId",
                                 "isDisabled",
+                                "isSelected",
                                 "isVisible",
                                 "itemsOf",
                                 "pressKey",
