@@ -3,13 +3,13 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-17
-:Updated by: Main orchestrator, session 10 (**Phase 13 signed off PARTIAL** --
-   :ref:`status-p13-signed`; specification revision 20; ``main`` pushed)
-:Current phase: **PAUSED by the owner after Phase 13** (2026-10-13: *"Pause
-   after phase 13 is green. I'll ask you to resume later."*). Phase 14 -- GUI
-   Automation and Packaged End-to-End Harness -- is next and is not
-   dispatched; no brief is written. Standing owner instruction (2026-10-08):
+:Updated: 2026-10-22
+:Updated by: Main orchestrator, session 10 (owner resumed after the pause
+   that followed Phase 13; **Phase 14 dispatched**)
+:Current phase: **Phase 14 -- GUI Automation and Packaged End-to-End
+   Harness**, IN PROGRESS (brief ``handoffs/PHASE-14-BRIEF.rst``). It runs on
+   the local fixture; ``D-006``'s CI-fixture half is still open and the
+   owner's, so any CI wiring of the end-to-end suite waits on it. Standing owner instruction (2026-10-08):
    *"When all is green with the current phase, push, then move on to the
    next phase."*
 :Overall: Fourteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
@@ -285,8 +285,9 @@ Phase board
        owner**.
    * - 14
      - GUI automation and packaged end-to-end harness
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-10-22, when the owner resumed after the pause that
+       followed Phase 13.
    * - 15
      - Version matrix, performance and hardening
      - NOT STARTED
@@ -4382,6 +4383,10 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-22
+     - 14
+     - Owner resumed (*"Resume"*). **Phase 14 dispatched**, on the local
+       fixture; ``D-006``'s CI-fixture half remains open.
    * - 2026-10-17
      - 13
      - **Phase 13 signed off PARTIAL** at ``0a289a3`` (build 11/11, gates
