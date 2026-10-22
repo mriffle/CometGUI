@@ -294,7 +294,21 @@ collide exists, so none is offered.
        listener on a per-call wrapper audited; the relaunch workaround
        removed from unit 2's test.
      - E3; items 1, 2
-     - pending
+     - **Accepted 2026-10-22**, ``64d5144`` (agent 2b). Diff read: the
+       product change is one field in ``CometGuiApplication`` holding the
+       ``rows()`` wrapper the listener is on; listener body unchanged; audit
+       of all 146 ``addListener`` sites found no other instance. New
+       ordinary test ``InstallReachesTheSectionsUiTest`` (forces a
+       collection until a weak sentinel clears, installs through the Tool
+       Manager from the loopback server). Ran myself: it plus Tier A, 1 + 18
+       run, 0 failures. My injection: the listener's
+       ``percolator.refresh()`` commented out -- red, "#run-engine did not
+       reach the expected text within PT2M ... Percolator 3.07.1 ... is not
+       installed"; restored, ``sha256sum -c`` OK. Agent showed both tests
+       red with the fix reverted. Gates on this tree, by me: ``quality`` 42,
+       ``paramui`` 87 (2366 s), ``provenanceui`` 96 (1298 s), PASS (these
+       also cover unit 2's driver change). Reads outside the module:
+       ``scratch/phase05/artefacts`` (as ``ToolManagerInstallUiTest``).
    * - 3
      - **Tier A canonical, steps 25--30**: PDV figure for a known PSM, real
        converter through the UI and XML validated, upload to the ``D-007``
@@ -371,7 +385,7 @@ E1 -- automatic installation on Run
     explicit install is the intended design. Not changed here: it is a product
     feature outside this phase's scope.
 
-E3 -- sections never learn of an install (found by unit 2, being repaired)
+E3 -- sections never learn of an install (found by unit 2, REPAIRED in 2b)
     ``CometGuiApplication.start`` adds its listener to
     ``toolManager.rows()``, a fresh unmodifiable wrapper per call that
     observes the backing list weakly; nothing keeps the wrapper, so after a
