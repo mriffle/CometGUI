@@ -27,7 +27,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 exec bash "${SCRIPT_DIR}/stub-lib.sh" \
     --script "release-e2e-canonical.sh" \
-    --phase  "PHASE-16" \
+    --phase  "PHASE-14" \
     --installed-by "PHASE-01" \
     --owns   "run the Tier B canonical end-to-end scenario (TierBCanonicalScenarioTest) against the exact packaged artefact of this release" \
     --spec   "specification.rst, Release pipeline" \

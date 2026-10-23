@@ -13,7 +13,7 @@
 # machine.  What they cannot run on a nightly runner yet is their data: every
 # end-to-end scenario searches the D-006 LOCAL fixture, and D-006's CI half is
 # OPEN -- no CI job may depend on the local fixture, and nothing may present it
-# as the CI fixture.  The owning phase follows nightly.yml's job name.
+# as the CI fixture.
 #
 # Exits 70 (never 0) via scripts/ci/stub-lib.sh.  Making it exit 0 to turn a
 # pipeline green is a gate weakening and a rejection at sign-off.
@@ -22,7 +22,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 exec bash "${SCRIPT_DIR}/stub-lib.sh" \
     --script "nightly-gui-tests.sh" \
-    --phase  "PHASE-15" \
+    --phase  "PHASE-14" \
     --installed-by "PHASE-01" \
     --owns   "run the headless and native GUI end-to-end suites (Tier A and Tier B) every night" \
     --spec   "specification.rst, Nightly pipeline" \

@@ -24,7 +24,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 exec bash "${SCRIPT_DIR}/stub-lib.sh" \
     --script "release-e2e-limelight.sh" \
-    --phase  "PHASE-16" \
+    --phase  "PHASE-14" \
     --installed-by "PHASE-01" \
     --owns   "run the XML-capable full Limelight end-to-end scenario (conversion validated against the converter's XSD, upload to the D-007 fake) against the exact packaged artefact of this release" \
     --spec   "specification.rst, Release pipeline" \

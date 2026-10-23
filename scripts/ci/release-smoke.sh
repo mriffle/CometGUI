@@ -23,7 +23,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 exec bash "${SCRIPT_DIR}/stub-lib.sh" \
     --script "release-smoke.sh" \
-    --phase  "PHASE-16" \
+    --phase  "PHASE-14" \
     --installed-by "PHASE-01" \
     --owns   "run the clean-home packaged smoke test (scripts/package/smoke-installed.sh) against the exact installer output of this release" \
     --spec   "specification.rst, Release pipeline" \
