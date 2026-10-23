@@ -23,11 +23,12 @@ import org.cometgui.app.e2e.scenario.LimelightEndpoint;
 import org.cometgui.tools.limelight.fake.FakeLimelightServer;
 
 /**
- * Tier A's controlled Limelight endpoint ({@code D-007}): the one loopback {@link
- * FakeLimelightServer}, which validates every request against the protocol's wire schema and every
- * file against the converter's own XSD, seen through the scenario's {@link LimelightEndpoint}.
+ * The controlled Limelight endpoint ({@code D-007}) of both tiers -- in this test JVM, on loopback,
+ * which Tier B's packaged application reaches as any server -- the one {@link FakeLimelightServer},
+ * which validates every request against the protocol's wire schema and every file against the
+ * converter's own XSD, seen through the scenario's {@link LimelightEndpoint}.
  */
-final class FakeLimelightEndpoint implements LimelightEndpoint {
+public final class FakeLimelightEndpoint implements LimelightEndpoint {
 
     private final FakeLimelightServer fake;
 
@@ -42,7 +43,7 @@ final class FakeLimelightEndpoint implements LimelightEndpoint {
      * @param project the project it holds
      * @param key the test key it accepts
      */
-    FakeLimelightEndpoint(FakeLimelightServer fake, int project, String key) {
+    public FakeLimelightEndpoint(FakeLimelightServer fake, int project, String key) {
         this.fake = Objects.requireNonNull(fake, "fake");
         this.project = Integer.toString(project);
         this.key = Objects.requireNonNull(key, "key");

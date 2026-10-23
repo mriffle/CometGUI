@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -136,6 +137,45 @@ public final class LaunchedCometGui implements AutoCloseable {
             Path portFile,
             List<String> extraJvmOptions)
             throws IOException {
+        return start(
+                installed,
+                display,
+                home,
+                launchDirectory,
+                bridgeJar,
+                portFile,
+                extraJvmOptions,
+                Set.of());
+    }
+
+    /**
+     * As {@link #start(InstalledCometGui, PackagedDisplay, Path, Path, Path, Path, List)}, with
+     * some of {@link PackagedDisplay#launchEnvironment}'s variables left out -- for the harness's
+     * own locale control, which launches the application with no locale at all (P14-9).
+     *
+     * @param installed the installation
+     * @param display the display and the launcher's environment
+     * @param home the fresh user home
+     * @param launchDirectory the working directory to start it from
+     * @param bridgeJar the bridge's agent jar ({@link BridgeJar})
+     * @param portFile where the bridge is to write its port and token; must not exist yet
+     * @param extraJvmOptions further options for {@code JAVA_TOOL_OPTIONS}, each without whitespace
+     * @param withoutVariables the launch environment's variables to leave out, such as {@code
+     *     LC_ALL}; never {@code JAVA_TOOL_OPTIONS}, which attaches the bridge
+     * @return the launch
+     * @throws IOException if the process cannot be started
+     * @throws IllegalArgumentException if a variable to leave out is not in the launch environment
+     */
+    public static LaunchedCometGui start(
+            InstalledCometGui installed,
+            PackagedDisplay display,
+            Path home,
+            Path launchDirectory,
+            Path bridgeJar,
+            Path portFile,
+            List<String> extraJvmOptions,
+            Set<String> withoutVariables)
+            throws IOException {
         requireNoWhitespace(bridgeJar, "the bridge jar");
         requireNoWhitespace(portFile, "the bridge's port file");
         if (Files.exists(portFile)) {
@@ -152,6 +192,12 @@ public final class LaunchedCometGui implements AutoCloseable {
             options.add(option);
         }
         Map<String, String> environment = new LinkedHashMap<>(display.launchEnvironment(home));
+        for (String variable : withoutVariables) {
+            if (environment.remove(variable) == null) {
+                throw new IllegalArgumentException(
+                        variable + " is not in the launch environment " + environment.keySet());
+            }
+        }
         environment.put("JAVA_TOOL_OPTIONS", String.join(" ", options));
 
         List<String> output = Collections.synchronizedList(new ArrayList<>());
@@ -193,6 +239,19 @@ public final class LaunchedCometGui implements AutoCloseable {
      *     the application printed
      */
     public String attach(Duration bound) {
+        return connect(bound).text("bridge.awaitApplication", Math.toIntExact(bound.toSeconds()));
+    }
+
+    /**
+     * Waits for the bridge and connects to it, without waiting for the application's window: for
+     * what the launched JVM reports about itself ({@link #environment()}, {@link #locale()}) when
+     * the application may never show one.
+     *
+     * @param bound how long the wait may take at most
+     * @return the connection
+     * @throws AssertionError if the process exited before its bridge started, with what it printed
+     */
+    public BridgeClient connect(Duration bound) {
         Await.until(
                 "the packaged application's bridge to write "
                         + portFile
@@ -207,8 +266,9 @@ public final class LaunchedCometGui implements AutoCloseable {
                             + " before its bridge started; it printed: "
                             + output());
         }
-        bridge = BridgeClient.connect(BridgeEndpoint.read(portFile));
-        return bridge.text("bridge.awaitApplication", Math.toIntExact(bound.toSeconds()));
+        BridgeClient connected = BridgeClient.connect(BridgeEndpoint.read(portFile));
+        bridge = connected;
+        return connected;
     }
 
     /**

@@ -1482,6 +1482,79 @@ public final class CanonicalScenario {
     }
 
     /**
+     * Step 25's first half alone, for a tier whose display PDV cannot draw on (Phase 14 E6): the
+     * chosen PSM selected, PDV absent before and installed on first use by the Draw, and exactly
+     * one {@code pdv.launched} event naming the pinned JAR in the fresh home's tool cache. It
+     * asserts nothing about the outcome; {@link #pdvDrewTheKnownPsm(PdvLaunch)} is the other half,
+     * and {@link #pdvDrawsAKnownPsm()} is both.
+     *
+     * @return the launch, as recorded
+     * @throws IOException if a file cannot be read
+     */
+    public PdvLaunch pdvIsLaunchedForAKnownPsm() throws IOException {
+        return downstream.pdvIsLaunchedForAKnownPsm();
+    }
+
+    /**
+     * Step 25's second half: the launch drew the chosen PSM, and the figure on disk is its.
+     *
+     * @param launch what {@link #pdvIsLaunchedForAKnownPsm()} returned
+     * @throws IOException if the figure cannot be read
+     */
+    public void pdvDrewTheKnownPsm(PdvLaunch launch) throws IOException {
+        downstream.pdvDrewTheKnownPsm(launch);
+    }
+
+    /**
+     * One PDV launch of step 25, as the run's {@code pdv.launched} event and the screen recorded
+     * it.
+     *
+     * @param outcome what the Visualisation section said when the launch ended
+     * @param jar the installed PDV JAR the test found under the fresh home
+     * @param argv the event's argument array, the Java launcher first
+     * @param environment the event's {@code process.environment}: the variables the command set,
+     *     one {@code NAME=value} per line, sorted
+     * @param workingDirectory the event's {@code process.working-directory}
+     * @param row the chosen PSM's 1-based row on the Results page
+     * @param seconds how long the Draw took, the first-use install included
+     */
+    public record PdvLaunch(
+            String outcome,
+            Path jar,
+            List<String> argv,
+            String environment,
+            String workingDirectory,
+            int row,
+            long seconds) {
+
+        /**
+         * Defensive copy.
+         *
+         * @throws NullPointerException if a part is {@code null}
+         */
+        public PdvLaunch {
+            Objects.requireNonNull(outcome, "outcome");
+            Objects.requireNonNull(jar, "jar");
+            argv = List.copyOf(argv);
+            Objects.requireNonNull(environment, "environment");
+            Objects.requireNonNull(workingDirectory, "workingDirectory");
+        }
+    }
+
+    /**
+     * The payloads of the current run's events of one type in its {@code provenance/events.log},
+     * oldest first, read with the test's own JSON reader: for a tier's own invariants, such as
+     * which Java launcher the converter ran on.
+     *
+     * @param type the event type's wire name, such as {@code limelight.converted}
+     * @return the payloads
+     * @throws IOException if the log cannot be read
+     */
+    public List<Map<String, Object>> events(String type) throws IOException {
+        return downstream.events(type);
+    }
+
+    /**
      * Step 26: the real converter, absent before and installed on first use, converts the run
      * through the Limelight section; the XML is validated against the schema in the installed JAR
      * and its counts against Percolator's raw table.

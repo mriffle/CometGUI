@@ -30,11 +30,12 @@ import org.cometgui.tools.process.ProcessService;
 import org.cometgui.tools.process.StartedProcess;
 
 /**
- * Tier A's runner for the scenario's own oracle commands: the project's process service, an
- * argument array, never a shell -- the one way this project launches a process. Its exit is waited
- * for through {@link Await} on the process being alive, never with a fixed sleep.
+ * The runner for the scenario's own oracle commands, in this test JVM whichever tier the
+ * application runs in (Tier B's classes use it too): the project's process service, an argument
+ * array, never a shell -- the one way this project launches a process. Its exit is waited for
+ * through {@link Await} on the process being alive, never with a fixed sleep.
  */
-final class ProcessServiceOracle implements OracleProcesses {
+public final class ProcessServiceOracle implements OracleProcesses {
 
     private final ProcessService service = new ProcessService(Clock.systemUTC());
 

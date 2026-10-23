@@ -34,6 +34,12 @@
  *       org.cometgui.app.e2e.scenario.ChooserScript}, so the tier-neutral scenarios run unchanged.
  *   <li>{@link org.cometgui.app.e2e.tierb.BridgeJar} builds the agent jar from the test classes
  *       this JVM is running ({@code scripts/e2e/build-bridge.sh}).
+ *   <li>{@link org.cometgui.app.e2e.tierb.TierBApplication} is Tier B's composition, shared by
+ *       {@code TierBCanonicalScenarioTest} and {@code TierBNoXmlScenarioTest}, which run the same
+ *       scenario steps as Tier A against the installed artefact; {@code TierBLocaleControlTest}
+ *       shows the launched-process locale check failing with no locale; {@link
+ *       org.cometgui.app.e2e.tierb.PdvOnThisHost} is what step 25 can assert on a host without a
+ *       system X11 library (Phase 14 E6).
  * </ul>
  *
  * <p>Every class here is opt-in ({@link org.cometgui.app.e2e.support.EndToEnd}) where it is a test.

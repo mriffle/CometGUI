@@ -199,6 +199,18 @@ public final class NoXmlScenario {
         return Objects.requireNonNull(derived, "the rerun has not run");
     }
 
+    /**
+     * The payloads of the current run's events of one type -- the first run's until the rerun, the
+     * derived run's after it -- as {@link CanonicalScenario#events(String)} reads them.
+     *
+     * @param type the event type's wire name
+     * @return the payloads, oldest first
+     * @throws IOException if the log cannot be read
+     */
+    public List<Map<String, Object>> events(String type) throws IOException {
+        return canonical.events(type);
+    }
+
     // ================================================== canonical steps, shared ====
 
     /**

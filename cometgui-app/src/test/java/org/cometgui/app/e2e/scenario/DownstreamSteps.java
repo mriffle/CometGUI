@@ -162,6 +162,20 @@ final class DownstreamSteps {
      * @throws IOException if a file cannot be read
      */
     void pdvDrawsAKnownPsm() throws IOException {
+        pdvDrewTheKnownPsm(pdvIsLaunchedForAKnownPsm());
+    }
+
+    /**
+     * Step 25's first half, which needs no display PDV can draw on: the chosen PSM selected in the
+     * Results section, PDV absent before and installed on first use by the Draw -- the pinned JAR
+     * in the fresh home's tool cache, the Tool Manager listing it installed -- and exactly one
+     * {@code pdv.launched} event naming that JAR, its digest and version, the launch kind and the
+     * PSM. Whether PDV then drew is {@link #pdvDrewTheKnownPsm}'s question.
+     *
+     * @return what the launch was, as the run's event and the screen record it
+     * @throws IOException if a file cannot be read
+     */
+    CanonicalScenario.PdvLaunch pdvIsLaunchedForAKnownPsm() throws IOException {
         Artefact pdv = scenario.manifest().onlyArtefact("pdv", scenario.platform());
         String row = CanonicalScenario.rowOf(pdv);
         assertEquals(List.of(), toolFiles("pdv.*\\.(jar|zip)"), "no PDV under the home before");
@@ -240,19 +254,12 @@ final class DownstreamSteps {
                                                 || text.startsWith("The PDV install was cancelled"),
                                 PDV_BOUND);
         long seconds = (System.nanoTime() - started) / 1_000_000_000L;
-        assertTrue(
-                outcome.startsWith(
-                        "PDV drew the annotated spectrum of PSM "
-                                + drawn.psmId()
-                                + " ("
-                                + drawn.sequence()
-                                + ") from spectrum "),
-                () -> "step 25: PDV drew " + drawn + ": " + outcome);
 
-        figure = onlyFigure();
-        FigureImage image = FigureImage.read(figure);
         List<Path> jars = toolFiles("pdv.*\\.jar");
-        assertEquals(1, jars.size(), () -> "one PDV JAR installed: " + jars);
+        assertEquals(
+                1,
+                jars.size(),
+                () -> "one PDV JAR installed: " + jars + "; the outcome: " + outcome);
         pdvJar = jars.get(0);
         String version;
         try (JarFile jar = new JarFile(pdvJar.toFile())) {
@@ -263,11 +270,14 @@ final class DownstreamSteps {
         }
         OwnDigests own = OwnDigests.of(pdvJar);
         List<Map<String, Object>> launches = events("pdv.launched");
-        assertEquals(1, launches.size(), "one PDV launch, one pdv.launched event");
+        assertEquals(
+                1,
+                launches.size(),
+                () -> "one PDV launch, one pdv.launched event; the outcome: " + outcome);
         Map<String, Object> launched = launches.get(0);
         String jarVersion = version;
         assertAll(
-                "step 25: PDV installed on first use, and the figure of the chosen PSM",
+                "step 25: PDV installed on first use, and launched for the chosen PSM",
                 () ->
                         assertTrue(
                                 pdvJar.startsWith(layout().toolCache()),
@@ -278,21 +288,6 @@ final class DownstreamSteps {
                         assertEquals(
                                 "PDV " + pdv.version() + " is installed: " + pdvJar + ".",
                                 screen().ui().textOf("visualisation-pdv-status")),
-                () -> assertTrue(outcome.contains(figure.toString()), outcome),
-                () ->
-                        assertTrue(
-                                outcome.endsWith(
-                                        ", " + image.width() + " x " + image.height() + " pixels."),
-                                outcome),
-                () -> assertTrue(image.bytes() > 2_000, "bytes: " + image.bytes()),
-                () -> assertTrue(image.width() >= 400 && image.width() <= 4_000, "" + image),
-                () -> assertTrue(image.height() >= 200 && image.height() <= 4_000, "" + image),
-                () ->
-                        assertTrue(
-                                image.ink() * 100 >= (long) image.width() * image.height(),
-                                () -> "at least 1% ink, not blank: " + image),
-                () -> assertTrue(image.orange() >= 100, () -> "orange ions: " + image),
-                () -> assertTrue(image.green() >= 100, () -> "green ions: " + image),
                 () -> assertEquals(own.sha256(), launched.get("pdv.jar.sha256")),
                 () -> assertEquals(pdvJar.toString(), launched.get("pdv.jar.path")),
                 () -> assertEquals(jarVersion, launched.get("tool.version")),
@@ -307,6 +302,53 @@ final class DownstreamSteps {
                                 "the Tool Manager to list PDV as installed",
                                 text -> text.endsWith(": installed"),
                                 CanonicalScenario.CHECK_BOUND));
+        return new CanonicalScenario.PdvLaunch(
+                outcome,
+                pdvJar,
+                argv(launched),
+                text(launched, "process.environment"),
+                text(launched, "process.working-directory"),
+                found + 1,
+                seconds);
+    }
+
+    /**
+     * Step 25's second half, which needs a display PDV can draw on: the launch drew the chosen
+     * PSM's annotated spectrum, and the figure -- the one file in the run's first figure directory
+     * -- exists, decodes, is of a plausible size, is not blank and shows both ion colours.
+     *
+     * @param launch what {@link #pdvIsLaunchedForAKnownPsm()} returned
+     * @throws IOException if the figure cannot be read
+     */
+    void pdvDrewTheKnownPsm(CanonicalScenario.PdvLaunch launch) throws IOException {
+        String outcome = launch.outcome();
+        assertTrue(
+                outcome.startsWith(
+                        "PDV drew the annotated spectrum of PSM "
+                                + drawn.psmId()
+                                + " ("
+                                + drawn.sequence()
+                                + ") from spectrum "),
+                () -> "step 25: PDV drew " + drawn + ": " + outcome);
+        figure = onlyFigure();
+        FigureImage image = FigureImage.read(figure);
+        assertAll(
+                "step 25: the figure of the chosen PSM",
+                () -> assertTrue(outcome.contains(figure.toString()), outcome),
+                () ->
+                        assertTrue(
+                                outcome.endsWith(
+                                        ", " + image.width() + " x " + image.height() + " pixels."),
+                                outcome),
+                () -> assertTrue(image.bytes() > 2_000, "bytes: " + image.bytes()),
+                () -> assertTrue(image.width() >= 400 && image.width() <= 4_000, "" + image),
+                () -> assertTrue(image.height() >= 200 && image.height() <= 4_000, "" + image),
+                () ->
+                        assertTrue(
+                                image.ink() * 100 >= (long) image.width() * image.height(),
+                                () -> "at least 1% ink, not blank: " + image),
+                () -> assertTrue(image.orange() >= 100, () -> "orange ions: " + image),
+                () -> assertTrue(image.green() >= 100, () -> "green ions: " + image));
         observe(
                 "PDV: drew PSM "
                         + drawn.psmId()
@@ -321,9 +363,9 @@ final class DownstreamSteps {
                         + " unmodified target PSMs at q <= "
                         + PSM_CUTOFF
                         + ", row "
-                        + (found + 1)
+                        + launch.row()
                         + " of the page) in "
-                        + seconds
+                        + launch.seconds()
                         + " s including the first-use install; figure "
                         + figure
                         + ": "
@@ -1393,7 +1435,7 @@ final class DownstreamSteps {
     }
 
     /** The payloads of the run's events of one type, oldest first, read with the test's JSON. */
-    private List<Map<String, Object>> events(String type) throws IOException {
+    List<Map<String, Object>> events(String type) throws IOException {
         List<Map<String, Object>> found = new ArrayList<>();
         for (String line :
                 Files.readAllLines(
