@@ -1,0 +1,438 @@
+# failure-paths.toml -- Phase 14 exit-gate item 4: "Every failure-path scenario
+# in the specification has a passing test."
+#
+# One [[scenario]] per item of specification.rst, "Failure-path scenarios", in
+# its words (inline literals and all) and in its order. scripts/e2e/
+# check-failure-paths.sh parses that paragraph itself and refuses this file if
+# the two lists differ in any way, so a scenario cannot be dropped, added or
+# reworded here without the specification changing first.
+#
+# Each scenario has a status:
+#   covered  -- at least one [[scenario.test]] exercises it, and every mapped
+#               test must exist, run and pass.
+#   partial  -- what exists is listed, and the scenario is NOT yet proved; the
+#               checker fails on it unless --allow-partial is given, and the
+#               note names who owns the rest.
+#
+# Each test is a fully-qualified id, class#method, with $ before a nested
+# class (Outer$Inner#method). Its level is one of:
+#   gui-e2e     the Tier A or Tier B end-to-end scenario (real tools, opt-in)
+#   gui         a GUI test of the launched application (TestFX, headless)
+#   integration the workflow engine or the Tool Manager port, real components
+#   unit+real   one component against the real tool binaries
+#   unit        one component, no tool binary
+# and its run is "ordinary" (scripts/build.sh runs it) or "e2e" (it runs only
+# under -Dcometgui.e2e=true, the end-to-end harness's opt-in).
+#
+# Defects named in notes as "8a-Dn" are the Phase 14 unit 8a report's; they are
+# recorded for the orchestrator and asserted by no test either way.
+
+[[scenario]]
+number = 1
+text = "download checksum mismatch"
+status = "covered"
+note = "One flipped byte at the pinned URL: rejected at DOWNLOADING with nothing executed (R-SEC-02), the cache empty, Install offered again."
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.ToolManagerInstallUiTest#aCorruptedArtefactIsRejectedAndNothingIsExecuted"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.manager.ManagedToolManagerInstallTest#aCorruptedArtefactIsRejectedAndNothingIsExecuted"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 2
+text = "network unavailable on first install"
+status = "covered"
+note = "A refused connection through the real HttpDownloader: FAILED after one attempt at the pinned URL, nothing probed or executed, the cache empty, Install offered again and then succeeding. The installer's exception names the URL and the ConnectException; the Tool Manager row says only that the attempt did not succeed (8a-D1)."
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.NetworkUnavailableUiTest#firstInstallWithoutANetwork"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.NetworkUnavailableUiTest#theNetworkBack"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.manager.NetworkUnavailableTest#firstInstallWithoutANetwork"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.manager.NetworkUnavailableTest#theReasonNamesTheUrlAndTheConnection"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.download.HttpDownloaderTest$Failures#aRefusedConnectionIsANetworkFailure"
+  level = "unit"
+  run = "ordinary"
+
+[[scenario]]
+number = 3
+text = "network unavailable after tools are cached"
+status = "covered"
+note = "Comet and Percolator installed through the Tool Manager, the network cut, and a real search run from the Run section succeeds with zero fetches; at the port, a new session over the same cache is INSTALLED with zero fetches while an uncached build fails (the control that the network is really down)."
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.NetworkUnavailableUiTest#cachedToolsRunWithoutANetwork"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.manager.NetworkUnavailableTest#cachedToolsNeedNoNetwork"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 4
+text = "a downloaded binary that cannot load on this host (``R-PLAT-03``)"
+status = "covered"
+note = "Real binaries that fail to load -- a missing shared object, a glibc symbol version, a foreign architecture -- each a distinct loader diagnostic; a build above the host's glibc floor is refused in advance and not offered."
+
+  [[scenario.test]]
+  id = "org.cometgui.install.probe.RealBinaryProbeTest#theRealMissingSharedObject"
+  level = "unit+real"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.probe.RealBinaryProbeTest#theRealSymbolVersionFailure"
+  level = "unit+real"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.probe.RealBinaryProbeTest#theRealForeignArchitectureBuild"
+  level = "unit+real"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.probe.ProbeGatedOffersTest#oneBelowTheGlibcFloorIsRefused"
+  level = "unit"
+  run = "ordinary"
+
+[[scenario]]
+number = 5
+text = "Comet exits non-zero"
+status = "covered"
+note = "The real Comet refuses an empty spectral library, exit 1: the outcome names the step, the invocation and its log, the stepper shows Comet failed."
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.RealRunUiTest#aFailureIsStated"
+  level = "gui"
+  run = "ordinary"
+
+[[scenario]]
+number = 6
+text = "Comet exits zero but the PIN is missing"
+status = "covered"
+note = "A stand-in Comet writes each pepXML and no PIN, exit 0: run-comet fails naming the first missing PIN, nothing after it starts, Percolator is never launched, the pepXML recorded partial. In the Run section the Percolator stage reads Running after the failed run ended (8a-D3); not asserted."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RunFailurePathTest#cometExitsZeroWithoutAPin"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.RunInputFailureUiTest#cometExitsZeroWithoutAPin"
+  level = "gui"
+  run = "ordinary"
+
+[[scenario]]
+number = 7
+text = "a FASTA with no decoys and ``decoy_search = 0``"
+status = "covered"
+note = "Blocked before Comet starts, in words on screen and to the keyboard; the real run's own validate step blocks too."
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.RunReadinessUiTest#theDecoyBlockOnScreen"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RealDecoyBlockTest#gate4NoDecoysAnywhereBlocksBeforeCometStarts"
+  level = "unit+real"
+  run = "ordinary"
+
+[[scenario]]
+number = 8
+text = "a PIN containing no decoy rows"
+status = "covered"
+note = "R-DEC-04: refused before Percolator is launched, naming the decoy configuration; the real Comet's own zero-decoy PIN too."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.PercolatorStepTest#aPinWithoutDecoysIsRefusedBeforeLaunch"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RealStepTest#aPinWithoutDecoysFailsValidation"
+  level = "unit+real"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RealPercolatorRunTest#gate5TheRealZeroDecoyPin"
+  level = "unit+real"
+  run = "ordinary"
+
+[[scenario]]
+number = 9
+text = "Percolator exits non-zero"
+status = "covered"
+note = "The step fails naming the exit code and its log; its outputs are recorded partial and left writable."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.PercolatorStepTest#aNonZeroExitFails"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 10
+text = "malformed Percolator output"
+status = "covered"
+note = "A table the parser refuses fails parse-percolator with the parser's message."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.PercolatorStepTest#aMalformedTableFailsParsing"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 11
+text = "converter exits non-zero"
+status = "covered"
+note = "The parameterised gate-2 test's EXITS_ONE case: the conversion fails and keeps nothing. Every case of the test must pass."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.limelight.LimelightConversionsTest#gate2AFailedConversionKeepsNothing"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 12
+text = "converter returns zero but the XML is missing or empty"
+status = "covered"
+note = "The same test's NOTHING and EMPTY cases, each its own failure kind."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.limelight.LimelightConversionsTest#gate2AFailedConversionKeepsNothing"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 13
+text = "the user cancels Comet"
+status = "covered"
+note = "A real search cancelled from the Run section, and through the engine mid-search: the process tree gone, outputs partial."
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.RealCancelUiTest#cancelARealSearch"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RealCancellationTest#gate7CancelTheRealCometMidSearch"
+  level = "unit+real"
+  run = "ordinary"
+
+[[scenario]]
+number = 14
+text = "the user cancels Percolator"
+status = "partial"
+note = "No engine or GUI test cancels a running Percolator yet. Owned by Phase 14 unit 8b."
+
+[[scenario]]
+number = 15
+text = "a source input deleted after selection"
+status = "covered"
+note = "Deleted before Run: refused before the run exists, naming the file, nothing launched or created -- through the workflow and through the Run section. Deleted after the run was created: hash-inputs names it, Comet never starts."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RunFailurePathTest#aSpectrumFileDeletedBeforeRun"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.RunInputFailureUiTest#aSpectrumFileDeletedAfterSelection"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.StepFailureTest#hashInputsNamesADeletedSpectrumFile"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.StepFailureTest#hashInputsNamesADeletedDatabase"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 16
+text = "an input checksum changed before a rerun"
+status = "covered"
+note = "R-RUN-02: the file, its role and both SHA-256s named, in the Run section's preview and by the engine's reuse check."
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.RealRunUiTest#aChangedInputIsNamed"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RealChangedInputTest#gate8ChangedSpectrumFileRefusesReuse"
+  level = "unit+real"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.StepFailureTest#hashInputsNamesEveryChangedInput"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 17
+text = "the output or project directory becoming unwritable"
+status = "partial"
+note = "Only the pre-run check of an unwritable runs directory exists; a directory becoming unwritable mid-run is untested. Owned by Phase 14 unit 8b."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.PreRunChecksTest#runsDirectory"
+  level = "unit"
+  run = "ordinary"
+
+[[scenario]]
+number = 18
+text = "insufficient disk space where it can be simulated safely"
+status = "partial"
+note = "Only a stage log whose writes fail with ENOSPC, simulated by a throwing writer, is tested; the product has no disk-space check. Owned by Phase 14 unit 8b."
+
+  [[scenario.test]]
+  id = "org.cometgui.tools.process.StageRecorderTest#oneWarningAndOnlyOne"
+  level = "unit"
+  run = "ordinary"
+
+[[scenario]]
+number = 19
+text = "paths containing spaces"
+status = "covered"
+note = "Spaces in the working directory, arguments, output and class path through the process service; in every path of a real Comet and Percolator run through the workflow; and in the end-to-end home."
+
+  [[scenario.test]]
+  id = "org.cometgui.tools.process.AwkwardPathTest$ThroughTheService#theWorkingDirectoryAndAnArgumentSurvive"
+  level = "unit"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RealAwkwardPathRunTest#unicodePaths"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.e2e.tiera.TierACanonicalScenarioTest#run"
+  level = "gui-e2e"
+  run = "e2e"
+
+[[scenario]]
+number = 20
+text = "paths containing Unicode"
+status = "covered"
+note = "Real Comet and Percolator through the workflow with the project, inputs, database and tools under non-ASCII names (the module's surefire fork is given LANG=C.UTF-8; the test fails, never skips, without it); and both end-to-end scenarios in both tiers under the non-ASCII home."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RealAwkwardPathRunTest#unicodePaths"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.tools.process.AwkwardPathTest$ThroughTheService#anAwkwardOutputFileIsWrittenAndReadBack"
+  level = "unit"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.e2e.tiera.TierACanonicalScenarioTest#run"
+  level = "gui-e2e"
+  run = "e2e"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.e2e.tiera.TierANoXmlScenarioTest#run"
+  level = "gui-e2e"
+  run = "e2e"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.e2e.tierb.TierBCanonicalScenarioTest#run"
+  level = "gui-e2e"
+  run = "e2e"
+
+[[scenario]]
+number = 21
+text = "long paths on supported platforms"
+status = "covered"
+note = "Linux: a real run with spectrum files at about 4000 bytes through 255-byte names, a 500-byte database and a -N base within 8 bytes of Comet's measured 511. Beyond Comet's limits the product has no check: a database_name of 511 or more passes the pre-run check (whose limit says 4095) and Comet refuses it, and a -N base over 511 is truncated by Comet, which exits 0 (8a-D2). Windows' 260-character MAX_PATH case cannot be exercised on this host and is not claimed."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.RealAwkwardPathRunTest#longPaths"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 22
+text = "a corrupted cached tool"
+status = "covered"
+note = "R-TOOL-04: a changed or same-length swapped file makes the entry not installed; an executable replaced after selection is refused before it is run."
+
+  [[scenario.test]]
+  id = "org.cometgui.install.cache.ToolCacheTest#aChangedFileMakesTheEntryNotInstalled"
+  level = "unit"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.cache.ToolCacheTest#aSwappedFileOfTheSameLengthIsCaughtByTheDigest"
+  level = "unit"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.StepFailureTest#resolveRefusesAReplacedExecutable"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 23
+text = "an interrupted tool install"
+status = "covered"
+note = "An install killed after each step never reports itself installed, and the next install recovers from whatever the crash left."
+
+  [[scenario.test]]
+  id = "org.cometgui.install.cache.InstallInterruptionTest#anInstallKilledAfterEachStepNeverReportsItselfInstalled"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.install.cache.InstallInterruptionTest#theNextInstallRecoversFromWhateverTheCrashLeft"
+  level = "integration"
+  run = "ordinary"
+
+[[scenario]]
+number = 24
+text = "a stale or partial run reopened"
+status = "partial"
+note = "No test reopens a stale or partial run yet. Owned by Phase 14 unit 8b."
+
+[[scenario]]
+number = 25
+text = "a second CometGUI instance opening a locked project"
+status = "covered"
+note = "R-RUN-05 at the storage level, across two real processes: a live holder refused and then released, a dead holder's stale lock recovered and named. A GUI-level test is Phase 14 unit 8b's (optional)."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.storage.ProjectLockProcessTest#liveHolderRefusedThenReleased"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.storage.ProjectLockProcessTest#deadHolderRecovered"
+  level = "integration"
+  run = "ordinary"

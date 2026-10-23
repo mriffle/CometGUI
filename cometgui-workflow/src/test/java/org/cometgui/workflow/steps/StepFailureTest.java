@@ -264,7 +264,7 @@ class StepFailureTest {
     }
 
     @Test
-    @DisplayName("hash-inputs: every changed input is named with both digests; a deleted one too")
+    @DisplayName("hash-inputs: every changed input is named with both digests")
     void hashInputsNamesEveryChangedInput(@TempDir Path directory)
             throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
         FakeSearch fake = FakeSearch.create(directory);
@@ -298,6 +298,47 @@ class StepFailureTest {
                             + RealComet.sha256(second)
                             + ". A run's inputs are fixed when it is created; start a new run to"
                             + " search the files as they are now",
+                    result.failures().get(EngineStep.HASH_INPUTS));
+        }
+    }
+
+    /**
+     * Failure path "a source input deleted after selection", once the run exists: the run was
+     * created and validated with both spectrum files present, then one was deleted and the other
+     * changed. Both are named, the deleted one as deleted, in input order, and Comet never starts.
+     */
+    @Test
+    @DisplayName(
+            "hash-inputs: a spectrum file deleted after it was selected is named, beside a changed"
+                    + " one")
+    void hashInputsNamesADeletedSpectrumFile(@TempDir Path directory)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
+        FakeSearch fake = FakeSearch.create(directory);
+        try (RealProject project = RealProject.create(fake.project())) {
+            PreparedRun prepared = prepare(project, fake);
+            Path first = fake.spectra().get(0);
+            Path second = fake.spectra().get(1);
+            String firstWas = RealComet.sha256(first);
+            RunResult result =
+                    runTampered(
+                            project,
+                            prepared,
+                            () -> {
+                                Files.writeString(first, "x", StandardOpenOption.APPEND);
+                                Files.delete(second);
+                            });
+            assertEquals(StepState.FAILED, result.states().get(EngineStep.HASH_INPUTS));
+            assertEquals(
+                    "the spectrum file 1 "
+                            + first
+                            + " has changed since the run was recorded: recorded SHA-256 "
+                            + firstWas
+                            + ", now "
+                            + RealComet.sha256(first)
+                            + "; the spectrum file 2 "
+                            + second
+                            + " no longer exists. A run's inputs are fixed when it is created;"
+                            + " start a new run to search the files as they are now",
                     result.failures().get(EngineStep.HASH_INPUTS));
         }
     }

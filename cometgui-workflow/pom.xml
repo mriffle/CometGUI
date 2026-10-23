@@ -67,4 +67,38 @@
       <artifactId>cometgui-params-percolator</artifactId>
     </dependency>
   </dependencies>
+  <build>
+    <plugins>
+      <!--
+        WHY THIS MODULE'S TESTS FORCE A UTF-8 LOCALE ON THE FORKED JVM (phase 14
+        unit 8a), for the reason cometgui-process gives in full.
+
+        The specification's failure-path list names "paths containing Unicode",
+        and RealAwkwardPathRunTest proves it through this module's workflow with
+        the real Comet and Percolator.  The build host exports no locale, so a
+        JVM forked here reports sun.jnu.encoding=ANSI_X3.4-1968 and cannot
+        spell a non-ASCII file name at all; measured before this block was
+        added, that test FAILED by design ("expected: <UTF-8> but was:
+        <ANSI_X3.4-1968>"), under surefire and in PIT's coverage run alike
+        ("1 tests did not pass without mutation").  pitest-maven reads this
+        block from surefire's configuration, so one setting serves both; PIT's
+        own configuration is not touched.
+
+        A TEST ENVIRONMENT correction, not a weakened gate: the test still
+        asserts the encoding and fails, never skips, without it.  Tools are
+        unaffected - the process service clears a tool's environment and puts
+        back only what the command names - so no product launch sees LANG.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <environmentVariables>
+            <LANG>C.UTF-8</LANG>
+            <LC_ALL>C.UTF-8</LC_ALL>
+          </environmentVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
