@@ -349,7 +349,25 @@ collide exists, so none is offered.
        rerun (P14-7), XML, conversion, both Percolator executions in
        provenance.
      - item 3; AC-TST-08
-     - pending
+     - **Accepted 2026-10-23**, ``adec5c5`` ``3f96c12`` (agent 4). Diff read
+       (5 files, test code only: ``NoXmlScenario`` reusing
+       ``CanonicalScenario``'s steps, ``TierAApplication`` shared by both
+       Tier A classes). Ran myself: ``TierANoXmlScenarioTest`` 15 and
+       ``TierACanonicalScenarioTest`` 23, 0 failures;
+       ``check-no-fixed-sleep.sh`` PASSED (109 classes). My injection:
+       ``PercolatorRerun.copy`` touching the source file's mtime after
+       copying -- red at step 5 on the disk check, "the first run's Comet
+       trees, unchanged ... changed=[pin/merged.pin: mtime] ...
+       [comet.params: mtime]"; restored, ``sha256sum -c`` OK. Agent's
+       injections (read): Comet re-executed by the rerun (red on disk alone,
+       the product's records agreeing), 3.07.1 installed eagerly or as a
+       silent prefetch (red at step 3, the first cache walk after the
+       explanation), ``-X`` passed to 3.09 (the run fails), a no-XML run
+       judged convertible (red at step 3). 3.09 is a registered local binary
+       (no Linux managed build); the "no managed build, offer registration"
+       branch is Phase 12's ``LimelightRerunUiTest.noManagedBuild``. Reads
+       outside the module (opt-in): as unit 3, plus
+       ``scratch/percolator/3.09``.
    * - 5
      - **Packaging** (P14-10): the Linux app-image and archive, the install
        step, macOS and Windows configuration unexecuted, ``bin/java`` present,
