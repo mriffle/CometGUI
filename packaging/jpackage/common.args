@@ -1,0 +1,41 @@
+# CometGUI -- jpackage options shared by every platform (Phase 14, unit 5).
+#
+# A jpackage argument file: scripts/package/build-app-image.sh passes it as
+# @packaging/jpackage/common.args, then the platform's own file, then the
+# values only a build knows (--app-version from the build identity, --input,
+# --main-jar, --add-modules from packaging/runtime-modules.txt, --dest).
+# Lines starting with # are comments; a value with spaces is double-quoted.
+
+--name CometGUI
+--main-class org.cometgui.app.bootstrap.CometGuiLauncher
+--vendor "The CometGUI authors"
+--description "Comet to Percolator proteomics search workflow with provenance"
+--copyright "Copyright (C) 2026 The CometGUI authors. GPL-3.0-only."
+
+# THE RUNTIME KEEPS bin/java.  Without --jlink-options jpackage runs jlink with
+# --strip-native-commands, and the bundled runtime has no java launcher at all
+# (docs/feasibility/toolchain.rst, "The bundled runtime has no java launcher by
+# default").  The product launches PDV and the Limelight converter -- both
+# JARs -- from java.home/bin/java (org.cometgui.tools.api.JavaRuntime), so an
+# image without it installs, starts, and then cannot run either tool.
+# Supplying the option REPLACES jpackage's defaults; these are those defaults
+# minus --strip-native-commands.
+--jlink-options "--strip-debug --no-man-pages --no-header-files"
+
+# NATIVE ACCESS, both measured on the packaged image on 2026-10-23.
+#  ALL-UNNAMED: org.cometgui.app.config.FfmGlibcVersionSource calls
+#    gnu_get_libc_version through java.lang.foreign from the class path
+#    (cometgui-app/pom.xml records this option for the packaged application).
+#  javafx.graphics: without it the launcher prints "WARNING: java.lang.System::load
+#    has been called by com.sun.glass.utils.NativeLibLoader in module
+#    javafx.graphics" at every start; the warning names this exact option.
+--java-options --enable-native-access=ALL-UNNAMED
+--java-options --enable-native-access=javafx.graphics
+
+# NOT HERE, ON PURPOSE: -Dsun.jnu.encoding=UTF-8.  It is inert -- the JVM
+# resolves sun.jnu.encoding from the process environment before system
+# properties apply -- so it would be accepted and change nothing (STATUS.rst,
+# "Risks currently live", item 1).  Starting the JVM in a UTF-8 locale is the
+# packaged launcher's job and belongs to Phase 16; it cannot be expressed as a
+# java option.  scripts/package/build-app-image.sh refuses an image whose
+# launcher configuration mentions sun.jnu.encoding.

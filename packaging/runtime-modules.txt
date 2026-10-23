@@ -1,0 +1,66 @@
+# CometGUI -- the root modules of the bundled Java runtime (Phase 14, unit 5).
+#
+# Read by scripts/package/build-app-image.sh, which joins the non-comment lines
+# with commas and passes them to jpackage --add-modules.  jlink then adds every
+# module these require, so the runtime's final list (lib/runtime/release,
+# MODULES=) is longer than this file; the build script records it.
+#
+# WHY A CHOSEN LIST AND NOT jpackage's DEFAULT.  With no --add-modules jpackage
+# roots the runtime at every system module that exports an API -- 61 modules,
+# 333 MB on 2026-10-23 -- including jdk.compiler, jdk.jshell, jdk.jdi,
+# jdk.jdwp.agent, jdk.attach, jdk.management.agent (remote JMX), jdk.jconsole,
+# jdk.javadoc, jdk.incubator.vector and two jfx.incubator modules.  None of
+# those is used, and a debugger agent and a remote-management agent are not
+# things a desktop product should ship.
+#
+# WHY NOT ONLY WHAT THE PRODUCT ITSELF NEEDS.  jdeps over cometgui-app and its
+# runtime class path reports java.base, java.net.http, java.xml and
+# javafx.controls -- and a runtime cut to that would break the product
+# silently, because THIS RUNTIME ALSO RUNS TWO THIRD-PARTY JARS.
+# org.cometgui.tools.api.JavaRuntime launches PDV and the Limelight converter
+# from java.home/bin/java, i.e. from this runtime, so their module needs are
+# this runtime's needs.  Measured with jdeps on 2026-10-23 (the converter's own
+# module-info stripped, and PDV's 184 JARs flattened into one class tree,
+# because jdeps refuses PDV's JARs as they are):
+#
+#   cometgui-app + class path   java.base java.net.http java.xml javafx.controls
+#   converter v2.8.1            java.base java.compiler java.desktop java.logging
+#   PDV 2.7.0                   java.base java.compiler java.desktop
+#                               java.instrument java.management java.prefs
+#                               java.rmi java.scripting java.security.jgss
+#                               java.sql.rowset jdk.httpserver jdk.jdi
+#                               jdk.unsupported
+#
+# A later PDV or converter release may need a module neither does today, which
+# is why the whole Java SE API is included rather than the union above.
+#
+# java.instrument IS PRESENT (through java.se).  It is here because Java SE is,
+# and PDV references it; it was not added for any test machinery.
+
+# The whole Java SE API (every java.* module): what "a Java runtime" means to
+# a third-party JAR, and a superset of everything jdeps found above.
+java.se
+
+# The JavaFX the product's interface is built on.  javafx.controls brings
+# javafx.graphics and javafx.base.  javafx.fxml, javafx.web, javafx.media and
+# javafx.swing are not used by the product or by either JAR tool.
+javafx.controls
+
+# sun.misc.Unsafe and friends: PDV's Guava, Kryo, Objenesis and Jodd call them.
+jdk.unsupported
+
+# com.sun.net.httpserver: PDV's own PDVGUI.gui.utils uses it.
+jdk.httpserver
+
+# Service providers jdeps cannot see, because they are found at run time
+# rather than referenced: the extended character sets (a file in a legacy
+# encoding), the locale data for every locale but English (the user's locale
+# is not ours to choose), and the zip file-system provider
+# (FileSystems.newFileSystem over an archive).
+jdk.charsets
+jdk.localedata
+jdk.zipfs
+
+# DELIBERATELY ABSENT: jdk.jdi.  PDV's jdeps lists it only because its bundled
+# javassist carries javassist.util.HotSwapper, a debugger client; including it
+# would also pull jdk.attach and jdk.jdwp.agent into a shipped product.

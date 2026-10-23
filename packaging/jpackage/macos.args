@@ -1,0 +1,32 @@
+# CometGUI -- jpackage options for macOS arm64 (tier 1) and x86-64 (tier 2).
+#
+# NEVER EXECUTED.  Written in Phase 14, unit 5 on a Linux host: jpackage is
+# not a cross-compiler (the Linux JDK's jdk.jpackage module contains no macOS
+# bundler), and no macOS machine exists in this environment.  Nothing here has
+# been shown to work; Phase 16's macOS runner is the first place it can run.
+#
+# What is known without running it, from the macOS JDK's own jdk.jpackage
+# module and Oracle's JDK 25 packaging guide (docs/feasibility/toolchain.rst,
+# "The macOS runner"):
+#   * dmg uses /usr/bin/hdiutil; pkg uses pkgbuild and productbuild -- all
+#     shipped with macOS.  An unsigned, default-icon dmg needs no Xcode.
+#   * Signing (--mac-sign, --mac-signing-key-user-name) needs Developer ID
+#     certificates; notarisation is a separate xcrun notarytool step after
+#     jpackage.  Both belong to Phase 16 and are not configured here.
+#   * LIKELY TO FAIL AS IT STANDS, UNVERIFIED: the macOS bundler is believed to
+#     reject an --app-version whose first number is zero (it becomes
+#     CFBundleVersion), and this build's version is 0.1.0.  The message is not
+#     in the Linux JDK's jdk.jpackage resources, so it could not be checked
+#     here.  Recorded rather than worked around: the version is the build
+#     identity's (cometgui-app's build-identity.properties), not this file's.
+#   * The architecture of the image is the architecture of the JDK running
+#     jpackage: an arm64 JDK makes an arm64 .app.  The x86-64 build is a
+#     separate run on an x86-64 JDK.
+#
+# The bundled runtime's module list and the java options are the same as on
+# Linux (common.args, packaging/runtime-modules.txt).  No --icon: the project
+# has no .icns yet.
+
+--type dmg
+--mac-package-identifier org.cometgui.CometGUI
+--mac-package-name CometGUI

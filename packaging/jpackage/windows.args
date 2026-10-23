@@ -1,0 +1,30 @@
+# CometGUI -- jpackage options for Windows x64 (Phase 14, unit 5).
+#
+# NEVER EXECUTED.  Written on a Linux host: jpackage is not a cross-compiler
+# (the Linux JDK's jdk.jpackage module contains no Windows bundler), and no
+# Windows machine exists in this environment.  Nothing here has been shown to
+# work; Phase 16's Windows runner is the first place it can run.
+#
+# What is known without running it (docs/feasibility/toolchain.rst, "The
+# Windows runner"):
+#   * msi and exe need the WiX Toolset on PATH (v3 candle/light, or v4/v5
+#     wix.exe).  An app-image (--type app-image) needs only the JDK and is the
+#     low-risk fallback.
+#   * An msi version is major.minor.build with major and minor at most 255 and
+#     build at most 65535; 0.1.0 satisfies that.
+#   * Comet's Thermo RAW companions (CometWrapper.dll, ThermoFisher.*) are
+#     installed by the product beside the Comet executable at run time, never
+#     baked into this installer.
+#
+# --win-upgrade-uuid identifies the product to Windows Installer across
+# versions, so an install of a newer CometGUI replaces an older one.  It was
+# generated once on 2026-10-23 and MUST NEVER CHANGE after a release ships.
+#
+# No --icon: the project has no .ico yet.
+
+--type msi
+--win-upgrade-uuid 40e2cf2f-aea1-4ba4-9c12-b0311d26046a
+--win-dir-chooser
+--win-menu
+--win-menu-group CometGUI
+--win-shortcut

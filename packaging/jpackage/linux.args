@@ -1,0 +1,17 @@
+# CometGUI -- jpackage options for Linux x86-64 (Phase 14, unit 5).
+#
+# EXECUTED on this project's Linux host.  The output is a self-contained
+# app-image directory, CometGUI/, which scripts/package/build-app-image.sh
+# then archives as CometGUI-<version>-linux-x86_64.tar.gz with a SHA-256 file
+# beside it: the "tar.gz" of the specification's platform matrix.
+#
+# An app-image needs nothing but the JDK.  A .deb (jpackage --type deb, with
+# --linux-package-name cometgui and --linux-shortcut) needs fakeroot, which is
+# absent here and may not be installed; an .rpm needs rpmbuild, also absent.
+# Neither is configured: the specification lists them "as infrastructure
+# permits", and that is Phase 16's runner, not this host
+# (docs/feasibility/toolchain.rst, "What jpackage needs on Linux").
+#
+# No --icon: the project has no icon yet, so jpackage's default is used.
+
+--type app-image
