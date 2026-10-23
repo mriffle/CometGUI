@@ -568,7 +568,23 @@ collide exists, so none is offered.
      - **Documentation**: ``docs/developer/e2e_harness.rst``, the testing
        page, traceability for the ``AC-`` and ``R-`` items this phase proves.
      - R-DOC-03
-     - pending
+     - **Accepted 2026-10-23**, ``114383e`` (agent 10). Diff read:
+       ``docs/developer/e2e_harness.rst`` (839 lines, every topic incl. a
+       known-gaps table E1-E15), ``testing.rst``, ``index.rst``,
+       ``releasing.rst`` (banner kept, Phase 16's page),
+       ``traceability-map.toml``. Ran myself: ``--only docs --only
+       traceability`` PASS (1 and 8 injected defects caught). Evidence kinds
+       read from the map: AC-TST-06, -08, -09, -12 test/check only;
+       AC-TST-07 tests plus planned 16; AC-INS-01 and AC-TST-05 tests plus
+       **planned 14** -- the generator rejects a criterion planned for a
+       PASSED phase, so their remainder (macOS/Windows; AC-TST-05's GUI list
+       not audited item by item, and the learned-weights chart it names does
+       not exist) needs tier 1's routing (escalated). Counts 46/7/19/8 to
+       50/9/13/8 (automated/partial/planned/human). Contradictions the agent
+       found: no ``e2e/failure`` package exists (failure-path tests live in
+       their modules); ``smoke-installed.sh`` is run by no harness; the
+       stubs' "PHASE-14 replaces this file" wording; the archive is
+       ``0.1.0-SNAPSHOT``.
 
 Rejections and rework
 =====================
