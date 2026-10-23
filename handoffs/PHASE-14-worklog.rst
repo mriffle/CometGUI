@@ -537,7 +537,33 @@ collide exists, so none is offered.
      - **The harness and CI wiring** (P14-13, P14-14), including gate item
        5's three injections as controls.
      - items 5--7
-     - pending
+     - **Accepted 2026-10-23**, ``0bda6c5`` ``81ac797`` (agent 9) plus my
+       ``76b18c9``. Diff read: ``scripts/verify-e2e-gates.sh`` (a ``git
+       archive HEAD`` sandbox; controls L, P, B, 4, 6, 7, 3i, 5q, 5p, 5b, H,
+       C; 48 graded), registered additively as ``e2e`` (items 14:1-7, floor
+       48; no other harness changed); ``stub-lib.sh`` optional arguments
+       (old stubs print as before); the four Phase 14 release stubs and
+       ``nightly-gui-tests.sh`` re-worded to name what they wait for (D-006's
+       CI fixture, Phase 16's ``release-package.sh``, a runner display);
+       the D-007 nightly slot (``nightly-limelight-sandbox.sh``, a new
+       ``nightly.yml`` job reading ``vars.``, exit 70 while unconfigured, no
+       default URL); ``LimelightSandboxUploadTest`` (cometgui-tools, reads
+       ``scratch/scientific-path/limelight/limelight.xml`` like
+       ``LimelightUploadClientTest``); a flaky wait in step 9 fixed.
+       **Rework by me**: the agent had moved the stubs' owner to PHASE-16 and
+       ``nightly-gui-tests`` to PHASE-15; reassigning a phase's obligations
+       is tier 1's call, so ``76b18c9`` restores PHASE-14 (escalated). Gates
+       by me on ``76b18c9``: ``e2e`` 48 controls PASS (1084 s),
+       ``pipeline`` 25 steps PASS (2217 s), ``workflows`` 23 PASS. My
+       demonstration: a copy of the harness expecting the wrong words for
+       5b, ``--only 5b`` -- "HARNESS FAILURE -- red, but without the
+       expected failure's own words", exit 1 (copy removed). Agent's: 5q
+       aimed at a comment -- "compiled form ... BYTE-IDENTICAL to the clean
+       baseline", exit 4. Found by the agent: Python's PEP 538 coerces a C
+       locale to C.UTF-8 for children, so the harness sets
+       ``PYTHONCOERCECLOCALE=0`` for its locale control. Residue: the
+       submit key has no route into CI (``secrets.`` forbidden), an owner
+       decision.
    * - 10
      - **Documentation**: ``docs/developer/e2e_harness.rst``, the testing
        page, traceability for the ``AC-`` and ``R-`` items this phase proves.
