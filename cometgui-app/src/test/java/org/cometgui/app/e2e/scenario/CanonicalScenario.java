@@ -78,9 +78,13 @@ import org.cometgui.app.uidriver.RemotableUiDriver;
  *       counts.
  * </ol>
  *
- * <p>Steps 1 to 24 are here (Phase 14 unit 2); unit 3 adds 25 to 30 -- PDV, the converter, the
- * upload, provenance and the relaunch, which calls {@link #attach} again with the new application's
- * driver.
+ * <p>Steps 1 to 24 were written by Phase 14 unit 2; unit 3 added 25 to 30 ({@link
+ * DownstreamSteps}): PDV, the converter, the upload -- which takes a {@link LimelightEndpoint} the
+ * tier supplies -- provenance, and the relaunch, for which a tier calls {@link
+ * #recordWhatIsShownBeforeTheClose()}, stops the application through its own stop, starts a new one
+ * over a new composition root from the same home, {@link #attach}es its driver and calls {@link
+ * #theRelaunchedApplicationIsCoherent()}. A tier must give the application a display PDV can reach
+ * (step 25) and a loopback endpoint and test key (step 27).
  *
  * <h2>Where the product diverges from the specification's wording</h2>
  *
@@ -101,6 +105,13 @@ import org.cometgui.app.uidriver.RemotableUiDriver;
  *       unit 2 found that they did not -- defect E3, a listener held only weakly -- and worked
  *       around it with a relaunch; unit 2b repaired the product and removed the relaunch, and
  *       {@code InstallReachesTheSectionsUiTest} is the defect's own test.)
+ *   <li><strong>Step 10</strong> (unit 3, escalated as E5): besides the precursor window the
+ *       scenario sets Comet's results per spectrum to {@value #RESULTS_PER_SPECTRUM} in the
+ *       Advanced level, because with Comet's default top 5 the pinned converter refuses this
+ *       fixture's run (see {@link #RESULTS_PER_SPECTRUM}).
+ *   <li><strong>Step 30</strong>: nothing diverges. The product keeps a run's q filters in the
+ *       run's {@code results/view-state.json}, so the relaunched Results section shows 0.005 and
+ *       0.02 again, and the counts under them; the scenario asserts the file and the screen.
  * </ul>
  *
  * <h2>Designed to go red</h2>
@@ -109,9 +120,12 @@ import org.cometgui.app.uidriver.RemotableUiDriver;
  * file (step 17 compares every parameter of the written file with Comet's own defaults plus the
  * changes made on screen), a downstream stage is bypassed (step 20 requires Percolator's execution
  * record, its exit, its XML and tables on disk, and step 21 the counts on screen equal to counts of
- * that very file), filtering uses {@code <} instead of {@code <=} (steps 21 to 23 also type a
- * cutoff equal to a q-value the file holds, so the two comparisons disagree), or Comet writes
- * beside its inputs (step 18 compares the inputs' directory with its snapshot).
+ * that very file; steps 25 to 27 require the figure, the converted file and the endpoint's own
+ * record of the upload, each read by the test), filtering uses {@code <} instead of {@code <=}
+ * (steps 21 to 23 also type a cutoff equal to a q-value the file holds, so the two comparisons
+ * disagree), an output is omitted from provenance (step 28 requires every file under {@code
+ * outputs/} declared as an output or named by its own event), or Comet writes beside its inputs
+ * (step 18 compares the inputs' directory with its snapshot).
  */
 public final class CanonicalScenario {
 
@@ -160,6 +174,22 @@ public final class CanonicalScenario {
     /** The variable modification the scenario edits: slot 1's oxidation, at most 2 per peptide. */
     public static final String EDITED_VARIABLE_MOD = "15.9949 M 0 2 -1 0 0 0.0";
 
+    /**
+     * How many results per spectrum the scenario has Comet report (step 10), in place of Comet's
+     * default 5, set in the Advanced level.
+     *
+     * <p><strong>A workaround, escalated (Phase 14 unit 3, E5).</strong> With Comet's default top 5
+     * on the {@code D-006} fixture and the whole proteome, Comet 2026.03.0 reports two hits of one
+     * spectrum with the same modified peptide ({@code k562_3} scan 11483, charge 2, {@code
+     * R.GGHM[15.9949]DDGGYSMNFNMSSSR.G}, ranks 1 and 3; {@code k562_4} scan 10245, charge 3), both
+     * reach Percolator's XML, and the pinned converter v2.8.1 refuses the run ("Got more than one
+     * entry for k562_3.pep.xml for the same scan to the same reported peptide"). The product runs
+     * the converter faithfully and reports that refusal; it cannot convert such a run. Reporting
+     * only the top hit removes the duplicate, so step 26 can prove the conversion; whether the
+     * product should do this itself is the escalation's question.
+     */
+    public static final String RESULTS_PER_SPECTRUM = "1";
+
     /** The decoy source chosen: the FASTA holds no decoys, so Comet makes them (step 10). */
     public static final String CONCATENATED_DECOYS =
             "Concatenated: targets and decoys compete, one result per spectrum";
@@ -198,6 +228,8 @@ public final class CanonicalScenario {
     private List<String> psmsAtOnePercent;
 
     private List<String> peptidesAtOnePercent;
+
+    private final DownstreamSteps downstream = new DownstreamSteps(this);
 
     /**
      * A scenario over a layout.
@@ -252,6 +284,44 @@ public final class CanonicalScenario {
      */
     public String runId() {
         return Objects.requireNonNull(runId, "no run has finished yet");
+    }
+
+    // ===================================================== for steps 25 to 30 ====
+
+    Screen screen() {
+        return Objects.requireNonNull(screen, "no application is attached");
+    }
+
+    ScenarioLayout layout() {
+        return layout;
+    }
+
+    ChooserScript chooser() {
+        return chooser;
+    }
+
+    ShippedManifest manifest() {
+        return manifest;
+    }
+
+    String platform() {
+        return platform;
+    }
+
+    void observe(String line) {
+        observations.add(line);
+    }
+
+    Path cometExecutable() {
+        return Objects.requireNonNull(cometExecutable, "Comet is not installed yet");
+    }
+
+    Path percolatorExecutable() {
+        return Objects.requireNonNull(percolatorExecutable, "Percolator is not installed yet");
+    }
+
+    String percolatorVersion() {
+        return Objects.requireNonNull(percolator, "Percolator is not installed yet").version();
     }
 
     // ================================================================= steps 1 and 2 ====
@@ -496,6 +566,14 @@ public final class CanonicalScenario {
         screen.enter("ess-peptide_mass_tolerance_upper", PRECURSOR_UPPER);
         screen.ui().select("ess-decoy_search", CONCATENATED_DECOYS);
         screen.enter("ess-variable_mod01-part-maximum-count", "2");
+        screen.ui().clickOn("param-mode-advanced");
+        if (!screen.ui().isSelected("adv-category-output-toggle")) {
+            screen.ui().clickOn("adv-category-output-toggle");
+        }
+        assertEquals("5", screen.ui().textOf("adv-num_output_lines"), "Comet's default top 5");
+        screen.enter("adv-num_output_lines", RESULTS_PER_SPECTRUM);
+        String perSpectrumOrigin = screen.ui().textOf("adv-num_output_lines-origin");
+        screen.ui().clickOn("param-mode-essentials");
 
         assertAll(
                 "steps 10 and 11: the controls took the changes",
@@ -515,6 +593,7 @@ public final class CanonicalScenario {
                         assertEquals(
                                 "Serialised: variable_mod01 = " + EDITED_VARIABLE_MOD,
                                 screen.ui().textOf("ess-variable_mod01-serialised")),
+                () -> assertEquals("Value from: Set by you", perSpectrumOrigin),
                 () ->
                         assertEquals(
                                 "Validation: No errors or warnings.",
@@ -533,6 +612,8 @@ public final class CanonicalScenario {
                                 + " Listed by the filters",
                         "Variable modification 1 (variable_mod01) -- Listed by the filters",
                         "Write Percolator input (PIN) (output_percolatorfile) -- Listed by the"
+                                + " filters",
+                        "Results reported per spectrum (num_output_lines) -- Listed by the"
                                 + " filters"),
                 modified,
                 "step 12: the parameter summary lists exactly the changed parameters");
@@ -599,7 +680,7 @@ public final class CanonicalScenario {
         return shown.isEmpty() ? "(none observed)" : List.copyOf(shown).get(shown.size() - 1);
     }
 
-    private static String rowOf(Artefact artefact) {
+    static String rowOf(Artefact artefact) {
         return "tool-row-" + artefact.tool() + "-" + artefact.version().replace('.', '_') + "-1";
     }
 
@@ -776,6 +857,7 @@ public final class CanonicalScenario {
         expected.put("peptide_mass_tolerance_upper", PRECURSOR_UPPER);
         expected.put("decoy_search", "1");
         expected.put("variable_mod01", EDITED_VARIABLE_MOD);
+        expected.put("num_output_lines", RESULTS_PER_SPECTRUM);
         expected.put("output_pepxmlfile", "1");
         expected.put("output_percolatorfile", "1");
 
@@ -804,7 +886,7 @@ public final class CanonicalScenario {
                         + defaults.values().size()
                         + " defaults with "
                         + COMETGUI_STARTING_VALUES.size()
-                        + " CometGUI starting value, the 5 on-screen changes and the 2 forced"
+                        + " CometGUI starting value, the 6 on-screen changes and the 2 forced"
                         + " outputs applied");
     }
 
@@ -1316,12 +1398,89 @@ public final class CanonicalScenario {
                 + " zero)";
     }
 
+    // ============================================================= steps 25 to 30 ====
+
+    /**
+     * Step 25: PDV, absent before and installed on first use, draws the figure of a PSM the test
+     * chose from Percolator's raw table, selected in the Results section; the figure is checked
+     * from disk. The tier must have given the application a display PDV can reach.
+     *
+     * @throws IOException if a file cannot be read
+     */
+    public void pdvDrawsAKnownPsm() throws IOException {
+        downstream.pdvDrawsAKnownPsm();
+    }
+
+    /**
+     * Step 26: the real converter, absent before and installed on first use, converts the run
+     * through the Limelight section; the XML is validated against the schema in the installed JAR
+     * and its counts against Percolator's raw table.
+     *
+     * @throws IOException if a file cannot be read
+     */
+    public void limelightConverts() throws IOException {
+        downstream.limelightConverts();
+    }
+
+    /**
+     * The converter JAR step 26 found installed in the tool cache: what a tier's fake endpoint
+     * reads the Limelight schema from ({@code D-007}).
+     *
+     * @return the installed JAR
+     */
+    public Path installedConverter() {
+        return downstream.converterJar();
+    }
+
+    /**
+     * Step 27: the converted file uploaded through the Limelight section to a controlled endpoint
+     * with its test key ({@code D-007}), and what the endpoint received checked.
+     *
+     * @param endpoint the endpoint, listening on loopback
+     * @throws IOException if a file cannot be read
+     */
+    public void uploadsToTheEndpoint(LimelightEndpoint endpoint) throws IOException {
+        downstream.uploadsToTheEndpoint(endpoint);
+    }
+
+    /**
+     * Step 28: the Provenance view opens the run; the record is proved against the disk, the
+     * section's display against the record, an export against the record, and the test key is in no
+     * file.
+     *
+     * @throws IOException if a file cannot be read
+     */
+    public void provenanceHoldsAgainstTheDisk() throws IOException {
+        downstream.provenanceHoldsAgainstTheDisk();
+    }
+
+    /**
+     * Before step 29: records what is shown and on disk, to hold the relaunched application to. The
+     * tier then stops the application through its own stop, starts a new one over a new composition
+     * root from the same home, and {@link #attach}es the new driver.
+     *
+     * @throws IOException if the run directory cannot be read
+     */
+    public void recordWhatIsShownBeforeTheClose() throws IOException {
+        downstream.recordWhatIsShownBeforeTheClose();
+    }
+
+    /**
+     * Steps 29 and 30, after the relaunch: the project reopens, and results, the selected run, tool
+     * versions, q-filter state and provenance are coherent with what was shown before.
+     *
+     * @throws IOException if the run directory cannot be read
+     */
+    public void theRelaunchedApplicationIsCoherent() throws IOException {
+        downstream.theRelaunchedApplicationIsCoherent();
+    }
+
     // ================================================================== internals ====
 
     /**
      * Shows one of the run's tables and waits for its answer under the cutoff it is filtered at.
      */
-    private void showTable(String table, String cutoff) {
+    void showTable(String table, String cutoff) {
         if (!screen.ui().selectedTextOf("results-table-choice").equals(table)) {
             screen.ui().select("results-table-choice", table);
         }
@@ -1343,7 +1502,7 @@ public final class CanonicalScenario {
     }
 
     /** The four counts shown: total, passing, failing, unknown. */
-    private List<String> shownCounts() {
+    List<String> shownCounts() {
         return List.of(
                 screen.ui().textOf("results-count-total"),
                 screen.ui().textOf("results-count-passing"),
@@ -1352,7 +1511,7 @@ public final class CanonicalScenario {
     }
 
     /** The scenario's own counts of a raw Percolator table under a cutoff, in the same order. */
-    private List<String> oracle(String table, String cutoff) throws IOException {
+    List<String> oracle(String table, String cutoff) throws IOException {
         QValueCounts counts =
                 QValueCounts.of(run.resolve("outputs/percolator").resolve(table), cutoff);
         return Stream.of(counts.total(), counts.passing(), counts.failing(), counts.unknown())

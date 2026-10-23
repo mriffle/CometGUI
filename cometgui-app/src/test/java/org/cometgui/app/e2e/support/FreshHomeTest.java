@@ -153,6 +153,51 @@ class FreshHomeTest {
     }
 
     @Test
+    @DisplayName(
+            "desktop variables are reported in place of the real ones, never in place of the"
+                    + " home's own, and a production composition root reads them")
+    void desktopVariablesAreReported() throws IOException {
+        FreshHome fresh = FreshHome.create(parent, FreshHome.Naming.PLAIN);
+        EnvironmentReader real =
+                known(
+                        Map.of("DISPLAY", ":0", "PATH", "/usr/bin:/bin"),
+                        Map.of("user.home", "/home/someone"));
+        EnvironmentReader seen = fresh.environment(real, Map.of("DISPLAY", ":97"));
+        ApplicationServices services = fresh.services(Map.of("DISPLAY", ":98"));
+        assertAll(
+                () -> assertEquals(Optional.of(":97"), seen.environmentVariable("DISPLAY")),
+                () -> assertEquals(Optional.of("/usr/bin:/bin"), seen.environmentVariable("PATH")),
+                () ->
+                        assertEquals(
+                                Optional.of(fresh.home().toString()),
+                                seen.environmentVariable("HOME")),
+                () -> assertEquals(Optional.empty(), seen.environmentVariable("XAUTHORITY")),
+                () ->
+                        assertEquals(
+                                Optional.of(":98"),
+                                services.environment().environmentVariable("DISPLAY")),
+                () ->
+                        assertEquals(
+                                Optional.of(":0"),
+                                fresh.environment(real).environmentVariable("DISPLAY"),
+                                "without desktop variables, the real one"));
+        for (String own : List.of("HOME", "XDG_DATA_HOME", "APPDATA")) {
+            IllegalArgumentException refused =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> fresh.environment(real, Map.of(own, "/elsewhere")));
+            assertEquals(
+                    own + " is the fresh home's own, not a desktop variable", refused.getMessage());
+        }
+        assertEquals(
+                "DISPLAY is blank",
+                assertThrows(
+                                IllegalArgumentException.class,
+                                () -> fresh.environment(real, Map.of("DISPLAY", " ")))
+                        .getMessage());
+    }
+
+    @Test
     @EnabledOnOs(
             value = OS.LINUX,
             disabledReason = "the application data directory's name is typed out for Linux here")

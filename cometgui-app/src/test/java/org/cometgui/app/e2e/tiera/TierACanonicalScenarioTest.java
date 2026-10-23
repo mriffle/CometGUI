@@ -22,23 +22,32 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import javafx.application.Application;
 import javafx.stage.Stage;
 import org.cometgui.app.bootstrap.CometGuiApplication;
 import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.config.BuildIdentityResource;
+import org.cometgui.app.config.PdvDisplay;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.e2e.scenario.CanonicalScenario;
 import org.cometgui.app.e2e.scenario.ScenarioLayout;
 import org.cometgui.app.e2e.support.EndToEnd;
 import org.cometgui.app.e2e.support.FreshHome;
+import org.cometgui.app.testing.ProjectXvfb;
 import org.cometgui.app.testing.RealSearch;
 import org.cometgui.app.testing.ScriptedChooser;
 import org.cometgui.app.uidriver.RobotFxUiDriver;
 import org.cometgui.app.uidriver.RunningApplication;
 import org.cometgui.domain.log.BoundedMessageLog;
+import org.cometgui.domain.ports.EnvironmentReader;
+import org.cometgui.tools.limelight.fake.FakeLimelightServer;
 import org.cometgui.tools.limelight.fake.LoopbackGuard;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,21 +62,33 @@ import org.junit.jupiter.api.io.TempDir;
 import org.testfx.api.FxToolkit;
 
 /**
- * The canonical end-to-end scenario in Tier A, steps 1 to 24 (Phase 14 unit 2): the assembled
- * application, in-process, from a brand-new home and an empty tool cache, driven as a scientist
- * drives it, with what it claims proved by the scenario's own oracles. The steps are {@link
- * CanonicalScenario}'s, tier-neutral; this class is Tier A's composition and nothing else.
+ * The canonical end-to-end scenario in Tier A, steps 1 to 30 (Phase 14 units 2 and 3): the
+ * assembled application, in-process, from a brand-new home and an empty tool cache, driven as a
+ * scientist drives it -- through the search, PDV, the Limelight conversion and upload, provenance,
+ * and a close and relaunch -- with what it claims proved by the scenario's own oracles. The steps
+ * are {@link CanonicalScenario}'s, tier-neutral; this class is Tier A's composition and nothing
+ * else.
  *
  * <h2>The composition (design decision P14-4)</h2>
  *
- * <p>The real {@link CometGuiApplication}, over {@link RunWiring.Setup#forThisApplication} and a
- * production {@link ApplicationServices} -- {@link FreshHome#services()}, in which only the
- * environment the application reads is the fresh home's -- and the production build identity.
- * Exactly one other seam is filled: the file-chooser factory, with a {@link ScriptedChooser}. The
- * Tool Manager, the installer, the process service and the workflow are the product's own; the
- * installer fetches Comet and Percolator from the URLs the shipped manifest pins, on GitHub. No
- * tool is staged or mirrored, no loopback artefact server is used, and no product class is
- * replaced.
+ * <p>The real {@link CometGuiApplication}, over a production {@link ApplicationServices} -- {@link
+ * FreshHome#services(Map)}, in which only the environment the application reads is the test's: the
+ * fresh home, and {@code DISPLAY} naming the project-local Xvfb ({@link ProjectXvfb}) -- and the
+ * production build identity. The file-chooser factory is a {@link ScriptedChooser}. The run setup
+ * is {@link RunWiring.Setup#forThisApplication}'s own Tool Manager and project, with one
+ * difference, stated here because it is a third test-supplied seam where P14-4 names two: the
+ * source of PDV's display environment. It is the product's own {@link PdvDisplay#fromHost} over the
+ * application's environment -- so the product finds {@code DISPLAY} through the {@code
+ * EnvironmentReader} port, which step 25 asserts -- plus the project-local X11 and font closures'
+ * library and fontconfig locations. A real Linux desktop has {@code libX11.so.6} in its system
+ * library directories; this build host has no X11 library at all, and the JVM PDV runs on cannot
+ * load {@code libawt_xawt.so} without them (measured: {@code UnsatisfiedLinkError ... libX11.so.6:
+ * cannot open shared object file}). {@link PdvDisplay#fromHost} passes only {@code DISPLAY} and
+ * {@code XAUTHORITY}, so without this seam PDV cannot draw on this host. The Tool Manager, the
+ * installer, the process service and the workflow are the product's own; the installer fetches
+ * Comet and Percolator through the Tool Manager, and PDV and the Limelight converter on first use,
+ * from the URLs the shipped manifest pins, on GitHub. No tool is staged or mirrored, no loopback
+ * artefact server is used, and no product class is replaced.
  *
  * <h2>The network</h2>
  *
@@ -76,7 +97,9 @@ import org.testfx.api.FxToolkit;
  * hosts the tools' pinned release URLs are served from -- {@code github.com} and the {@code
  * githubusercontent.com} storage hosts its release downloads redirect to -- exactly as {@code
  * UpstreamInstallUiTest} does, and puts the guard back afterwards. Any other host, a Limelight
- * server among them, still lands in the sinkhole and fails the test.
+ * server among them, still lands in the sinkhole and fails the test. Step 27 uploads to the {@code
+ * D-007} fake, {@link FakeLimelightServer}, on loopback, with a test key made for the run; the fake
+ * reads the Limelight schema from the converter JAR step 26 installed in the fresh home.
  *
  * <h2>Files read outside this module</h2>
  *
@@ -84,20 +107,23 @@ import org.testfx.api.FxToolkit;
  * {@code D-006} local fixture under {@code scratch/fixture}: both K562 mzML files (checksum
  * verified, then LF-repaired and verified again) and the UniProt human proteome (checksum
  * verified). This is the local fixture, not the CI fixture, whose half of {@code D-006} is open; a
- * missing or changed file fails the test, nothing skips. Network: the pinned GitHub release URLs.
+ * missing or changed file fails the test, nothing skips. For the display, {@link ProjectXvfb}'s:
+ * {@code tools/x11-bookworm-20260829/}, {@code tools/fontstack-bookworm-20260829/} and {@code
+ * scripts/feasibility/gui-spike/xkbcomp-path-shim.c}, compiled with the host's {@code gcc}.
+ * Network: the pinned GitHub release URLs, and loopback.
  *
  * <h2>How to run it</h2>
  *
  * <pre>{@code
- * LC_ALL=C.UTF-8 mvn -B -o -pl cometgui-app test -Dtest=TierACanonicalScenarioTest \
- *     -Dcometgui.e2e=true
+ * LC_ALL=C.UTF-8 mvn -B -o -pl cometgui-app -am test -Dtest=TierACanonicalScenarioTest \
+ *     -Dsurefire.failIfNoSpecifiedTests=false -Dcometgui.e2e=true
  * }</pre>
  *
  * <p>The steps are ordered and each builds on the last; once one fails, the rest are skipped with
  * that step named, rather than failing on the state it left. The installs (P14-5) come straight
- * after the application is ready, and the same application then configures and runs the search:
- * there is no relaunch between them. (Unit 2 relaunched here, to get past defect E3 -- the sections
- * never learned of an install -- which unit 2b repaired; see {@link CanonicalScenario}.)
+ * after the application is ready, and the same application then configures and runs the search,
+ * draws, converts, uploads and shows the provenance: the only relaunch is step 29's, through the
+ * application's own {@code stop()} and a new composition root from the same home (P14-4).
  */
 @EndToEnd
 @EnabledOnOs(
@@ -111,7 +137,23 @@ class TierACanonicalScenarioTest {
     /** The hosts the tools' pinned release URLs are served from, and nothing else. */
     private static final String UPSTREAM_HOSTS = "github.com|*.githubusercontent.com";
 
+    /** The project the controlled Limelight endpoint holds. */
+    private static final int LIMELIGHT_PROJECT = 7;
+
+    /** The test key the endpoint accepts: a recognisable prefix and 48 characters made per run. */
+    private static final String KEY = seed();
+
     @TempDir private static Path parent;
+
+    private static ProjectXvfb display;
+
+    private static Map<String, String> desktop;
+
+    /** What the product's own {@link PdvDisplay#fromHost} answered, each time PDV asked. */
+    private static final List<Map<String, String>> PRODUCT_DISPLAY =
+            Collections.synchronizedList(new ArrayList<>());
+
+    private static FakeLimelightServer fake;
 
     private static String guardedNonProxyHosts;
 
@@ -133,6 +175,8 @@ class TierACanonicalScenarioTest {
         System.setProperty("http.nonProxyHosts", guardedNonProxyHosts + "|" + UPSTREAM_HOSTS);
 
         Path root = parent.toRealPath();
+        display = ProjectXvfb.start(root.resolve("xvfb"));
+        desktop = Map.of(PdvDisplay.DISPLAY, display.display());
         home = FreshHome.create(root, FreshHome.Naming.SPACE_AND_NON_ASCII);
         Path inputs = Files.createDirectories(home.root().resolve("inputs"));
         List<Path> spectra = RealSearch.spectra(inputs);
@@ -151,8 +195,18 @@ class TierACanonicalScenarioTest {
                         new ProcessServiceOracle());
     }
 
+    private static String seed() {
+        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder seed = new StringBuilder("CGE2E-");
+        for (int index = 0; index < 48; index++) {
+            seed.append(alphabet.charAt(random.nextInt(alphabet.length())));
+        }
+        return seed.toString();
+    }
+
     @AfterAll
-    static void stop() throws TimeoutException {
+    static void stop() throws TimeoutException, IOException {
         try {
             if (application != null) {
                 FxToolkit.cleanupApplication(application);
@@ -160,6 +214,12 @@ class TierACanonicalScenarioTest {
         } finally {
             if (guardedNonProxyHosts != null) {
                 System.setProperty("http.nonProxyHosts", guardedNonProxyHosts);
+            }
+            if (fake != null) {
+                fake.close();
+            }
+            if (display != null) {
+                display.close();
             }
             if (scenario != null) {
                 for (String observed : scenario.observations()) {
@@ -207,11 +267,17 @@ class TierACanonicalScenarioTest {
 
     /**
      * Starts the real application over a new production composition root for the fresh home and
-     * attaches the scenario to it. Step 30's relaunch (unit 3) calls it again (P14-4: a new {@code
+     * attaches the scenario to it. Step 29's relaunch calls it again (P14-4: a new {@code
      * CometGuiApplication} over a new composition root, built from the same home, in the same JVM).
      */
     private static void start() throws TimeoutException {
-        ApplicationServices services = home.services();
+        ApplicationServices services = home.services(desktop);
+        RunWiring.Setup production = RunWiring.Setup.forThisApplication(services);
+        RunWiring.Setup setup =
+                new RunWiring.Setup(
+                        production.tools(),
+                        production.projectDirectory(),
+                        TierACanonicalScenarioTest::pdvEnvironment);
         Stage primary = FxToolkit.registerPrimaryStage();
         application =
                 FxToolkit.setupApplication(
@@ -221,8 +287,26 @@ class TierACanonicalScenarioTest {
                                         new BoundedMessageLog(),
                                         BuildIdentityResource::load,
                                         owner -> chooser,
-                                        RunWiring.Setup.forThisApplication(services)));
+                                        setup));
         scenario.attach(new RobotFxUiDriver(RunningApplication.showing(primary)));
+    }
+
+    /**
+     * What PDV is given to reach a display: the product's own {@link PdvDisplay#fromHost} over the
+     * application's environment -- which answers {@code DISPLAY} with the project's Xvfb because
+     * the fresh home's environment reports it -- and, beside it, the project-local X11 and font
+     * closures' library and fontconfig locations ({@link ProjectXvfb#clientEnvironment()}), which a
+     * real Linux desktop has in its system library directories and this build host does not have at
+     * all: without them the JVM PDV runs on cannot load {@code libawt_xawt.so} ({@code libX11.so.6}
+     * not found). Nothing here replaces a variable the product chose.
+     */
+    private static Map<String, String> pdvEnvironment(EnvironmentReader host) {
+        Map<String, String> chosen = PdvDisplay.fromHost(host);
+        PRODUCT_DISPLAY.add(chosen);
+        Map<String, String> environment = new LinkedHashMap<>(display.clientEnvironment());
+        environment.remove(PdvDisplay.DISPLAY);
+        environment.putAll(chosen);
+        return Map.copyOf(environment);
     }
 
     @Test
@@ -342,5 +426,84 @@ class TierACanonicalScenarioTest {
     @DisplayName("step 24: the learned feature weights and their ranking equal the artefact's")
     void learnedWeights() throws Exception {
         step("24", scenario::learnedWeightsMatchTheArtefact);
+    }
+
+    @Test
+    @Order(19)
+    @DisplayName(
+            "step 25: PDV, absent before, installs on first use and draws the figure of a PSM"
+                    + " the test chose from the raw table")
+    void pdv() throws Exception {
+        step(
+                "25",
+                () -> {
+                    scenario.pdvDrawsAKnownPsm();
+                    assertTrue(
+                            !PRODUCT_DISPLAY.isEmpty()
+                                    && PRODUCT_DISPLAY.stream()
+                                            .allMatch(
+                                                    chosen ->
+                                                            chosen.equals(
+                                                                    Map.of(
+                                                                            PdvDisplay.DISPLAY,
+                                                                            display.display()))),
+                            () ->
+                                    "the product read DISPLAY from the fresh home's environment: "
+                                            + PRODUCT_DISPLAY);
+                });
+    }
+
+    @Test
+    @Order(20)
+    @DisplayName(
+            "step 26: the real converter, absent before, installs on first use and converts; the"
+                    + " XML is valid against the JAR's schema and holds the raw table's PSMs")
+    void limelightConversion() throws Exception {
+        step("26", scenario::limelightConverts);
+    }
+
+    @Test
+    @Order(21)
+    @DisplayName(
+            "step 27: the upload to the loopback fake (D-007) with a test key; the fake received"
+                    + " exactly the converted file, valid, and the screen shows its tracking id")
+    void upload() throws Exception {
+        step(
+                "27",
+                () -> {
+                    fake =
+                            FakeLimelightServer.start(
+                                    KEY, LIMELIGHT_PROJECT, scenario.installedConverter());
+                    scenario.uploadsToTheEndpoint(
+                            new FakeLimelightEndpoint(fake, LIMELIGHT_PROJECT, KEY));
+                });
+    }
+
+    @Test
+    @Order(22)
+    @DisplayName(
+            "step 28: provenance recomputed from disk -- every declared file's MD5 and SHA-256,"
+                    + " every tool binary and JAR, versions, argument arrays -- shown as recorded,"
+                    + " and the key in no file")
+    void provenance() throws Exception {
+        step("28", scenario::provenanceHoldsAgainstTheDisk);
+    }
+
+    @Test
+    @Order(23)
+    @DisplayName(
+            "steps 29-30: closed through its own stop(), relaunched over a new composition root"
+                    + " from the same home; the project, run, results, filters, tools and"
+                    + " provenance are coherent")
+    void relaunch() throws Exception {
+        step(
+                "29-30",
+                () -> {
+                    scenario.recordWhatIsShownBeforeTheClose();
+                    FxToolkit.cleanupApplication(application);
+                    application = null;
+                    start();
+                    scenario.theRelaunchedApplicationIsCoherent();
+                });
     }
 }

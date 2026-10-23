@@ -23,8 +23,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.cometgui.app.config.ApplicationServices;
@@ -70,6 +72,9 @@ import org.cometgui.domain.ports.EnvironmentReader;
  * wrong in the same way as what it is checking.
  */
 public final class FreshHome {
+
+    /** The variables that are the home's own, which no desktop variable may replace. */
+    private static final Set<String> HOME_VARIABLES = Set.of("HOME", "XDG_DATA_HOME", "APPDATA");
 
     /** The plain directory name: ASCII, no space. */
     public static final String PLAIN_SEGMENT = "cometgui-e2e-home";
@@ -203,7 +208,34 @@ public final class FreshHome {
      * @return the reader
      */
     public EnvironmentReader environment(EnvironmentReader real) {
+        return environment(real, Map.of());
+    }
+
+    /**
+     * An environment that reports this home, the given desktop variables, and otherwise the real
+     * one. A desktop variable is one the test's desktop supplies -- {@code DISPLAY} of the
+     * project's own virtual display, for PDV (canonical scenario step 25) -- and is reported in
+     * place of the real environment's value of that name.
+     *
+     * @param real what to delegate every other question to
+     * @param desktop the variables to report as well, by name; never {@code HOME}, {@code
+     *     XDG_DATA_HOME} or {@code APPDATA}, which are the home's
+     * @return the reader
+     * @throws IllegalArgumentException if a desktop variable names one of the home's own, or is
+     *     blank
+     */
+    public EnvironmentReader environment(EnvironmentReader real, Map<String, String> desktop) {
         Objects.requireNonNull(real, "real");
+        Map<String, String> variables = Map.copyOf(desktop);
+        for (Map.Entry<String, String> variable : variables.entrySet()) {
+            if (HOME_VARIABLES.contains(variable.getKey())) {
+                throw new IllegalArgumentException(
+                        variable.getKey() + " is the fresh home's own, not a desktop variable");
+            }
+            if (variable.getValue().isBlank()) {
+                throw new IllegalArgumentException(variable.getKey() + " is blank");
+            }
+        }
         FreshHome fresh = this;
         return new EnvironmentReader() {
             @Override
@@ -213,7 +245,10 @@ public final class FreshHome {
                     case "HOME" -> Optional.of(fresh.home.toString());
                     case "XDG_DATA_HOME" -> Optional.of(fresh.dataHome.toString());
                     case "APPDATA" -> Optional.of(fresh.appData.toString());
-                    default -> real.environmentVariable(name);
+                    default ->
+                            variables.containsKey(name)
+                                    ? Optional.of(variables.get(name))
+                                    : real.environmentVariable(name);
                 };
             }
 
@@ -227,7 +262,9 @@ public final class FreshHome {
 
             @Override
             public String toString() {
-                return "the environment of the fresh home " + fresh.home;
+                return "the environment of the fresh home "
+                        + fresh.home
+                        + (variables.isEmpty() ? "" : " with " + variables.keySet());
             }
         };
     }
@@ -242,8 +279,20 @@ public final class FreshHome {
      * @return the services
      */
     public ApplicationServices services() {
+        return services(Map.of());
+    }
+
+    /**
+     * As {@link #services()}, with an environment that also reports the given desktop variables
+     * ({@link #environment(EnvironmentReader, Map)}).
+     *
+     * @param desktop the desktop variables, by name
+     * @return the services
+     * @throws IllegalArgumentException as {@link #environment(EnvironmentReader, Map)}
+     */
+    public ApplicationServices services(Map<String, String> desktop) {
         ApplicationServices real = ApplicationServices.forThisHost();
-        EnvironmentReader environment = environment(real.environment());
+        EnvironmentReader environment = environment(real.environment(), desktop);
         return new ApplicationServices(
                 real.clock(),
                 environment,

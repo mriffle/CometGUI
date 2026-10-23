@@ -244,6 +244,30 @@ public record ShippedManifest(List<Artefact> artefacts) {
     }
 
     /**
+     * The one record of a tool for a platform, where the manifest names exactly one version of it
+     * there -- as it does for PDV and the Limelight converter, which the product installs on first
+     * use without a choice of version.
+     *
+     * @param tool the tool
+     * @param platform {@code os/arch}, as {@link #hostPlatform()} gives it
+     * @return the record
+     * @throws AssertionError if the platform has none, or more than one
+     */
+    public Artefact onlyArtefact(String tool, String platform) {
+        List<Artefact> found =
+                artefacts.stream()
+                        .filter(artefact -> artefact.tool().equals(tool))
+                        .filter(
+                                artefact ->
+                                        (artefact.os() + "/" + artefact.arch()).equals(platform))
+                        .toList();
+        if (found.size() != 1) {
+            throw new AssertionError(found.size() + " records for " + tool + " on " + platform);
+        }
+        return found.get(0);
+    }
+
+    /**
      * The newest Percolator whose record for a platform claims {@value #XML_OUTPUT}: what the
      * product's default for a Limelight-enabled run must be there, worked out from the records' own
      * fields.

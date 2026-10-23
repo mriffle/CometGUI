@@ -375,7 +375,13 @@ public final class FakeLimelightServer implements AutoCloseable {
     public void close() throws IOException {
         socket.close();
         try {
-            acceptor.join(10_000);
+            /*
+             * Untimed on purpose: the acceptor ends as soon as the closed socket makes accept()
+             * throw, or when the one connection it is answering ends, each of which has a 60-second
+             * read timeout -- so this waits on that state, never for a fixed time (Phase 14's
+             * no-fixed-sleep check, design decision P14-8, rejects a timed join).
+             */
+            acceptor.join();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         }
