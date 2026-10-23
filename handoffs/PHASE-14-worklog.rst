@@ -373,7 +373,33 @@ collide exists, so none is offered.
        step, macOS and Windows configuration unexecuted, ``bin/java`` present,
        no JDK on ``PATH``.
      - item 2; AC-INS-01
-     - pending
+     - **Accepted 2026-10-23**, ``a717cdc`` (agent 5). Diff read
+       (``packaging/jpackage/{common,linux,macos,windows}.args``,
+       ``packaging/runtime-modules.txt``, ``scripts/package/``:
+       ``build-app-image.sh``, ``install-archive.sh``,
+       ``smoke-installed.sh``, ``x11_windows.py``; no ``src/main``, POM or
+       ``.rst``; ``release-package.sh`` untouched). ``--jlink-options``
+       keeps ``bin/java``; native access for ALL-UNNAMED and
+       javafx.graphics; no ``-Dsun.jnu.encoding`` (the build refuses it).
+       Runtime: 29 modules (``java.se`` -- so ``java.instrument`` -- JavaFX
+       base/graphics/controls, ``jdk.unsupported``, ``jdk.httpserver``,
+       ``jdk.charsets``, ``jdk.localedata``, ``jdk.zipfs``), chosen for the
+       app, the converter and PDV. Ran myself: build 24 s (incremental),
+       install outside the repository read-only, ``smoke-installed.sh``
+       S1-S11 all PASS (no java on ``PATH``, ``JAVA_HOME`` unset; runtime
+       ``bin/java`` with ``sun.jnu.encoding=UTF-8``; the converter JAR's
+       ``--version`` from the installed runtime; a viewable ``CometGUI``
+       window owned by the installed launcher, ``/proc`` exe and libjvm
+       inside the install; clean exit 0 on WM_DELETE_WINDOW; install tree
+       unchanged, 264 entries; writes confined to the fresh home). My
+       injection: a copy of the install without ``libglassgtk3.so`` -- S6-S9
+       FAIL, "UnsatisfiedLinkError: no glassgtk3 in java.library.path".
+       Agent showed each check failing on its own broken variant
+       (``--self-test``). Sizes: image 169 MB, archive 61 MB. Unverified:
+       macOS and Windows argfiles (never executed; macOS likely rejects
+       version 0.1.0). Findings: E7; the font stack needs a generated
+       ``FONTCONFIG_FILE`` under a fresh ``XDG_DATA_HOME`` (test
+       environment only).
    * - 6
      - **The bridge and the release check** (P14-11, P14-12), with the
        check's red demonstration.
@@ -472,6 +498,16 @@ E6 -- PDV's display environment on a host without system X11 (RECORDED)
     that PDV starts from the installed runtime but not that it draws. A real
     Linux desktop has ``libX11``; this is a testing gap of this host, not a
     product defect.
+
+E7 -- a failed start leaves an invisible process (ESCALATED, not repaired)
+    Found by unit 5: when the packaged application's ``start`` failed (no
+    fonts under a fresh ``XDG_DATA_HOME``), the process stayed alive with no
+    window, logging a ``RejectedExecutionException`` from
+    ``PercolatorRerunViewModel.refresh``; the application's own non-daemon
+    threads keep the JVM up. A scientist would see nothing and a second start
+    could meet a held resource. Recommendation: the application exits (or
+    shuts its executors down) when ``start`` throws. Outside this phase's
+    scope; not repaired here.
 
 E2 -- no project chooser
     See P14-6. Scenario step 5 has no control. Recommendation: amend the step
