@@ -24,8 +24,9 @@
 # and its run is "ordinary" (scripts/build.sh runs it) or "e2e" (it runs only
 # under -Dcometgui.e2e=true, the end-to-end harness's opt-in).
 #
-# Defects named in notes as "8a-Dn" are the Phase 14 unit 8a report's; they are
-# recorded for the orchestrator and asserted by no test either way.
+# Defects named in notes as "8a-Dn" and "8b-Dn" are the Phase 14 unit 8a and 8b
+# reports'; they are recorded for the orchestrator and asserted by no test
+# either way.
 
 [[scenario]]
 number = 1
@@ -243,8 +244,18 @@ note = "A real search cancelled from the Run section, and through the engine mid
 [[scenario]]
 number = 14
 text = "the user cancels Percolator"
-status = "partial"
-note = "No engine or GUI test cancels a running Percolator yet. Owned by Phase 14 unit 8b."
+status = "covered"
+note = "A stand-in Percolator that has written its files and keeps running with a child of its own is cancelled -- through the engine, and with the Run section's Cancel: Percolator and its child dead by pid (a zombie counts as dead: this host's process 1 reaps nothing), run-percolator through CANCEL_REQUESTED to CANCELLED, every later step NOT_STARTED, the Comet half kept succeeded in run.json for a retry, the stage log and event log ending with the cancellation, provenance.json sealed cancelled with the Percolator invocation exit 143 cancelled and exactly Percolator's files partial; on screen the outcome says cancelled and the stepper shows Comet succeeded, Percolator cancelled, Results not started."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.PercolatorCancellationTest#cancelWhilePercolatorRuns"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.PercolatorCancelUiTest#cancelWhilePercolatorRuns"
+  level = "gui"
+  run = "ordinary"
 
 [[scenario]]
 number = 15
@@ -296,8 +307,18 @@ note = "R-RUN-02: the file, its role and both SHA-256s named, in the Run section
 [[scenario]]
 number = 17
 text = "the output or project directory becoming unwritable"
-status = "partial"
-note = "Only the pre-run check of an unwritable runs directory exists; a directory becoming unwritable mid-run is untested. Owned by Phase 14 unit 8b."
+status = "covered"
+note = "Write permission taken away while a stage runs, proved by a refused write first (so a run as root fails rather than passing). The run's own directory while Percolator runs: failed at run-percolator naming the run.json temporary file it could not create, the unrecordable attempt end stated as a finalisation error naming it too, run.json byte-identical to its last good state, no temporary file left, provenance.json sealed failed with Percolator's files partial. The run's logs/ while Comet runs: failed at run-percolator naming logs/percolator.log, Percolator never launched, run.json and provenance.json both failed. Before a run, an unwritable runs directory is refused by the pre-run check. The provenance/ directory becoming unwritable is NOT asserted: the run is then recorded succeeded with no provenance.json (8b-D1)."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.UnwritableRunDirectoryTest#theRunDirectoryWhilePercolatorRuns"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.UnwritableRunDirectoryTest#theLogsDirectoryWhileCometRuns"
+  level = "integration"
+  run = "ordinary"
 
   [[scenario.test]]
   id = "org.cometgui.workflow.steps.PreRunChecksTest#runsDirectory"
@@ -307,8 +328,13 @@ note = "Only the pre-run check of an unwritable runs directory exists; a directo
 [[scenario]]
 number = 18
 text = "insufficient disk space where it can be simulated safely"
-status = "partial"
-note = "Only a stage log whose writes fail with ENOSPC, simulated by a throwing writer, is tested; the product has no disk-space check. Owned by Phase 14 unit 8b."
+status = "covered"
+note = "Simulated: the kernel refusing CometGUI's own writes mid-run. A child JVM prepares a two-file run, lowers its own RLIMIT_FSIZE to 15000 bytes with util-linux prlimit (proved from its /proc/self/limits) and runs it; the first write refused is the merged PIN (about 20600 bytes; each stand-in PIN is 10318, run.json, the event log and provenance.json stay under the limit). The run fails at merge-pin saying File too large, nothing after it starts, no merged PIN or temporary file is left, run.json and provenance.json parse whole and agree it failed. Separately, a stage log whose writes fail is warned about once and does not end the run. NOT simulated: ENOSPC itself (EFBIG differs in text, not in the product's code path), a device full for every process, a tool rather than CometGUI hitting the limit, and a free-space pre-check, which the product does not have. A disk filling during finalisation leaves a run recorded succeeded with no provenance.json (8b-D1), measured and not asserted."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.FileSizeLimitRunTest#aWriteRefusedForWantOfRoom"
+  level = "integration"
+  run = "ordinary"
 
   [[scenario.test]]
   id = "org.cometgui.tools.process.StageRecorderTest#oneWarningAndOnlyOne"
@@ -418,14 +444,39 @@ note = "An install killed after each step never reports itself installed, and th
 [[scenario]]
 number = 24
 text = "a stale or partial run reopened"
-status = "partial"
-note = "No test reopens a stale or partial run yet. Owned by Phase 14 unit 8b."
+status = "covered"
+note = "A child JVM runs a search through the real workflow (the product's ProjectSession in the GUI case) and halts itself with Runtime.halt while Percolator runs: run.json records the attempt running, no provenance.json, the event log without the run's end, the lock naming a dead process, the tool stranded. Reopened through the lock and provenance reader, and through the launched application: the stale lock taken over (the storage layer's notice names the dead pid and host), the run listed interrupted with no sealed record and warned about, Results not labelling it succeeded or executing, the next Run a new run (the preview says so) that succeeds and is sealed, the interrupted run's directory unchanged by bytes, mtime and entries. Not asserted, reported: the interface never shows the recovery notice (8b-D2); Results labels the interrupted run running and the Provenance summary says Status: running (8b-D3); an interrupted run cannot be retried, only replaced by a new run (8b-D4)."
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.InterruptedRunReopenedTest#haltedMidPercolatorThenReopened"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.InterruptedRunReopenUiTest#whatTheCrashLeft"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.InterruptedRunReopenUiTest#theProvenanceSectionSaysInterrupted"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.InterruptedRunReopenUiTest#theResultsSectionDoesNotOfferItAsComplete"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.InterruptedRunReopenUiTest#theNextRunIsANewRunAndSucceeds"
+  level = "gui"
+  run = "ordinary"
 
 [[scenario]]
 number = 25
 text = "a second CometGUI instance opening a locked project"
 status = "covered"
-note = "R-RUN-05 at the storage level, across two real processes: a live holder refused and then released, a dead holder's stale lock recovered and named. A GUI-level test is Phase 14 unit 8b's (optional)."
+note = "R-RUN-05 across two real processes. At the storage level: a live holder refused and then released, a dead holder's stale lock recovered and named. In the launched application: another CometGUI (a second JVM through the product's ProjectSession) holds the project; the Run section refuses, naming that JVM's pid, host and start time as its lock file records them, Run disabled, nothing launched, no run created; once the other exits, the next pre-run check takes the lock (the lock file names this JVM) and a run from the interface succeeds."
 
   [[scenario.test]]
   id = "org.cometgui.workflow.storage.ProjectLockProcessTest#liveHolderRefusedThenReleased"
@@ -435,4 +486,14 @@ note = "R-RUN-05 at the storage level, across two real processes: a live holder 
   [[scenario.test]]
   id = "org.cometgui.workflow.storage.ProjectLockProcessTest#deadHolderRecovered"
   level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.LockedProjectUiTest#refusedWhileTheOtherHoldsIt"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.LockedProjectUiTest#recoveredOnceTheOtherExits"
+  level = "gui"
   run = "ordinary"

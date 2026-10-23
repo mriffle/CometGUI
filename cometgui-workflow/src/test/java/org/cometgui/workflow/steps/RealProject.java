@@ -141,6 +141,41 @@ final class RealProject implements AutoCloseable {
                 new LineSink());
     }
 
+    /**
+     * Opens a project that already exists and locks it -- taking over a stale lock if the process
+     * that held it has died ({@link ProjectLock#recovered()}) -- with run identifiers {@code
+     * <prefix>-0001}, {@code <prefix>-0002} and so on.
+     *
+     * @param root the project directory
+     * @param runPrefix what this session's run identifiers begin with
+     * @return the project
+     */
+    static RealProject open(Path root, String runPrefix) throws IOException {
+        Clock clock = Clock.systemUTC();
+        ProjectLayout project = new ProjectLayout(root);
+        ProjectStore.read(project);
+        ProjectLock lock = ProjectLock.acquire(project, clock);
+        AtomicInteger next = new AtomicInteger();
+        RunStore store =
+                new RunStore(
+                        project,
+                        clock,
+                        () ->
+                                new RunId(
+                                        String.format(
+                                                Locale.ROOT,
+                                                "%s-%04d",
+                                                runPrefix,
+                                                next.incrementAndGet())));
+        return new RealProject(
+                project,
+                lock,
+                store,
+                new CachingHashService(new StreamingHashService()),
+                new CountingRunner(new ProcessService(clock)),
+                new LineSink());
+    }
+
     ProjectLayout project() {
         return project;
     }

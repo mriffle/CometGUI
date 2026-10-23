@@ -504,7 +504,11 @@ def self_test(spec, map_path, source_root, workdir):
         block_9 = real_map[real_map.index("[[scenario]]\nnumber = 9\n"):real_map.index("[[scenario]]\nnumber = 10\n")]
         control("M11-covered-with-no-test", "scenario 9 is marked covered and maps no test",
                 _replace_once(real_map, block_9, block_9[:block_9.index("  [[scenario.test]]")], "M11"))
-        control("M12-partial-not-allowed", "scenario 14 is partial", allow_partial=False)
+        block_14 = real_map[real_map.index("[[scenario]]\nnumber = 14\n"):real_map.index("[[scenario]]\nnumber = 15\n")]
+        partial_14 = _replace_once(
+            real_map, block_14, _replace_once(block_14, 'status = "covered"', 'status = "partial"', "M12"), "M12")
+        control("M12-partial-not-allowed", "scenario 14 is partial", partial_14, allow_partial=False)
+        control("M12-partial-allowed-when-asked", "", partial_14, allow_partial=True, want_status=0)
         control("M13-malformed-id", "not a test id of the form",
                 _replace_once(real_map, '"org.cometgui.workflow.steps.PercolatorStepTest#aNonZeroExitFails"',
                               '"PercolatorStepTest.aNonZeroExitFails"', "M13"))
