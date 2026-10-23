@@ -404,7 +404,45 @@ collide exists, so none is offered.
      - **The bridge and the release check** (P14-11, P14-12), with the
        check's red demonstration.
      - item 7; R-TEST-06; AC-TST-12
-     - pending
+     - **Accepted 2026-10-23**, ``b20c6aa`` (agent 6). Diff read: the bridge
+       (``e2e/bridge``: a ``-javaagent`` attached through
+       ``JAVA_TOOL_OPTIONS`` to the **unmodified** installed image; binds
+       IPv4 loopback and re-checks after binding, drops non-loopback
+       clients; 32-byte token in an owner-only port file; every operation a
+       ``RemotableUiDriver`` call on an in-process ``RobotFxUiDriver``; file
+       choosers answered by rewriting only ``FxFileChooser``'s native-dialog
+       object, so the product's chooser logic runs; inert in child JVMs),
+       the client side (``e2e/tierb``), ``scripts/e2e/build-bridge.sh``, and
+       ``scripts/ci/release-no-test-bridge.sh`` + ``no_test_bridge.py``
+       replacing the Phase 01 stub. No ``src/main``, POM or ``packaging/``
+       change. Ran myself: the bridge unit tests and
+       ``BridgeEndToEndTest`` against the installed archive -- 57 run, 0
+       failures (locale from the launched process, values read and set,
+       chooser answered under a non-ASCII path, token and non-loopback
+       refusals, close to exit 0, a second process over the same home).
+       Release check on the clean archive PASS (14 JARs, 1511 class
+       entries, 1 cfg, 29 modules / 24 134 classes inspected);
+       ``--self-test`` 9 bridge-included variants rejected, an empty image
+       refused as uninspected. **Gate item 7, my own variant**: the bridge's
+       classes in ``lib/extras.zip`` -- FAILED, 22 findings, "the end-to-end
+       harness, which holds the test bridge". Gates by me: ``workflows`` 23,
+       ``pipeline`` 24 steps (1449 s; the check now a real step, exit 0),
+       PASS; agent's ``quality`` 42 PASS. The check builds the archive if it
+       is absent (cost then about 2 minutes, else 2 s).
+   * - 6r
+     - **Rework of units 1-4, found by agent 6**: SpotBugs runs on test
+       classes at ``verify``; nine findings in units 1-4's code (null
+       dereferences, a hard-coded ``/tmp``, ``throws Exception``) would have
+       failed ``scripts/build.sh``. **My sign-offs ran ``test``, not
+       ``verify``, and missed them**; the ``quality`` control does not
+       grade test-code SpotBugs either.
+     - build
+     - **Repaired by me 2026-10-23**, ``6b77a54``: required non-null with a
+       reason, ``java.io.tmpdir``, narrowed throws clauses; no exclusion.
+       ``mvn -pl cometgui-app verify -DskipTests``: 9 findings, then BUILD
+       SUCCESS; e2e support/oracle tests and both Tier A scenarios 91 run,
+       0 failures. **Every later sign-off adds that ``verify -DskipTests``
+       run.**
    * - 7
      - **Tier B**: both scenarios against the installed artefact on the
        project Xvfb, non-ASCII home, launched-process locale asserted, the
