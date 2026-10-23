@@ -93,6 +93,7 @@ readonly -a ALL_GATES=(
     pdv
     limelight
     provenanceui
+    e2e
 )
 
 PASSED=0
@@ -149,7 +150,8 @@ declare -a COVERED=()
 #                pdv: 107 on 2026-10-11, phase 11 unit 9's first shipping
 #                count.  limelight: 130 on 2026-10-12, phase 12 unit 9's
 #                first shipping count.  provenanceui: 96 on 2026-10-14,
-#                phase 13 unit 7's first shipping count.)
+#                phase 13 unit 7's first shipping count.  e2e: 48 on
+#                2026-10-23, phase 14 unit 9's first shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -407,6 +409,20 @@ gate_spec() {
             GATE_FLOOR=96
             GATE_UNIT="controls"
             ;;
+        e2e)
+            GATE_PHASE="14"
+            GATE_ITEMS="1,2,3,4,5,6,7"
+            GATE_DEFECT="from the record in handoffs/PHASE-14-worklog.rst: the end-to-end tier run ONCE in a git-archive sandbox under LC_ALL=C.UTF-8, which the harness exports itself -- Tier A's canonical and no-XML scenarios and Tier B's against the archive build-app-image.sh builds there and each class installs fresh, every @Test method counted as RUN from that run's surefire XML (none skipped), Comet-not-rerun named in both tiers, the class's own locale assertion shown failing with no locale, and Tier B's launched-process locale control; every failure-path test the map names run fresh and check-failure-paths.sh graded over exactly those reports (and its --self-test); check-no-fixed-sleep.sh and release-no-test-bridge.sh on the clean archive, each with its --self-test; and, each into PRODUCTION code, proved in the bytecode and graded on the failing assertion's own words in the named step, with an earlier step required green: the compatible rerun touching the first run's Comet outputs (item 3, red on the disk assertion), and gate item 5's three -- QValueFilter's <= made < (red at the boundary step), the searched FASTA dropped from provenance.json (red at step 28) and the Limelight upload's final submit skipped while the screen says submitted (red at step 27); and, as controls on the harness itself, a missing anchor, an injection that reached the source but not the bytecode, a green graded as red, a red without its words, and a real run of an end-to-end class without its opt-in in which every test was skipped, each a HARNESS FAILURE. Needs network to the tools' GitHub release hosts and the D-006 local fixture; no CI job runs it"
+            GATE_SCRIPT="scripts/verify-e2e-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-14 exit gate items 1 to 7 were proved here"
+                "bytecode, and a run in which zero tests ran, as a HARNESS FAILURE"
+            )
+            GATE_FLOOR=48
+            GATE_UNIT="controls"
+            ;;
         *)
             return 1
             ;;
@@ -457,6 +473,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         provenanceui)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        e2e)
+            sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -465,8 +483,8 @@ usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
 that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07,
-PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12 and PHASE-13 gate still fails
-on the defect it exists to catch.
+PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12, PHASE-13 and PHASE-14 gate
+still fails on the defect it exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -496,8 +514,10 @@ WHEN TO RUN IT.
   * In the nightly pipeline, where seven minutes is free.
 
 WHAT IT NEEDS.  A built tree (run bash scripts/build.sh first) for tools/,
-.venv/ and _build/m2repo; the project-local font stack; and network access to
-https://api.osv.dev for the dependency-scan control.
+.venv/ and _build/m2repo; the project-local font stack; network access to
+https://api.osv.dev for the dependency-scan control; and, for the e2e control,
+the D-006 local fixture under scratch/ and network access to github.com and
+*.githubusercontent.com, where the tools' pinned release URLs are served.
 
 WHAT IT DOES NOT COVER.  Exit gate item 1 -- "a clean checkout builds and tests
 green with one documented command" -- is bash scripts/build.sh, and is not
@@ -543,7 +563,7 @@ list_gates() {
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
     printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06, 07:n of\n'
     printf '  PHASE-07, 08:n of PHASE-08, 09:n of PHASE-09, 10:n of PHASE-10, 11:n of\n'
-    printf '  PHASE-11, 12:n of PHASE-12, 13:n of PHASE-13.\n'
+    printf '  PHASE-11, 12:n of PHASE-12, 13:n of PHASE-13, 14:n of PHASE-14.\n'
     printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
@@ -635,14 +655,21 @@ list_gates() {
     printf '  and a cancelled run opening with partial outputs marked; 5 JSON and RST\n'
     printf '  from one model, the RST'"'"'s facts asserted against the JSON; 6 no secret in\n'
     printf '  either export.\n'
+    printf '  PHASE-14 items: 1 the canonical scenario in Tier A from an empty tool cache\n'
+    printf '  through provenance and restart; 2 the canonical scenario in Tier B against the\n'
+    printf '  packaged artefact; 3 the no-XML scenario in both tiers, Comet not rerun; 4\n'
+    printf '  every specified failure path with a passing test; 5 an inverted q-value\n'
+    printf '  comparison, a dropped provenance entry and a bypassed downstream stage each\n'
+    printf '  failing the canonical test; 6 no fixed sleep; 7 the bridge-absence check\n'
+    printf '  failing on a build that includes the bridge.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
     printf '  phases/PHASE-05-tool-registry.rst, phases/PHASE-06-comet-param-model.rst,\n'
     printf '  phases/PHASE-07-comet-param-ui.rst, phases/PHASE-08-workflow-comet.rst,\n'
     printf '  phases/PHASE-09-percolator.rst, phases/PHASE-10-results.rst,\n'
-    printf '  phases/PHASE-11-pdv.rst, phases/PHASE-12-limelight.rst and\n'
-    printf '  phases/PHASE-13-provenance-ui.rst.\n\n'
+    printf '  phases/PHASE-11-pdv.rst, phases/PHASE-12-limelight.rst,\n'
+    printf '  phases/PHASE-13-provenance-ui.rst and phases/PHASE-14-e2e.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -804,7 +831,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12 and PHASE-13 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12, PHASE-13 and PHASE-14 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -842,7 +869,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05 06 07 08 09 10 11 12 13; do
+    for phase in 01 02 04 05 06 07 08 09 10 11 12 13 14; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"
