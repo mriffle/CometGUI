@@ -928,7 +928,7 @@ final class DownstreamSteps {
 
         // -- an export, byte for byte
         exported = layout().work().resolve("exports/provenance-" + runId() + ".json");
-        Files.createDirectories(exported.getParent());
+        Files.createDirectories(Objects.requireNonNull(exported.getParent(), "export directory"));
         scenario.chooser().nextExportTarget(exported);
         screen().ui().clickOn("provenance-export-json");
         screen().await(

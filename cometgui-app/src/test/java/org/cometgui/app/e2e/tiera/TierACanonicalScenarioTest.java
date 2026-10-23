@@ -177,10 +177,11 @@ class TierACanonicalScenarioTest {
     /** One step of the scenario, which every later step builds on. */
     @FunctionalInterface
     private interface Step {
-        void run() throws Exception;
+        void run() throws IOException, InterruptedException, TimeoutException;
     }
 
-    private static void step(String name, Step step) throws Exception {
+    private static void step(String name, Step step)
+            throws IOException, InterruptedException, TimeoutException {
         assumeTrue(
                 failedStep == null, () -> "not run: an earlier step failed (" + failedStep + ")");
         try {
@@ -194,14 +195,14 @@ class TierACanonicalScenarioTest {
     @Test
     @Order(1)
     @DisplayName("steps 1-2: a brand-new home and application data directory, no tool present")
-    void freshHome() throws Exception {
+    void freshHome() throws IOException, InterruptedException, TimeoutException {
         step("1-2", scenario::freshHomeHoldsNoTool);
     }
 
     @Test
     @Order(2)
     @DisplayName("steps 3-4: the assembled application starts and reaches its ready state")
-    void launch() throws Exception {
+    void launch() throws IOException, InterruptedException, TimeoutException {
         step(
                 "3-4",
                 () -> {
@@ -225,7 +226,7 @@ class TierACanonicalScenarioTest {
             "steps 14-15: Comet and Percolator installed from the empty cache through the Tool"
                     + " Manager (P14-5): downloaded, checksum-verified, probed; the Run section"
                     + " learns of them and the default project appears, with no run")
-    void install() throws Exception {
+    void install() throws IOException, InterruptedException, TimeoutException {
         step("14-15", scenario::installCometAndPercolatorFromTheToolManager);
     }
 
@@ -234,21 +235,21 @@ class TierACanonicalScenarioTest {
     @DisplayName(
             "steps 5-7: the default project, no run in it yet; two spectrum files and the FASTA"
                     + " through the controls")
-    void inputs() throws Exception {
+    void inputs() throws IOException, InterruptedException, TimeoutException {
         step("5-7", scenario::chooseSpectraAndDatabase);
     }
 
     @Test
     @Order(5)
     @DisplayName("step 8: the default Comet, 2026.03.0")
-    void defaultComet() throws Exception {
+    void defaultComet() throws IOException, InterruptedException, TimeoutException {
         step("8", scenario::defaultCometIsSelected);
     }
 
     @Test
     @Order(6)
     @DisplayName("step 9: the default XML-capable Percolator, resolved from the shipped manifest")
-    void defaultPercolator() throws Exception {
+    void defaultPercolator() throws IOException, InterruptedException, TimeoutException {
         step("9", scenario::defaultXmlCapablePercolatorIsSelected);
     }
 
@@ -256,28 +257,28 @@ class TierACanonicalScenarioTest {
     @Order(7)
     @DisplayName(
             "steps 10-12: a precursor and a variable modification changed; the summary says so")
-    void parameters() throws Exception {
+    void parameters() throws IOException, InterruptedException, TimeoutException {
         step("10-12", scenario::changeParameters);
     }
 
     @Test
     @Order(8)
     @DisplayName("step 13: both q filters show 0.01")
-    void defaultFilters() throws Exception {
+    void defaultFilters() throws IOException, InterruptedException, TimeoutException {
         step("13", scenario::bothFiltersAreOnePercent);
     }
 
     @Test
     @Order(9)
     @DisplayName("steps 14, 16: Run, waiting on observable workflow state; the run succeeds")
-    void run() throws Exception {
+    void run() throws IOException, InterruptedException, TimeoutException {
         step("14,16", scenario::run);
     }
 
     @Test
     @Order(10)
     @DisplayName("step 17: comet.params holds exactly the GUI-selected values, outputs forced on")
-    void cometParams() throws Exception {
+    void cometParams() throws IOException, InterruptedException, TimeoutException {
         step("17", scenario::cometParamsHoldExactlyTheChosenValues);
     }
 
@@ -285,56 +286,56 @@ class TierACanonicalScenarioTest {
     @Order(11)
     @DisplayName(
             "step 18: one Comet per file, distinct -N, nothing beside the inputs, outputs parse")
-    void cometOutputs() throws Exception {
+    void cometOutputs() throws IOException, InterruptedException, TimeoutException {
         step("18", scenario::cometRanOncePerFileAndWroteNothingBesideTheInputs);
     }
 
     @Test
     @Order(12)
     @DisplayName("step 19: the merged PIN has one header and the summed rows of its sources")
-    void mergedPin() throws Exception {
+    void mergedPin() throws IOException, InterruptedException, TimeoutException {
         step("19", scenario::mergedPinHasOneHeaderAndEveryRow);
     }
 
     @Test
     @Order(13)
     @DisplayName("step 20: Percolator exited 0; PSM, peptide, weights and XML artefacts parse")
-    void percolatorArtefacts() throws Exception {
+    void percolatorArtefacts() throws IOException, InterruptedException, TimeoutException {
         step("20", scenario::percolatorRanAndItsArtefactsParse);
     }
 
     @Test
     @Order(14)
     @DisplayName("step 21: PSM and peptide counts at q <= 0.01 equal the raw files' own counts")
-    void countsAtOnePercent() throws Exception {
+    void countsAtOnePercent() throws IOException, InterruptedException, TimeoutException {
         step("21", scenario::countsAtOnePercentMatchTheRawFiles);
     }
 
     @Test
     @Order(15)
     @DisplayName("step 22: the PSM filter at 0.005 changes only the PSM count, to the raw count")
-    void psmFilter() throws Exception {
+    void psmFilter() throws IOException, InterruptedException, TimeoutException {
         step("22", scenario::psmFilterAtHalfAPercentChangesOnlyThePsms);
     }
 
     @Test
     @Order(16)
     @DisplayName("step 23: the peptide filter at 0.02 gives the raw file's peptide count")
-    void peptideFilter() throws Exception {
+    void peptideFilter() throws IOException, InterruptedException, TimeoutException {
         step("23", scenario::peptideFilterAtTwoPercent);
     }
 
     @Test
     @Order(17)
     @DisplayName("steps 21-23: a cutoff equal to a q-value in the file passes (<=, never <)")
-    void inclusiveCutoff() throws Exception {
+    void inclusiveCutoff() throws IOException, InterruptedException, TimeoutException {
         step("21-23 boundary", scenario::aCutoffEqualToAQValuePasses);
     }
 
     @Test
     @Order(18)
     @DisplayName("step 24: the learned feature weights and their ranking equal the artefact's")
-    void learnedWeights() throws Exception {
+    void learnedWeights() throws IOException, InterruptedException, TimeoutException {
         step("24", scenario::learnedWeightsMatchTheArtefact);
     }
 
@@ -343,7 +344,7 @@ class TierACanonicalScenarioTest {
     @DisplayName(
             "step 25: PDV, absent before, installs on first use and draws the figure of a PSM"
                     + " the test chose from the raw table")
-    void pdv() throws Exception {
+    void pdv() throws IOException, InterruptedException, TimeoutException {
         step(
                 "25",
                 () -> {
@@ -369,7 +370,7 @@ class TierACanonicalScenarioTest {
     @DisplayName(
             "step 26: the real converter, absent before, installs on first use and converts; the"
                     + " XML is valid against the JAR's schema and holds the raw table's PSMs")
-    void limelightConversion() throws Exception {
+    void limelightConversion() throws IOException, InterruptedException, TimeoutException {
         step("26", scenario::limelightConverts);
     }
 
@@ -378,7 +379,7 @@ class TierACanonicalScenarioTest {
     @DisplayName(
             "step 27: the upload to the loopback fake (D-007) with a test key; the fake received"
                     + " exactly the converted file, valid, and the screen shows its tracking id")
-    void upload() throws Exception {
+    void upload() throws IOException, InterruptedException, TimeoutException {
         step(
                 "27",
                 () -> {
@@ -396,7 +397,7 @@ class TierACanonicalScenarioTest {
             "step 28: provenance recomputed from disk -- every declared file's MD5 and SHA-256,"
                     + " every tool binary and JAR, versions, argument arrays -- shown as recorded,"
                     + " and the key in no file")
-    void provenance() throws Exception {
+    void provenance() throws IOException, InterruptedException, TimeoutException {
         step("28", scenario::provenanceHoldsAgainstTheDisk);
     }
 
@@ -406,7 +407,7 @@ class TierACanonicalScenarioTest {
             "steps 29-30: closed through its own stop(), relaunched over a new composition root"
                     + " from the same home; the project, run, results, filters, tools and"
                     + " provenance are coherent")
-    void relaunch() throws Exception {
+    void relaunch() throws IOException, InterruptedException, TimeoutException {
         step(
                 "29-30",
                 () -> {

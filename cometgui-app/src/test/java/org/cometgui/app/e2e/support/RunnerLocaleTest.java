@@ -131,7 +131,7 @@ class RunnerLocaleTest {
         RunnerLocale here = RunnerLocale.ofThisJvm();
         boolean representable;
         try {
-            Path.of("/tmp", FreshHome.NON_ASCII_SEGMENT, "x.mzML");
+            Path.of(System.getProperty("java.io.tmpdir"), FreshHome.NON_ASCII_SEGMENT, "x.mzML");
             representable = true;
         } catch (InvalidPathException unmappable) {
             representable = false;

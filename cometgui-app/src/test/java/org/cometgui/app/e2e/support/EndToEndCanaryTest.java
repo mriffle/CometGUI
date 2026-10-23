@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 import org.cometgui.app.config.ApplicationServices;
 import org.junit.jupiter.api.DisplayName;
@@ -75,7 +76,12 @@ class EndToEndCanaryTest {
         Path written = Files.writeString(data.resolve("café.txt"), "été", StandardCharsets.UTF_8);
         List<String> names;
         try (Stream<Path> listed = Files.list(parent)) {
-            names = listed.map(path -> path.getFileName().toString()).toList();
+            names =
+                    listed.map(
+                                    path ->
+                                            Objects.requireNonNull(path.getFileName(), "a name")
+                                                    .toString())
+                            .toList();
         }
         assertAll(
                 () -> assertEquals(fresh.applicationDataDirectory(), data),

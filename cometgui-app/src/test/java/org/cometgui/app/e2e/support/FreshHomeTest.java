@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.cometgui.app.config.ApplicationServices;
@@ -242,7 +243,7 @@ class FreshHomeTest {
             Path base = Files.createDirectories(parent.resolve("for-" + tool.replace('/', '-')));
             FreshHome fresh = FreshHome.create(base, FreshHome.Naming.PLAIN);
             Path file = fresh.home().resolve(tool);
-            Files.createDirectories(file.getParent());
+            Files.createDirectories(Objects.requireNonNull(file.getParent(), "parent"));
             Files.write(file, new byte[] {1});
             AssertionError failed = assertThrows(AssertionError.class, fresh::assertNoToolPresent);
             assertTrue(
@@ -275,7 +276,7 @@ class FreshHomeTest {
                         Files.createDirectories(parent.resolve("b")), FreshHome.Naming.PLAIN);
         Path partial =
                 downloading.applicationDataDirectory().resolve("cache/downloads/0a1b2c/part");
-        Files.createDirectories(partial.getParent());
+        Files.createDirectories(Objects.requireNonNull(partial.getParent(), "parent"));
         Files.write(partial, new byte[] {1});
         AssertionError cache = assertThrows(AssertionError.class, downloading::assertNoToolPresent);
         assertTrue(

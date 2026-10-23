@@ -666,7 +666,12 @@ public final class CanonicalScenario {
         installCometFromTheToolManager();
         percolatorExecutable = install(percolator);
         for (ShippedManifest.Companion companion : percolator.companions()) {
-            Path installRoot = percolatorExecutable.getParent().getParent();
+            Path installRoot =
+                    Objects.requireNonNull(
+                            Objects.requireNonNull(
+                                            percolatorExecutable.getParent(), "bin directory")
+                                    .getParent(),
+                            "install root");
             for (Map.Entry<String, String> member : companion.members().entrySet()) {
                 Path file = installRoot.resolve(member.getKey());
                 assertEquals(
@@ -1018,7 +1023,11 @@ public final class CanonicalScenario {
 
         Set<String> written = new TreeSet<>();
         try (Stream<Path> listed = Files.list(run.resolve("outputs/comet"))) {
-            listed.map(path -> path.getFileName().toString()).forEach(written::add);
+            listed.map(
+                            path ->
+                                    Objects.requireNonNull(path.getFileName(), "a listed name")
+                                            .toString())
+                    .forEach(written::add);
         }
         Set<String> outputs = new TreeSet<>();
         for (Path spectrum : layout.spectra()) {

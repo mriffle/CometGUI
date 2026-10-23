@@ -130,10 +130,11 @@ class TierANoXmlScenarioTest {
     /** One step of the scenario, which every later step builds on. */
     @FunctionalInterface
     private interface Step {
-        void run() throws Exception;
+        void run() throws IOException, InterruptedException, TimeoutException;
     }
 
-    private static void step(String name, Step step) throws Exception {
+    private static void step(String name, Step step)
+            throws IOException, InterruptedException, TimeoutException {
         assumeTrue(
                 failedStep == null, () -> "not run: an earlier step failed (" + failedStep + ")");
         try {
@@ -147,14 +148,14 @@ class TierANoXmlScenarioTest {
     @Test
     @Order(1)
     @DisplayName("a brand-new home and application data directory, no tool present")
-    void freshHome() throws Exception {
+    void freshHome() throws IOException, InterruptedException, TimeoutException {
         step("fresh home", scenario::freshHomeHoldsNoTool);
     }
 
     @Test
     @Order(2)
     @DisplayName("the assembled application starts and reaches its ready state")
-    void launch() throws Exception {
+    void launch() throws IOException, InterruptedException, TimeoutException {
         step(
                 "launch",
                 () -> {
@@ -169,14 +170,14 @@ class TierANoXmlScenarioTest {
             "step 1: Comet installed through the Tool Manager; Percolator 3.09, which has no"
                     + " managed Linux build, registered as a local binary through the Percolator"
                     + " section and selected (R-LL-02)")
-    void select309() throws Exception {
+    void select309() throws IOException, InterruptedException, TimeoutException {
         step("1", scenario::installCometAndRegisterPercolator);
     }
 
     @Test
     @Order(4)
     @DisplayName("step 2: two spectrum files and the FASTA through the controls; the default Comet")
-    void inputs() throws Exception {
+    void inputs() throws IOException, InterruptedException, TimeoutException {
         step(
                 "2 inputs",
                 () -> {
@@ -188,7 +189,7 @@ class TierANoXmlScenarioTest {
     @Test
     @Order(5)
     @DisplayName("step 2: the parameters changed (E5's top 1 among them); both q filters 0.01")
-    void parameters() throws Exception {
+    void parameters() throws IOException, InterruptedException, TimeoutException {
         step(
                 "2 parameters",
                 () -> {
@@ -200,7 +201,7 @@ class TierANoXmlScenarioTest {
     @Test
     @Order(6)
     @DisplayName("step 2: Run; Comet and Percolator 3.09 succeed")
-    void run() throws Exception {
+    void run() throws IOException, InterruptedException, TimeoutException {
         step("2 run", scenario::run);
     }
 
@@ -209,7 +210,7 @@ class TierANoXmlScenarioTest {
     @DisplayName(
             "step 2: comet.params as chosen; one Comet per file, nothing beside the inputs; the"
                     + " merged PIN")
-    void cometOutputs() throws Exception {
+    void cometOutputs() throws IOException, InterruptedException, TimeoutException {
         step(
                 "2 Comet",
                 () -> {
@@ -222,7 +223,7 @@ class TierANoXmlScenarioTest {
     @Test
     @Order(8)
     @DisplayName("step 2: Percolator 3.09 ran once, given no XML option, and wrote no XML")
-    void percolatorWithoutXml() throws Exception {
+    void percolatorWithoutXml() throws IOException, InterruptedException, TimeoutException {
         step("2 Percolator", scenario::percolatorRanWithoutXml);
     }
 
@@ -231,7 +232,7 @@ class TierANoXmlScenarioTest {
     @DisplayName(
             "step 2: standard viewing -- PSM and peptide counts at 0.01 and the learned weights"
                     + " equal the raw files'")
-    void viewing() throws Exception {
+    void viewing() throws IOException, InterruptedException, TimeoutException {
         step(
                 "2 viewing",
                 () -> {
@@ -245,7 +246,7 @@ class TierANoXmlScenarioTest {
     @DisplayName(
             "step 3: the Limelight section explains the XML incompatibility before any"
                     + " conversion is attempted; nothing was launched or installed")
-    void explanation() throws Exception {
+    void explanation() throws IOException, InterruptedException, TimeoutException {
         step("3", scenario::limelightExplainsBeforeAnyConversion);
     }
 
@@ -254,7 +255,7 @@ class TierANoXmlScenarioTest {
     @DisplayName(
             "step 4: no 3.07.1 in the cache before the click; the one-click rerun installs it and"
                     + " uses it")
-    void compatibleRerun() throws Exception {
+    void compatibleRerun() throws IOException, InterruptedException, TimeoutException {
         step("4", scenario::theCompatibleRerunInstallsOnlyAfterTheClick);
     }
 
@@ -263,14 +264,14 @@ class TierANoXmlScenarioTest {
     @DisplayName(
             "step 5: Comet was not rerun -- proved from disk (bytes, inode, mtime; no new pepXML"
                     + " or PIN), then the product's records agree")
-    void cometNotRerun() throws Exception {
+    void cometNotRerun() throws IOException, InterruptedException, TimeoutException {
         step("5", scenario::cometWasNotRerun);
     }
 
     @Test
     @Order(13)
     @DisplayName("step 6: the new Percolator execution wrote XML holding its tables' rows")
-    void xml() throws Exception {
+    void xml() throws IOException, InterruptedException, TimeoutException {
         step("6", scenario::theRerunWroteXml);
     }
 
@@ -279,7 +280,7 @@ class TierANoXmlScenarioTest {
     @DisplayName(
             "step 7: the Limelight conversion of the derived run succeeds; the XML is valid"
                     + " against the installed JAR's schema and holds its PSMs")
-    void conversion() throws Exception {
+    void conversion() throws IOException, InterruptedException, TimeoutException {
         step("7", scenario::limelightConvertsTheRerun);
     }
 
@@ -288,7 +289,7 @@ class TierANoXmlScenarioTest {
     @DisplayName(
             "step 8: provenance holds both Percolator executions -- distinct versions, checksums"
                     + " equal to the binaries on disk, and commands")
-    void provenance() throws Exception {
+    void provenance() throws IOException, InterruptedException, TimeoutException {
         step("8", scenario::provenanceHoldsBothPercolatorExecutions);
     }
 }
