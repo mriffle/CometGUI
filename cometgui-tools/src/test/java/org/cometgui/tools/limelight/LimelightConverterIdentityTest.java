@@ -28,6 +28,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
@@ -119,6 +120,9 @@ class LimelightConverterIdentityTest {
                 () -> assertEquals("--version", command.argv().get(3)),
                 () -> assertEquals(4, command.argv().size()),
                 () -> assertEquals(directory, command.workingDirectory()),
+                // Phase 14 E4: with an empty environment the child JVM's sun.jnu.encoding is
+                // ASCII and it cannot open a JAR under a non-ASCII path (an accented home).
+                () -> assertEquals(Map.of("LANG", "C.UTF-8"), command.environment()),
                 () ->
                         assertEquals(
                                 List.of("--version"),

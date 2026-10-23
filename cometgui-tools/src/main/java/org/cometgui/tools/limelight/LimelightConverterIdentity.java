@@ -19,7 +19,6 @@ package org.cometgui.tools.limelight;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -99,7 +98,11 @@ public final class LimelightConverterIdentity {
                             + tool.id());
         }
         ToolRunOutcome outcome =
-                runner.run(java.jarCommand(jar.toAbsolutePath(), VERSION_ARGUMENTS, Map.of()));
+                runner.run(
+                        java.jarCommand(
+                                jar.toAbsolutePath(),
+                                VERSION_ARGUMENTS,
+                                LimelightConverter.ENVIRONMENT));
         if (outcome.timedOut()) {
             throw new IOException(
                     "the Limelight converter at "
