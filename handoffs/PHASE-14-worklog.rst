@@ -449,7 +449,33 @@ collide exists, so none is offered.
        converter and PDV started from the installed runtime, a real process
        restart.
      - items 2, 3; AC-TST-07
-     - pending
+     - **Accepted 2026-10-23**, ``50b9921`` (agent 7). Diff read (12 files,
+       test code only; the same tier-neutral scenario code as Tier A, step
+       25 split into "launched" and "drew"). Ran myself on a rebuilt image:
+       ``TierBCanonicalScenarioTest`` 24, ``TierBNoXmlScenarioTest`` 16,
+       ``TierBLocaleControlTest`` 2 -- 0 failures, 249 s; ``verify
+       -DskipTests`` BUILD SUCCESS; ``check-no-fixed-sleep.sh`` PASSED
+       (153 classes); ``/home/agent`` left untouched. Tier B invariants: the
+       launched process reports ``sun.jnu.encoding=UTF-8``, the installed
+       runtime as ``java.home``, no ``JAVA_HOME``, no java on ``PATH``; all
+       four tools downloaded into the fresh home by the packaged app; the
+       install tree unchanged by bytes, mtime and inode; the converter ran on
+       ``<install>/lib/runtime/bin/java``; a real process restart with the
+       filters restored. **Step 25 partial (E6)**: PDV installed and
+       launched from the installed runtime, fails only for ``libX11.so.6
+       => not found`` -- drawing not proved on this host. Locale control:
+       launched without a locale, the harness's assertion throws naming
+       ``sun.jnu.encoding=ANSI_X3.4-1968``. My injection: results ``<=``
+       to ``<`` in ``QValueFilter.classify``, built into the image -- red,
+       "PSMs at q <= 0.00949668 ==> expected: <[1201, 1053, 148, 0]> but
+       was: <[1201, 1044, 157, 0]>"; restored, ``sha256sum -c`` OK, image
+       rebuilt. Agent's injections (read): ``java.logging`` dropped from the
+       runtime (Tier B red at the converter/PDV, Tier A green, and
+       ``build-app-image.sh`` still passed -- its checks cover the app's own
+       needs only); ``JavaRuntime`` taking java from ``PATH`` (Tier B red,
+       Tier A green). Incident: the locale control twice wrote a tool cache
+       into ``/home/agent`` before the agent pinned ``user.home`` for that
+       launch; removed and verified absent.
    * - 8
      - **Failure-path suite**: every scenario in the specification's list
        mapped to a named passing test, existing or new.
@@ -546,6 +572,14 @@ E7 -- a failed start leaves an invisible process (ESCALATED, not repaired)
     could meet a held resource. Recommendation: the application exits (or
     shuts its executors down) when ``start`` throws. Outside this phase's
     scope; not repaired here.
+
+E8 -- an unrepresentable XDG_DATA_HOME is dropped silently (RECORDED, Phase 16)
+    Found by unit 7's locale control: under a non-UTF-8 locale an accented
+    ``XDG_DATA_HOME`` arrives as U+FFFD, ``PlatformFileSystemAccess`` cannot
+    use it and falls back to ``user.home`` -- the password-database home, not
+    ``$HOME`` -- without a word, and the tool cache and default project go
+    there. Belongs with the launcher locale repair (Phase 16); a warning at
+    least is recommended.
 
 E2 -- no project chooser
     See P14-6. Scenario step 5 has no control. Recommendation: amend the step
