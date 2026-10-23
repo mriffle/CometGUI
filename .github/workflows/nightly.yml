@@ -131,6 +131,29 @@ jobs:
       - name: Tool manifest verification (R-TEST-08)
         run: bash scripts/ci/nightly-manifest-verify.sh
 
+  limelight-sandbox:
+    # D-007's nightly Limelight-sandbox slot: provisioned for, and NOT
+    # configured.  No sandbox has been named and naming one is the owner's, so
+    # until then the step reports that, names why, and exits 70 through
+    # stub-lib.sh -- red, in its own job, never a green step that uploaded
+    # nothing.  Supplying a sandbox is configuration: set the repository
+    # VARIABLES below (vars., which hold no secret) and the script runs the
+    # upload test against it.  The submit key has no way in yet: a secrets.
+    # reference is forbidden in every workflow (check-workflows.py, D-008), so
+    # admitting one credential here is an owner decision.  No default URL exists.
+    name: "Nightly (Linux): Limelight sandbox (D-007, not configured)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Limelight sandbox upload (D-007 slot)
+        run: bash scripts/ci/nightly-limelight-sandbox.sh
+        env:
+          COMETGUI_LIMELIGHT_SANDBOX_URL: ${{ vars.COMETGUI_LIMELIGHT_SANDBOX_URL }}
+          COMETGUI_LIMELIGHT_SANDBOX_PROJECT: ${{ vars.COMETGUI_LIMELIGHT_SANDBOX_PROJECT }}
+
   windows:
     # UNVERIFIABLE IN THIS ENVIRONMENT.  There is no non-Linux machine here and
     # This job has never run on a runner.  When

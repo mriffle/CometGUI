@@ -504,7 +504,21 @@ public final class CanonicalScenario {
         String version = percolator.version();
         screen.show("percolator");
         if (!screen.ui().isSelected("percolator-limelight")) {
+            // On observable state, not on the click's return (P14-8): the box may still be
+            // disabled while the section refreshes after the installs, and a robot click is an
+            // input event that the toolkit applies when it reaches it. Phase 14 unit 9's harness
+            // saw the assertion below read the box unselected straight after the click, once.
+            Await.until(
+                    "the Limelight conversion check box to be enabled",
+                    () -> screen.ui().isDisabled("percolator-limelight"),
+                    disabled -> !disabled,
+                    CHECK_BOUND);
             screen.ui().clickOn("percolator-limelight");
+            Await.until(
+                    "the Limelight conversion check box to read selected after the click",
+                    () -> screen.ui().isSelected("percolator-limelight"),
+                    selected -> selected,
+                    CHECK_BOUND);
         }
         int known = manifest.versionsOf("percolator");
         assertAll(
