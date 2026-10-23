@@ -509,6 +509,30 @@ collide exists, so none is offered.
        on ``b140915`` (PASS); mine run after 8b, which touches the same
        modules. Reads outside modules: ``scratch/phase05/artefacts``,
        ``scratch/fixture``, ``manifests/tools.json``.
+       **8b accepted 2026-10-23**, ``6f9e3df`` ``a8faba4`` (agent 8b). Diff
+       read (16 files, test code and the map; no ``src/main``, no POM):
+       14 ``PercolatorCancellationTest``, ``PercolatorCancelUiTest``; 17
+       ``UnwritableRunDirectoryTest`` (fails, not skips, as root); 18
+       ``FileSizeLimitRunTest`` (a child JVM under RLIMIT_FSIZE 15000 --
+       EFBIG, not ENOSPC; no free-space pre-check exists); 24
+       ``InterruptedRunReopenedTest``, ``InterruptedRunReopenUiTest`` (a
+       child JVM halts mid-Percolator); 25 ``LockedProjectUiTest`` (a second
+       JVM holds the project). Map: no scenario partial. Ran myself with no
+       locale exported: 4+2+1+1+1+1+2 run, 0 failures, 60 s;
+       ``check-failure-paths.sh`` (no ``--allow-partial``) PASSED, 25/25
+       scenarios, ids all found; ``--self-test`` PASSED. My injection:
+       ``RunExecution`` ending a cancelled run-percolator as FAILED, not
+       CANCELLED -- red, but by the test's 60 s run bound ("the cancelled run
+       did not end within PT1M", the engine refusing the transition) rather
+       than a state assertion; restored, ``sha256sum -c`` OK. Agent's
+       injections (read): ten, each red, after the first cancel injection
+       showed a watchdog could outlast the bound (repaired in ``a8faba4``).
+       Defects: E12-E15. ``paramui`` control 2v failed once in the agent's
+       run (85/87) and passed alone 3/3 and on a full rerun -- an
+       intermittent in ``VariableModificationEditorUiTest``, untouched here.
+       **Gates for 8a and 8b, by me on ``a8faba4``**: ``quality`` 42,
+       ``install`` 95, ``paramui`` 87 (2248 s), ``workflow`` 110,
+       ``provenanceui`` 96 (1252 s) -- all PASS.
    * - 9
      - **The harness and CI wiring** (P14-13, P14-14), including gate item
        5's three injections as controls.
@@ -628,6 +652,28 @@ E11 -- the stepper shows Percolator "Running" after a Comet failure (ESCALATED)
     "Running" and stays so; ``StageProjection.combine`` draws a stage whose
     first step (resolve-percolator) succeeded and the rest never started as
     running.
+
+E12 -- a run recorded SUCCEEDED with no provenance record (ESCALATED, serious)
+    Found by 8b: if ``provenance/`` becomes unwritable mid-run, or the disk
+    fills during finalisation, the run's outcome and ``run.json`` say
+    SUCCEEDED while ``provenance.json`` and ``provenance.rst`` were never
+    written; the outcome text only adds "Its provenance could not be
+    finalised". Cause: ``RunExecution.finish`` fixes the outcome before
+    writing the seal. A provenance-complete product should not call such a
+    run a success. Recommended for repair before release.
+
+E13 -- a stale-lock takeover is never shown (ESCALATED)
+    ``ProjectLock.recoveryNotice()`` is produced and read by no product code;
+    the interface takes over a dead CometGUI's lock silently.
+
+E14 -- an interrupted run is labelled "running" (ESCALATED)
+    Results reads "... running" and the Provenance summary "Status:
+    running"; only the Provenance run list says "interrupted".
+
+E15 -- an interrupted run cannot be retried (ESCALATED)
+    No product code ends an interrupted attempt, so
+    ``RunDescriptor.withNewAttempt`` refuses ("still running"); only a new
+    run is offered. Cited from code by 8b, not asserted by a test.
 
 E2 -- no project chooser
     See P14-6. Scenario step 5 has no control. Recommendation: amend the step
