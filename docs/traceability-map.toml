@@ -66,9 +66,22 @@ check = "bash scripts/ci/traceability.sh"
 # --- AC-INS -----------------------------------------------------------------
 
 [[ac."AC-INS-01".evidence]]
+kind = "test"
+class = "org.cometgui.app.e2e.tierb.TierBCanonicalScenarioTest"
+method = "launch"
+note = "Phase 14 unit 7, Linux x86-64 only. The packaged archive installed read-only outside the repository and launched with PATH=/usr/bin:/bin (checked to hold no java) and JAVA_HOME unset; the launched process reports the installed bundled runtime as java.home and no JAVA_HOME, then runs the whole canonical scenario. Opt-in (-Dcometgui.e2e=true), run by scripts/verify-e2e-gates.sh control B."
+
+[[ac."AC-INS-01".evidence]]
+kind = "check"
+command = "bash scripts/package/smoke-installed.sh INSTALL_DIR"
+file = "scripts/package/smoke-installed.sh"
+contains = "S1  the launch environment: no java on PATH, JAVA_HOME unset"
+note = "Phase 14 unit 5, Linux x86-64 only. The installed archive with no JDK on PATH: S1 the launch environment, S2 the bundled runtime's bin/java runs with java.home inside the install, through S11. Run by hand (and its --self-test); no harness or CI job runs it yet -- release-smoke.sh is a stub."
+
+[[ac."AC-INS-01".evidence]]
 kind = "planned"
 phase = "14"
-note = "Foundations are laid earlier, in phase 05."
+note = "macOS and Windows are UNVERIFIED: packaging/jpackage/macos.args and windows.args have never been executed (no such host). Phase 14 cannot close the criterion on every tier-1 OS; tier 1 must reassign the remainder (no later phase's :Proves: field claims AC-INS-01) or record it unmet before PHASE-14 is marked PASSED, which this entry will otherwise fail."
 
 [[ac."AC-INS-02".evidence]]
 kind = "planned"
@@ -1188,26 +1201,79 @@ class = "org.cometgui.app.gui.ConsoleFloodUiTest"
 note = "Phase 02: the console pane under a 250,000-message flood -- oldest discarded, both caps held, retained heap measured."
 
 [[ac."AC-TST-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.gui.RemotableDriverUiTest"
+note = "Phase 14 unit 1: every RemotableUiDriver operation the end-to-end scenarios use, proved against the running application through both in-process drivers (TestFX and javafx.scene.robot)."
+
+[[ac."AC-TST-05".evidence]]
+kind = "test"
+class = "org.cometgui.app.e2e.tiera.TierACanonicalScenarioTest"
+note = "Phase 14 units 2-3: the assembled application driven through the GUI from a fresh home through install, parameters, run, results, weights, PDV, Limelight, provenance and relaunch. Opt-in, Linux."
+
+[[ac."AC-TST-05".evidence]]
 kind = "planned"
 phase = "14"
-note = "Phase 02 lays the foundations above; phase 14 closes the criterion when the suite covers the whole GUI list in the specification's JavaFX GUI automation section, not only navigation, accessibility and the console."
+note = "Still open: the GUI tests have not been audited item by item against the specification's JavaFX GUI automation list, and one item, the learned-weights chart data, has no test because WeightsPane draws no chart. Must be audited or reassigned by tier 1 before PHASE-14 is marked PASSED."
 
 [[ac."AC-TST-06".evidence]]
-kind = "planned"
-phase = "14"
+kind = "test"
+class = "org.cometgui.app.e2e.tiera.TierACanonicalScenarioTest"
+note = "Phase 14 units 2, 2b, 3 (R-TEST-03, R-TEST-05): the canonical scenario, steps 1-30, in-process from an empty tool cache through provenance recomputation and relaunch, two real spectrum files with per-file -N and PIN merge, entered only through the UI's controls. Opt-in (-Dcometgui.e2e=true), Linux, D-006 local fixture, network to the tools' GitHub release URLs. Departures recorded in docs/developer/e2e_harness.rst (E1, E2, E5)."
+
+[[ac."AC-TST-06".evidence]]
+kind = "check"
+command = "bash scripts/verify-e2e-gates.sh"
+file = "scripts/verify-e2e-gates.sh"
+contains = "TierACanonicalScenarioTest"
+note = "Phase 14 unit 9: control A requires every @Test of the class RUN and passed from the surefire report of the run it started (gate item 1), control L its locale assertion red without a locale, and controls 5q, 5p, 5b each production-code injection red at its named step (gate item 5). Registered as e2e in scripts/verify-all-gates.sh; no CI job runs it (D-006)."
+
+[[ac."AC-TST-07".evidence]]
+kind = "test"
+class = "org.cometgui.app.e2e.tierb.TierBCanonicalScenarioTest"
+note = "Phase 14 unit 7, LINUX x86-64 ONLY: the canonical scenario against the installed packaged archive, launched unmodified with the test-only bridge (R-TEST-06), fresh non-ASCII home, launched-process locale asserted, install tree unchanged, real process restart. Step 25 is partial on this host (E6: PDV launched from the installed runtime, drawing not proved)."
+
+[[ac."AC-TST-07".evidence]]
+kind = "test"
+class = "org.cometgui.app.e2e.tierb.TierBNoXmlScenarioTest"
+note = "Phase 14 unit 7, Linux x86-64 only: the no-XML scenario against the installed packaged archive."
 
 [[ac."AC-TST-07".evidence]]
 kind = "planned"
 phase = "16"
-note = "Foundations are laid earlier, in phase 14."
+note = "Not met on macOS or Windows: their packaging configuration has never been executed, and no CI runner runs Tier B (D-006's CI fixture is open). Phase 16 closes it on every tier-1 platform."
 
 [[ac."AC-TST-08".evidence]]
-kind = "planned"
-phase = "14"
+kind = "test"
+class = "org.cometgui.app.e2e.tiera.TierANoXmlScenarioTest"
+method = "cometNotRerun"
+note = "Phase 14 unit 4: Percolator 3.09 (a registered local binary; no Linux managed build), the Limelight explanation before conversion, the compatible rerun installing 3.07.1 only after the action, and Comet not rerun -- proved from disk (bytes, inode, mtime; no new pepXML or PIN) before the product's records. Opt-in, Linux."
+
+[[ac."AC-TST-08".evidence]]
+kind = "test"
+class = "org.cometgui.app.e2e.tierb.TierBNoXmlScenarioTest"
+method = "cometNotRerun"
+note = "Phase 14 unit 7: the same scenario and assertion against the installed packaged archive. Opt-in, Linux."
+
+[[ac."AC-TST-08".evidence]]
+kind = "check"
+command = "bash scripts/verify-e2e-gates.sh"
+file = "scripts/verify-e2e-gates.sh"
+contains = "TierANoXmlScenarioTest"
+note = "Phase 14 unit 9: controls A and B require cometNotRerun named and passed in both tiers (gate item 3); control 3i shows the disk assertion red when the rerun touches the first run's Comet outputs."
 
 [[ac."AC-TST-09".evidence]]
-kind = "planned"
-phase = "14"
+kind = "check"
+command = "bash scripts/e2e/check-failure-paths.sh"
+file = "scripts/e2e/check-failure-paths.sh"
+contains = "Every failure-path"
+note = "Phase 14 unit 8a/8b: scripts/e2e/failure-paths.toml maps all 25 failure-path scenarios, re-parsed from specification.rst on every run, to 61 named tests in 12 test source trees; the checker requires each to exist, not be @Disabled, and -- given reports -- to have run and passed. No scenario is partial. --self-test proves it rejects damaged maps and reports."
+
+[[ac."AC-TST-09".evidence]]
+kind = "check"
+command = "bash scripts/verify-e2e-gates.sh"
+file = "scripts/verify-e2e-gates.sh"
+contains = "check-failure-paths.sh"
+note = "Phase 14 unit 9, control 4 (gate item 4): every ordinary mapped test run fresh, and the checker graded over exactly that run's reports plus both tiers' (--scope all)."
 
 [[ac."AC-TST-10".evidence]]
 kind = "planned"
@@ -1218,8 +1284,18 @@ kind = "planned"
 phase = "15"
 
 [[ac."AC-TST-12".evidence]]
-kind = "planned"
-phase = "14"
+kind = "check"
+command = "bash scripts/ci/release-no-test-bridge.sh"
+file = "scripts/ci/release-no-test-bridge.sh"
+contains = "verify, by inspecting the SHIPPED ARTEFACT"
+note = "Phase 14 unit 6 (R-TEST-06): inspects every JAR, class, manifest, the runtime module image and the launcher configuration of the packaged artefact and fails on the bridge's classes, test frameworks, agent options or the cometgui.e2e flag; a real step of release.yml. --self-test rejects nine bridge-included variants and refuses an empty image (gate item 7). Linux archive only: on macOS and Windows it exits 1 because it cannot yet unpack their installers, so an uninspected artefact cannot pass."
+
+[[ac."AC-TST-12".evidence]]
+kind = "check"
+command = "bash scripts/verify-e2e-gates.sh"
+file = "scripts/verify-e2e-gates.sh"
+contains = "release-no-test-bridge.sh"
+note = "Phase 14 unit 9, control 7: the check PASSES on the clean archive built in the sandbox and its --self-test rejects every bridge-included variant."
 
 # --- AC-DOC -----------------------------------------------------------------
 

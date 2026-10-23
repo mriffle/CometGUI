@@ -124,12 +124,17 @@ the first of them and has built the scaffolding for two more.
      - Drive JavaFX controls, verify UI state and validation.
      - **Recipe proven, suite not written.** Two headless JavaFX tests run in
        ``cometgui-ui``; see `The headless JavaFX recipe`_. Phase 14 owns the
-       suite.
+       suite. *Since then:* later phases wrote the GUI suite
+       (``*UiTest`` in ``cometgui-app``), and Phase 14 the end-to-end tier
+       over it -- see :ref:`dev-e2e-harness`.
 
    * - Packaged end-to-end
      - Start the packaged application in a clean environment and drive a real
        workflow.
-     - **Not written.** Phase 14.
+     - **Not written.** Phase 14. *Since then:* Phase 14's Tier B runs both
+       end-to-end scenarios against the installed Linux archive, opt-in and
+       Linux only; macOS and Windows packaging has never been executed. See
+       :ref:`dev-e2e-harness`.
 
    * - Nightly / scientific regression
      - Larger real data, version matrices, determinism, performance.
@@ -139,7 +144,10 @@ the first of them and has built the scaffolding for two more.
 
    * - Release acceptance
      - The exact installer and package artefacts that will be published.
-     - **Not written.** Phases 14 and 16.
+     - **Not written.** Phases 14 and 16. *Since then:* the no-test-bridge
+       check is a real release step (:ref:`dev-e2e-no-bridge`); the smoke and
+       end-to-end release steps remain stubs waiting for ``D-006``'s CI
+       fixture and Phase 16's release artefact.
 
 Two rules from ``CONTRIBUTING.rst`` apply to every test anyone adds:
 
@@ -627,6 +635,20 @@ pass is worse than no aggregator at all.
        the MD5 alone -- ``.../parameters/comet.params: MD5 recomputed from
        disk ==> expected: <...> but was: <...>``, which a gate comparing the
        record with the product's own digests could not see.
+
+   * - End-to-end tier (Phase 14, ``e2e``)
+     - ``scripts/verify-e2e-gates.sh``: both tiers' scenarios run once in a
+       ``git archive HEAD`` sandbox, the failure-path map graded over that
+       run's reports, the no-fixed-sleep and no-test-bridge checks with their
+       self-tests, and four injections into production code -- the compatible
+       rerun touching Comet's outputs, ``<=`` made ``<`` in the q-value
+       filter, the FASTA dropped from provenance, the Limelight final submit
+       skipped -- plus a control H on itself. 48 graded checks in 1084 s at
+       unit 9's sign-off; needs network to GitHub and the ``D-006`` local
+       fixture. See :ref:`dev-e2e-gate-harness`.
+     - Each failing assertion's own words in the named step, e.g. ``the first
+       run's Comet trees, unchanged ... mtime`` for the rerun, and ``...
+       UP000005640_9606.fasta: not declared as an input`` at step 28.
 
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs
@@ -2435,7 +2457,9 @@ exists is worse than no page.
 
    * - The GUI suite, and packaged end-to-end tests
      - 14
-     - The recipe is proven; the controls to drive do not exist.
+     - The recipe is proven; the controls to drive do not exist. *Since
+       then:* written, Linux only; what remains open is listed in
+       :ref:`dev-e2e-gaps`.
 
    * - Nightly regression, determinism, performance, version matrix
      - 15
@@ -2443,7 +2467,9 @@ exists is worse than no page.
 
    * - Release acceptance on real installer artefacts
      - 14, 16
-     - Nothing is packaged yet.
+     - Nothing is packaged yet. *Since then:* Phase 14 packages and tests a
+       Linux archive locally; no CI job runs it, and no macOS or Windows
+       artefact has been built (:ref:`dev-e2e-ci`).
 
    * - Coverage gates on adapter, workflow, install and app modules
      - the phase that fills each module

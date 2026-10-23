@@ -18,3 +18,10 @@ What this page will cover
 The release checklist: packaging per tier-1 platform, checksums, SBOM,
 signing and notarisation where infrastructure permits, and the gates that must
 be green before anything is published.
+
+Phase 14 built the pieces this page will assemble, all Linux only so far: the
+``jpackage`` configuration and the packaging, install and smoke scripts
+(:ref:`dev-e2e-packaging`), the release check that no test bridge ships
+(:ref:`dev-e2e-no-bridge`), and the release steps that remain stubs until
+``D-006``'s CI fixture and Phase 16's ``release-package.sh`` exist
+(:ref:`dev-e2e-ci`).
