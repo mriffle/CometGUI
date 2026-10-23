@@ -316,7 +316,32 @@ collide exists, so none is offered.
        and output, tool binaries and JARs on disk, versions, argv, no
        secret), close, relaunch, coherence.
      - items 1, 5; AC-TST-06
-     - pending
+     - **Accepted 2026-10-23**, ``9b4a4a7`` (agent 3) plus my repair of E4,
+       ``031748b``. Diff read (18 files: scenario ``DownstreamSteps``, three
+       new oracles with hand-computed tests, ``FreshHome`` desktop
+       variables, the Tier A class; ``FakeLimelightServer.close`` joins
+       untimed in all four byte-identical copies). On ``9b4a4a7`` alone the
+       test is red at step 26 (E4); with ``031748b``, run by me: 23 run, 0
+       failures, 73 s. My injection: ``ManifestWriter.render`` skipping the
+       ``.fasta`` file record -- red at step 28, "...UP000005640_9606.fasta:
+       not declared as an input"; restored, ``sha256sum -c`` OK. Agent's
+       injections (read): ``weights.txt`` dropped from the record (gate item
+       5's dropped entry), one MD5 wrong, the upload's final submit skipped
+       while the UI still says submitted (a silent bypass the product does
+       not catch). Numbers with E5's top-1 setting: 1201 target PSMs, 1053 at
+       0.01; Limelight XML 3 525 177 bytes, schema-valid, 1201 psm; 28
+       declared files recomputed; key absent from 269 files in 15 encodings;
+       q filters persisted in ``results/view-state.json`` and restored on
+       relaunch. **Step 10 now also sets ``num_output_lines = 1``** (E5),
+       which changed unit 2's counts. PDV in Tier A is given the project
+       Xvfb's library variables through ``RunWiring.Setup`` built from
+       ``forThisApplication``'s own parts (a third seam; see E6). Agent's
+       gates on ``9b4a4a7``: ``paramui`` 87, ``limelight`` 130,
+       ``provenanceui`` 96 PASS. Reads outside the module (opt-in only):
+       ``manifests/tools.json``, ``scratch/fixture``,
+       ``tools/x11-bookworm-20260829``, ``tools/fontstack-bookworm-20260829``,
+       ``scripts/feasibility/gui-spike/xkbcomp-path-shim.c`` (host ``gcc``),
+       GitHub.
    * - 4
      - **Tier A no-XML scenario**: 3.09 registered through the UI, run,
        viewing, the Limelight explanation before any conversion, the
@@ -395,6 +420,40 @@ E3 -- sections never learn of an install (found by unit 2, REPAIRED in 2b)
     is not installed" ten minutes after the Tool Manager showed it installed.
     A defect in approved work, so repaired in this phase (unit 2b) under the
     owner's fix-red-and-continue rule, and reported.
+
+E4 -- the converter cannot be installed under a non-ASCII home (REPAIRED, ``031748b``)
+    ``LimelightConverterIdentity`` probed ``java -jar <jar> --version`` with
+    an empty environment, so the child JVM could not open a JAR under an
+    accented path; the install failed with no diagnostic on screen. Repaired
+    by the orchestrator: the probe passes ``LimelightConverter.ENVIRONMENT``
+    (``LANG=C.UTF-8``), as a conversion already did. The identity test
+    asserts the environment (red with ``Map.of()``, "expected:
+    <{LANG=C.UTF-8}> but was: <{}>"); targeted PIT 7/7 killed;
+    ``TierACanonicalScenarioTest`` 23/23 with it.
+    Gates after it, by me: ``install`` 95 (408 s), ``limelight`` 130
+    (1178 s), PASS. Note: targeted PIT rewrote ``cometgui-tools``'s PIT
+    report; regenerate every module's report before ``--only tests``.
+
+E5 -- Comet's default top 5 makes the pinned converter refuse the run (ESCALATED)
+    With ``num_output_lines = 5`` on the ``D-006`` fixture and the whole
+    proteome, Comet 2026.03.0 reports one spectrum twice with the same
+    modified peptide (``k562_3`` scan 11483, ``k562_4`` scan 10245); both
+    reach Percolator's XML and converter v2.8.1 refuses: "Got more than one
+    entry ... for the same scan to the same reported peptide". The product
+    reports the refusal faithfully; it cannot convert such a run. The
+    scenario sets top 1 in the Advanced level as a documented workaround.
+    Question for tier 1/owner: should the product restrict or deduplicate
+    when Limelight is enabled (a product and scientific choice), or document
+    it?
+
+E6 -- PDV's display environment on a host without system X11 (RECORDED)
+    ``PdvDisplay.fromHost`` passes PDV only ``DISPLAY`` and ``XAUTHORITY``;
+    this host has no ``libX11``, so PDV needs the project closure's library
+    path. Tier A supplies it through the ``RunWiring.Setup`` seam. A packaged
+    application cannot be given that seam, so on this host Tier B can prove
+    that PDV starts from the installed runtime but not that it draws. A real
+    Linux desktop has ``libX11``; this is a testing gap of this host, not a
+    product defect.
 
 E2 -- no project chooser
     See P14-6. Scenario step 5 has no control. Recommendation: amend the step
