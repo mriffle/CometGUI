@@ -221,6 +221,8 @@ public final class CanonicalScenario {
 
     private Path percolatorExecutable;
 
+    private String percolatorVersion;
+
     private String runId;
 
     private Path run;
@@ -321,6 +323,9 @@ public final class CanonicalScenario {
     }
 
     String percolatorVersion() {
+        if (percolatorVersion != null) {
+            return percolatorVersion;
+        }
         return Objects.requireNonNull(percolator, "Percolator is not installed yet").version();
     }
 
@@ -401,15 +406,21 @@ public final class CanonicalScenario {
         screen.ui().clickOn("param-mode-essentials");
         assertEquals("No spectrum files chosen.", screen.ui().textOf("ess-spectra-summary"));
 
+        int askedBefore = chooser.asked().size();
         chooser.nextSpectra(layout.spectra());
         screen.ui().clickOn("ess-spectra-add");
         chooser.nextDatabase(layout.database());
         screen.ui().clickOn("ess-database_name-choose");
 
         String database = layout.database().toString();
+        List<String> asked = chooser.asked();
         assertAll(
                 "steps 6 and 7: two spectrum files and the FASTA, chosen through the controls",
-                () -> assertEquals(List.of("spectra", "database"), chooser.asked()),
+                () ->
+                        assertEquals(
+                                List.of("spectra", "database"),
+                                asked.subList(askedBefore, asked.size()),
+                                "the dialogs this step opened"),
                 () ->
                         assertEquals(
                                 "2 spectrum files chosen.",
@@ -651,11 +662,8 @@ public final class CanonicalScenario {
      * @throws IOException if an installed file cannot be read
      */
     public void installCometAndPercolatorFromTheToolManager() throws IOException {
-        comet = manifest.artefact("comet", DEFAULT_COMET, platform);
         percolator = manifest.newestXmlCapablePercolator(platform);
-        layout.home().assertNoToolPresent();
-        screen.show("tool-manager");
-        cometExecutable = install(comet);
+        installCometFromTheToolManager();
         percolatorExecutable = install(percolator);
         for (ShippedManifest.Companion companion : percolator.companions()) {
             Path installRoot = percolatorExecutable.getParent().getParent();
@@ -667,6 +675,59 @@ public final class CanonicalScenario {
                         () -> "the companion member " + file + " is the manifest's bytes");
             }
         }
+        theRunSectionKnowsBothTools();
+    }
+
+    /**
+     * Step 14's Comet half (P14-5), alone: from a cache with no tool in it, the default Comet is
+     * installed through the Tool Manager's Install control and checked as {@link
+     * #installCometAndPercolatorFromTheToolManager()} checks it. The no-XML scenario uses it, and
+     * gives the run its Percolator another way ({@link #percolatorIs}).
+     *
+     * @return the installed Comet executable
+     * @throws IOException if an installed file cannot be read
+     */
+    Path installCometFromTheToolManager() throws IOException {
+        comet = manifest.artefact("comet", DEFAULT_COMET, platform);
+        layout.home().assertNoToolPresent();
+        screen.show("tool-manager");
+        cometExecutable = install(comet);
+        return cometExecutable;
+    }
+
+    /**
+     * The Percolator the steps that follow hold the run to, where it is not the managed build
+     * {@link #installCometAndPercolatorFromTheToolManager()} installs: a registered local binary,
+     * or the build a compatible rerun installed.
+     *
+     * @param version the version, as the binary states it
+     * @param executable the executable the run's record must name
+     */
+    void percolatorIs(String version, Path executable) {
+        percolatorVersion = Objects.requireNonNull(version, "version");
+        percolatorExecutable = Objects.requireNonNull(executable, "executable");
+    }
+
+    /**
+     * The run the steps that follow work on, where it is not the one {@link #run()} started: the
+     * derived run of a compatible Percolator rerun.
+     *
+     * @param id the run's identifier, as the screen stated it
+     * @param directory the run's directory
+     */
+    void runIs(String id, Path directory) {
+        runId = Objects.requireNonNull(id, "id");
+        run = Objects.requireNonNull(directory, "directory");
+    }
+
+    /**
+     * Once Comet and a Percolator are both usable: the Run section has learned of them -- its
+     * engine names neither tool, only the missing inputs (defect E3) -- and the default project
+     * holds no run yet.
+     *
+     * @throws IOException if the project cannot be listed
+     */
+    void theRunSectionKnowsBothTools() throws IOException {
         screen.show("run");
         screen.await(
                 "run-engine",

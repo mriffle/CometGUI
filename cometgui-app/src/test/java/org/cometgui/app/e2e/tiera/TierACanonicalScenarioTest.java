@@ -20,33 +20,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-import javafx.application.Application;
-import javafx.stage.Stage;
 import org.cometgui.app.bootstrap.CometGuiApplication;
 import org.cometgui.app.config.ApplicationServices;
-import org.cometgui.app.config.BuildIdentityResource;
 import org.cometgui.app.config.PdvDisplay;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.e2e.scenario.CanonicalScenario;
-import org.cometgui.app.e2e.scenario.ScenarioLayout;
 import org.cometgui.app.e2e.support.EndToEnd;
 import org.cometgui.app.e2e.support.FreshHome;
 import org.cometgui.app.testing.ProjectXvfb;
 import org.cometgui.app.testing.RealSearch;
 import org.cometgui.app.testing.ScriptedChooser;
-import org.cometgui.app.uidriver.RobotFxUiDriver;
-import org.cometgui.app.uidriver.RunningApplication;
-import org.cometgui.domain.log.BoundedMessageLog;
-import org.cometgui.domain.ports.EnvironmentReader;
 import org.cometgui.tools.limelight.fake.FakeLimelightServer;
 import org.cometgui.tools.limelight.fake.LoopbackGuard;
 import org.junit.jupiter.api.AfterAll;
@@ -59,7 +47,6 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
-import org.testfx.api.FxToolkit;
 
 /**
  * The canonical end-to-end scenario in Tier A, steps 1 to 30 (Phase 14 units 2 and 3): the
@@ -71,7 +58,8 @@ import org.testfx.api.FxToolkit;
  *
  * <h2>The composition (design decision P14-4)</h2>
  *
- * <p>The real {@link CometGuiApplication}, over a production {@link ApplicationServices} -- {@link
+ * <p>Built by {@link TierAApplication}, which every Tier A scenario shares: the real {@link
+ * CometGuiApplication}, over a production {@link ApplicationServices} -- {@link
  * FreshHome#services(Map)}, in which only the environment the application reads is the test's: the
  * fresh home, and {@code DISPLAY} naming the project-local Xvfb ({@link ProjectXvfb}) -- and the
  * production build identity. The file-chooser factory is a {@link ScriptedChooser}. The run setup
@@ -134,9 +122,6 @@ import org.testfx.api.FxToolkit;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class TierACanonicalScenarioTest {
 
-    /** The hosts the tools' pinned release URLs are served from, and nothing else. */
-    private static final String UPSTREAM_HOSTS = "github.com|*.githubusercontent.com";
-
     /** The project the controlled Limelight endpoint holds. */
     private static final int LIMELIGHT_PROJECT = 7;
 
@@ -145,54 +130,20 @@ class TierACanonicalScenarioTest {
 
     @TempDir private static Path parent;
 
-    private static ProjectXvfb display;
-
-    private static Map<String, String> desktop;
-
-    /** What the product's own {@link PdvDisplay#fromHost} answered, each time PDV asked. */
-    private static final List<Map<String, String>> PRODUCT_DISPLAY =
-            Collections.synchronizedList(new ArrayList<>());
+    private static TierAApplication tierA;
 
     private static FakeLimelightServer fake;
 
-    private static String guardedNonProxyHosts;
-
-    private static FreshHome home;
-
-    private static ScriptedChooser chooser;
-
     private static CanonicalScenario scenario;
-
-    private static Application application;
 
     private static String failedStep;
 
     @BeforeAll
     static void prepare() throws IOException {
-        assertTrue(
-                LoopbackGuard.installed(), "the loopback guard is in place before it is widened");
-        guardedNonProxyHosts = System.getProperty("http.nonProxyHosts");
-        System.setProperty("http.nonProxyHosts", guardedNonProxyHosts + "|" + UPSTREAM_HOSTS);
-
-        Path root = parent.toRealPath();
-        display = ProjectXvfb.start(root.resolve("xvfb"));
-        desktop = Map.of(PdvDisplay.DISPLAY, display.display());
-        home = FreshHome.create(root, FreshHome.Naming.SPACE_AND_NON_ASCII);
-        Path inputs = Files.createDirectories(home.root().resolve("inputs"));
-        List<Path> spectra = RealSearch.spectra(inputs);
-        Path database = RealSearch.proteome(inputs.resolve("UP000005640_9606.fasta"));
-        chooser = new ScriptedChooser();
+        tierA = TierAApplication.prepare(parent);
         scenario =
                 new CanonicalScenario(
-                        ScenarioLayout.defaultsUnder(
-                                home,
-                                inputs,
-                                spectra,
-                                database,
-                                RealSearch.repositoryRoot().resolve("manifests/tools.json"),
-                                Files.createDirectories(root.resolve("oracle-work"))),
-                        new ScriptedChooserScript(chooser),
-                        new ProcessServiceOracle());
+                        tierA.layout(), tierA.chooserScript(), new ProcessServiceOracle());
     }
 
     private static String seed() {
@@ -208,18 +159,12 @@ class TierACanonicalScenarioTest {
     @AfterAll
     static void stop() throws TimeoutException, IOException {
         try {
-            if (application != null) {
-                FxToolkit.cleanupApplication(application);
-            }
-        } finally {
-            if (guardedNonProxyHosts != null) {
-                System.setProperty("http.nonProxyHosts", guardedNonProxyHosts);
-            }
             if (fake != null) {
                 fake.close();
             }
-            if (display != null) {
-                display.close();
+        } finally {
+            if (tierA != null) {
+                tierA.close();
             }
             if (scenario != null) {
                 for (String observed : scenario.observations()) {
@@ -271,42 +216,7 @@ class TierACanonicalScenarioTest {
      * CometGuiApplication} over a new composition root, built from the same home, in the same JVM).
      */
     private static void start() throws TimeoutException {
-        ApplicationServices services = home.services(desktop);
-        RunWiring.Setup production = RunWiring.Setup.forThisApplication(services);
-        RunWiring.Setup setup =
-                new RunWiring.Setup(
-                        production.tools(),
-                        production.projectDirectory(),
-                        TierACanonicalScenarioTest::pdvEnvironment);
-        Stage primary = FxToolkit.registerPrimaryStage();
-        application =
-                FxToolkit.setupApplication(
-                        () ->
-                                new CometGuiApplication(
-                                        services,
-                                        new BoundedMessageLog(),
-                                        BuildIdentityResource::load,
-                                        owner -> chooser,
-                                        setup));
-        scenario.attach(new RobotFxUiDriver(RunningApplication.showing(primary)));
-    }
-
-    /**
-     * What PDV is given to reach a display: the product's own {@link PdvDisplay#fromHost} over the
-     * application's environment -- which answers {@code DISPLAY} with the project's Xvfb because
-     * the fresh home's environment reports it -- and, beside it, the project-local X11 and font
-     * closures' library and fontconfig locations ({@link ProjectXvfb#clientEnvironment()}), which a
-     * real Linux desktop has in its system library directories and this build host does not have at
-     * all: without them the JVM PDV runs on cannot load {@code libawt_xawt.so} ({@code libX11.so.6}
-     * not found). Nothing here replaces a variable the product chose.
-     */
-    private static Map<String, String> pdvEnvironment(EnvironmentReader host) {
-        Map<String, String> chosen = PdvDisplay.fromHost(host);
-        PRODUCT_DISPLAY.add(chosen);
-        Map<String, String> environment = new LinkedHashMap<>(display.clientEnvironment());
-        environment.remove(PdvDisplay.DISPLAY);
-        environment.putAll(chosen);
-        return Map.copyOf(environment);
+        scenario.attach(tierA.start());
     }
 
     @Test
@@ -438,18 +348,19 @@ class TierACanonicalScenarioTest {
                 "25",
                 () -> {
                     scenario.pdvDrawsAKnownPsm();
+                    List<Map<String, String>> chosen = tierA.productDisplay();
                     assertTrue(
-                            !PRODUCT_DISPLAY.isEmpty()
-                                    && PRODUCT_DISPLAY.stream()
+                            !chosen.isEmpty()
+                                    && chosen.stream()
                                             .allMatch(
-                                                    chosen ->
-                                                            chosen.equals(
+                                                    each ->
+                                                            each.equals(
                                                                     Map.of(
                                                                             PdvDisplay.DISPLAY,
-                                                                            display.display()))),
+                                                                            tierA.display()))),
                             () ->
                                     "the product read DISPLAY from the fresh home's environment: "
-                                            + PRODUCT_DISPLAY);
+                                            + chosen);
                 });
     }
 
@@ -500,8 +411,7 @@ class TierACanonicalScenarioTest {
                 "29-30",
                 () -> {
                     scenario.recordWhatIsShownBeforeTheClose();
-                    FxToolkit.cleanupApplication(application);
-                    application = null;
+                    tierA.stopApplication();
                     start();
                     scenario.theRelaunchedApplicationIsCoherent();
                 });
