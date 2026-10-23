@@ -130,7 +130,9 @@ class DialogsTransformerTest {
     void theProductsChooserLogicStillRuns() throws IOException, ReflectiveOperationException {
         FileChooserPort port =
                 chooserOver(load(transform(DIALOGS_OBJECT, bytesOf(DIALOGS_OBJECT))));
-        Path first = scratch.resolve("échantillon 1.mzML");
+        // ASCII on purpose: an ordinary test must not depend on the runner's locale. A
+        // non-ASCII answer through the bridge is BridgeEndToEndTest's, under a UTF-8 runner.
+        Path first = scratch.resolve("sample 1.mzML");
         Path second = scratch.resolve("sample_2.mzML");
         Path export = scratch.resolve("psms.tsv");
         BridgeDialogs.queue(
