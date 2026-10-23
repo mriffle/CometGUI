@@ -493,12 +493,9 @@ public final class NoXmlScenario {
                         "the Limelight section to judge the run",
                         text -> !text.startsWith("Checking") && !text.isEmpty(),
                         CanonicalScenario.CHECK_BOUND);
-        String action =
-                screen.await(
-                        "limelight-action",
-                        "the action to be offered",
-                        text -> !text.isEmpty(),
-                        CanonicalScenario.CHECK_BOUND);
+        // The section sets its judgement, its action and the controls' states in one update, so
+        // once the judgement shows they are what it decided.
+        String action = screen.ui().textOf("limelight-action");
         String label = "Rerun Percolator with " + xmlCapable.version() + " for Limelight";
         assertAll(
                 "step 3: the explanation, before anything is attempted",
