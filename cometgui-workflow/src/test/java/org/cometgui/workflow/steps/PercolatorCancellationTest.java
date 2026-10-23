@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -74,6 +75,14 @@ import org.junit.jupiter.api.io.TempDir;
         disabledReason = "the stand-in tools are POSIX shell scripts")
 class PercolatorCancellationTest {
 
+    /**
+     * How long the run may take to end once it is cancelled: a fifth of the stand-in's {@value
+     * StandInTools#CHILD_SECONDS}-second watchdog. Measured necessary, not chosen: with the
+     * engine's whole-run bound the test stayed green with descendants left unkilled, because the
+     * stranded child died of old age just before the bound and the stage then ended.
+     */
+    private static final Duration CANCEL_BOUND = Duration.ofSeconds(60);
+
     @Test
     @DisplayName(
             "cancel while Percolator runs: Percolator and its child dead by pid, run-percolator"
@@ -123,8 +132,12 @@ class PercolatorCancellationTest {
 
             handle.cancel();
             RunResult result =
-                    handle.await(RealProject.RUN_BOUND)
-                            .orElseThrow(() -> new AssertionError("the cancelled run never ended"));
+                    handle.await(CANCEL_BOUND)
+                            .orElseThrow(
+                                    () ->
+                                            new AssertionError(
+                                                    "the cancelled run did not end within "
+                                                            + CANCEL_BOUND));
 
             ProvenanceManifest manifest = RunEvidence.manifest(prepared.layout());
             List<ToolRecord> percolators =

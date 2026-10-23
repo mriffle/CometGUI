@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -81,6 +82,13 @@ class PercolatorCancelUiTest {
             BuildIdentity.of("0.0.0-guitest", "unknown", Instant.parse("2026-10-23T00:00:00Z"));
 
     private static final String ENGINE_CAN_RUN = "The workflow engine can run this search.";
+
+    /**
+     * How long the run may take to end once Cancel is pressed: a fifth of the stand-in's {@value
+     * StandInRun#CHILD_SECONDS}-second watchdog, so a child that was not killed cannot die of old
+     * age in time and pass -- which, under the Run section's whole-run bound, it did.
+     */
+    private static final Duration CANCEL_BOUND = Duration.ofSeconds(60);
 
     @TempDir private static Path scratch;
 
@@ -167,7 +175,7 @@ class PercolatorCancelUiTest {
                             driver,
                             "run-outcome",
                             text -> text.startsWith("The run "),
-                            RunSection.RUN_BOUND);
+                            CANCEL_BOUND);
             Path run = onlyRun();
             String id = idOf(run);
             Map<String, Object> record =

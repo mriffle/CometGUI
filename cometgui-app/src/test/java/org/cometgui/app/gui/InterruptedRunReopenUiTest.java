@@ -139,7 +139,7 @@ class InterruptedRunReopenUiTest {
     private static Map<String, String> interruptedTree;
 
     /** The lock file as the crash left it, read before the application is launched. */
-    private static Map<String, Object> lockAtCrash;
+    private static String lockAtCrash;
 
     @BeforeAll
     static void launch() throws IOException, InterruptedException {
@@ -166,7 +166,7 @@ class InterruptedRunReopenUiTest {
         interruptedRun = Path.of(parts[3]);
         interruptedTree = tree(interruptedRun);
         // Read now: the application's first pre-run check, when its window opens, takes the lock.
-        lockAtCrash = lockRecord();
+        lockAtCrash = Files.readString(project.resolve("project.lock"), StandardCharsets.UTF_8);
 
         ToolOffer offer =
                 TestPercolators.installed(
@@ -223,10 +223,9 @@ class InterruptedRunReopenUiTest {
                 () -> assertEquals(0, crashExit, "Runtime.halt(0)"),
                 () -> assertFalse(StandInRun.running(crashed.pid()), "the JVM is gone"),
                 () ->
-                        assertEquals(
-                                Long.toString(crashed.pid()),
-                                String.valueOf(lockAtCrash.get("pid")),
-                                "the lock file named the dead JVM"),
+                        assertTrue(
+                                lockAtCrash.contains("\"pid\": " + crashed.pid() + ","),
+                                () -> "the lock file named the dead JVM: " + lockAtCrash),
                 () -> assertEquals(OtherCometGui.CRASHED_RUN, runJson.get("runId")),
                 () -> assertEquals(1, attempts.size()),
                 () ->
