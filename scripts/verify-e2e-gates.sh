@@ -1295,6 +1295,28 @@ control_P() {
     else
         record_fail "the archive lists no CometGUI/bin/CometGUI or no CometGUI/lib/runtime/bin/java"
     fi
+    # AC-INS-01 and item 2's "bundled runtime starts": the archive installed
+    # read-only outside the repository and smoke-tested with no java on PATH
+    # (S1-S11), then the smoke script's own self-test, whose damaged artefacts
+    # must each be caught.  Added by the phase orchestrator at sign-off.
+    local inst slog="${LOGS}/P-smoke.log" src=0
+    inst="$(mktemp -d /tmp/cometgui-e2e-smoke.XXXXXX)" || harness_error "(P) no temporary directory for the smoke install."
+    rmdir -- "${inst}"
+    ( cd -- "${SANDBOX}" && bash scripts/package/install-archive.sh "${ARCHIVE}" "${inst}" \
+        && python3 "${REAPER}" bash scripts/package/smoke-installed.sh "${inst}" ) >"${slog}" 2>&1 || src=$?
+    if [ "${src}" -eq 0 ] && grep -q 'smoke-installed.sh: PASSED -- every check (S1-S11)' "${slog}"; then
+        record_pass "  ... installed read-only outside the repository, smoke S1-S11 pass with no java on PATH ($(rel "${slog}"))"
+    else
+        record_fail "the installed archive's smoke failed (exit ${src}): $(grep -E 'FAIL' "${slog}" | head -2 | tr '\n' ' ' | cut -c1-240)"
+    fi
+    ( cd -- "${SANDBOX}" && bash scripts/package/install-archive.sh --uninstall "${inst}" ) >>"${slog}" 2>&1 || true
+    local stlog="${LOGS}/P-smoke-self-test.log" strc=0
+    ( cd -- "${SANDBOX}" && python3 "${REAPER}" bash scripts/package/smoke-installed.sh --self-test ) >"${stlog}" 2>&1 || strc=$?
+    if [ "${strc}" -eq 0 ] && grep -q 'smoke-installed.sh --self-test: PASSED' "${stlog}"; then
+        record_pass "  ... and smoke-installed.sh --self-test: $(grep 'smoke-installed.sh --self-test: PASSED' "${stlog}" | cut -c1-200)"
+    else
+        record_fail "smoke-installed.sh --self-test did not pass (exit ${strc}): $(tail -2 "${stlog}" | tr '\n' ' ' | cut -c1-240)"
+    fi
     end_control
 }
 

@@ -151,7 +151,9 @@ declare -a COVERED=()
 #                count.  limelight: 130 on 2026-10-12, phase 12 unit 9's
 #                first shipping count.  provenanceui: 96 on 2026-10-14,
 #                phase 13 unit 7's first shipping count.  e2e: 48 on
-#                2026-10-23, phase 14 unit 9's first shipping count.)
+#                2026-10-23, phase 14 unit 9's first shipping count; 50 the
+#                same day, when the orchestrator added the smoke and its
+#                self-test to control P.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -420,7 +422,7 @@ gate_spec() {
                 "PHASE-14 exit gate items 1 to 7 were proved here"
                 "bytecode, and a run in which zero tests ran, as a HARNESS FAILURE"
             )
-            GATE_FLOOR=48
+            GATE_FLOOR=50
             GATE_UNIT="controls"
             ;;
         *)
