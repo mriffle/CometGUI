@@ -478,9 +478,37 @@ collide exists, so none is offered.
        launch; removed and verified absent.
    * - 8
      - **Failure-path suite**: every scenario in the specification's list
-       mapped to a named passing test, existing or new.
+       mapped to a named passing test, existing or new. Split: **8a** the
+       map, its checker, gaps 2, 3, 6, 15, 20, 21; **8b** gaps 14, 17, 18, 24
+       and 25 at GUI level.
      - item 4; AC-TST-09
-     - pending
+     - **8a accepted 2026-10-23**, ``b140915`` (agent 8a) plus my
+       ``d4e8bd7``. Diff read: ``scripts/e2e/failure-paths.toml`` (the 25
+       scenarios in the specification's words and order),
+       ``check-failure-paths.sh`` + ``failure_paths.py`` (re-parses
+       ``specification.rst`` each run; ids must exist and not be
+       ``@Disabled``; given reports, every mapped test must have run and
+       passed); new tests ``NetworkUnavailableUiTest``,
+       ``RunInputFailureUiTest`` (app), ``NetworkUnavailableTest``
+       (install), ``RealAwkwardPathRunTest``, ``RunFailurePathTest``
+       (workflow), ``StepFailureTest`` gaining a real deletion; **POM:
+       ``cometgui-workflow`` surefire gets ``LANG``/``LC_ALL=C.UTF-8``**, as
+       ``cometgui-process`` already has (needed by the real Unicode run under
+       surefire and PIT; reported to tier 1). Ran myself with no locale
+       exported: the six classes 3+2+3+2+2+9 run, 0 failures. Checker: red by
+       default (4 partial, owned by 8b), green with ``--allow-partial``;
+       ``--self-test`` PASSED. My injection: ``RunExecution.firstAbsent``
+       treating a declared file as present when its directory exists -- red,
+       "the step that ran the tool fails, naming the missing PIN ==>
+       expected: <FAILED> but was: <SUCCEEDED>"; restored, ``sha256sum -c``
+       OK. **Found by 8a, repaired by me (``d4e8bd7``)**: unit 6's
+       ``DialogsTransformerTest`` errored with no UTF-8 locale (a non-ASCII
+       file name in an ordinary test) -- now ASCII; 4/4 both ways. Product
+       defects found: E9, E10, E11. Gates: the agent ran ``install`` 95,
+       ``workflow`` 110, ``provenanceui`` 96, ``paramui`` 87, ``quality`` 42
+       on ``b140915`` (PASS); mine run after 8b, which touches the same
+       modules. Reads outside modules: ``scratch/phase05/artefacts``,
+       ``scratch/fixture``, ``manifests/tools.json``.
    * - 9
      - **The harness and CI wiring** (P14-13, P14-14), including gate item
        5's three injections as controls.
@@ -580,6 +608,26 @@ E8 -- an unrepresentable XDG_DATA_HOME is dropped silently (RECORDED, Phase 16)
     ``$HOME`` -- without a word, and the tool cache and default project go
     there. Belongs with the launcher locale repair (Phase 16); a warning at
     least is recommended.
+
+E9 -- a failed install never says why (ESCALATED)
+    Found by 8a: the installer's exception names the URL and the refused
+    connection, but ``ManagedToolManager.runInstall`` swallows it; the row
+    only says "the last install attempt did not succeed". Small, clear,
+    user-visible; recommended for a product phase.
+
+E10 -- the pre-run path-length limit is not Comet's (ESCALATED)
+    Found by 8a, measured on Comet 2026.03.0: it refuses a database path of
+    511 bytes or more while ``PathRule.FILE_NAME_LIMIT`` allows 4095, and it
+    cuts ``-N`` and ``-P`` at 511 bytes, so a run with a longer output path
+    exits 0 having written under a shortened name and then fails with a
+    misleading "declared pepXML ... does not exist". Recommendation: a
+    release-specific limit in the validator.
+
+E11 -- the stepper shows Percolator "Running" after a Comet failure (ESCALATED)
+    Found by 8a: after a run fails at run-comet the Percolator stage reads
+    "Running" and stays so; ``StageProjection.combine`` draws a stage whose
+    first step (resolve-percolator) succeeded and the rest never started as
+    running.
 
 E2 -- no project chooser
     See P14-6. Scenario step 5 has no control. Recommendation: amend the step
