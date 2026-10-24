@@ -591,10 +591,26 @@ Rejections and rework
 
 None yet.
 
+Phase-end checks
+================
+
+* ``5f016e7``: the orchestrator added the installed-archive smoke and its
+  self-test to ``e2e`` control P (floor 48 -> 50); ``--only P`` PASS
+  (smoke S1-S11; self-test 10 damaged artefacts caught).
+* PIT reports regenerated as ``build.sh`` writes them (BUILD SUCCESS).
+* ``--only tests`` first run on ``a1fd7e4``: **36/37, FAIL** --
+  ``InstallReachesTheSectionsUiTest`` erred under load inside control 7's
+  ``build.sh`` (a click into a re-read Tool Manager row). Root cause repaired
+  in ``52ebab1`` (wait until the control is shown and enabled; 5/5, 3/3 at
+  full CPU load). ``e2e`` on ``52ebab1``: 50 PASS (1266 s). ``--only tests``
+  on ``52ebab1``: **37 PASS, 18 789 s**.
+
 Deferred
 ========
 
-None yet.
+macOS and Windows packaging and execution (no host); Tier B PDV drawing on a
+host with system X11 (E6); the CI wiring that waits on ``D-006`` and Phase 16
+(five stubs, owner PHASE-14).
 
 Blockers escalated
 ==================

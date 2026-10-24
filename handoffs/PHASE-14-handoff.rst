@@ -4,7 +4,8 @@ PHASE-14 handoff -- GUI Automation and Packaged End-to-End Harness
 
 :Phase: 14
 :Written: 2026-10-23 by the Phase-14 orchestrator (tier 2)
-:Outcome: **All work units accepted** (1, 2, 2b, 3-7, 8a, 8b, 9, 10; one
+:Outcome: **All work units accepted**, ``--only tests`` PASS (37) and
+   ``e2e`` PASS (50) on ``52ebab1`` (1, 2, 2b, 3-7, 8a, 8b, 9, 10; one
    rework unit 6r). Every exit-gate item is met **on Linux x86-64**, the
    reference platform and the only one anything here has executed on.
    Recommended grade **PARTIAL**: platform residue (no macOS or Windows
@@ -181,8 +182,7 @@ injection's failure text.
        rejected with 22 findings.
 
 **Harness runs, by me, on the last commit that changed what each reads**:
-``e2e`` 48 (1084 s, ``76b18c9``) and control P after the floor rose to 50
-(``5f016e7``); ``pipeline`` 25 steps, ``workflows`` 23 (``76b18c9``);
+``e2e`` 50 (1266 s, ``52ebab1``; 48 at ``76b18c9`` before control P grew); ``pipeline`` 25 steps, ``workflows`` 23 (``76b18c9``);
 ``workflow`` 110, ``install`` 95, ``quality`` 42, ``paramui`` 87,
 ``provenanceui`` 96 (``a8faba4``); ``limelight`` 130 (``031748b``); ``docs``,
 ``traceability`` (``114383e``). ``--only tests``: see `The deferred tests
@@ -193,11 +193,30 @@ harness`_.
 The deferred tests harness
 ==========================
 
-To be completed at the end of the phase: every module's PIT report
-regenerated exactly as ``scripts/build.sh`` writes it (targeted PIT runs
-overwrote some), then ``bash scripts/verify-all-gates.sh --only tests``
-detached and watched to its exit line. Result recorded here and in the work
-log.
+Every module's PIT report was first regenerated exactly as
+``scripts/build.sh`` writes it (``mvn -B -o -Dcometgui.pit.threads=16
+test-compile org.pitest:pitest-maven:mutationCoverage`` at the root, BUILD
+SUCCESS, 2026-10-23 18:38-20:10 UTC), because targeted PIT runs had
+overwritten some; no stray ``cometgui-ui``/``cometgui-app`` report existed.
+Totals: domain 707 (703 KILLED), provenance 795 (791), process 185 (175),
+tools 2169 (2039), install 1418 (1401), params-comet 1783 (1776),
+params-percolator 176/176, results 943 (888), workflow 242/242.
+
+``bash scripts/verify-test-gates.sh --preflight``: every precondition holds.
+
+* **First run** (``a1fd7e4``, detached, watched to its exit line): **FAIL,
+  36 passed, 1 failed, 13 767 s.** Control 7's ``build.sh`` failed for the
+  wrong reason: ``InstallReachesTheSectionsUiTest`` (unit 2b) erred under
+  load -- "the query ``#tool-row-percolator-3_07_1-1-install`` returned 1
+  nodes, but no nodes were visible": the Tool Manager re-reads its rows after
+  the previous install and the click landed in that gap.
+* **Root cause repaired** (``52ebab1``): the test and
+  ``CanonicalScenario``'s install step wait (``Await``, bounded) until the
+  Install control is shown and enabled. 5/5 alone, 3/3 with all 64 cores
+  saturated; ``verify -DskipTests`` clean; ``e2e`` re-run on ``52ebab1``:
+  **50 controls PASS** (1266 s, the new floor).
+* **Second run** (``52ebab1``): **PASS, 37 assertions in 18 789 s
+  (313 minutes)**, against 18 644 s at Phase 13.
 
 Tests of this phase that read outside their module (all already read by
 earlier tests, or opt-in): ``manifests/tools.json``; ``scratch/fixture``;
