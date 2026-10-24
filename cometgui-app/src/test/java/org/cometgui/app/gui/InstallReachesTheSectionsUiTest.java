@@ -249,6 +249,17 @@ class InstallReachesTheSectionsUiTest {
      * @param row the row's identifier
      */
     private static void install(String row) {
+        // The Tool Manager re-reads its rows after the previous install, and a row's Install
+        // button can be briefly not visible while that happens; under load the click once landed
+        // in that window ("no nodes were visible"). Wait on the observable state instead.
+        Await.until(
+                row + "'s Install control to be shown and enabled",
+                () ->
+                        driver.exists(row + "-install")
+                                && driver.isVisible(row + "-install")
+                                && !driver.isDisabled(row + "-install"),
+                Boolean::booleanValue,
+                INSTALL_BOUND);
         driver.clickOn(row + "-install");
         Await.until(
                 row + " to be read again as installed, with its installed path",

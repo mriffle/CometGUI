@@ -783,6 +783,15 @@ public final class CanonicalScenario {
 
         Set<String> progress = new LinkedHashSet<>();
         long started = System.nanoTime();
+        // A row's Install control can be briefly not visible while the Tool Manager re-reads its
+        // rows after an earlier install: wait on that state, never click into the gap.
+        Await.until(
+                row + "'s Install control to be shown and enabled",
+                () ->
+                        screen.ui().isVisible(row + "-install")
+                                && !screen.ui().isDisabled(row + "-install"),
+                Boolean::booleanValue,
+                Duration.ofMinutes(2));
         screen.ui().clickOn(row + "-install");
         String state =
                 Await.until(
