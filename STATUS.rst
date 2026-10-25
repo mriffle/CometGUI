@@ -3,21 +3,22 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-22
-:Updated by: Main orchestrator, session 10 (owner resumed after the pause
-   that followed Phase 13; **Phase 14 dispatched**)
-:Current phase: **Phase 14 -- GUI Automation and Packaged End-to-End
-   Harness**, IN PROGRESS (brief ``handoffs/PHASE-14-BRIEF.rst``). It runs on
-   the local fixture; ``D-006``'s CI-fixture half is still open and the
-   owner's, so any CI wiring of the end-to-end suite waits on it. Standing owner instruction (2026-10-08):
-   *"When all is green with the current phase, push, then move on to the
-   next phase."*
-:Overall: Fourteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
-   05, 08, 09, 10, 11, 12 and 13 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
+:Updated: 2026-10-25
+:Updated by: Main orchestrator, session 10 (**Phase 14 signed off
+   PARTIAL**; paused by the owner before Phase 15)
+:Current phase: **None -- paused by the owner** after Phase 14 (2026-10-23:
+   *"Do not start phase 15, pause after this phase is finished"*). Phase 15
+   starts only on the owner's word; tier 1 recommends a between-phase repair
+   of ``E12`` first (:ref:`status-p14-signed`). ``D-006``'s CI-fixture half
+   is still open and the owner's. Standing owner instruction (2026-10-08),
+   suspended by the pause: *"When all is green with the current phase, push,
+   then move on to the next phase."*
+:Overall: Fifteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
+   05, 08, 09, 10, 11, 12, 13 and 14 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (**about 11 hours at Phase 13** -- build
-   130 min, ``tests`` 309, the other nineteen 223 -- run detached; raised
+   ``scripts/verify-all-gates.sh`` (**about 11 hours at Phase 14** -- build
+   142 min, ``tests`` 321, the other twenty 190 -- run detached; raised
    with the owner, :ref:`status-p10-signed`) runs once
    per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
@@ -285,9 +286,11 @@ Phase board
        owner**.
    * - 14
      - GUI automation and packaged end-to-end harness
-     - IN PROGRESS
-     - Dispatched 2026-10-22, when the owner resumed after the pause that
-       followed Phase 13.
+     - PARTIAL
+     - **Signed off 2026-10-25** at ``df3d3ce``: build 11/11, gates 21/21 (new
+       ``e2e``, 50 controls), three tier-1 injections
+       (:ref:`status-p14-signed`). PARTIAL on platform. Then **paused by the
+       owner**.
    * - 15
      - Version matrix, performance and hardening
      - NOT STARTED
@@ -3279,6 +3282,175 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-p14-signed:
+
+Phase 14 signed off PARTIAL (2026-10-25)
+========================================
+
+Ten units (1, 2, 2b, 3, 4-7, 8a, 8b, 9, 10) were all accepted by the phase
+orchestrator. It stalled once, waiting on a report that could not arrive, and
+was resumed by tier 1 from its commits. Record:
+``handoffs/PHASE-14-worklog.rst`` and ``handoffs/PHASE-14-handoff.rst``.
+
+**What exists.** An end-to-end tier under
+``cometgui-app/src/test/java/org/cometgui/app/e2e/``:
+
+* **Tier A** drives the real application in-process.
+* **Tier B** drives the installed archive in another process, through a
+  loopback-only test bridge attached with ``JAVA_TOOL_OPTIONS``.
+
+Both run the canonical scenario on the ``D-006`` local fixture: tools
+installed from an empty cache, a real Comet + Percolator search, filtering, a
+spectrum, conversion and upload to the ``D-007`` fake, provenance checked
+against the disk with the test's own digests, and a relaunch. They also run
+the no-XML scenario. The test computes its own counts and digests from the
+raw files.
+
+The supporting pieces:
+
+* a failure-path map with a checker that re-reads the specification;
+* a no-fixed-sleep check over bytecode and source;
+* ``scripts/package/build-app-image.sh``, ``install-archive.sh`` and
+  ``smoke-installed.sh``;
+* ``release-no-test-bridge.sh``, now a real release step;
+* a new harness, ``scripts/verify-e2e-gates.sh`` (``e2e``, 50 controls, floor
+  50, about 21 minutes).
+
+**Gate items** (proved on Linux x86-64):
+
+* 1, Tier A: 23 of 23.
+* 2, Tier B: 24 of 24, read-only, no Java on ``PATH``, UTF-8 asserted in the
+  launched process. Step 25 is partial because PDV cannot draw on this host,
+  which has no system libX11 (E6).
+* 3, the no-XML scenario: 15 of 15 and 16 of 16. "Comet was not rerun" is
+  proved from the disk.
+* 4, failure paths: all 25 mapped to passing tests. Disk-full is simulated
+  with a file-size limit, and long paths are tested on Linux only.
+* 5, the three injections: all red.
+* 6, no fixed sleeps: met.
+* 7, the bridge-absence check: met. It rejects all ten bridge-included
+  variants.
+
+**Product repairs made here:**
+
+* E3: the listener that tells the sections about an install was held only
+  weakly, so it went silent after a garbage collection.
+* E4: the converter's identity probe ran with an empty environment and could
+  not open its JAR under a non-ASCII home.
+
+**One POM change:** ``cometgui-workflow``'s surefire sets a UTF-8 locale, as
+``cometgui-process`` already did. The test still asserts the encoding and
+fails without it.
+
+**Tier 1's exit-gate run**, at ``df3d3ce`` on a quiet tree:
+
+* ``scripts/build.sh``: 11/11 in 8505 s.
+* The other twenty controls, in 190 minutes, all at or above their floors:
+
+  - ``e2e`` 50 (new)
+  - ``provenanceui`` 96
+  - ``limelight`` 130
+  - ``pdv`` 107
+  - ``results`` 100
+  - ``percolator`` 109
+  - ``workflow`` 110
+  - ``paramui`` 87
+  - ``params`` 109
+  - ``install`` 95
+  - ``provenance`` 24
+  - ``shell`` 30
+  - ``quality`` 42
+  - ``pipeline`` 25
+
+* ``--only tests``: 37 assertions in 19 242 s.
+
+**21 of 21**, in 10 h 52 min. The orchestrator's own first ``tests`` run had
+failed once, on a GUI test that clicked Install while the Tool Manager was
+re-reading its rows. It was repaired in ``52ebab1`` by waiting for the control
+to be shown and enabled. That is a test change, with no assertion relaxed.
+
+**Diff read: nothing weakened.**
+
+* ``verify-all-gates.sh`` changed additively (``e2e``).
+* No floor, threshold, PIT setting or survivor changed.
+* ``FxUiDriver``'s methods moved, unchanged, into a new supertype,
+  ``RemotableUiDriver``.
+* The traceability map lost only ``planned`` entries now answered by tests.
+* The five CI stubs still exit 70 and now say what each waits for.
+
+**Tier 1's own injections**, none of them among the harness's, each restored
+and verified with ``sha256sum -c``:
+
+* E4 undone (the identity probe given an empty environment):
+  ``LimelightConverterIdentityTest.theCommand`` red, ``expected:
+  <{LANG=C.UTF-8}> but was: <{}>``.
+* E3 undone (the row listener registered on an unheld view):
+  ``InstallReachesTheSectionsUiTest.anInstallAfterACollectionReachesRunAndPercolator``
+  red.
+* The relaunched application restoring the peptide filter from the PSM
+  field of ``view-state.json``: Tier A's real run, ``relaunch`` red on its
+  own oracle, ``the peptide filter ==> expected: <0.02> but was: <0.005>``,
+  with the peptide counts wrong. The other 22 steps stayed green.
+
+**Grade: PARTIAL**, on platform. All seven items are met on Linux x86-64,
+with nothing packaged or run on macOS or Windows. Item 2's drawing step is
+not provable on this host.
+
+**Accepted by tier 1:**
+
+* P14-1: the phase document's ``src/test/e2e/`` is read as the e2e package
+  tree.
+* P14-4: Tier A relaunches in-process; Tier B does a real process restart.
+* P14-11: the bridge is attached to the unmodified image through
+  ``JAVA_TOOL_OPTIONS``, which ``release-no-test-bridge.sh`` guards.
+
+**For the owner** (no ``D-`` item is open):
+
+* **E12 (serious).** A run is recorded SUCCEEDED with no provenance record
+  when finalisation cannot write it. Tier 1 recommends a between-phase repair
+  before Phase 15.
+* **Specification versus product.** In each case either the specification or
+  the program changes:
+
+  - E1: Run does not install missing tools; the Tool Manager does.
+  - E2: there is no project chooser; the product uses its default project.
+  - E5: Comet's default of five results per spectrum is refused by the
+    Limelight converter.
+
+* **Smaller product defects:**
+
+  - E7: a failed start leaves an invisible process.
+  - E8: an unrepresentable ``XDG_DATA_HOME`` is dropped silently. This goes
+    with Phase 16's launcher repair.
+  - E9: install failures never say why.
+  - E10: Comet's real 511-byte path limit is not what the pre-run check
+    enforces.
+  - E11: the stepper shows Percolator "Running" after a Comet failure.
+  - E13: a stale-lock takeover is never shown.
+  - E14 and E15: interrupted runs are labelled "running" and cannot be
+    retried.
+
+* **Owners to settle.**
+
+  - The five stubs waiting on ``D-006``'s CI fixture and Phase 16's
+    packaging: ``release-e2e-canonical``, ``release-e2e-limelight``,
+    ``release-e2e-noxml``, ``release-smoke`` and ``nightly-gui-tests``.
+    They are kept with PHASE-14.
+  - ``AC-INS-01`` and ``AC-TST-05``, still "planned, Phase 14": macOS and
+    Windows, and an item-by-item audit of the GUI list. The learned-weights
+    chart that list names does not exist.
+
+* **The ``D-007`` nightly sandbox** is wired and red while unconfigured. The
+  upload key has no route into CI, because workflows may not reference
+  ``secrets.``.
+
+**Residue carried forward:**
+
+* Tier B's runtime-module list is checked only by Tier B.
+* The orchestrator signed units off on ``mvn test`` rather than ``verify``,
+  which missed nine SpotBugs findings in test code. They were repaired, and
+  later sign-offs ran ``verify``.
+
 .. _status-p13-signed:
 
 Phase 13 signed off PARTIAL (2026-10-17)
@@ -4383,6 +4555,11 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-25
+     - 14
+     - **Phase 14 signed off PARTIAL** at ``df3d3ce`` (build 11/11, gates
+       21/21, three tier-1 injections). ``main`` pushed; **paused by the
+       owner** before Phase 15. See :ref:`status-p14-signed`.
    * - 2026-10-22
      - 14
      - Owner resumed (*"Resume"*). **Phase 14 dispatched**, on the local

@@ -91,7 +91,7 @@ authoritative for its own scope and exit gate.
      - GUI Automation and Packaged End-to-End Harness
      - 07, 10, 11, 12, 13
      - D-006's CI-fixture half only; D-007 DECIDED
-     - IN PROGRESS (dispatched 2026-10-22)
+     - PARTIAL (signed off 2026-10-25; Linux only)
    * - `15 <PHASE-15-hardening.rst>`_
      - Version Matrix, Performance and Hardening
      - 14
