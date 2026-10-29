@@ -166,6 +166,32 @@ class StageStepperTest {
     }
 
     @Test
+    @DisplayName("a run failed for a reason no step carries says so, with the reason, in words")
+    void aReasonIsStatedWithTheRunState() throws InterruptedException {
+        Label runState = (Label) scene.lookup("#" + UiIds.STAGE_STEPPER_RUN_STATE);
+        Label results = (Label) scene.lookup("#" + UiIds.stepperStageState(WorkflowStage.RESULTS));
+        FxToolkit.onFxThread(
+                () -> {
+                    for (WorkflowStage stage : WorkflowStage.coreStages()) {
+                        viewModel.setState(stage, StepState.SUCCEEDED);
+                    }
+                    viewModel.failStage(
+                            WorkflowStage.RESULTS,
+                            "Its provenance record could not be written: File too large");
+                });
+        assertEquals(
+                "Run state: Failed. Its provenance record could not be written: File too large",
+                runState.getText());
+        assertEquals(
+                "run state: Failed. Its provenance record could not be written: File too large",
+                runState.getAccessibleText());
+        assertEquals("Failed", results.getText());
+
+        FxToolkit.onFxThread(() -> viewModel.setState(WorkflowStage.INPUTS, StepState.RUNNING));
+        assertEquals("Run state: Running", runState.getText(), "the reason goes with its states");
+    }
+
+    @Test
     @DisplayName("the arrows carry an accessible name, since their text is a glyph")
     void theArrowsCarryAnAccessibleName() {
         Label arrow = (Label) scene.lookup("#stage-arrow-comet-percolator");

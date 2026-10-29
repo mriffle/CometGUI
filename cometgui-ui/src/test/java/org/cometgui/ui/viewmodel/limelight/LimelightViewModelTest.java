@@ -1020,6 +1020,60 @@ class LimelightViewModelTest {
                 () -> assertFalse(section.rerunCancelEnabledProperty().get()));
     }
 
+    /**
+     * E12, repaired: the compatible rerun's steps all succeeded but its provenance record could not
+     * be written. The rerun is stated failed, with the reason; the new run is not chosen in the
+     * Results section and is not offered for conversion -- what any failed rerun gets, no more.
+     */
+    @Test
+    @DisplayName(
+            "a rerun whose provenance record could not be written is stated failed, and its run is"
+                    + " neither chosen nor offered for conversion")
+    void rerunWhoseRecordCannotBeWritten() {
+        ToolOffer build = Percolators.managed3071(Path.of("p/percolator").toAbsolutePath());
+        open(installed(), incompatible(rerunAction(build)));
+        section.act();
+        settle();
+        ScriptedLimelight.Rerun rerun = port.reruns().get(0);
+        rerun.observer().planned(PLAN, "run run-derived");
+        runs.add(DERIVED);
+        port.check(run -> ready(run.id().value(), "0.01"));
+        String why =
+                "its provenance record /p/runs/run-derived/provenance/provenance.json could not be"
+                        + " written: No space left on device";
+        RunResult steps = result(AttemptOutcome.SUCCEEDED, Map.of());
+        rerun.observer()
+                .onRunFinished(
+                        new RunResult(
+                                1,
+                                AttemptOutcome.FAILED,
+                                RunState.FAILED,
+                                steps.states(),
+                                Map.of(),
+                                steps.manifest(),
+                                List.of(),
+                                0,
+                                Optional.of(why)));
+        settle();
+        String outcome = section.actionOutcomeProperty().get();
+        assertAll(
+                () ->
+                        assertEquals(
+                                "The Percolator rerun failed: "
+                                        + why
+                                        + ". The new run is run run-derived. What Percolator wrote"
+                                        + " is kept in the new run's directory, and it is not"
+                                        + " offered for conversion.",
+                                outcome),
+                () -> assertFalse(outcome.contains("succeeded"), outcome),
+                () ->
+                        assertEquals(
+                                Optional.of(RUN),
+                                results.chosenRunProperty().get().map(r -> r.id().value()),
+                                "the failed rerun's run is not chosen"),
+                () -> assertFalse(section.rerunCancelEnabledProperty().get()));
+    }
+
     @Test
     @DisplayName("a refused, failed or cancelled rerun says so and chooses nothing")
     void rerunFailures() {

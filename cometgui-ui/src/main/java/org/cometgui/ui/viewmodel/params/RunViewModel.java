@@ -544,6 +544,13 @@ public final class RunViewModel {
                 stepStates = new EnumMap<>(result.states());
                 project();
             }
+            /*
+             * A run whose provenance record could not be written failed although every step did
+             * its work: the Results stage, where core provenance is finalised, is shown failed with
+             * the reason, so the stepper's run state is failed too (E12).
+             */
+            result.provenanceFailure()
+                    .ifPresent(why -> stepper.failStage(WorkflowStage.RESULTS, capitalised(why)));
         } catch (RuntimeException unshown) {
             words += " The stage stepper could not show the run's final states: " + unshown;
         }
@@ -582,7 +589,7 @@ public final class RunViewModel {
                             .append('.');
         }
         if (!result.finalisationErrors().isEmpty()) {
-            text.append(" Its provenance could not be finalised: ")
+            text.append(" Part of its record could not be written: ")
                     .append(String.join("; ", result.finalisationErrors()));
         }
         if (result.listenerFailures() > 0) {
@@ -605,8 +612,18 @@ public final class RunViewModel {
                         + failure
                         + ". "
                         + capitalised(description)
-                        + '.';
+                        + '.'
+                        + result.provenanceFailure()
+                                .map(why -> " " + capitalised(why) + '.')
+                                .orElse("");
             }
+        }
+        if (result.provenanceFailure().isPresent()) {
+            return "The run failed: "
+                    + result.provenanceFailure().get()
+                    + ". "
+                    + capitalised(description)
+                    + ". What its tools wrote is kept in the run's directory.";
         }
         return "The run failed: " + description + '.';
     }

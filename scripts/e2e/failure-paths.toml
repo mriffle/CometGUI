@@ -308,7 +308,7 @@ note = "R-RUN-02: the file, its role and both SHA-256s named, in the Run section
 number = 17
 text = "the output or project directory becoming unwritable"
 status = "covered"
-note = "Write permission taken away while a stage runs, proved by a refused write first (so a run as root fails rather than passing). The run's own directory while Percolator runs: failed at run-percolator naming the run.json temporary file it could not create, the unrecordable attempt end stated as a finalisation error naming it too, run.json byte-identical to its last good state, no temporary file left, provenance.json sealed failed with Percolator's files partial. The run's logs/ while Comet runs: failed at run-percolator naming logs/percolator.log, Percolator never launched, run.json and provenance.json both failed. Before a run, an unwritable runs directory is refused by the pre-run check. The provenance/ directory becoming unwritable is NOT asserted: the run is then recorded succeeded with no provenance.json (8b-D1)."
+note = "Write permission taken away while a stage runs, proved by a refused write first (so a run as root fails rather than passing). The run's own directory while Percolator runs: failed at run-percolator naming the run.json temporary file it could not create, the unrecordable attempt end stated as a finalisation error naming it too, run.json byte-identical to its last good state, no temporary file left, provenance.json sealed failed with Percolator's files partial. The run's logs/ while Comet runs: failed at run-percolator naming logs/percolator.log, Percolator never launched, run.json and provenance.json both failed. Before a run, an unwritable runs directory is refused by the pre-run check. The provenance/ directory becoming unwritable after every step's work, before the seal (E12, found by 8b as 8b-D1 and repaired between Phases 14 and 15): the run fails, never succeeds -- the real Comet and Percolator run and the real Percolator rerun each end FAILED with the reason naming provenance.json and the error in the result, in run.json (schema version 3) and in the event log's run.finished, no record or report written, every step succeeded and every output on disk with the digest it was recorded with, read back as failed and unsealed; with run.json unwritable too, a reopened project lists the run as interrupted, never completed; in the launched application the outcome and the stepper say failed with the reason, and the Results and Provenance sections list it as failed."
 
   [[scenario.test]]
   id = "org.cometgui.workflow.steps.UnwritableRunDirectoryTest#theRunDirectoryWhilePercolatorRuns"
@@ -325,14 +325,54 @@ note = "Write permission taken away while a stage runs, proved by a refused writ
   level = "unit"
   run = "ordinary"
 
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.SealFailureRunTest#anOrdinaryRunWhoseRecordCannotBeWritten"
+  level = "unit+real"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.SealFailureRunTest#aPercolatorRerunWhoseRecordCannotBeWritten"
+  level = "unit+real"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.SealFailureRunTest#runJsonUnwritableToo"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.engine.EngineEdgeTest#anUnwritableManifestFailsTheRunWithTheReasonEverywhere"
+  level = "unit"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.SealFailureUiTest#theRunSectionSaysFailed"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.SealFailureUiTest#theResultsSectionSaysFailed"
+  level = "gui"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.app.gui.SealFailureUiTest#theProvenanceSectionSaysFailed"
+  level = "gui"
+  run = "ordinary"
+
 [[scenario]]
 number = 18
 text = "insufficient disk space where it can be simulated safely"
 status = "covered"
-note = "Simulated: the kernel refusing CometGUI's own writes mid-run. A child JVM prepares a two-file run, lowers its own RLIMIT_FSIZE to 15000 bytes with util-linux prlimit (proved from its /proc/self/limits) and runs it; the first write refused is the merged PIN (about 20600 bytes; each stand-in PIN is 10318, run.json, the event log and provenance.json stay under the limit). The run fails at merge-pin saying File too large, nothing after it starts, no merged PIN or temporary file is left, run.json and provenance.json parse whole and agree it failed. Separately, a stage log whose writes fail is warned about once and does not end the run. NOT simulated: ENOSPC itself (EFBIG differs in text, not in the product's code path), a device full for every process, a tool rather than CometGUI hitting the limit, and a free-space pre-check, which the product does not have. A disk filling during finalisation leaves a run recorded succeeded with no provenance.json (8b-D1), measured and not asserted."
+note = "Simulated: the kernel refusing CometGUI's own writes mid-run. A child JVM prepares a two-file run, lowers its own RLIMIT_FSIZE to 15000 bytes with util-linux prlimit (proved from its /proc/self/limits) and runs it; the first write refused is the merged PIN (about 20600 bytes; each stand-in PIN is 10318, run.json, the event log and provenance.json stay under the limit). The run fails at merge-pin saying File too large, nothing after it starts, no merged PIN or temporary file is left, run.json and provenance.json parse whole and agree it failed. Separately, a stage log whose writes fail is warned about once and does not end the run. NOT simulated: ENOSPC itself (EFBIG differs in text, not in the product's code path), a device full for every process, a tool rather than CometGUI hitting the limit, and a free-space pre-check, which the product does not have. The disk filling at the seal, after every step's work (E12, repaired): a child JVM lowers RLIMIT_FSIZE to 12000 bytes only then; provenance.json is refused (File too large) and the run ends FAILED saying so, run.json -- small enough to be written -- records it failed with that reason, the event log, already larger than the limit, cannot take its last events and the result states each, no record, report or temporary file is left, and every step succeeded."
 
   [[scenario.test]]
   id = "org.cometgui.workflow.steps.FileSizeLimitRunTest#aWriteRefusedForWantOfRoom"
+  level = "integration"
+  run = "ordinary"
+
+  [[scenario.test]]
+  id = "org.cometgui.workflow.steps.FileSizeLimitRunTest#theRecordRefusedForWantOfRoom"
   level = "integration"
   run = "ordinary"
 

@@ -108,7 +108,10 @@ record*. The words you may see:
    * - completed
      - The run finished successfully.
    * - failed
-     - A step of the run failed.
+     - A step of the run failed, or every step did its work but the run's
+       provenance record could not be written -- the folder was not
+       writable, or the disk was full. A run without its record is never
+       shown as completed; what its tools wrote is kept in its folder.
    * - cancelled
      - You cancelled the run.
    * - running

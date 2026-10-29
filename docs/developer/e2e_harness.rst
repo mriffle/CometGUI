@@ -824,8 +824,12 @@ below was changed in the product by Phase 14 except E3 and E4.
        stepper shows Percolator "Running" after a Comet failure (E11).
        Escalated.
    * - E12
-     - **Serious**: a run whose provenance could not be written is still
-       recorded SUCCEEDED. Escalated for repair before release.
+     - **Serious**: a run whose provenance could not be written was recorded
+       SUCCEEDED. **Repaired** between Phases 14 and 15: such a run ends
+       FAILED with the reason in the result, ``run.json`` and the event log,
+       and the interface says so. Failure paths 17 and 18 map the tests
+       (``SealFailureRunTest``, ``FileSizeLimitRunTest``,
+       ``SealFailureUiTest``).
    * - E13--E15
      - A stale-lock takeover is never shown (E13); an interrupted run is
        labelled "running" (E14) and cannot be retried (E15). Escalated.

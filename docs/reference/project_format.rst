@@ -15,8 +15,9 @@ The provenance record inside each run has its own reference,
 
 **This page describes schema version 1** of ``project.json``,
 ``project.lock`` and a run's ``results/view-state.json``, and **schema
-versions 1 and 2** of ``run.json`` -- version 2 is a *derived* run's (see
-`A derived run`_). See :ref:`ref-project-format-versions`.
+versions 1, 2 and 3** of ``run.json`` -- version 2 is a *derived* run's (see
+`A derived run`_), version 3 a run with an attempt that failed for a reason
+no step carries. See :ref:`ref-project-format-versions`.
 
 .. contents:: Contents
    :depth: 2
@@ -592,7 +593,8 @@ Schema versions
 ``project.json``, ``run.json``, ``project.lock`` and
 ``results/view-state.json`` each begin with a ``schemaVersion`` member.
 ``project.json``, ``project.lock`` and ``view-state.json`` declare ``1``;
-``run.json`` declares ``1``, or ``2`` for a derived run. The policy for any
+``run.json`` declares ``1``, ``2`` for a derived run, or ``3`` for a run one
+of whose attempts records a reason. The policy for any
 other version (``R-RUN-04``) is the same for all four -- with one difference
 in what a refusal means for ``view-state.json``, which is not part of the
 run's record: the run opens with the default filters and the refusal is shown
@@ -612,12 +614,16 @@ beside them (`What CometGUI derives: results/ and exports/`_):
      - Reads the document: a derived run's ``run.json``, version 1 plus the
        ``derivedFrom`` member.
 
+   * - ``3`` (``run.json`` only)
+     - Reads the document: version 2's members, ``derivedFrom`` ``null`` for a
+       run that executes its own search, plus a ``reason`` on every attempt.
+
    * - Lower than ``1``
      - Refuses it, with a message naming both versions and saying that no
        migration exists. Version 1 is the first published format, so nothing
        older was ever written.
 
-   * - Higher than the newest it reads (``1``; ``2`` for ``run.json``)
+   * - Higher than the newest it reads (``1``; ``3`` for ``run.json``)
      - Refuses it **before any other member is read**, with a message naming
        both versions. A newer CometGUI may have changed what a member *means*,
        not only added one, so a document read "as far as this build understands
@@ -639,6 +645,20 @@ would execute Comet in a run that must never run it. Such a build refuses
 version 2 before reading anything. The two versions are not mixed: a version-1
 document carrying ``derivedFrom``, or a version-2 document without an object
 there, is refused like any other malformed document.
+
+**How version 3 relates to the others.** Version 3 exists for one fact the
+earlier versions cannot hold: why an attempt **failed when no step did** --
+every step finished, but the run's provenance record could not be written
+(``provenance/`` unwritable, the disk full). Its members are version 2's, with
+``derivedFrom`` ``null`` for a run that executes its own search, and every
+attempt has one more member, ``reason`` (`An attempt`_). A run is written at
+version 3 exactly when one of its attempts records a reason, so it reaches
+version 3 at most once, at the end of such an attempt, and never leaves it; a
+run that never met such a failure is still written byte for byte as version 1
+or 2. A version-3 document whose attempts record no reason is refused: it is
+not the lowest version that can express the run. A build that knows only
+versions 1 and 2 refuses version 3 before reading anything, rather than read
+a failed attempt with no failed step and no word of why.
 
 Conventions a reader may rely on
 ================================
@@ -847,9 +867,10 @@ The root
        overriding it -- for example to search a cached index).
 
    * - ``derivedFrom``
-     - object
-     - **Version 2 only**, and there required: the run whose Comet results
-       this derived run reuses. See `The derivation`_.
+     - object, or ``null`` in version 3
+     - **Versions 2 and 3 only**, and there required: the run whose Comet
+       results this derived run reuses. See `The derivation`_. In version 3 it
+       is ``null`` for a run that executes its own search.
 
    * - ``attempts``
      - array
@@ -1028,6 +1049,16 @@ An attempt
        (the digest of each of the step's inputs, keyed by input kind, for
        example ``comet-parameters``). Identifiers are lower-case letters and
        digits in hyphen-separated words.
+
+   * - ``reason``
+     - string or ``null``
+     - **Version 3 only**, and there present on every attempt, last. Why a
+       ``failed`` attempt failed when no step did, in plain words: that its
+       provenance record could not be written, which file, and the system's
+       error -- for example ``its provenance record
+       /.../provenance/provenance.json could not be written: No space left on
+       device``. ``null`` for every other attempt; only a failed attempt may
+       have one.
 
 A rerun preview compares against the fingerprints of every attempt merged,
 the latest attempt's winning where two recorded the same step.

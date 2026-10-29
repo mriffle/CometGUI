@@ -1419,7 +1419,7 @@ public final class LimelightViewModel {
                 };
         if (!result.finalisationErrors().isEmpty()) {
             words +=
-                    " Its provenance could not be finalised: "
+                    " Part of its record could not be written: "
                             + String.join("; ", result.finalisationErrors());
         }
         if (result.outcome() == AttemptOutcome.SUCCEEDED && derived != null) {
@@ -1441,10 +1441,25 @@ public final class LimelightViewModel {
                         + failure
                         + ". The new run is "
                         + rerunDescription
-                        + ".";
+                        + "."
+                        + result.provenanceFailure()
+                                .map(why -> " " + capitalised(why) + ".")
+                                .orElse("");
             }
         }
+        if (result.provenanceFailure().isPresent()) {
+            return "The Percolator rerun failed: "
+                    + result.provenanceFailure().get()
+                    + ". The new run is "
+                    + rerunDescription
+                    + ". What Percolator wrote is kept in the new run's directory, and it is not"
+                    + " offered for conversion.";
+        }
         return "The Percolator rerun failed: " + rerunDescription + ".";
+    }
+
+    private static String capitalised(String text) {
+        return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
     }
 
     private void rerunEnded(Object mine, String words) {

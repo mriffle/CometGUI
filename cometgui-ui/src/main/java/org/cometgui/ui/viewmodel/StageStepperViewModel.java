@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Objects;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableMap;
 import org.cometgui.workflow.state.RunState;
@@ -56,6 +58,14 @@ import org.cometgui.workflow.state.WorkflowStage;
  * downstream</em> stage does not fail the run belongs to {@link RunState}, is documented there, and
  * is not repeated or overridden here.
  *
+ * <h2>Why a stage failed when no step did</h2>
+ *
+ * <p>A run whose provenance record could not be written failed although every step did its work
+ * (E12). {@link #failStage(WorkflowStage, String)} shows that: the stage where the record is
+ * finalised is set failed -- so the run state, still derived, is failed -- and {@link
+ * #reasonProperty()} carries the reason in words. Any later change of a stage's state clears the
+ * reason, because it belongs to the states it was set with.
+ *
  * <h2>Nothing runs</h2>
  *
  * <p>There is no engine behind this, no process, no timer and no thread. It is a state holder the
@@ -68,6 +78,8 @@ public final class StageStepperViewModel {
     private final ObservableMap<WorkflowStage, StepState> states;
 
     private final ReadOnlyObjectWrapper<RunState> runState;
+
+    private final ReadOnlyStringWrapper reason = new ReadOnlyStringWrapper(this, "reason", "");
 
     /** A stepper with every stage {@link StepState#NOT_STARTED}. */
     public StageStepperViewModel() {
@@ -155,8 +167,45 @@ public final class StageStepperViewModel {
     public void setState(WorkflowStage stage, StepState state) {
         Objects.requireNonNull(stage, "stage");
         Objects.requireNonNull(state, "state");
+        reason.set("");
         states.put(stage, state);
         runState.set(RunState.deriveFrom(states));
+    }
+
+    /**
+     * Shows a stage failed for a reason no step's state carries: the run's provenance record could
+     * not be written. The run state is derived from the stage states as ever, and is failed.
+     *
+     * @param stage the stage where the failure belongs
+     * @param why the reason, in words
+     * @throws NullPointerException if either argument is {@code null}
+     * @throws IllegalArgumentException if {@code why} is blank
+     */
+    public void failStage(WorkflowStage stage, String why) {
+        Objects.requireNonNull(why, "why");
+        if (why.isBlank()) {
+            throw new IllegalArgumentException("a stage fails for a reason, and this one is blank");
+        }
+        setState(stage, StepState.FAILED);
+        reason.set(why);
+    }
+
+    /**
+     * Why the run failed, when no step's state says so; empty otherwise.
+     *
+     * @return the property
+     */
+    public ReadOnlyStringProperty reasonProperty() {
+        return reason.getReadOnlyProperty();
+    }
+
+    /**
+     * Why the run failed, when no step's state says so.
+     *
+     * @return the reason, or empty
+     */
+    public String reason() {
+        return reason.get();
     }
 
     /**

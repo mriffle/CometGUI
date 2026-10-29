@@ -127,6 +127,22 @@ final class StandInRun {
      * @return the executable
      */
     static Path percolator(Path file, boolean waits) throws IOException {
+        return percolator(file, waits, false);
+    }
+
+    /**
+     * Writes the stand-in Percolator that, its files written, keeps running until its child is
+     * killed -- and then exits 0, as if it had finished: the test decides when Percolator ends, and
+     * it ends well.
+     *
+     * @param file where it goes
+     * @return the executable
+     */
+    static Path releasablePercolator(Path file) throws IOException {
+        return percolator(file, true, true);
+    }
+
+    private static Path percolator(Path file, boolean waits, boolean endsWell) throws IOException {
         List<String> lines = new ArrayList<>();
         lines.add("#!/bin/sh");
         lines.add("table='" + TABLE + "'");
@@ -149,7 +165,7 @@ final class StandInRun {
             lines.add("echo \"child $child\"");
             lines.add("echo \"pid $$\"");
             lines.add("wait \"$child\"");
-            lines.add("exit $?");
+            lines.add(endsWell ? "exit 0" : "exit $?");
         } else {
             lines.add("exit 0");
         }

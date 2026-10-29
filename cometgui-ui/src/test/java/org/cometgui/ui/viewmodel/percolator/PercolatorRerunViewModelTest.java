@@ -305,14 +305,14 @@ class PercolatorRerunViewModelTest {
                         result(
                                 AttemptOutcome.FAILED,
                                 Map.of(EngineStep.RUN_PERCOLATOR, "Percolator exited with code 1"),
-                                List.of("provenance.json could not be written")));
+                                List.of("could not append run.finished: java.io.IOException: x")));
         port.settle();
         assertEquals(
                 "The Percolator rerun failed at step run-percolator (Run Percolator): Percolator"
                         + " exited with code 1. The new run is "
                         + DESCRIPTION
-                        + ". Its provenance could not be finalised: provenance.json could not be"
-                        + " written",
+                        + ". Part of its record could not be written: could not append"
+                        + " run.finished: java.io.IOException: x",
                 rerun.outcomeProperty().get());
 
         offered();
@@ -436,6 +436,50 @@ class PercolatorRerunViewModelTest {
                         assertThrows(
                                 IllegalArgumentException.class,
                                 () -> new RerunCheck(Optional.empty(), LINES, Optional.of("no"))));
+    }
+
+    /**
+     * E12, repaired: every step of the rerun succeeded but its provenance record could not be
+     * written. The rerun is stated failed, with the reason, and nowhere as a success.
+     */
+    @Test
+    @DisplayName("a rerun whose provenance record could not be written is stated failed, with why")
+    void provenanceFailureStated() {
+        offered();
+        rerun.start();
+        port.settle();
+        String why =
+                "its provenance record /p/runs/run-2/provenance/provenance.json could not be"
+                        + " written: File too large";
+        RunResult succeededSteps = result(AttemptOutcome.SUCCEEDED, Map.of(), List.of());
+        port.started()
+                .get(0)
+                .observer()
+                .onRunFinished(
+                        new RunResult(
+                                1,
+                                AttemptOutcome.FAILED,
+                                RunState.FAILED,
+                                succeededSteps.states(),
+                                Map.of(),
+                                succeededSteps.manifest(),
+                                List.of(),
+                                0,
+                                Optional.of(why)));
+        port.settle();
+        String outcome = rerun.outcomeProperty().get();
+        assertAll(
+                () ->
+                        assertEquals(
+                                "The Percolator rerun failed: "
+                                        + why
+                                        + ". The new run is "
+                                        + DESCRIPTION
+                                        + ". What Percolator wrote is kept in the new run's"
+                                        + " directory.",
+                                outcome),
+                () -> assertFalse(outcome.contains("succeeded"), outcome),
+                () -> assertFalse(rerun.runningProperty().get()));
     }
 
     private static RunResult result(

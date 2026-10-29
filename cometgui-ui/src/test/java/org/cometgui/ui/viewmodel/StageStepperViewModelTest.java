@@ -16,6 +16,7 @@
 
 package org.cometgui.ui.viewmodel;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -260,6 +261,35 @@ class StageStepperViewModelTest {
             stepper.setState(WorkflowStage.VALIDATE, StepState.SUCCEEDED);
             stepper.setState(WorkflowStage.COMET, StepState.FAILED);
             assertRunStateIs(RunState.FAILED);
+        }
+
+        @Test
+        @DisplayName(
+                "is FAILED, with the reason, when a stage fails for a reason no step carries;"
+                        + " any later state change clears the reason")
+        void failsForAReason() {
+            succeedCorePath();
+            assertEquals(RunState.SUCCEEDED, stepper.runState());
+            stepper.failStage(WorkflowStage.RESULTS, "Its provenance record could not be written");
+            assertAll(
+                    () -> assertRunStateIs(RunState.FAILED),
+                    () -> assertEquals(StepState.FAILED, stepper.stateOf(WorkflowStage.RESULTS)),
+                    () -> assertEquals(StepState.SUCCEEDED, stepper.stateOf(WorkflowStage.COMET)),
+                    () ->
+                            assertEquals(
+                                    "Its provenance record could not be written", stepper.reason()),
+                    () -> assertEquals(stepper.reason(), stepper.reasonProperty().get()));
+            stepper.setState(WorkflowStage.INPUTS, StepState.NOT_STARTED);
+            assertEquals("", stepper.reason());
+            assertEquals(
+                    "a stage fails for a reason, and this one is blank",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () -> stepper.failStage(WorkflowStage.RESULTS, " "))
+                            .getMessage());
+            assertThrows(
+                    NullPointerException.class,
+                    () -> stepper.failStage(WorkflowStage.RESULTS, Nulls.of(String.class)));
         }
 
         @Test

@@ -92,6 +92,8 @@ public final class StageStepper extends VBox {
 
     private final Label runStateLabel;
 
+    private final StageStepperViewModel viewModel;
+
     /**
      * The arrow the diagram draws between two stages, as a Unicode escape to keep this file ASCII.
      */
@@ -124,13 +126,15 @@ public final class StageStepper extends VBox {
         runStateLabel = new Label();
         runStateLabel.setId(UiIds.STAGE_STEPPER_RUN_STATE);
         named(runStateLabel, "run state");
-        showRunState(viewModel.runState());
+        this.viewModel = viewModel;
+        showRunState();
 
         getChildren().addAll(core, branches, runStateLabel);
 
         stageStates.addListener(
                 (MapChangeListener<WorkflowStage, StepState>) change -> showStage(change.getKey()));
-        viewModel.runStateProperty().addListener((property, was, now) -> showRunState(now));
+        viewModel.runStateProperty().addListener((property, was, now) -> showRunState());
+        viewModel.reasonProperty().addListener((property, was, now) -> showRunState());
     }
 
     /**
@@ -225,15 +229,14 @@ public final class StageStepper extends VBox {
         label.setAccessibleText(stage.displayName() + " stage: " + words);
     }
 
-    /**
-     * Rewrites the derived run state, in words.
-     *
-     * @param runState the run state the view-model derived
-     */
-    private void showRunState(RunState runState) {
+    /** Rewrites the derived run state in words, with the reason when the view-model gives one. */
+    private void showRunState() {
+        RunState runState = viewModel.runState();
         String words = inWords(runState.name());
-        runStateLabel.setText("Run state: " + words);
-        runStateLabel.setAccessibleText("run state: " + words);
+        String why = viewModel.reason();
+        String shown = why.isEmpty() ? words : words + ". " + why;
+        runStateLabel.setText("Run state: " + shown);
+        runStateLabel.setAccessibleText("run state: " + shown);
     }
 
     /**

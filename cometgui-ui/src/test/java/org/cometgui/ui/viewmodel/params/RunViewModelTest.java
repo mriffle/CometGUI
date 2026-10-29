@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -526,18 +527,85 @@ class RunViewModelTest {
                             states,
                             Map.of(EngineStep.RUN_COMET, "comet-01 exited with status 1"),
                             manifest(),
-                            List.of("provenance.rst could not be written"),
+                            List.of("could not append run.finished: java.io.IOException: gone"),
                             2));
             engine.ui().drain();
             assertEquals(
                     "The run failed at step run-comet (Run Comet once per spectrum file):"
                             + " comet-01 exited with status 1. Run run-1 in"
-                            + " /projects/p/runs/run-1. Its provenance could not be finalised:"
-                            + " provenance.rst could not be written (2 progress updates could not"
-                            + " be delivered to this window.)",
+                            + " /projects/p/runs/run-1. Part of its record could not be written:"
+                            + " could not append run.finished: java.io.IOException: gone (2"
+                            + " progress updates could not be delivered to this window.)",
                     run.outcome());
             assertEquals(StepState.FAILED, stepper.stateOf(WorkflowStage.COMET));
             assertFalse(run.running());
+        }
+
+        /**
+         * E12, repaired: every step succeeded, but the run's provenance record could not be
+         * written. The outcome says the run failed, why, and that the work is kept; the stepper
+         * shows the Results stage -- where core provenance is finalised -- failed with that reason,
+         * so its run state is failed; nothing says the run succeeded. The next run's plan clears
+         * the reason.
+         */
+        @Test
+        @DisplayName(
+                "a run whose provenance record could not be written: failed, with the reason, on"
+                        + " the outcome and the stepper; never succeeded")
+        void provenanceFailureStated() {
+            ready();
+            run.start();
+            engine.background().drain();
+            RunObserver observer = engine.started().get(0).observer();
+            String why =
+                    "its provenance record /projects/p/runs/run-1/provenance/provenance.json could"
+                            + " not be written: No space left on device"
+                            + " (/projects/p/runs/run-1/provenance/provenance.json.tmp-1)";
+            observer.onRunFinished(
+                    new RunResult(
+                            1,
+                            AttemptOutcome.FAILED,
+                            RunState.FAILED,
+                            allSucceeded(),
+                            Map.of(),
+                            manifest(),
+                            List.of(),
+                            0,
+                            Optional.of(why)));
+            engine.ui().drain();
+            assertAll(
+                    "failed for its record",
+                    () ->
+                            assertEquals(
+                                    "The run failed: "
+                                            + why
+                                            + ". Run run-1 in /projects/p/runs/run-1. What its"
+                                            + " tools wrote is kept in the run's directory.",
+                                    run.outcome()),
+                    () ->
+                            assertFalse(
+                                    run.outcome().toLowerCase(Locale.ROOT).contains("succeeded"),
+                                    run.outcome()),
+                    () -> assertEquals(StepState.SUCCEEDED, stepper.stateOf(WorkflowStage.COMET)),
+                    () -> assertEquals(StepState.FAILED, stepper.stateOf(WorkflowStage.RESULTS)),
+                    () -> assertEquals(RunState.FAILED, stepper.runState()),
+                    () ->
+                            assertEquals(
+                                    "Its provenance record"
+                                            + why.substring("its provenance record".length()),
+                                    stepper.reason()),
+                    () -> assertFalse(run.running()));
+
+            engine.settle();
+            run.start();
+            engine.background().drain();
+            engine.ui().drain();
+            assertAll(
+                    "the next run starts from nothing",
+                    () -> assertEquals("", stepper.reason()),
+                    () ->
+                            assertEquals(
+                                    StepState.NOT_STARTED, stepper.stateOf(WorkflowStage.RESULTS)));
         }
 
         @Test

@@ -501,10 +501,24 @@ An attempt, from start to finish
    other ready step. Each step that succeeds has its fingerprint recorded in
    ``run.json``. A step that fails stops new steps from starting; steps
    already running finish.
-#. **Finalisation**, whether the attempt succeeded, failed or was cancelled:
-   ``provenance.json`` is written atomically by the redacting manifest writer,
-   ``provenance.rst`` is rendered from the same model, ``run.finished`` carries
-   the terminal status, and the attempt's outcome is recorded in ``run.json``.
+#. **Finalisation**, whether the attempt succeeded, failed or was cancelled.
+   **The outcome is decided after the seal.** ``provenance.json`` is written
+   atomically by the redacting manifest writer and ``provenance.rst`` is
+   rendered from the same model; then the attempt's outcome is recorded in
+   ``run.json`` and ``run.finished`` carries the terminal status. If either
+   document cannot be written -- ``provenance/`` unwritable, the disk full --
+   the attempt ends ``FAILED`` whatever its steps did, and the reason (the
+   record could not be written, which file, the system's own error) is the
+   result's ``provenanceFailure``, the attempt's ``reason`` in ``run.json``
+   (:ref:`schema version 3 <ref-project-format-versions>`) and the
+   ``message`` of ``run.finished``. No report is written for a record that is
+   not there; a ``provenance.json`` already written when the report then
+   fails is rewritten as failed. Nothing a step produced is touched, and every
+   step keeps the state it reached. Each of these is written as far as the
+   disk allows: a ``run.json`` that cannot take the end is left saying the
+   attempt is running, which a reopened project lists as *interrupted* --
+   never as completed. This is defect E12 of Phase 14, repaired; before it, such
+   a run was recorded ``SUCCEEDED``.
 
 What is written per step and per invocation
 -------------------------------------------

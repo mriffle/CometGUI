@@ -369,7 +369,7 @@ public final class PercolatorRerunViewModel {
                             .append('.');
         }
         if (!result.finalisationErrors().isEmpty()) {
-            text.append(" Its provenance could not be finalised: ")
+            text.append(" Part of its record could not be written: ")
                     .append(String.join("; ", result.finalisationErrors()));
         }
         return text.toString();
@@ -387,10 +387,24 @@ public final class PercolatorRerunViewModel {
                         + failure
                         + ". The new run is "
                         + description
-                        + '.';
+                        + '.'
+                        + result.provenanceFailure()
+                                .map(why -> " " + capitalised(why) + '.')
+                                .orElse("");
             }
         }
+        if (result.provenanceFailure().isPresent()) {
+            return "The Percolator rerun failed: "
+                    + result.provenanceFailure().get()
+                    + ". The new run is "
+                    + description
+                    + ". What Percolator wrote is kept in the new run's directory.";
+        }
         return "The Percolator rerun failed: " + description + '.';
+    }
+
+    private static String capitalised(String text) {
+        return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
     }
 
     /** Runs a task on the interface thread, stating any failure in the outcome. */
