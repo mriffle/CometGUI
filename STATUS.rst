@@ -3,16 +3,15 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-25
-:Updated by: Main orchestrator, session 10 (**Phase 14 signed off
-   PARTIAL**; paused by the owner before Phase 15)
-:Current phase: **None -- paused by the owner** after Phase 14 (2026-10-23:
-   *"Do not start phase 15, pause after this phase is finished"*). Phase 15
-   starts only on the owner's word; tier 1 recommends a between-phase repair
-   of ``E12`` first (:ref:`status-p14-signed`). ``D-006``'s CI-fixture half
-   is still open and the owner's. Standing owner instruction (2026-10-08),
-   suspended by the pause: *"When all is green with the current phase, push,
-   then move on to the next phase."*
+:Updated: 2026-10-29
+:Updated by: Main orchestrator, session 10 (owner resumed: *"fix the E12 bug
+   and then proceed to phase 15"*)
+:Current phase: **Between Phases 14 and 15 -- the E12 repair**, IN PROGRESS
+   (brief ``handoffs/FIX-P14-P15-BRIEF.rst``): a run whose provenance cannot
+   be finalised ends FAILED, never SUCCEEDED. Phase 15 follows it.
+   ``D-006``'s CI-fixture half is still open and the owner's. Standing owner
+   instruction (2026-10-08): *"When all is green with the current phase,
+   push, then move on to the next phase."*
 :Overall: Fifteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
    05, 08, 09, 10, 11, 12, 13 and 14 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
@@ -4555,6 +4554,10 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-29
+     - 14+, 15
+     - Owner resumed (*"fix the E12 bug and then proceed to phase 15"*).
+       **E12 repair dispatched** (``handoffs/FIX-P14-P15-BRIEF.rst``).
    * - 2026-10-25
      - 14
      - **Phase 14 signed off PARTIAL** at ``df3d3ce`` (build 11/11, gates
