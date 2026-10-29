@@ -56,6 +56,13 @@ import org.cometgui.workflow.state.EngineStep;
  *       prints what the result says: {@code RUN <directory>}, {@code OUTCOME <outcome>}, one {@code
  *       FAILURE <step> <message>} per failed step and one {@code FINALISATION <message>} per
  *       finalisation error, then {@code DONE}.
+ *   <li>{@code seal <bytes>}: as {@code full}, except that the file-size limit is lowered only at
+ *       the seal -- after the last step has recorded its success, before {@code provenance.json} is
+ *       written ({@link SealTrigger}) -- so that every step's work is done under no limit, and the
+ *       first write refused is the record's. It prints, besides what {@code full} prints, the size
+ *       of the event log and of {@code run.json} at that moment ({@code AT-SEAL <name> <bytes>}),
+ *       the attempt's reason ({@code REASON <message>}) and {@code TRIGGER <failure>} if lowering
+ *       the limit failed.
  * </ul>
  *
  * <p>Nothing here sleeps: every wait is on a line a stand-in prints, or on the run's end.
@@ -90,6 +97,11 @@ public final class RunChild {
             halt(fake, StandInTools.percolator(bin, StandInTools.Ending.CANCELLED_ONLY));
         } else if ("full".equals(mode)) {
             full(
+                    fake,
+                    FakePercolator.write(bin, FakePercolator.Behaviour.normal()),
+                    Long.parseLong(args[2]));
+        } else if ("seal".equals(mode)) {
+            seal(
                     fake,
                     FakePercolator.write(bin, FakePercolator.Behaviour.normal()),
                     Long.parseLong(args[2]));
@@ -146,6 +158,53 @@ public final class RunChild {
             for (String error : result.finalisationErrors()) {
                 System.out.println("FINALISATION " + oneLine(error));
             }
+            System.out.println("DONE");
+            System.out.flush();
+        }
+    }
+
+    private static void seal(FakeSearch fake, Path percolator, long bytes)
+            throws IOException, InterruptedException, RunBlockedException, ReuseRefusedException {
+        SealTrigger trigger = new SealTrigger();
+        try (RealProject project = RealProject.create(fake.project(), trigger)) {
+            PreparedRun prepared = project.prepare(StandInTools.request(fake, percolator));
+            org.cometgui.domain.run.RunLayout layout = prepared.layout();
+            trigger.arm(
+                    layout.runFile(),
+                    () -> {
+                        System.out.println(
+                                "AT-SEAL events.log "
+                                        + java.nio.file.Files.size(layout.eventLogFile()));
+                        System.out.println(
+                                "AT-SEAL run.json " + java.nio.file.Files.size(layout.runFile()));
+                        try {
+                            limitFileSize(bytes);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException("interrupted lowering the limit", interrupted);
+                        }
+                    });
+            RunResult result = project.run(prepared);
+            trigger.failure()
+                    .ifPresent(
+                            failure ->
+                                    System.out.println("TRIGGER " + oneLine(failure.toString())));
+            System.out.println("FIRED " + trigger.fired());
+            System.out.println("RUN " + layout.root());
+            System.out.println("OUTCOME " + result.outcome());
+            for (Map.Entry<EngineStep, org.cometgui.workflow.state.StepState> state :
+                    result.states().entrySet()) {
+                System.out.println("STATE " + state.getKey().id() + " " + state.getValue());
+            }
+            for (Map.Entry<EngineStep, String> failure : result.failures().entrySet()) {
+                System.out.println(
+                        "FAILURE " + failure.getKey().id() + " " + oneLine(failure.getValue()));
+            }
+            for (String error : result.finalisationErrors()) {
+                System.out.println("FINALISATION " + oneLine(error));
+            }
+            result.provenanceFailure()
+                    .ifPresent(reason -> System.out.println("REASON " + oneLine(reason)));
             System.out.println("DONE");
             System.out.flush();
         }

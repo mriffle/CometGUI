@@ -53,19 +53,26 @@ import org.cometgui.provenance.json.JsonValue;
 import org.cometgui.provenance.json.JsonWriter;
 
 /**
- * The {@code run.json} format, schema versions 1 and 2: written by the one {@link JsonWriter}, read
- * by the one {@code JsonReader}.
+ * The {@code run.json} format, schema versions 1, 2 and 3: written by the one {@link JsonWriter},
+ * read by the one {@code JsonReader}.
  *
- * <h2>Two versions</h2>
+ * <h2>Three versions</h2>
  *
  * <p>Version 2 is version 1 plus one member, {@code derivedFrom}, between {@code databaseDelivery}
  * and {@code attempts}: the run a derived run reuses the Comet results of ({@link RunDerivation}).
  * A run is written at the lowest version that can express it ({@link
  * RunDescriptor#schemaVersion()}): a run that executes its own search is version 1, byte for byte
- * as Phase 08 wrote it, and a derived run is version 2. This reader reads both. A version-1
+ * as Phase 08 wrote it, and a derived run is version 2. This reader reads all three. A version-1
  * document with a {@code derivedFrom} member, and a version-2 document without an object there, are
- * refused like any other malformed document; anything below 1 or above 2 is refused by {@code
+ * refused like any other malformed document; anything below 1 or above 3 is refused by {@code
  * R-RUN-04}'s policy before any other member is read.
+ *
+ * <p>Version 3 is version 2's members with {@code derivedFrom} {@code null} for a run that executes
+ * its own search, plus one member on every attempt, {@code reason}: why a failed attempt failed
+ * when no step did -- its provenance record could not be written -- or {@code null}. A run is
+ * written at version 3 exactly when one of its attempts records a reason ({@link
+ * RunDescriptor#REASON_SCHEMA_VERSION}), so a run that never met such a failure is still written
+ * byte for byte as before.
  *
  * <p>The identity members come first, in the order of {@link RunIdentity}'s components, then {@code
  * attempts}. Every member is always present -- an absent optional is {@code null}, never omitted --
@@ -131,6 +138,10 @@ public final class RunJson {
     static final List<String> ATTEMPT_MEMBERS =
             List.of("number", "started", "ended", "outcome", "succeededSteps");
 
+    /** An attempt's members in a version-3 document, in the order written. */
+    static final List<String> REASON_ATTEMPT_MEMBERS =
+            List.of("number", "started", "ended", "outcome", "succeededSteps", "reason");
+
     /** A recorded fingerprint's members, in the order written. */
     static final List<String> FINGERPRINT_MEMBERS = List.of("fingerprint", "inputDigests");
 
@@ -182,6 +193,10 @@ public final class RunJson {
                 .value(identity.indexMode().wireName())
                 .name("databaseDelivery")
                 .value(identity.databaseDelivery().wireName());
+        boolean reasons = descriptor.schemaVersion() == RunDescriptor.REASON_SCHEMA_VERSION;
+        if (identity.derivedFrom().isEmpty() && reasons) {
+            json.name("derivedFrom").nullValue();
+        }
         if (identity.derivedFrom().isPresent()) {
             RunDerivation derivation = identity.derivedFrom().get();
             json.name("derivedFrom")
@@ -198,7 +213,7 @@ public final class RunJson {
         }
         json.name("attempts").beginArray();
         for (RunAttempt attempt : descriptor.attempts()) {
-            writeAttempt(json, attempt);
+            writeAttempt(json, attempt, reasons);
         }
         return json.endArray().endObject().finish();
     }
@@ -223,7 +238,7 @@ public final class RunJson {
         json.name("md5").value(hashes.md5()).name("sha256").value(hashes.sha256());
     }
 
-    private static void writeAttempt(JsonWriter json, RunAttempt attempt) {
+    private static void writeAttempt(JsonWriter json, RunAttempt attempt, boolean reasons) {
         json.beginObject()
                 .name("number")
                 .value(attempt.number())
@@ -248,7 +263,16 @@ public final class RunJson {
                     .sortedObject(step.getValue().inputDigests())
                     .endObject();
         }
-        json.endObject().endObject();
+        json.endObject();
+        if (reasons) {
+            json.name("reason");
+            if (attempt.reason().isPresent()) {
+                json.value(attempt.reason().get());
+            } else {
+                json.nullValue();
+            }
+        }
+        json.endObject();
     }
 
     /**
@@ -259,20 +283,22 @@ public final class RunJson {
      * @return the record
      * @throws org.cometgui.domain.project.UnsupportedSchemaVersionException if the document is of
      *     another schema version, before any other member is read
-     * @throws InvalidDocumentException if the document is not a version-1 or version-2 {@code
-     *     run.json}
+     * @throws InvalidDocumentException if the document is not a version-1, version-2 or version-3
+     *     {@code run.json}
      */
     public static RunDescriptor parse(String text, String document) {
         Objects.requireNonNull(text, "text");
         DocumentFields fields = new DocumentFields(document);
         JsonValue.JsonObject root = fields.root(text);
-        boolean derived =
+        long version =
                 fields.requireVersionBetween(
-                                root,
-                                RunDescriptor.SCHEMA_VERSION,
-                                RunDescriptor.DERIVED_SCHEMA_VERSION)
-                        == RunDescriptor.DERIVED_SCHEMA_VERSION;
-        fields.requireOnly(root, ROOT, derived ? DERIVED_MEMBERS : MEMBERS);
+                        root, RunDescriptor.SCHEMA_VERSION, RunDescriptor.REASON_SCHEMA_VERSION);
+        boolean reasons = version == RunDescriptor.REASON_SCHEMA_VERSION;
+        boolean derived = version == RunDescriptor.DERIVED_SCHEMA_VERSION;
+        fields.requireOnly(root, ROOT, derived || reasons ? DERIVED_MEMBERS : MEMBERS);
+        if (reasons) {
+            derived = !(fields.member(root, ROOT, "derivedFrom") instanceof JsonValue.JsonNull);
+        }
 
         String runIdText = fields.string(fields.member(root, ROOT, "runId"), "runId");
         RunId runId = fields.rebuilt("runId", () -> new RunId(runIdText));
@@ -346,9 +372,23 @@ public final class RunJson {
         for (int index = 0; index < attemptElements.size(); index++) {
             String path = element("attempts", index);
             attempts.add(
-                    readAttempt(fields, fields.object(attemptElements.get(index), path), path));
+                    readAttempt(
+                            fields,
+                            fields.object(attemptElements.get(index), path),
+                            path,
+                            reasons));
         }
-        return fields.rebuilt("attempts", () -> new RunDescriptor(identity, attempts));
+        RunDescriptor read =
+                fields.rebuilt("attempts", () -> new RunDescriptor(identity, attempts));
+        if (read.schemaVersion() != version) {
+            throw fields.invalid(
+                    "schemaVersion",
+                    "must be "
+                            + read.schemaVersion()
+                            + ", the lowest version that can express this run: a version-3"
+                            + " document records a reason on at least one attempt");
+        }
+        return read;
     }
 
     private static List<SpectrumInput> readSpectra(DocumentFields fields, JsonValue value) {
@@ -441,8 +481,8 @@ public final class RunJson {
     }
 
     private static RunAttempt readAttempt(
-            DocumentFields fields, JsonValue.JsonObject attempt, String path) {
-        fields.requireOnly(attempt, path, ATTEMPT_MEMBERS);
+            DocumentFields fields, JsonValue.JsonObject attempt, String path, boolean reasons) {
+        fields.requireOnly(attempt, path, reasons ? REASON_ATTEMPT_MEMBERS : ATTEMPT_MEMBERS);
         int number =
                 fields.smallInteger(fields.member(attempt, path, "number"), child(path, "number"));
         Instant started =
@@ -467,8 +507,16 @@ public final class RunJson {
             succeeded.put(
                     stepId, readFingerprint(fields, step.getValue(), child(stepsPath, stepId)));
         }
+        Optional<String> reason = Optional.empty();
+        if (reasons) {
+            JsonValue recorded = fields.member(attempt, path, "reason");
+            if (!(recorded instanceof JsonValue.JsonNull)) {
+                reason = Optional.of(fields.string(recorded, child(path, "reason")));
+            }
+        }
+        Optional<String> why = reason;
         return fields.rebuilt(
-                path, () -> new RunAttempt(number, started, ended, outcome, succeeded));
+                path, () -> new RunAttempt(number, started, ended, outcome, succeeded, why));
     }
 
     private static RecordedFingerprint readFingerprint(

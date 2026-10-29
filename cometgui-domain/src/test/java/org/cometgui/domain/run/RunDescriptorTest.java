@@ -486,4 +486,45 @@ class RunDescriptorTest {
                                 () -> FRESH.requireSuccessor(Nulls.of(RunDescriptor.class)))
                         .getMessage());
     }
+
+    @Test
+    @DisplayName("an attempt failed for a reason makes the run version 3, for good, and is final")
+    void failedForAReason() {
+        RunDescriptor running = FRESH.withNewAttempt(T1);
+        RunDescriptor failed =
+                running.withAttemptFailed("its provenance record is not written", T2);
+        RunDescriptor retried = failed.withNewAttempt(T3);
+        RunDescriptor retryEnded = retried.withAttemptFinished(AttemptOutcome.SUCCEEDED, T3);
+        assertAll(
+                () -> assertEquals(3, RunDescriptor.REASON_SCHEMA_VERSION),
+                () -> assertEquals(1, running.schemaVersion()),
+                () -> assertEquals(AttemptOutcome.FAILED, failed.attempts().get(0).outcome()),
+                () ->
+                        assertEquals(
+                                Optional.of("its provenance record is not written"),
+                                failed.attempts().get(0).reason()),
+                () -> assertEquals(Optional.of(T2), failed.attempts().get(0).ended()),
+                () -> assertEquals(3, failed.schemaVersion()),
+                () -> assertEquals(3, retried.schemaVersion(), "a retry does not lower it"),
+                () -> assertEquals(3, retryEnded.schemaVersion()),
+                () -> running.requireSuccessor(failed),
+                () ->
+                        assertEquals(
+                                "attempts[0]",
+                                assertThrows(
+                                                RunImmutabilityException.class,
+                                                () ->
+                                                        failed.requireSuccessor(
+                                                                running.withAttemptFinished(
+                                                                        AttemptOutcome.FAILED, T2)))
+                                        .member(),
+                                "the reason of an ended attempt cannot be removed"),
+                () ->
+                        assertEquals(
+                                "run " + identity().runId() + " has no running attempt",
+                                assertThrows(
+                                                IllegalStateException.class,
+                                                () -> failed.withAttemptFailed("again", T3))
+                                        .getMessage()));
+    }
 }

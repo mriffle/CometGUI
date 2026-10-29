@@ -77,9 +77,8 @@ import org.junit.jupiter.api.io.TempDir;
  * RealComet#makeReadOnly}). Permission is given back afterwards so the temporary directory can be
  * removed. No file outside this module is read.
  *
- * <p>Not tested here, because the product's behaviour is a defect reported by Phase 14 unit 8b
- * rather than a behaviour to pin: {@code provenance/} becoming unwritable leaves a run recorded as
- * succeeded with no {@code provenance.json}.
+ * <p>{@code provenance/} becoming unwritable -- defect E12, found by Phase 14 unit 8b and repaired
+ * since -- is tested by {@link SealFailureRunTest}: the run then ends failed, never succeeded.
  */
 @EnabledOnOs(
         value = {OS.LINUX, OS.MAC},

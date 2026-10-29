@@ -18,6 +18,8 @@ package org.cometgui.workflow.steps;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -72,6 +74,9 @@ import org.junit.jupiter.api.io.TempDir;
  * log ends with the run failed; nothing could not be finalised. The limit is proved in force by the
  * child's own {@code /proc/self/limits}, so the failure cannot be a coincidence.
  *
+ * <p>And the disk filling <strong>at the seal</strong>, after every step's work (defect E12,
+ * repaired): {@link #theRecordRefusedForWantOfRoom}.
+ *
  * <p>No file outside this module is read.
  */
 @EnabledOnOs(
@@ -81,6 +86,131 @@ class FileSizeLimitRunTest {
 
     /** The file-size limit the run executes under, in bytes. */
     static final long LIMIT = 15_000;
+
+    /**
+     * The file-size limit lowered at the seal, in bytes: above {@code run.json} with its reason
+     * (about 5 100 bytes in this run), below {@code provenance.json} (about 16 200). The event log
+     * is already larger (about 20 100 bytes at the seal), so its last events are refused too --
+     * which a disk with no room left would do as well.
+     */
+    static final long SEAL_LIMIT = 12_000;
+
+    /**
+     * E12, repaired, for the disk filling at the seal. The child JVM runs a one-file search with
+     * the stand-in tools under no limit and lowers its {@code RLIMIT_FSIZE} to {@value #SEAL_LIMIT}
+     * bytes only after the last step has recorded its success ({@link SealTrigger}): every step's
+     * work is done, and the first write refused is {@code provenance.json}'s. The run must end
+     * FAILED, saying that its provenance record could not be written, which file, and {@code File
+     * too large}; {@code run.json} -- small enough to be written -- records the attempt failed with
+     * that reason; the event log, too large to take another line, cannot record the end, and the
+     * result says so; no record, report or temporary file is left; and every step succeeded.
+     */
+    @Test
+    @DisplayName(
+            "the disk full at the seal: FAILED saying provenance.json could not be written (File"
+                    + " too large), run.json failed with that reason, the unrecorded events"
+                    + " stated, every step's work kept")
+    void theRecordRefusedForWantOfRoom(@TempDir Path directory)
+            throws IOException, InterruptedException {
+        Path root = directory.toRealPath();
+        Path search = Files.createDirectories(root.resolve("search"));
+        RunChildJvm child =
+                RunChildJvm.start(root, "seal", search.toString(), Long.toString(SEAL_LIMIT));
+        try {
+            child.awaitLine(line -> line.equals("DONE"));
+            assertEquals(0, child.awaitExit(), () -> String.valueOf(child.output()));
+        } finally {
+            child.stop();
+        }
+        List<String> said = child.output();
+        RunLayout run = new RunLayout(Path.of(valueOf(said, "RUN ")));
+        ProjectLayout project = new ProjectLayout(search.resolve("project"));
+        List<RunAttempt> attempts =
+                new RunStore(
+                                project,
+                                java.time.Clock.systemUTC(),
+                                () -> {
+                                    throw new AssertionError("no run is created here");
+                                })
+                        .read(run)
+                        .attempts();
+        String reason =
+                "its provenance record "
+                        + run.provenanceJsonFile()
+                        + " could not be written: File"
+                        + " too large";
+        List<ProvenanceEvent> events = RunEvidence.events(run);
+        ProvenanceEvent last = events.get(events.size() - 1);
+        assertAll(
+                "the record refused for want of room",
+                () ->
+                        assertEquals(
+                                "Max file size " + SEAL_LIMIT + " " + SEAL_LIMIT + " bytes",
+                                valueOf(said, "LIMITED "),
+                                "the limit was in force at the seal"),
+                () -> assertEquals("true", valueOf(said, "FIRED ")),
+                () -> assertEquals(List.of(), linesStarting(said, "TRIGGER ")),
+                () ->
+                        assertTrue(
+                                Long.parseLong(valueOf(said, "AT-SEAL run.json "))
+                                        < SEAL_LIMIT - 500,
+                                "run.json has room for its reason"),
+                () ->
+                        assertTrue(
+                                Long.parseLong(valueOf(said, "AT-SEAL events.log ")) > SEAL_LIMIT,
+                                "the event log has none"),
+                () -> assertEquals("FAILED", valueOf(said, "OUTCOME ")),
+                () -> assertEquals(reason, valueOf(said, "REASON ")),
+                () -> assertEquals(List.of(), linesStarting(said, "FAILURE "), "no step failed"),
+                () ->
+                        assertEquals(
+                                StandInTools.statesUpTo(
+                                                EngineStep.FINALISE_PROVENANCE, StepState.SUCCEEDED)
+                                        .entrySet()
+                                        .stream()
+                                        .map(
+                                                state ->
+                                                        "STATE "
+                                                                + state.getKey().id()
+                                                                + " "
+                                                                + state.getValue())
+                                        .sorted()
+                                        .toList(),
+                                linesStarting(said, "STATE ").stream().sorted().toList(),
+                                "every step succeeded"),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "FINALISATION could not append stage.finished:"
+                                                + " java.io.IOException: File too large",
+                                        "FINALISATION could not append run.finished:"
+                                                + " java.io.IOException: File too large"),
+                                linesStarting(said, "FINALISATION "),
+                                "the events the log could not take are stated"),
+                () -> assertEquals(1, attempts.size()),
+                () -> assertEquals(AttemptOutcome.FAILED, attempts.get(0).outcome()),
+                () -> assertEquals(java.util.Optional.of(reason), attempts.get(0).reason()),
+                () -> assertFalse(Files.exists(run.provenanceJsonFile()), "no record"),
+                () -> assertFalse(Files.exists(run.provenanceRstFile()), "no report"),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                temporaryFiles(run.root()),
+                                "no temporary file anywhere in the run"),
+                () ->
+                        assertEquals(
+                                List.of("stage.started", "finalise-provenance", "running"),
+                                List.of(
+                                        last.type().wireName(),
+                                        last.payload().get(ProvenanceEvent.STAGE_KEY),
+                                        last.payload().get("state")),
+                                "the log ends where the room ran out: the last step running"),
+                () ->
+                        assertTrue(
+                                Files.isRegularFile(run.mergedPinFile())
+                                        && Files.size(run.mergedPinFile()) > 0,
+                                "the merged PIN is kept"));
+    }
 
     @Test
     @DisplayName(

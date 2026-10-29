@@ -17,6 +17,7 @@
 package org.cometgui.workflow.engine;
 
 import static org.cometgui.workflow.engine.EngineAssertions.awaitResult;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -34,17 +35,22 @@ import java.time.ZoneOffset;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.cometgui.domain.run.AttemptOutcome;
+import org.cometgui.domain.run.RunAttempt;
 import org.cometgui.domain.secrets.SecretRedactor;
+import org.cometgui.provenance.events.ProvenanceEvent;
+import org.cometgui.provenance.events.ProvenanceEventType;
 import org.cometgui.provenance.hashing.CachingHashService;
 import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.provenance.manifest.ManifestReader;
 import org.cometgui.provenance.manifest.ProvenanceStatus;
 import org.cometgui.tools.process.ProcessService;
 import org.cometgui.workflow.state.EngineStep;
+import org.cometgui.workflow.state.RunState;
 import org.cometgui.workflow.state.StepState;
 import org.cometgui.workflow.testing.Nulls;
 import org.junit.jupiter.api.Test;
@@ -177,8 +183,15 @@ class EngineEdgeTest {
         }
     }
 
+    /**
+     * E12, repaired: a run whose {@code provenance.json} cannot be written is never a success. It
+     * ends failed, with the reason -- the file and the error -- in the result, in {@code run.json}
+     * and in the event log; no report is written for the record that is not there; every step keeps
+     * the state it reached. Before the repair this run ended SUCCEEDED, the missing record noted
+     * only as a finalisation error.
+     */
     @Test
-    void anUnwritableManifestOrReportIsReportedAndTheRunStillFinishes()
+    void anUnwritableManifestFailsTheRunWithTheReasonEverywhere()
             throws IOException,
                     InterruptedException,
                     ReuseRefusedException,
@@ -186,28 +199,87 @@ class EngineEdgeTest {
                     ExecutionException,
                     TimeoutException {
         try (EngineFixture fixture = EngineFixture.create(tmp, 1)) {
-            Files.createDirectory(fixture.layout().provenanceJsonFile());
-            Files.createDirectory(fixture.layout().provenanceRstFile());
+            Path manifest = fixture.layout().provenanceJsonFile();
+            Files.createDirectory(manifest);
             RunResult result =
                     awaitResult(
                             fixture.engine()
                                     .start(
                                             fixture.request(fixture.standardActions()),
                                             new RecordingListener()));
-            assertEquals(AttemptOutcome.SUCCEEDED, result.outcome());
-            assertEquals(
-                    2, result.finalisationErrors().size(), result.finalisationErrors()::toString);
-            assertTrue(
-                    result.finalisationErrors()
-                            .get(0)
-                            .startsWith("could not write provenance.json: "));
-            assertTrue(
-                    result.finalisationErrors()
-                            .get(1)
-                            .startsWith("could not write provenance.rst: "));
-            assertEquals(
-                    AttemptOutcome.SUCCEEDED,
-                    fixture.store().read(fixture.layout()).attempts().get(0).outcome());
+            String expected = "its provenance record " + manifest + " could not be written: ";
+            String reason = result.provenanceFailure().orElseThrow();
+            RunAttempt attempt = fixture.store().read(fixture.layout()).attempts().get(0);
+            List<ProvenanceEvent> events =
+                    EngineAssertions.intactEvents(fixture.layout().eventLogFile());
+            ProvenanceEvent last = events.get(events.size() - 1);
+            assertAll(
+                    () -> assertEquals(AttemptOutcome.FAILED, result.outcome()),
+                    () -> assertEquals(RunState.FAILED, result.runState()),
+                    () -> assertTrue(reason.startsWith(expected), reason),
+                    () -> assertEquals(List.of(), result.finalisationErrors()),
+                    () -> assertEquals(ProvenanceStatus.FAILED, result.manifest().run().status()),
+                    () ->
+                            assertTrue(
+                                    result.states().values().stream()
+                                            .allMatch(state -> state == StepState.SUCCEEDED),
+                                    () -> "every step keeps what it did: " + result.states()),
+                    () -> assertEquals(Map.of(), result.failures()),
+                    () -> assertEquals(AttemptOutcome.FAILED, attempt.outcome()),
+                    () -> assertEquals(Optional.of(reason), attempt.reason()),
+                    () -> assertEquals(ProvenanceEventType.RUN_FINISHED, last.type()),
+                    () -> assertEquals("failed", last.payload().get(ProvenanceEvent.STATUS_KEY)),
+                    () -> assertEquals(reason, last.payload().get(ProvenanceEvent.MESSAGE_KEY)),
+                    () -> assertTrue(Files.isDirectory(manifest), "nothing replaced it"),
+                    () ->
+                            assertFalse(
+                                    Files.exists(fixture.layout().provenanceRstFile()),
+                                    "no report of a record that is not there"));
+        }
+    }
+
+    /**
+     * The report half of the seal: {@code provenance.json} is written, {@code provenance.rst}
+     * cannot be. The run fails naming the report, and the record written as a success is replaced
+     * by one saying the run failed, so the record never contradicts the run.
+     */
+    @Test
+    void anUnwritableReportFailsTheRunAndTheRecordSaysSo()
+            throws IOException,
+                    InterruptedException,
+                    ReuseRefusedException,
+                    StepFailedException,
+                    ExecutionException,
+                    TimeoutException {
+        try (EngineFixture fixture = EngineFixture.create(tmp, 1)) {
+            Path report = fixture.layout().provenanceRstFile();
+            Files.createDirectory(report);
+            RunResult result =
+                    awaitResult(
+                            fixture.engine()
+                                    .start(
+                                            fixture.request(fixture.standardActions()),
+                                            new RecordingListener()));
+            String reason = result.provenanceFailure().orElseThrow();
+            RunAttempt attempt = fixture.store().read(fixture.layout()).attempts().get(0);
+            assertAll(
+                    () -> assertEquals(AttemptOutcome.FAILED, result.outcome()),
+                    () ->
+                            assertTrue(
+                                    reason.startsWith(
+                                            "its provenance report "
+                                                    + report
+                                                    + " could not be written: "),
+                                    reason),
+                    () -> assertEquals(List.of(), result.finalisationErrors()),
+                    () -> assertEquals(Optional.of(reason), attempt.reason()),
+                    () ->
+                            assertEquals(
+                                    ProvenanceStatus.FAILED,
+                                    ManifestReader.readFrom(fixture.layout().provenanceJsonFile())
+                                            .run()
+                                            .status(),
+                                    "provenance.json says the run failed"));
         }
     }
 

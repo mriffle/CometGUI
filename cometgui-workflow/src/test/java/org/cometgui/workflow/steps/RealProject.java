@@ -91,7 +91,8 @@ final class RealProject implements AutoCloseable {
             RunStore store,
             CachingHashService hashes,
             CountingRunner runner,
-            LineSink sink) {
+            LineSink sink,
+            Clock engineClock) {
         this.project = project;
         this.lock = lock;
         this.store = store;
@@ -99,12 +100,11 @@ final class RealProject implements AutoCloseable {
         this.runner = runner;
         this.sink = sink;
         this.workflow = new CometWorkflow(hashes, RealComet.BUILD);
-        Clock clock = Clock.systemUTC();
         this.engine =
                 new WorkflowEngine(
                         new EngineServices(
                                 runner,
-                                clock,
+                                engineClock,
                                 SecretRedactor.patternsOnly(),
                                 sink,
                                 hashes,
@@ -119,6 +119,19 @@ final class RealProject implements AutoCloseable {
      * @return the project
      */
     static RealProject create(Path root) throws IOException {
+        return create(root, Clock.systemUTC());
+    }
+
+    /**
+     * A new project whose engine reads the time from the given clock -- a {@link SealTrigger}, to
+     * act on a run between its last step and its seal.
+     *
+     * @param root the project's directory, which must not yet be a project
+     * @param engineClock the engine's clock
+     * @return the project, locked
+     * @throws IOException if it cannot be created
+     */
+    static RealProject create(Path root, Clock engineClock) throws IOException {
         Clock clock = Clock.systemUTC();
         ProjectLayout project = new ProjectLayout(root);
         new ProjectStore(clock).create(project, new ProjectId("project-real"));
@@ -138,7 +151,8 @@ final class RealProject implements AutoCloseable {
                 store,
                 new CachingHashService(new StreamingHashService()),
                 new CountingRunner(new ProcessService(clock)),
-                new LineSink());
+                new LineSink(),
+                engineClock);
     }
 
     /**
@@ -173,7 +187,8 @@ final class RealProject implements AutoCloseable {
                 store,
                 new CachingHashService(new StreamingHashService()),
                 new CountingRunner(new ProcessService(clock)),
-                new LineSink());
+                new LineSink(),
+                clock);
     }
 
     ProjectLayout project() {

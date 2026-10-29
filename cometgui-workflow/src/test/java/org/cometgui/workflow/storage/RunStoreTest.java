@@ -503,7 +503,7 @@ class RunStoreTest {
     void newerRunJsonRefused() throws IOException, NoSuchAlgorithmException {
         RunLayout layout = reserveWithParameters();
         Files.writeString(
-                layout.runFile(), RUN_JSON.replace("\"schemaVersion\": 1", "\"schemaVersion\": 3"));
+                layout.runFile(), RUN_JSON.replace("\"schemaVersion\": 1", "\"schemaVersion\": 4"));
         String before = sha256(layout.runFile());
         UnsupportedSchemaVersionException thrown =
                 assertThrows(UnsupportedSchemaVersionException.class, () -> store.read(layout));

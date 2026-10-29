@@ -35,6 +35,11 @@ import java.util.TreeMap;
  * was reused from an earlier attempt has no entry here, so a rerun preview computed from these is
  * never told that something was produced when it was not.
  *
+ * <p>{@link #reason()} says why an attempt {@link AttemptOutcome#FAILED failed} when its step
+ * states cannot: every step finished, but the run's provenance record could not be written ({@link
+ * #failed}). It is empty for every other attempt -- a failed step carries its own message in the
+ * event log -- and only a failed attempt may have one.
+ *
  * <p>Times are truncated to milliseconds, the precision {@code run.json} records.
  *
  * @param number the attempt's 1-based number within its run
@@ -42,21 +47,23 @@ import java.util.TreeMap;
  * @param ended when it ended; empty while it is running
  * @param outcome how it ended, or {@link AttemptOutcome#RUNNING}
  * @param succeededSteps the fingerprints of the steps that succeeded in it, by step identifier
+ * @param reason why a failed attempt failed when no step did; otherwise empty
  */
 public record RunAttempt(
         int number,
         Instant started,
         Optional<Instant> ended,
         AttemptOutcome outcome,
-        Map<String, RecordedFingerprint> succeededSteps) {
+        Map<String, RecordedFingerprint> succeededSteps,
+        Optional<String> reason) {
 
     /**
      * Validates and copies the attempt; the fingerprints are held sorted by step identifier.
      *
      * @throws NullPointerException naming a component, key or value that is {@code null}
      * @throws IllegalArgumentException if the number is not positive, the end is present for a
-     *     running attempt or absent for an ended one, the end is before the start, or a step
-     *     identifier is malformed
+     *     running attempt or absent for an ended one, the end is before the start, a step
+     *     identifier is malformed, or a reason is blank or given for an attempt that did not fail
      */
     public RunAttempt {
         if (number < 1) {
@@ -84,6 +91,38 @@ public record RunAttempt(
             sorted.put(step, Objects.requireNonNull(entry.getValue(), "fingerprint of " + step));
         }
         succeededSteps = Collections.unmodifiableMap(sorted);
+        Objects.requireNonNull(reason, "reason");
+        if (reason.isPresent() && outcome != AttemptOutcome.FAILED) {
+            throw new IllegalArgumentException(
+                    "attempt "
+                            + number
+                            + " is "
+                            + outcome.wireName()
+                            + ", and only a failed attempt records a reason");
+        }
+        if (reason.isPresent() && reason.get().isBlank()) {
+            throw new IllegalArgumentException("attempt " + number + " has a blank reason");
+        }
+    }
+
+    /**
+     * An attempt with no reason: every attempt but one that failed with no step failing.
+     *
+     * @param number the attempt's 1-based number within its run
+     * @param started when the attempt started
+     * @param ended when it ended; empty while it is running
+     * @param outcome how it ended, or {@link AttemptOutcome#RUNNING}
+     * @param succeededSteps the fingerprints of the steps that succeeded in it, by step identifier
+     * @throws NullPointerException as the canonical constructor
+     * @throws IllegalArgumentException as the canonical constructor
+     */
+    public RunAttempt(
+            int number,
+            Instant started,
+            Optional<Instant> ended,
+            AttemptOutcome outcome,
+            Map<String, RecordedFingerprint> succeededSteps) {
+        this(number, started, ended, outcome, succeededSteps, Optional.empty());
     }
 
     /**
@@ -155,5 +194,31 @@ public record RunAttempt(
                     "attempt " + number + " has already ended (" + outcome.wireName() + ")");
         }
         return new RunAttempt(number, started, Optional.of(end), ending, succeededSteps);
+    }
+
+    /**
+     * This attempt, ended {@link AttemptOutcome#FAILED} for a reason its steps do not carry: they
+     * all finished, but what records the run could not be written.
+     *
+     * @param why the reason, in plain words, naming the file and the error
+     * @param end when it ended
+     * @return the ended attempt
+     * @throws IllegalStateException if the attempt has already ended
+     * @throws IllegalArgumentException if {@code why} is blank or the end is before the start
+     * @throws NullPointerException if {@code why} is {@code null}
+     */
+    public RunAttempt failed(String why, Instant end) {
+        Objects.requireNonNull(why, "why");
+        if (outcome.isTerminal()) {
+            throw new IllegalStateException(
+                    "attempt " + number + " has already ended (" + outcome.wireName() + ")");
+        }
+        return new RunAttempt(
+                number,
+                started,
+                Optional.of(end),
+                AttemptOutcome.FAILED,
+                succeededSteps,
+                Optional.of(why));
     }
 }

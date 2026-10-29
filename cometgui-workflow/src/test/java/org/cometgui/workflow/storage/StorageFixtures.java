@@ -143,6 +143,55 @@ final class StorageFixtures {
                         AttemptOutcome.SUCCEEDED, Instant.parse("2026-08-28T23:15:30.000Z"));
     }
 
+    /** The reason {@link #reasonDescriptor()}'s first attempt failed. */
+    static final String REASON =
+            "its provenance record /p/runs/x/provenance/provenance.json could not be written: No"
+                    + " space left on device";
+
+    /**
+     * {@link #descriptor()}, except that its first attempt failed because its provenance record
+     * could not be written: version 3.
+     */
+    static RunDescriptor reasonDescriptor() {
+        return RunDescriptor.of(identity())
+                .withNewAttempt(Instant.parse("2026-08-28T23:15:01.000Z"))
+                .withStepSucceeded(
+                        "hash-inputs",
+                        new RecordedFingerprint(FP, Map.of("spectrum-files", DG_S, "fasta", DG_F)))
+                .withAttemptFailed(REASON, Instant.parse("2026-08-28T23:16:00.000Z"))
+                .withNewAttempt(Instant.parse("2026-08-28T23:17:00.000Z"));
+    }
+
+    /**
+     * {@link #reasonDescriptor()}'s run.json: {@link #RUN_JSON} with the three changes version 3
+     * makes, each typed here by hand -- the version, {@code derivedFrom} as {@code null}, and a
+     * {@code reason} on every attempt.
+     */
+    static final String REASON_RUN_JSON = reasonRunJson();
+
+    private static String reasonRunJson() {
+        String text = runJson();
+        text = once(text, "  \"schemaVersion\": 1,\n", "  \"schemaVersion\": 3,\n");
+        text = once(text, "  \"attempts\": [\n", "  \"derivedFrom\": null,\n  \"attempts\": [\n");
+        text =
+                once(
+                        text,
+                        "        }\n      }\n    },\n",
+                        "        }\n      },\n      \"reason\": \"" + REASON + "\"\n    },\n");
+        return once(
+                text,
+                "      \"succeededSteps\": {}\n    }\n",
+                "      \"succeededSteps\": {},\n      \"reason\": null\n    }\n");
+    }
+
+    private static String once(String text, String from, String to) {
+        int at = text.indexOf(from);
+        if (at < 0 || text.indexOf(from, at + 1) >= 0) {
+            throw new AssertionError("the fixture must contain \"" + from + "\" exactly once");
+        }
+        return text.substring(0, at) + to + text.substring(at + from.length());
+    }
+
     /** {@link #derivedDescriptor()}'s run.json, typed by hand from the format. */
     static final String DERIVED_RUN_JSON = derivedRunJson();
 

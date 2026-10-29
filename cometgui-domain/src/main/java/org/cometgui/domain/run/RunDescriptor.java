@@ -72,6 +72,17 @@ public record RunDescriptor(RunIdentity identity, List<RunAttempt> attempts) {
     public static final int DERIVED_SCHEMA_VERSION = 2;
 
     /**
+     * The {@code run.json} format of a run one of whose attempts records a {@linkplain
+     * RunAttempt#reason() reason}: version 2's members, {@code derivedFrom} {@code null} for a run
+     * that executes its own search, plus a {@code reason} member on every attempt. A run reaches it
+     * only when an attempt fails because its provenance record could not be written, and never
+     * leaves it. It is a version of its own because a build that knows only versions 1 and 2 would
+     * read such an attempt as failed with no failed step and no word of why; such a build refuses
+     * version 3 before reading anything.
+     */
+    public static final int REASON_SCHEMA_VERSION = 3;
+
+    /**
      * Validates and copies the descriptor.
      *
      * @throws NullPointerException naming a component or element that is {@code null}
@@ -112,12 +123,19 @@ public record RunDescriptor(RunIdentity identity, List<RunAttempt> attempts) {
 
     /**
      * The schema version this record is written as: the lowest that can express it. It is decided
-     * by the identity alone, which never changes, so a run's {@code run.json} keeps its version for
-     * life.
+     * by the identity, which never changes, and by whether any attempt records a reason, which an
+     * ended attempt never stops doing -- so a run's {@code run.json} changes version at most once,
+     * upward, when an attempt first fails for a reason its steps do not carry.
      *
-     * @return {@link #DERIVED_SCHEMA_VERSION} for a derived run, otherwise {@link #SCHEMA_VERSION}
+     * @return {@link #REASON_SCHEMA_VERSION} if an attempt records a reason, otherwise {@link
+     *     #DERIVED_SCHEMA_VERSION} for a derived run and {@link #SCHEMA_VERSION} for any other
      */
     public int schemaVersion() {
+        for (RunAttempt attempt : attempts) {
+            if (attempt.reason().isPresent()) {
+                return REASON_SCHEMA_VERSION;
+            }
+        }
         return identity.isDerived() ? DERIVED_SCHEMA_VERSION : SCHEMA_VERSION;
     }
 
@@ -190,6 +208,20 @@ public record RunDescriptor(RunIdentity identity, List<RunAttempt> attempts) {
      */
     public RunDescriptor withAttemptFinished(AttemptOutcome outcome, Instant ended) {
         return replaceRunning(requireRunning().finished(outcome, ended));
+    }
+
+    /**
+     * This run with its running attempt ended {@link AttemptOutcome#FAILED} for a reason its steps
+     * do not carry ({@link RunAttempt#failed}).
+     *
+     * @param why the reason, in plain words
+     * @param ended when it ended
+     * @return the new descriptor
+     * @throws IllegalStateException if no attempt is running
+     * @throws IllegalArgumentException as {@link RunAttempt#failed}
+     */
+    public RunDescriptor withAttemptFailed(String why, Instant ended) {
+        return replaceRunning(requireRunning().failed(why, ended));
     }
 
     private RunAttempt requireRunning() {

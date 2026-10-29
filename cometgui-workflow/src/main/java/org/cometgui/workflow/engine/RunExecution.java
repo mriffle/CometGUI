@@ -17,6 +17,8 @@
 package org.cometgui.workflow.engine;
 
 import java.io.IOException;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
@@ -515,79 +517,63 @@ final class RunExecution implements EventRecorder {
         workers.execute(() -> finish(finalStates, finalFailures));
     }
 
+    /**
+     * Finalises the attempt. <strong>The outcome is decided after the seal</strong>: the provenance
+     * record is written first, and a run whose {@code provenance.json} or {@code provenance.rst}
+     * could not be written ends {@link AttemptOutcome#FAILED}, whatever its steps did, with the
+     * reason in {@code run.json} and in the event log. Then {@code run.json} records the outcome
+     * and the event log the run's end, each as far as the disk allows: a {@code run.json} that
+     * cannot take the end is left saying the attempt is running, which a reopened project reads as
+     * interrupted, never as a success. Nothing a step produced is touched.
+     */
     private void finish(
             Map<EngineStep, StepState> finalStates, Map<EngineStep, String> finalFailures) {
         try {
-            RunState runState = RunState.deriveFrom(plan, finalStates);
-            AttemptOutcome outcome =
-                    switch (runState) {
+            RunState stepsState = RunState.deriveFrom(plan, finalStates);
+            AttemptOutcome intended =
+                    switch (stepsState) {
                         case SUCCEEDED -> AttemptOutcome.SUCCEEDED;
                         case CANCELLED -> AttemptOutcome.CANCELLED;
                         default -> AttemptOutcome.FAILED;
                     };
-            ProvenanceStatus status =
-                    switch (outcome) {
-                        case SUCCEEDED -> ProvenanceStatus.COMPLETED;
-                        case CANCELLED -> ProvenanceStatus.CANCELLED;
-                        default -> ProvenanceStatus.FAILED;
-                    };
             Instant ended = services.clock().instant();
-            RunIdentity identity = runIdentity();
-            Map<String, String> settings = new TreeMap<>(request.settings());
-            settings.put(WorkflowEngine.ATTEMPT_SETTING, Integer.toString(attempt));
-            settings.put(WorkflowEngine.PLAN_SETTING, planIds());
-            ProvenanceManifest manifest =
-                    ledger.manifest(
-                            plan,
-                            new RunRecord(
-                                    identity.runId(),
-                                    identity.projectId().value(),
-                                    status,
-                                    started,
-                                    Optional.of(ended)),
-                            request.application(),
-                            settings);
-            try {
-                ManifestWriter.redactingWith(services.redactor())
-                        .writeTo(request.layout().provenanceJsonFile(), manifest);
-            } catch (IOException | RuntimeException notWritten) {
-                recordingErrors.add("could not write provenance.json: " + notWritten);
-            }
-            try {
-                ProvenanceReportWriter.redactingWith(services.redactor())
-                        .writeTo(request.layout().provenanceRstFile(), manifest);
-            } catch (IOException | RuntimeException notWritten) {
-                recordingErrors.add("could not write provenance.rst: " + notWritten);
-            }
-            Map<String, String> payload = new LinkedHashMap<>();
-            payload.put(ProvenanceEvent.STATUS_KEY, status.wireName());
-            payload.put(ProvenanceEvent.RUN_ID_KEY, identity.runId().value());
-            payload.put("attempt", Integer.toString(attempt));
-            record(ProvenanceEventType.RUN_FINISHED, payload);
-            try {
-                synchronized (journalLock) {
-                    descriptor =
-                            request.store()
-                                    .update(
-                                            request.lock(),
-                                            descriptor.withAttemptFinished(outcome, ended));
+            ProvenanceManifest manifest = manifest(statusOf(intended), ended);
+            Seal seal = seal(manifest);
+            Optional<String> sealFailure = seal.failure();
+            AttemptOutcome outcome = intended;
+            RunState runState = stepsState;
+            if (sealFailure.isPresent()) {
+                outcome = AttemptOutcome.FAILED;
+                runState = RunState.FAILED;
+                manifest = manifest(ProvenanceStatus.FAILED, ended);
+                if (seal.recordWritten() && intended != AttemptOutcome.FAILED) {
+                    rewriteAsFailed(manifest);
                 }
-            } catch (IOException | RuntimeException notRecorded) {
-                recordingErrors.add("could not record the attempt's end: " + notRecorded);
             }
+            recordEnd(outcome, sealFailure, ended);
+            Map<String, String> payload = new LinkedHashMap<>();
+            payload.put(ProvenanceEvent.STATUS_KEY, statusOf(outcome).wireName());
+            payload.put(ProvenanceEvent.RUN_ID_KEY, runIdentity().runId().value());
+            payload.put("attempt", Integer.toString(attempt));
+            sealFailure.ifPresent(why -> payload.put(ProvenanceEvent.MESSAGE_KEY, why));
+            record(ProvenanceEventType.RUN_FINISHED, payload);
             closeEvents();
+            AttemptOutcome ending = outcome;
+            RunState endState = runState;
+            ProvenanceManifest recorded = manifest;
             notifier.execute(
                     () -> {
                         RunResult done =
                                 new RunResult(
                                         attempt,
-                                        outcome,
-                                        runState,
+                                        ending,
+                                        endState,
                                         finalStates,
                                         finalFailures,
-                                        manifest,
+                                        recorded,
                                         List.copyOf(recordingErrors),
-                                        listenerFailures.get());
+                                        listenerFailures.get(),
+                                        sealFailure);
                         try {
                             listener.onRunFinished(done);
                         } catch (RuntimeException thrown) {
@@ -602,6 +588,121 @@ final class RunExecution implements EventRecorder {
             notifier.shutdown();
             workers.shutdown();
         }
+    }
+
+    private static ProvenanceStatus statusOf(AttemptOutcome outcome) {
+        return switch (outcome) {
+            case SUCCEEDED -> ProvenanceStatus.COMPLETED;
+            case CANCELLED -> ProvenanceStatus.CANCELLED;
+            default -> ProvenanceStatus.FAILED;
+        };
+    }
+
+    private ProvenanceManifest manifest(ProvenanceStatus status, Instant ended) {
+        RunIdentity identity = runIdentity();
+        Map<String, String> settings = new TreeMap<>(request.settings());
+        settings.put(WorkflowEngine.ATTEMPT_SETTING, Integer.toString(attempt));
+        settings.put(WorkflowEngine.PLAN_SETTING, planIds());
+        return ledger.manifest(
+                plan,
+                new RunRecord(
+                        identity.runId(),
+                        identity.projectId().value(),
+                        status,
+                        started,
+                        Optional.of(ended)),
+                request.application(),
+                settings);
+    }
+
+    /**
+     * Writes the provenance record: {@code provenance.json}, the sealed record, and then {@code
+     * provenance.rst}, the report generated from it. A report is not written for a record that
+     * could not be: it would describe a record that is not on disk.
+     *
+     * @return whether {@code provenance.json} was written, and why the record is not whole if it is
+     *     not
+     */
+    private Seal seal(ProvenanceManifest manifest) {
+        try {
+            ManifestWriter.redactingWith(services.redactor())
+                    .writeTo(request.layout().provenanceJsonFile(), manifest);
+        } catch (IOException | RuntimeException notWritten) {
+            return new Seal(
+                    false,
+                    Optional.of(
+                            "its provenance record "
+                                    + request.layout().provenanceJsonFile()
+                                    + " could not be written: "
+                                    + plainly(notWritten)));
+        }
+        try {
+            ProvenanceReportWriter.redactingWith(services.redactor())
+                    .writeTo(request.layout().provenanceRstFile(), manifest);
+        } catch (IOException | RuntimeException notWritten) {
+            return new Seal(
+                    true,
+                    Optional.of(
+                            "its provenance report "
+                                    + request.layout().provenanceRstFile()
+                                    + " could not be written: "
+                                    + plainly(notWritten)));
+        }
+        return new Seal(true, Optional.empty());
+    }
+
+    /**
+     * What sealing did.
+     *
+     * @param recordWritten whether this attempt's {@code provenance.json} is on disk
+     * @param failure why the record is not whole; empty when both documents were written
+     */
+    private record Seal(boolean recordWritten, Optional<String> failure) {}
+
+    /**
+     * Replaces a {@code provenance.json} that was written as a success, when its report then could
+     * not be, so that the record on disk never says the run completed while the run says it failed.
+     */
+    private void rewriteAsFailed(ProvenanceManifest asFailed) {
+        try {
+            ManifestWriter.redactingWith(services.redactor())
+                    .writeTo(request.layout().provenanceJsonFile(), asFailed);
+        } catch (IOException | RuntimeException notWritten) {
+            recordingErrors.add(
+                    "could not record in provenance.json that the run failed: " + notWritten);
+        }
+    }
+
+    private void recordEnd(AttemptOutcome outcome, Optional<String> sealFailure, Instant ended) {
+        try {
+            synchronized (journalLock) {
+                descriptor =
+                        request.store()
+                                .update(
+                                        request.lock(),
+                                        sealFailure.isPresent()
+                                                ? descriptor.withAttemptFailed(
+                                                        sealFailure.get(), ended)
+                                                : descriptor.withAttemptFinished(outcome, ended));
+            }
+        } catch (IOException | RuntimeException notRecorded) {
+            recordingErrors.add("could not record the attempt's end: " + notRecorded);
+        }
+    }
+
+    /**
+     * An error in plain words: the system's own reason -- "No space left on device", "File too
+     * large", "Permission denied" -- and the file it concerns, rather than an exception's class.
+     */
+    static String plainly(Exception error) {
+        if (error instanceof AccessDeniedException denied) {
+            return "permission was denied (" + denied.getFile() + ")";
+        }
+        if (error instanceof FileSystemException system && system.getReason() != null) {
+            return system.getReason() + " (" + system.getFile() + ")";
+        }
+        String message = error.getMessage();
+        return message == null || message.isBlank() ? error.getClass().getSimpleName() : message;
     }
 
     private void closeEvents() {

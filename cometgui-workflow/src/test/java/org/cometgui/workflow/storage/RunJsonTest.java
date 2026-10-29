@@ -17,6 +17,8 @@
 package org.cometgui.workflow.storage;
 
 import static org.cometgui.workflow.storage.StorageFixtures.DERIVED_RUN_JSON;
+import static org.cometgui.workflow.storage.StorageFixtures.REASON;
+import static org.cometgui.workflow.storage.StorageFixtures.REASON_RUN_JSON;
 import static org.cometgui.workflow.storage.StorageFixtures.RUN_JSON;
 import static org.cometgui.workflow.testing.TestPaths.absolute;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -201,23 +203,24 @@ class RunJsonTest {
     @DisplayName("a newer schema version is refused before any other member is read")
     void newerRefusedFirst() {
         // Every other member is wrong too; only the version may be reported. Version 2 is a
-        // derived run's, which this build reads; 3 is the first it does not.
+        // derived run's and 3 a run with an attempt's reason, which this build reads; 4 is the
+        // first it does not.
         String newer =
-                "{\"schemaVersion\": 3, \"runId\": 5, \"spectra\": \"x\", \"surprise\": true}\n";
+                "{\"schemaVersion\": 4, \"runId\": 5, \"spectra\": \"x\", \"surprise\": true}\n";
         UnsupportedSchemaVersionException thrown =
                 assertThrows(
                         UnsupportedSchemaVersionException.class, () -> RunJson.parse(newer, DOC));
         assertAll(
                 () -> assertEquals(SchemaVerdict.NEWER, thrown.verdict()),
-                () -> assertEquals(3, thrown.found()),
-                () -> assertEquals(2, thrown.current()),
+                () -> assertEquals(4, thrown.found()),
+                () -> assertEquals(3, thrown.current()),
                 () -> assertEquals("run.json", thrown.document()),
                 () ->
                         assertTrue(
                                 thrown.getMessage()
                                         .startsWith(
-                                                "run.json declares schema version 3, and this build"
-                                                        + " of CometGUI reads version 2."),
+                                                "run.json declares schema version 4, and this build"
+                                                        + " of CometGUI reads version 3."),
                                 thrown.getMessage()));
     }
 
@@ -239,8 +242,8 @@ class RunJsonTest {
                 () ->
                         assertEquals(
                                 "run.json declares schema version 0, and this build of CometGUI"
-                                        + " reads version 2. No migration from version 0 to version"
-                                        + " 2 exists, so it is refused; the file has not been"
+                                        + " reads version 3. No migration from version 0 to version"
+                                        + " 3 exists, so it is refused; the file has not been"
                                         + " changed.",
                                 thrown.getMessage()));
     }
@@ -874,6 +877,108 @@ class RunJsonTest {
                                 PREFIX + "the document has no member \"derivedFrom\"",
                                 thrown.getMessage()),
                 () -> assertEquals("", thrown.member()));
+    }
+
+    @Test
+    @DisplayName("an attempt failed for a reason is written as the hand-made version-3 document")
+    void writerPinsTheReasonBytes() {
+        assertEquals(REASON_RUN_JSON, RunJson.render(StorageFixtures.reasonDescriptor()));
+    }
+
+    @Test
+    @DisplayName("the reader reads a version-3 document's reasons, and nothing else changes")
+    void readerReadsTheReason() {
+        RunDescriptor read = RunJson.parse(REASON_RUN_JSON, DOC);
+        assertAll(
+                () -> assertEquals(3, read.schemaVersion()),
+                () -> assertFalse(read.identity().isDerived()),
+                () -> assertEquals(AttemptOutcome.FAILED, read.attempts().get(0).outcome()),
+                () -> assertEquals(Optional.of(REASON), read.attempts().get(0).reason()),
+                () -> assertEquals(Optional.empty(), read.attempts().get(1).reason()),
+                () -> assertEquals(StorageFixtures.reasonDescriptor(), read),
+                () ->
+                        assertEquals(
+                                StorageFixtures.descriptor().identity(),
+                                read.identity(),
+                                "the identity is version 1's, member for member"));
+    }
+
+    @Test
+    @DisplayName("a derived run failed for a reason is version 3 and keeps its derivedFrom")
+    void derivedWithAReason() {
+        RunDescriptor failed =
+                RunDescriptor.of(StorageFixtures.derivedIdentity())
+                        .withNewAttempt(Instant.parse("2026-08-28T23:15:01.000Z"))
+                        .withAttemptFailed(REASON, Instant.parse("2026-08-28T23:15:30.000Z"));
+        String written = RunJson.render(failed);
+        String expected =
+                replaceOnce(
+                        replaceOnce(
+                                DERIVED_RUN_JSON, "\"schemaVersion\": 2", "\"schemaVersion\": 3"),
+                        "      \"outcome\": \"succeeded\",\n      \"succeededSteps\": {}\n",
+                        "      \"outcome\": \"failed\",\n      \"succeededSteps\": {},\n"
+                                + "      \"reason\": \""
+                                + REASON
+                                + "\"\n");
+        assertAll(
+                () -> assertEquals(expected, written),
+                () -> assertEquals(failed, RunJson.parse(written, DOC)),
+                () -> assertTrue(RunJson.parse(written, DOC).identity().isDerived()));
+    }
+
+    static Stream<Arguments> reasonDamage() {
+        return Stream.of(
+                Arguments.of(
+                        "a version-1 document carrying a reason",
+                        "\"schemaVersion\": 3",
+                        "\"schemaVersion\": 1",
+                        "",
+                        "the document has 1 member(s) this build does not know; its schema version"
+                                + " defines exactly [schemaVersion, runId, projectId, created,"
+                                + " cometRelease, spectra, fasta, parameters, indexMode,"
+                                + " databaseDelivery, attempts]"),
+                Arguments.of(
+                        "a version-3 document whose attempts record no reason",
+                        "\"reason\": \"" + REASON + "\"",
+                        "\"reason\": null",
+                        "schemaVersion",
+                        "\"schemaVersion\" must be 1, the lowest version that can express this"
+                                + " run: a version-3 document records a reason on at least one"
+                                + " attempt"),
+                Arguments.of(
+                        "a reason on the attempt still running",
+                        "\"reason\": null",
+                        "\"reason\": \"x\"",
+                        "attempts[1]",
+                        "\"attempts[1]\" was refused by the model (IllegalArgumentException); the"
+                                + " model's own message is not repeated, because it quotes the"
+                                + " value it refused"),
+                Arguments.of(
+                        "a reason that is not a string",
+                        "\"reason\": \"" + REASON + "\"",
+                        "\"reason\": 7",
+                        "attempts[0].reason",
+                        "\"attempts[0].reason\" must be a string"),
+                Arguments.of(
+                        "an attempt without its reason member",
+                        ",\n      \"reason\": null\n",
+                        "\n",
+                        "attempts[1]",
+                        "\"attempts[1]\" has no member \"reason\""));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("reasonDamage")
+    @DisplayName("damaged version-3 documents are refused naming the member, quoting no value")
+    void reasonDamaged(String what, String from, String to, String member, String problem) {
+        String damaged = replaceOnce(REASON_RUN_JSON, from, to);
+        assertNotEquals(REASON_RUN_JSON, damaged, "the damage must change the document");
+        InvalidDocumentException thrown =
+                assertThrows(
+                        InvalidDocumentException.class, () -> RunJson.parse(damaged, DOC), what);
+        assertAll(
+                () -> assertEquals(PREFIX + problem, thrown.getMessage()),
+                () -> assertEquals(member, thrown.member()));
     }
 
     static String replaceOnce(String text, String from, String to) {

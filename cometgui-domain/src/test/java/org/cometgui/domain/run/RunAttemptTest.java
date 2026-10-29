@@ -386,4 +386,85 @@ class RunAttemptTest {
         steps.clear();
         assertEquals(1, attempt.succeededSteps().size());
     }
+
+    @Test
+    @DisplayName(
+            "failing for a reason ends the attempt failed, keeps what it recorded, and is final")
+    void failsForAReason() {
+        RunAttempt running =
+                RunAttempt.started(1, T0).withStepSucceeded("hash-inputs", fingerprint(DIGEST_1));
+        RunAttempt ended = running.failed("its provenance record could not be written", T1);
+        assertAll(
+                () -> assertEquals(AttemptOutcome.FAILED, ended.outcome()),
+                () ->
+                        assertEquals(
+                                Optional.of("its provenance record could not be written"),
+                                ended.reason()),
+                () -> assertEquals(Optional.of(T1), ended.ended()),
+                () -> assertEquals(running.succeededSteps(), ended.succeededSteps()),
+                () -> assertEquals(Optional.empty(), running.reason()),
+                () ->
+                        assertEquals(
+                                Optional.empty(),
+                                running.finished(AttemptOutcome.FAILED, T1).reason(),
+                                "an ordinary failure carries no reason"),
+                () ->
+                        assertEquals(
+                                "attempt 1 has already ended (failed)",
+                                assertThrows(
+                                                IllegalStateException.class,
+                                                () -> assertNotNull(ended.failed("again", T1)))
+                                        .getMessage()),
+                () ->
+                        assertEquals(
+                                "attempt 1 has a blank reason",
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () -> assertNotNull(running.failed(" ", T1)))
+                                        .getMessage()),
+                () ->
+                        assertThrows(
+                                NullPointerException.class,
+                                () -> assertNotNull(running.failed(Nulls.of(String.class), T1))));
+    }
+
+    @Test
+    @DisplayName("only a failed attempt may record a reason")
+    void reasonOnlyWhenFailed() {
+        for (AttemptOutcome outcome :
+                List.of(
+                        AttemptOutcome.SUCCEEDED,
+                        AttemptOutcome.CANCELLED,
+                        AttemptOutcome.RUNNING)) {
+            Optional<Instant> end =
+                    outcome == AttemptOutcome.RUNNING ? Optional.empty() : Optional.of(T1);
+            assertEquals(
+                    "attempt 1 is "
+                            + outcome.wireName()
+                            + ", and only a failed attempt records a reason",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () ->
+                                            assertNotNull(
+                                                    new RunAttempt(
+                                                            1,
+                                                            T0,
+                                                            end,
+                                                            outcome,
+                                                            Map.of(),
+                                                            Optional.of("why"))))
+                            .getMessage());
+        }
+        assertThrows(
+                NullPointerException.class,
+                () ->
+                        assertNotNull(
+                                new RunAttempt(
+                                        1,
+                                        T0,
+                                        Optional.of(T1),
+                                        AttemptOutcome.FAILED,
+                                        Map.of(),
+                                        Nulls.of(Optional.class))));
+    }
 }
