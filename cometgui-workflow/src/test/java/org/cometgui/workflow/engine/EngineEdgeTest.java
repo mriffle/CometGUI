@@ -208,7 +208,7 @@ class EngineEdgeTest {
                                             fixture.request(fixture.standardActions()),
                                             new RecordingListener()));
             String expected = "its provenance record " + manifest + " could not be written: ";
-            String reason = result.provenanceFailure().orElseThrow();
+            String reason = result.provenanceFailure().orElse("");
             RunAttempt attempt = fixture.store().read(fixture.layout()).attempts().get(0);
             List<ProvenanceEvent> events =
                     EngineAssertions.intactEvents(fixture.layout().eventLogFile());
@@ -260,7 +260,7 @@ class EngineEdgeTest {
                                     .start(
                                             fixture.request(fixture.standardActions()),
                                             new RecordingListener()));
-            String reason = result.provenanceFailure().orElseThrow();
+            String reason = result.provenanceFailure().orElse("");
             RunAttempt attempt = fixture.store().read(fixture.layout()).attempts().get(0);
             assertAll(
                     () -> assertEquals(AttemptOutcome.FAILED, result.outcome()),

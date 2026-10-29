@@ -530,35 +530,39 @@ final class RunExecution implements EventRecorder {
             Map<EngineStep, StepState> finalStates, Map<EngineStep, String> finalFailures) {
         try {
             RunState stepsState = RunState.deriveFrom(plan, finalStates);
-            AttemptOutcome intended =
+            // What the steps did; the attempt's outcome is decided only after the seal, below.
+            AttemptOutcome outcome =
                     switch (stepsState) {
                         case SUCCEEDED -> AttemptOutcome.SUCCEEDED;
                         case CANCELLED -> AttemptOutcome.CANCELLED;
                         default -> AttemptOutcome.FAILED;
                     };
             Instant ended = services.clock().instant();
-            ProvenanceManifest manifest = manifest(statusOf(intended), ended);
+            Map<String, String> settings = new TreeMap<>(request.settings());
+            settings.put(WorkflowEngine.ATTEMPT_SETTING, Integer.toString(attempt));
+            settings.put(WorkflowEngine.PLAN_SETTING, planIds());
+            ProvenanceManifest manifest = manifest(statusOf(outcome), ended, settings);
             Seal seal = seal(manifest);
             Optional<String> sealFailure = seal.failure();
-            AttemptOutcome outcome = intended;
+            AttemptOutcome ending = outcome;
             RunState runState = stepsState;
             if (sealFailure.isPresent()) {
-                outcome = AttemptOutcome.FAILED;
+                ending = AttemptOutcome.FAILED;
                 runState = RunState.FAILED;
-                manifest = manifest(ProvenanceStatus.FAILED, ended);
-                if (seal.recordWritten() && intended != AttemptOutcome.FAILED) {
+                manifest = manifest(ProvenanceStatus.FAILED, ended, settings);
+                if (seal.recordWritten() && outcome != AttemptOutcome.FAILED) {
                     rewriteAsFailed(manifest);
                 }
             }
-            recordEnd(outcome, sealFailure, ended);
+            recordEnd(ending, sealFailure, ended);
             Map<String, String> payload = new LinkedHashMap<>();
-            payload.put(ProvenanceEvent.STATUS_KEY, statusOf(outcome).wireName());
+            payload.put(ProvenanceEvent.STATUS_KEY, statusOf(ending).wireName());
             payload.put(ProvenanceEvent.RUN_ID_KEY, runIdentity().runId().value());
             payload.put("attempt", Integer.toString(attempt));
             sealFailure.ifPresent(why -> payload.put(ProvenanceEvent.MESSAGE_KEY, why));
             record(ProvenanceEventType.RUN_FINISHED, payload);
             closeEvents();
-            AttemptOutcome ending = outcome;
+            AttemptOutcome finalOutcome = ending;
             RunState endState = runState;
             ProvenanceManifest recorded = manifest;
             notifier.execute(
@@ -566,7 +570,7 @@ final class RunExecution implements EventRecorder {
                         RunResult done =
                                 new RunResult(
                                         attempt,
-                                        ending,
+                                        finalOutcome,
                                         endState,
                                         finalStates,
                                         finalFailures,
@@ -598,11 +602,9 @@ final class RunExecution implements EventRecorder {
         };
     }
 
-    private ProvenanceManifest manifest(ProvenanceStatus status, Instant ended) {
+    private ProvenanceManifest manifest(
+            ProvenanceStatus status, Instant ended, Map<String, String> settings) {
         RunIdentity identity = runIdentity();
-        Map<String, String> settings = new TreeMap<>(request.settings());
-        settings.put(WorkflowEngine.ATTEMPT_SETTING, Integer.toString(attempt));
-        settings.put(WorkflowEngine.PLAN_SETTING, planIds());
         return ledger.manifest(
                 plan,
                 new RunRecord(
