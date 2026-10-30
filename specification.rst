@@ -5,9 +5,9 @@ CometGUI: Comet + Percolator Desktop Workflow -- Implementation Specification
 ##############################################################################
 
 :Status: Implementation-ready design specification
-:Revision: 20
-:Revision date: 2026-10-17
-:Supersedes: Revision 19, 2026-10-13
+:Revision: 21
+:Revision date: 2026-10-30
+:Supersedes: Revision 20, 2026-10-17
 :Target application: Cross-platform Java desktop application
 :Primary source base: Noble-Lab CasanovoGUI (GPL-3.0). Derivation approved 2026-08-29 (``D-001``)
 :Licence: **GPL-3.0** -- decided 2026-08-29 (``D-001``, ``D-008``)
@@ -33,6 +33,12 @@ Revision History
    * - Rev
      - Date
      - Summary
+   * - 21
+     - 2026-10-30
+     - A run whose provenance cannot be finalised is never ``SUCCEEDED``
+       (``R-PROV-05``, and the workflow state model): it ends ``FAILED``,
+       naming the record and the error, and keeps what its tools wrote. The
+       repair of ``E12``, found by Phase 14.
    * - 20
      - 2026-10-17
      - Provenance finalisation (``R-PROV-05``) as Phase 13 settled it for
@@ -1388,7 +1394,8 @@ Workflow state model
 Each workflow step shall use explicit states: ``NOT_STARTED``, ``VALIDATING``,
 ``READY``, ``RUNNING``, ``SUCCEEDED``, ``FAILED``, ``CANCEL_REQUESTED``,
 ``CANCELLED``, ``SKIPPED``. The overall run state shall be derived from step
-states. State changes shall be observable by the UI and written to provenance.
+states and from finalisation: a run whose provenance cannot be finalised is
+``FAILED`` whatever its steps reached (``R-PROV-05``). State changes shall be observable by the UI and written to provenance.
 
 Process execution
 -----------------
@@ -2594,6 +2601,16 @@ Provenance event model
     expose a partial one, and a rename still refused at the bound fails the
     write cleanly. CometGUI's own readers of ``provenance.json`` read it whole
     and hold no handle on it.
+
+    The run's outcome shall be decided only after finalisation. A run whose
+    ``provenance.json`` or ``provenance.rst`` cannot be written -- a full
+    disk, a directory made unwritable -- shall never be recorded or shown as
+    ``SUCCEEDED``, nor offered what only a successful run is offered. It ends
+    ``FAILED``, a cancelled run included, with a reason that names the record
+    and the underlying error, recorded in ``run.json``, in the event log and
+    in the interface as far as the disk allows. What its tools wrote is kept.
+    If ``run.json`` cannot be written either, a reopened project shows the run
+    as interrupted, never as succeeded.
 
 The human-readable ``provenance.rst`` report shall be generated from the same
 machine-readable model, never maintained independently.

@@ -3,15 +3,15 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-29
-:Updated by: Main orchestrator, session 10 (owner resumed: *"fix the E12 bug
-   and then proceed to phase 15"*)
-:Current phase: **Between Phases 14 and 15 -- the E12 repair**, IN PROGRESS
-   (brief ``handoffs/FIX-P14-P15-BRIEF.rst``): a run whose provenance cannot
-   be finalised ends FAILED, never SUCCEEDED. Phase 15 follows it.
-   ``D-006``'s CI-fixture half is still open and the owner's. Standing owner
-   instruction (2026-10-08): *"When all is green with the current phase,
-   push, then move on to the next phase."*
+:Updated: 2026-10-30
+:Updated by: Main orchestrator, session 10 (**E12 repair signed off**;
+   specification revision 21; paused by the owner)
+:Current phase: **None -- paused by the owner** after the E12 repair
+   (2026-10-29: *"pause after the E12 fix is in, commited, pushed, and
+   green"*; :ref:`status-fix-p14-p15`). Phase 15 starts only on the owner's
+   word. ``D-006``'s CI-fixture half is still open and the owner's. Standing
+   owner instruction (2026-10-08), suspended by the pause: *"When all is
+   green with the current phase, push, then move on to the next phase."*
 :Overall: Fifteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
    05, 08, 09, 10, 11, 12, 13 and 14 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
@@ -3281,6 +3281,96 @@ Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
 
+.. _status-fix-p14-p15:
+
+Between Phases 14 and 15: E12, a run without its record is not a success (signed off 2026-10-30)
+=================================================================================================
+
+One tier-1 fix agent, brief ``handoffs/FIX-P14-P15-BRIEF.rst``, work log
+``handoffs/FIX-P14-P15-worklog.rst``. Owner: *"fix the E12 bug"*.
+
+**What changed.** ``RunExecution.finish`` is the only code that seals a run.
+It now writes the seal first and decides the outcome after it. That covers
+three paths: the ordinary run and its retry, the Percolator rerun, and the
+Limelight section's rerun. Limelight's conversion does not seal, so it needed
+no change.
+
+If ``provenance.json`` or ``provenance.rst`` cannot be written:
+
+* The run ends ``FAILED``, a cancelled run included. If ``provenance.json``
+  was written but ``provenance.rst`` was not, ``provenance.json`` is
+  rewritten as failed.
+* The reason names the record and the system error. It is recorded in the
+  result, in ``run.json`` and in the event's message, as far as the disk
+  allows.
+* Every tool output stays on disk with its recorded digest.
+* The interface says "The run failed: <reason>", and the stepper, Results and
+  Provenance all show the run as failed.
+* If ``run.json`` cannot be written either, a reopened project lists the run
+  as interrupted, never as completed.
+
+``run.json`` gains schema version 3, a per-attempt ``reason``. It is written
+only when an attempt has a reason; every other run is byte-identical to
+before. Specification revision 21 writes all of this into ``R-PROV-05`` and
+the workflow state model.
+
+**Diff read: nothing weakened.**
+
+* One existing test asserted SUCCEEDED for exactly this case. It was replaced
+  by two that assert FAILED.
+* Two view-model tests that pinned the old wording were updated.
+* Three "newer version refused" tests moved from version 3 to 4, because 3 is
+  now readable.
+* ``scripts/e2e/failure-paths.toml`` gained eight test IDs and lost none.
+* No POM, floor, PIT setting or harness changed.
+* One Phase 14 test, ``RealAwkwardPathRunTest#longPaths``, no longer depends
+  on JUnit's random directory name. Its assertion is unchanged.
+
+**Tests:**
+
+* ``SealFailureRunTest`` (3): the real Comet + Percolator 3.07.1 run and the
+  real rerun, plus the case where ``run.json`` is unwritable too.
+* ``FileSizeLimitRunTest#theRecordRefusedForWantOfRoom``: ``RLIMIT_FSIZE``
+  lowered at the seal.
+* ``SealFailureUiTest`` (3, GUI).
+* ``EngineEdgeTest`` +2 and ``SealFailureWordsTest`` (5).
+* Module totals: domain 1230, workflow 1038, ui 1286, app 583; 0 failures.
+* The agent's PIT run on the changed classes: 115 of 115 killed on
+  ``RunExecution`` after its last fixes.
+
+**Tier 1's run**, at ``35f5b2e`` on a quiet tree: ``docs``, ``traceability``,
+``quality`` 42, ``shell`` 30, ``provenance`` 24, ``workflow`` 110,
+``percolator`` 109, ``results`` 100, ``limelight`` 130, ``provenanceui`` 96 and
+``e2e`` 50. **11 of 11**, in 2 h 42 min. The full build and the ``tests``
+harness wait for Phase 15's exit gate, by the owner's build-economy rule.
+
+**Tier 1's own injections**, none of them the agent's, each restored and
+verified with ``sha256sum -c``:
+
+* ``run.json``'s writer dropping the reason: ``RunJsonTest`` red, 2 failures
+  and 5 errors of 1038.
+* ``provenance.json`` not rewritten as failed when only the report fails:
+  ``EngineEdgeTest.anUnwritableReportFailsTheRunAndTheRecordSaysSo`` red,
+  ``expected: <FAILED> but was: <COMPLETED>``.
+* The reason left out of the event log's ``run.finished``: 4 of 1038 red, all
+  three ``SealFailureRunTest`` real runs among them.
+* The run's outcome text not saying "failed":
+  ``RunViewModelTest.provenanceFailureStated`` red, and in the launched
+  application ``SealFailureUiTest.theRunSectionSaysFailed`` red.
+
+**Accepted by tier 1:**
+
+* A cancelled run whose seal fails ends ``FAILED``.
+* A report failure fails the run too.
+* The order of writes is seal, then ``run.json``, then event.
+
+**Residue:**
+
+* Under the file-size limit the event log is already larger than the limit,
+  so its last events cannot be written. The result and ``run.json`` still
+  state the reason.
+* The reopened run's summary word is E14's ("running"), still open.
+
 .. _status-p14-signed:
 
 Phase 14 signed off PARTIAL (2026-10-25)
@@ -4554,6 +4644,11 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-10-30
+     - 14+
+     - **E12 repair signed off** at ``35f5b2e`` (11/11 affected gates, four
+       tier-1 injections). Specification revision 21. ``main`` pushed;
+       **paused by the owner** before Phase 15. See :ref:`status-fix-p14-p15`.
    * - 2026-10-29
      - 14+, 15
      - Owner resumed (*"fix the E12 bug and then proceed to phase 15"*).
