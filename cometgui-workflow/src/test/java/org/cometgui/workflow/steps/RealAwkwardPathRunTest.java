@@ -303,6 +303,16 @@ class RealAwkwardPathRunTest {
                 <= LINUX_PATH_MAX - 40) {
             inputs = inputs.resolve(longest);
         }
+        /*
+         * One shorter directory takes the first spectrum file's path to exactly
+         * LINUX_PATH_MAX - 40 bytes. Without it the length depended on the temporary directory's
+         * own, which JUnit draws at random: one character shorter, and the path came out at 3998,
+         * under the 4000 asserted below (seen once in the e2e gate's failure-path run).
+         */
+        int pad = LINUX_PATH_MAX - 40 - inputs.toString().length() - names.get(0).length() - 2;
+        if (pad > 0) {
+            inputs = inputs.resolve("p".repeat(pad));
+        }
         Path fasta = within(root.resolve("db"), 500 - "/db.fasta".length()).resolve("db.fasta");
         /*
          * The run directory is <project>/runs/<20261023T070115Z-run-0001>/: the longest -N base
