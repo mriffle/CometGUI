@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.collections.MapChangeListener;
 import javafx.collections.ObservableMap;
 import javafx.geometry.Insets;
@@ -92,7 +94,11 @@ public final class StageStepper extends VBox {
 
     private final Label runStateLabel;
 
-    private final StageStepperViewModel viewModel;
+    /** The derived run state, read for every rewrite of the run-state label. */
+    private final ReadOnlyObjectProperty<RunState> runState;
+
+    /** The reason the run failed when no step's state says so; empty otherwise. */
+    private final ReadOnlyStringProperty reason;
 
     /**
      * The arrow the diagram draws between two stages, as a Unicode escape to keep this file ASCII.
@@ -126,15 +132,16 @@ public final class StageStepper extends VBox {
         runStateLabel = new Label();
         runStateLabel.setId(UiIds.STAGE_STEPPER_RUN_STATE);
         named(runStateLabel, "run state");
-        this.viewModel = viewModel;
+        this.runState = viewModel.runStateProperty();
+        this.reason = viewModel.reasonProperty();
         showRunState();
 
         getChildren().addAll(core, branches, runStateLabel);
 
         stageStates.addListener(
                 (MapChangeListener<WorkflowStage, StepState>) change -> showStage(change.getKey()));
-        viewModel.runStateProperty().addListener((property, was, now) -> showRunState());
-        viewModel.reasonProperty().addListener((property, was, now) -> showRunState());
+        runState.addListener((property, was, now) -> showRunState());
+        reason.addListener((property, was, now) -> showRunState());
     }
 
     /**
@@ -231,9 +238,8 @@ public final class StageStepper extends VBox {
 
     /** Rewrites the derived run state in words, with the reason when the view-model gives one. */
     private void showRunState() {
-        RunState runState = viewModel.runState();
-        String words = inWords(runState.name());
-        String why = viewModel.reason();
+        String words = inWords(runState.get().name());
+        String why = reason.get();
         String shown = why.isEmpty() ? words : words + ". " + why;
         runStateLabel.setText("Run state: " + shown);
         runStateLabel.setAccessibleText("run state: " + shown);

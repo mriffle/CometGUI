@@ -524,7 +524,10 @@ class RunDescriptorTest {
                                 "run " + identity().runId() + " has no running attempt",
                                 assertThrows(
                                                 IllegalStateException.class,
-                                                () -> failed.withAttemptFailed("again", T3))
+                                                () ->
+                                                        assertNotNull(
+                                                                failed.withAttemptFailed(
+                                                                        "again", T3)))
                                         .getMessage()));
     }
 }

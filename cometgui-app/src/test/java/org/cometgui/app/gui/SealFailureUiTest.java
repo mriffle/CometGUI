@@ -119,6 +119,15 @@ class SealFailureUiTest {
 
     private static String id;
 
+    /** What the Run section showed once the run ended, read as it ended. */
+    private static String outcome;
+
+    private static String runState;
+
+    private static Map<String, String> stages;
+
+    private static boolean cancelDisabled;
+
     @BeforeAll
     static void launch() throws IOException {
         Path root = scratch.toRealPath();
@@ -151,6 +160,45 @@ class SealFailureUiTest {
                 driver,
                 "ess-decoy_search",
                 "Concatenated: targets and decoys compete, one result per spectrum");
+        runWithItsRecordUnwritable();
+    }
+
+    /**
+     * Runs the search from the Run section and, while Percolator waits, makes {@code provenance/}
+     * unwritable, then lets Percolator end well; reads what the section shows once the run ends.
+     */
+    private static void runWithItsRecordUnwritable() throws IOException {
+        driver.clickOn("nav-run");
+        assertEquals(ENGINE_CAN_RUN, RunSection.awaitEngineAnswer(driver));
+        CompletableFuture<String> childLine = launches.lineContaining("child ");
+        driver.clickOn("run-start");
+        long child = pidAfter(within(childLine), "child ");
+        try {
+            RunSection.awaitText(
+                    driver, "stage-percolator-state", "Running"::equals, RunSection.RUN_BOUND);
+            run = onlyRun();
+            id = idOf(run);
+            readOnly(run.resolve("provenance"));
+            StandInRun.kill(child);
+            outcome =
+                    RunSection.awaitText(
+                            driver,
+                            "run-outcome",
+                            text -> text.startsWith("The run "),
+                            RunSection.RUN_BOUND);
+        } finally {
+            StandInRun.kill(child);
+            if (run != null) {
+                writable(run.resolve("provenance"));
+            }
+        }
+        runState = driver.textOf(UiIds.STAGE_STEPPER_RUN_STATE);
+        stages =
+                Map.of(
+                        "comet", driver.textOf("stage-comet-state"),
+                        "percolator", driver.textOf("stage-percolator-state"),
+                        "results", driver.textOf("stage-results-state"));
+        cancelDisabled = RunSection.isDisabled(driver, "run-cancel");
     }
 
     @AfterAll
@@ -173,31 +221,6 @@ class SealFailureUiTest {
                     + " failed, with the reason, and run.json records it; nothing says succeeded")
     @SuppressWarnings("unchecked")
     void theRunSectionSaysFailed() throws IOException {
-        driver.clickOn("nav-run");
-        assertEquals(ENGINE_CAN_RUN, RunSection.awaitEngineAnswer(driver));
-        CompletableFuture<String> childLine = launches.lineContaining("child ");
-        driver.clickOn("run-start");
-        long child = pidAfter(within(childLine), "child ");
-        String outcome;
-        try {
-            RunSection.awaitText(
-                    driver, "stage-percolator-state", "Running"::equals, RunSection.RUN_BOUND);
-            run = onlyRun();
-            id = idOf(run);
-            readOnly(run.resolve("provenance"));
-            StandInRun.kill(child);
-            outcome =
-                    RunSection.awaitText(
-                            driver,
-                            "run-outcome",
-                            text -> text.startsWith("The run "),
-                            RunSection.RUN_BOUND);
-        } finally {
-            StandInRun.kill(child);
-            if (run != null) {
-                writable(run.resolve("provenance"));
-            }
-        }
         Path record = run.resolve("provenance/provenance.json");
         String reason =
                 "its provenance record "
@@ -209,7 +232,6 @@ class SealFailureUiTest {
                 TestJson.object(Files.readString(run.resolve("run.json"), StandardCharsets.UTF_8));
         Map<String, Object> attempt =
                 (Map<String, Object>) ((List<Object>) runJson.get("attempts")).get(0);
-        String runState = driver.textOf(UiIds.STAGE_STEPPER_RUN_STATE);
         String said = outcome;
         assertAll(
                 "the run failed for its record, in words, on the stepper and in run.json",
@@ -225,9 +247,9 @@ class SealFailureUiTest {
                                                 + " directory."),
                                 said),
                 () -> assertFalse(said.toLowerCase(Locale.ROOT).contains("succeeded"), said),
-                () -> assertEquals("Succeeded", driver.textOf("stage-comet-state")),
-                () -> assertEquals("Succeeded", driver.textOf("stage-percolator-state")),
-                () -> assertEquals("Failed", driver.textOf("stage-results-state")),
+                () -> assertEquals("Succeeded", stages.get("comet")),
+                () -> assertEquals("Succeeded", stages.get("percolator")),
+                () -> assertEquals("Failed", stages.get("results")),
                 () ->
                         assertTrue(
                                 runState.startsWith(
@@ -235,7 +257,7 @@ class SealFailureUiTest {
                                                 + record
                                                 + " could not be written: permission was denied"),
                                 runState),
-                () -> assertTrue(RunSection.isDisabled(driver, "run-cancel")),
+                () -> assertTrue(cancelDisabled, "Cancel is offered again only for a new run"),
                 () -> assertEquals("failed", attempt.get("outcome")),
                 () ->
                         assertTrue(
