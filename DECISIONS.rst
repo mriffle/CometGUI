@@ -2,8 +2,8 @@
 Decisions
 =========
 
-:Updated: 2026-10-10 (D-011 and D-013 decided by the owner on 2026-10-08;
-   no decision now open)
+:Updated: 2026-11-05 (D-014 and D-015, how the mutation gate scores, decided
+   by the owner on 2026-11-05; no decision now open)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -1028,3 +1028,57 @@ never reaches the analytics call (3.07.1 posts only from ``Caller::run()``;
 3.09's call is commented out), so the switch-free ``--help`` launches send
 nothing.
 
+----
+
+D-014 -- Whether a timed-out mutant counts as detected
+=======================================================
+
+:Status: **DECIDED 2026-11-05** -- option A, to be implemented in Phase 15
+:Raised: 2026-09-18, by tier 1 (``STATUS.rst``, the mutation drift section)
+:Blocks: Phase 15 exit gate item 2
+:Owner: Project owner
+
+**Question.** ``scripts/build.sh`` scores the 80% mutation gate on
+``status='KILLED'`` alone. PIT counts ``TIMED_OUT`` -- a mutant that made the
+tests run past PIT's time limit -- as detected. So a mutant on the boundary
+moves the gated number with machine load, in the failing direction, while
+PIT's own verdict does not change.
+
+**Options.** A. Count ``TIMED_OUT`` as detected, as PIT does. B. Keep
+``KILLED`` alone.
+
+**Recommendation.** A. The tests did notice the mutant, by never finishing.
+And the gate stops reading machine load, which matters more now that gate
+controls run concurrently.
+
+**DECISION (2026-11-05).** The owner chose A, asked in plain terms: *"Count as
+caught."* ``SURVIVED``, ``NO_COVERAGE`` and every other status still count
+against the score. A ``TIMED_OUT`` mutant is listed by name in the gate's
+output, so a hang that is really a broken test stays visible.
+
+----
+
+D-015 -- What the 80% mutation threshold is measured over
+=========================================================
+
+:Status: **DECIDED 2026-11-05** -- option A, to be implemented in Phase 15
+:Raised: 2026-10-02, by Phase 06 (``STATUS.rst``, ``status-p06-signed``)
+:Blocks: Phase 15 exit gate item 2
+:Owner: Project owner
+
+**Question.** ``scripts/build.sh`` grades mutation module-wide. In a
+deliberate test, ``cometgui-params-comet``'s validation package fell to 37.5%
+while the module stayed at 88.7%, and the build passed. Phase 15's gate item
+2 says *">= 80% in the critical packages"*.
+
+**Options.** A. Each critical package separately, each at least 80%. B.
+Module-wide, as now.
+
+**Recommendation.** A. It is what the gate says, and a weak package cannot
+hide behind strong ones.
+
+**DECISION (2026-11-05).** The owner chose A: *"Each area separately."* Every
+package ``R-TEST-02`` names as critical (the PIT ``targetClasses`` list) is
+graded on its own at 80% or more, with ``TIMED_OUT`` counted as in ``D-014``.
+A critical package with no mutations at all is a failure, not a pass. The
+module-wide figure may still be printed, but it grades nothing.

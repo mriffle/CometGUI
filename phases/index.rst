@@ -96,7 +96,7 @@ authoritative for its own scope and exit gate.
      - Version Matrix, Performance and Hardening
      - 14
      - none open; D-002 and D-003 both DECIDED
-     - NOT STARTED
+     - IN PROGRESS
    * - `16 <PHASE-16-release.rst>`_
      - Documentation and Release Qualification
      - 15

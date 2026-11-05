@@ -4,16 +4,15 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-11-05
-:Updated by: Main orchestrator, session 11 (**build-time repair signed
-   off**; paused by the owner)
-:Current phase: **None -- Phase 15 still paused by the owner.** The
-   build-time repair the owner approved on 2026-11-05 (*"Do the first two
-   fixes now, before Phase 15 ... remember on GitHub CI we only have 2 or 4
-   cores"*) is signed off and pushed (:ref:`status-fix-build-time`). Phase
-   15 starts only on the owner's word. ``D-006``'s CI-fixture half is still
-   open and the owner's. Standing owner instruction (2026-10-08), suspended
-   by the pause: *"When all is green with the current phase, push, then move
-   on to the next phase."*
+:Updated by: Main orchestrator, session 11 (build-time repair signed off;
+   owner resumed; **Phase 15 dispatched**)
+:Current phase: **15 -- IN PROGRESS** (dispatched 2026-11-05,
+   ``handoffs/PHASE-15-BRIEF.rst``). The owner resumed the project on
+   2026-11-05: *"Resume Phase 15"*, and decided ``D-014`` and ``D-015`` (the
+   mutation gate counts ``TIMED_OUT`` as detected and grades each critical
+   package at 80%). ``D-006``'s CI-fixture half is still open and the
+   owner's. Standing owner instruction (2026-10-08): *"When all is green
+   with the current phase, push, then move on to the next phase."*
 :Overall: Fifteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
    05, 08, 09, 10, 11, 12, 13 and 14 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
@@ -23,7 +22,8 @@ Project Status
    min four at a time; :ref:`status-fix-build-time`) runs once
    per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
-   :ref:`status-p06-signed`). No ``D-`` item is open; ``D-011`` option D, asking
+   :ref:`status-p06-signed`) -- **decided 2026-11-05** as ``D-014`` and
+   ``D-015``, for Phase 15 to implement. No ``D-`` item is open; ``D-011`` option D, asking
    UWPR for an Intel macOS Comet build, is the owner's own action. The nightly is red **by the owner's decision**
    until Phase 15 replaces its stubs (:ref:`status-nightly-masking`).
 
@@ -293,8 +293,8 @@ Phase board
        owner**.
    * - 15
      - Version matrix, performance and hardening
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-11-05 (``handoffs/PHASE-15-BRIEF.rst``).
    * - 16
      - Documentation and release qualification
      - NOT STARTED
