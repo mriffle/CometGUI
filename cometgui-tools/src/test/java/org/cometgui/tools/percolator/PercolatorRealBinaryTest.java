@@ -202,13 +202,22 @@ class PercolatorRealBinaryTest {
         return runner().run(new ToolCommand(argv, workspace, Map.of()));
     }
 
+    /**
+     * Where every capability probe of this class makes its workspace: a directory the test owns, so
+     * that a probe which failed to tidy up leaves nothing in the system temporary directory.
+     */
+    @TempDir private Path workspaces;
+
+    private PercolatorCapabilityProbe probe(ToolRunner runner) {
+        return new PercolatorCapabilityProbe(runner, SyntheticPin.PROBE_TARGET_ROWS, workspaces);
+    }
+
     /* Probes once, and prints what was found and how long it took, for the record. */
-    private static Set<ToolCapability> probeAndReport(
-            String label, ToolVersion version, Path binary) throws IOException {
+    private Set<ToolCapability> probeAndReport(String label, ToolVersion version, Path binary)
+            throws IOException {
         long started = System.nanoTime();
         Set<ToolCapability> observed =
-                new PercolatorCapabilityProbe(runner())
-                        .probe(ToolName.PERCOLATOR, version, HOST, binary);
+                probe(runner()).probe(ToolName.PERCOLATOR, version, HOST, binary);
         long elapsed = System.nanoTime() - started;
         System.out.printf(
                 Locale.ROOT,
@@ -298,8 +307,7 @@ class PercolatorRealBinaryTest {
 
         long started = System.nanoTime();
         RegisteredLocalBinary registered =
-                new LocalPercolatorRegistration(
-                                runner, new PercolatorCapabilityProbe(runner), hashes(), HOST)
+                new LocalPercolatorRegistration(runner, probe(runner), hashes(), HOST)
                         .register(wrapper);
         long elapsed = System.nanoTime() - started;
         ToolOffer offer = registered.offer();
@@ -408,7 +416,7 @@ class PercolatorRealBinaryTest {
         Recording recording = new Recording();
 
         Set<ToolCapability> observed =
-                new PercolatorCapabilityProbe(new ToolRunner(recording, Duration.ofSeconds(120)))
+                probe(new ToolRunner(recording, Duration.ofSeconds(120)))
                         .probe(ToolName.PERCOLATOR, V3071, HOST, binary);
 
         assertEveryLaunchWithoutAnalytics("3.07.1", binary, observed, recording);
@@ -427,7 +435,7 @@ class PercolatorRealBinaryTest {
         Recording recording = new Recording();
 
         Set<ToolCapability> observed =
-                new PercolatorCapabilityProbe(new ToolRunner(recording, Duration.ofSeconds(120)))
+                probe(new ToolRunner(recording, Duration.ofSeconds(120)))
                         .probe(ToolName.PERCOLATOR, V309, HOST, wrapper);
 
         assertEveryLaunchWithoutAnalytics("3.09", wrapper, observed, recording);
@@ -484,8 +492,7 @@ class PercolatorRealBinaryTest {
         run(binary, directory, List.of("-X", written.toString(), pin.toString()));
         PoutDocument document = PoutDocument.read(written);
         Set<ToolCapability> observed =
-                new PercolatorCapabilityProbe(runner())
-                        .probe(ToolName.PERCOLATOR, V3065, HOST, binary);
+                probe(runner()).probe(ToolName.PERCOLATOR, V3065, HOST, binary);
 
         assertAll(
                 () -> assertEquals(OBSERVED_NAMESPACE, document.namespace()),
@@ -503,10 +510,10 @@ class PercolatorRealBinaryTest {
         ToolRunOutcome aborted =
                 run(binary, directory, List.of("-X", written.toString(), small.toString()));
         Set<ToolCapability> atEight =
-                new PercolatorCapabilityProbe(runner(), 8)
+                new PercolatorCapabilityProbe(runner(), 8, workspaces)
                         .probe(ToolName.PERCOLATOR, V3071, HOST, binary);
         Set<ToolCapability> atSixtyFour =
-                new PercolatorCapabilityProbe(runner(), 64)
+                new PercolatorCapabilityProbe(runner(), 64, workspaces)
                         .probe(ToolName.PERCOLATOR, V3071, HOST, binary);
 
         assertAll(
@@ -573,9 +580,7 @@ class PercolatorRealBinaryTest {
         IOException refused =
                 assertThrows(
                         IOException.class,
-                        () ->
-                                new PercolatorCapabilityProbe(runner())
-                                        .probe(ToolName.PERCOLATOR, V309, HOST, staged));
+                        () -> probe(runner()).probe(ToolName.PERCOLATOR, V309, HOST, staged));
 
         assertAll(
                 () ->

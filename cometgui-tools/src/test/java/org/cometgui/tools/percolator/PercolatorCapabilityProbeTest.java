@@ -26,8 +26,10 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -45,8 +47,13 @@ import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.testing.FakePercolator;
 import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.ScriptedRunner;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -117,8 +124,33 @@ class PercolatorCapabilityProbeTest {
         return runner;
     }
 
-    private static PercolatorCapabilityProbe probe(ScriptedRunner runner) {
-        return new PercolatorCapabilityProbe(new ToolRunner(runner, Duration.ofSeconds(5)), 64);
+    /**
+     * Where every probe of this class makes its workspace: a directory this test owns, never the
+     * system temporary directory every other process on the host shares. {@link #nothingIsLeft}
+     * holds each test to leaving it empty.
+     */
+    @TempDir private Path workspaces;
+
+    private PercolatorCapabilityProbe probe(ScriptedRunner runner) {
+        return new PercolatorCapabilityProbe(
+                new ToolRunner(runner, Duration.ofSeconds(5)), 64, workspaces);
+    }
+
+    /*
+     * EVERY PROBE IN THIS CLASS TIDIES UP AFTER ITSELF, answered or refused.  Checked after every
+     * test, over the directory the test owns, so a probe that stopped deleting its workspace fails
+     * every test that ran one -- and, because the directory is the test's, what it left goes with
+     * the directory instead of accumulating in /tmp.
+     */
+    @AfterEach
+    void nothingIsLeft() throws IOException {
+        assertEquals(List.of(), names(workspaces), "what the probes left in " + workspaces);
+    }
+
+    private static List<String> names(Path directory) throws IOException {
+        try (Stream<Path> entries = Files.list(directory)) {
+            return entries.map(entry -> String.valueOf(entry.getFileName())).sorted().toList();
+        }
     }
 
     private static Path binary(Path directory) throws IOException {
@@ -310,7 +342,8 @@ class PercolatorCapabilityProbeTest {
         Path executable = binary(directory);
         ScriptedRunner runner = new ScriptedRunner().thenNeverFinishes();
         PercolatorCapabilityProbe probe =
-                new PercolatorCapabilityProbe(new ToolRunner(runner, Duration.ofMillis(50)), 64);
+                new PercolatorCapabilityProbe(
+                        new ToolRunner(runner, Duration.ofMillis(50)), 64, workspaces);
 
         assertEquals(
                 "Percolator 3.07.1 at "
@@ -413,6 +446,60 @@ class PercolatorCapabilityProbeTest {
     }
 
     @Test
+    @DisplayName(
+            "the product's own probe makes its workspace in the system temporary directory, and a"
+                    + " test's in the directory it gives")
+    void theWorkspaceParent(@TempDir Path directory) {
+        ToolRunner runner = new ToolRunner(new ScriptedRunner(), Duration.ofSeconds(1));
+        Path system = Path.of(System.getProperty("java.io.tmpdir"));
+
+        assertAll(
+                () -> assertEquals(system, new PercolatorCapabilityProbe(runner).workspaceParent()),
+                () ->
+                        assertEquals(
+                                system, new PercolatorCapabilityProbe(runner, 8).workspaceParent()),
+                () ->
+                        assertEquals(
+                                directory,
+                                new PercolatorCapabilityProbe(runner, 8, directory)
+                                        .workspaceParent()),
+                () ->
+                        assertEquals(
+                                8,
+                                new PercolatorCapabilityProbe(runner, 8, directory).targetRows()),
+                () ->
+                        assertEquals(
+                                "a synthetic PIN needs at least one target row, but was asked for"
+                                        + " 0",
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () ->
+                                                        new PercolatorCapabilityProbe(
+                                                                runner, 0, directory))
+                                        .getMessage()),
+                () ->
+                        assertEquals(
+                                "workspaceParent",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () ->
+                                                        new PercolatorCapabilityProbe(
+                                                                runner, 64, Nulls.of(Path.class)))
+                                        .getMessage()),
+                () ->
+                        assertEquals(
+                                "runner",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () ->
+                                                        new PercolatorCapabilityProbe(
+                                                                Nulls.of(ToolRunner.class),
+                                                                64,
+                                                                directory))
+                                        .getMessage()));
+    }
+
+    @Test
     @DisplayName("every argument is required")
     void everyArgumentIsRequired(@TempDir Path directory) throws IOException {
         Path executable = binary(directory);
@@ -469,23 +556,231 @@ class PercolatorCapabilityProbeTest {
                                         .getMessage()));
     }
 
+    /** What one run saw of the probe's workspace while the probe was still running. */
+    private record Sighting(Path workspace, List<String> parentHeld, List<String> workspaceHeld) {}
+
+    /**
+     * An answer that first looks at the workspace the probe made -- from inside the run, which is
+     * the only moment it is guaranteed to exist -- and then plays {@code then}.
+     */
+    private static ScriptedRunner.Answer looking(
+            List<Sighting> sightings, ScriptedRunner.Answer then) {
+        return (command, listener) -> {
+            Path workspace = command.workingDirectory();
+            sightings.add(new Sighting(workspace, names(workspace.getParent()), names(workspace)));
+            then.play(command, listener);
+        };
+    }
+
+    private static ScriptedRunner.Answer exits(int code, String standardError) {
+        return (command, listener) -> {
+            listener.onStandardError(standardError);
+            listener.onExit(code);
+        };
+    }
+
     @Test
-    @DisplayName("no temporary workspace is left behind, whether the probe answers or refuses")
+    @DisplayName(
+            "each probe makes its workspace in the directory it is given, and nothing is left there"
+                    + " afterwards, whether the probe answers, refuses or cannot start the binary")
     void theWorkspaceIsCleanedUp(@TempDir Path directory) throws IOException {
-        Path temporary = Path.of(System.getProperty("java.io.tmpdir"));
-        long before = countProbeWorkspaces(temporary);
-        ScriptedRunner good =
+        Path executable = binary(directory);
+        Path parent = Files.createDirectory(directory.resolve("probe workspaces"));
+        List<Sighting> sightings = new ArrayList<>();
+        ScriptedRunner answers =
                 refusingTheRest(
-                        refusingNoAnalytics()
+                        new ScriptedRunner()
+                                .then(looking(sightings, exits(1, "Exception caught: " + BANNER)))
                                 .thenWrites(writes(document(64, false)), 0, List.of(BANNER))
                                 .thenWrites(writes(document(128, true)), 0, List.of(BANNER)));
-        probe(good).probe(ToolName.PERCOLATOR, V3071, LINUX, binary(directory));
-        ScriptedRunner bad = new ScriptedRunner().thenPrints(127, List.of("no banner"), List.of());
-        assertThrows(
-                IOException.class,
-                () -> probe(bad).probe(ToolName.PERCOLATOR, V3071, LINUX, binary(directory)));
+        ScriptedRunner refuses =
+                new ScriptedRunner().then(looking(sightings, exits(127, "no banner")));
+        ScriptedRunner cannotStart =
+                new ScriptedRunner()
+                        .then(
+                                looking(
+                                        sightings,
+                                        (command, listener) -> {
+                                            throw new IOException("Permission denied");
+                                        }));
 
-        assertEquals(before, countProbeWorkspaces(temporary));
+        Set<ToolCapability> answered =
+                new PercolatorCapabilityProbe(
+                                new ToolRunner(answers, Duration.ofSeconds(5)), 64, parent)
+                        .probe(ToolName.PERCOLATOR, V3071, LINUX, executable);
+        List<String> afterAnswer = names(parent);
+        IOException refused =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                new PercolatorCapabilityProbe(
+                                                new ToolRunner(refuses, Duration.ofSeconds(5)),
+                                                64,
+                                                parent)
+                                        .probe(ToolName.PERCOLATOR, V3071, LINUX, executable));
+        List<String> afterRefusal = names(parent);
+        IOException notStarted =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                new PercolatorCapabilityProbe(
+                                                new ToolRunner(cannotStart, Duration.ofSeconds(5)),
+                                                64,
+                                                parent)
+                                        .probe(ToolName.PERCOLATOR, V3071, LINUX, executable));
+        List<String> afterFailedStart = names(parent);
+
+        Path system = Path.of(System.getProperty("java.io.tmpdir"));
+        List<Executable> checks = new ArrayList<>();
+        checks.add(
+                () ->
+                        assertEquals(
+                                EnumSet.of(
+                                        ToolCapability.XML_OUTPUT, ToolCapability.XML_DECOY_OUTPUT),
+                                answered));
+        checks.add(
+                () ->
+                        assertTrue(
+                                refused.getMessage().endsWith("It exited 127 saying: no banner"),
+                                refused.getMessage()));
+        checks.add(() -> assertEquals("Permission denied", notStarted.getMessage()));
+        checks.add(() -> assertEquals(3, sightings.size(), "one look per probe"));
+        for (Sighting sighting : sightings) {
+            Path workspace = sighting.workspace();
+            String name = String.valueOf(workspace.getFileName());
+            checks.add(
+                    () ->
+                            assertEquals(
+                                    parent,
+                                    workspace.getParent(),
+                                    "the workspace is made in the directory the probe was given"));
+            checks.add(
+                    () ->
+                            assertTrue(
+                                    name.startsWith("cometgui-percolator-probe-"),
+                                    workspace::toString));
+            checks.add(
+                    () ->
+                            assertEquals(
+                                    List.of(name),
+                                    sighting.parentHeld(),
+                                    "while the probe ran, its workspace was the one thing in the"
+                                            + " directory"));
+            checks.add(
+                    () ->
+                            assertEquals(
+                                    List.of("probe.pin"),
+                                    sighting.workspaceHeld(),
+                                    "the fixture was written into it before the first run"));
+            checks.add(() -> assertTrue(Files.notExists(workspace), workspace + " is still there"));
+            checks.add(
+                    () ->
+                            assertTrue(
+                                    Files.notExists(system.resolve(name)),
+                                    "nothing of this probe's was put in " + system));
+        }
+        checks.add(
+                () ->
+                        assertEquals(
+                                3,
+                                sightings.stream().map(Sighting::workspace).distinct().count(),
+                                "each probe makes a workspace of its own"));
+        checks.add(() -> assertEquals(List.of(), afterAnswer, "left by the answered probe"));
+        checks.add(() -> assertEquals(List.of(), afterRefusal, "left by the refused probe"));
+        checks.add(() -> assertEquals(List.of(), afterFailedStart, "left by the unstarted probe"));
+        assertAll(checks);
+    }
+
+    /*
+     * WHAT LEFT 21 cometgui-percolator-probe-* DIRECTORIES IN /tmp AFTER A BUILD (Phase 15 unit 2).
+     * scripts/build.sh's PIT stage runs this module's tests against mutants of this probe, and the
+     * mutant that deletes the probe's call to its own tidying (or a minion PIT kills mid-probe on a
+     * timeout) leaves every workspace those tests make where the probe made it -- which was the
+     * shared system temporary directory.  A probe that cannot tidy is reproduced here without a
+     * mutant: the "binary" leaves a directory the probe has no permission to empty.  The verdict
+     * survives, as the probe's own design says it must, and the workspace stays where it was put:
+     * in the test's own directory, never in /tmp.
+     */
+    @Test
+    @EnabledOnOs(
+            value = {OS.LINUX, OS.MAC},
+            disabledReason = "the undeletable entry is made with POSIX permissions")
+    @DisplayName(
+            "a probe that cannot tidy its workspace keeps its verdict and leaves the workspace in"
+                    + " the directory it was given, not in the system temporary directory")
+    void aWorkspaceThatCannotBeTidiedStaysInItsParent(@TempDir Path directory) throws IOException {
+        Path executable = binary(directory);
+        Path parent = Files.createDirectory(directory.resolve("probe workspaces"));
+        List<Path> locked = new ArrayList<>();
+        ScriptedRunner runner =
+                new ScriptedRunner()
+                        .then(
+                                (command, listener) -> {
+                                    Path held =
+                                            Files.createDirectory(
+                                                    command.workingDirectory().resolve("held"));
+                                    Files.writeString(held.resolve("open.log"), "still here");
+                                    Files.setPosixFilePermissions(
+                                            held, PosixFilePermissions.fromString("r-xr-xr-x"));
+                                    locked.add(held);
+                                    listener.onStandardError("no banner");
+                                    listener.onExit(127);
+                                });
+        try {
+            IOException refused =
+                    assertThrows(
+                            IOException.class,
+                            () ->
+                                    new PercolatorCapabilityProbe(
+                                                    new ToolRunner(runner, Duration.ofSeconds(5)),
+                                                    64,
+                                                    parent)
+                                            .probe(ToolName.PERCOLATOR, V3071, LINUX, executable));
+            Path workspace = runner.commands().get(0).workingDirectory();
+            String name = String.valueOf(workspace.getFileName());
+            Assumptions.assumeFalse(
+                    Files.isWritable(locked.get(0)),
+                    "this user can write a r-xr-xr-x directory (root?), so tidying cannot be made"
+                            + " to fail this way");
+
+            assertAll(
+                    () ->
+                            assertTrue(
+                                    refused.getMessage()
+                                            .endsWith("It exited 127 saying: no banner"),
+                                    "the tidying failure must not replace the diagnostic: "
+                                            + refused.getMessage()),
+                    () -> assertEquals(List.of(name), names(parent)),
+                    () -> assertTrue(name.startsWith("cometgui-percolator-probe-"), name),
+                    () ->
+                            assertEquals(
+                                    "still here",
+                                    Files.readString(workspace.resolve("held/open.log"))),
+                    () ->
+                            assertTrue(
+                                    Files.notExists(
+                                            Path.of(System.getProperty("java.io.tmpdir"))
+                                                    .resolve(name)),
+                                    "the system temporary directory got nothing"));
+        } finally {
+            /*
+             * Unlocked and removed wherever it is, so that a probe which put its workspace
+             * somewhere other than the directory it was given cannot leave this test's
+             * undeletable entry there.
+             */
+            for (Path held : locked) {
+                Files.setPosixFilePermissions(held, PosixFilePermissions.fromString("rwx------"));
+                deleteTree(held.getParent());
+            }
+        }
+    }
+
+    private static void deleteTree(Path root) throws IOException {
+        try (Stream<Path> walk = Files.walk(root)) {
+            for (Path entry : walk.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(entry);
+            }
+        }
     }
 
     // ------------------------------------------------------ every capability, over a fake --
@@ -516,9 +811,9 @@ class PercolatorCapabilityProbeTest {
                     ToolCapability.MAX_ITERATIONS_OPTION,
                     ToolCapability.NO_ANALYTICS_OPTION);
 
-    private static Set<ToolCapability> probeOver(FakePercolator fake, Path directory)
-            throws IOException {
-        return new PercolatorCapabilityProbe(new ToolRunner(fake, Duration.ofSeconds(5)), 64)
+    private Set<ToolCapability> probeOver(FakePercolator fake, Path directory) throws IOException {
+        return new PercolatorCapabilityProbe(
+                        new ToolRunner(fake, Duration.ofSeconds(5)), 64, workspaces)
                 .probe(ToolName.PERCOLATOR, V3071, LINUX, binary(directory));
     }
 
@@ -578,7 +873,7 @@ class PercolatorCapabilityProbeTest {
         FakePercolator fake = new FakePercolator();
         Path executable = binary(directory);
 
-        new PercolatorCapabilityProbe(new ToolRunner(fake, Duration.ofSeconds(5)), 64)
+        new PercolatorCapabilityProbe(new ToolRunner(fake, Duration.ofSeconds(5)), 64, workspaces)
                 .probe(ToolName.PERCOLATOR, V3071, LINUX, executable);
 
         List<ToolCommand> commands = fake.commands();
@@ -714,7 +1009,9 @@ class PercolatorCapabilityProbeTest {
                         IOException.class,
                         () ->
                                 new PercolatorCapabilityProbe(
-                                                new ToolRunner(fake, Duration.ofSeconds(5)), 64)
+                                                new ToolRunner(fake, Duration.ofSeconds(5)),
+                                                64,
+                                                workspaces)
                                         .probe(ToolName.PERCOLATOR, V3071, LINUX, executable));
 
         assertAll(
@@ -763,7 +1060,8 @@ class PercolatorCapabilityProbeTest {
                         .thenPrints(1, List.of("Exception caught: " + BANNER), List.of())
                         .thenNeverFinishes();
         PercolatorCapabilityProbe probe =
-                new PercolatorCapabilityProbe(new ToolRunner(runner, Duration.ofMillis(50)), 64);
+                new PercolatorCapabilityProbe(
+                        new ToolRunner(runner, Duration.ofMillis(50)), 64, workspaces);
 
         assertTrue(
                 assertThrows(
@@ -988,7 +1286,8 @@ class PercolatorCapabilityProbeTest {
         Path executable = binary(directory);
 
         Set<ToolCapability> observed =
-                new PercolatorCapabilityProbe(new ToolRunner(fake, Duration.ofSeconds(5)), 64)
+                new PercolatorCapabilityProbe(
+                                new ToolRunner(fake, Duration.ofSeconds(5)), 64, workspaces)
                         .probe(ToolName.PERCOLATOR, V3071, LINUX, executable);
 
         List<List<String>> launched = fake.commands().stream().map(ToolCommand::argv).toList();
@@ -1073,15 +1372,5 @@ class PercolatorCapabilityProbeTest {
                                                 command ->
                                                         command.argv().contains("--no-analytics")),
                                 "only the observation run carried it"));
-    }
-
-    private static long countProbeWorkspaces(Path temporary) throws IOException {
-        try (Stream<Path> entries = Files.list(temporary)) {
-            return entries.filter(
-                            entry ->
-                                    String.valueOf(entry.getFileName())
-                                            .startsWith("cometgui-percolator-probe-"))
-                    .count();
-        }
     }
 }

@@ -157,9 +157,11 @@ public final class PercolatorCapabilityProbe {
 
     private final ToolRunner runner;
     private final int targetRows;
+    private final Path workspaceParent;
 
     /**
-     * Creates the probe, with the fixture size {@code R-PERC-02} fixes.
+     * Creates the probe, with the fixture size {@code R-PERC-02} fixes and its workspace in the
+     * system temporary directory ({@code java.io.tmpdir}).
      *
      * @param runner how one invocation is run and collected; every process in this product goes
      *     through the process service ({@code R-PROC-02})
@@ -170,7 +172,8 @@ public final class PercolatorCapabilityProbe {
     }
 
     /**
-     * Creates the probe with a chosen fixture size.
+     * Creates the probe with a chosen fixture size, its workspace in the system temporary
+     * directory.
      *
      * <p><strong>This exists so that the fixture size can be shown to matter.</strong> {@code
      * R-PERC-02} says 64 target and 64 decoy rows is sufficient and 8 and 8 is not, and the only
@@ -187,6 +190,30 @@ public final class PercolatorCapabilityProbe {
      * @throws IllegalArgumentException if {@code targetRows} is not positive
      */
     public PercolatorCapabilityProbe(ToolRunner runner, int targetRows) {
+        this(runner, targetRows, systemTemporaryDirectory());
+    }
+
+    /**
+     * Creates the probe with a chosen fixture size and a chosen place for its workspace.
+     *
+     * <p><strong>This exists so that a test owns the directory its probe writes in.</strong> Each
+     * probe makes one {@code cometgui-percolator-probe-*} workspace and deletes it when it is done.
+     * The product keeps that workspace in the system temporary directory, which every other process
+     * on the host shares; a test that let its probes write there could neither count them without
+     * counting somebody else's, nor keep a probe whose tidying failed -- a mutation removing it, a
+     * test JVM killed mid-probe -- from leaving its workspace behind in {@code /tmp}. Given a
+     * directory of its own, the test asserts on exactly that directory, and whatever a broken probe
+     * leaves goes when the test's own directory does. {@link
+     * #PercolatorCapabilityProbe(ToolRunner)} is what the product uses.
+     *
+     * @param runner how one invocation is run and collected
+     * @param targetRows how many target rows the fixture gets; the same number of decoy rows
+     *     follows
+     * @param workspaceParent the existing directory each probe's workspace is created in
+     * @throws NullPointerException if {@code runner} or {@code workspaceParent} is {@code null}
+     * @throws IllegalArgumentException if {@code targetRows} is not positive
+     */
+    public PercolatorCapabilityProbe(ToolRunner runner, int targetRows, Path workspaceParent) {
         this.runner = Objects.requireNonNull(runner, "runner");
         if (targetRows < 1) {
             throw new IllegalArgumentException(
@@ -194,6 +221,15 @@ public final class PercolatorCapabilityProbe {
                             + targetRows);
         }
         this.targetRows = targetRows;
+        this.workspaceParent = Objects.requireNonNull(workspaceParent, "workspaceParent");
+    }
+
+    /*
+     * The directory Files.createTempDirectory(prefix) uses when it is given no directory, named
+     * explicitly so that the product's probe keeps writing exactly where it always has.
+     */
+    private static Path systemTemporaryDirectory() {
+        return Path.of(System.getProperty("java.io.tmpdir"));
     }
 
     /**
@@ -203,6 +239,16 @@ public final class PercolatorCapabilityProbe {
      */
     public int targetRows() {
         return targetRows;
+    }
+
+    /**
+     * Where this probe creates its workspace.
+     *
+     * @return the parent directory, the system temporary directory ({@code java.io.tmpdir}) for the
+     *     product's own probe
+     */
+    public Path workspaceParent() {
+        return workspaceParent;
     }
 
     /**
@@ -234,7 +280,7 @@ public final class PercolatorCapabilityProbe {
                             + tool.id()
                             + "; a capability of one tool means nothing said of another");
         }
-        Path workspace = Files.createTempDirectory(WORKSPACE_PREFIX);
+        Path workspace = Files.createTempDirectory(workspaceParent, WORKSPACE_PREFIX);
         try {
             return probeIn(workspace, version, executable);
         } finally {

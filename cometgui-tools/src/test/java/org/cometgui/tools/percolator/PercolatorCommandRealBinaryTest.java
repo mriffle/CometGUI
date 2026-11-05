@@ -108,7 +108,11 @@ class PercolatorCommandRealBinaryTest {
         PercolatorRealBinaryTest.fixture309(
                 PercolatorRealBinaryTest.BOOST_SYSTEM_309,
                 PercolatorRealBinaryTest.SHA256_BOOST_SYSTEM_309);
-        PercolatorCapabilityProbe probe = new PercolatorCapabilityProbe(runner());
+        PercolatorCapabilityProbe probe =
+                new PercolatorCapabilityProbe(
+                        runner(),
+                        SyntheticPin.PROBE_TARGET_ROWS,
+                        Files.createDirectory(scratch.resolve("probe workspaces")));
         probed3071 =
                 probe.probe(
                         ToolName.PERCOLATOR,

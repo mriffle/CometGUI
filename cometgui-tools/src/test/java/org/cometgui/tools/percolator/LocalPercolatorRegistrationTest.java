@@ -124,17 +124,25 @@ class LocalPercolatorRegistrationTest {
                 ZIP_3071, "percolator", directory.resolve("bin").resolve("percolator"));
     }
 
-    private static LocalPercolatorRegistration realRegistrar() {
-        ToolRunner runner =
-                new ToolRunner(new ProcessService(Clock.systemUTC()), Duration.ofSeconds(120));
-        return new LocalPercolatorRegistration(
-                runner, new PercolatorCapabilityProbe(runner), hashes(), HOST);
+    /**
+     * Where every capability probe of this class makes its workspace: a directory the test owns, so
+     * that a probe which failed to tidy up leaves nothing in the system temporary directory.
+     */
+    @TempDir private Path workspaces;
+
+    private PercolatorCapabilityProbe probe(ToolRunner runner) {
+        return new PercolatorCapabilityProbe(runner, SyntheticPin.PROBE_TARGET_ROWS, workspaces);
     }
 
-    private static LocalPercolatorRegistration scriptedRegistrar(ScriptedRunner runner) {
+    private LocalPercolatorRegistration realRegistrar() {
+        ToolRunner runner =
+                new ToolRunner(new ProcessService(Clock.systemUTC()), Duration.ofSeconds(120));
+        return new LocalPercolatorRegistration(runner, probe(runner), hashes(), HOST);
+    }
+
+    private LocalPercolatorRegistration scriptedRegistrar(ScriptedRunner runner) {
         ToolRunner tool = new ToolRunner(runner, Duration.ofSeconds(5));
-        return new LocalPercolatorRegistration(
-                tool, new PercolatorCapabilityProbe(tool), hashes(), HOST);
+        return new LocalPercolatorRegistration(tool, probe(tool), hashes(), HOST);
     }
 
     @Test
@@ -431,10 +439,7 @@ class LocalPercolatorRegistrationTest {
                                 ToolRegistrationException.class,
                                 () ->
                                         new LocalPercolatorRegistration(
-                                                        runner,
-                                                        new PercolatorCapabilityProbe(runner),
-                                                        hashes(),
-                                                        HOST)
+                                                        runner, probe(runner), hashes(), HOST)
                                                 .register(binary))
                         .getMessage());
     }
@@ -498,10 +503,7 @@ class LocalPercolatorRegistrationTest {
                                 ToolRegistrationException.class,
                                 () ->
                                         new LocalPercolatorRegistration(
-                                                        runner,
-                                                        new PercolatorCapabilityProbe(runner),
-                                                        broken,
-                                                        HOST)
+                                                        runner, probe(runner), broken, HOST)
                                                 .register(binary))
                         .getMessage());
     }
