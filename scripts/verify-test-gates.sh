@@ -87,6 +87,9 @@ readonly ROOT
 readonly SANDBOX="${ROOT}/_build/test-gate-sandbox"
 readonly M2REPO="${ROOT}/_build/m2repo"
 readonly LOGS="${ROOT}/_build/test-gate-logs"
+# Control 0's copy of the pristine sandbox's cometgui-domain PIT report; see
+# pit_report_of.
+readonly BASELINE_PIT_REPORT="${LOGS}/00-baseline-mutations.xml"
 
 readonly DOMAIN_PKG="cometgui-domain/src/main/java/org/cometgui/domain/build"
 readonly TOOLS_PKG="cometgui-tools/src/main/java/org/cometgui/tools/comet"
@@ -659,22 +662,30 @@ print(covered)
 PYTHON
 }
 
-# pit_report_of / pit_mutation_total <module> -- the same, for PIT's mutations.
+# pit_report_of <module> -- the sandbox's own PIT report for a module.
+#
+# THE SANDBOX'S, AND NEVER THE WORKING TREE'S.  This used to fall back to
+# <module>/target/pit-reports/mutations.xml in the working tree, which is
+# whatever the last PIT run there left -- and that need not be a whole-module
+# run.  On 2026-11-05 it was a targeted run over two classes from the E12
+# repair (63 mutations against the module's 716): control 6, which runs after
+# controls 4 and 5 have cleaned the sandbox's report away, sized its injection
+# from that, injected a quarter of what the module needed, and the gate
+# correctly accepted a 95% score.  A control sized from evidence that is not
+# the module's is a control that silently stops injecting enough.
 pit_report_of() {
-    local module="$1" candidate
-    for candidate in "${SANDBOX}/${module}/target/pit-reports/mutations.xml" \
-                     "${ROOT}/${module}/target/pit-reports/mutations.xml"; do
-        if [ -s "${candidate}" ]; then
-            printf '%s\n' "${candidate}"
-            return 0
-        fi
-    done
-    die "HARNESS ERROR: no PIT report for ${module} in the sandbox or the working tree, so the mutation control cannot be sized from the module. Run bash scripts/build.sh first."
+    local module="$1" candidate="${SANDBOX}/$1/target/pit-reports/mutations.xml"
+    [ -s "${candidate}" ] \
+        || die "HARNESS ERROR: no PIT report for ${module} in the sandbox (${candidate#"${ROOT}/"}). The working tree's is not read: it is whatever the last PIT run there left."
+    printf '%s\n' "${candidate}"
 }
 
+# pit_mutation_total <mutations.xml> -- how many mutations a report holds.
+# Control 6 passes the copy control 0 keeps of the pristine sandbox's report
+# (BASELINE_PIT_REPORT), which is this run's own measurement of the module.
 pit_mutation_total() {
-    local module="$1" xml
-    xml="$(pit_report_of "${module}")"
+    local xml="$1"
+    [ -s "${xml}" ] || die "HARNESS ERROR: no PIT report at ${xml#"${ROOT}/"} to size against."
     python3 - "${xml}" <<'PYTHON'
 import sys
 import xml.etree.ElementTree as ET
@@ -784,6 +795,14 @@ control_baseline() {
     assert_pit_killed_everything \
         "the baseline mutation run really mutated something, and killed all of it" \
         "${LOGS}/00-baseline-mutation.log"
+    # Kept for control 6, which sizes its injection from the pristine module:
+    # by then controls 4 and 5 have cleaned the sandbox's own report away.
+    # If PIT wrote none, the failure is already recorded above, and control 6
+    # stops with a HARNESS ERROR rather than size itself from anything else.
+    rm -f -- "${BASELINE_PIT_REPORT}"
+    if [ -s "${SANDBOX}/cometgui-domain/target/pit-reports/mutations.xml" ]; then
+        cp -- "${SANDBOX}/cometgui-domain/target/pit-reports/mutations.xml" "${BASELINE_PIT_REPORT}"
+    fi
 }
 
 control_javafx_in_domain() {
@@ -1031,7 +1050,7 @@ control_unasserted_test() {
     # choice would go stale again with the next phase.  A generated class of
     # measured size cannot: it is re-sized from PIT's own report every run.
     local mutations statements
-    mutations="$(pit_mutation_total cometgui-domain)" \
+    mutations="$(pit_mutation_total "${BASELINE_PIT_REPORT}")" \
         || die "HARNESS ERROR: control 6 could not size its injection from cometgui-domain's PIT report (see above). An injection of guessed size proves nothing."
     statements="$(mutations_to_break_score "${mutations}" 80)"
     sizing "cometgui-domain generates ${mutations} mutations and kills all of them; K/(K+S) < 80% needs S > K/4 = $(( mutations / 4 )) survivors." \
