@@ -599,6 +599,94 @@ The no-option path was compared again with ``783444e``'s ``build.sh --only
 gates`` under the stub ``mvn``: identical, 361 lines, exit 0. ``--only shell``
 was run after the change: 30 controls in 609 s, exit 0. ``docs-build.sh`` passed after this section was written.
 
+The e2e red at tier 1's sign-off run (``c9d037c``)
+==================================================
+
+**What failed.** At four jobs, ``e2e`` exited 1 with 41 passed and 9 failed.
+The 9 are the three dirty controls 3i, 5q and 5p, three assertions each. Each
+failed at the same place: the Percolator 3.07.1 install, ``[Downloading: 0
+bytes, Failed: 946,303 of 946,303 bytes]``, about 2 s in (3i: "Percolator could
+not be installed, so it was not rerun"). The H-controls' ``HARNESS FAILURE``
+lines are their expected output; H1 to H6 all PASSED. The window was 09:05 to
+09:07:50. ``5b-dirty`` (09:07:50 to 09:09:48) installed the same Percolator and
+went red only at its own step 27. The clean A and B runs (08:48 to 08:58) also
+installed it.
+
+**What the evidence says about the failing step.** ``InstallPipeline`` reports
+``FAILED`` with the bytes it counted, so all 946,303 bytes arrived. One of the
+steps after the transfer threw: the download's own check, the SHA-256 check,
+ZIP extraction, layout check, fix-ups, probe, move or record. Which one is
+not recorded anywhere. ``ManagedToolManager`` swallows the exception on the
+install thread, and ``ToolRowViewModel`` says by design that "a failed install
+carries no reason". Nothing reached the test's output.
+
+**Ruled out:**
+
+* *The upstream file.* Fetched afterwards from the pinned URL: 946,303 bytes,
+  SHA-256 ``4d0e94af...``, equal to the manifest pin and to
+  ``scratch/phase05/artefacts``.
+* *A probe timeout.* ``PROBE_TIMEOUT`` is 120 s.
+* *Analytics or network calls in the probe.* 3.07.1 accepts
+  ``--no-analytics``, and the probe passes it from its first run.
+* *Percolator temporary files.* The binary names them randomly
+  (``%%%%-%%%%-%%%%-%converters-tmp``).
+* *The probe's workspace.* It is created with ``createTempDirectory`` and only
+  that directory is deleted.
+* *The tool cache and the install lock.* Both live in each test's fresh home,
+  under a JUnit temporary directory.
+* *Disk.* 1.3 TB free.
+* *Machine-wide process killing.* No Java code enumerates all processes, and
+  every harness reaper is scoped to its own sandbox path or children.
+* *Shared read-only resources.* Unchanged in tier 1's run and in every run
+  here.
+
+**Reproduction attempts.** All runs were in ``_build/e2e-gate-sandbox``,
+checked pristine against its ``pristine-sources.sha256``. JFR recorded every
+thrown exception in every JVM (``JDK_JAVA_OPTIONS``, no code change), so a
+failure would have carried its reason.
+
+* ``TierACanonicalScenarioTest`` alone: 23/23.
+* Ten consecutive runs of it beside the ``tests`` sandbox's ``cometgui-app`` GUI
+  tests. Those are the classes that were running at 09:05 to 09:08
+  (``PercolatorCancelUiTest``, ``ResultsAccessibilityUiTest``,
+  ``ResultsCountsUiTest``, ``ResultsFiltersUiTest``, ...), and they ran in the
+  same order and overlapping the loop (169 tests, 0 failures): **10/10
+  green**.
+* Nine consecutive runs of ``TierACanonicalScenarioTest`` and
+  ``TierANoXmlScenarioTest`` beside the ``provenanceui`` control
+  (``--only provenanceui``, PASS 96) and the GUI tests: **9/9 green**.
+
+That is 28 Percolator 3.07.1 installs from GitHub beside the controls that were
+running at the failure, with none failing.
+
+* **The targeted concurrent rerun**: ``verify-all-gates.sh --jobs 3 --only
+  e2e,limelight,provenanceui``, the sign-off's companions, all three started
+  together. ``e2e: 50 controls`` (3i red at step 5, 5q at the boundary step,
+  5p at step 28, 5b at step 27, each its own), ``limelight: 130``,
+  ``provenanceui: 96``, exit 0, shared resources unchanged.
+
+**Conclusion.** No concurrency cause was found, and the failure did not
+reproduce under the same concurrency. The pattern fits a transient outside
+the machine better than a collision on it: one artefact fetched from GitHub
+failed three times in three minutes, while the Comet artefact from the same
+host installed fine in the same runs, and the next install of the same
+Percolator succeeded. That is an inference, not a proof. The reason was
+discarded, and proving it needs the install's exception recorded, a product
+(or test-support) change this brief does not allow. **No lock, harness or
+timeout was changed:** with no cause shown, a lock would be a guess. Escalated
+to tier 1, with the next item.
+
+**A separate concurrency hazard found while looking.**
+``PercolatorCapabilityProbeTest.theWorkspaceIsCleanedUp`` (``cometgui-tools``)
+counts every ``cometgui-percolator-probe-*`` directory in the shared
+``java.io.tmpdir`` before and after its own probes. Any other JVM probing
+Percolator at the same moment changes that count: the ``tests`` control's
+control C, ``workflow``, ``percolator``, ``limelight``, ``provenanceui`` and
+``e2e`` all can. It has not gone red yet. 21 such directories have been left
+in ``/tmp`` since 07:05:47 (tier 1's ``build.sh``), which also means the
+count's baseline is not empty. Fixing it is a test change: escalated, not
+made.
+
 For tier 1
 ==========
 
