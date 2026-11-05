@@ -3,13 +3,17 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-10-30
+:Updated: 2026-11-05
 :Updated by: Main orchestrator, session 10 (**E12 repair signed off**;
    specification revision 21; paused by the owner)
-:Current phase: **None -- paused by the owner** after the E12 repair
-   (2026-10-29: *"pause after the E12 fix is in, commited, pushed, and
-   green"*; :ref:`status-fix-p14-p15`). Phase 15 starts only on the owner's
-   word. ``D-006``'s CI-fixture half is still open and the owner's. Standing
+:Current phase: **None -- Phase 15 still paused by the owner.** On
+   2026-11-05 the owner approved a build-time repair before it: *"Do the
+   first two fixes now, before Phase 15 ... remember on GitHub CI we only
+   have 2 or 4 cores"* -- the ``tests`` harness no longer runs the whole
+   ``build.sh`` twice, and ``verify-all-gates.sh`` runs its controls side by
+   side, serial at 4 cores or fewer. Dispatched to one tier-1 fix agent,
+   ``handoffs/FIX-BUILD-TIME-BRIEF.rst``. Phase 15 starts only on the
+   owner's word (E12: :ref:`status-fix-p14-p15`). ``D-006``'s CI-fixture half is still open and the owner's. Standing
    owner instruction (2026-10-08), suspended by the pause: *"When all is
    green with the current phase, push, then move on to the next phase."*
 :Overall: Fifteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
