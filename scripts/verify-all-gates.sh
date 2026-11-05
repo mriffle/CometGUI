@@ -53,6 +53,30 @@
 # THE WORKING TREE IS NEVER TOUCHED.  Every sub-harness damages a copy under
 # _build/.  This script writes only _build/all-gate-logs/.
 #
+# SIDE BY SIDE, SIZED BY CORES (2026-11-05).  The controls can run
+# concurrently, up to a job count:
+#
+#   * computed from the cores this process may use (nproc, which honours CPU
+#     affinity): 1 -- SERIAL, exactly the behaviour before this existed -- at 4
+#     cores or fewer, which is every GitHub-hosted runner; above that one job
+#     per CORES_PER_JOB cores, capped at JOBS_CAP (see compute_jobs for the
+#     measurements behind both numbers);
+#   * or set explicitly, with --jobs N or COMETGUI_GATE_JOBS=N (the option
+#     wins).  1 means serial.
+#
+# Each control keeps its own log, and the grading, the summary, the floors,
+# the exit code and the ORDER the controls print in are those of a serial run:
+# controls are graded in ALL_GATES order once all have ended, whatever order
+# they finished in.  A control whose harness exits non-zero, is killed, or
+# whose worker dies before recording an exit status is a FAILURE.
+#
+# What the controls SHARE was audited before any two were allowed to run
+# together (handoffs/FIX-BUILD-TIME-worklog.rst has the audit).  Two groups
+# write the same working-tree files and never run at once -- see gate_locks.
+# Everything else they share (_build/m2repo, tools/, scratch/, .venv/) they
+# only read, and a concurrent run proves it: each is fingerprinted before the
+# first control starts and after the last ends, and a change FAILS the run.
+#
 # Exit status:
 #   0  every control ran and bit
 #   1  at least one control did not bite, or reported fewer controls than its
@@ -96,6 +120,13 @@ readonly -a ALL_GATES=(
     e2e
 )
 
+# The job-count rule; see compute_jobs.
+readonly CORES_PER_JOB=8
+readonly JOBS_CAP=4
+
+# Read-only resources every concurrent control shares; see fingerprint.
+readonly -a SHARED_READ_ONLY=(_build/m2repo tools scratch .venv)
+
 PASSED=0
 FAILED=0
 declare -a FAILURES=()
@@ -125,7 +156,11 @@ declare -a COVERED=()
 #                2026-08-29, 33 on 2026-08-30 when phase 02 unit 11 re-sized the
 #                coverage and mutation injections against the grown tree and
 #                added control 6's proof that the coverage gate accepts the
-#                defect the mutation gate rejects.  shell: 30 on 2026-08-30,
+#                defect the mutation gate rejects; 37 by Phase 14; 49 on
+#                2026-11-05, when FIX-BUILD-TIME replaced the two whole
+#                sandbox builds of controls 7 and 8 with one (control C) and
+#                the census alone, adding twelve assertions on the census's
+#                picture and currency.  shell: 30 on 2026-08-30,
 #                when phase 02 unit 10 first shipped it.  workflows: 9 on
 #                2026-08-29, 23 on 2026-10-01, measured by phase 05 unit 12 --
 #                it had grown to 19 and then 23 without the floor following.
@@ -259,11 +294,11 @@ gate_spec() {
             ;;
         tests)
             GATE_ITEMS="3, 4"
-            GATE_DEFECT="a JavaFX import in the domain, a ProcessBuilder outside the process service, a truncated ArchUnit import, an untested class in a gated package sized so the ratio really falls below 0.90, an untested view-model sized against the package rule, a covered class whose test asserts nothing so its mutations survive, and a module whose coverage was never measured"
+            GATE_DEFECT="a JavaFX import in the domain, a ProcessBuilder outside the process service, a truncated ArchUnit import, an untested class in a gated package sized so the ratio really falls below 0.90, an untested view-model sized against the package rule, a covered class whose test asserts nothing so its mutations survive, a module whose coverage was never measured and a class excluded from the coverage report -- each graded by scripts/build.sh's own evidence census over a sandbox built once (--gates-census-root), which must accept the clean sandbox, refuse the working tree, and report old or missing evidence STALE or NO EVIDENCE beside the defect rather than read it"
             GATE_SCRIPT="scripts/verify-test-gates.sh"
             GATE_ARGS=()
             GATE_PROOF=("Every gate rejected its defect and accepted the clean tree.")
-            GATE_FLOOR=37
+            GATE_FLOOR=49
             GATE_UNIT="assertions"
             ;;
         provenance)
@@ -432,6 +467,68 @@ gate_spec() {
     return 0
 }
 
+# gate_locks NAME -- the working-tree outputs a control WRITES and another
+# control writes or reads, as lock names.  Two controls that hold a common lock
+# never run at the same time.  Found by audit, not assumed from the sandboxes:
+#
+#   docs-tree  every real Sphinx build of docs/ -- docs-build.sh, which the docs
+#              control and the pipeline's release step run, and the pipeline's
+#              link check -- deletes and rewrites docs/_build/ and writes the
+#              generated pages docs/developer/traceability.rst and
+#              docs/_generated/ into the source tree; the traceability control's
+#              self-test copies docs/ while that happens.  The pipeline and docs
+#              also share _build/docs-gate.
+#   sbom-out   sbom.sh deletes and rewrites _build/sbom/, which the sbom
+#              control and the pipeline's release step run, and the depscan
+#              control reads _build/sbom/cometgui-sbom.json.
+gate_locks() {
+    case "$1" in
+        docs|traceability) echo "docs-tree" ;;
+        sbom|depscan)      echo "sbom-out" ;;
+        pipeline)          echo "docs-tree sbom-out" ;;
+        *)                 echo "" ;;
+    esac
+}
+
+# compute_jobs -- the default job count, from the cores this process may use.
+#
+#   <= 4 cores          1, serial.  Every GitHub-hosted runner the project
+#                       uses has 2 or 4 (owner, 2026-11-05), and serial is the
+#                       behaviour every floor here was measured under.
+#   above 4             cores / CORES_PER_JOB, at least 1, at most JOBS_CAP.
+#
+# CORES_PER_JOB = 8.  One heavy control is a Maven reactor running real Comet,
+# Percolator, PDV and headless GUI tests.  Measured on the 64-core development
+# machine on 2026-11-05 from this container's own cgroup CPU counter (not the
+# load average, which other tenants of that machine drove to 50 that day), the
+# tests control's whole-reactor build used 1 to 4 cores in 30-second samples
+# through cometgui-app's real-tool tests, with momentary bursts to about 17
+# (handoffs/FIX-BUILD-TIME-worklog.rst).  Eight cores a job is twice the
+# sustained figure, which matters because some controls grade time and
+# patience -- GUI tests wait on the interface, two suites hold wall-clock
+# budgets, and PIT's grading moves with load -- and none of those may be eased
+# to make a concurrent run pass.  So a 16-core machine runs 2, a 32-core one 4.
+#
+# JOBS_CAP = 4.  The run cannot end before its longest control does, the tests
+# control; with the per-control times recorded at the Phase 14 and E12 gate
+# runs and the tests control's own after this change, four jobs already finish
+# every other control inside that one's run, so a fifth slot could only add
+# load (the worklog has the arithmetic).
+compute_jobs() {
+    local cores jobs
+    cores="$(nproc 2>/dev/null || echo 1)"
+    case "${cores}" in ''|*[!0-9]*) cores=1 ;; esac
+    if [ "${cores}" -le 4 ]; then
+        jobs=1
+    else
+        jobs=$(( cores / CORES_PER_JOB ))
+        [ "${jobs}" -lt 1 ] && jobs=1
+        [ "${jobs}" -gt "${JOBS_CAP}" ] && jobs="${JOBS_CAP}"
+    fi
+    CORES="${cores}"
+    JOBS="${jobs}"
+}
+
 gate_count() {
     local name="$1" log="$2"
     case "${name}" in
@@ -492,6 +589,11 @@ Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
   bash scripts/${SCRIPT_NAME} --only NAME     run one control (repeatable, or
                                               comma-separated)
+  bash scripts/${SCRIPT_NAME} --jobs N        run up to N controls at once (1 is
+                                              serial); COMETGUI_GATE_JOBS=N does
+                                              the same.  Default: 1 at 4 cores or
+                                              fewer, else one per ${CORES_PER_JOB} cores,
+                                              at most ${JOBS_CAP}
   bash scripts/${SCRIPT_NAME} --list          what the controls are, what each
                                               injects, and the command that
                                               proves it
@@ -710,11 +812,10 @@ preflight() {
     printf '\n  %d/%d sub-harness(es) present and executable.\n' "$#" "$#"
 }
 
-# run_gate NAME -- run one control and grade it.
-run_gate() {
+# gate_banner NAME -- the control's heading, before its result.
+gate_banner() {
     local name="$1"
     gate_spec "${name}"
-
     local log="${LOGS}/${name}.log"
     local rel="${log#"${ROOT}/"}"
     local cmd="bash ${GATE_SCRIPT}"
@@ -724,20 +825,51 @@ run_gate() {
     printf '  injects  %s\n' "${GATE_DEFECT}"
     printf '  proved by %s\n' "${cmd}"
     printf '  log       %s\n\n' "${rel}"
+}
 
-    local started rc=0
+# exec_gate NAME -- run one control's harness, its output to its own log.
+# Sets RUN_RC and RUN_ELAPSED.
+exec_gate() {
+    local name="$1"
+    gate_spec "${name}"
+    local log="${LOGS}/${name}.log" started
+    RUN_RC=0
     started="$(date +%s)"
     if [ "${#GATE_ARGS[@]}" -gt 0 ]; then
-        bash "${ROOT}/${GATE_SCRIPT}" "${GATE_ARGS[@]}" >"${log}" 2>&1 || rc=$?
+        bash "${ROOT}/${GATE_SCRIPT}" "${GATE_ARGS[@]}" >"${log}" 2>&1 || RUN_RC=$?
     else
-        bash "${ROOT}/${GATE_SCRIPT}" >"${log}" 2>&1 || rc=$?
+        bash "${ROOT}/${GATE_SCRIPT}" >"${log}" 2>&1 || RUN_RC=$?
     fi
-    local elapsed=$(( $(date +%s) - started ))
+    RUN_ELAPSED=$(( $(date +%s) - started ))
+}
+
+# run_gate NAME -- run one control and grade it (the serial path).
+run_gate() {
+    local name="$1"
+    gate_banner "${name}"
+    exec_gate "${name}"
+    grade_gate "${name}" "${RUN_RC}" "${RUN_ELAPSED}" ""
+}
+
+# grade_gate NAME RC ELAPSED WHY-NOT-RUN -- grade one control from its log and
+# exit status, and record it.  WHY-NOT-RUN, when not empty, is the reason no
+# exit status exists (a worker that died); the control then FAILS.
+grade_gate() {
+    local name="$1" rc="$2" elapsed="$3" lost="$4"
+    gate_spec "${name}"
+
+    local log="${LOGS}/${name}.log"
+    local rel="${log#"${ROOT}/"}"
+    local cmd="bash ${GATE_SCRIPT}"
+    [ "${#GATE_ARGS[@]}" -gt 0 ] && cmd="${cmd} ${GATE_ARGS[*]}"
 
     # --- grade it -----------------------------------------------------------
     local verdict="PASS" why="" count=""
 
-    if [ ! -s "${log}" ]; then
+    if [ -n "${lost}" ]; then
+        verdict="FAIL"
+        why="${lost}. See ${rel}"
+    elif [ ! -s "${log}" ]; then
         verdict="FAIL"
         why="the harness wrote no output at all (exit ${rc}); it cannot have run a control"
     elif [ "${rc}" -ne 0 ]; then
@@ -787,10 +919,123 @@ run_gate() {
     ROWS+=("$(printf '        injected: %s' "${GATE_DEFECT}")")
 }
 
+# fingerprint DIR -- one digest of every path, size and mtime under DIR,
+# following links (tools/ and scratch/ are reached through them in sandboxes).
+# Python's bytecode caches are left out: CPython writes them on a module's
+# first import, by write-then-rename, so concurrent writers are safe by design
+# and a fresh cache file is not a control writing what another reads.
+fingerprint() {
+    ( cd -- "${ROOT}" && find -L "$1" \( -name __pycache__ -prune \) -o -printf '%P %s %T@\n' 2>/dev/null \
+        | LC_ALL=C sort | sha256sum | cut -d' ' -f1 )
+}
+
+# kill_tree PID -- end a worker and everything under it, children first.
+kill_tree() {
+    local pid="$1" child
+    for child in $(ps -o pid= --ppid "${pid}" 2>/dev/null); do
+        kill_tree "${child}"
+    done
+    kill -TERM "${pid}" 2>/dev/null || true
+}
+
+declare -A WORKER_PID=()
+declare -A WORKER_DONE=()
+
+on_interrupt() {
+    local name
+    printf '\n%s: interrupted; ending every running control.\n' "${SCRIPT_NAME}" >&2
+    for name in "${!WORKER_PID[@]}"; do
+        [ -n "${WORKER_DONE[${name}]:-}" ] || kill_tree "${WORKER_PID[${name}]}"
+    done
+    exit 1
+}
+
+# run_concurrently SELECTED... -- run the controls up to JOBS at a time,
+# never two that share a lock, then grade every one of them in the order
+# given.  Each worker records "<exit status> <seconds>" in STATE/<name>.done
+# only once its harness has ended; a control with no such file is graded as
+# a failure, never as a pass.
+run_concurrently() {
+    # One state directory per invocation, so that a second invocation running
+    # other controls at the same time cannot remove this one's exit statuses.
+    local state
+    state="$(mktemp -d "${LOGS}/.state.XXXXXX")"
+    trap on_interrupt INT TERM
+
+    local -a pending=("$@")
+    local -A held=()
+    local total="$#" finished=0 running=0 name lock free
+    local -a still=()
+
+    while [ "${#pending[@]}" -gt 0 ] || [ "${running}" -gt 0 ]; do
+        # Start whatever may start, in the order given.
+        still=()
+        for name in "${pending[@]}"; do
+            free=1
+            for lock in $(gate_locks "${name}"); do
+                [ -z "${held[${lock}]:-}" ] || free=0
+            done
+            if [ "${running}" -lt "${JOBS}" ] && [ "${free}" -eq 1 ]; then
+                for lock in $(gate_locks "${name}"); do held[${lock}]="${name}"; done
+                (
+                    trap - INT TERM
+                    exec_gate "${name}"
+                    printf '%s %s\n' "${RUN_RC}" "${RUN_ELAPSED}" >"${state}/${name}.tmp"
+                    mv -- "${state}/${name}.tmp" "${state}/${name}.done"
+                ) &
+                WORKER_PID[${name}]=$!
+                running=$((running + 1))
+                printf '  %s  started  %-13s (%d running)\n' "$(date +%T)" "${name}" "${running}"
+            else
+                still+=("${name}")
+            fi
+        done
+        pending=("${still[@]}")
+        [ "${running}" -gt 0 ] || continue
+
+        # Wait for one to end, then collect every one that has.
+        wait -n 2>/dev/null || true
+        for name in "${!WORKER_PID[@]}"; do
+            [ -z "${WORKER_DONE[${name}]:-}" ] || continue
+            kill -0 "${WORKER_PID[${name}]}" 2>/dev/null && continue
+            wait "${WORKER_PID[${name}]}" 2>/dev/null || true
+            WORKER_DONE[${name}]=1
+            running=$((running - 1))
+            finished=$((finished + 1))
+            for lock in $(gate_locks "${name}"); do unset "held[${lock}]"; done
+            if [ -f "${state}/${name}.done" ]; then
+                printf '  %s  finished %-13s exit %s in %ss (%d of %d)\n' "$(date +%T)" \
+                    "${name}" "$(cut -d' ' -f1 "${state}/${name}.done")" \
+                    "$(cut -d' ' -f2 "${state}/${name}.done")" "${finished}" "${total}"
+            else
+                printf '  %s  LOST     %-13s its worker ended without an exit status (%d of %d)\n' \
+                    "$(date +%T)" "${name}" "${finished}" "${total}"
+            fi
+        done
+    done
+    trap - INT TERM
+
+    # Grade, in the order given -- the order a serial run prints.
+    local rc elapsed
+    for name in "$@"; do
+        gate_banner "${name}"
+        if [ -f "${state}/${name}.done" ]; then
+            read -r rc elapsed < "${state}/${name}.done"
+            grade_gate "${name}" "${rc}" "${elapsed}" ""
+        else
+            grade_gate "${name}" 1 0 \
+                "no exit status was recorded: the control's worker died or was killed before its harness ended, so nothing it did can be counted"
+        fi
+    done
+    rm -rf -- "${state}"
+}
+
 # -------------------------------------------------------------------- main --
 main() {
     local -a selected=()
-    local only=""
+    local only="" jobs_from="computed"
+    local jobs_option="${COMETGUI_GATE_JOBS:-}"
+    [ -n "${jobs_option}" ] && jobs_from="COMETGUI_GATE_JOBS"
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -799,6 +1044,12 @@ main() {
             --only)
                 [ "$#" -ge 2 ] || die "--only needs a gate name (try --list)"
                 only="${only}${only:+,}$2"
+                shift 2
+                ;;
+            --jobs)
+                [ "$#" -ge 2 ] || die "--jobs needs a number (1 is serial)"
+                jobs_option="$2"
+                jobs_from="--jobs"
                 shift 2
                 ;;
             *) usage >&2; die "unknown option: $1" ;;
@@ -829,6 +1080,14 @@ main() {
         selected=("${ALL_GATES[@]}")
     fi
 
+    compute_jobs
+    if [ -n "${jobs_option}" ]; then
+        case "${jobs_option}" in
+            ''|*[!0-9]*|0*) die "${jobs_from}: '${jobs_option}' is not a whole number of at least 1 (1 is serial)" ;;
+        esac
+        JOBS="${jobs_option}"
+    fi
+
     cd -- "${ROOT}"
     mkdir -p -- "${LOGS}"
 
@@ -838,6 +1097,13 @@ main() {
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
     printf '  logs         %s\n' "${LOGS#"${ROOT}/"}"
+    if [ "${JOBS}" -eq 1 ]; then
+        printf '  jobs         1 -- SERIAL, one control after another (%s; %s core(s) available)\n' \
+            "${jobs_from}" "${CORES}"
+    else
+        printf '  jobs         %d -- CONCURRENT, up to %d controls at once (%s; %s core(s) available)\n' \
+            "${JOBS}" "${JOBS}" "${jobs_from}" "${CORES}"
+    fi
     printf '  expect this to take several minutes; see --help\n'
 
     preflight "${selected[@]}"
@@ -845,9 +1111,32 @@ main() {
     local started
     started="$(date +%s)"
     local name
-    for name in "${selected[@]}"; do
-        run_gate "${name}"
-    done
+    if [ "${JOBS}" -eq 1 ]; then
+        for name in "${selected[@]}"; do
+            run_gate "${name}"
+        done
+    else
+        local resource
+        local -A before=()
+        for resource in "${SHARED_READ_ONLY[@]}"; do
+            before[${resource}]="$(fingerprint "${resource}")"
+        done
+        printf '\n=== %d control(s), up to %d at once; graded below in the serial order ===\n' \
+            "${#selected[@]}" "${JOBS}"
+        printf '  shared and only read, fingerprinted now and again at the end: %s\n\n' \
+            "${SHARED_READ_ONLY[*]}"
+        run_concurrently "${selected[@]}"
+        banner "SHARED RESOURCES  --  every concurrent control must only have read them"
+        for resource in "${SHARED_READ_ONLY[@]}"; do
+            if [ "$(fingerprint "${resource}")" = "${before[${resource}]}" ]; then
+                printf '  ok       %s unchanged\n' "${resource}"
+            else
+                FAILED=$((FAILED + 1))
+                FAILURES+=("shared resources: ${resource} CHANGED during a concurrent run. A control wrote something every other control reads, so no result of this run can be trusted; find the writer, and run with --jobs 1 until it is fixed")
+                printf '  CHANGED  %s -- a control wrote to it while others read it\n' "${resource}"
+            fi
+        done
+    fi
     local total=$(( $(date +%s) - started ))
 
     # --- the summary --------------------------------------------------------

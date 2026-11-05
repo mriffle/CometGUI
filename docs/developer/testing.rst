@@ -60,7 +60,12 @@ Commands
        ``scripts/dev-verify.sh``), Phase 07's ``paramui`` adds about
        twenty minutes, Phase 08's ``workflow`` about eight, Phase 09's
        ``percolator`` about eleven and Phase 10's ``results`` about ten.
-       Run it before signing off a phase.
+       Run it before signing off a phase. Since 2026-11-05 it runs controls
+       side by side where the machine has the cores (see below).
+
+   * - ``bash scripts/verify-all-gates.sh --jobs N``
+     - Up to ``N`` controls at once; ``1`` is serial, and so is the default at
+       four cores or fewer. ``COMETGUI_GATE_JOBS=N`` does the same.
 
    * - ``bash scripts/verify-all-gates.sh --list``
      - The seventeen controls, what each injects, and the command that proves
@@ -665,7 +670,33 @@ it requires the sub-harness to exist and be executable *before any control
 runs*, to print the marker that means the defect was caught, and to grade at
 least as many controls as the floor recorded in the script. A harness that
 exits 0 with a lower count than it used to has had controls removed or skipped,
-and that is a failure. On 2026-08-29 the nine controls graded 123 individual
+and that is a failure.
+
+It may run them side by side. The default job count is computed from the
+cores the process may use (``nproc``, which honours CPU affinity): **1, serial,
+at four cores or fewer**, and above that one job per eight cores, capped at
+four. Each control still writes its own log, and the controls are graded and
+printed in the serial order once all have ended, so the summary, the floors
+and the exit code read exactly as a serial run's; a control whose harness exits
+non-zero, is killed, or whose worker dies before recording an exit status is a
+failure. Controls that write the same working-tree files hold a common lock
+(``gate_locks``: ``docs``, ``traceability`` and ``pipeline`` share
+``docs/_build`` and the generated pages; ``sbom``, ``depscan`` and
+``pipeline`` share ``_build/sbom``) and never overlap, and a concurrent run
+fingerprints the four resources every control only reads -- ``_build/m2repo``,
+``tools/``, ``scratch/`` and ``.venv/`` -- before and after, and fails if one
+changed. The audit behind both is in ``handoffs/FIX-BUILD-TIME-worklog.rst``.
+
+The ``tests`` control proves the evidence census in ``scripts/build.sh``
+without running the whole build to reach it: it builds its sandbox once
+(control C), rebuilds only ``cometgui-domain`` for each defect, and runs
+``bash scripts/build.sh --gates-census-root <sandbox>``, which executes the
+census function the gates stage executes and nothing else. That option refuses
+the repository itself and every other option, reports a module that was never
+built as ``NO EVIDENCE`` and evidence older than its sources as ``STALE``, and
+is never a build.
+
+On 2026-08-29 the nine controls graded 123 individual
 checks in 4 m 58 s. Phase 02 added a tenth, ``shell``
 (``scripts/verify-shell-gates.sh``, which proves that phase's five exit gate
 items fail on the defects they exist to catch), re-sized the ``tests``

@@ -179,6 +179,21 @@ never the real file. Make the harness itself falsifiable too: a control whose
 defect was not actually injected must be reported as a harness failure, not a
 pass.
 
+**The gate suite runs side by side, so a new harness says what it shares.**
+``scripts/verify-all-gates.sh`` runs its controls concurrently when the machine
+has the cores for it -- one job per eight cores, at most four, and **serial at
+four cores or fewer**, which is every GitHub-hosted runner; ``--jobs N`` or
+``COMETGUI_GATE_JOBS=N`` sets it, and ``1`` is serial. Its summary, floors, exit
+code and order are those of a serial run. That is safe only because every
+control damages its own sandbox and only *reads* ``_build/m2repo``, ``tools/``,
+``scratch/`` and ``.venv/`` -- a concurrent run fingerprints those four and fails
+if any changed -- and because the controls that write the same working-tree
+files (``docs/_build`` and the generated pages; ``_build/sbom``) hold a common
+lock in ``gate_locks`` and never overlap. A harness that writes anything outside
+its own sandbox must be added to ``gate_locks`` with the controls it would
+collide with, in the same commit; "it has its own sandbox" is not the argument
+(``ONBOARDING.rst``, *What parallel agents actually share*).
+
 **Numeric targets come from the specification, not from taste.** The mutation
 score gate (``R-TEST-02``) is >= 80% over the critical packages with no
 surviving mutation that can disable a checksum, invert a q-value comparison,
