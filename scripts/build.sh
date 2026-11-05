@@ -69,6 +69,10 @@ readonly STAGES=(
 MVN_OFFLINE=""
 ONLY=""
 CENSUS_ROOT=""
+GATES_CENSUS_ROOT=""
+# The tree whose target/ directories the gates stage's evidence census reads.
+# ROOT in every real build; only --gates-census-root changes it.
+EVIDENCE_ROOT="${ROOT}"
 STAGE_RESULTS=()
 
 usage() {
@@ -90,6 +94,19 @@ Options:
                    scripts/verify-quality-gates.sh can prove the census fails on
                    a damaged tree without damaging the working tree, and so that
                    there is exactly one implementation of the census.
+  --gates-census-root DIR
+                   Run ONLY the gates stage's evidence census -- the JaCoCo,
+                   class-population and ArchUnit checks it makes before PIT --
+                   against DIR's target/ directories, and exit.  Nothing is
+                   built and PIT is not run, so this is never a build: it
+                   refuses the repository itself, refuses every other option,
+                   and never prints BUILD OK.  DIR must be a sandbox some other
+                   command has already built; every product module with main
+                   sources must have compiled classes there, and evidence older
+                   than the sources beside it is reported STALE, so a sandbox
+                   built incompletely or before a change cannot pass.  This
+                   exists so that scripts/verify-test-gates.sh can prove the
+                   census bites without running the whole build to reach it.
   --only ID[,ID]   Run only the named stages, in the order listed below.  This
                    exists so that the CI step scripts in scripts/ci/ can invoke
                    THIS script rather than reimplementing a stage: the local
@@ -649,7 +666,7 @@ percent_of() {
 # those has nothing for a coverage or mutation gate to measure.  Prints paths
 # relative to target/classes.
 real_classes_of() {
-    local module="$1" dir="${ROOT}/$1/target/classes"
+    local module="$1" dir="${EVIDENCE_ROOT}/$1/target/classes"
     [ -d "${dir}" ] || return 0
     ( cd "${dir}" && find . -name '*.class' -type f ! -name 'package-info.class' \
         | sed 's|^\./||' | sort )
@@ -685,7 +702,7 @@ pit_class_names_of() {
 # True when a module's POM opts into one of the gate switches.
 module_opts_in() {
     local module="$1" property="$2"
-    grep -qF "<${property}>false</${property}>" "${ROOT}/${module}/pom.xml" 2>/dev/null
+    grep -qF "<${property}>false</${property}>" "${EVIDENCE_ROOT}/${module}/pom.xml" 2>/dev/null
 }
 
 # The package prefixes the coverage gate covers, from the specification's
@@ -707,13 +724,28 @@ stage_gates() {
     # comes back empty, and both exit 0 while proving nothing.  PIT is the one
     # gate that is genuinely run here, because it is deliberately not part of
     # `mvn verify`.
-    local failures=0 module
+    local failures=0 module class_file prefix hit
+
+    gates_evidence_census
+    stage_gates_pit
+}
+
+# The evidence half of stage_gates: everything the gates stage READS, before it
+# runs PIT.  It is a function of its own for one reason: so that
+# --gates-census-root can run exactly this code -- not a copy of it -- against a
+# sandbox, which is how scripts/verify-test-gates.sh proves that the census
+# rejects a module with no jacoco.xml and a class missing from one without
+# rebuilding the whole reactor twice to get here.  It reads every module under
+# EVIDENCE_ROOT, which is ROOT in every real build, and adds what it finds wrong
+# to the caller's `failures` (bash's dynamic scope: the caller declares it).
+gates_evidence_census() {
+    local module
 
     echo "-- JaCoCo: what was measured, per module"
     local xml covered missed line_pair branch_pair gated real_count measured=0
     for module in "${PRODUCT_MODULES[@]}"; do
         real_count="$(real_classes_of "${module}" | wc -l)"
-        xml="${ROOT}/${module}/target/site/jacoco/jacoco.xml"
+        xml="${EVIDENCE_ROOT}/${module}/target/site/jacoco/jacoco.xml"
         gated="no gate"
         module_opts_in "${module}" "cometgui.coverage.core.skip" \
             && gated="core >=90% line >=85% branch"
@@ -778,7 +810,7 @@ stage_gates() {
     # same failure, and it is the one that bites when a single test is excluded.
     local absent census_total
     for module in "${PRODUCT_MODULES[@]}"; do
-        xml="${ROOT}/${module}/target/site/jacoco/jacoco.xml"
+        xml="${EVIDENCE_ROOT}/${module}/target/site/jacoco/jacoco.xml"
         [ -f "${xml}" ] || continue
         census_total="$(compiled_class_names_of "${module}" | wc -l)"
         [ "${census_total}" -gt 0 ] || continue
@@ -804,7 +836,7 @@ stage_gates() {
     # weakened within a week.  It is printed for a person to judge instead.
     local pit_xml unmutated
     for module in "${PRODUCT_MODULES[@]}"; do
-        pit_xml="${ROOT}/${module}/target/pit-reports/mutations.xml"
+        pit_xml="${EVIDENCE_ROOT}/${module}/target/pit-reports/mutations.xml"
         [ -f "${pit_xml}" ] || continue
         unmutated="$(comm -23 \
             <(compiled_class_names_of "${module}") \
@@ -841,7 +873,7 @@ stage_gates() {
     fi
 
     echo "-- ArchUnit: the class import the rules were actually checked against"
-    local census="${ROOT}/cometgui-archtests/target/archunit-import.txt"
+    local census="${EVIDENCE_ROOT}/cometgui-archtests/target/archunit-import.txt"
     if [ ! -f "${census}" ]; then
         echo "   MISSING  cometgui-archtests/target/archunit-import.txt."
         echo "            ClassImportCensusTest did not run, so no rule in that module is"
@@ -872,7 +904,7 @@ stage_gates() {
         failures=$(( failures + empty_modules ))
     fi
 
-    local arch_report="${ROOT}/cometgui-archtests/target/surefire-reports/TEST-org.cometgui.archtests.LayeringRulesTest.xml"
+    local arch_report="${EVIDENCE_ROOT}/cometgui-archtests/target/surefire-reports/TEST-org.cometgui.archtests.LayeringRulesTest.xml"
     if [ -f "${arch_report}" ]; then
         local arch_tests arch_fail arch_err
         arch_tests="$(sed -n 's/.*<testsuite [^>]*tests="\([0-9]*\)".*/\1/p' "${arch_report}" | head -1)"
@@ -888,7 +920,13 @@ stage_gates() {
         echo "   MISSING  no surefire report for LayeringRulesTest; the rules did not run."
         failures=$((failures + 1))
     fi
+}
 
+# The PIT half of stage_gates, which runs PIT over the tree the build stage
+# produced and then grades it, and the stage's verdict.  Never reached from
+# --gates-census-root.  Like the census above, it adds to the caller's
+# `failures` and reads the caller's class_file, prefix and hit.
+stage_gates_pit() {
     echo "-- PIT: mutation testing over the critical packages (R-TEST-02, >= 80%)"
     # Not part of `mvn verify` on purpose (see the pitest block in pom.xml), so
     # it is run here, against the classes the build stage already produced.  The
@@ -993,6 +1031,54 @@ stage_gates() {
     echo "    deliberately damaged copy of the tree under _build/)."
 }
 
+# gates_evidence_currency -- --gates-census-root only, and before the census.
+# A real build reaches the census straight after `mvn clean verify`, so its
+# evidence is complete and current by construction.  A sandbox census has no
+# such guarantee: the census treats a module with no target/classes as inert,
+# and reads whatever jacoco.xml is on disk.  So here, and only here, every
+# module must have been compiled if it has main sources (NO EVIDENCE
+# otherwise), and no source, module POM or parent POM may be newer than the
+# evidence read for it (STALE otherwise) -- the module's jacoco.xml, or for a
+# module with none its newest class file, or for cometgui-archtests its import
+# census.  Adds to the caller's `failures`.
+gates_evidence_currency() {
+    local module reference newer main_sources
+    echo "-- evidence: every module was built, and after its last change"
+    for module in "${PRODUCT_MODULES[@]}" cometgui-archtests; do
+        reference=""
+        if [ "${module}" = cometgui-archtests ]; then
+            reference="${EVIDENCE_ROOT}/${module}/target/archunit-import.txt"
+            # Its absence is the census's own ArchUnit MISSING, below.
+            [ -f "${reference}" ] || continue
+        else
+            main_sources="$(find -H "${EVIDENCE_ROOT}/${module}/src/main/java" -name '*.java' -type f 2>/dev/null | head -1 || true)"
+            if [ -f "${EVIDENCE_ROOT}/${module}/target/site/jacoco/jacoco.xml" ]; then
+                reference="${EVIDENCE_ROOT}/${module}/target/site/jacoco/jacoco.xml"
+            elif [ -d "${EVIDENCE_ROOT}/${module}/target/classes" ]; then
+                reference="$(find -H "${EVIDENCE_ROOT}/${module}/target/classes" -name '*.class' -type f -printf '%T@ %p\n' \
+                    | sort -n | tail -1 | cut -d' ' -f2- || true)"
+            fi
+            if [ -z "${reference}" ]; then
+                if [ -n "${main_sources}" ]; then
+                    echo "   NO EVIDENCE ${module}: main sources but no compiled classes under target/;"
+                    echo "            it was never built here, and the census would call it inert."
+                    failures=$((failures + 1))
+                fi
+                continue
+            fi
+        fi
+        newer="$(find -H "${EVIDENCE_ROOT}/${module}/src" "${EVIDENCE_ROOT}/${module}/pom.xml" \
+            "${EVIDENCE_ROOT}/pom.xml" -type f -newer "${reference}" -print 2>/dev/null | head -1 || true)"
+        if [ -n "${newer}" ]; then
+            echo "   STALE    ${module}: ${newer#"${EVIDENCE_ROOT}/"} is newer than"
+            echo "            ${reference#"${EVIDENCE_ROOT}/"}; the evidence predates the change."
+            failures=$((failures + 1))
+        else
+            printf '   ok       %-28s %s\n' "${module}" "${reference#"${EVIDENCE_ROOT}/"}"
+        fi
+    done
+}
+
 # The four stages below are thin on purpose.  Each one delegates to the same
 # scripts/ci/<step>.sh that the pull-request workflow runs, so there is exactly
 # one implementation of each check and `bash scripts/build.sh` runs the whole
@@ -1024,6 +1110,7 @@ main() {
             --offline) MVN_OFFLINE="-o"; shift ;;
             --only) ONLY="${2:-}"; [ -n "${ONLY}" ] || die "--only needs a stage id"; shift 2 ;;
             --census-root) CENSUS_ROOT="${2:-}"; [ -n "${CENSUS_ROOT}" ] || die "--census-root needs a directory"; shift 2 ;;
+            --gates-census-root) GATES_CENSUS_ROOT="${2:-}"; [ -n "${GATES_CENSUS_ROOT}" ] || die "--gates-census-root needs a directory"; shift 2 ;;
             -h|--help) usage; exit 0 ;;
             *) usage >&2; die "unknown option: $1" ;;
         esac
@@ -1042,6 +1129,28 @@ main() {
             || die "${census_failures} file-set census check(s) failed in ${CENSUS_ROOT}."
         printf '\nOK: both Spotless file sets and both Checkstyle file sets are exhaustive and\n'
         printf '    disjoint, and checkstyle-derived.xml is a superset of checkstyle.xml.\n'
+        exit 0
+    fi
+
+    # --gates-census-root: the gates stage's evidence census alone, against a
+    # sandbox.  Nothing is built, PIT is not run, nothing is written.  It is
+    # not a way to skip anything in a real build: it refuses the repository
+    # itself and every other option, and it ends with its own verdict line,
+    # never BUILD OK.
+    if [ -n "${GATES_CENSUS_ROOT}" ]; then
+        [ -z "${ONLY}${CENSUS_ROOT}${MVN_OFFLINE}" ] \
+            || die "--gates-census-root takes no other option; it is a census of a sandbox, not a build."
+        [ -d "${GATES_CENSUS_ROOT}" ] || die "--gates-census-root: no such directory: ${GATES_CENSUS_ROOT}"
+        EVIDENCE_ROOT="$(cd -- "${GATES_CENSUS_ROOT}" && pwd -P)"
+        [ "${EVIDENCE_ROOT}" != "$(pwd -P)" ] \
+            || die "--gates-census-root refuses the repository itself. Its evidence is graded by a real build, bash scripts/build.sh, which runs this census after clean verify and then runs PIT."
+        printf 'Evidence census of %s (a sandbox: nothing is built here, and PIT is not run).\n\n' "${EVIDENCE_ROOT}"
+        local failures=0
+        gates_evidence_currency
+        gates_evidence_census
+        [ "${failures}" -eq 0 ] || die "${failures} test-gate evidence check(s) failed."
+        printf '\nOK: the gates stage'"'"'s evidence census passed over %s.\n' "${EVIDENCE_ROOT}"
+        printf '    A census of a sandbox, not a build: nothing was compiled or tested here.\n'
         exit 0
     fi
 

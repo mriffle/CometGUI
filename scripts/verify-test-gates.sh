@@ -28,9 +28,19 @@
 #      org.cometgui.ui.viewmodel (80% line)                           gate item 4
 #   6  PIT rejects a test that runs the code and checks nothing about
 #      it -- the weakness line coverage cannot see                    R-TEST-02
-#   7  `bash scripts/build.sh` rejects a module whose coverage was never
-#      measured -- the vacuous pass JaCoCo offers for free, where the
-#      rule is never evaluated and `mvn verify` still exits 0
+#   C  The census's picture: the whole sandbox built once from its
+#      pristine sources, and scripts/build.sh's evidence census
+#      accepting it -- the clean counterpart of controls 7 and 8 -- and
+#      refusing to run over the working tree
+#   7  scripts/build.sh's evidence census rejects a module whose coverage
+#      was never measured -- the vacuous pass JaCoCo offers for free,
+#      where the rule is never evaluated and `mvn verify` still exits 0
+#      -- and, with the defect present and the module not rebuilt,
+#      reports its old evidence STALE rather than reading it
+#   8  ... and a class that quietly left the coverage sample; and, with
+#      that defect present, a module that was never built, or whose
+#      evidence predates its sources, is reported beside it, not
+#      silently accepted
 #   S  The harness itself: a control whose defect was NOT injected is
 #      reported as a harness failure, not as a pass
 #
@@ -125,6 +135,13 @@ Usage:
   bash scripts/${SCRIPT_NAME} [-h|--help]
   bash scripts/${SCRIPT_NAME} --preflight   check every precondition below and
                                             stop, running no Maven at all
+  bash scripts/${SCRIPT_NAME} --census-only run controls C, 7, 8 and S alone:
+                                            the evidence census in
+                                            scripts/build.sh, for checking a
+                                            change to it.  NOT the gate:
+                                            verify-all-gates.sh runs the whole
+                                            harness, and its floor fails a run
+                                            this short
 
 It needs a populated ${M2REPO#"${ROOT}/"} and a built tree (run
 bash scripts/build.sh first), the project-local toolchain in tools/, the
@@ -347,16 +364,40 @@ assert_passes() {
     record_pass "${label}: exit 0"
 }
 
-# assert_build_script_fails <label> <expected diagnostic, an ERE> <log>
-# The whole documented build command, run inside the sandbox.  Some defects are
-# invisible to any single Maven goal and are caught only by the evidence checks
-# in scripts/build.sh; this is how those are proved to work.  The expected
-# diagnostic is a regular expression because the one it checks counts classes.
-assert_build_script_fails() {
+# THE EVIDENCE CENSUS, REACHED WITHOUT REBUILDING THE WORLD.
+#
+# Some defects are invisible to any single Maven goal and are caught only by
+# the evidence census in the gates stage of scripts/build.sh.  Until 2026-11-05
+# controls 7 and 8 proved it by running the whole of `bash scripts/build.sh
+# --offline` in the sandbox, twice: a full clean verify of every module with
+# every test, then PIT over the reactor, about two hours each, to reach one
+# check.  Now control C builds the sandbox ONCE, from its pristine sources, and
+# each control rebuilds only cometgui-domain, the module it damages (it already
+# did), and then runs the census alone over the sandbox with
+#
+#   bash scripts/build.sh --gates-census-root _build/test-gate-sandbox
+#
+# which is the working tree's own scripts/build.sh executing the very function
+# its gates stage executes in a real build (gates_evidence_census), not a copy.
+# What --gates-census-root adds in front of it, and only there, is the currency
+# check a sandbox needs and a real build gets for free from `clean verify`: a
+# module with main sources and no compiled classes is NO EVIDENCE rather than
+# inert, and evidence older than the sources beside it is STALE.  Controls 7
+# and 8 show those bite too, with the defect present.
+#
+# The diagnostics are regular expressions because the census counts classes.
+census_run() {
+    local log="$1" rc=0
+    bash "${ROOT}/scripts/build.sh" --gates-census-root "${SANDBOX}" >"${log}" 2>&1 || rc=$?
+    return "${rc}"
+}
+
+# assert_census_fails <label> <expected diagnostic, an ERE> <log>
+assert_census_fails() {
     local label="$1" expected="$2" log="$3" rc=0
-    ( cd "${SANDBOX}" && bash scripts/build.sh --offline ) >"${log}" 2>&1 || rc=$?
+    census_run "${log}" || rc=$?
     if [ "${rc}" -eq 0 ]; then
-        record_fail "${label}: scripts/build.sh exited 0 with the defect present (log: ${log#"${ROOT}/"})"
+        record_fail "${label}: scripts/build.sh's evidence census exited 0 with the defect present (log: ${log#"${ROOT}/"})"
         return
     fi
     if ! grep -qE -- "${expected}" "${log}"; then
@@ -365,6 +406,26 @@ assert_build_script_fails() {
     fi
     record_pass "${label}: rejected, exit ${rc}"
     printf '         %s\n' "$(grep -E -- "${expected}" "${log}" | head -1 | cut -c1-160)"
+}
+
+# assert_census_passes <label> <log>
+assert_census_passes() {
+    local label="$1" log="$2" rc=0
+    census_run "${log}" || rc=$?
+    if [ "${rc}" -ne 0 ] || ! grep -qF -- "OK: the gates stage's evidence census passed over" "${log}"; then
+        record_fail "${label}: the census did not accept the sandbox (exit ${rc}; log: ${log#"${ROOT}/"})"
+        printf '         %s\n' "$(grep -E -- '^   [A-Z]{5}|^FATAL' "${log}" | head -3 | cut -c1-140)"
+        return
+    fi
+    record_pass "${label}: exit 0"
+}
+
+# assert_census_counted <label> <log> <n> -- the census failed for exactly n
+# reasons.  A control whose census is also red for a reason nobody injected
+# proves less than it claims: the expected line could be the only one that
+# happened to match.
+assert_census_counted() {
+    assert_log_matches "$1" "$2" "^FATAL: $3 test-gate evidence check\\(s\\) failed\\.\$"
 }
 
 # Harness falsifiability: a control whose defect was never written to disk must
@@ -416,11 +477,14 @@ build_sandbox() {
     # symlink, not a copy: tools/ holds a JDK, Maven and 30 MB of fonts.
     ln -s "${ROOT}/tools" "${SANDBOX}/tools"
 
-    # Control 7 runs the documented build command inside the sandbox, so it
-    # needs the scripts (copied, not symlinked: build.sh derives the repository
-    # root from its own path), the virtualenv and the populated local
-    # repository.  The last two are symlinks because they are large and are only
-    # read.
+    # The sandbox build reads scripts/ as input (cometgui-app's ProjectXvfb
+    # compiles scripts/feasibility/gui-spike/xkbcomp-path-shim.c, its real-run
+    # helpers read scripts/), and the local repository.  scripts/ is copied,
+    # not symlinked, so that nothing a test does there can reach the working
+    # tree; the virtualenv and the repository are symlinks because they are
+    # large and are only read.  Controls 7 and 8 used to run scripts/build.sh
+    # in here; they now run the working tree's scripts/build.sh over this
+    # directory with --gates-census-root (see census_run).
     cp -r "${ROOT}/scripts" "${SANDBOX}/scripts"
     ln -s "${ROOT}/.venv" "${SANDBOX}/.venv"
     mkdir -p "${SANDBOX}/_build"
@@ -1016,6 +1080,68 @@ class UnassertedControlTest {
         -pl cometgui-domain clean test-compile org.pitest:pitest-maven:mutationCoverage
 }
 
+control_census_picture() {
+    banner "C  the census's picture: the whole sandbox, built once, from its pristine sources"
+    # Controls 7 and 8 damage cometgui-domain and grade the evidence census in
+    # scripts/build.sh, which reads EVERY module's target/.  For that verdict to
+    # mean what it would mean in a real build, the other eleven modules must
+    # carry exactly the evidence a real build would give them: compiled from
+    # these sources, tested, measured, in this run.  Not the working tree's
+    # target/ -- that is whatever the last build left, and it can be older
+    # than the sources (it was, on 2026-11-05: five modules' jacoco.xml
+    # predated the E12 repair's sources).  Not the sandbox as the controls
+    # above left it either: they compiled injected classes into it and did not
+    # clean.  So, once: every control above has restored what it damaged; prove
+    # that, then build and test the whole sandbox, and require the census to
+    # accept it.  That green census is the clean counterpart of 7 and 8.
+    local module
+    for module in "${ROOT}"/cometgui-*/; do
+        module="$(basename -- "${module}")"
+        cmp -s "${ROOT}/${module}/pom.xml" "${SANDBOX}/${module}/pom.xml" \
+            || die "HARNESS ERROR: ${module}/pom.xml in the sandbox differs from the working tree before control C; a control above did not restore it."
+        if [ -d "${ROOT}/${module}/src" ]; then
+            diff -r -q "${ROOT}/${module}/src" "${SANDBOX}/${module}/src" >/dev/null \
+                || die "HARNESS ERROR: ${module}/src in the sandbox differs from the working tree before control C; a control above did not restore it."
+        fi
+    done
+    cmp -s "${ROOT}/pom.xml" "${SANDBOX}/pom.xml" \
+        || die "HARNESS ERROR: the parent pom.xml in the sandbox differs from the working tree before control C."
+    printf '   every module'"'"'s sources and POM in the sandbox are byte-identical to the working tree\n'
+
+    assert_passes "the whole sandbox builds and tests green, once, from its pristine sources" \
+        "${LOGS}/C-picture-verify.log" clean verify
+
+    # How much real testing the picture rests on, from the reports themselves.
+    local reports=0 tests=0 file count
+    while IFS= read -r file; do
+        reports=$((reports + 1))
+        count="$(sed -n 's/.*<testsuite [^>]*tests="\([0-9]*\)".*/\1/p' "${file}" | head -1)"
+        tests=$((tests + ${count:-0}))
+    done < <(find "${SANDBOX}"/cometgui-*/target/surefire-reports -name 'TEST-*.xml' -type f 2>/dev/null)
+    sizing "the picture's build ran ${tests} test(s) in ${reports} surefire report(s) across the reactor"
+    if [ "${tests}" -gt 0 ]; then
+        record_pass "the picture was built by running the tests: ${tests} in ${reports} report(s)"
+    else
+        record_fail "the picture's build reported no tests at all; its evidence measures nothing"
+    fi
+
+    assert_census_passes "scripts/build.sh's evidence census accepts the honestly built sandbox" \
+        "${LOGS}/C-picture-census.log"
+    assert_log_matches "and it graded cometgui-domain's population rather than skipping it" \
+        "${LOGS}/C-picture-census.log" \
+        '^   ok       cometgui-domain +[1-9][0-9]* compiled class\(es\), all [1-9][0-9]* in the sample$'
+
+    # The shortcut is not a way round a real build: over the working tree it
+    # refuses, whatever is in target/ there.
+    local rc=0
+    bash "${ROOT}/scripts/build.sh" --gates-census-root "${ROOT}" >"${LOGS}/C-refuses-working-tree.log" 2>&1 || rc=$?
+    if [ "${rc}" -ne 0 ] && grep -qF -- '--gates-census-root refuses the repository itself' "${LOGS}/C-refuses-working-tree.log"; then
+        record_pass "--gates-census-root refuses the working tree, exit ${rc}"
+    else
+        record_fail "--gates-census-root ran over the working tree (exit ${rc}); it must refuse it (log: ${LOGS#"${ROOT}/"}/C-refuses-working-tree.log)"
+    fi
+}
+
 control_unmeasured_coverage() {
     banner "7  the vacuous pass JaCoCo offers for free: a module with no execution data"
     # This is the failure the brief calls the main risk of this unit, and it is
@@ -1040,6 +1166,14 @@ with open(path, "w", encoding="utf-8") as handle:
 PYTHON
     assert_modified "unmeasured coverage" "cometgui-domain/pom.xml"
 
+    # The shortcut must not read old evidence and pass.  The defect is in the
+    # POM and the module has NOT been rebuilt: its target/ still holds control
+    # C's clean jacoco.xml, which the census would read as "ok".  It must say
+    # STALE instead -- the defect present and the evidence old is red.
+    assert_census_fails "with the defect present and cometgui-domain not rebuilt, its old evidence is STALE, not read" \
+        '^   STALE    cometgui-domain: cometgui-domain/pom\.xml is newer than$' \
+        "${LOGS}/07-unmeasured-stale-census.log"
+
     assert_passes "mvn verify still exits 0 with no coverage data at all (the vacuous pass)" \
         "${LOGS}/07-unmeasured-verify.log" -pl cometgui-domain clean verify
     assert_log_contains "the 90% / 85% rule was never evaluated" \
@@ -1049,14 +1183,17 @@ PYTHON
     # The count in that diagnostic is the number of classes the module compiles,
     # which grows with the module; what must be true is that it named THIS
     # module, counted at least one class, and said no report existed for them.
-    assert_build_script_fails "the documented build command rejects unmeasured coverage" \
+    assert_census_fails "scripts/build.sh's evidence census rejects unmeasured coverage" \
         'MISSING  cometgui-domain: [1-9][0-9]* class\(es\) with code but no jacoco\.xml' \
-        "${LOGS}/07-unmeasured-buildsh.log"
+        "${LOGS}/07-unmeasured-census.log"
+    assert_census_counted "and for that reason alone: one evidence check failed" \
+        "${LOGS}/07-unmeasured-census.log" 1
 
     restore_from_tree "cometgui-domain/pom.xml"
-    # The clean counterpart of this control is acceptance condition 1 itself:
-    # `bash scripts/build.sh` in the working tree, which exits 0.  Running the
-    # whole build a second time here would cost 90 s to prove the same thing.
+    # The clean counterpart of this control is control C's green census over
+    # the same sandbox, and acceptance condition 1 itself: `bash
+    # scripts/build.sh` in the working tree, which exits 0 (well over an hour
+    # at Phase 14; it is not repeated here).
 }
 
 control_class_left_the_coverage_sample() {
@@ -1124,9 +1261,9 @@ PYTHON
         "All coverage checks have been met"
 
     # Second half: the census names the class, by name, and fails the build.
-    assert_build_script_fails "the documented build command rejects the incomplete population" \
+    assert_census_fails "scripts/build.sh's evidence census rejects the incomplete population" \
         'ABSENT   cometgui-domain: compiled, but missing from jacoco\.xml' \
-        "${LOGS}/08-left-sample-buildsh.log"
+        "${LOGS}/08-left-sample-census.log"
     # ANCHORED, and the anchors are the point.  A plain substring search for the
     # class name passes on "[INFO] Running org.cometgui.domain.secrets.
     # SecretRegistryTest", which surefire prints on every build -- so the
@@ -1135,9 +1272,38 @@ PYTHON
     # absent class indented on a line of its own, so match that and nothing
     # else: leading whitespace, the exact name, end of line.
     assert_log_matches "and it names the class that left the sample, on the census's own line" \
-        "${LOGS}/08-left-sample-buildsh.log" \
+        "${LOGS}/08-left-sample-census.log" \
         '^ +org\.cometgui\.domain\.secrets\.SecretRegistry$'
+    assert_census_counted "and for that reason alone: one evidence check failed" \
+        "${LOGS}/08-left-sample-census.log" 1
 
+    # The shortcut must not let missing or old evidence ELSEWHERE pass, or hide
+    # the defect.  With the defect still in place: first a module that was
+    # never built (its target/ moved aside -- the census alone would call it
+    # inert), then one whose evidence predates a source beside it.  Each must be
+    # reported, and the domain's defect with it.
+    local other="cometgui-results" other_source
+    mv -- "${SANDBOX}/${other}/target" "${SANDBOX}/${other}/target.aside"
+    [ ! -e "${SANDBOX}/${other}/target" ] \
+        || die "HARNESS ERROR: ${other}/target is still in the sandbox; the control would test nothing."
+    assert_census_fails "a module with sources and no build is NO EVIDENCE, not inert" \
+        "^   NO EVIDENCE ${other}: main sources but no compiled classes under target/;\$" \
+        "${LOGS}/08-never-built-census.log"
+    assert_log_matches "and the domain's defect is still reported beside it" \
+        "${LOGS}/08-never-built-census.log" '^ +org\.cometgui\.domain\.secrets\.SecretRegistry$'
+    mv -- "${SANDBOX}/${other}/target.aside" "${SANDBOX}/${other}/target"
+
+    other_source="$(find "${SANDBOX}/${other}/src/main/java" -name '*.java' -type f | LC_ALL=C sort | head -1)"
+    [ -n "${other_source}" ] || die "HARNESS ERROR: ${other} has no main source to make newer than its evidence."
+    touch -- "${other_source}"
+    [ "${other_source}" -nt "${SANDBOX}/${other}/target/site/jacoco/jacoco.xml" ] \
+        || die "HARNESS ERROR: ${other_source#"${SANDBOX}/"} is not newer than its module's jacoco.xml; the control would test nothing."
+    printf '   touched  %s (now newer than %s/target/site/jacoco/jacoco.xml)\n' "${other_source#"${SANDBOX}/"}" "${other}"
+    assert_census_fails "a module whose evidence predates its sources is STALE, not read" \
+        "^   STALE    ${other}: ${other_source#"${SANDBOX}/"} is newer than\$" \
+        "${LOGS}/08-old-evidence-census.log"
+    assert_log_matches "and the domain's defect is still reported beside it" \
+        "${LOGS}/08-old-evidence-census.log" '^ +org\.cometgui\.domain\.secrets\.SecretRegistry$'
 
     restore_from_tree "cometgui-domain/pom.xml"
 }
@@ -1282,9 +1448,11 @@ preflight() {
 # -------------------------------------------------------------------- main --
 main() {
     PREFLIGHT_ONLY=0
+    CENSUS_ONLY=0
     case "${1:-}" in
         -h|--help) usage; exit 0 ;;
         --preflight) PREFLIGHT_ONLY=1 ;;
+        --census-only) CENSUS_ONLY=1 ;;
         "") ;;
         *) usage >&2; die "unknown option: $1" ;;
     esac
@@ -1303,13 +1471,18 @@ main() {
     started="$(date +%s)"
 
     build_sandbox
-    control_baseline
-    control_javafx_in_domain
-    control_processbuilder_outside_process_service
-    control_truncated_import
-    control_untested_class_in_gated_package
-    control_untested_viewmodel
-    control_unasserted_test
+    if [ "${CENSUS_ONLY}" -eq 1 ]; then
+        printf '\n--census-only: controls C, 7, 8 and S alone. This is NOT the gate.\n'
+    else
+        control_baseline
+        control_javafx_in_domain
+        control_processbuilder_outside_process_service
+        control_truncated_import
+        control_untested_class_in_gated_package
+        control_untested_viewmodel
+        control_unasserted_test
+    fi
+    control_census_picture
     control_unmeasured_coverage
     control_class_left_the_coverage_sample
     control_harness_self_test
