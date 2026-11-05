@@ -11,8 +11,9 @@ Project Status
    2026-11-05: *"Resume Phase 15"*, and decided ``D-014`` and ``D-015`` (the
    mutation gate counts ``TIMED_OUT`` as detected and grades each critical
    package at 80%). ``D-006``'s CI-fixture half is still open and the
-   owner's. Standing owner instruction (2026-10-08): *"When all is green
-   with the current phase, push, then move on to the next phase."*
+   owner's. **The owner will pause after it** (2026-11-05): *"Pause after
+   Phase 15 is signed off and pushed"* -- this overrides, for 15 to 16, the
+   standing instruction (2026-10-08) to push and move on.
 :Overall: Fifteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
    05, 08, 09, 10, 11, 12, 13 and 14 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
