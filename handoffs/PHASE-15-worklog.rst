@@ -248,7 +248,53 @@ Sign-offs
 Unit 1 sign-off
 ---------------
 
-Pending.
+**Accepted 2026-11-05 at** ``a3f2ff5``, one round. One fresh agent.
+
+*Diff read* (31 files). ``ToolOffer`` gains ``failureReason``, required
+exactly in state ``FAILED`` and refused in every other state, so "failed, cause
+unknown" is unrepresentable; cancelled stays reasonless. ``ArtefactInstaller``
+gains an ``InstallFailureListener`` told the failing ``InstallStep`` and the
+exception *before* the terminal report; ``ManagedToolManager`` keeps state and
+reason in one ``Attempt`` entry (one writer of FAILED, the listener), the text
+``Install step N of 8, <STEP>, failed: <cause>`` through
+``SecretRedactor.patternsOnly()``; ``ArtefactUnavailableException``'s
+``D-008`` words pass unchanged. Row label ``tool-row-<key>-failure``;
+``ToolManagerViewModel`` writes one console ERROR line per failed install.
+Tests that pinned "a failed row carries no reason" were replaced by assertions
+of the reason, none deleted; ``StableIdentifierPinTest`` 610 -> 611. No POM,
+PIT, floor or harness change. Installer steps unchanged.
+
+*My runs:*
+
+* ``mvn -o -B install`` over the whole reactor (46 min 58 s): every module's
+  tests green -- domain 1238, provenance 709 (2 skipped), process 281, results
+  1310, tools 1127 (1), install 1069 (2), params-comet 2123,
+  params-percolator 68, workflow 1038, ui 843, app 573 (91 opt-in skipped),
+  archtests 40; 0 failures, 0 errors. (The run ends with archtests' "no file
+  to install", which is packaging, after its tests passed.) Run as
+  ``install`` deliberately: the agent had installed an early
+  ``cometgui-domain`` jar into ``_build/m2repo``, leaving its ``org/cometgui``
+  jars from two different trees; they are now all from ``a3f2ff5``.
+* PIT on ``org.cometgui.domain.tools.ToolOffer*``: 46 generated, 46 killed.
+  The agent's PIT on ``ManagedToolManager*`` and ``ArtefactInstaller*``: 92/92.
+* ``verify-all-gates.sh --only install,quality,shell,docs,e2e`` (4 jobs):
+  docs 1, quality 42, shell 30, install 95, e2e 50 -- all PASS, shared
+  resources unchanged, exit 0.
+
+*My injections*, each into production code, anchor count 0 while in,
+``sha256sum -c`` FAILED while in and OK after restore:
+
+* ``ArtefactInstaller.failedStep`` returning no step:
+  ``FailedInstallReasonTest`` + ``InstallFailureListenerTest`` red, 11 of 19
+  (``step1``, ``step3``, ``step4``, ``step6``, ``anErrorIsToldToo`` ...).
+* ``ToolManagerPane`` never showing the reason
+  (``showOptional(failure, Optional.empty())``):
+  ``ToolManagerPaneTest.aFailedRowSaysWhy`` red, 1 of 15.
+
+*Residue named by the agent, accepted as residue:* the probe's words for an
+executable that exits non-zero do not include the exit status, so the reason
+does not either (probe wording, out of scope); a failed install's reason lives
+in memory and is gone after a restart (documented in ``docs/tool_manager.rst``).
 
 Unit 2 sign-off
 ---------------
