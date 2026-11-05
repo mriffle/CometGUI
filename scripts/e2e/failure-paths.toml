@@ -48,7 +48,7 @@ note = "One flipped byte at the pinned URL: rejected at DOWNLOADING with nothing
 number = 2
 text = "network unavailable on first install"
 status = "covered"
-note = "A refused connection through the real HttpDownloader: FAILED after one attempt at the pinned URL, nothing probed or executed, the cache empty, Install offered again and then succeeding. The installer's exception names the URL and the ConnectException; the Tool Manager row says only that the attempt did not succeed (8a-D1)."
+note = "A refused connection through the real HttpDownloader: FAILED after one attempt at the pinned URL, nothing probed or executed, the cache empty, Install offered again and then succeeding. The installer's exception names the URL and the ConnectException, and since Phase 15 unit 1 the Tool Manager row, the port's offer and the console's log carry it after the failing install step (8a-D1, repaired)."
 
   [[scenario.test]]
   id = "org.cometgui.app.gui.NetworkUnavailableUiTest#firstInstallWithoutANetwork"

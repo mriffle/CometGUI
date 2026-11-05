@@ -44,6 +44,20 @@ public final class ToolOffers {
     /** Percolator 3.07.1's real download on Linux: the portable zip plus the XSD companion. */
     public static final long PERCOLATOR_3_07_1_LINUX_BYTES = 2_798_963L;
 
+    /**
+     * Why {@link #pdvFailed()}'s install failed, worded as {@code ManagedToolManager} words a
+     * vanished artefact ({@code D-008}). Hand-typed.
+     */
+    public static final String PDV_FAILURE =
+            "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the pinned artefact is no"
+                    + " longer available upstream: HTTP 404 for"
+                    + " https://github.com/wenbostar/PDV/releases/download/v2.7.0/PDV-2.7.0.zip;"
+                    + " expected sha-256"
+                    + " 0b1c2d3e4f5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0. CometGUI"
+                    + " redistributes no tool binary and holds no copy (D-008), so this is an"
+                    + " upstream availability failure, not a corrupt download and not a probe"
+                    + " failure: the release asset has been removed or re-tagged.";
+
     /** The first of Percolator 3.07.1's two advisories, from {@code manifests/tools.json}. */
     public static final String I_SPLINE_ADVISORY =
             "Percolator 3.07.1 predates 3.08's change of the default PEP regressor to I-splines, so"
@@ -176,7 +190,35 @@ public final class ToolOffers {
                 List.of(),
                 Optional.empty(),
                 Optional.empty(),
-                OptionalLong.of(103_407_417L));
+                OptionalLong.of(103_407_417L),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(PDV_FAILURE));
+    }
+
+    /**
+     * The same build as {@code available}, after an install attempt that failed for {@code reason}.
+     *
+     * @param available a managed offer that is not installed
+     * @param reason why the attempt failed, as the port words it
+     * @return the failed offer
+     */
+    public static ToolOffer failed(ToolOffer available, String reason) {
+        return new ToolOffer(
+                available.tool(),
+                available.version(),
+                available.origin(),
+                ToolInstallState.FAILED,
+                available.capabilities(),
+                available.advisories(),
+                Optional.empty(),
+                Optional.empty(),
+                available.downloadSizeBytes(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(reason));
     }
 
     /**

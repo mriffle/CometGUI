@@ -43,6 +43,8 @@ import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.TestFxUiDriver;
 import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.BoundedMessageLog;
+import org.cometgui.domain.log.LogMessage;
+import org.cometgui.domain.log.MessageSeverity;
 import org.cometgui.domain.platform.GlibcVersion;
 import org.cometgui.domain.tools.HostArchitecture;
 import org.cometgui.domain.tools.HostOperatingSystem;
@@ -72,9 +74,10 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <ol>
  *   <li><strong>No network on the first install.</strong> Comet's Install is pressed in the Tool
- *       Manager with the network down. The row ends saying the attempt did not succeed, names no
- *       location, offers Install again; nothing was executed, nothing is in the cache, and Run
- *       still says Comet is not installed.
+ *       Manager with the network down. The row ends saying the attempt did not succeed and why --
+ *       the install step, the URL the transfer went to and the refused connection -- the console's
+ *       log says the same, Install is offered again; nothing was executed, nothing is in the cache,
+ *       and Run still says Comet is not installed.
  *   <li><strong>The network back.</strong> The same Install control, pressed again, installs Comet;
  *       Percolator installs beside it.
  *   <li><strong>No network once both are cached.</strong> The network is taken away again, and a
@@ -83,14 +86,11 @@ import org.junit.jupiter.api.io.TempDir;
  *       section, with <strong>not one fetch</strong> after the cut.
  * </ol>
  *
- * <p><strong>What the row cannot say.</strong> The specification's scenario wants the failure in
- * words; the row says "the last install attempt did not succeed" and no more, because {@code
- * ManagedToolManager} keeps only the attempt's outcome and {@code ToolRowViewModel} documents that
- * a failed row carries no reason. The reason does exist one layer down -- {@code
- * NetworkUnavailableTest} in cometgui-install proves the installer's exception names the URL and
- * the refused connection -- and that it never reaches the window is reported by Phase 14 unit 8a as
- * a defect for the orchestrator. This class asserts what the window shows today, and nothing it
- * does not.
+ * <p><strong>The failure in words.</strong> The specification's scenario wants the failure in
+ * words. Phase 14 unit 8a found that the row said "the last install attempt did not succeed" and no
+ * more, because {@code ManagedToolManager} discarded the installer's exception; since Phase 15 unit
+ * 1 the row's failure label carries the step and the exception's own words, and the same line
+ * reaches the console's message log. Both are asserted here, word for word.
  *
  * <p>What is real: the application and its sections, {@code ManagedToolManager} as {@link
  * ToolManagerWiring} composes it over an empty cache, the shipped manifest, the real downloader,
@@ -167,6 +167,8 @@ class NetworkUnavailableUiTest {
 
     private static FxUiDriver driver;
 
+    private static BoundedMessageLog messageLog;
+
     @BeforeAll
     static void launch() throws IOException {
         Path root = scratch.toRealPath();
@@ -197,12 +199,10 @@ class NetworkUnavailableUiTest {
                         Clock.systemUTC(),
                         ToolManagerWiring.installThreads(),
                         network);
+        messageLog = new BoundedMessageLog();
         app =
                 ParameterEditorApp.launch(
-                        BUILD,
-                        launches,
-                        new BoundedMessageLog(),
-                        new RunWiring.Setup(() -> manager, project));
+                        BUILD, launches, messageLog, new RunWiring.Setup(() -> manager, project));
         driver = new TestFxUiDriver(app.application());
     }
 
@@ -226,8 +226,9 @@ class NetworkUnavailableUiTest {
     @Test
     @Order(1)
     @DisplayName(
-            "network unavailable on the first install: the row says the attempt did not succeed,"
-                    + " Install is offered again, nothing ran, the cache is empty")
+            "network unavailable on the first install: the row says the attempt did not succeed"
+                    + " and why, the log says the same, Install is offered again, nothing ran, the"
+                    + " cache is empty")
     void firstInstallWithoutANetwork() throws IOException, InterruptedException {
         driver.clickOn("nav-tool-manager");
         driver.clickOn(COMET_ROW + "-install");
@@ -238,8 +239,38 @@ class NetworkUnavailableUiTest {
                         FAILED::equals,
                         INSTALL_BOUND);
         ToolCache cache = new ToolCache(cacheRoot, new StreamingHashService());
+        String why =
+                "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the request to"
+                        + " http://127.0.0.1:"
+                        + network.deadPort()
+                        + comet().url().getPath()
+                        + " failed before any body arrived: java.net.ConnectException";
+        List<String> logged =
+                Await.until(
+                        "the console's log to record the failed install",
+                        () ->
+                                messageLog.snapshot().stream()
+                                        .filter(
+                                                message ->
+                                                        message.severity() == MessageSeverity.ERROR)
+                                        .map(LogMessage::text)
+                                        .filter(text -> text.startsWith("The install of "))
+                                        .toList(),
+                        lines -> !lines.isEmpty(),
+                        INSTALL_BOUND);
         assertAll(
                 () -> assertEquals(FAILED, shown),
+                () ->
+                        assertEquals(
+                                why,
+                                driver.textOf(COMET_ROW + "-failure"),
+                                "the row says why: the step, the URL the transfer went to, and"
+                                        + " the refused connection"),
+                () ->
+                        assertEquals(
+                                List.of("The install of comet 2026.03.0 did not succeed. " + why),
+                                logged,
+                                "and the console's log says the same, once"),
                 () ->
                         assertFalse(
                                 RunSection.isDisabled(driver, COMET_ROW + "-install"),

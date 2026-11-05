@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import javafx.beans.property.ReadOnlyObjectProperty;
+import org.cometgui.domain.secrets.SecretRedactor;
 import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallPhase;
@@ -43,18 +44,23 @@ import org.cometgui.domain.tools.ToolOrigin;
  * what the manager already decided -- so a row can be read in a test with no toolkit started and
  * the string a user sees is the string the test asserts.
  *
- * <p>Two components carry no wording of this class's own and are rendered
+ * <p>Three components carry no wording of this class's own and are rendered
  * <strong>verbatim</strong>: the {@code R-PLAT-03} loader diagnostic, which already names the
- * required version, the host's version and the alternatives, and each advisory's sentence ({@code
- * R-PERC-11}). Re-wording either would be this application saying something the domain did not.
+ * required version, the host's version and the alternatives; each advisory's sentence ({@code
+ * R-PERC-11}); and a failed install's reason, which names the install step that failed and carries
+ * the cause's own words. Re-wording any of them would be this application saying something the
+ * domain did not.
  *
- * <h2>What is deliberately not here</h2>
+ * <h2>A failed install says why</h2>
  *
- * <p><strong>A failed install carries no reason.</strong> {@link ToolInstallState#FAILED} says an
- * install was attempted and did not succeed, and the only reason-carrying component an offer has is
- * {@link ToolOffer#loaderDiagnostic()} -- which a checksum, extraction or probe failure does not
- * set. {@link #stateText()} therefore says that the attempt failed and stops. Inventing a sentence
- * for it would be this layer making up a fact about a download it did not watch.
+ * <p>{@link #stateText()} says that the last attempt did not succeed, and {@link #failureText()}
+ * says why: {@link ToolOffer#failureReason()}, which the domain requires on every {@link
+ * ToolInstallState#FAILED} offer. Until Phase 15 a failed row carried no reason at all -- the
+ * installer's exception was discarded on the install thread -- and an install that failed after its
+ * whole download could not be diagnosed. The reason passes through the project's one redactor
+ * ({@code R-SEC-03}) here as well as where the port stored it, because this string is shown on
+ * screen and written to the console's log, and the port is an interface any implementation can
+ * stand behind.
  *
  * <h2>The key, and why it is not the tool and the version</h2>
  *
@@ -76,6 +82,12 @@ public final class ToolRowViewModel {
 
     /** What {@link #advisoriesText()} says for a build with no caveats. */
     public static final String NO_ADVISORIES = "Advisories: none";
+
+    /**
+     * The one redactor ({@code R-SEC-03}), in its patterns-only form: nothing on this row is a
+     * credential the session admitted, so the patterns are the whole of what applies.
+     */
+    private static final SecretRedactor REDACTOR = SecretRedactor.patternsOnly();
 
     /** What {@link #downloadText()} says where this host would fetch nothing. */
     public static final String NOTHING_TO_DOWNLOAD = "Download: nothing to fetch on this host";
@@ -249,6 +261,17 @@ public final class ToolRowViewModel {
      */
     public Optional<String> diagnosticText() {
         return offer.get().loaderDiagnostic().map(LoaderDiagnostic::message);
+    }
+
+    /**
+     * Why the last install attempt of this build did not succeed, exactly as the domain gave it,
+     * redacted.
+     *
+     * @return the install step that failed and the cause's own words, or empty where the last
+     *     attempt did not fail
+     */
+    public Optional<String> failureText() {
+        return offer.get().failureReason().map(REDACTOR::redactText);
     }
 
     /**

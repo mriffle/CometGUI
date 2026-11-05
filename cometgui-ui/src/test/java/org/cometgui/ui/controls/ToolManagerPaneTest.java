@@ -242,8 +242,8 @@ class ToolManagerPaneTest {
     }
 
     @Test
-    @DisplayName("a failed row says the attempt failed and claims no reason it does not have")
-    void aFailedRowClaimsNoReasonItDoesNotHave() throws InterruptedException {
+    @DisplayName("a failed row says the attempt failed and why, under its own identifier")
+    void aFailedRowSaysWhy() throws InterruptedException {
         Fixture fixture = shown(everyKindOfOffer());
 
         assertAll(
@@ -252,10 +252,21 @@ class ToolManagerPaneTest {
                                 "CometGUI-managed: the last install attempt did not succeed",
                                 fixture.textOf(UiIds.toolRowState(PDV))),
                 () ->
+                        assertEquals(
+                                ToolOffers.PDV_FAILURE,
+                                fixture.textOf(UiIds.toolRowFailure(PDV)),
+                                "the step that failed and the cause's own words"),
+                () -> assertTrue(fixture.isShowing(UiIds.toolRowFailure(PDV))),
+                () ->
+                        assertFalse(
+                                fixture.isShowing(UiIds.toolRowFailure(PERCOLATOR_3_07_1)),
+                                "a row whose last attempt did not fail shows no failure"),
+                () ->
                         assertFalse(
                                 fixture.isShowing(UiIds.toolRowDiagnostic(PDV)),
-                                "a checksum, extraction or probe failure carries no diagnostic"
-                                        + " through the port, and the view does not invent one"),
+                                "a download, checksum, extraction or probe failure is not a"
+                                        + " loader diagnostic, and the view does not dress it as"
+                                        + " one"),
                 () ->
                         assertFalse(
                                 fixture.isDisabled(UiIds.toolRowInstall(PDV)),

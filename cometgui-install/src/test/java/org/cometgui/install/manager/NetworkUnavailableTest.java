@@ -48,11 +48,10 @@ import org.junit.jupiter.api.io.TempDir;
  * connection through the real {@code HttpDownloader}.
  *
  * <p>What a scientist sees in the window is {@code NetworkUnavailableUiTest} in cometgui-app. The
- * reason a failed install carries is stated here at the one layer that has it -- {@code
- * ArtefactInstaller}'s exception -- because {@code ManagedToolManager} records only that the
- * attempt failed (its {@code runInstall} catches the exception, and {@code ToolRowViewModel}
- * documents that a failed row carries no reason). That the window cannot say why is reported by
- * Phase 14 unit 8a as a defect for the orchestrator to decide; nothing here asserts it either way.
+ * reason a failed install carries is stated here twice: at the installer, whose exception names the
+ * URL and the refused connection, and at the port, whose row carries that exception's words after
+ * the step that failed ({@link ToolOffer#failureReason()}, Phase 15 unit 1). Phase 14 unit 8a
+ * reported the second missing -- the row said only that the attempt failed.
  *
  * <p>Files read outside this module: the real artefacts in {@code scratch/phase05/artefacts}, as
  * every test of {@link ToolManagerFixtures} does.
@@ -123,6 +122,18 @@ class NetworkUnavailableTest {
                                     rowFor(offers, PERCOLATOR_3_07_1).state(),
                                     "the row says the attempt failed -- the state from which"
                                             + " the Tool Manager offers Install again"),
+                    () ->
+                            assertEquals(
+                                    Optional.of(
+                                            "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE,"
+                                                    + " failed: the request to http://127.0.0.1:"
+                                                    + network.deadPort()
+                                                    + record.url().getPath()
+                                                    + " failed before any body arrived:"
+                                                    + " java.net.ConnectException"),
+                                    rowFor(offers, PERCOLATOR_3_07_1).failureReason(),
+                                    "and says why: the step, the URL the transfer went to, and"
+                                            + " the refused connection"),
                     () ->
                             assertEquals(
                                     ToolInstallState.NOT_INSTALLED,

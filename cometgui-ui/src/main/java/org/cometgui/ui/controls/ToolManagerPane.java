@@ -46,9 +46,10 @@ import org.cometgui.ui.viewmodel.ToolRowViewModel;
  *
  * <p>The tool and the version, the state, what the build can do with the evidence behind each
  * claim, its advisories, how many bytes installing it would move, the {@code R-PLAT-03} loader
- * diagnostic where there is one, and where it is installed where it is. Every one of those strings
- * is produced by {@link ToolRowViewModel} and asserted there; this class places them and gives each
- * one a stable identifier. There is no logic here beyond showing and hiding.
+ * diagnostic where there is one, why the last install attempt failed where it did, and where it is
+ * installed where it is. Every one of those strings is produced by {@link ToolRowViewModel} and
+ * asserted there; this class places them and gives each one a stable identifier. There is no logic
+ * here beyond showing and hiding.
  *
  * <h2>A build that cannot run here is shown, not hidden</h2>
  *
@@ -261,6 +262,8 @@ public final class ToolManagerPane extends VBox {
 
         private final Label diagnostic = new Label();
 
+        private final Label failure = new Label();
+
         private final Label installedPath = new Label();
 
         private final Label progress = new Label();
@@ -288,6 +291,7 @@ public final class ToolManagerPane extends VBox {
             prepare(advisories, UiIds.toolRowAdvisories(key), "advisories for " + name);
             prepare(download, UiIds.toolRowDownload(key), "download size of " + name);
             prepare(diagnostic, UiIds.toolRowDiagnostic(key), "loader diagnostic for " + name);
+            prepare(failure, UiIds.toolRowFailure(key), "why the install of " + name + " failed");
             prepare(installedPath, UiIds.toolRowPath(key), "installed location of " + name);
             prepare(progress, UiIds.toolRowProgress(key), "install progress for " + name);
 
@@ -308,6 +312,7 @@ public final class ToolManagerPane extends VBox {
                             advisories,
                             download,
                             diagnostic,
+                            failure,
                             installedPath,
                             progress,
                             actions);
@@ -331,6 +336,7 @@ public final class ToolManagerPane extends VBox {
             advisories.setText(row.advisoriesText());
             download.setText(row.downloadText());
             showOptional(diagnostic, row.diagnosticText());
+            showOptional(failure, row.failureText());
             showOptional(installedPath, row.installedPathText());
             showOptional(progress, row.progressText());
             install.setDisable(!row.canInstall());

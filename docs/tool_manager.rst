@@ -64,6 +64,10 @@ Each row carries:
     The loader diagnostic, printed exactly as produced, naming what the build
     requires, what this machine has, and what else you could use instead.
 
+**Why the last install attempt failed**, where it did
+    The install step that failed and the cause in its own words. See
+    :ref:`tool-manager-failed-install`.
+
 **Where it is installed**, once it is
     ``Installed at: ...``.
 
@@ -263,6 +267,39 @@ If a download arrives corrupt, it is rejected and **the tool is never run**.
 The checksum check happens before anything is unpacked, and a failed check ends
 the install without launching a process.
 
+.. _tool-manager-failed-install:
+
+When an install fails
+---------------------
+
+A row whose install did not succeed says so --
+``CometGUI-managed: the last install attempt did not succeed`` -- and, under
+it, why. The reason names the install step that failed, by its number and its
+name, and then gives the cause exactly as the part of CometGUI that met it
+worded it. Three examples:
+
+* ``Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: SHA-256 mismatch,
+  so the artefact is rejected and is never executed ...`` -- the bytes that
+  arrived are not the bytes the manifest pins. The line goes on to give both
+  digests.
+* ``Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the pinned artefact
+  is no longer available upstream: HTTP 404 for ...`` -- the file has gone from
+  the place upstream published it. CometGUI keeps no copy of any tool
+  (``D-008``), so this is worded as an *availability* failure, with the URL and
+  the checksum it expected, and never as a corrupt download or a broken tool.
+* ``Install step 6 of 8, PROBE, failed: ...`` -- the build was downloaded and
+  unpacked, but running it on this machine did not work.
+
+The same line, prefixed with ``The install of <tool> <version> did not
+succeed.``, is written to the console as an error, once per failed attempt.
+Anything in the cause that looks like a credential -- a token in a URL, a
+password -- is replaced with ``[REDACTED]`` before it reaches the row or the
+console.
+
+A cancelled install is not a failure: the row goes back to *not installed* and
+carries no reason. Pressing **Install** again on a failed row starts a fresh
+attempt, and the reason is cleared while it runs.
+
 .. _tool-manager-diagnostics:
 
 When a build will not run here
@@ -303,10 +340,9 @@ Percolator of your own is registered from the Percolator section --
 around an install. A tool installed or removed outside CometGUI while it is
 running is not noticed until the application is restarted.
 
-**A failed install does not say why.** ``the last install attempt did not
-succeed`` is all a row reports for a checksum, extraction or probe failure; only
-a *loader* failure carries a diagnostic. The row says what it knows rather than
-inventing a reason for a download it did not watch.
+**A failed install's reason lasts as long as the application.** It is held in
+memory, like the attempt itself: after a restart the row reads *not installed*
+again, and **Install** starts afresh.
 
 **Advisories hang off an artefact record, so a release with none here shows
 none.** Percolator 3.09 publishes nothing for Linux. The row is still there,

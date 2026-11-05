@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.cometgui.domain.tools.InstallHandle;
 import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
@@ -90,6 +91,8 @@ class TerminalReportSettlesFirstTest {
 
         private ToolInstallState stateAtTerminalReport;
 
+        private Optional<String> reasonAtTerminalReport;
+
         AsksWhileReporting(ToolManager manager) {
             this.manager = manager;
         }
@@ -99,7 +102,9 @@ class TerminalReportSettlesFirstTest {
             phases.add(progress.phase());
             if (progress.phase().isTerminal()) {
                 terminal = progress.phase();
-                stateAtTerminalReport = percolatorRow(manager.offers()).state();
+                ToolOffer row = percolatorRow(manager.offers());
+                stateAtTerminalReport = row.state();
+                reasonAtTerminalReport = row.failureReason();
             }
         }
 
@@ -111,6 +116,11 @@ class TerminalReportSettlesFirstTest {
         ToolInstallState stateAtTerminalReport() {
             terminal();
             return stateAtTerminalReport;
+        }
+
+        Optional<String> reasonAtTerminalReport() {
+            terminal();
+            return reasonAtTerminalReport;
         }
     }
 
@@ -146,7 +156,7 @@ class TerminalReportSettlesFirstTest {
     }
 
     @Test
-    @DisplayName("on FAILED the row already says the attempt did not succeed")
+    @DisplayName("on FAILED the row already says the attempt did not succeed, and why")
     void onFailedTheRowAlreadySaysTheAttemptFailed() throws IOException {
         ToolManagerHarness harness =
                 ToolManagerHarness.at(temporary.resolve("cache"))
@@ -165,6 +175,16 @@ class TerminalReportSettlesFirstTest {
         assertAll(
                 () -> assertEquals(InstallPhase.FAILED, listener.terminal()),
                 () -> assertEquals(ToolInstallState.FAILED, listener.stateAtTerminalReport()),
+                () ->
+                        assertEquals(
+                                Optional.of(
+                                        "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed:"
+                                                + " this test refuses every transfer, so the"
+                                                + " install fails at step 1"),
+                                listener.reasonAtTerminalReport(),
+                                "the reason is in place before the listener hears FAILED: one"
+                                        + " that read the row then and found no reason would have"
+                                        + " been told the install failed and not why"),
                 () ->
                         assertEquals(
                                 ToolInstallState.FAILED,
@@ -201,6 +221,11 @@ class TerminalReportSettlesFirstTest {
                                 listener.stateAtTerminalReport(),
                                 "cancelling is not failing, and the row must be back where it was"
                                         + " by the time the user is told it stopped"),
+                () ->
+                        assertEquals(
+                                Optional.empty(),
+                                listener.reasonAtTerminalReport(),
+                                "and a cancelled install carries no failure reason"),
                 () ->
                         assertEquals(
                                 ToolInstallState.NOT_INSTALLED,

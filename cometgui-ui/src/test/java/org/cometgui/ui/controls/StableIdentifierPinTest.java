@@ -206,8 +206,11 @@ class StableIdentifierPinTest {
      * presets and the notes; the executions with Copy command and the event log; the logs with Open
      * file location; the warnings; the actions' state; Export JSON, Export RST, Replace and the
      * exports' state; Verify against disk, its Cancel, its state and its rows).
+     *
+     * <p>Raised from 610 to 611 by phase 15 unit 1: one row-level label, {@code toolRowFailure},
+     * saying why a row's last install attempt did not succeed.
      */
-    private static final int PINNED_IDENTIFIER_COUNT = 610;
+    private static final int PINNED_IDENTIFIER_COUNT = 611;
 
     // -----------------------------------------------------------------------------------------
     // The pinned table. Every string below is typed out. Nothing here is derived from anything.
@@ -968,6 +971,7 @@ class StableIdentifierPinTest {
                     "toolRowAdvisories",
                     "toolRowDownload",
                     "toolRowDiagnostic",
+                    "toolRowFailure",
                     "toolRowPath",
                     "toolRowProgress",
                     "toolRowInstall",
@@ -1059,6 +1063,7 @@ class StableIdentifierPinTest {
                     Map.entry("toolRowAdvisories", "tool-row-percolator-3_07_1-1-advisories"),
                     Map.entry("toolRowDownload", "tool-row-percolator-3_07_1-1-download"),
                     Map.entry("toolRowDiagnostic", "tool-row-percolator-3_07_1-1-diagnostic"),
+                    Map.entry("toolRowFailure", "tool-row-percolator-3_07_1-1-failure"),
                     Map.entry("toolRowPath", "tool-row-percolator-3_07_1-1-path"),
                     Map.entry("toolRowProgress", "tool-row-percolator-3_07_1-1-progress"),
                     Map.entry("toolRowInstall", "tool-row-percolator-3_07_1-1-install"),

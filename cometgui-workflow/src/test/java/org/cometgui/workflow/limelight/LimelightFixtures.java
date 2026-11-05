@@ -492,7 +492,15 @@ final class LimelightFixtures {
                 List.of(),
                 Optional.empty(),
                 Optional.empty(),
-                fetchable ? OptionalLong.of(2_762_075L) : OptionalLong.empty());
+                fetchable ? OptionalLong.of(2_762_075L) : OptionalLong.empty(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                state == ToolInstallState.FAILED
+                        ? Optional.of(
+                                "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the"
+                                        + " request was refused")
+                        : Optional.empty());
     }
 
     /** What the scripted converter does with a conversion. */

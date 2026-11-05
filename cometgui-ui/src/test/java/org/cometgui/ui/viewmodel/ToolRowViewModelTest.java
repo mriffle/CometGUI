@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -60,6 +61,12 @@ class ToolRowViewModelTest {
      * therefore the wording the view contributes -- "Installed at: " -- with the path itself an
      * input rather than an expectation.
      */
+    /** Why an attempt failed, for an offer built in state FAILED. Hand-typed. */
+    private static final String REASON =
+            "Install step 6 of 8, PROBE, failed: percolator 3.07.1 linux-x86-64 was not installed:"
+                    + " the installed build was not accepted by the probe: exit status 127"
+                    + " (install step 6, PROBE)";
+
     private static final Path INSTALLED_AT =
             Path.of("opt", "cometgui", "tools", "comet", "2026.2.2", "bin", "comet")
                     .toAbsolutePath();
@@ -110,23 +117,73 @@ class ToolRowViewModelTest {
     }
 
     @Test
-    @DisplayName("a failed row carries no reason, because the port gives it none")
-    void aFailedRowCarriesNoReason() {
+    @DisplayName(
+            "a failed row says why, in the port's words, and does not dress it as a loader"
+                    + " diagnostic")
+    void aFailedRowSaysWhy() {
         ToolRowViewModel row = row(ToolOffers.pdvFailed());
 
         assertAll(
                 () ->
                         assertEquals(
+                                Optional.of(ToolOffers.PDV_FAILURE),
+                                row.failureText(),
+                                "the step that failed and the cause's own words, verbatim"),
+                () ->
+                        assertEquals(
                                 Optional.empty(),
                                 row.diagnosticText(),
-                                "the only reason-carrying component of an offer is its loader"
-                                        + " diagnostic, and a checksum, extraction or probe failure"
-                                        + " sets none; inventing a sentence here would be this"
-                                        + " layer making one up"),
+                                "a download, checksum, extraction or probe failure is not an"
+                                        + " R-PLAT-03 loader diagnostic"),
+                () ->
+                        assertEquals(
+                                "CometGUI-managed: the last install attempt did not succeed",
+                                row.stateText(),
+                                "and the state line stays the state"));
+    }
+
+    @Test
+    @DisplayName("a secret in a failure reason never reaches the row's text")
+    void aSecretInAFailureReasonIsRedacted() {
+        String token = "ghp_0123456789abcdefghijABCDEFGHIJ0123";
+        ToolRowViewModel row =
+                row(
+                        ToolOffers.failed(
+                                ToolOffers.percolatorAvailable(),
+                                "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the"
+                                        + " request to https://mirror.invalid/p.zip?token="
+                                        + token
+                                        + " was refused"));
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                Optional.of(
+                                        "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed:"
+                                                + " the request to"
+                                                + " https://mirror.invalid/p.zip?token=[REDACTED]"
+                                                + " was refused"),
+                                row.failureText()),
                 () ->
                         assertFalse(
-                                row.stateText().contains("because"),
-                                () -> "the state line claims a cause: " + row.stateText()));
+                                row.failureText().orElseThrow().contains(token),
+                                "the token itself"));
+    }
+
+    @Test
+    @DisplayName("a row whose last attempt did not fail has nothing to say about a failure")
+    void onlyAFailedRowHasAFailureText() {
+        Map<String, Optional<String>> seen = new LinkedHashMap<>();
+        for (ToolInstallState state : ToolInstallState.values()) {
+            seen.put(state.name(), row(managedPercolatorIn(state)).failureText());
+        }
+        Map<String, Optional<String>> expected = new LinkedHashMap<>();
+        for (ToolInstallState state : ToolInstallState.values()) {
+            expected.put(
+                    state.name(),
+                    state == ToolInstallState.FAILED ? Optional.of(REASON) : Optional.empty());
+        }
+        assertEquals(expected, seen);
     }
 
     @Test
@@ -483,6 +540,10 @@ class ToolRowViewModelTest {
                 state == ToolInstallState.INSTALLED ? Optional.of(INSTALLED_AT) : Optional.empty(),
                 state == ToolInstallState.UNAVAILABLE_ON_THIS_PLATFORM
                         ? OptionalLong.empty()
-                        : available.downloadSizeBytes());
+                        : available.downloadSizeBytes(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                state == ToolInstallState.FAILED ? Optional.of(REASON) : Optional.empty());
     }
 }

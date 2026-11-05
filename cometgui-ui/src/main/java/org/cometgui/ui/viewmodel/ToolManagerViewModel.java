@@ -18,20 +18,25 @@ package org.cometgui.ui.viewmodel;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.cometgui.domain.tools.InstallHandle;
+import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
 import org.cometgui.domain.tools.NoManagedBuild;
+import org.cometgui.domain.tools.ToolInstallState;
 import org.cometgui.domain.tools.ToolManager;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolOffer;
@@ -139,6 +144,19 @@ public final class ToolManagerViewModel {
     /** How the user picks the binary to register; {@code null} exactly when {@link #tools} is. */
     private final FileChooserPort chooser;
 
+    /**
+     * Where a failed install's reason is written down: the application's log, in the running
+     * application. Given one line per failed install this view-model started.
+     */
+    private final Consumer<String> installLog;
+
+    /**
+     * The keys of rows whose install this view-model saw end {@link InstallPhase#FAILED} and whose
+     * reason has not been written to {@link #installLog} yet. Read and written on the interface
+     * thread only.
+     */
+    private final Set<String> failuresToLog = new HashSet<>();
+
     private final ObservableList<NoManagedBuildViewModel> noManagedBuild =
             FXCollections.observableArrayList();
 
@@ -164,11 +182,38 @@ public final class ToolManagerViewModel {
      */
     public ToolManagerViewModel(
             ToolManager tools, Executor uiThread, Executor background, FileChooserPort chooser) {
+        this(tools, uiThread, background, chooser, line -> {});
+    }
+
+    /**
+     * A Tool Manager over the port that writes each failed install's reason to a log.
+     *
+     * <p>A failed install is written down once, when the rows read after its terminal report show
+     * it {@link ToolInstallState#FAILED}: the line names the build and carries {@link
+     * ToolRowViewModel#failureText()} -- the step that failed and the cause's own words, through
+     * the project's one redactor -- so the log and the row say the same thing. Only installs this
+     * view-model started are written; a cancelled or finished one is not.
+     *
+     * @param tools the manager the application composed for this host
+     * @param uiThread how a progress report gets back onto the interface thread
+     * @param background where the port is read and a local-binary registration runs
+     * @param chooser how the user picks a binary of their own to register
+     * @param installLog where a failed install's reason is written, called on the interface thread;
+     *     the composition root passes the console's message log
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public ToolManagerViewModel(
+            ToolManager tools,
+            Executor uiThread,
+            Executor background,
+            FileChooserPort chooser,
+            Consumer<String> installLog) {
         this.tools = Objects.requireNonNull(tools, "tools");
         this.unavailableReason = null;
         this.uiThread = Objects.requireNonNull(uiThread, "uiThread");
         this.background = Objects.requireNonNull(background, "background");
         this.chooser = Objects.requireNonNull(chooser, "chooser");
+        this.installLog = Objects.requireNonNull(installLog, "installLog");
     }
 
     private ToolManagerViewModel(String unavailableReason, Executor uiThread) {
@@ -182,6 +227,7 @@ public final class ToolManagerViewModel {
         this.uiThread = Objects.requireNonNull(uiThread, "uiThread");
         this.background = uiThread;
         this.chooser = null;
+        this.installLog = line -> {};
     }
 
     /**
@@ -338,6 +384,7 @@ public final class ToolManagerViewModel {
             } else {
                 row.update(offer);
             }
+            logFailure(row);
             next.add(row);
         }
         rows.setAll(next);
@@ -551,7 +598,29 @@ public final class ToolManagerViewModel {
         row.reportProgress(report);
         if (report.phase().isTerminal()) {
             row.installFinished();
+            if (report.phase() == InstallPhase.FAILED) {
+                failuresToLog.add(row.key());
+            } else {
+                failuresToLog.remove(row.key());
+            }
             refresh();
+        }
+    }
+
+    /*
+     * ONE LINE PER FAILED INSTALL, WRITTEN WHEN THE ROW CAN SAY WHY.  The terminal report says only
+     * FAILED; the reason is on the offer, and the offer is read by the refresh the report starts.
+     * So the report marks the row and the first read that shows it FAILED writes the line -- from
+     * the row's own failureText(), so the console and the window cannot word one failure two ways,
+     * and both have been through the redactor.  Keyed on the install's report rather than on the
+     * state changing, because a second attempt that fails for the same reason is a second failure
+     * and the log should say so twice.
+     */
+    private void logFailure(ToolRowViewModel row) {
+        Optional<String> why = row.failureText();
+        if (why.isPresent() && failuresToLog.remove(row.key())) {
+            installLog.accept(
+                    "The install of " + row.nameText() + " did not succeed. " + why.get());
         }
     }
 }

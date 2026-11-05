@@ -136,6 +136,17 @@ final class ServedArtefacts implements ArtefactFetcher, AutoCloseable {
         return List.copyOf(requested);
     }
 
+    /**
+     * Where the server answers for a manifest URL: the loopback URL a transfer really goes to, and
+     * so the URL a download failure names.
+     *
+     * @param manifestUrl the URL the manifest pins
+     * @return the loopback URL with the same path
+     */
+    URI servedAt(URI manifestUrl) {
+        return server.uri(manifestUrl.getPath());
+    }
+
     @Override
     public DownloadReport fetch(DownloadRequest request) throws IOException {
         await();

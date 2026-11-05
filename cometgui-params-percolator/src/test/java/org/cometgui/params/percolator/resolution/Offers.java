@@ -116,7 +116,15 @@ final class Offers {
                 state == ToolInstallState.INSTALLED
                         ? Optional.of(Path.of("/tools/percolator/" + version + "/bin/percolator"))
                         : Optional.empty(),
-                fetchable ? OptionalLong.of(downloadSize) : OptionalLong.empty());
+                fetchable ? OptionalLong.of(downloadSize) : OptionalLong.empty(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                state == ToolInstallState.FAILED
+                        ? Optional.of(
+                                "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the"
+                                        + " request was refused")
+                        : Optional.empty());
     }
 
     static ToolOffer local(String version, List<DeclaredCapability> capabilities) {

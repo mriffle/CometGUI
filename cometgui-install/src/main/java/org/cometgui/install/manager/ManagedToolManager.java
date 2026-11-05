@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.cometgui.domain.secrets.SecretRedactor;
 import org.cometgui.domain.tools.CapabilityEvidence;
 import org.cometgui.domain.tools.DeclaredCapability;
 import org.cometgui.domain.tools.HostPlatform;
@@ -49,6 +50,7 @@ import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolRegistrationException;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.install.cache.ArtefactInstaller;
+import org.cometgui.install.cache.InstallStep;
 import org.cometgui.install.cache.InstallationCheck;
 import org.cometgui.install.cache.InstallationMarker;
 import org.cometgui.install.cache.ToolCache;
@@ -145,11 +147,19 @@ public final class ManagedToolManager implements ToolManager {
      * What this process has started, keyed the way the cache keys an entry.
      *
      * <p>Holds {@link ToolInstallState#INSTALLING} while an install runs and {@link
-     * ToolInstallState#FAILED} after one that did not succeed; an entry is removed when the install
-     * finished or was cancelled, because in both of those cases {@link ToolCache#verify} is then
-     * the whole truth.
+     * ToolInstallState#FAILED}, with the reason, after one that did not succeed; an entry is
+     * removed when the install finished or was cancelled, because in both of those cases {@link
+     * ToolCache#verify} is then the whole truth. The reason lives in the same entry as the state
+     * rather than in a map beside it, so the two cannot disagree about which attempt they describe.
      */
-    private final Map<String, ToolInstallState> attempts = new ConcurrentHashMap<>();
+    private final Map<String, Attempt> attempts = new ConcurrentHashMap<>();
+
+    /**
+     * The one redactor ({@code R-SEC-03}), applied to a failure reason before it is stored: what an
+     * exception says is not under this product's control -- a URL a redirect produced, a line a
+     * tool printed -- and the reason is shown in the window and written to the console's log.
+     */
+    private static final SecretRedactor REDACTOR = SecretRedactor.patternsOnly();
 
     /**
      * The binaries the user pointed CometGUI at, by the path they named.
@@ -277,7 +287,7 @@ public final class ManagedToolManager implements ToolManager {
         ArtefactRecord record = installableRecord(tool, version);
         Cancellation cancellation = new Cancellation();
         String entry = keyOf(record);
-        attempts.put(entry, ToolInstallState.INSTALLING);
+        attempts.put(entry, Attempt.RUNNING);
         installThreads.execute(() -> runInstall(record, listener, cancellation, entry));
         return cancellation;
     }
@@ -546,8 +556,8 @@ public final class ManagedToolManager implements ToolManager {
     }
 
     private ToolOffer offerFor(ArtefactRecord record, InstallationCheck verified) {
-        ToolInstallState attempt = attempts.get(keyOf(record));
-        if (attempt == ToolInstallState.INSTALLING) {
+        Attempt attempt = attempts.get(keyOf(record));
+        if (attempt == Attempt.RUNNING) {
             return managedOffer(
                     record,
                     ToolInstallState.INSTALLING,
@@ -571,13 +581,21 @@ public final class ManagedToolManager implements ToolManager {
                     Optional.of(marker.artefactIdentity()),
                     Optional.of(marker.releaseTag()));
         }
-        if (attempt == ToolInstallState.FAILED) {
-            return managedOffer(
-                    record,
+        if (attempt != null) {
+            return new ToolOffer(
+                    record.tool(),
+                    record.version(),
+                    ToolOrigin.MANAGED,
                     ToolInstallState.FAILED,
                     record.capabilities(),
+                    record.advisories(),
                     Optional.empty(),
-                    Optional.empty());
+                    Optional.empty(),
+                    OptionalLong.of(wholeDownloadOf(record)),
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    Optional.of(attempt.reason()));
         }
         return managedOffer(
                 record,
@@ -745,19 +763,59 @@ public final class ManagedToolManager implements ToolManager {
             Cancellation cancellation,
             String entry) {
         try {
-            installer.install(record, settlingFirst(listener, entry), cancellation);
+            installer.install(
+                    record,
+                    settlingFirst(listener, entry),
+                    cancellation,
+                    (step, failure) ->
+                            attempts.put(entry, Attempt.failed(reasonFor(step, failure))));
         } catch (IOException | RuntimeException stopped) {
             /*
              * NOTHING LEFT TO DO HERE, AND DELIBERATELY NO SECOND PLACE THAT WRITES THE STATE.
              * Every way out of ArtefactInstaller.install -- done, cancelled, failed -- reports its
-             * terminal phase before it returns or throws, and the listener above has already
-             * written the attempt map from it.  Writing it again here would be a second answer to
-             * "what state is this entry in", and the second answer would be on a branch no test can
-             * reach: a mutation no test can kill.  The throw is swallowed because this runs on an
-             * install thread, where an escape would kill the thread with nobody to catch it, and
-             * the row already says what happened.
+             * terminal phase before it returns or throws: a failure's reason through the failure
+             * listener above, and then the terminal phase through the settling listener, so the
+             * attempt map already says what happened and why.  Writing it again here would be a
+             * second answer to "what state is this entry in", and the second answer would be on a
+             * branch no test can reach: a mutation no test can kill.  The throw is swallowed
+             * because this runs on an install thread, where an escape would kill the thread with
+             * nobody to catch it, and the row already carries the reason.
              */
         }
+    }
+
+    /*
+     * WHY AN INSTALL FAILED, IN THE INSTALLER'S OWN WORDS.  The step is named by its number and its
+     * InstallStep constant, which is what InstallRejectedException already prints, so one install
+     * reads the same in the window, in the log and in a stack trace.  The words are the
+     * exception's message, unchanged: the download package words a vanished artefact as D-008's
+     * upstream availability failure with the URL and the pinned SHA-256, the verifier words a
+     * mismatch with both digests, and re-wording either here would be this class saying something
+     * the component that saw the failure did not.  An exception with no message -- common in
+     * java.net and java.util.zip -- is named by its class rather than shown as "null".
+     *
+     * Then the one redactor, because a message is text this product did not write.
+     */
+    static String reasonFor(Optional<InstallStep> step, Throwable failure) {
+        String message = failure.getMessage();
+        String words =
+                message == null || message.isBlank() ? failure.getClass().getName() : message;
+        String where =
+                step.map(
+                                failed ->
+                                        "Install step "
+                                                + failed.number()
+                                                + " of "
+                                                + InstallStep.values().length
+                                                + ", "
+                                                + failed
+                                                + ", failed: ")
+                        .orElse(
+                                "The install failed outside its "
+                                        + InstallStep.values().length
+                                        + " steps (taking or releasing the install lock, or"
+                                        + " clearing what an earlier attempt left): ");
+        return REDACTOR.redactText(where + words);
     }
 
     /**
@@ -781,11 +839,14 @@ public final class ManagedToolManager implements ToolManager {
      * cache, so the honest state is the one the build was in before the user pressed the button,
      * and removing the entry is what makes ToolCache.verify the whole truth again.  A finished
      * install is removed for the same reason: the marker it wrote is now the answer.
+     *
+     * A FAILED report changes nothing here, because the entry already holds it: ArtefactInstaller
+     * tells the failure listener in runInstall the step and the exception before it sends FAILED,
+     * and that listener is the one writer of a failed attempt -- with its reason.  Writing FAILED
+     * again here would be a second writer of the same fact, and the one without the reason.
      */
     private void settle(String entry, InstallPhase terminal) {
-        if (terminal == InstallPhase.FAILED) {
-            attempts.put(entry, ToolInstallState.FAILED);
-        } else {
+        if (terminal != InstallPhase.FAILED) {
             attempts.remove(entry);
         }
     }
@@ -809,6 +870,21 @@ public final class ManagedToolManager implements ToolManager {
     @Override
     public String toString() {
         return "ManagedToolManager[" + host.id() + ", " + cache.root() + "]";
+    }
+
+    /**
+     * What this process knows about one install it started: running, or failed and why.
+     *
+     * @param reason why it failed, already redacted; {@code null} exactly for {@link #RUNNING}
+     */
+    private record Attempt(String reason) {
+
+        /** An install under way. */
+        static final Attempt RUNNING = new Attempt(null);
+
+        static Attempt failed(String reason) {
+            return new Attempt(Objects.requireNonNull(reason, "reason"));
+        }
     }
 
     /**

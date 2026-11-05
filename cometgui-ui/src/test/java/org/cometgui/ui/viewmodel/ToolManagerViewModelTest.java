@@ -221,6 +221,144 @@ class ToolManagerViewModelTest {
                                 "an install that has finished has no handle left to ask"));
     }
 
+    /** A Tool Manager over {@code manager} whose install log is {@code logged}. */
+    private static ToolManagerViewModel logging(ToolManager manager, List<String> logged) {
+        return new ToolManagerViewModel(
+                manager, Runnable::run, Runnable::run, new Editors.ScriptedChooser(), logged::add);
+    }
+
+    /** Starts Percolator 3.07.1's install and ends it FAILED for {@code reason}. */
+    private static ToolRowViewModel failOnce(
+            ScriptedToolManager manager, ToolManagerViewModel viewModel, String reason) {
+        ToolRowViewModel row = viewModel.rows().get(0);
+        viewModel.install(row);
+        manager.answerWith(ToolOffers.failed(ToolOffers.percolatorAvailable(), reason));
+        manager.report(progress(InstallPhase.FAILED, 0L));
+        return row;
+    }
+
+    private static final String STEP_ONE_REFUSED =
+            "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the request to"
+                    + " https://github.com/percolator/percolator/releases/download/rel-3-07-01/"
+                    + "percolator-noxml-ubuntu-portable.zip failed before any body arrived:"
+                    + " java.net.ConnectException";
+
+    @Test
+    @DisplayName(
+            "a failed install is written to the log once, in the row's own words, and the row"
+                    + " says the same")
+    void aFailedInstallIsLoggedOnce() {
+        ScriptedToolManager manager = new ScriptedToolManager(ToolOffers.percolatorAvailable());
+        List<String> logged = new ArrayList<>();
+        ToolManagerViewModel viewModel = logging(manager, logged);
+        viewModel.refresh();
+
+        ToolRowViewModel row = failOnce(manager, viewModel, STEP_ONE_REFUSED);
+        List<String> afterTheFailure = List.copyOf(logged);
+        viewModel.refresh();
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "The install of percolator 3.07.1 did not succeed. "
+                                                + STEP_ONE_REFUSED),
+                                afterTheFailure),
+                () -> assertEquals(Optional.of(STEP_ONE_REFUSED), row.failureText()),
+                () ->
+                        assertEquals(
+                                afterTheFailure,
+                                logged,
+                                "reading the rows again writes nothing more: one failure, one"
+                                        + " line"));
+    }
+
+    @Test
+    @DisplayName("a second attempt that fails the same way is a second failure, and a second line")
+    void aSecondFailureIsASecondLine() {
+        ScriptedToolManager manager = new ScriptedToolManager(ToolOffers.percolatorAvailable());
+        List<String> logged = new ArrayList<>();
+        ToolManagerViewModel viewModel = logging(manager, logged);
+        viewModel.refresh();
+
+        failOnce(manager, viewModel, STEP_ONE_REFUSED);
+        manager.answerWith(ToolOffers.percolatorAvailable());
+        viewModel.refresh();
+        failOnce(manager, viewModel, STEP_ONE_REFUSED);
+
+        String line = "The install of percolator 3.07.1 did not succeed. " + STEP_ONE_REFUSED;
+        assertEquals(List.of(line, line), logged);
+    }
+
+    @Test
+    @DisplayName(
+            "an install that finished or was cancelled writes nothing, and neither does a failure"
+                    + " this Tool Manager did not start")
+    void onlyFailuresAreLogged() {
+        ScriptedToolManager manager = new ScriptedToolManager(ToolOffers.percolatorAvailable());
+        List<String> logged = new ArrayList<>();
+        ToolManagerViewModel viewModel = logging(manager, logged);
+        viewModel.refresh();
+        ToolRowViewModel row = viewModel.rows().get(0);
+
+        viewModel.install(row);
+        manager.answerWith(ToolOffers.percolatorAvailable());
+        manager.report(progress(InstallPhase.CANCELLED, 0L));
+        viewModel.install(row);
+        manager.answerWith(ToolOffers.failed(ToolOffers.percolatorAvailable(), STEP_ONE_REFUSED));
+        manager.report(progress(InstallPhase.DONE, 2_798_963L));
+        List<String> afterCancelAndDone = List.copyOf(logged);
+        ScriptedToolManager failedElsewhere = new ScriptedToolManager(ToolOffers.pdvFailed());
+        List<String> elsewhere = new ArrayList<>();
+        logging(failedElsewhere, elsewhere).refresh();
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of(),
+                                afterCancelAndDone,
+                                "a cancelled install is not a failure, and a DONE report is not"
+                                        + " one even when the row reads FAILED afterwards"),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                elsewhere,
+                                "a row that was already FAILED when first read was not this Tool"
+                                        + " Manager's install, and its line was never owed here"));
+    }
+
+    @Test
+    @DisplayName("a secret in a failure reason reaches neither the row nor the log")
+    void aSecretReachesNeitherTheRowNorTheLog() {
+        String token = "s3cr3t-T0ken-value-1234567890";
+        ScriptedToolManager manager = new ScriptedToolManager(ToolOffers.percolatorAvailable());
+        List<String> logged = new ArrayList<>();
+        ToolManagerViewModel viewModel = logging(manager, logged);
+        viewModel.refresh();
+
+        ToolRowViewModel row =
+                failOnce(
+                        manager,
+                        viewModel,
+                        "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the request to"
+                                + " https://mirror.invalid/p.zip?token="
+                                + token
+                                + " was refused");
+
+        String redacted =
+                "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the request to"
+                        + " https://mirror.invalid/p.zip?token=[REDACTED] was refused";
+        assertAll(
+                () -> assertEquals(Optional.of(redacted), row.failureText()),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "The install of percolator 3.07.1 did not succeed. "
+                                                + redacted),
+                                logged),
+                () -> assertFalse(String.join("\n", logged).contains(token), "the token itself"));
+    }
+
     @Test
     @DisplayName("cancelling a row reaches the handle its install returned")
     void cancellingARowReachesTheHandle() {
@@ -376,6 +514,19 @@ class ToolManagerViewModelTest {
                                                 Runnable::run,
                                                 Runnable::run,
                                                 Nulls.of(FileChooserPort.class))),
+                () ->
+                        assertEquals(
+                                "installLog",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () ->
+                                                        new ToolManagerViewModel(
+                                                                new ScriptedToolManager(),
+                                                                Runnable::run,
+                                                                Runnable::run,
+                                                                new Editors.ScriptedChooser(),
+                                                                null))
+                                        .getMessage()),
                 () ->
                         assertThrows(
                                 NullPointerException.class,

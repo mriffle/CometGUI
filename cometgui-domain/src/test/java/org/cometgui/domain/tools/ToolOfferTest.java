@@ -90,6 +90,16 @@ class ToolOfferTest {
                 : Optional.empty();
     }
 
+    /** The reason a FAILED offer must carry and any other must not. Hand-typed. */
+    private static final String REASON =
+            "install step 1, DOWNLOAD_TO_TEMPORARY_FILE, failed: the pinned artefact is no longer"
+                    + " available upstream";
+
+    /** A failure reason is required exactly when the state is FAILED, so states differ here. */
+    private static Optional<String> reasonFor(ToolInstallState state) {
+        return state == ToolInstallState.FAILED ? Optional.of(REASON) : Optional.empty();
+    }
+
     private static ToolOffer offer(
             ToolInstallState state,
             List<DeclaredCapability> capabilities,
@@ -104,7 +114,11 @@ class ToolOfferTest {
                 advisories,
                 Optional.empty(),
                 installedPath,
-                sizeFor(state));
+                sizeFor(state),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                reasonFor(state));
     }
 
     @Nested
@@ -597,7 +611,11 @@ class ToolOfferTest {
                     List.of(),
                     Optional.empty(),
                     pathFor(state),
-                    downloadSizeBytes);
+                    downloadSizeBytes,
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    reasonFor(state));
         }
 
         @ParameterizedTest(name = "[{index}] state={0}")
@@ -957,7 +975,9 @@ class ToolOfferTest {
                     pathFor(state),
                     origin == ToolOrigin.MANAGED ? sizeFor(state) : OptionalLong.empty(),
                     List.of(),
-                    identity);
+                    identity,
+                    Optional.empty(),
+                    reasonFor(state));
         }
 
         @Test
@@ -984,8 +1004,13 @@ class ToolOfferTest {
         }
 
         @ParameterizedTest
-        @EnumSource(ToolInstallState.class)
-        @DisplayName("the nine- and ten-part constructors carry none, in every state")
+        @EnumSource(
+                value = ToolInstallState.class,
+                names = "FAILED",
+                mode = EnumSource.Mode.EXCLUDE)
+        @DisplayName(
+                "the nine- and ten-part constructors carry none, in every state they can build"
+                        + " (FAILED needs a reason, which they cannot take)")
         void noneByDefault(ToolInstallState state) {
             assertAll(
                     () ->
@@ -1094,7 +1119,8 @@ class ToolOfferTest {
                     origin == ToolOrigin.MANAGED ? sizeFor(state) : OptionalLong.empty(),
                     List.of(),
                     Optional.empty(),
-                    tag);
+                    tag,
+                    reasonFor(state));
         }
 
         @Test
@@ -1184,6 +1210,127 @@ class ToolOfferTest {
                                     "releaseTag must not be blank when present, but was: \" \"",
                                     blank.getMessage()),
                     () -> assertEquals("releaseTag", missing.getMessage()));
+        }
+    }
+
+    @Nested
+    @DisplayName("why a failed install failed")
+    class FailureReason {
+
+        private ToolOffer with(ToolInstallState state, Optional<String> reason) {
+            return new ToolOffer(
+                    ToolName.PERCOLATOR,
+                    PERCOLATOR_3_07_1,
+                    ToolOrigin.MANAGED,
+                    state,
+                    List.of(XML_OBSERVED),
+                    List.of(),
+                    Optional.empty(),
+                    pathFor(state),
+                    sizeFor(state),
+                    List.of(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    reason);
+        }
+
+        @Test
+        @DisplayName("a failed offer keeps it word for word, and it is part of equality")
+        void kept() {
+            ToolOffer failed = with(ToolInstallState.FAILED, Optional.of(REASON));
+            assertAll(
+                    () -> assertEquals(Optional.of(REASON), failed.failureReason()),
+                    () -> assertEquals(failed, with(ToolInstallState.FAILED, Optional.of(REASON))),
+                    () ->
+                            assertNotEquals(
+                                    failed,
+                                    with(ToolInstallState.FAILED, Optional.of(REASON + "."))));
+        }
+
+        @Test
+        @DisplayName("a failed offer with no reason is refused, by the shorter constructors too")
+        void requiredWhenFailed() {
+            String expected =
+                    "failureReason is required for an offer in state FAILED: a failed install that"
+                            + " cannot say which step failed and why sends the reader looking in"
+                            + " the wrong place";
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    expected,
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () ->
+                                                            with(
+                                                                    ToolInstallState.FAILED,
+                                                                    Optional.empty()))
+                                            .getMessage()),
+                    () ->
+                            assertEquals(
+                                    expected,
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () ->
+                                                            new ToolOffer(
+                                                                    ToolName.PERCOLATOR,
+                                                                    PERCOLATOR_3_07_1,
+                                                                    ToolOrigin.MANAGED,
+                                                                    ToolInstallState.FAILED,
+                                                                    List.of(),
+                                                                    List.of(),
+                                                                    Optional.empty(),
+                                                                    Optional.empty(),
+                                                                    OptionalLong.of(946303L)))
+                                            .getMessage()));
+        }
+
+        @Test
+        @DisplayName("a blank reason is refused, quoting it")
+        void notBlank() {
+            assertEquals(
+                    "failureReason must not be blank, but was: \" \t\"",
+                    assertThrows(
+                                    IllegalArgumentException.class,
+                                    () -> with(ToolInstallState.FAILED, Optional.of(" \t")))
+                            .getMessage());
+        }
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @EnumSource(
+                value = ToolInstallState.class,
+                names = "FAILED",
+                mode = EnumSource.Mode.EXCLUDE)
+        @DisplayName(
+                "an offer in any other state has no reason to give, and carrying one is refused")
+        void absentOtherwise(ToolInstallState state) {
+            assertAll(
+                    () ->
+                            assertEquals(
+                                    Optional.empty(),
+                                    with(state, Optional.empty()).failureReason()),
+                    () ->
+                            assertEquals(
+                                    "failureReason must be absent for an offer in state "
+                                            + state
+                                            + ", because only a failed install has a reason to"
+                                            + " give, but was: "
+                                            + REASON,
+                                    assertThrows(
+                                                    IllegalArgumentException.class,
+                                                    () -> with(state, Optional.of(REASON)))
+                                            .getMessage()));
+        }
+
+        @Test
+        @DisplayName("a null is refused by name")
+        void nullRefused() {
+            Optional<String> absent = Nulls.of(Optional.class);
+            assertEquals(
+                    "failureReason",
+                    assertThrows(
+                                    NullPointerException.class,
+                                    () -> with(ToolInstallState.FAILED, absent))
+                            .getMessage());
         }
     }
 }

@@ -67,7 +67,15 @@ class PdvProvisioningTest {
                 installed
                         ? Optional.of("2.8.0".equals(version) ? NEWER_JAR : JAR)
                         : Optional.empty(),
-                fetchable ? OptionalLong.of(103_407_417L) : OptionalLong.empty());
+                fetchable ? OptionalLong.of(103_407_417L) : OptionalLong.empty(),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                state == ToolInstallState.FAILED
+                        ? Optional.of(
+                                "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the"
+                                        + " request was refused")
+                        : Optional.empty());
     }
 
     private static ToolOffer pdv(String version, ToolInstallState state) {

@@ -822,7 +822,10 @@ below was changed in the product by Phase 14 except E3 and E4.
      - Found by the failure-path suite: a failed install never says why (E9);
        the pre-run path-length limit is not Comet's 511-byte limit (E10); the
        stepper shows Percolator "Running" after a Comet failure (E11).
-       Escalated.
+       Escalated. **E9 repaired** in Phase 15 unit 1: the row, the port's
+       offer and the console's log carry the failing install step and the
+       cause's words, through the one redactor; ``NetworkUnavailableUiTest``
+       asserts them word for word.
    * - E12
      - **Serious**: a run whose provenance could not be written was recorded
        SUCCEEDED. **Repaired** between Phases 14 and 15: such a run ends

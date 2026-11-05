@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Objects;
+import java.util.Optional;
 import org.cometgui.domain.ports.HashService;
 import org.cometgui.domain.tools.InstallPhase;
 import org.cometgui.domain.tools.InstallProgress;
@@ -143,8 +144,36 @@ public final class ArtefactInstaller {
             InstallProgressListener listener,
             DownloadCancellation cancellation)
             throws IOException {
+        return install(record, listener, cancellation, (step, failure) -> {});
+    }
+
+    /**
+     * Installs one artefact, or returns the one that is already installed, and says why when it
+     * fails.
+     *
+     * <p>{@code failures} is told the step and the exception of an install that fails, exactly once
+     * and before {@code listener} sees {@link InstallPhase#FAILED}. It is not told about an install
+     * that finished or was cancelled.
+     *
+     * @param record the artefact to install
+     * @param listener told where the install has got to; use a no-op rather than {@code null}
+     * @param cancellation asked between steps whether the caller still wants the install
+     * @param failures told why the install failed, before the terminal report
+     * @return the installation
+     * @throws InstallCancelledException if the caller asked for the install to stop
+     * @throws InstallRejectedException if a step refuses the artefact
+     * @throws IOException if the install fails
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public Installation install(
+            ArtefactRecord record,
+            InstallProgressListener listener,
+            DownloadCancellation cancellation,
+            InstallFailureListener failures)
+            throws IOException {
         Objects.requireNonNull(record, "record");
         Objects.requireNonNull(listener, "listener");
+        Objects.requireNonNull(failures, "failures");
         /*
          * EXACTLY ONE TERMINAL REPORT, ON EVERY PATH.  The phase is decided in the body and sent
          * from the finally block rather than from each branch, because sending it from the branches
@@ -165,7 +194,23 @@ public final class ArtefactInstaller {
             terminal = InstallPhase.CANCELLED;
             throw cancelled;
         } catch (IOException | RuntimeException failed) {
+            /*
+             * THE REASON BEFORE THE VERDICT.  The failure listener is told here, in the catch, so
+             * that it runs before the finally block sends FAILED: a caller that records the reason
+             * from it has the reason in place when its progress listener sees the terminal phase.
+             */
             terminal = InstallPhase.FAILED;
+            failures.onInstallFailed(failedStep(started), failed);
+            throw failed;
+        } catch (Error failed) {
+            /*
+             * A step that dies of an Error has failed too, and the finally block has always
+             * reported it with the phase already decided -- FAILED, unless every step had finished
+             * and only close() died after DONE.  What was missing was the why, so the listener is
+             * told and the Error rethrown unchanged.  The phase is deliberately not re-decided
+             * here: that would be a change to what an Error reports, which this arm is not for.
+             */
+            failures.onInstallFailed(failedStep(started), failed);
             throw failed;
         } finally {
             if (started == null) {
@@ -253,6 +298,18 @@ public final class ArtefactInstaller {
                 cancellation,
                 lock,
                 staging);
+    }
+
+    /*
+     * WHICH STEP WAS RUNNING.  A pipeline advances its index only after a step succeeds, so the
+     * step it would run next is the one that threw.  Empty in the two places outside the steps:
+     * begin() failed, so there is no pipeline; or every step ran and close() failed releasing it.
+     */
+    private static Optional<InstallStep> failedStep(InstallPipeline started) {
+        if (started == null || !started.hasNextStep()) {
+            return Optional.empty();
+        }
+        return Optional.of(started.nextStep());
     }
 
     private static void report(

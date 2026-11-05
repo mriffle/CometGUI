@@ -818,9 +818,20 @@ public final class CanonicalScenario {
             capabilities.add(claim.capability() + " (observed-by-execution)");
         }
         String shownCapabilities = screen.ui().textOf(row + "-capabilities");
+        /*
+         * WHY IT FAILED, IF IT DID.  At the build-time repair's sign-off run a Percolator install
+         * here ended "did not succeed" after its whole download and nobody could say which step
+         * threw; the row now carries the step and the cause, and a red step 15 quotes it.
+         */
+        String failure =
+                screen.ui().exists(row + "-failure") ? screen.ui().textOf(row + "-failure") : "";
         assertAll(
                 "step 15: " + name + " downloaded, checked and probed (" + progress + ")",
-                () -> assertEquals("CometGUI-managed: installed", state),
+                () ->
+                        assertEquals(
+                                "CometGUI-managed: installed",
+                                state,
+                                () -> "the row says why it failed: " + failure),
                 () ->
                         assertEquals(
                                 "Done",

@@ -102,6 +102,10 @@ import java.util.Set;
  *     ToolInstallState#INSTALLED} was installed from, as its completion marker records it; absent
  *     for every other offer, a {@link ToolOrigin#LOCAL} binary included, whose tag CometGUI does
  *     not know
+ * @param failureReason why the last install attempt of this build did not succeed: the install step
+ *     that failed and the cause's own words, already passed through {@code
+ *     org.cometgui.domain.secrets.SecretRedactor}; present exactly when the state is {@link
+ *     ToolInstallState#FAILED}, and never blank
  */
 public record ToolOffer(
         ToolName tool,
@@ -115,7 +119,8 @@ public record ToolOffer(
         OptionalLong downloadSizeBytes,
         List<DeclaredCapability> unconfirmedClaims,
         Optional<String> artefactIdentity,
-        Optional<String> releaseTag) {
+        Optional<String> releaseTag,
+        Optional<String> failureReason) {
 
     /**
      * Validates the offer and takes defensive, immutable copies of its three lists.
@@ -125,9 +130,10 @@ public record ToolOffer(
      *     tool, if a capability, an unconfirmed claim or an advisory identifier appears twice, if a
      *     capability is both offered and unconfirmed, if an offer that is not installed carries an
      *     unconfirmed claim, if a present installed path is relative, if an installed offer names
-     *     no path, or if an artefact identity or a release tag is blank or present on an offer that
-     *     is not an installed managed build -- with a message naming the field and the rejected
-     *     value
+     *     no path, if an artefact identity or a release tag is blank or present on an offer that is
+     *     not an installed managed build, or if a failed offer carries no failure reason, a blank
+     *     one, or an offer in any other state carries one -- with a message naming the field and
+     *     the rejected value
      */
     public ToolOffer {
         Objects.requireNonNull(tool, "tool");
@@ -144,6 +150,56 @@ public record ToolOffer(
         unconfirmedClaims = checkedUnconfirmed(unconfirmedClaims, tool, state, capabilities);
         checkInstallFact(origin, state, artefactIdentity, "artefactIdentity");
         checkInstallFact(origin, state, releaseTag, "releaseTag");
+        checkFailureReason(state, failureReason);
+    }
+
+    /**
+     * An offer with no failure reason: every offer whose state is not {@link
+     * ToolInstallState#FAILED}.
+     *
+     * @param tool which tool
+     * @param version which version of it, as upstream names the release
+     * @param origin whether CometGUI installed it or the user pointed at it
+     * @param state what can be done with it on this machine
+     * @param capabilities what it can do, each with the evidence behind the claim
+     * @param advisories the caveats to show at selection time and record in provenance
+     * @param loaderDiagnostic why the build will not run here, when it will not
+     * @param installedPath where the executable or JAR is, absolute, when installed
+     * @param downloadSizeBytes how many bytes this host fetches to install the build
+     * @param unconfirmedClaims the manifest's claims the install's probe did not confirm
+     * @param artefactIdentity the upstream artefact an installed managed build came from
+     * @param releaseTag the upstream release tag an installed managed build came from
+     * @throws NullPointerException if any component is {@code null}
+     * @throws IllegalArgumentException as the canonical constructor, and in particular when the
+     *     state is {@link ToolInstallState#FAILED}, which needs a reason
+     */
+    public ToolOffer(
+            ToolName tool,
+            ToolVersion version,
+            ToolOrigin origin,
+            ToolInstallState state,
+            List<DeclaredCapability> capabilities,
+            List<ToolAdvisory> advisories,
+            Optional<LoaderDiagnostic> loaderDiagnostic,
+            Optional<Path> installedPath,
+            OptionalLong downloadSizeBytes,
+            List<DeclaredCapability> unconfirmedClaims,
+            Optional<String> artefactIdentity,
+            Optional<String> releaseTag) {
+        this(
+                tool,
+                version,
+                origin,
+                state,
+                capabilities,
+                advisories,
+                loaderDiagnostic,
+                installedPath,
+                downloadSizeBytes,
+                unconfirmedClaims,
+                artefactIdentity,
+                releaseTag,
+                Optional.empty());
     }
 
     /**
@@ -269,6 +325,37 @@ public record ToolOffer(
                 installedPath,
                 downloadSizeBytes,
                 List.of());
+    }
+
+    /*
+     * A FAILED INSTALL SAYS WHY, AND ONLY A FAILED INSTALL HAS A WHY.  FAILED used to be the whole
+     * message, and at Phase 14's gate run a Percolator install ended FAILED after its full download
+     * with nobody able to name the step that threw -- the reason existed on the install thread and
+     * was discarded there.  Requiring the reason here makes "failed, cause unknown" a value this
+     * record cannot hold, so no producer can drop it again without a test seeing the constructor
+     * refuse.  The other direction keeps cancelled distinct from failed: a cancelled install
+     * returns to NOT_INSTALLED, and a reason on it would be an error the user never had.
+     */
+    private static void checkFailureReason(ToolInstallState state, Optional<String> reason) {
+        Objects.requireNonNull(reason, "failureReason");
+        if (state == ToolInstallState.FAILED) {
+            if (reason.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "failureReason is required for an offer in state FAILED: a failed install"
+                                + " that cannot say which step failed and why sends the reader"
+                                + " looking in the wrong place");
+            }
+            if (reason.get().isBlank()) {
+                throw new IllegalArgumentException(
+                        "failureReason must not be blank, but was: \"" + reason.get() + "\"");
+            }
+        } else if (reason.isPresent()) {
+            throw new IllegalArgumentException(
+                    "failureReason must be absent for an offer in state "
+                            + state
+                            + ", because only a failed install has a reason to give, but was: "
+                            + reason.get());
+        }
     }
 
     /*

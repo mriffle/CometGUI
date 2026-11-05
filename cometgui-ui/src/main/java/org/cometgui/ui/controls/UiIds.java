@@ -1384,6 +1384,18 @@ public final class UiIds {
     }
 
     /**
+     * The identifier of the label saying why a row's last install attempt did not succeed.
+     *
+     * @param rowKey the view-model's key for that row
+     * @return the row identifier with {@code "-failure"} appended
+     * @throws NullPointerException if {@code rowKey} is {@code null}
+     * @throws IllegalArgumentException if the key is not of the required shape
+     */
+    public static String toolRowFailure(String rowKey) {
+        return toolRow(rowKey) + "-failure";
+    }
+
+    /**
      * The identifier of the label naming where an installed build lives.
      *
      * @param rowKey the view-model's key for that row

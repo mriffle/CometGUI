@@ -72,8 +72,26 @@ final class InstallHarness {
     private final RecordingInstallListener listener = new RecordingInstallListener();
 
     InstallHarness(Path root, RecordingProbe probe, HostOperatingSystem host) {
+        this(root, probe, probe, host);
+    }
+
+    /**
+     * A harness whose step 6 is any probe, for a test that needs the probe to do something a {@link
+     * RecordingProbe} does not -- throw an {@link Error}, or leave something behind. {@link
+     * #probe()} is {@code null} on it.
+     *
+     * @param root the cache root
+     * @param stepSix what step 6 calls
+     * @return the harness, on Linux
+     */
+    static InstallHarness probingWith(Path root, ToolProbe stepSix) {
+        return new InstallHarness(root, stepSix, null, HostOperatingSystem.LINUX);
+    }
+
+    private InstallHarness(
+            Path root, ToolProbe stepSix, RecordingProbe recorded, HostOperatingSystem host) {
         this.root = root;
-        this.probe = probe;
+        this.probe = recorded;
         this.fixups = new PlatformFixups(host, ScriptedXattr.NEVER_CALLED);
         StreamingHashService hashes = new StreamingHashService();
         this.cache = new ToolCache(root, hashes);
@@ -85,7 +103,7 @@ final class InstallHarness {
                         downloader::fetch,
                         new ArtefactExtractor(),
                         fixups,
-                        probe,
+                        stepSix,
                         hashes,
                         Clock.fixed(INSTALLED_AT, ZoneOffset.UTC));
     }

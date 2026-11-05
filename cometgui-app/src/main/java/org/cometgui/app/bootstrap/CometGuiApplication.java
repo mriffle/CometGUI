@@ -324,7 +324,8 @@ public final class CometGuiApplication extends Application {
                                 tools.get(),
                                 Platform::runLater,
                                 ToolManagerWiring.installThreads(),
-                                chooser)
+                                chooser,
+                                this::recordFailedInstall)
                         : ToolManagerViewModel.unavailable(toolsUnavailable, Platform::runLater);
 
         /*
@@ -612,6 +613,20 @@ public final class CometGuiApplication extends Application {
         if (project != null) {
             project.close();
         }
+    }
+
+    /**
+     * Puts a failed install's reason into the shared message log, as an error.
+     *
+     * <p>The line is the Tool Manager's own: the build, the install step that failed and the
+     * cause's words, already through the project's one redactor ({@code R-SEC-03}). It has no
+     * stage, because installing a tool is not a step of any run.
+     *
+     * @param line what the Tool Manager says about the failure
+     */
+    private void recordFailedInstall(String line) {
+        messageLog.append(
+                LogMessage.recordedBy(services.clock(), null, MessageSeverity.ERROR, line));
     }
 
     /**

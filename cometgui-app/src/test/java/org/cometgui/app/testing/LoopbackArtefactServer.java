@@ -271,6 +271,17 @@ public final class LoopbackArtefactServer implements ArtefactFetcher, AutoClosea
         return List.copyOf(ranges);
     }
 
+    /**
+     * Where this server answers for a manifest URL: the loopback URL a transfer really goes to, and
+     * so the URL a download failure names.
+     *
+     * @param manifestUrl the URL the manifest pins
+     * @return the loopback URL with the same path
+     */
+    public URI servedAt(URI manifestUrl) {
+        return URI.create("http://127.0.0.1:" + socket.getLocalPort() + manifestUrl.getPath());
+    }
+
     @Override
     public DownloadReport fetch(DownloadRequest request) throws IOException {
         URI manifestUrl = request.source();
