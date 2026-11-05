@@ -1142,8 +1142,19 @@ main() {
             || die "--gates-census-root takes no other option; it is a census of a sandbox, not a build."
         [ -d "${GATES_CENSUS_ROOT}" ] || die "--gates-census-root: no such directory: ${GATES_CENSUS_ROOT}"
         EVIDENCE_ROOT="$(cd -- "${GATES_CENSUS_ROOT}" && pwd -P)"
-        [ "${EVIDENCE_ROOT}" != "$(pwd -P)" ] \
+        # Compared with the repository itself, resolved, not with the working
+        # directory: the refusal must not depend on where this was run from.
+        # A directory inside the repository is accepted only under _build/,
+        # where every sandbox lives.
+        local repository
+        repository="$(cd -- "${ROOT}" && pwd -P)"
+        [ "${EVIDENCE_ROOT}" != "${repository}" ] \
             || die "--gates-census-root refuses the repository itself. Its evidence is graded by a real build, bash scripts/build.sh, which runs this census after clean verify and then runs PIT."
+        case "${EVIDENCE_ROOT}/" in
+            "${repository}/_build/"?*) ;;
+            "${repository}/"*)
+                die "--gates-census-root refuses ${EVIDENCE_ROOT#"${repository}/"}: a directory inside the repository is accepted only under _build/, where sandboxes live." ;;
+        esac
         printf 'Evidence census of %s (a sandbox: nothing is built here, and PIT is not run).\n\n' "${EVIDENCE_ROOT}"
         local failures=0
         gates_evidence_currency

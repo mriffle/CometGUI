@@ -558,6 +558,47 @@ Not pushed. ``STATUS.rst``, ``DECISIONS.rst``, ``phases/``,
 ``specification.rst`` and ``CLAUDE.md`` were not edited. No POM, no product
 code, no threshold, floor, timeout or survivor set was lowered or eased.
 
+Rework after tier 1's diff read
+===============================
+
+Tier 1 found that the ``--gates-census-root`` refusal compared the resolved
+DIR with ``$(pwd -P)`` rather than with the repository. In practice it held,
+because ``main`` changes into ROOT before that branch runs: ``cd /tmp && bash
+.../scripts/build.sh --gates-census-root <repo>`` was already refused, exit 1.
+But it held by accident of ordering. It now compares DIR with ROOT resolved
+by ``pwd -P``, and also refuses any DIR inside the repository that is not
+strictly under ``_build/``. Control C's refusal assertion now runs the refusal
+both from ROOT and from a ``mktemp -d`` directory outside it, and requires
+both to be refused.
+
+``--census-only`` would rebuild the whole sandbox (control C), so this was
+proved directly instead, with the working tree's ``scripts/build.sh``:
+
+.. list-table::
+   :header-rows: 1
+
+   * - DIR, and where it was run from
+     - Result
+   * - ROOT, from ROOT
+     - exit 1, "refuses the repository itself"
+   * - ROOT, from ``/tmp``
+     - exit 1, "refuses the repository itself"
+   * - a symlink to ROOT, from ``/tmp``
+     - exit 1, "refuses the repository itself"
+   * - ``ROOT/docs``, from ``/tmp``
+     - exit 1, "refuses docs: a directory inside the repository is accepted
+       only under _build/"
+   * - ``ROOT/_build`` itself, from ``/tmp``
+     - exit 1, "refuses _build: ..."
+   * - ``ROOT/_build/test-gate-sandbox``, from ``/tmp``
+     - accepted; the census ran over it
+   * - a directory outside the repository, from ``/tmp``
+     - accepted; the census ran over it
+
+The no-option path was compared again with ``783444e``'s ``build.sh --only
+gates`` under the stub ``mvn``: identical, 361 lines, exit 0. ``--only shell``
+was run after the change: 30 controls in 609 s, exit 0. ``docs-build.sh`` passed after this section was written.
+
 For tier 1
 ==========
 

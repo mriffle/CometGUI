@@ -1151,13 +1151,21 @@ control_census_picture() {
         '^   ok       cometgui-domain +[1-9][0-9]* compiled class\(es\), all [1-9][0-9]* in the sample$'
 
     # The shortcut is not a way round a real build: over the working tree it
-    # refuses, whatever is in target/ there.
-    local rc=0
+    # refuses, whatever is in target/ there -- run from the repository and
+    # from somewhere else, because the refusal must not depend on the working
+    # directory.
+    local rc=0 rc2 elsewhere
     bash "${ROOT}/scripts/build.sh" --gates-census-root "${ROOT}" >"${LOGS}/C-refuses-working-tree.log" 2>&1 || rc=$?
-    if [ "${rc}" -ne 0 ] && grep -qF -- '--gates-census-root refuses the repository itself' "${LOGS}/C-refuses-working-tree.log"; then
-        record_pass "--gates-census-root refuses the working tree, exit ${rc}"
+    rc2=0
+    elsewhere="$(mktemp -d)"
+    ( cd -- "${elsewhere}" && bash "${ROOT}/scripts/build.sh" --gates-census-root "${ROOT}" ) \
+        >"${LOGS}/C-refuses-working-tree-elsewhere.log" 2>&1 || rc2=$?
+    rmdir -- "${elsewhere}"
+    if [ "${rc}" -ne 0 ] && grep -qF -- '--gates-census-root refuses the repository itself' "${LOGS}/C-refuses-working-tree.log" \
+        && [ "${rc2}" -ne 0 ] && grep -qF -- '--gates-census-root refuses the repository itself' "${LOGS}/C-refuses-working-tree-elsewhere.log"; then
+        record_pass "--gates-census-root refuses the working tree, run from it (exit ${rc}) and from ${elsewhere} (exit ${rc2})"
     else
-        record_fail "--gates-census-root ran over the working tree (exit ${rc}); it must refuse it (log: ${LOGS#"${ROOT}/"}/C-refuses-working-tree.log)"
+        record_fail "--gates-census-root did not refuse the working tree from both directories (exit ${rc} from the repository, ${rc2} from elsewhere; logs: ${LOGS#"${ROOT}/"}/C-refuses-working-tree*.log)"
     fi
 }
 
