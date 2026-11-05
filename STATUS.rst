@@ -4,29 +4,26 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-11-05
-:Updated by: Main orchestrator, session 10 (**E12 repair signed off**;
-   specification revision 21; paused by the owner)
-:Current phase: **None -- Phase 15 still paused by the owner.** On
-   2026-11-05 the owner approved a build-time repair before it: *"Do the
-   first two fixes now, before Phase 15 ... remember on GitHub CI we only
-   have 2 or 4 cores"* -- the ``tests`` harness no longer runs the whole
-   ``build.sh`` twice, and ``verify-all-gates.sh`` runs its controls side by
-   side, serial at 4 cores or fewer. Dispatched to one tier-1 fix agent,
-   ``handoffs/FIX-BUILD-TIME-BRIEF.rst``. Phase 15 starts only on the
-   owner's word (E12: :ref:`status-fix-p14-p15`). ``D-006``'s CI-fixture half is still open and the owner's. Standing
-   owner instruction (2026-10-08), suspended by the pause: *"When all is
-   green with the current phase, push, then move on to the next phase."*
+:Updated by: Main orchestrator, session 11 (**build-time repair signed
+   off**; paused by the owner)
+:Current phase: **None -- Phase 15 still paused by the owner.** The
+   build-time repair the owner approved on 2026-11-05 (*"Do the first two
+   fixes now, before Phase 15 ... remember on GitHub CI we only have 2 or 4
+   cores"*) is signed off and pushed (:ref:`status-fix-build-time`). Phase
+   15 starts only on the owner's word. ``D-006``'s CI-fixture half is still
+   open and the owner's. Standing owner instruction (2026-10-08), suspended
+   by the pause: *"When all is green with the current phase, push, then move
+   on to the next phase."*
 :Overall: Fifteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
    05, 08, 09, 10, 11, 12, 13 and 14 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
    been seen to fail on a deliberate defect. **Build economy is a standing
    owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (**about 11 hours at Phase 14** -- build
-   142 min, ``tests`` 321, the other twenty 190 -- run detached; raised
-   with the owner, :ref:`status-p10-signed`) runs once
+   ``scripts/verify-all-gates.sh`` (**about 4 h 10 min since 2026-11-05**,
+   down from 10 h 52 min at Phase 14 -- build 156 min, the 21 controls 91
+   min four at a time; :ref:`status-fix-build-time`) runs once
    per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
    mutation gate (``TIMED_OUT``, and module-wide versus per-package --
-   :ref:`status-p06-signed`); and how to cut the build time (same
-   section as above). No ``D-`` item is open; ``D-011`` option D, asking
+   :ref:`status-p06-signed`). No ``D-`` item is open; ``D-011`` option D, asking
    UWPR for an Intel macOS Comet build, is the owner's own action. The nightly is red **by the owner's decision**
    until Phase 15 replaces its stubs (:ref:`status-nightly-masking`).
 
@@ -3284,6 +3281,87 @@ runs the full build and gates once, at its exit.
 Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
+
+.. _status-fix-build-time:
+
+Between Phases 14 and 15: the gate run's wall clock (signed off 2026-11-05)
+===========================================================================
+
+One tier-1 fix agent, brief ``handoffs/FIX-BUILD-TIME-BRIEF.rst``, work log
+``handoffs/FIX-BUILD-TIME-worklog.rst``. Owner, 2026-11-05: *"Do the first
+two fixes now, before Phase 15. Those changes are fine for this system, but
+remember on GitHub CI we only have 2 or 4 cores."*
+
+**What changed.**
+
+* **Fix 1, the** ``tests`` **harness.** Controls 7 and 8 no longer run the
+  whole ``scripts/build.sh`` twice in their sandbox. ``build.sh``'s gates
+  stage is split, statement for statement, into its evidence census and its
+  PIT half. A new option, ``--gates-census-root DIR``, runs only the census
+  over a sandbox. It refuses the repository (by resolved path, from any
+  directory), any directory inside it outside ``_build/``, and every other
+  option. In that mode only, unbuilt modules are ``NO EVIDENCE`` and evidence
+  older than its sources is ``STALE``. A new control C builds the sandbox
+  once from sources proved identical to the tree. Floor 37 to 49. Control 6
+  now sizes from the sandbox's own PIT baseline, not the working tree's
+  (which the E12 repair's partial PIT run had left at 63 of 716 mutations).
+* **Fix 2,** ``verify-all-gates.sh`` **runs controls side by side.** The job
+  count is ``nproc``-based: **1, serial, at 4 cores or fewer**, otherwise one
+  per 8 cores, capped at 4. ``--jobs N`` or ``COMETGUI_GATE_JOBS`` overrides
+  it. Grading, floors, summary order and exit code are a serial run's. A
+  control that is killed, or whose worker records no exit status, FAILS.
+  ``docs``/``traceability``/``pipeline`` and ``sbom``/``depscan``/``pipeline``
+  never overlap (they write the same files). ``_build/m2repo``, ``tools/``,
+  ``scratch/`` and ``.venv/`` are fingerprinted before and after, and a
+  change fails the run.
+
+**Diff read: nothing weakened.** No POM, product code, floor (one raised),
+threshold, timeout or survivor changed. Real ``build.sh`` with no options is
+byte-identical in output to ``783444e`` (the agent's stub-``mvn`` comparison;
+tier 1's real run below). Tier 1 sent back one finding: the self-refusal
+compared with the current directory, not the repository (``c9d037c``).
+
+**Tier 1's own checks:**
+
+* The census's ``STALE`` check disabled: the census over the left-behind
+  sandbox stopped reporting two stale modules and graded old evidence
+  instead. Restored, ``sha256sum -c`` OK.
+* ``taskset -c 0-3 ... --only shell``: header ``jobs 1 -- SERIAL``, 30
+  controls, PASS.
+* ``--jobs 2 --only quality --only provenance`` with the ``provenance``
+  harness killed (``SIGKILL``) 45 s in: ``FAIL provenance: exited 137``,
+  ``quality`` 42 PASS, run exit 1, shared resources unchanged.
+
+**Tier 1's run at** ``c9d037c``:
+
+* ``scripts/build.sh``: 11/11 in 9353 s.
+* ``verify-all-gates.sh``, computed 4 jobs on 64 cores: **20 of 21 in 91
+  min** (``tests`` 49 in 5454 s, against 321 min before), all at or above
+  their floors.
+* **The red:** ``e2e``, 41 of 50. Its clean runs passed. Its three dirty
+  runs failed because the Tier A install of Percolator 3.07.1 reported
+  ``Failed`` after the whole 946 303-byte download, between 09:05 and 09:07.
+  The agent did not reproduce it in 28 concurrent installs (with JFR
+  recording every exception), and found no shared cause. The upstream file
+  still matches its pinned SHA-256. The unproved inference is a transient
+  upstream failure. No fix was made; a guessed lock would be no fix.
+* Rerun by tier 1: ``--jobs 3 --only e2e,limelight,provenanceui``, all
+  green -- ``e2e`` 50, ``limelight`` 130, ``provenanceui`` 96, shared
+  resources unchanged. **21 of 21.**
+
+**Residue, for Phase 15:**
+
+* A failed tool install records no reason (``ManagedToolManager`` discards
+  the exception), which is why the red above cannot be named. Product
+  change; not in this brief.
+* ``PercolatorCapabilityProbeTest.theWorkspaceIsCleanedUp`` counts every
+  ``cometgui-percolator-probe-*`` directory in the shared ``/tmp``, so a
+  concurrent probe can move it; 21 such directories are left in ``/tmp`` by
+  a build. Test change.
+* ``tests`` control 5 still sizes from the working tree's ``cometgui-ui``
+  ``jacoco.xml``.
+* No CI workflow calls ``verify-all-gates.sh`` yet; called with no options on
+  a 2- or 4-core runner it runs serially.
 
 .. _status-fix-p14-p15:
 
