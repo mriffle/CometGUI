@@ -299,7 +299,45 @@ in memory and is gone after a restart (documented in ``docs/tool_manager.rst``).
 Unit 2 sign-off
 ---------------
 
-Pending.
+**Accepted 2026-11-05 at** ``466c6f2``, one round. One fresh agent.
+
+*What left the directories*, as the agent found and reproduced it: the
+``gates`` stage's PIT run over ``cometgui-tools``. A mutant removing the
+probe's ``deleteRecursively`` is killed only by ``theWorkspaceIsCleanedUp``,
+so every probe the other tests ran first in that worker JVM leaked its
+workspace into ``/tmp`` (20 of the 21 directories created within 0.2 s while
+PIT was on ``cometgui-tools``; contents match the test doubles' partial runs).
+Reproduced: targeted PIT with the workers' ``java.io.tmpdir`` redirected left
+64 workspaces before the fix, 0 after. Not a product leak.
+
+*Diff read.* ``PercolatorCapabilityProbe(ToolRunner, int, Path
+workspaceParent)``; the two existing constructors default to
+``java.io.tmpdir``, so the product is unchanged. Every ``cometgui-tools`` test
+that probes now passes a ``@TempDir``; ``theWorkspaceIsCleanedUp`` captures
+the workspace during the probe (exists, inside the given directory, holds
+``probe.pin``) and asserts it gone after, over success, refusal and a binary
+that cannot start; an ``@AfterEach`` requires the directory empty after every
+test; new ``aWorkspaceThatCannotBeTidiedStaysInItsParent`` and
+``theWorkspaceParent``. No POM, PIT or harness change.
+
+*My runs:* ``mvn -o -B -pl cometgui-tools -am verify``: BUILD SUCCESS, domain
+1238, provenance 709 (2 skipped), process 281, results 1310, tools 1129 (1
+skipped), 0 failures. (A first attempt was cut by my own ``timeout 590``
+after the tests and before SpotBugs, and was re-run whole.) PIT on
+``PercolatorCapabilityProbe*`` with its test class: 43 generated, 43 killed --
+and ``/tmp/cometgui-percolator-probe-*`` still 21 after it.
+``verify-all-gates.sh --only percolator,install``: percolator 109, install 95,
+PASS, shared resources unchanged.
+
+*My injection:* the ``finally``'s ``deleteRecursively(workspace)`` removed
+(anchor count 0, ``sha256sum -c`` FAILED; restored, OK):
+``PercolatorCapabilityProbeTest`` 64 of 69 red, the ``@AfterEach`` catching
+every probing test, and ``/tmp`` unchanged at 21.
+
+*Residue, recorded:* ``CometCapabilityProbe`` has the same shape (13
+``cometgui-comet-probe-*`` directories in ``/tmp`` from the same PIT window);
+the workflow and app tests still probe in ``/tmp`` with the product default;
+the 21 pre-existing directories were left alone.
 
 Unit 3 sign-off
 ---------------
