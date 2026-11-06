@@ -2104,8 +2104,10 @@ with nothing installed, and one batched clean re-run. The differences:
    * - 5e
      - 5
      - New: the application's ``stop()`` no longer closes PDV's windows.
-     - *GUI*, ``PdvLiveWindowUiTest``: ``PDV ended``, ``the launched process
-       ended ==> expected: <false> but was: <true>``.
+     - *GUI*, ``PdvLiveWindowUiTest``: ``PDV was still running when the
+       application's exit closed the Results section's run: stop() did not
+       end PDV itself ==> expected: <false> but was: <true>`` (see
+       :ref:`dev-pdv-timing-controls`).
    * - 6a
      - 6
      - Recorded (unit 6, N1): score and q-value columns swapped.
@@ -2191,6 +2193,50 @@ controls 8-15 s each, 5c 39 s (the fake's ten-second shutdown deadline), 5b
 77 s (the observer's one-minute draw bound), the GUI controls 1b 111 s and
 5e 56 s, and control H 15 s. No process was left for the script to end. The
 floor in ``verify-all-gates.sh`` is 107.
+
+.. _dev-pdv-timing-controls:
+
+Controls 5b and 5e graded by timing (fixed in Phase 15, unit 9a)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Handled under the specification's *Flakiness policy*: each was a defect in
+its test, found and fixed at its cause -- no retry, no quarantine, and no
+diagnostic widened (5e's now names one outcome where it allowed two). Both were
+seen on ``eec0003`` (``handoffs/PHASE-15-worklog.rst``, unit 4's sign-off).
+
+* **5e passed with its defect present** (four harnesses at once). The exit
+  ends PDV twice over: ``stop()``'s ``closeAllWindows()``, which waits for
+  each process, and then ``results.close()``, whose emptied run makes
+  ``VisualisationViewModel.runChanged`` close the window *again*,
+  asynchronously on the Run section's threads, unwaited -- ``R-PDV-04`` ends a
+  window when its result set closes as well as on exit. With the first
+  removed, the second still sent PDV ``SIGTERM`` 20-45 ms into the exit (a
+  stack trace on ``requestCancellation`` names it), and PDV was gone before
+  ``assertGone`` looked whenever it looked late: holding the assertion back
+  until PDV ended made the old test pass with the defect. The test now reads
+  PDV's process at the moment the Results section's run chooser is emptied --
+  inside ``stop()``, before the second path starts -- so PDV can have ended by
+  then only through ``stop()`` itself.
+* **5b failed without its diagnostic.** PDV draws its first row by itself
+  when its import ends, on a thread of its own, and ``/ready`` can answer 200
+  before it has (54 ms before, in a quiet run). That drawing's report could
+  arrive after the first selection's ``forgetDisplayed()``: as a stray
+  ``row=0`` line at the head of ``seen`` (the run that failed), or -- row 0
+  being the first PSM selected, and the report able to carry row 0's own
+  peaks -- satisfying that selection with the defect present, moving the red
+  to row 1. Delaying that one report by 2 s reproduced the second outcome
+  twice in two runs. ``PdvControllerRealPdvTest`` now waits for the opening
+  report before it selects anything, and ``PdvDisplayObserver`` refuses with
+  an error, rather than attaching, if PDV had drawn before it listened. The
+  same delay then gave 5b's own words, and the clean test stayed green.
+* The 10 s shutdown bound in that run's output is control 5c's *expected*
+  diagnostic (5c passed), not part of 5b; nothing was holding PDV.
+
+Repeat evidence on ``69e1b45``, ``bash scripts/verify-pdv-gates.sh --only
+5b,5e`` (each run the baseline, 5b, 5e and the clean re-run, 10 grades): five
+runs alone, 10 of 10 each, 301-305 s; three runs beside 96 busy loops on the
+64-core host (load average about 100), 10 of 10 each, 794-862 s. Every run
+showed 5b's and 5e's own words, and the clean re-run green.
 
 .. _dev-limelight-falsifiability:
 
