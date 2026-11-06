@@ -18,6 +18,13 @@
 # scripts/matrix/matrix.py's; see its docstring and docs/developer/testing.rst,
 # "Version matrix".
 #
+# THE DETERMINISM SUITE (PHASE-15 exit gate item 3; Phase 15 unit 7) is this
+# runner's --part determinism (both halves) or --part determinism-synthetic (no
+# spectra): the same pinned run repeated, then varied where nothing should
+# change, compared artefact by artefact with the documented tolerance by
+# scripts/matrix/determinism.py into _build/determinism/; see its docstring and
+# docs/developer/testing.rst, "Determinism".
+#
 # OPT-IN (P15-5): nothing here runs in a plain `mvn verify` or scripts/build.sh.
 #
 # THE FIXTURE IS ONE NAMED INPUT, WITH NO DEFAULT (P15-4):
@@ -28,7 +35,9 @@
 # Usage:
 #   bash scripts/matrix/run-matrix.sh [--part tools|pairs|all] [--out DIR]
 #                                     [--fixture DIR] [--offline] [--no-local-309]
-#   bash scripts/matrix/run-matrix.sh --self-test   # the grading, no Maven, no network
+#   bash scripts/matrix/run-matrix.sh --part determinism|determinism-synthetic
+#                                     [--out DIR] [--fixture DIR] [--offline]
+#   bash scripts/matrix/run-matrix.sh --self-test   # both gradings, no Maven, no network
 #   bash scripts/matrix/run-matrix.sh --help
 #
 # Network (P15-5b): the manifest's download URLs and the GitHub storage hosts
@@ -42,7 +51,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
 case "${1:-}" in
-    -h|--help) sed -n '3,38p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,47p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
 esac
 
 PYTHON=""
@@ -56,8 +65,16 @@ done
 [ -n "${PYTHON}" ] || { printf 'run-matrix.sh: no Python 3.9 or newer\n' >&2; exit 2; }
 
 if [ "${1:-}" = "--self-test" ]; then
-    exec "${PYTHON}" -B "${SCRIPT_DIR}/matrix.py" --self-test
+    "${PYTHON}" -B "${SCRIPT_DIR}/matrix.py" --self-test
+    exec "${PYTHON}" -B "${SCRIPT_DIR}/determinism.py" --self-test
 fi
+
+GRADER="matrix.py"
+for argument in "$@"; do
+    case "${argument}" in
+        determinism|determinism-synthetic) GRADER="determinism.py" ;;
+    esac
+done
 
 if [ ! -f "${ROOT}/tools/env.sh" ]; then
     bash "${ROOT}/scripts/ci/toolchain.sh" || { printf 'run-matrix.sh: the project toolchain could not be provisioned\n' >&2; exit 2; }
@@ -67,4 +84,4 @@ fi
 command -v mvn >/dev/null 2>&1 || { printf 'run-matrix.sh: no mvn after sourcing tools/env.sh\n' >&2; exit 2; }
 
 cd -- "${ROOT}"
-exec "${PYTHON}" -B "${SCRIPT_DIR}/matrix.py" run "$@"
+exec "${PYTHON}" -B "${SCRIPT_DIR}/${GRADER}" run "$@"

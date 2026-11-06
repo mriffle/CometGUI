@@ -38,7 +38,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.config.ClockRunIdSource;
@@ -83,6 +85,7 @@ import org.cometgui.results.parser.WeightsReader;
 import org.cometgui.tools.percolator.PoutDocument;
 import org.cometgui.tools.process.ProcessService;
 import org.cometgui.ui.viewmodel.params.PercolatorRequest;
+import org.cometgui.ui.viewmodel.params.RunNotStartedException;
 import org.cometgui.ui.viewmodel.params.RunObserver;
 import org.cometgui.workflow.engine.RunResult;
 import org.cometgui.workflow.engine.StepTransition;
@@ -146,8 +149,7 @@ class VersionMatrixPairs {
     }
 
     /** The fixture as the runs see it. */
-    private record Fixture(
-            String digest, List<Path> spectra, Path fasta, Map<String, Object> files) {}
+    record Fixture(String digest, List<Path> spectra, Path fasta, Map<String, Object> files) {}
 
     @Test
     @DisplayName(
@@ -182,17 +184,7 @@ class VersionMatrixPairs {
         assertFalse(comets.isEmpty(), "no Comet is offered here");
         assertFalse(percolators.isEmpty(), "no Percolator is offered here");
 
-        EnvironmentReader environment = withoutSessionBus(new SystemEnvironmentReader());
-        ApplicationServices services =
-                new ApplicationServices(
-                        clock,
-                        environment,
-                        new PlatformFileSystemAccess(environment),
-                        new ClockRunIdSource(clock),
-                        new FfmGlibcVersionSource(),
-                        processes,
-                        null,
-                        null);
+        ApplicationServices services = services(clock, processes);
         Path projectDirectory = temporary.resolve("project");
         List<String> failed = new ArrayList<>();
         try (ProjectSession session =
@@ -321,64 +313,23 @@ class VersionMatrixPairs {
                 row.check(
                         "the whole workflow ran through the product's run port and succeeded",
                         () -> {
-                            CometParameters model =
-                                    ReleaseDefaults.load(
-                                                    MetadataLoader.loadBundled(), comet.version())
-                                            .withText(
-                                                    "database_name",
-                                                    fixture.fasta().toString(),
-                                                    ValueOrigin.USER)
-                                            .withText("decoy_search", "1", ValueOrigin.USER)
-                                            .withText(
-                                                    "num_threads", COMET_THREADS, ValueOrigin.USER)
-                                            .withWorkflowEnforcedOutputs();
-                            PercolatorResolution resolution =
-                                    PercolatorResolver.resolve(
+                            Run run =
+                                    runOnce(
+                                            engine,
+                                            projectDirectory,
+                                            fixture,
+                                            comet,
+                                            percolator,
                                             every,
-                                            EnumSet.of(DownstreamStage.LIMELIGHT_CONVERSION));
-                            PercolatorRequest request =
-                                    new PercolatorRequest(
-                                            Optional.of(percolator),
-                                            resolution
-                                                    .selected()
-                                                    .map(percolator::equals)
-                                                    .orElse(false),
-                                            Optional.of(resolution),
-                                            Optional.of(PercolatorSettings.defaults()),
-                                            List.of(),
-                                            false);
-                            List<String> before = runDirectories(projectDirectory);
-                            CompletableFuture<RunResult> finished = new CompletableFuture<>();
-                            long started = System.nanoTime();
-                            engine.start(
-                                    model,
-                                    List.of(),
-                                    fixture.spectra(),
-                                    request,
-                                    new RunObserver() {
-                                        @Override
-                                        public void planned(Plan plan, String description) {}
-
-                                        @Override
-                                        public void onTransition(StepTransition transition) {}
-
-                                        @Override
-                                        public void onRunFinished(RunResult result) {
-                                            finished.complete(result);
-                                        }
-                                    });
-                            RunResult result = finished.get(RUN_MINUTES, TimeUnit.MINUTES);
-                            row.observe(
-                                    "runSeconds", (System.nanoTime() - started) / 1_000_000_000L);
-                            List<String> after = new ArrayList<>(runDirectories(projectDirectory));
-                            after.removeAll(before);
-                            assertEquals(1, after.size(), "one new run directory: " + after);
-                            directory[0] = projectDirectory.resolve("runs").resolve(after.get(0));
-                            row.observe("runDirectory", after.get(0));
+                                            COMET_THREADS,
+                                            PercolatorSettings.defaults());
+                            row.observe("runSeconds", run.seconds());
+                            row.observe("runDirectory", run.name());
+                            directory[0] = run.directory();
                             assertEquals(
                                     AttemptOutcome.SUCCEEDED,
-                                    result.outcome(),
-                                    () -> "the attempt: " + result.failures());
+                                    run.result().outcome(),
+                                    () -> "the attempt: " + run.result().failures());
                         });
         if (!ran) {
             return;
@@ -565,6 +516,119 @@ class VersionMatrixPairs {
     }
 
     /**
+     * One finished run of the whole workflow.
+     *
+     * @param directory the run's directory
+     * @param name the run directory's name
+     * @param seconds the wall clock it took
+     * @param result the engine's result
+     */
+    record Run(Path directory, String name, long seconds, RunResult result) {}
+
+    /**
+     * Runs the whole workflow once through the product's run port: the release's own defaults with
+     * the fixture's FASTA, decoys searched, the given Comet thread count and Percolator settings,
+     * and Limelight enabled so that a stage needs XML. Shared by the matrix and the determinism
+     * suite ({@link DeterminismPairs}).
+     *
+     * @param engine the session's run port
+     * @param projectDirectory the session's project directory
+     * @param fixture the fixture
+     * @param comet the Comet build
+     * @param percolator the Percolator build
+     * @param every every Percolator build offered, for the product's resolution
+     * @param cometThreads the {@code num_threads} text
+     * @param settings the Percolator settings
+     * @return the run, which exactly one new run directory holds
+     * @throws IOException if the project cannot be read
+     * @throws InterruptedException if interrupted while waiting
+     * @throws ExecutionException if the observer's result failed
+     * @throws TimeoutException if the run did not finish in time
+     * @throws RunNotStartedException if the product refused to start it
+     */
+    static Run runOnce(
+            SessionEngine engine,
+            Path projectDirectory,
+            Fixture fixture,
+            ToolOffer comet,
+            ToolOffer percolator,
+            List<ToolOffer> every,
+            String cometThreads,
+            PercolatorSettings settings)
+            throws IOException,
+                    InterruptedException,
+                    ExecutionException,
+                    TimeoutException,
+                    RunNotStartedException {
+        CometParameters model =
+                ReleaseDefaults.load(MetadataLoader.loadBundled(), comet.version())
+                        .withText("database_name", fixture.fasta().toString(), ValueOrigin.USER)
+                        .withText("decoy_search", "1", ValueOrigin.USER)
+                        .withText("num_threads", cometThreads, ValueOrigin.USER)
+                        .withWorkflowEnforcedOutputs();
+        PercolatorResolution resolution =
+                PercolatorResolver.resolve(every, EnumSet.of(DownstreamStage.LIMELIGHT_CONVERSION));
+        PercolatorRequest request =
+                new PercolatorRequest(
+                        Optional.of(percolator),
+                        resolution.selected().map(percolator::equals).orElse(false),
+                        Optional.of(resolution),
+                        Optional.of(settings),
+                        List.of(),
+                        false);
+        List<String> before = runDirectories(projectDirectory);
+        CompletableFuture<RunResult> finished = new CompletableFuture<>();
+        long started = System.nanoTime();
+        engine.start(
+                model,
+                List.of(),
+                fixture.spectra(),
+                request,
+                new RunObserver() {
+                    @Override
+                    public void planned(Plan plan, String description) {}
+
+                    @Override
+                    public void onTransition(StepTransition transition) {}
+
+                    @Override
+                    public void onRunFinished(RunResult result) {
+                        finished.complete(result);
+                    }
+                });
+        RunResult result = finished.get(RUN_MINUTES, TimeUnit.MINUTES);
+        long seconds = (System.nanoTime() - started) / 1_000_000_000L;
+        List<String> after = new ArrayList<>(runDirectories(projectDirectory));
+        after.removeAll(before);
+        assertEquals(1, after.size(), "one new run directory: " + after);
+        return new Run(
+                projectDirectory.resolve("runs").resolve(after.get(0)),
+                after.get(0),
+                seconds,
+                result);
+    }
+
+    /**
+     * The application's services over the real environment, without a session bus.
+     *
+     * @param clock the clock
+     * @param processes the process service
+     * @return the services
+     */
+    static ApplicationServices services(Clock clock, ProcessService processes) {
+        EnvironmentReader environment = withoutSessionBus(new SystemEnvironmentReader());
+        return new ApplicationServices(
+                clock,
+                environment,
+                new PlatformFileSystemAccess(environment),
+                new ClockRunIdSource(clock),
+                new FfmGlibcVersionSource(),
+                processes,
+                null,
+                null);
+    }
+
+    /**
      * A PSM identifier without the directory Comet puts in front of it. Comet builds the identifier
      * from its {@code -N} value, which the product passes as the absolute output base inside the
      * run directory, so every identifier begins with that run's own path (measured: {@code
@@ -601,12 +665,12 @@ class VersionMatrixPairs {
         return new long[] {rows, targets, decoys};
     }
 
-    private static Path find(Path run, String name) throws IOException {
+    static Path find(Path run, String name) throws IOException {
         return optionalFind(run, name)
                 .orElseThrow(() -> new AssertionError("no " + name + " under " + run));
     }
 
-    private static Optional<Path> optionalFind(Path run, String name) throws IOException {
+    static Optional<Path> optionalFind(Path run, String name) throws IOException {
         List<Path> found;
         try (Stream<Path> walked = Files.walk(run)) {
             found =

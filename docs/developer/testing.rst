@@ -1111,6 +1111,606 @@ point; the Comet ``-p``/``-q`` fixtures exist only for ``linux-x86-64``, so a
 first run elsewhere would fail on "no committed fixture" until captured there.
 The pair runs have never run on a CI runner (``D-006``).
 
+.. _dev-testing-determinism:
+
+Determinism -- gate item 3
+--------------------------
+
+:Checks: that the same pinned run -- the same inputs, the same parameters, the
+   same seed -- repeated N = 3 times through the product, each time into a fresh
+   run directory, gives the same results artefact by artefact; that varying what
+   should change nothing (Comet's and Percolator's thread counts) changes only
+   what the tolerance below names; and that the comparison can see a change at
+   all (a control with another seed must change Percolator's results). PHASE-15
+   exit gate item 3; specification, *Version matrix tests* ("repeated-run
+   determinism on a pinned fixture").
+:Fails: exit 1 when any artefact of a repeat or a variation differs from the
+   first repeat beyond what the tolerance below names -- the words name the
+   part, the tool pair or build, the configuration, the artefact, the file and
+   the line, row and column, attribute or field -- when the control changed
+   nothing, when a varied setting never reached the tool, when a run wrote a
+   file no artefact names, when a planned run is missing, or when this
+   section's table and the data disagree; exit 3 when the fixture half was
+   requested and no fixture was named. Exit 0 only when everything agrees.
+:Configured in: ``scripts/matrix/determinism-data.json`` (the runs and the
+   per-artefact tolerance), ``scripts/matrix/determinism.py`` (the comparison,
+   standard library only), and two opt-in JUnit classes in ``cometgui-app``,
+   ``org.cometgui.app.matrix.Determinism{Synthetic,Pairs}``, which share the
+   version matrix's support and its run-port helper.
+:Runs with: ``bash scripts/matrix/run-matrix.sh --part determinism`` (both
+   halves) or ``--part determinism-synthetic`` (no spectra); the nightly's
+   ``determinism`` job (``scripts/ci/nightly-determinism.sh``, the synthetic
+   half, real) and ``determinism-fixture`` job
+   (``scripts/ci/nightly-determinism-fixture.sh``, waiting on ``D-006``).
+
+**How to run it.** ::
+
+    COMETGUI_MATRIX_FIXTURE=scratch/fixture bash scripts/matrix/run-matrix.sh --part determinism
+    bash scripts/matrix/run-matrix.sh --part determinism-synthetic   # no spectra: what the nightly runs
+    python3 scripts/matrix/determinism.py --self-test                # the comparison, no Maven
+    python3 scripts/matrix/determinism.py check-doc                  # this section against the data
+
+The report is ``_build/determinism/determinism-report.txt`` (and ``.json``):
+every run against the first repeat, artefact by artefact, with its verdict --
+``identical``, ``within tolerance`` (naming the only fields that differed),
+``differs, as the control requires``, or ``DIFFERS`` with where. Every run's
+whole directory stays under ``_build/determinism/runs/`` (about 300 MB for the
+fixture half) so a difference can be read. The fixture is the version
+matrix's one named input, ``COMETGUI_MATRIX_FIXTURE``; without it the fixture
+half is refused (exit 3, never green) and the synthetic half still runs.
+
+**What runs.** Both halves install every build from its pinned upstream URL into
+an empty cache through the product's Tool Manager, as the version matrix does.
+
+* *Synthetic* (no spectra): every Percolator offered here (3.07.1 and 3.06.5 on
+  Linux x86-64) over CometGUI's own committed synthetic PIN, each run in a fresh
+  directory with a fresh copy of the PIN, the command built by the product's
+  ``PercolatorCommands`` from ``PercolatorSettings`` as the workflow maps them,
+  ``-X`` where the probe observed ``XML_OUTPUT``.
+* *Fixture*: the whole Comet -> Percolator run through the product's run port
+  (``RunWiring.port``, ``WorkflowRunPort``, ``CometWorkflow``), each run in a
+  *fresh project* so that it is a new run in a new run directory and never the
+  session's retry of its last one; Limelight enabled, so a stage needs XML.
+
+.. list-table:: The runs (``configurations`` in the data)
+   :header-rows: 1
+   :widths: 20 12 10 10 10 38
+
+   * - Configuration
+     - Halves
+     - Comet threads
+     - Percolator seed
+     - Percolator threads
+     - Role
+   * - ``repeat-1``, ``repeat-2``, ``repeat-3``
+     - both; every offered build and pair
+     - 4
+     - 1
+     - 3
+     - the pinned run, N = 3 times; ``repeat-1`` is what everything is compared with
+   * - ``comet-threads-1``
+     - fixture, default pair
+     - 1
+     - 1
+     - 3
+     - a variation that must change no result: every protein searched by one thread
+   * - ``comet-threads-0``
+     - fixture, default pair
+     - 0
+     - 1
+     - 3
+     - the same: Comet's own default, one thread per core (64 here)
+   * - ``percolator-threads-1``
+     - both
+     - 4
+     - 1
+     - 1
+     - the same: the folds trained one after another
+   * - ``percolator-threads-8``
+     - synthetic
+     - (none)
+     - 1
+     - 8
+     - the same: more threads than folds
+   * - ``control-seed-2``
+     - both
+     - 4
+     - 2
+     - 3
+     - the control: another seed draws other folds, so Percolator's results must
+       change and Comet's must not
+
+The default pair is Comet 2026.03.0 with Percolator 3.07.1, the product's own
+choice for a Limelight-enabled run. The variations run for the default pair
+alone; the repeats for every pair (four on Linux x86-64). A variation must show
+its setting reached the tool (``carries``: the varied value appears in
+``comet.params`` and the pepXML, in ``percolator-settings.json``, the argument
+array and provenance), or it is red: an unvaried variation proves nothing.
+
+What Comet and Percolator vary, read from their source
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Read at the pinned tags, Comet ``v2026.03.0`` (and ``v2026.02.2``) from
+``github.com/UWPR/Comet`` and Percolator ``rel-3-07-01`` (and ``rel-3-06-05``)
+from ``github.com/percolator/percolator``. Paths are within each tag's tree.
+
+*Comet threads.* In a direct FASTA search each protein is one job of the
+thread pool (``CometSearch/CometSearch.cpp:1214-1218``), so one spectrum's
+candidates are scored by several threads in whatever order they finish. Nothing
+the output shows depends on that order: a candidate's xcorr is summed by one
+thread in a fixed loop and rounded to three decimals before any shared state is
+touched (``:5222``); the per-query histogram the E-value is fitted to takes
+integer increments under the query's own lock (``:5224``, ``:5251``); a
+candidate that merely ties the last stored score no longer evicts it by arrival
+order -- the tie is broken by peptide string (``:5643-5697``, the comment there
+records the earlier arrival-order defect); the stored candidates are sorted by
+xcorr, then peptide, then modification sites (``CometPostAnalysis.cpp:400``,
+``:1200-1229``); the E-value is fitted per query (``:1567-1640``), padding a
+small histogram from a fixed table (``CometDecoys.h:25``); and the queries are
+sorted by scan, then charge, before any writer runs
+(``search/Pipeline.cpp:198``, ``search/SearchUtils.h:57-62``). No random number
+is drawn anywhere in the search (``rand``, ``srand``, ``shuffle``, ``mt19937``
+and ``<random>`` occur only in comments), and internal decoys are reversals,
+not shuffles (``CometSearch.cpp:3923``). The numbers are printed at fixed
+precision (``CometWritePepXML.cpp:832-849``, ``CometWritePercolator.cpp:166-237``).
+So the PIN and the pepXML must be identical whatever the thread count, apart
+from what Comet writes about the run itself: the date (``CometWritePepXML.cpp:68-69``,
+``:144``), the paths it resolves (``:148``, ``:150``, ``:190``), every
+parameter as configured -- ``num_threads`` among them, so a thread variation
+shows there (``:300-304``) -- and its standard output's dates and timings
+(``search/Pipeline.cpp:91``, ``:248``, ``:280``). The PIN's ``SpecId`` is built
+from the ``-N`` base (``CometWritePercolator.cpp:121-125``), which the product
+passes as the absolute output base inside the run directory.
+
+*Percolator's randomness.* One process-wide Park-Miller generator
+(``PseudoRandom.cpp:20-27``), seeded by ``--seed``, default 1
+(``Caller.cpp:229-232``, ``:530-531``). It assigns PSMs to the three
+cross-validation folds after a deterministic sort (``Scores.cpp:396-455``:
+``:412`` sorts by a hash of file and scan, ``:428`` draws the fold); the other
+draws are switched off at the product's settings (subset training, the RESET
+algorithm) or are mix-max bootstrap draws from the same generator in a fixed
+order. The SVM starts from zero weights (``CrossValidation.cpp:333-335``). The
+product always passes the seed, so the same seed draws the same folds; another
+seed draws others -- which is what the control shows. Rel-3-06-05 has the same
+generator and default but sorts by scan, mass and charge before drawing
+(``Scores.cpp:384``), so its folds, and therefore its results, differ from
+3.07.1's for the same seed (the version matrix's advisory).
+
+*Percolator's threads.* ``--num-threads`` sets OpenMP's team size
+(``Caller.cpp:310-312``, ``:946-947``) for three loops over folds and
+(cpos, cneg) pairs (``CrossValidation.cpp:297``, ``:371``, ``:411``); each
+iteration writes its own slot, no reduction or shared accumulator exists, the
+generator is not called inside them, the SVM uses Percolator's own
+single-threaded BLAS, and the folds are merged in a fixed order
+(``Scores.cpp:225-238``). Every value Percolator prints is therefore the same
+at any thread count -- and measured, it is: every score, q-value, PEP and
+weight. What is *not* fixed is the order of rows Percolator's final sort cannot
+separate: ``std::sort`` -- not stable -- on (score, scan, expMass, label)
+(``Scores.cpp:44-46``, ``:241-242``). PSMs of one spectrum whose features are
+identical (positional isomers of an oxidised methionine, ranks of one scan)
+score exactly alike and tie on all four keys. Measured: at ``--num-threads 1``
+against 3, Percolator 3.07.1 moved such tied rows at 84 row positions of the
+four tables (30, 24, 24 and 6 of 3886, 2973, 2784 and 2356 rows) and the
+matching ``<psm>`` and ``<peptide>`` elements of the pout XML -- each table the
+same set of rows, every value identical; at one thread count, repeats never
+did. Why the input order of that unstable sort follows the
+thread count was not traced to a line; the tolerance does not depend on it, as
+it allows only the order *within* a block of rows tied on what the table shows
+of those keys.
+
+*Percolator's output.* Tables at the stream's default six significant digits
+(``ResultHolder.cpp:42-52``), weights at fixed precision with a static header
+(``CrossValidation.cpp:464-500``), pout XML with no timestamp but its own
+command line (``XMLInterface.cpp:440``, ``Caller.cpp:98-105``); the standard
+error carries the start time and timings (``Caller.cpp:77-78``, ``:732-733``,
+``:1008``).
+
+*No numeric tolerance.* None of the above lets accumulation order reach a
+printed number: Comet rounds each candidate's score before it is shared and
+adds integers to the histogram; Percolator's parallel loops do not reduce into
+shared floating point. So no artefact is compared with a numeric tolerance --
+every number must be equal, as text. (The specification's *tolerant scientific
+metrics* are for larger datasets *across platforms*; determinism is one
+platform, one build.)
+
+*What the product varies.* Every run is a new run directory named from the
+clock (``ClockRunIdSource``), and that path is written into the content: Comet
+writes it into the PIN's ``SpecId`` and the pepXML, Percolator copies it into
+its tables and pout XML. Provenance records instants, durations, file
+modification times, and the digests and sizes of files whose content carries
+that path. The engine runs ready steps concurrently, so the event log's order
+is the scheduler's.
+
+The tolerance
+~~~~~~~~~~~~~
+
+Each artefact is compared with the same artefact of ``repeat-1`` by one rule:
+``bytes`` (byte-identical); ``text``, ``tsv``, ``pout``, ``json`` (identical,
+line for line, row for row or field for field, after removing exactly the
+fields named); ``jsonl-unordered`` (the same, as a set of events); ``record``
+(the values the run's record holds, exactly). A field marked *only when ...* is
+removed only for a run whose configuration varies that setting. Every file a
+run writes must belong to an artefact, or the run is red. ``determinism.py
+check-doc`` requires this table and the data to name the same artefacts, with
+the same rule and the same fields -- one more or one fewer on either side is
+red -- and this section to state the data's N.
+
+.. determinism-tolerance-table-start
+
+.. list-table:: The tolerance, per artefact (machine-readable: ``scripts/matrix/determinism-data.json``)
+   :header-rows: 1
+   :widths: 16 12 10 62
+
+   * - Artefact
+     - Written by
+     - Compared
+     - What may differ, why, and where the source says so
+   * - ``fixture:comet-params``
+       (``parameters/comet.params``)
+     - CometGUI
+     - ``text``
+     - the product's parameter writer is deterministic: the same model writes the same bytes.
+
+       *num_threads*, only when Comet's thread count is varied: the varied Comet setting itself (source: CometGUI CometParameters num_threads).
+   * - ``fixture:percolator-settings``
+       (``parameters/percolator-settings.json``)
+     - CometGUI
+     - ``text``
+     - the product's archived Percolator settings: the same settings write the same bytes.
+
+       *thread-count*, only when Percolator's thread count is varied: the varied Percolator setting itself (source: CometGUI PercolatorSettingsFile).
+
+       *random-seed*, only when the seed is varied (the control): the control's varied seed (source: CometGUI PercolatorSettingsFile).
+   * - ``fixture:comet-pepxml``
+       (``outputs/comet/*.pep.xml``)
+     - Comet
+     - ``text``
+     - each query is scored and its candidates ranked by one deterministic rule whatever thread scores which protein: a candidate's xcorr is summed by one thread and rounded to 3 decimals, the per-query histogram takes integer adds under the query's lock, a tie for the last stored place is broken by peptide string, candidates are sorted by xcorr then peptide then modification sites, queries by scan then charge before anything is written, the E-value is fitted per query, and no random number is drawn (source: Comet v2026.03.0 CometSearch/CometSearch.cpp:1214-1218, :5222, :5224-5284, :5643-5697; CometPostAnalysis.cpp:400, :1200-1229, :1567-1640; search/Pipeline.cpp:198; search/SearchUtils.h:57-62; CometDecoys.h:25).
+
+       *msms_pipeline_analysis date*: Comet writes the local time of the search (source: Comet v2026.03.0 CometSearch/CometWritePepXML.cpp:68-69, :144).
+
+       *summary_xml and search_summary base_name: the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content (source: Comet v2026.03.0 CometSearch/CometWritePepXML.cpp:148, :190 (the -N base, resolved)).
+
+       *parameter num_threads*, only when Comet's thread count is varied: Comet writes every parameter as configured, num_threads among them (source: Comet v2026.03.0 CometSearch/CometWritePepXML.cpp:300-304; Comet.cpp:283-287).
+   * - ``fixture:comet-pin``
+       (``outputs/comet/*.pin``)
+     - Comet
+     - ``tsv``
+     - as comet-pepxml: the same queries in the same order with the same scores; the PIN carries no date, version or parameter.
+
+       *SpecId: the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Comet builds SpecId from the -N base (source: Comet v2026.03.0 CometSearch/CometWritePercolator.cpp:121-125; Comet.cpp:140-146).
+   * - ``fixture:merged-pin``
+       (``inputs/pin/merged.pin``)
+     - CometGUI (PinMerger)
+     - ``tsv``
+     - every row of every per-file PIN in input order, byte for byte (PinMerger).
+
+       *SpecId: the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Comet builds SpecId from the -N base (source: Comet v2026.03.0 CometSearch/CometWritePercolator.cpp:121-125; Comet.cpp:140-146).
+   * - ``fixture:percolator-psms``
+       (``outputs/percolator/psms.tsv``)
+     - Percolator
+     - ``tsv``
+     - one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision (source: Percolator rel-3-07-01 src/PseudoRandom.cpp:20-27; Caller.cpp:229-232, :530-531; Scores.cpp:396-455; CrossValidation.cpp:297, :371, :411; Scores.cpp:225-238).
+
+       *PSMId: the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId (source: Percolator rel-3-07-01 src/ResultHolder.cpp:42-52).
+
+       *order of rows tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``fixture:percolator-peptides``
+       (``outputs/percolator/peptides.tsv``)
+     - Percolator
+     - ``tsv``
+     - one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision (source: Percolator rel-3-07-01 src/PseudoRandom.cpp:20-27; Caller.cpp:229-232, :530-531; Scores.cpp:396-455; CrossValidation.cpp:297, :371, :411; Scores.cpp:225-238).
+
+       *PSMId: the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId (source: Percolator rel-3-07-01 src/ResultHolder.cpp:42-52).
+
+       *order of rows tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``fixture:percolator-decoy-psms``
+       (``outputs/percolator/decoy-psms.tsv``)
+     - Percolator
+     - ``tsv``
+     - one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision (source: Percolator rel-3-07-01 src/PseudoRandom.cpp:20-27; Caller.cpp:229-232, :530-531; Scores.cpp:396-455; CrossValidation.cpp:297, :371, :411; Scores.cpp:225-238).
+
+       *PSMId: the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId (source: Percolator rel-3-07-01 src/ResultHolder.cpp:42-52).
+
+       *order of rows tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``fixture:percolator-decoy-peptides``
+       (``outputs/percolator/decoy-peptides.tsv``)
+     - Percolator
+     - ``tsv``
+     - one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision (source: Percolator rel-3-07-01 src/PseudoRandom.cpp:20-27; Caller.cpp:229-232, :530-531; Scores.cpp:396-455; CrossValidation.cpp:297, :371, :411; Scores.cpp:225-238).
+
+       *PSMId: the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId (source: Percolator rel-3-07-01 src/ResultHolder.cpp:42-52).
+
+       *order of rows tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``fixture:percolator-weights``
+       (``outputs/percolator/weights.txt``)
+     - Percolator
+     - ``bytes``
+     - the learned weights of each fold, written at fixed precision with a static header: no path, no time (source: Percolator rel-3-07-01 src/CrossValidation.cpp:464-500).
+
+       Nothing may differ.
+   * - ``fixture:percolator-pout``
+       (``outputs/percolator/pout.xml``)
+     - Percolator
+     - ``pout``
+     - as the tables; pout XML carries no timestamp.
+
+       *process_info command_line*: Percolator echoes its argument array, which names the run's own directory; the argument array itself is compared in provenance-json (source: Percolator rel-3-07-01 src/XMLInterface.cpp:440; Caller.cpp:98-105).
+
+       *psm_id: the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId (source: Percolator rel-3-07-01 src/Scores.cpp:62-101).
+
+       *order of <psm> and <peptide> elements tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Elements are compared as a set only within a block of consecutive rows equal in svm_score, q_value, pep, exp_mass and scan number; a peptide's psm_ids, listed in that same order, are compared as a set (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``fixture:comet-log``
+       (``logs/comet-*.log``)
+     - Comet (captured by CometGUI)
+     - ``text``
+     - Comet's standard output, captured line by line by the product.
+
+       *log line time*: the product stamps every captured line with the instant it was read (source: CometGUI StageLogFormat (cometgui-process)).
+
+       *the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content (source: CometGUI RunLayout (runs/<run id>/); Comet -N base Comet v2026.03.0 Comet.cpp:140-146).
+
+       *Search start / Search end / Run stats*: Comet prints the wall-clock date, elapsed time, rate and memory (source: Comet v2026.03.0 CometSearch/search/Pipeline.cpp:91, :248, :280).
+
+       *stage duration*: the product records how long the process ran (source: CometGUI StageLogFormat).
+   * - ``fixture:percolator-log``
+       (``logs/percolator.log``)
+     - Percolator (captured by CometGUI)
+     - ``text``
+     - Percolator's standard error, captured line by line by the product.
+
+       *log line time*: the product stamps every captured line with the instant it was read (source: CometGUI StageLogFormat (cometgui-process)).
+
+       *the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content (source: CometGUI RunLayout (runs/<run id>/); Comet -N base Comet v2026.03.0 Comet.cpp:140-146).
+
+       *Started*: Percolator prints the wall-clock start time (source: Percolator rel-3-07-01 src/Caller.cpp:78).
+
+       *cpu and wall-clock seconds*: Percolator prints how long reading and processing took (source: Percolator rel-3-07-01 src/Caller.cpp:732-733, :1008).
+
+       *stage duration*: the product records how long the process ran (source: CometGUI StageLogFormat).
+
+       *--num-threads value*, only when Percolator's thread count is varied: the varied Percolator setting itself, echoed wherever the command is recorded (source: CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312).
+
+       *--seed value*, only when the seed is varied (the control): the control's varied seed, echoed wherever the command is recorded (source: Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531).
+   * - ``fixture:provenance-json``
+       (``provenance/provenance.json``)
+     - CometGUI
+     - ``json``
+     - the provenance record: every tool's name, version, path and digests, every argument array, every input's digests, every output's size and digests, the settings.
+
+       *run identifier, times and durations*: the run identifier is taken from the clock, and every start, end and duration is a measurement (source: CometGUI ClockRunIdSource, ManifestWriter).
+
+       *digests of the run's own files*: a digest of a file whose content carries the run's own directory differs with it; each digest of a file under the run directory is replaced by the name of the file it is the digest of (the files themselves are compared above). Digests of the inputs and of the tools, outside the run directory, are compared as recorded (source: CometGUI provenance FileRecord, ToolRecord; this suite's digest_labels).
+
+       *sizes of the run's own files*: a file whose content carries the run's own directory is longer or shorter with that path; the file itself is compared above, so its recorded size is dropped. Sizes of the inputs, outside the run directory, are compared as recorded (source: CometGUI provenance FileRecord (sizeBytes)).
+
+       *the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content (source: CometGUI RunLayout).
+
+       *--num-threads value*, only when Percolator's thread count is varied: the varied Percolator setting itself, echoed wherever the command is recorded (source: CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312).
+
+       *percolator.thread-count*, only when Percolator's thread count is varied: the varied setting, recorded (source: CometGUI PercolatorProvenance).
+
+       *--seed value*, only when the seed is varied (the control): the control's varied seed, echoed wherever the command is recorded (source: Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531).
+
+       *percolator seed settings*, only when the seed is varied (the control): the control's seed, recorded (source: CometGUI PercolatorProvenance, EffectiveSeed).
+   * - ``fixture:provenance-rst``
+       (``provenance/provenance.rst``)
+     - CometGUI
+     - ``text``
+     - the provenance record rendered for people: the same content as provenance-json, read with each list-table row on one line.
+
+       *digests of the run's own files*: a digest of a file whose content carries the run's own directory differs with it; each digest of a file under the run directory is replaced by the name of the file it is the digest of (the files themselves are compared above). Digests of the inputs and of the tools, outside the run directory, are compared as recorded (source: CometGUI provenance FileRecord, ToolRecord; this suite's digest_labels).
+
+       *the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content (source: CometGUI RunLayout).
+
+       *run identifier, instants and durations*: the run identifier is taken from the clock, and every start, end and duration is a measurement (source: CometGUI ProvenanceRstWriter).
+
+       *sizes of the run's own files*: a file whose content carries the run's own directory is longer or shorter with that path; the file itself is compared above, so its recorded size is dropped. Sizes of the inputs, outside the run directory, are compared as recorded (source: CometGUI provenance FileRecord (sizeBytes)).
+
+       *--num-threads value*, only when Percolator's thread count is varied: the varied Percolator setting itself, echoed wherever the command is recorded (source: CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312).
+
+       *percolator.thread-count*, only when Percolator's thread count is varied: the varied setting, recorded (source: CometGUI PercolatorProvenance).
+
+       *--seed value*, only when the seed is varied (the control): the control's varied seed, echoed wherever the command is recorded (source: Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531).
+
+       *percolator seed settings*, only when the seed is varied (the control): the control's seed, recorded (source: CometGUI PercolatorProvenance, EffectiveSeed).
+   * - ``fixture:events-log``
+       (``provenance/events.log``)
+     - CometGUI
+     - ``jsonl-unordered``
+     - the provenance event log; compared as a set of events because the engine runs ready steps concurrently (resolve-comet, resolve-percolator, serialise-comet-params and hash-inputs start together), so their interleaving is the scheduler's.
+
+       *seq, time and run identifier*: each event's sequence number and instant follow the scheduler and the clock, and the run identifier is taken from the clock (source: CometGUI EventLog, ClockRunIdSource).
+
+       *digests of the run's own files*: a digest of a file whose content carries the run's own directory differs with it; each digest of a file under the run directory is replaced by the name of the file it is the digest of (the files themselves are compared above). Digests of the inputs and of the tools, outside the run directory, are compared as recorded (source: CometGUI provenance FileRecord, ToolRecord; this suite's digest_labels).
+
+       *the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content (source: CometGUI RunLayout).
+
+       *--num-threads value*, only when Percolator's thread count is varied: the varied Percolator setting itself, echoed wherever the command is recorded (source: CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312).
+
+       *--seed value*, only when the seed is varied (the control): the control's varied seed, echoed wherever the command is recorded (source: Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531).
+   * - ``fixture:run-json``
+       (``run.json``)
+     - CometGUI
+     - ``json``
+     - the run's own record of its inputs, parameters and attempts.
+
+       *run identifier and times*: from the clock (source: CometGUI RunJson, ClockRunIdSource).
+
+       *step fingerprints*: a digest over a step's input digests, among them outputs whose bytes carry the run's own directory (source: CometGUI RecordedFingerprint).
+
+       *digests of the run's own files*: a digest of a file whose content carries the run's own directory differs with it; each digest of a file under the run directory is replaced by the name of the file it is the digest of (the files themselves are compared above). Digests of the inputs and of the tools, outside the run directory, are compared as recorded (source: CometGUI provenance FileRecord, ToolRecord; this suite's digest_labels).
+
+       *the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content (source: CometGUI RunLayout).
+   * - ``fixture:product-results``
+       (``the run's record``)
+     - CometGUI
+     - ``record``
+     - what the product derives from the tables: each table's parsed row count, the rows its default filters select at q <= 0.01 and their identifiers (PSM identifiers without the run's directory), and the weights as its reader reads them.
+
+       *order of the selected identifiers among tied rows*, only when Percolator's thread count is varied: the product lists the rows its default filter selects in the table's order, so it inherits the order of tied rows above; the identifiers themselves and their count must be equal (source: Percolator rel-3-07-01 src/Scores.cpp:241-242; DeterminismSupport.derived (the product's PsmQValueFilter, PeptideQValueFilter in table order)).
+   * - ``synthetic:synthetic-pin``
+       (``probe.pin``)
+     - CometGUI (SyntheticPin)
+     - ``bytes``
+     - the committed synthetic PIN is generated from a fixed seed (SyntheticPin.PROBE_SEED).
+
+       Nothing may differ.
+   * - ``synthetic:synthetic-psms``
+       (``out/psms.tsv``)
+     - Percolator
+     - ``tsv``
+     - as percolator-psms; the synthetic identifiers carry no path.
+
+       *order of rows tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``synthetic:synthetic-peptides``
+       (``out/peptides.tsv``)
+     - Percolator
+     - ``tsv``
+     - as percolator-psms; the synthetic identifiers carry no path.
+
+       *order of rows tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``synthetic:synthetic-decoy-psms``
+       (``out/decoy-psms.tsv``)
+     - Percolator
+     - ``tsv``
+     - as percolator-psms; the synthetic identifiers carry no path.
+
+       *order of rows tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``synthetic:synthetic-decoy-peptides``
+       (``out/decoy-peptides.tsv``)
+     - Percolator
+     - ``tsv``
+     - as percolator-psms; the synthetic identifiers carry no path.
+
+       *order of rows tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``synthetic:synthetic-weights``
+       (``out/weights.txt``)
+     - Percolator
+     - ``bytes``
+     - as percolator-weights.
+
+       Nothing may differ.
+   * - ``synthetic:synthetic-pout``
+       (``out/pout.xml``)
+     - Percolator
+     - ``pout``
+     - as percolator-pout.
+
+       *process_info command_line*: Percolator echoes its argument array, which names the run's own directory; the argument array itself is compared in provenance-json (source: Percolator rel-3-07-01 src/XMLInterface.cpp:440; Caller.cpp:98-105).
+
+       *order of <psm> and <peptide> elements tied on Percolator's sort keys*, only when Percolator's thread count is varied: Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Elements are compared as a set only within a block of consecutive rows equal in svm_score, q_value, pep, exp_mass and scan number; a peptide's psm_ids, listed in that same order, are compared as a set (source: Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable).
+   * - ``synthetic:synthetic-stdout``
+       (``percolator.stdout``)
+     - Percolator
+     - ``bytes``
+     - Percolator writes its results to files, so its standard output is empty.
+
+       Nothing may differ.
+   * - ``synthetic:synthetic-stderr``
+       (``percolator.stderr``)
+     - Percolator
+     - ``text``
+     - Percolator's standard error.
+
+       *the run's own directory*: the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content (source: this suite's run directory).
+
+       *Started*: Percolator prints the wall-clock start time (source: Percolator rel-3-07-01 src/Caller.cpp:78).
+
+       *cpu and wall-clock seconds*: Percolator prints how long reading and processing took (source: Percolator rel-3-07-01 src/Caller.cpp:732-733, :1008).
+
+       *--num-threads value*, only when Percolator's thread count is varied: the varied Percolator setting itself, echoed wherever the command is recorded (source: CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312).
+
+       *--seed value*, only when the seed is varied (the control): the control's varied seed, echoed wherever the command is recorded (source: Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531).
+   * - ``synthetic:synthetic-command``
+       (``the run's record``)
+     - CometGUI (PercolatorCommands)
+     - ``record``
+     - the argument array the product's command builder made (the run's directory written <work>) and the effective seed the product records.
+
+       *--num-threads value*, only when Percolator's thread count is varied: the varied Percolator setting itself, echoed wherever the command is recorded (source: CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312).
+
+       *--seed value and the effective seed*, only when the seed is varied (the control): the control's seed (source: CometGUI EffectiveSeed).
+   * - ``synthetic:synthetic-product-results``
+       (``the run's record``)
+     - CometGUI
+     - ``record``
+     - as product-results.
+
+       *order of the selected identifiers among tied rows*, only when Percolator's thread count is varied: the product lists the rows its default filter selects in the table's order, so it inherits the order of tied rows above; the identifiers themselves and their count must be equal (source: Percolator rel-3-07-01 src/Scores.cpp:241-242; DeterminismSupport.derived (the product's PsmQValueFilter, PeptideQValueFilter in table order)).
+
+.. determinism-tolerance-table-end
+
+
+**Evidence** (2026-11-06, Linux x86-64, 64 cores, on the tree of this unit).
+``COMETGUI_MATRIX_FIXTURE=scratch/fixture bash scripts/matrix/run-matrix.sh
+--part determinism --offline``: **GREEN** in 360 s (Maven 349 s; the fixture
+runs 293 s of it). N = 3. 28 runs: 12 synthetic (Percolator 3.07.1 and 3.06.5,
+six configurations each) and 16 over the fixture (the three repeats of each of
+the four pairs, and the four variations of the default pair); 22 comparisons
+with ``repeat-1``, 323 artefact verdicts. Every repeat: 188 of 188 artefacts
+``identical`` after the base fields alone -- no repeat needed a ``whenVaried``
+field, and none a numeric tolerance. Variations: 77 ``identical``, 21 ``within
+tolerance`` (Comet's thread count: only ``num_threads`` in ``comet.params`` and
+the pepXML; Percolator's: only the thread count wherever it is recorded, and,
+at 1 thread against 3, the order of tied rows above). Controls: 23 artefacts
+``differs, as the control requires`` (every Percolator table, the weights, the
+pout XML, Percolator's standard error, the event log's table counts and the
+product's selected identifiers), 12 ``identical`` (every Comet artefact and
+log, the merged PIN, ``run.json``, the synthetic PIN, Percolator's empty
+standard output, and the synthetic runs' derived results, where nothing passes
+1% either way) and 5 ``within tolerance`` (the provenance record, its rendering,
+the archived settings and the argument array: only the seed where recorded).
+The synthetic half alone (``--part determinism-synthetic``, what the nightly
+runs) took 56 s, and 29 s as a step of the ``pipeline`` control (warm build):
+that is what this unit adds to that control. Without the fixture, ``--part
+determinism`` ran the synthetic half green and exited 3, ``REFUSED``.
+
+The digests behind "identical" (SHA-256, first 16 hex digits; for a compared
+form, of the lines left after the named fields are removed), the same in
+``repeat-1``, ``repeat-2`` and ``repeat-3`` of the default pair:
+``weights.txt`` ``a1c7db225fe1b555`` (the file itself; provenance records the
+same), ``merged.pin`` ``1d215d23fae05f7d``, the two PINs ``ebd046c51ecbaf4c``
+and ``ab6f7a42aaef8b3b``, the two pepXML ``1d5ed4c095e2081a`` and
+``25a7fae13b53846f``, ``psms.tsv`` ``437b3ad4b5591678``, ``pout.xml``
+``dd487f9e2911b4ef``; over the synthetic PIN with 3.07.1, ``weights.txt``
+``5370f2375d3ea1f1`` and ``psms.tsv`` ``6e782dd7bbba9f16``. Every run's
+digests are in ``determinism-report.json``.
+
+**Shown red** (2026-11-06; each injected into production code, the anchor gone
+and ``sha256sum -c`` FAILED while in, restored and ``sha256sum -c`` OK after):
+
+* ``PinMerger`` writing each file's rows in ``HashSet`` order (the rows carry
+  the run's directory, so the order differs run to run): RED, 43 problems,
+  first ``fixture comet-2026.02.2_percolator-3.06.5 repeat-2 (repeat): artefact
+  merged-pin DIFFERS -- inputs/pin/merged.pin: line 2, row
+  '<run>/outputs/comet/20100614_Velos1_TaGe_SA_K562_3_11788_4_3', column
+  SpecId``; Percolator's tables and pout XML followed, its tied rows now read in
+  another order -- the input order is what decides them.
+* ``PercolatorSettings.valueText`` giving the seed from the clock instead of the
+  setting: synthetic half RED, 60 problems, first ``synthetic percolator-3.06.5
+  repeat-2 (repeat): artefact synthetic-psms DIFFERS -- out/psms.tsv: line 2,
+  row 'psm84', column PSMId``, and ``synthetic-command ... field argv``.
+* ``WorkflowRunPort.start`` handing the engine the spectrum files in reverse
+  order on every second run: RED, 51 problems, first ``fixture
+  comet-2026.02.2_percolator-3.06.5 repeat-2 (repeat): artefact merged-pin
+  DIFFERS -- inputs/pin/merged.pin: line 2, row
+  '<run>/outputs/comet/20100614_Velos1_TaGe_SA_K562_4_9939_2_1', column
+  SpecId``, with the Comet logs, provenance, its rendering, the event log and
+  ``run.json`` red beside it on every pair (``repeat-3``, an odd run, agreed).
+
+``determinism.py --self-test`` (in the ``traceability`` control) proves the
+document check red on a field, an artefact, a rule or N on one side only, and
+the comparison red on each of its own defects.
+
+**What it does not cover.** Linux x86-64 only; macOS and Windows would run the
+same entry point on their runners. One fixture (the ``D-006`` local one: two
+K562 mzML files, the UniProt human proteome) and one host. The ``RESET``
+algorithm, subset training, index search and the fragment-ion index are not
+exercised (the product does not offer them); Percolator 3.09, a local binary on
+Linux, is not part of the suite. The fixture half has never run on a CI runner
+(``D-006``).
+
 Falsifiability
 ==============
 
@@ -3291,7 +3891,8 @@ exists is worse than no page.
      - 15
      - Every nightly step is a stub that exits 70 naming its phase. *Since
        then:* the tool manifest verification is real
-       (:ref:`dev-manifest-verify`).
+       (:ref:`dev-manifest-verify`), and so is determinism's synthetic half
+       (:ref:`dev-testing-determinism`; its fixture half waits on ``D-006``).
 
    * - Release acceptance on real installer artefacts
      - 14, 16

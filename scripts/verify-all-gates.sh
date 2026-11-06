@@ -238,7 +238,7 @@ gate_spec() {
             ;;
         traceability)
             GATE_ITEMS="5"
-            GATE_DEFECT="eight defects in copies of the map and the phase documents -- among them an AC- given no test reference, which must also fail the strict Sphinx build; and, since Phase 15 unit 6, R-TEST-07's review rule over copies of the goldens: a golden changed with no new review record, its bytes changed by one newline, a placeholder and an empty explanation, a future date, a missing REVIEW.json, a stale record, an unjustified tolerance, a golden under another tool pair's key and a stray file, each red, the committed goldens green"
+            GATE_DEFECT="eight defects in copies of the map and the phase documents -- among them an AC- given no test reference, which must also fail the strict Sphinx build; and, since Phase 15 unit 6, R-TEST-07's review rule over copies of the goldens: a golden changed with no new review record, its bytes changed by one newline, a placeholder and an empty explanation, a future date, a missing REVIEW.json, a stale record, an unjustified tolerance, a golden under another tool pair's key and a stray file, each red, the committed goldens green; and, since Phase 15 unit 7, gate item 3's determinism tolerance (determinism.py --self-test): a removed field, an undocumented field, a changed rule, an undocumented artefact, a documented artefact never compared and a different N, each red where the document and the data disagree, and the comparison red on an unnamed attribute, a changed byte, tied rows reordered with no thread count varied, a changed q-value, a control that changed nothing, a variation that never reached the tool, a file no artefact names and a planned run never made"
             GATE_SCRIPT="scripts/ci/traceability.sh"
             GATE_ARGS=(--self-test)
             GATE_PROOF=(
@@ -283,7 +283,7 @@ gate_spec() {
             ;;
         pipeline)
             GATE_ITEMS="6"
-            GATE_DEFECT="none injected: every nightly and release step whose work belongs to a later phase is a stub, and each MUST exit 70 rather than 0 -- the silent pass this phase was told not to ship; every real step MUST exit 0, among them, since Phase 15 unit 5, the real tool manifest verification, which downloads every pinned artefact (about 170 MB, twice: nightly and release) and reads the GitHub releases listings, so it needs the network and is red whenever upstream has changed"
+            GATE_DEFECT="none injected: every nightly and release step whose work belongs to a later phase is a stub, and each MUST exit 70 rather than 0 -- the silent pass this phase was told not to ship; every real step MUST exit 0, among them, since Phase 15 unit 5, the real tool manifest verification, which downloads every pinned artefact (about 170 MB, twice: nightly and release) and reads the GitHub releases listings, so it needs the network and is red whenever upstream has changed, and, since Phase 15 unit 7, the determinism suite's synthetic half (every offered Percolator installed from upstream and run twelve times over the synthetic PIN)"
             GATE_SCRIPT="scripts/ci/run-pipeline-locally.sh"
             GATE_ARGS=(nightly release)
             GATE_PROOF=("0 unexpected." "OK -- every executed step behaved as its classification requires.")

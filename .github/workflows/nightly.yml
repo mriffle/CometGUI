@@ -26,7 +26,8 @@
 # be added to mark a step as allowed to fail, or to swallow its exit status
 # (scripts/ci/check-workflows.sh refuses both).  Phase 15 replaces them one
 # at a time: the tool manifest verification (R-TEST-08) is real since unit 5,
-# and the version matrix since unit 6 (its fixture half waits on D-006).
+# the version matrix since unit 6 and determinism since unit 7 (the fixture
+# half of each waits on D-006).
 #
 # scripts/ci/run-pipeline-locally.sh runs every step below on this machine and
 # requires each stub to fail and each real step to pass.
@@ -106,15 +107,43 @@ jobs:
         run: bash scripts/ci/nightly-large-dataset.sh
 
   determinism:
-    name: "Nightly (Linux): determinism (stub, Phase 15)"
+    # PHASE-15 gate item 3, real since Phase 15 unit 7: the determinism suite's
+    # spectra-free half.  Every Percolator the product offers on this runner,
+    # installed from its pinned upstream URL by the product's Tool Manager, run
+    # over CometGUI's own synthetic PIN through the product's command builder:
+    # repeated with the same seed, varied in thread count, and -- the control --
+    # given another seed; every artefact compared with the tolerance written in
+    # scripts/matrix/determinism-data.json and docs/developer/testing.rst.
+    # Needs the project JDK and Maven; no spectra.  The Comet -> Percolator half
+    # is the determinism-fixture job's.
+    name: "Nightly (Linux): determinism (gate item 3, no spectra)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Project-local JDK and Maven (no setup-java)
+        run: bash scripts/ci/toolchain.sh
+
+      - name: Determinism comparisons
+        run: bash scripts/ci/nightly-determinism.sh
+
+  determinism-fixture:
+    # The determinism suite's fixture half: the whole Comet -> Percolator run
+    # repeated over a real dataset for every offered pair.  It takes the version
+    # matrix's one named input, COMETGUI_MATRIX_FIXTURE, and none exists on a
+    # runner: D-006's CI fixture is OPEN, so the step exits 70 through
+    # stub-lib.sh, naming what it waits for -- red, in its own job, never green.
+    name: "Nightly (Linux): determinism over a dataset (waits on D-006's CI fixture)"
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
       - name: Check out the repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
-      - name: Determinism comparisons
-        run: bash scripts/ci/nightly-determinism.sh
+      - name: Determinism comparisons over a real dataset
+        run: bash scripts/ci/nightly-determinism-fixture.sh
 
   performance:
     name: "Nightly (Linux): performance (stub, Phase 15)"

@@ -1,0 +1,1071 @@
+{
+  "schemaVersion": 1,
+  "about": "Phase 15 unit 7, the determinism suite (gate item 3). The runs the suite makes, and the tolerance each artefact is compared with. scripts/matrix/determinism.py runs and grades it; the 'Determinism' section of docs/developer/testing.rst states the same tolerance with its justification, and determinism.py check-doc is red when the two differ.",
+  "repeats": 3,
+  "defaultPair": {
+    "comet": "2026.03.0",
+    "percolator": "3.07.1"
+  },
+  "configurations": [
+    {
+      "label": "repeat-1",
+      "parts": [
+        "synthetic",
+        "fixture"
+      ],
+      "scope": "every",
+      "cometThreads": "4",
+      "percolatorSeed": 1,
+      "percolatorThreads": 3,
+      "role": "baseline",
+      "why": "the pinned run: Comet with 4 threads (the matrix's setting), Percolator's defaults (seed 1, 3 threads)"
+    },
+    {
+      "label": "repeat-2",
+      "parts": [
+        "synthetic",
+        "fixture"
+      ],
+      "scope": "every",
+      "cometThreads": "4",
+      "percolatorSeed": 1,
+      "percolatorThreads": 3,
+      "role": "repeat",
+      "why": "the same run again, in a fresh project"
+    },
+    {
+      "label": "repeat-3",
+      "parts": [
+        "synthetic",
+        "fixture"
+      ],
+      "scope": "every",
+      "cometThreads": "4",
+      "percolatorSeed": 1,
+      "percolatorThreads": 3,
+      "role": "repeat",
+      "why": "and again"
+    },
+    {
+      "label": "comet-threads-1",
+      "parts": [
+        "fixture"
+      ],
+      "scope": "default",
+      "cometThreads": "1",
+      "percolatorSeed": 1,
+      "percolatorThreads": 3,
+      "role": "variant",
+      "why": "Comet single-threaded: every protein searched by one thread in file order",
+      "carries": [
+        "comet-params",
+        "comet-pepxml"
+      ]
+    },
+    {
+      "label": "comet-threads-0",
+      "parts": [
+        "fixture"
+      ],
+      "scope": "default",
+      "cometThreads": "0",
+      "percolatorSeed": 1,
+      "percolatorThreads": 3,
+      "role": "variant",
+      "why": "Comet's own default, one thread per core (64 on the reference host)",
+      "carries": [
+        "comet-params",
+        "comet-pepxml"
+      ]
+    },
+    {
+      "label": "percolator-threads-1",
+      "parts": [
+        "synthetic",
+        "fixture"
+      ],
+      "scope": "default",
+      "cometThreads": "4",
+      "percolatorSeed": 1,
+      "percolatorThreads": 1,
+      "role": "variant",
+      "why": "Percolator single-threaded: the folds trained one after another",
+      "carries": [
+        "percolator-settings",
+        "provenance-json",
+        "synthetic-command"
+      ]
+    },
+    {
+      "label": "percolator-threads-8",
+      "parts": [
+        "synthetic"
+      ],
+      "scope": "default",
+      "cometThreads": "4",
+      "percolatorSeed": 1,
+      "percolatorThreads": 8,
+      "role": "variant",
+      "why": "Percolator with more threads than folds",
+      "carries": [
+        "synthetic-command"
+      ]
+    },
+    {
+      "label": "control-seed-2",
+      "parts": [
+        "synthetic",
+        "fixture"
+      ],
+      "scope": "default",
+      "cometThreads": "4",
+      "percolatorSeed": 2,
+      "percolatorThreads": 3,
+      "role": "control",
+      "why": "another seed draws other folds: Percolator's results must change, Comet's must not",
+      "changes": [
+        "percolator-psms",
+        "percolator-peptides",
+        "percolator-decoy-psms",
+        "percolator-decoy-peptides",
+        "percolator-weights",
+        "percolator-pout",
+        "product-results",
+        "percolator-log",
+        "events-log",
+        "synthetic-psms",
+        "synthetic-peptides",
+        "synthetic-decoy-psms",
+        "synthetic-decoy-peptides",
+        "synthetic-weights",
+        "synthetic-pout",
+        "synthetic-stderr"
+      ]
+    }
+  ],
+  "artefacts": [
+    {
+      "id": "comet-params",
+      "part": "fixture",
+      "writer": "CometGUI",
+      "files": "parameters/comet.params",
+      "compare": "text",
+      "why": "the product's parameter writer is deterministic: the same model writes the same bytes",
+      "fields": [],
+      "whenVaried": {
+        "cometThreads": [
+          {
+            "name": "num_threads",
+            "pattern": "^num_threads = \\S+",
+            "replace": "num_threads = <varied>",
+            "why": "the varied Comet setting itself",
+            "source": "CometGUI CometParameters num_threads"
+          }
+        ]
+      }
+    },
+    {
+      "id": "percolator-settings",
+      "part": "fixture",
+      "writer": "CometGUI",
+      "files": "parameters/percolator-settings.json",
+      "compare": "text",
+      "why": "the product's archived Percolator settings: the same settings write the same bytes",
+      "fields": [],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "thread-count",
+            "pattern": "\"thread-count\": \"\\d+\"",
+            "replace": "\"thread-count\": \"<varied>\"",
+            "why": "the varied Percolator setting itself",
+            "source": "CometGUI PercolatorSettingsFile"
+          }
+        ],
+        "percolatorSeed": [
+          {
+            "name": "random-seed",
+            "pattern": "\"random-seed\": \"\\d+\"",
+            "replace": "\"random-seed\": \"<varied>\"",
+            "why": "the control's varied seed",
+            "source": "CometGUI PercolatorSettingsFile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "comet-pepxml",
+      "part": "fixture",
+      "writer": "Comet",
+      "files": "outputs/comet/*.pep.xml",
+      "compare": "text",
+      "why": "each query is scored and its candidates ranked by one deterministic rule whatever thread scores which protein: a candidate's xcorr is summed by one thread and rounded to 3 decimals, the per-query histogram takes integer adds under the query's lock, a tie for the last stored place is broken by peptide string, candidates are sorted by xcorr then peptide then modification sites, queries by scan then charge before anything is written, the E-value is fitted per query, and no random number is drawn",
+      "fields": [
+        {
+          "name": "msms_pipeline_analysis date",
+          "pattern": "(<msms_pipeline_analysis date=\")[^\"]*\"",
+          "replace": "\\1<date>\"",
+          "why": "Comet writes the local time of the search",
+          "source": "Comet v2026.03.0 CometSearch/CometWritePepXML.cpp:68-69, :144"
+        },
+        {
+          "name": "summary_xml and search_summary base_name: the run's own directory",
+          "pattern": "((?:summary_xml|<search_summary base_name)=\"){run}",
+          "replace": "\\1<run>",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content",
+          "source": "Comet v2026.03.0 CometSearch/CometWritePepXML.cpp:148, :190 (the -N base, resolved)"
+        }
+      ],
+      "whenVaried": {
+        "cometThreads": [
+          {
+            "name": "parameter num_threads",
+            "pattern": "(<parameter name=\"num_threads\" value=\")[^\"]*\"",
+            "replace": "\\1<varied>\"",
+            "why": "Comet writes every parameter as configured, num_threads among them",
+            "source": "Comet v2026.03.0 CometSearch/CometWritePepXML.cpp:300-304; Comet.cpp:283-287"
+          }
+        ]
+      },
+      "source": "Comet v2026.03.0 CometSearch/CometSearch.cpp:1214-1218, :5222, :5224-5284, :5643-5697; CometPostAnalysis.cpp:400, :1200-1229, :1567-1640; search/Pipeline.cpp:198; search/SearchUtils.h:57-62; CometDecoys.h:25"
+    },
+    {
+      "id": "comet-pin",
+      "part": "fixture",
+      "writer": "Comet",
+      "files": "outputs/comet/*.pin",
+      "compare": "tsv",
+      "why": "as comet-pepxml: the same queries in the same order with the same scores; the PIN carries no date, version or parameter",
+      "fields": [
+        {
+          "name": "SpecId: the run's own directory",
+          "pattern": "^{run}/",
+          "replace": "<run>/",
+          "column": "SpecId",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Comet builds SpecId from the -N base",
+          "source": "Comet v2026.03.0 CometSearch/CometWritePercolator.cpp:121-125; Comet.cpp:140-146"
+        }
+      ],
+      "whenVaried": {}
+    },
+    {
+      "id": "merged-pin",
+      "part": "fixture",
+      "writer": "CometGUI (PinMerger)",
+      "files": "inputs/pin/merged.pin",
+      "compare": "tsv",
+      "why": "every row of every per-file PIN in input order, byte for byte (PinMerger)",
+      "fields": [
+        {
+          "name": "SpecId: the run's own directory",
+          "pattern": "^{run}/",
+          "replace": "<run>/",
+          "column": "SpecId",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Comet builds SpecId from the -N base",
+          "source": "Comet v2026.03.0 CometSearch/CometWritePercolator.cpp:121-125; Comet.cpp:140-146"
+        }
+      ],
+      "whenVaried": {}
+    },
+    {
+      "id": "percolator-psms",
+      "part": "fixture",
+      "writer": "Percolator",
+      "files": "outputs/percolator/psms.tsv",
+      "compare": "tsv",
+      "why": "one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision",
+      "fields": [
+        {
+          "name": "PSMId: the run's own directory",
+          "pattern": "^{run}/",
+          "replace": "<run>/",
+          "column": "PSMId",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
+          "source": "Percolator rel-3-07-01 src/ResultHolder.cpp:42-52"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of rows tied on Percolator's sort keys",
+            "tieOrder": [
+              "score",
+              "q-value",
+              "posterior_error_prob"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      },
+      "source": "Percolator rel-3-07-01 src/PseudoRandom.cpp:20-27; Caller.cpp:229-232, :530-531; Scores.cpp:396-455; CrossValidation.cpp:297, :371, :411; Scores.cpp:225-238"
+    },
+    {
+      "id": "percolator-peptides",
+      "part": "fixture",
+      "writer": "Percolator",
+      "files": "outputs/percolator/peptides.tsv",
+      "compare": "tsv",
+      "why": "one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision",
+      "fields": [
+        {
+          "name": "PSMId: the run's own directory",
+          "pattern": "^{run}/",
+          "replace": "<run>/",
+          "column": "PSMId",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
+          "source": "Percolator rel-3-07-01 src/ResultHolder.cpp:42-52"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of rows tied on Percolator's sort keys",
+            "tieOrder": [
+              "score",
+              "q-value",
+              "posterior_error_prob"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      },
+      "source": "Percolator rel-3-07-01 src/PseudoRandom.cpp:20-27; Caller.cpp:229-232, :530-531; Scores.cpp:396-455; CrossValidation.cpp:297, :371, :411; Scores.cpp:225-238"
+    },
+    {
+      "id": "percolator-decoy-psms",
+      "part": "fixture",
+      "writer": "Percolator",
+      "files": "outputs/percolator/decoy-psms.tsv",
+      "compare": "tsv",
+      "why": "one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision",
+      "fields": [
+        {
+          "name": "PSMId: the run's own directory",
+          "pattern": "^{run}/",
+          "replace": "<run>/",
+          "column": "PSMId",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
+          "source": "Percolator rel-3-07-01 src/ResultHolder.cpp:42-52"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of rows tied on Percolator's sort keys",
+            "tieOrder": [
+              "score",
+              "q-value",
+              "posterior_error_prob"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      },
+      "source": "Percolator rel-3-07-01 src/PseudoRandom.cpp:20-27; Caller.cpp:229-232, :530-531; Scores.cpp:396-455; CrossValidation.cpp:297, :371, :411; Scores.cpp:225-238"
+    },
+    {
+      "id": "percolator-decoy-peptides",
+      "part": "fixture",
+      "writer": "Percolator",
+      "files": "outputs/percolator/decoy-peptides.tsv",
+      "compare": "tsv",
+      "why": "one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision",
+      "fields": [
+        {
+          "name": "PSMId: the run's own directory",
+          "pattern": "^{run}/",
+          "replace": "<run>/",
+          "column": "PSMId",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
+          "source": "Percolator rel-3-07-01 src/ResultHolder.cpp:42-52"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of rows tied on Percolator's sort keys",
+            "tieOrder": [
+              "score",
+              "q-value",
+              "posterior_error_prob"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      },
+      "source": "Percolator rel-3-07-01 src/PseudoRandom.cpp:20-27; Caller.cpp:229-232, :530-531; Scores.cpp:396-455; CrossValidation.cpp:297, :371, :411; Scores.cpp:225-238"
+    },
+    {
+      "id": "percolator-weights",
+      "part": "fixture",
+      "writer": "Percolator",
+      "files": "outputs/percolator/weights.txt",
+      "compare": "bytes",
+      "why": "the learned weights of each fold, written at fixed precision with a static header: no path, no time",
+      "fields": [],
+      "whenVaried": {},
+      "source": "Percolator rel-3-07-01 src/CrossValidation.cpp:464-500"
+    },
+    {
+      "id": "percolator-pout",
+      "part": "fixture",
+      "writer": "Percolator",
+      "files": "outputs/percolator/pout.xml",
+      "compare": "pout",
+      "why": "as the tables; pout XML carries no timestamp",
+      "fields": [
+        {
+          "name": "process_info command_line",
+          "pattern": "<command_line>.*</command_line>",
+          "replace": "<command_line/>",
+          "why": "Percolator echoes its argument array, which names the run's own directory; the argument array itself is compared in provenance-json",
+          "source": "Percolator rel-3-07-01 src/XMLInterface.cpp:440; Caller.cpp:98-105"
+        },
+        {
+          "name": "psm_id: the run's own directory",
+          "pattern": "((?:p:psm_id=\"|<psm_id>)){run}/",
+          "replace": "\\1<run>/",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
+          "source": "Percolator rel-3-07-01 src/Scores.cpp:62-101"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of <psm> and <peptide> elements tied on Percolator's sort keys",
+            "tieOrder": [
+              "svm_score",
+              "q_value",
+              "pep"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Elements are compared as a set only within a block of consecutive rows equal in svm_score, q_value, pep, exp_mass and scan number; a peptide's psm_ids, listed in that same order, are compared as a set",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      }
+    },
+    {
+      "id": "comet-log",
+      "part": "fixture",
+      "writer": "Comet (captured by CometGUI)",
+      "files": "logs/comet-*.log",
+      "compare": "text",
+      "why": "Comet's standard output, captured line by line by the product",
+      "fields": [
+        {
+          "name": "log line time",
+          "pattern": "^\\S+Z ",
+          "replace": "",
+          "why": "the product stamps every captured line with the instant it was read",
+          "source": "CometGUI StageLogFormat (cometgui-process)"
+        },
+        {
+          "name": "the run's own directory",
+          "pattern": "{run}",
+          "replace": "<run>",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content",
+          "source": "CometGUI RunLayout (runs/<run id>/); Comet -N base Comet v2026.03.0 Comet.cpp:140-146"
+        },
+        {
+          "name": "Search start / Search end / Run stats",
+          "pattern": "^(\\[stdout\\]\\s+(Search start:|Search end:|- Run stats:)).*$",
+          "replace": "\\1 <time>",
+          "why": "Comet prints the wall-clock date, elapsed time, rate and memory",
+          "source": "Comet v2026.03.0 CometSearch/search/Pipeline.cpp:91, :248, :280"
+        },
+        {
+          "name": "stage duration",
+          "pattern": "(ended: exit code \\d+ after )PT[0-9.]+S",
+          "replace": "\\1<duration>",
+          "why": "the product records how long the process ran",
+          "source": "CometGUI StageLogFormat"
+        }
+      ],
+      "whenVaried": {
+        "cometThreads": []
+      }
+    },
+    {
+      "id": "percolator-log",
+      "part": "fixture",
+      "writer": "Percolator (captured by CometGUI)",
+      "files": "logs/percolator.log",
+      "compare": "text",
+      "why": "Percolator's standard error, captured line by line by the product",
+      "fields": [
+        {
+          "name": "log line time",
+          "pattern": "^\\S+Z ",
+          "replace": "",
+          "why": "the product stamps every captured line with the instant it was read",
+          "source": "CometGUI StageLogFormat (cometgui-process)"
+        },
+        {
+          "name": "the run's own directory",
+          "pattern": "{run}",
+          "replace": "<run>",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content",
+          "source": "CometGUI RunLayout (runs/<run id>/); Comet -N base Comet v2026.03.0 Comet.cpp:140-146"
+        },
+        {
+          "name": "Started",
+          "pattern": "^(\\[stderr\\] Started ).*$",
+          "replace": "\\1<time>",
+          "why": "Percolator prints the wall-clock start time",
+          "source": "Percolator rel-3-07-01 src/Caller.cpp:78"
+        },
+        {
+          "name": "cpu and wall-clock seconds",
+          "pattern": "took [0-9.]+ cpu seconds or [0-9.]+ seconds",
+          "replace": "took <time>",
+          "why": "Percolator prints how long reading and processing took",
+          "source": "Percolator rel-3-07-01 src/Caller.cpp:732-733, :1008"
+        },
+        {
+          "name": "stage duration",
+          "pattern": "(ended: exit code \\d+ after )PT[0-9.]+S",
+          "replace": "\\1<duration>",
+          "why": "the product records how long the process ran",
+          "source": "CometGUI StageLogFormat"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "--num-threads value",
+            "pattern": "(--num-threads(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the varied Percolator setting itself, echoed wherever the command is recorded",
+            "source": "CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312"
+          }
+        ],
+        "percolatorSeed": [
+          {
+            "name": "--seed value",
+            "pattern": "(--seed(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the control's varied seed, echoed wherever the command is recorded",
+            "source": "Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531"
+          }
+        ]
+      }
+    },
+    {
+      "id": "provenance-json",
+      "part": "fixture",
+      "writer": "CometGUI",
+      "files": "provenance/provenance.json",
+      "compare": "json",
+      "why": "the provenance record: every tool's name, version, path and digests, every argument array, every input's digests, every output's size and digests, the settings",
+      "fields": [
+        {
+          "name": "run identifier, times and durations",
+          "path": "run\\.(runId|start|end|durationMillis)|tools\\[\\d+\\]\\.execution\\.(start|end|durationMillis)|files\\[\\d+\\]\\.modifiedAt",
+          "why": "the run identifier is taken from the clock, and every start, end and duration is a measurement",
+          "source": "CometGUI ClockRunIdSource, ManifestWriter"
+        },
+        {
+          "name": "digests of the run's own files",
+          "digests": true,
+          "why": "a digest of a file whose content carries the run's own directory differs with it; each digest of a file under the run directory is replaced by the name of the file it is the digest of (the files themselves are compared above). Digests of the inputs and of the tools, outside the run directory, are compared as recorded",
+          "source": "CometGUI provenance FileRecord, ToolRecord; this suite's digest_labels"
+        },
+        {
+          "name": "sizes of the run's own files",
+          "runFileSizes": true,
+          "why": "a file whose content carries the run's own directory is longer or shorter with that path; the file itself is compared above, so its recorded size is dropped. Sizes of the inputs, outside the run directory, are compared as recorded",
+          "source": "CometGUI provenance FileRecord (sizeBytes)"
+        },
+        {
+          "name": "the run's own directory",
+          "pattern": "{run}",
+          "replace": "<run>",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content",
+          "source": "CometGUI RunLayout"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "--num-threads value",
+            "pattern": "(--num-threads(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the varied Percolator setting itself, echoed wherever the command is recorded",
+            "source": "CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312"
+          },
+          {
+            "name": "percolator.thread-count",
+            "path": "settings\\.percolator\\.thread-count",
+            "why": "the varied setting, recorded",
+            "source": "CometGUI PercolatorProvenance"
+          }
+        ],
+        "percolatorSeed": [
+          {
+            "name": "--seed value",
+            "pattern": "(--seed(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the control's varied seed, echoed wherever the command is recorded",
+            "source": "Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531"
+          },
+          {
+            "name": "percolator seed settings",
+            "path": "settings\\.percolator\\.(random-seed|seed|seed-explanation)",
+            "why": "the control's seed, recorded",
+            "source": "CometGUI PercolatorProvenance, EffectiveSeed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "provenance-rst",
+      "part": "fixture",
+      "writer": "CometGUI",
+      "files": "provenance/provenance.rst",
+      "compare": "text",
+      "why": "the provenance record rendered for people: the same content as provenance-json, read with each list-table row on one line",
+      "fields": [
+        {
+          "name": "digests of the run's own files",
+          "digests": true,
+          "why": "a digest of a file whose content carries the run's own directory differs with it; each digest of a file under the run directory is replaced by the name of the file it is the digest of (the files themselves are compared above). Digests of the inputs and of the tools, outside the run directory, are compared as recorded",
+          "source": "CometGUI provenance FileRecord, ToolRecord; this suite's digest_labels"
+        },
+        {
+          "name": "the run's own directory",
+          "pattern": "{run}",
+          "replace": "<run>",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content",
+          "source": "CometGUI RunLayout"
+        },
+        {
+          "name": "run identifier, instants and durations",
+          "pattern": "run-\\d{8}T\\d{9}Z-\\d+|\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d+)?Z|(?<=:Duration \\(ms\\): )``\\d+``",
+          "replace": "<varies>",
+          "why": "the run identifier is taken from the clock, and every start, end and duration is a measurement",
+          "source": "CometGUI ProvenanceRstWriter"
+        },
+        {
+          "name": "sizes of the run's own files",
+          "runFileSizes": false,
+          "why": "a file whose content carries the run's own directory is longer or shorter with that path; the file itself is compared above, so its recorded size is dropped. Sizes of the inputs, outside the run directory, are compared as recorded",
+          "source": "CometGUI provenance FileRecord (sizeBytes)",
+          "pattern": "(``<run>/[^`]*`` \\| )``\\d+``",
+          "replace": "\\1<size>",
+          "listTableRows": true
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "--num-threads value",
+            "pattern": "(--num-threads(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the varied Percolator setting itself, echoed wherever the command is recorded",
+            "source": "CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312"
+          },
+          {
+            "name": "percolator.thread-count",
+            "pattern": "(``percolator\\.thread-count`` \\| ``)\\d+",
+            "replace": "\\1<varied>",
+            "why": "the varied setting, recorded",
+            "source": "CometGUI PercolatorProvenance"
+          }
+        ],
+        "percolatorSeed": [
+          {
+            "name": "--seed value",
+            "pattern": "(--seed(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the control's varied seed, echoed wherever the command is recorded",
+            "source": "Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531"
+          },
+          {
+            "name": "percolator seed settings",
+            "pattern": "(``percolator\\.(?:random-seed|seed)`` \\| ``|``percolator\\.seed-explanation`` \\| ``The random seed )\\d+",
+            "replace": "\\1<varied>",
+            "why": "the control's seed, recorded",
+            "source": "CometGUI PercolatorProvenance, EffectiveSeed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "events-log",
+      "part": "fixture",
+      "writer": "CometGUI",
+      "files": "provenance/events.log",
+      "compare": "jsonl-unordered",
+      "why": "the provenance event log; compared as a set of events because the engine runs ready steps concurrently (resolve-comet, resolve-percolator, serialise-comet-params and hash-inputs start together), so their interleaving is the scheduler's",
+      "fields": [
+        {
+          "name": "seq, time and run identifier",
+          "path": "seq|time|payload\\.run\\.id",
+          "why": "each event's sequence number and instant follow the scheduler and the clock, and the run identifier is taken from the clock",
+          "source": "CometGUI EventLog, ClockRunIdSource"
+        },
+        {
+          "name": "digests of the run's own files",
+          "digests": true,
+          "why": "a digest of a file whose content carries the run's own directory differs with it; each digest of a file under the run directory is replaced by the name of the file it is the digest of (the files themselves are compared above). Digests of the inputs and of the tools, outside the run directory, are compared as recorded",
+          "source": "CometGUI provenance FileRecord, ToolRecord; this suite's digest_labels"
+        },
+        {
+          "name": "the run's own directory",
+          "pattern": "{run}",
+          "replace": "<run>",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content",
+          "source": "CometGUI RunLayout"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "--num-threads value",
+            "pattern": "(--num-threads(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the varied Percolator setting itself, echoed wherever the command is recorded",
+            "source": "CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312"
+          }
+        ],
+        "percolatorSeed": [
+          {
+            "name": "--seed value",
+            "pattern": "(--seed(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the control's varied seed, echoed wherever the command is recorded",
+            "source": "Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531"
+          }
+        ]
+      }
+    },
+    {
+      "id": "run-json",
+      "part": "fixture",
+      "writer": "CometGUI",
+      "files": "run.json",
+      "compare": "json",
+      "why": "the run's own record of its inputs, parameters and attempts",
+      "fields": [
+        {
+          "name": "run identifier and times",
+          "path": "runId|created|attempts\\[\\d+\\]\\.(started|ended)",
+          "why": "from the clock",
+          "source": "CometGUI RunJson, ClockRunIdSource"
+        },
+        {
+          "name": "step fingerprints",
+          "path": "attempts\\[\\d+\\]\\.succeededSteps\\..*\\.fingerprint",
+          "why": "a digest over a step's input digests, among them outputs whose bytes carry the run's own directory",
+          "source": "CometGUI RecordedFingerprint"
+        },
+        {
+          "name": "digests of the run's own files",
+          "digests": true,
+          "why": "a digest of a file whose content carries the run's own directory differs with it; each digest of a file under the run directory is replaced by the name of the file it is the digest of (the files themselves are compared above). Digests of the inputs and of the tools, outside the run directory, are compared as recorded",
+          "source": "CometGUI provenance FileRecord, ToolRecord; this suite's digest_labels"
+        },
+        {
+          "name": "the run's own directory",
+          "pattern": "{run}",
+          "replace": "<run>",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content",
+          "source": "CometGUI RunLayout"
+        }
+      ],
+      "whenVaried": {}
+    },
+    {
+      "id": "product-results",
+      "part": "fixture",
+      "writer": "CometGUI",
+      "files": "",
+      "compare": "record",
+      "why": "what the product derives from the tables: each table's parsed row count, the rows its default filters select at q <= 0.01 and their identifiers (PSM identifiers without the run's directory), and the weights as its reader reads them",
+      "fields": [],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of the selected identifiers among tied rows",
+            "tieOrder": [
+              "selected"
+            ],
+            "why": "the product lists the rows its default filter selects in the table's order, so it inherits the order of tied rows above; the identifiers themselves and their count must be equal",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:241-242; DeterminismSupport.derived (the product's PsmQValueFilter, PeptideQValueFilter in table order)"
+          }
+        ]
+      },
+      "keys": [
+        "product",
+        "fixtureDigest",
+        "cometVersion",
+        "percolatorVersion"
+      ]
+    },
+    {
+      "id": "synthetic-pin",
+      "part": "synthetic",
+      "writer": "CometGUI (SyntheticPin)",
+      "files": "probe.pin",
+      "compare": "bytes",
+      "why": "the committed synthetic PIN is generated from a fixed seed (SyntheticPin.PROBE_SEED)",
+      "fields": [],
+      "whenVaried": {}
+    },
+    {
+      "id": "synthetic-psms",
+      "part": "synthetic",
+      "writer": "Percolator",
+      "files": "out/psms.tsv",
+      "compare": "tsv",
+      "why": "as percolator-psms; the synthetic identifiers carry no path",
+      "fields": [],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of rows tied on Percolator's sort keys",
+            "tieOrder": [
+              "score",
+              "q-value",
+              "posterior_error_prob"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      }
+    },
+    {
+      "id": "synthetic-peptides",
+      "part": "synthetic",
+      "writer": "Percolator",
+      "files": "out/peptides.tsv",
+      "compare": "tsv",
+      "why": "as percolator-psms; the synthetic identifiers carry no path",
+      "fields": [],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of rows tied on Percolator's sort keys",
+            "tieOrder": [
+              "score",
+              "q-value",
+              "posterior_error_prob"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      }
+    },
+    {
+      "id": "synthetic-decoy-psms",
+      "part": "synthetic",
+      "writer": "Percolator",
+      "files": "out/decoy-psms.tsv",
+      "compare": "tsv",
+      "why": "as percolator-psms; the synthetic identifiers carry no path",
+      "fields": [],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of rows tied on Percolator's sort keys",
+            "tieOrder": [
+              "score",
+              "q-value",
+              "posterior_error_prob"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      }
+    },
+    {
+      "id": "synthetic-decoy-peptides",
+      "part": "synthetic",
+      "writer": "Percolator",
+      "files": "out/decoy-peptides.tsv",
+      "compare": "tsv",
+      "why": "as percolator-psms; the synthetic identifiers carry no path",
+      "fields": [],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of rows tied on Percolator's sort keys",
+            "tieOrder": [
+              "score",
+              "q-value",
+              "posterior_error_prob"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Rows are compared as a set only within a block of consecutive rows equal in score, q-value, PEP and scan number",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      }
+    },
+    {
+      "id": "synthetic-weights",
+      "part": "synthetic",
+      "writer": "Percolator",
+      "files": "out/weights.txt",
+      "compare": "bytes",
+      "why": "as percolator-weights",
+      "fields": [],
+      "whenVaried": {}
+    },
+    {
+      "id": "synthetic-pout",
+      "part": "synthetic",
+      "writer": "Percolator",
+      "files": "out/pout.xml",
+      "compare": "pout",
+      "why": "as percolator-pout",
+      "fields": [
+        {
+          "name": "process_info command_line",
+          "pattern": "<command_line>.*</command_line>",
+          "replace": "<command_line/>",
+          "why": "Percolator echoes its argument array, which names the run's own directory; the argument array itself is compared in provenance-json",
+          "source": "Percolator rel-3-07-01 src/XMLInterface.cpp:440; Caller.cpp:98-105"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of <psm> and <peptide> elements tied on Percolator's sort keys",
+            "tieOrder": [
+              "svm_score",
+              "q_value",
+              "pep"
+            ],
+            "why": "Percolator sorts its results with std::sort, which is not stable, on (score, scan, expMass, label); PSMs of one spectrum with identical features (positional isomers of an oxidised methionine, ranks of one scan) score exactly alike and stay unordered. Measured: at --num-threads 1 against 3 such rows change places, their values identical; repeats at one thread count never do. Elements are compared as a set only within a block of consecutive rows equal in svm_score, q_value, pep, exp_mass and scan number; a peptide's psm_ids, listed in that same order, are compared as a set",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:44-46 (operator> keys), :241-242 (postMergeStep: sort, greater<ScoreHolder>); ISO C++ [alg.sort]: std::sort is not stable"
+          }
+        ]
+      }
+    },
+    {
+      "id": "synthetic-stdout",
+      "part": "synthetic",
+      "writer": "Percolator",
+      "files": "percolator.stdout",
+      "compare": "bytes",
+      "why": "Percolator writes its results to files, so its standard output is empty",
+      "fields": [],
+      "whenVaried": {}
+    },
+    {
+      "id": "synthetic-stderr",
+      "part": "synthetic",
+      "writer": "Percolator",
+      "files": "percolator.stderr",
+      "compare": "text",
+      "why": "Percolator's standard error",
+      "fields": [
+        {
+          "name": "the run's own directory",
+          "pattern": "{run}",
+          "replace": "<run>",
+          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content",
+          "source": "this suite's run directory"
+        },
+        {
+          "name": "Started",
+          "pattern": "^Started .*$",
+          "replace": "Started <time>",
+          "why": "Percolator prints the wall-clock start time",
+          "source": "Percolator rel-3-07-01 src/Caller.cpp:78"
+        },
+        {
+          "name": "cpu and wall-clock seconds",
+          "pattern": "took [0-9.]+ cpu seconds or [0-9.]+ seconds",
+          "replace": "took <time>",
+          "why": "Percolator prints how long reading and processing took",
+          "source": "Percolator rel-3-07-01 src/Caller.cpp:732-733, :1008"
+        }
+      ],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "--num-threads value",
+            "pattern": "(--num-threads(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the varied Percolator setting itself, echoed wherever the command is recorded",
+            "source": "CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312"
+          }
+        ],
+        "percolatorSeed": [
+          {
+            "name": "--seed value",
+            "pattern": "(--seed(?:\"?,? \"?|``\\n\\s*\\* ``))\\d+",
+            "replace": "\\1<varied>",
+            "why": "the control's varied seed, echoed wherever the command is recorded",
+            "source": "Percolator rel-3-07-01 src/Caller.cpp:229-232, 530-531"
+          }
+        ]
+      }
+    },
+    {
+      "id": "synthetic-command",
+      "part": "synthetic",
+      "writer": "CometGUI (PercolatorCommands)",
+      "files": "",
+      "compare": "record",
+      "why": "the argument array the product's command builder made (the run's directory written <work>) and the effective seed the product records",
+      "fields": [],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "--num-threads value",
+            "path": "argv",
+            "why": "the varied Percolator setting itself, echoed wherever the command is recorded",
+            "source": "CometGUI PercolatorRun.values / PercolatorCommands (the option the product passes); Percolator rel-3-07-01 src/Caller.cpp:310-312"
+          }
+        ],
+        "percolatorSeed": [
+          {
+            "name": "--seed value and the effective seed",
+            "path": "argv|effectiveSeed",
+            "why": "the control's seed",
+            "source": "CometGUI EffectiveSeed"
+          }
+        ]
+      },
+      "keys": [
+        "argv",
+        "effectiveSeed",
+        "xmlCapable",
+        "percolatorVersion"
+      ]
+    },
+    {
+      "id": "synthetic-product-results",
+      "part": "synthetic",
+      "writer": "CometGUI",
+      "files": "",
+      "compare": "record",
+      "why": "as product-results",
+      "fields": [],
+      "whenVaried": {
+        "percolatorThreads": [
+          {
+            "name": "order of the selected identifiers among tied rows",
+            "tieOrder": [
+              "selected"
+            ],
+            "why": "the product lists the rows its default filter selects in the table's order, so it inherits the order of tied rows above; the identifiers themselves and their count must be equal",
+            "source": "Percolator rel-3-07-01 src/Scores.cpp:241-242; DeterminismSupport.derived (the product's PsmQValueFilter, PeptideQValueFilter in table order)"
+          }
+        ]
+      },
+      "keys": [
+        "product"
+      ]
+    }
+  ]
+}

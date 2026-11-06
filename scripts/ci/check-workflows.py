@@ -893,10 +893,18 @@ def self_test(root: Path) -> int:
              encoding="utf-8"),
          restore, EXIT_PROBLEMS)
 
+    # The specimen must BE a stub, or this case proves nothing: nightly-determinism.sh
+    # was the specimen until Phase 15 unit 7 made it real.  nightly-windows-raw.sh
+    # stays a stub while no Windows runner and no Thermo RAW fixture exist (AC-TST-11),
+    # and the precondition below turns this self-test red, saying so, the day it does not.
+    specimen = "nightly-windows-raw.sh"
+    specimen_is_stub = "stub-lib.sh" in (tree / "scripts" / "ci" / specimen).read_text(encoding="utf-8")
+    print(f"  {'ok  ' if specimen_is_stub else 'FAIL'} {'the stub specimen is a stub':<38} "
+          f"scripts/ci/{specimen} {'references' if specimen_is_stub else 'NO LONGER references'} stub-lib.sh")
     case("stub put in the PR pipeline",
          lambda: pr.write_text(
              pristine_pr.replace("run: bash scripts/ci/integration-tests.sh",
-                                 "run: bash scripts/ci/nightly-determinism.sh"),
+                                 f"run: bash scripts/ci/{specimen}"),
              encoding="utf-8"),
          restore, EXIT_PROBLEMS)
 
@@ -1074,12 +1082,12 @@ def self_test(root: Path) -> int:
     results.append(control_ok)
     print(f"  {'ok  ' if control_ok else 'FAIL'} {'control-undamaged-copy':<38} exit {control} (expected 0)")
 
-    if all(results):
+    if all(results) and specimen_is_stub:
         print(f"\ncheck-workflows: self-test OK -- {len(results) - 1} damaged copies rejected, "
               f"the undamaged one accepted.")
         return EXIT_OK
-    print("\ncheck-workflows: SELF-TEST FAILED -- a damaged copy was accepted, or the undamaged "
-          "one was rejected.", file=sys.stderr)
+    print("\ncheck-workflows: SELF-TEST FAILED -- a damaged copy was accepted, the undamaged "
+          "one was rejected, or the stub specimen is no longer a stub.", file=sys.stderr)
     return EXIT_UNFALSIFIABLE
 
 

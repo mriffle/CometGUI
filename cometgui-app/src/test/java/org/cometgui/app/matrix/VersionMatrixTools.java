@@ -440,7 +440,21 @@ class VersionMatrixTools {
     /** The product's request, with the default settings mapped as the workflow maps them. */
     private static PercolatorRequest request(
             Path executable, Path pin, Path out, Set<ToolCapability> probed, boolean xmlNeeded) {
-        PercolatorSettings settings = PercolatorSettings.defaults();
+        return request(executable, pin, out, probed, xmlNeeded, PercolatorSettings.defaults());
+    }
+
+    /**
+     * The product's request, with the given settings mapped as the workflow maps them (each
+     * setting's text from {@link PercolatorSettings#valueText}, keyed by the option that carries
+     * it). Shared with the determinism suite ({@link DeterminismSynthetic}).
+     */
+    static PercolatorRequest request(
+            Path executable,
+            Path pin,
+            Path out,
+            Set<ToolCapability> probed,
+            boolean xmlNeeded,
+            PercolatorSettings settings) {
         Map<PercolatorOption, String> values = new EnumMap<>(PercolatorOption.class);
         for (PercolatorSetting setting : PercolatorSetting.values()) {
             PercolatorOption option =

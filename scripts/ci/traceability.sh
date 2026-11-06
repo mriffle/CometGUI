@@ -30,6 +30,14 @@
 #      recorded expectation must trace to a reviewed reason -- and this gate
 #      already runs on every pull request, needs no network, and takes under a
 #      second for it. Verified by requiring its "goldens: OK -- N" with N > 0.
+#   D. Gate item 3's tolerance (Phase 15 unit 7): scripts/matrix/determinism.py
+#      check-doc -- the "Determinism" section of docs/developer/testing.rst and
+#      scripts/matrix/determinism-data.json must state the same per-artefact
+#      tolerance (the same artefacts, rules and removed fields, and the same
+#      N): a tolerance in the data and not the document, or the reverse, is
+#      red. The same kind of rule again -- an expectation must trace to a
+#      written reason -- and it needs no network and no Maven. Verified by
+#      requiring its "determinism: OK -- N artefact(s)" with N > 0.
 #
 # The documentation tree is never written to from here; the generated page is
 # produced by the documentation build itself.
@@ -44,6 +52,12 @@
 # missing review file, a stale record, an unjustified tolerance, a golden under
 # the wrong tool-pair key and a stray file, each red on a temporary copy, and
 # the committed tree green.
+#
+# --self-test also runs determinism.py --self-test: the document check red on
+# a field, an artefact, a rule or N present on one side only, and the
+# comparison itself red on unnamed differences, tied rows reordered where no
+# thread count varied, a control that changed nothing, a variation that never
+# reached the tool, a file no artefact names and a planned run never made.
 #
 # --self-test adds step 4: eight defects injected into copies of the project
 # under _build/traceability/negative/, each of which must be caught with its own
@@ -63,6 +77,8 @@
 #   4  the generator's unit test suite failed, or --self-test found the gate
 #      unfalsifiable: an injected defect that the check did not catch
 #   5  R-TEST-07: a golden is not covered by a reviewed explanation
+#   6  gate item 3: the document and the data state different determinism
+#      tolerances
 #
 # Needs no network access.
 
@@ -242,6 +258,35 @@ if [ "${SELF_TEST}" -eq 1 ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# D. Gate item 3: the determinism tolerance, the same in the document and data.
+# ---------------------------------------------------------------------------
+
+DETERMINISM_LOG="${OUT_DIR}/determinism-doc.log"
+printf '\n=== D  gate item 3: python scripts/matrix/determinism.py check-doc ===\n'
+determinism_status=0
+run_tee "${DETERMINISM_LOG}" "${PYTHON}" -B "${SCRIPTS_DIR}/matrix/determinism.py" check-doc \
+    || determinism_status=$?
+if [ "${determinism_status}" -ne 0 ]; then
+    printf '\ntraceability.sh: FAILED -- the determinism tolerance in docs/developer/testing.rst\n' >&2
+    printf 'traceability.sh: ("Determinism") and in scripts/matrix/determinism-data.json differ.\n' >&2
+    printf 'traceability.sh: Log: %s\n' "${DETERMINISM_LOG}" >&2
+    exit 6
+fi
+TOLERANCES="$(sed -n 's/^determinism: OK -- .* for \([0-9]\{1,\}\) artefact(s).*/\1/p' -- "${DETERMINISM_LOG}" | head -n 1)"
+[ -n "${TOLERANCES}" ] && [ "${TOLERANCES}" -gt 0 ] \
+    || die "determinism.py check-doc exited 0 without reporting any artefact checked; see ${DETERMINISM_LOG}" 3
+
+if [ "${SELF_TEST}" -eq 1 ]; then
+    printf '\n=== D  gate item 3: determinism.py --self-test ===\n'
+    dst_status=0
+    run_tee "${OUT_DIR}/determinism-selftest.log" "${PYTHON}" -B "${SCRIPTS_DIR}/matrix/determinism.py" \
+        --self-test || dst_status=$?
+    [ "${dst_status}" -eq 0 ] || { printf '\ntraceability.sh: SELF-TEST FAILED -- determinism check\n' >&2; exit 4; }
+    grep -q '^determinism: self-test OK -- ' -- "${OUT_DIR}/determinism-selftest.log" \
+        || die "the determinism self-test exited 0 without reporting OK" 3
+fi
+
+# ---------------------------------------------------------------------------
 # 4. --self-test -- prove the gate can fail (CONTRIBUTING.rst, gate conventions)
 # ---------------------------------------------------------------------------
 
@@ -327,6 +372,7 @@ sed -n 's/^traceability: criteria by evidence -- /traceability.sh: criteria by e
 sed -n 's/^traceability: evidence names /traceability.sh: evidence names /p' -- "${CHECK_LOG}"
 printf 'traceability.sh: unit tests    %s passed\n' "${RAN}"
 printf 'traceability.sh: goldens       %s, each covered by a reviewed explanation (R-TEST-07)\n' "${GOLDENS}"
+printf 'traceability.sh: determinism   %s artefact tolerances, the same in the document and the data\n' "${TOLERANCES}"
 printf 'traceability.sh: rendered      %s (%s R- rows, %s AC- rows)\n' \
     "${RENDERED}" "${RENDERED_RULES}" "${RENDERED_CRITERIA}"
 printf 'traceability.sh: logs          %s, %s, %s\n' "${CHECK_LOG}" "${TESTS_LOG}" "${RENDER_LOG}"
