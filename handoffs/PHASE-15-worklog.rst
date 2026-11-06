@@ -163,6 +163,15 @@ verbatim. No two units run at once.
        by module if the list is long.
      - gate item 2, ``AC-TST-01``, ``AC-TST-03``
      - `Unit 4 sign-off`_
+   * - 9a
+     - **Added 2026-11-06, run before unit 5.** ``pdv`` controls 5b and 5e
+       grade by timing (see the unit 4 sign-off). Root cause of each found and
+       fixed -- in the test or the product, whichever is wrong -- so that each
+       control is red with its own words only because of its defect; shown red
+       repeatedly alone and under load; no retry, no relaxed diagnostic, no
+       quarantine.
+     - gate item 6; ``R-PDV-04``
+     - `Unit 9a sign-off`_
    * - 5
      - **The manifest verification job** (``R-TEST-08``).
        ``scripts/ci/nightly-manifest-verify.sh`` replaces its stub: every
@@ -411,6 +420,93 @@ no-mutation rule off) went red in M2 and M4.
 
 Unit 4 sign-off
 ---------------
+
+**Accepted 2026-11-06 at** ``eec0003``, one round, with the ``pdv`` red below
+named and routed. One fresh agent.
+
+*What it did.* All 76 undetected mutants of unit 3's final whole-reactor run
+audited against ``R-TEST-02``'s six forbidden classes: **2 forbidden, both
+killed** -- ``SecretToolCredentialStore.save:140`` (``Arrays.fill`` removed,
+the secret's bytes left in memory: *leak a secret*) and
+``ZipArchiveReader.zip64UncompressedSize`` (``cursor + 4`` -> ``cursor - 4``,
+a malformed archive unpacked: *suppress a validation error*); **1 real
+defect fixed** -- a Zip64 size field whose header claims eight bytes the extra
+field does not hold was read from the bytes after it and the archive unpacked;
+one condition, ``cursor + 4 + dataSize <= end`` (not a checksum bypass: the
+SHA-256 is checked before extraction); **17 others killed**; **57 remain, none
+forbidden**, each with its reason in ``docs/developer/testing.rst``,
+*Forbidden survivors: the audit* (28 equivalent). No exclusion, threshold,
+target, POM or harness change.
+
+*My runs:* ``mvn -o -B -pl cometgui-install,cometgui-process,cometgui-results,
+cometgui-tools -am verify``: BUILD SUCCESS -- domain 1238, provenance 709 (2
+skipped), process 286, results 1312, tools 1135 (1), install 1071 (2), 0
+failures. My injection, ``ZipArchiveReader`` line 340 ``while (cursor + 4 <=
+end)`` -> ``cursor - 4`` (anchor 0, ``sha256sum -c`` FAILED; restored, OK):
+``ArchiveEdgeCasesTest.anExtraFieldThatEndsTheDirectory`` red, 1 of 35.
+``verify-all-gates.sh --only docs,install,pdv,limelight,results`` (4 jobs):
+docs 1, install 95, results 100, limelight 130 PASS, **pdv FAIL**; rerun of
+``--only pdv`` alone: **pdv FAIL** again, for a different control.
+
+The ``pdv`` reds, named (tier 1 asked for the cause, 2026-11-06)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* **Run 1 (4 jobs, beside install, results and limelight): control 5e did not
+  bite** -- ``PdvLiveWindowUiTest.theLiveWindow`` passed with ``stop()``'s
+  ``visualisation.closeAllWindows()`` removed (105 passed, 2 failed: the
+  HARNESS FAILURE and its testcase assertion). **Run 2 (alone): 5e bit** with
+  its expected words (``the launched process ended ==> expected: <false> but
+  was: <true>``, pid 110410 left), and **control 5b failed** "without the
+  expected diagnostic": the injected controller sent row 1's reference, and
+  the real PDV was seen displaying row 0 (``seen: [PDVOBS displayed row=0
+  ...``), plus a 10 s shutdown bound missed (106 passed, 1 failed).
+  The agent's own ``pdv`` run on the same commit passed 107.
+* **Not unit 4.** Unit 4 changed none of the code either control injects into
+  or runs: ``CometGuiApplication.stop()``, ``PdvLiveWindowUiTest``,
+  ``PdvControllerRealPdvTest``, ``derived/PdvController`` and
+  ``workflow/pdv/PdvWindows`` are untouched this phase (``git log``; unit 1's
+  edit to ``CometGuiApplication`` adds ``recordFailedInstall`` and does not
+  touch ``stop()``). Its PDV-side changes are test-only
+  (``PdvControllerTest``, ``PdvFiguresTest``, ``FakePdvWindows``), none of
+  which either control selects.
+* **The injection landed** in run 1: the harness proves each injection reached
+  the compiled class before grading, and its words were "HARNESS FAILURE --
+  the check PASSED with the defect present", i.e. graded after a landed
+  injection; the identical injection bit in run 2 on the same commit.
+* **So it is timing, which makes both controls flaky.** For 5e the mechanism
+  read from the code, not yet proven: the Visualisation port runs on the Run
+  section's ``runThreads``, and ``stop()`` calls ``runThreads.shutdownNow()``
+  right after the injected-away ``closeAllWindows()``. If the reopened
+  window's work is still in flight on one of those threads when the test
+  calls ``stopApplication()`` -- ``awaitReady`` returns on the READY text,
+  not on the end of that work -- the interrupt reaches the product's own
+  ending of a window it is still opening, PDV dies by that second path, and
+  ``assertGone`` (which waits for nothing) passes with the defect present.
+  When the work has finished first, only ``closeAllWindows()`` can end PDV
+  and the control bites. That is a check that can be green for the wrong
+  reason under load: the project's signature defect.
+
+**Flakiness policy, applied explicitly** (``specification.rst``, *Flakiness
+policy*): a flaky test is a defect; no retry, no relaxed regex, nothing
+quarantined. Recorded here as the defect, with owner and plan:
+
+* *Issue:* ``pdv`` controls 5b and 5e grade correctly or not depending on
+  timing. *Owner:* this phase, unit 9a, dispatched next. *Diagnostics
+  captured:* both runs' logs (orchestrator scratch, ``u4-gates.log``,
+  ``u4-pdv2.log``, ``u4-pdv-5e-dirty-run1.log``). *Reason:* above. *Fix plan:*
+  find each root cause and make the test wait on the observable state that
+  makes the defect the only possible cause (for 5e, the end of the reopened
+  window's in-flight work before ``stopApplication()``), then show each
+  control red with its own words repeatedly, alone and under load. Neither is
+  release-critical in itself, but ``pdv`` gates ``R-PDV-04`` and may not stay
+  flaky.
+
+Unit 4 is accepted on its own evidence: its tests, its injection and every
+harness that reads what it changed except ``pdv``, whose two reds are
+pre-existing, named, and owned by unit 9a.
+
+Unit 9a sign-off
+----------------
 
 Pending.
 
