@@ -675,7 +675,54 @@ in my verify -- routed to unit 9 under the flakiness policy; (4) Comet
 Unit 7 sign-off
 ---------------
 
-Pending.
+**Accepted 2026-11-06 at** ``83ae276``, one round. One fresh agent.
+
+*Diff read* (15 files; test-side Java and scripts, no production code).
+``run-matrix.sh --part determinism`` (and ``determinism-synthetic``) runs
+opt-in ``DeterminismSynthetic``/``DeterminismPairs`` (reusing the matrix's
+classes, refactored) and ``scripts/matrix/determinism.py`` grades every
+artefact of every run against ``repeat-1`` with the per-artefact rule in
+``scripts/matrix/determinism-data.json``; red on any unnamed difference, a
+control that changed nothing, a variation whose setting never reached the
+tool, an uncovered file, a missing run. ``check-doc`` keeps
+``testing.rst``'s *Determinism* section and the data equal (in
+``traceability.sh``). Runs: ``repeat-1..3`` per offered pair and Percolator;
+Comet threads 1 and 0 (all cores); Percolator threads 1 (and 8 synthetic);
+``control-seed-2``, which must change Percolator and not Comet.
+**Tolerance: no numeric tolerance anywhere**; byte-identical, or identical
+after named fields (run directory, dates, timings, ids), each tied to a source
+line of Comet v2026.03.0 or Percolator rel-3-07-01 (xcorr rounded before
+shared state, ties broken by peptide, no RNG in Comet; one Park-Miller
+generator seeded 1 in Percolator, unstable ``std::sort`` on four keys). One
+finding, documented: Percolator's **thread count** reorders rows tied on all
+four sort keys (84 positions at 1 vs 3 threads), with identical values;
+allowed only when the thread count is varied; why the pre-sort order follows
+the thread count is not traced (stated). Provenance digests of files inside
+the run directory are excluded because those files embed the run path; the
+files themselves are compared with only that path normalised, so nothing is
+hidden. Nightly: ``nightly-determinism.sh`` real (synthetic half);
+``nightly-determinism-fixture.sh`` a separate job, exit 70 naming ``D-006``
+without the fixture; ``check-workflows.py``'s stub specimen re-pointed to
+``nightly-windows-raw.sh`` with a precondition that it stays a stub.
+
+*My runs:* determinism over ``scratch/fixture``: **GREEN** (N = 3); without
+the fixture: **REFUSED, exit 3, "not green"**; ``mvn -o -B -pl cometgui-app
+-am verify``: BUILD SUCCESS, app 573 (91 opt-in skipped, unchanged);
+``verify-all-gates.sh --only workflows,pipeline,docs,traceability``:
+workflows 23, docs 1, traceability 8, pipeline 28 steps, PASS.
+
+*My injection* -- in a place the agent named as covered only by the fixture
+half: ``PercolatorRun.values`` taking the seed from ``System.nanoTime()``
+(anchor 0, ``sha256sum -c`` FAILED; restored, OK): **RED**, ``DIFFERS
+percolator-psms ... column PSMId``, peptides, decoy tables, and
+``percolator-weights ... bytes differ first at offset 370``. The agent's three
+(merged PIN in HashSet order; seed from the clock in ``PercolatorSettings``;
+spectra reversed every second run) and a doc/data mismatch (``traceability.sh``
+exit 6) went red with the artefact named.
+
+*Residue:* ``check-doc`` compares field names, rules and N, not the regular
+expressions behind them; the fixture half has never run on a CI runner
+(``D-006``).
 
 Unit 8 sign-off
 ---------------
