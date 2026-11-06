@@ -508,7 +508,48 @@ pre-existing, named, and owned by unit 9a.
 Unit 9a sign-off
 ----------------
 
-Pending.
+**Accepted 2026-11-06 at** ``50c788d`` (code ``69e1b45``), one round. One
+fresh agent. Both were **test defects, not product defects**, each reproduced
+on purpose before it was fixed. My 5e hypothesis was **refuted**, and the
+agent said so.
+
+* **5e.** With ``closeAllWindows()`` removed, PDV is still sent SIGTERM 20-45
+  ms into ``stop()`` -- not by ``runThreads.shutdownNow()``, but because
+  ``results.close()`` empties the Results run and
+  ``VisualisationViewModel.runChanged`` closes the window on a Run-section
+  thread, unwaited (``R-PDV-04`` ends PDV both on exit and when its result
+  set closes). So "PDV is gone after the exit" could not show that ``stop()``
+  ended it. Reproduced by holding ``assertGone`` back until PDV had ended:
+  the old test passed with the defect present. **Fix:** the test samples
+  PDV's liveness at the moment ``stop()``'s own ``results.close()`` empties
+  the run chooser -- after ``closeAllWindows()``, before the second path can
+  start -- and asserts it dead there; the harness's 5e regex now accepts only
+  that message (it had accepted either of two).
+* **5b.** PDV draws row 0 by itself when its import ends, and ``/ready`` can
+  answer 200 first (54 ms, measured); that report could land after
+  ``forgetDisplayed()`` and satisfy the first selection, which is row 0.
+  Reproduced with a 2 s delayed report: red moved to the wrong row 2/2.
+  **Fix:** setup waits for both the observer's attach and PDV's own row-0
+  report before selecting; the observer reports an error rather than attach
+  if PDV had already drawn. The 10 s shutdown message I had attributed to 5b
+  is control 5c's own expected words; no bound changed.
+
+*Diff read* (5 files): two test classes, the observer (test code),
+``verify-pdv-gates.sh`` (5e's regex narrowed to one message -- a
+strengthening), ``testing.rst``. No production, POM, floor or bound change; no
+retry, no quarantine.
+
+*My runs:* ``mvn -o -B -pl cometgui-tools,cometgui-app -am verify``: BUILD
+SUCCESS, every module 0 failures (tools 1135, app 573 with 91 opt-in skipped,
+...). **Under load** -- ``verify-all-gates.sh --only pdv`` run concurrently
+with that reactor build: **PASS, 107 controls** in 913 s. **Alone** --
+``verify-pdv-gates.sh --only 5b,5e``: 10 of 10, 309 s. The agent's repeats: 5
+alone and 3 with 96 busy loops (load about 100), all 10/10, each control red
+with its own words, clean runs green.
+
+*Residue recorded:* a possible PDV race (the product's first selection sent
+before PDV's own row-0 drawing could be overwritten by it) tried twice, not
+seen; the redundant second close on exit is harmless and left.
 
 Unit 5 sign-off
 ---------------
