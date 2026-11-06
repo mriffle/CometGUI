@@ -83,6 +83,14 @@ Commands
 
    * - ``bash scripts/ci/traceability.sh``
      - The traceability report gate on its own, without Sphinx. About 1 s.
+       Since Phase 15 unit 6 it also enforces ``R-TEST-07``'s review rule over
+       the goldens (``scripts/matrix/check_goldens.py``).
+
+   * - ``COMETGUI_MATRIX_FIXTURE=scratch/fixture bash scripts/matrix/run-matrix.sh``
+     - The version matrix (PHASE-15 gate item 1): every offered build installed
+       from upstream and exercised, every pair run over the named fixture, every
+       other combination recorded by name. Opt-in; about two minutes. See
+       :ref:`dev-testing-version-matrix`.
 
 ``scripts/verify-all-gates.sh`` is deliberately **not** a stage of
 ``scripts/build.sh``. It costs about twelve minutes where the whole build costs
@@ -933,6 +941,175 @@ unauthenticated API requests an hour per address with whatever else runs on
 the runner's address; it uses four, and a refusal is "could not verify", not
 green. The release workflow's Windows and macOS entries run it too, and have
 never run.
+
+.. _dev-testing-version-matrix:
+
+Version matrix -- gate item 1 and ``R-TEST-07``
+-----------------------------------------------
+
+:Checks: every version/platform combination ``manifests/tools.json`` and the
+   product name: each build offered on this host installed and exercised, every
+   other combination recorded by name with its reason (PHASE-15 exit gate item
+   1; specification, *Version matrix tests*).
+:Fails: exit 1 when a combination offered here failed a check, differed from its
+   reviewed golden or has no verdict, or when the derivation finds an
+   unexplained gap, a stale reason, an unrecorded version difference, or a
+   disagreement between the two readings of the manifest; exit 3 when the
+   fixture part was requested and no fixture was named. Exit 0 only when
+   everything this invocation is responsible for ``RUN-PASSED``.
+:Configured in: ``scripts/matrix/matrix.py`` (the grading, standard library
+   only), ``scripts/matrix/matrix-data.json`` (platforms, recorded reasons,
+   advisories), the goldens under ``cometgui-app/src/test/resources/goldens/``,
+   and three opt-in JUnit classes in ``cometgui-app``,
+   ``org.cometgui.app.matrix.VersionMatrix{Census,Tools,Pairs}``.
+:Runs with: ``bash scripts/matrix/run-matrix.sh`` -- the one entry point; the
+   nightly's ``version-matrix`` job (``scripts/ci/nightly-version-matrix.sh``,
+   ``--part tools``) and ``large-dataset`` job
+   (``scripts/ci/nightly-large-dataset.sh``, ``--part pairs``, waiting on
+   ``D-006``).
+
+**How to run it.** ::
+
+    COMETGUI_MATRIX_FIXTURE=scratch/fixture bash scripts/matrix/run-matrix.sh   # everything
+    bash scripts/matrix/run-matrix.sh --part tools     # no spectra: what the nightly runs
+    bash scripts/matrix/run-matrix.sh --self-test      # the grading, no Maven, no network
+
+Add ``--offline`` where ``_build/m2repo`` already holds the build's
+dependencies. The report is ``_build/version-matrix/matrix-report.txt`` (and
+``.json``): one row per combination with its tools and versions, platform,
+verdict, evidence and reason, then every version difference observed and the
+advisory that explains it. On this machine the whole matrix takes about two
+minutes (an empty-cache install of every Linux build -- about 120 MB from
+GitHub, PDV being 103 MB of it -- the Comet and Percolator checks, and four
+pair runs of about 15 s each); ``--part tools`` takes about one.
+
+**The named fixture input.** The pair runs need spectra and take them as one
+named input and nothing else: ``COMETGUI_MATRIX_FIXTURE`` (or ``--fixture``), a
+directory whose ``*.mzML`` files are searched against its one ``*.fasta``.
+There is no default. Without it the pair part is *refused*: its rows are
+``UNVERIFIED`` with the words "REFUSED ... nothing was searched; this is not a
+pass", and the exit status is 3. ``D-006``'s CI fixture is open, so on a runner
+the ``large-dataset`` job exits 70 through ``stub-lib.sh`` naming ``D-006`` and
+what it would need. Locally, ``scratch/fixture`` is the ``D-006`` local fixture;
+it is never committed and never presented as the CI fixture. The fixture's
+digest -- the SHA-256 of the sorted lines ``<sha256>  <name>`` of the files read
+-- is computed twice, by the JUnit class and by ``matrix.py``, and must agree.
+An mzML that arrived with CR bytes is searched as an LF copy (``D-006``'s
+transit corruption); both digests are recorded.
+
+**What runs, for each combination offered on this host.**
+
+* *Install and probe*, the real code path: the product's Tool Manager
+  (``ToolManagerWiring.toolManager``) over an empty cache, the real
+  ``HttpDownloader`` against each record's pinned upstream URL, the real
+  eight-step installer and three-stage probe. The installed executable must be
+  the pinned bytes and every capability the probe's observation.
+* *Comet*, each release: ``-p`` and ``-q`` write the committed fixtures under
+  ``cometgui-params-comet/src/test/resources/fixtures/comet/`` byte for byte,
+  and the product's ``CometParameterSchemaProvider`` reads the release's schema
+  (mode from the probed ``COMPLETE_PARAMS_QUERY``, no drift).
+* *Percolator*, each release, over CometGUI's own synthetic PIN: through the
+  product's ``PercolatorCommands``, ``-X`` exactly when the probe observed
+  ``XML_OUTPUT``; every requested output parsed by the product's readers and
+  counted with its default filters beside the test's own counts; and the
+  builder shown to leave ``-X`` out when no stage needs XML and when the build's
+  probed set lacks ``XML_OUTPUT``.
+* *PDV and the Limelight converter*: installed and identified. Their functional
+  runs are the ``pdv`` and ``limelight`` harnesses', not repeated.
+* *Every (Comet, Percolator) pair* over the fixture: the whole workflow through
+  the product's run port, Limelight enabled. Exact invariants are asserted
+  (success; one Comet invocation per spectrum file and one Percolator, each the
+  installed executable at its digest, exit 0; ``-X`` exactly when probed; every
+  output present; every recorded digest equal to the test's own; the merged
+  PIN holding exactly the per-file PIN rows); the golden values are compared
+  with the reviewed goldens.
+* *A registered local Percolator 3.09* where ``scratch/percolator/3.09`` exists:
+  recorded as "local binary, not a managed offer" (Linux has no managed 3.09,
+  ``D-003``).
+
+**What each verdict means.**
+
+``RUN-PASSED``
+   Exercised on this host; every check passed and every golden value equals
+   the reviewed golden.
+``RUN-FAILED``
+   Exercised and a check failed or a golden differed -- or the combination is
+   offered here and no row was recorded for it at all.
+``UNAVAILABLE``
+   The product does not offer it; ``matrix-data.json`` records the reason and
+   the decision (``D-011`` for an Intel Mac's Comet, ``D-003`` for Linux 3.09,
+   the platform matrix for Linux aarch64's Percolator and for Windows on ARM).
+   A gap with no recorded reason, or a reason that covers no gap, is red.
+``UNVERIFIED``
+   Offered, not exercised here: a platform no machine here can run (the reason
+   says what that platform's CI runner would run), a part not requested, the
+   fixture part refused, or the Windows Thermo RAW smoke test (``AC-TST-11``,
+   "when that feature ships"). Unverified is not passed.
+
+**Derived, never typed.** The rows come from ``manifests/tools.json`` read by
+``matrix.py`` as plain JSON *and* from the census the product writes
+(``VersionMatrixCensus``: every record its own reader returned, and what
+``ArtefactManifest.select`` offers on each platform it names). The two readings
+must agree record for record, every record must be offered somewhere, the
+host's offers must be what the Tool Manager lists, and every row the product
+writes must be one the matrix derived. A manifest row the matrix ignored is
+red, naming it.
+
+**Goldens and the review rule (``R-TEST-07``).** Goldens live under
+``cometgui-app/src/test/resources/goldens/<key>/`` -- ``<key>`` is the tool
+pair, ``comet-<v>_percolator-<v>``, or the single tool for the synthetic-PIN
+runs, ``percolator-<v>`` (``-local`` for a registered local binary) -- one file
+per fixture digest and platform, ``fixture-<digest>.<platform>.json``. A golden
+holds derived results only: counts, the selected-PSM count at the default
+cut-off, decoy counts, the weights split count, and SHA-256 digests of the
+sorted selected identifiers (PSM identifiers without the run directory Comet
+prefixes them with) -- never spectrum or FASTA content. A ``D-006`` CI fixture
+has its own digest and therefore adds goldens beside the local fixture's.
+Every value is compared exactly: two complete runs gave identical values for
+every key, Comet writes byte-identical PINs run to run at 4 threads and
+Percolator byte-identical tables with ``--seed 1``, so nothing the values derive
+from varies on one platform. That equality is per platform, which is why the
+platform is part of the key; a tolerance, if one is ever needed, must carry a
+written ``why``.
+
+``R-TEST-07``'s rule is enforced by ``scripts/matrix/check_goldens.py``, which
+``scripts/ci/traceability.sh`` runs on every pull request: each golden's
+current SHA-256 must appear in the ``REVIEW.json`` beside it, with a date that
+is not in the future, a reviewer and a written explanation of why the
+scientific change is expected that is not a placeholder. A golden whose
+content changes without a new record is red, however small the change; old
+records stay as history. ``check_goldens.py --self-test`` (part of the
+``traceability`` control) proves each of those red on a copy and the
+committed tree green. To change a golden: run the matrix, inspect the
+candidates ``python3 scripts/matrix/matrix.py write-goldens --report
+_build/version-matrix --out _build/golden-candidates`` writes, copy the ones
+whose change you can explain, and add the record.
+
+**Version differences are advisories.** Every difference the matrix observes
+between two versions -- Comet defaults, Percolator capabilities, Percolator
+outputs over the synthetic PIN, pair results -- must be matched by an advisory
+in ``matrix-data.json``, which is also listed in
+:ref:`dev-version-matrix-advisories`; an unmatched difference is red. Nothing
+is special-cased: no product or test logic branches on a version number.
+
+**Shown red** (2026-11-06, each into production code or the grading, each
+restored and ``sha256sum -c`` OK after): ``PercolatorCommands`` requesting
+``-X`` whatever the build's capabilities -- both managed Percolator rows red at
+"the same build without XML_OUTPUT ... -X left out" and the local 3.09 row red
+at "-X requested exactly when XML_OUTPUT was observed"; ``PinMerger`` dropping
+the second file's first row -- every pair red at "merged PIN rows against the
+per-file PINs ==> expected: <6670> but was: <6669>" (the product's own run
+still succeeded: the merge record counts what it read, not what it wrote);
+``matrix.py``'s manifest reader skipping one Windows row -- red at "only in the
+product [('percolator', '3.06.5', 'windows-x86-64')]".
+``bash scripts/matrix/run-matrix.sh --self-test`` grades fifteen synthetic
+cases, among them each of the derivation's reds.
+
+**What it does not cover.** Only Linux x86-64 has been run. macOS and Windows
+rows are ``UNVERIFIED`` until a runner of that platform runs the same entry
+point; the Comet ``-p``/``-q`` fixtures exist only for ``linux-x86-64``, so a
+first run elsewhere would fail on "no committed fixture" until captured there.
+The pair runs have never run on a CI runner (``D-006``).
 
 Falsifiability
 ==============

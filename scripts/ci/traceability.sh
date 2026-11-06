@@ -22,6 +22,14 @@
 #   3. A real generation into _build/traceability/, never into docs/. Verified
 #      by counting the rendered R- and AC- rows and requiring them to equal the
 #      counts step 1 reported.
+#   G. R-TEST-07's review rule (Phase 15 unit 6): scripts/matrix/check_goldens.py
+#      -- every golden under cometgui-app/src/test/resources/goldens/ must have
+#      its current SHA-256 in the review record beside it, with a date, a
+#      reviewer and a written explanation that is not a placeholder. It lives
+#      here because it is the same kind of rule as the rest of this gate -- a
+#      recorded expectation must trace to a reviewed reason -- and this gate
+#      already runs on every pull request, needs no network, and takes under a
+#      second for it. Verified by requiring its "goldens: OK -- N" with N > 0.
 #
 # The documentation tree is never written to from here; the generated page is
 # produced by the documentation build itself.
@@ -30,6 +38,12 @@
 #   bash scripts/ci/traceability.sh
 #   bash scripts/ci/traceability.sh --self-test   # the gate, then prove it can fail
 #   bash scripts/ci/traceability.sh --help
+#
+# --self-test also runs check_goldens.py --self-test: a golden changed without
+# a new review record, a placeholder or empty explanation, a future date, a
+# missing review file, a stale record, an unjustified tolerance, a golden under
+# the wrong tool-pair key and a stray file, each red on a temporary copy, and
+# the committed tree green.
 #
 # --self-test adds step 4: eight defects injected into copies of the project
 # under _build/traceability/negative/, each of which must be caught with its own
@@ -48,6 +62,7 @@
 #   3  a step exited 0 but produced no or incomplete output
 #   4  the generator's unit test suite failed, or --self-test found the gate
 #      unfalsifiable: an injected defect that the check did not catch
+#   5  R-TEST-07: a golden is not covered by a reviewed explanation
 #
 # Needs no network access.
 
@@ -66,7 +81,7 @@ RENDERED="${OUT_DIR}/traceability.rst"
 
 die() { printf 'traceability.sh: %s\n' "$1" >&2; exit "${2:-2}"; }
 
-usage() { sed -n '3,52p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,67p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 SELF_TEST=0
 case "${1:-}" in
@@ -199,6 +214,34 @@ for marker in '.. _dev-traceability:' 'Requirement rules' 'Acceptance criteria' 
 done
 
 # ---------------------------------------------------------------------------
+# G. R-TEST-07: every golden covered by a reviewed explanation.
+# ---------------------------------------------------------------------------
+
+GOLDENS_LOG="${OUT_DIR}/goldens.log"
+printf '\n=== G  R-TEST-07: python scripts/matrix/check_goldens.py ===\n'
+goldens_status=0
+run_tee "${GOLDENS_LOG}" "${PYTHON}" -B "${SCRIPTS_DIR}/matrix/check_goldens.py" || goldens_status=$?
+if [ "${goldens_status}" -ne 0 ]; then
+    printf '\ntraceability.sh: FAILED -- a golden is not covered by a reviewed explanation\n' >&2
+    printf 'traceability.sh: (R-TEST-07). Add a record to the REVIEW.json beside it; see\n' >&2
+    printf 'traceability.sh: docs/developer/testing.rst, "Version matrix". Log: %s\n' "${GOLDENS_LOG}" >&2
+    exit 5
+fi
+GOLDENS="$(sed -n 's/^goldens: OK -- \([0-9]\{1,\}\) golden file(s).*/\1/p' -- "${GOLDENS_LOG}" | head -n 1)"
+[ -n "${GOLDENS}" ] && [ "${GOLDENS}" -gt 0 ] \
+    || die "check_goldens.py exited 0 without reporting any golden checked; see ${GOLDENS_LOG}" 3
+
+if [ "${SELF_TEST}" -eq 1 ]; then
+    printf '\n=== G  R-TEST-07: check_goldens.py --self-test ===\n'
+    gst_status=0
+    run_tee "${OUT_DIR}/goldens-selftest.log" "${PYTHON}" -B "${SCRIPTS_DIR}/matrix/check_goldens.py" \
+        --self-test || gst_status=$?
+    [ "${gst_status}" -eq 0 ] || { printf '\ntraceability.sh: SELF-TEST FAILED -- R-TEST-07 check\n' >&2; exit 4; }
+    grep -q '^goldens: self-test OK -- ' -- "${OUT_DIR}/goldens-selftest.log" \
+        || die "the goldens self-test exited 0 without reporting OK" 3
+fi
+
+# ---------------------------------------------------------------------------
 # 4. --self-test -- prove the gate can fail (CONTRIBUTING.rst, gate conventions)
 # ---------------------------------------------------------------------------
 
@@ -283,6 +326,7 @@ sed -n 's/^traceability: criteria by evidence -- /traceability.sh: criteria by e
     -- "${CHECK_LOG}"
 sed -n 's/^traceability: evidence names /traceability.sh: evidence names /p' -- "${CHECK_LOG}"
 printf 'traceability.sh: unit tests    %s passed\n' "${RAN}"
+printf 'traceability.sh: goldens       %s, each covered by a reviewed explanation (R-TEST-07)\n' "${GOLDENS}"
 printf 'traceability.sh: rendered      %s (%s R- rows, %s AC- rows)\n' \
     "${RENDERED}" "${RENDERED_RULES}" "${RENDERED_CRITERIA}"
 printf 'traceability.sh: logs          %s, %s, %s\n' "${CHECK_LOG}" "${TESTS_LOG}" "${RENDER_LOG}"

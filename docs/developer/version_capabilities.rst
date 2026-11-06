@@ -567,3 +567,79 @@ Known limits, recorded rather than hidden:
 * The PIT mutants in ``workflow.steps`` that time out (unit 5) appear to come
   from real-binary test setup exceeding PIT's per-test timeout rather than
   from hangs; ``workflow.steps`` is not a POM PIT target.
+
+.. _dev-version-matrix-advisories:
+
+Version advisories the matrix records
+=====================================
+
+Phase 15's version matrix (:ref:`dev-testing-version-matrix`) runs every build
+the product offers on Linux x86-64 and compares what each version does. Every
+difference it finds between two versions is an **advisory**: recorded here and
+in ``scripts/matrix/matrix-data.json``, never special-cased in product or test
+logic -- nothing branches on a version number; each release is configured from
+its own probed capabilities, schema and defaults. A difference the matrix sees
+with no advisory recorded for it turns the matrix red, so this list is complete
+for what has been run. Measured on 2026-11-06 at Linux x86-64; no other platform
+has been run.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 18 62
+
+   * - Versions
+     - What differs
+     - Advisory
+   * - Comet 2026.02.2 / 2026.03.0
+     - ``-p`` and ``-q`` defaults
+     - ``index_search_type`` defaults to ``1`` in 2026.02.2 and ``-1`` in
+       2026.03.0, and 2026.03.0's ``-p`` file no longer lists it; the meaning
+       of the parameter changed (``D-010``). Both releases declare the same 118
+       parameter names to ``-q``. The product reads each release's schema
+       from its own binary and its defaults from that release's metadata, and a
+       2026.02.2 parameter file migrates with a reviewable diff.
+       (``matrix.comet-2026.03.0-index-search-type``)
+   * - Percolator 3.06.5 / 3.07.1 (and 3.09)
+     - outputs over the same input
+     - Over CometGUI's synthetic PIN with the same seed, 3.06.5 learns
+       different weights, so its scores, q-values and PEPs differ; the table
+       header, row counts and the weights layout (3 splits, the same features)
+       do not. This is the 3.06-era behaviour ``D-003`` asks to be carried, not
+       hidden, beside the manifest's own advisories for 3.06.5.
+       (``matrix.percolator-3.06.5-learns-different-weights``,
+       ``matrix.percolator-3.06.5-vs-3.09``)
+   * - Percolator 3.07.1 / 3.09
+     - PEP
+     - 3.09 estimates PEP with I-splines (3.08's change; ``R-PERC-11``'s 3.07.1
+       advisory): over the synthetic PIN every column but
+       ``posterior_error_prob`` is identical, and ``weights.txt`` is
+       byte-identical. 3.09 was run as a registered local binary only
+       (``D-003``). (``matrix.percolator-3.09-i-spline-pep``)
+   * - Percolator 3.06.5 or 3.07.1 / 3.09
+     - capabilities
+     - 3.09's probe observes no ``XML_OUTPUT`` and no ``XML_DECOY_OUTPUT``:
+       the product never passes it ``-X`` and Limelight cannot be fed from it
+       (``R-PERC-03``). (``matrix.percolator-3.09-writes-no-pout-xml``,
+       ``matrix.percolator-3.09-writes-no-pout-xml-vs-3.07.1``)
+   * - Percolator 3.06.5 / 3.07.1, same Comet search
+     - selected PSMs and peptides
+     - Over the D-006 local fixture, 3.06.5 selects a different number of PSMs
+       and peptides at the default 1% cut-off than 3.07.1 (1008 and 1036 PSMs
+       with Comet 2026.02.2; 1013 and 1053 with 2026.03.0). Row counts, decoy
+       counts at the cut-off and the three weight splits are the same.
+       (``matrix.pair-results-differ-by-percolator``)
+   * - Comet 2026.02.2 / 2026.03.0, same Percolator
+     - scored PSMs
+     - Each release is searched with its own defaults (the matrix does not
+       equalise them). The PIN row counts are the same (6670: 3886 target,
+       2784 decoy) but PSMs are scored differently, so Percolator selects
+       different PSMs at 1%. (``matrix.pair-results-differ-by-comet``)
+
+One behaviour common to both Comet releases, recorded because it shapes every
+PSM identifier: **Comet builds each PSM's identifier from its** ``-N`` **value**,
+which the product passes as the absolute output base inside the run directory,
+so every ``PSMId`` in a Percolator table begins with that run's own path
+(``/.../runs/<run>/outputs/comet/<base>_<scan>_<charge>_<rank>``). Identifiers
+therefore differ from run to run and machine to machine; the matrix compares
+them with the directory removed. Whether the product should shorten them is a
+product question, not the matrix's.

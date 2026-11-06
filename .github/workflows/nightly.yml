@@ -25,7 +25,8 @@
 # until Phase 15 replaces the stubs; that is the honest state, and nothing may
 # be added to mark a step as allowed to fail, or to swallow its exit status
 # (scripts/ci/check-workflows.sh refuses both).  Phase 15 replaces them one
-# at a time: the tool manifest verification (R-TEST-08) is real since unit 5.
+# at a time: the tool manifest verification (R-TEST-08) is real since unit 5,
+# and the version matrix since unit 6 (its fixture half waits on D-006).
 #
 # scripts/ci/run-pipeline-locally.sh runs every step below on this machine and
 # requires each stub to fail and each real step to pass.
@@ -67,18 +68,34 @@ jobs:
         run: bash scripts/ci/nightly-linkcheck.sh
 
   version-matrix:
-    name: "Nightly (Linux): version matrix (stub, Phase 15)"
+    # PHASE-15 gate item 1, real since Phase 15 unit 6: the version matrix's
+    # spectra-free half.  Every build the product offers on this runner is
+    # installed from its pinned upstream URL into an empty cache by the
+    # product's own Tool Manager and probes, then exercised (Comet -p/-q against
+    # the committed fixtures, Percolator over CometGUI's own synthetic PIN
+    # against reviewed goldens); every other combination the manifest names is
+    # recorded as UNAVAILABLE or UNVERIFIED by name.  Needs the project JDK and
+    # Maven; no spectra.  The pair runs are the large-dataset job's.
+    name: "Nightly (Linux): version matrix (gate item 1, no spectra)"
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 120
     steps:
       - name: Check out the repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Project-local JDK and Maven (no setup-java)
+        run: bash scripts/ci/toolchain.sh
 
       - name: Broader Comet and Percolator version matrix
         run: bash scripts/ci/nightly-version-matrix.sh
 
   large-dataset:
-    name: "Nightly (Linux): large dataset (stub, Phase 15)"
+    # The version matrix's fixture half: every (Comet, Percolator) pair run over
+    # a real dataset against version-keyed goldens.  It takes its fixture as ONE
+    # named input, COMETGUI_MATRIX_FIXTURE, and none exists on a runner: D-006's
+    # CI fixture is OPEN, so the step exits 70 through stub-lib.sh, naming what
+    # it waits for and what it would need -- red, in its own job, never green.
+    name: "Nightly (Linux): large dataset (waits on D-006's CI fixture)"
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:

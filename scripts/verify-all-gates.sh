@@ -238,12 +238,13 @@ gate_spec() {
             ;;
         traceability)
             GATE_ITEMS="5"
-            GATE_DEFECT="eight defects in copies of the map and the phase documents -- among them an AC- given no test reference, which must also fail the strict Sphinx build"
+            GATE_DEFECT="eight defects in copies of the map and the phase documents -- among them an AC- given no test reference, which must also fail the strict Sphinx build; and, since Phase 15 unit 6, R-TEST-07's review rule over copies of the goldens: a golden changed with no new review record, its bytes changed by one newline, a placeholder and an empty explanation, a future date, a missing REVIEW.json, a stale record, an unjustified tolerance, a golden under another tool pair's key and a stray file, each red, the committed goldens green"
             GATE_SCRIPT="scripts/ci/traceability.sh"
             GATE_ARGS=(--self-test)
             GATE_PROOF=(
                 "selftest: OK"
                 "self-test OK -- the gate fails on every injected defect"
+                "goldens: self-test OK -- "
                 "traceability.sh: PASSED."
             )
             GATE_FLOOR=8
