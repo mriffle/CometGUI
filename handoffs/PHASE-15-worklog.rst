@@ -342,7 +342,72 @@ the 21 pre-existing directories were left alone.
 Unit 3 sign-off
 ---------------
 
-Pending.
+**Accepted 2026-11-06 at** ``d70206a``, one round. One fresh agent.
+
+*Measured before the change* (whole-reactor PIT at 16 threads, 105 min, the
+agent's run): every module above 80% under the old KILLED-only module score --
+the lowest ``cometgui-process`` 89.7% KILLED-only, 96.2% with ``TIMED_OUT``;
+46 Java packages, none below 80% under ``D-014``/``D-015``, none with code and
+no mutations. **The owner's rules do not turn the gate red on today's tree**;
+unit 4 has no package to lift, only the forbidden-survivor audit.
+
+*P15-3 decided: ``org.cometgui.workflow.*`` NOT added.* PIT over
+``cometgui-workflow`` with it had run more than 2 h 45 min unfinished (165
+test units, 211 minions killed for timeout; the real-binary tests under
+mutation) against 20 min for ``workflow.state`` alone. Far over the 15-minute
+limit; escalated to tier 1 as a cost question, not added.
+
+*Diff read* (7 files). ``build.sh``: ``stage_gates_pit`` runs PIT then
+``pit_package_grading`` (Python, ``xml.etree``): per Java package,
+``(KILLED+TIMED_OUT)/all >= 80%``, BELOW lists the package's undetected
+mutants, every ``TIMED_OUT`` named, ``EMPTY`` (a ``targetClasses`` entry with
+no mutation) and ``NO MUTATIONS`` (a package with code and none) are failures,
+module totals printed ``not graded``; MISSING/VACUOUS/UNEXPECTED/OFF kept.
+New ``--gates-pit-root DIR [--gates-pit-modules ...]`` grades existing reports,
+refuses the repository, adds a STALE check. ``pom.xml``: only
+``org.cometgui.results.export.*`` added. ``verify-test-gates.sh``: control M
+(19 assertions, every report from a real PIT run): M1 a 0% package inside
+``cometgui-domain`` -- PIT's own threshold passes, the grading is red naming
+it; M2 a real ``TIMED_OUT`` (a loop its mutant never leaves) -- passes at 4/4
+where KILLED alone is 3/4, named; M3 an empty target -- ``EMPTY``; M4
+``domain.secrets`` excluded -- ``NO MUTATIONS``. Control 5 moved after control
+C and sizes from the sandbox's own ``cometgui-ui`` ``jacoco.xml``; no second
+whole-sandbox build. Floor ``tests`` 49 -> 68. ``dev-verify.sh --mutation``:
+PIT 1.30.0 refuses history without a history plugin, which pitest does not
+ship, so the history file is gone; the flag now runs PIT on the changed
+classes into ``_build/dev-verify/`` and prints the grading. Docs:
+``testing.rst`` PIT section and falsifiability row, ``CONTRIBUTING.rst``.
+
+*My runs:*
+
+* ``build.sh --gates-pit-root`` over a shadow of the working tree (symlinks,
+  outside the repository) holding the agent's whole-reactor AFTER reports:
+  **47 packages graded, 47 at or above 80%, 0 below**; 169 ``TIMED_OUT``
+  named; the run's one failure was ``STALE cometgui-params-percolator``, the
+  mtime of ``FdrValues.java`` from the agent's edit-and-revert proof of
+  ``dev-verify --mutation`` (content equal to ``HEAD``, ``git status``
+  clean) -- the currency check doing its job. Lowest packages:
+  ``tools.pdv.derived`` 132/147 89.7%, ``tools.credentials`` 45/49 91.8%,
+  ``results.export`` 93/97 95.8%, ``tools.process`` 178/185 96.2%,
+  ``results.filtering.store`` 565/577 97.9%; 32 packages at 100%.
+* ``verify-all-gates.sh --only tests,quality,docs``: **tests 68 in 5276 s**,
+  quality 42, docs 1, all PASS, shared resources unchanged.
+
+*My injections into the grading* (``build.sh``; anchor 0, ``sha256sum -c``
+FAILED while in, OK after), each graded by ``verify-test-gates.sh
+--mutation-only``:
+
+* ``failures += below`` -> ``failures += 0`` (a BELOW package printed but not
+  counted): 23 passed, 2 failed -- M1 "exited 0 with the defect present".
+* the ``EMPTY`` rule disabled (``if target_hits[glob]:`` -> ``if True:``):
+  23 passed, 2 failed -- M3.
+
+The agent's own two (``TIMED_OUT`` scored as a miss; the package-level
+no-mutation rule off) went red in M2 and M4.
+
+*Residue:* ``scripts/verify-param-gates.sh`` still says it scores "as
+``scripts/build.sh`` scores it (KILLED only)" -- stale wording in a harness
+(unit 10/11); ``CometCapabilityProbe`` and workflow coverage as above.
 
 Unit 4 sign-off
 ---------------
@@ -397,4 +462,9 @@ None yet.
 Blockers escalated
 ==================
 
-None yet.
+#. **P15-3, ``org.cometgui.workflow.*`` in PIT's targets** (unit 3): not
+   added. Measured PIT over ``cometgui-workflow`` with it at more than 2 h 45
+   min, unfinished. Adding it would grow ``scripts/build.sh`` by hours against
+   the owner's build-economy rule; whether to accept that cost, or to fund a
+   faster test split for the workflow module first, is tier 1's (and the
+   owner's) to decide. ``workflow.state`` stays gated (100%).
