@@ -605,7 +605,72 @@ call during the agent's survey, outside P15-5b's allowance, recorded.
 Unit 6 sign-off
 ---------------
 
-Pending.
+**Accepted 2026-11-06 at** ``8c77bb3`` (``ed5b985``, ``aab1aab``,
+``8c77bb3``), one round. One fresh agent.
+
+*Diff read* (31 files). ``scripts/matrix/run-matrix.sh`` (``--part
+tools|pairs|all``) runs three opt-in classes in
+``cometgui-app/src/test/java/org/cometgui/app/matrix/`` (not ``*Test``, and
+gated on ``-Dcometgui.matrix=true``) and ``scripts/matrix/matrix.py`` grades
+what they wrote. **Census**: the product's manifest reader and offers on six
+platforms, cross-checked against a plain-JSON reading in Python -- a row
+either reading lacks, or a gap with no recorded reason, is red. **Tools**:
+every Linux build installed from its pinned URL by the product's Tool Manager
+into an empty cache and probed; Comet ``-p``/``-q`` byte-equal to the
+committed fixtures; Percolator over the committed synthetic PIN through the
+product's command builder, ``-X`` exactly when ``XML_OUTPUT`` was probed;
+PDV and converter installed and identified; Percolator 3.09 run as a
+registered local binary, recorded separately. **Pairs**: Comet ->
+Percolator per pair through the product's run port over
+``COMETGUI_MATRIX_FIXTURE`` (refused without it). Goldens under
+``cometgui-app/src/test/resources/goldens/<pair>/fixture-<digest>.<platform>.json``
+with ``REVIEW.json``; derived values only; exact comparison, justified as
+measured byte-stable per platform (platform in the key).
+``scripts/matrix/check_goldens.py`` enforces ``R-TEST-07`` (self-test 11),
+wired into ``scripts/ci/traceability.sh``. Advisories in
+``docs/developer/version_capabilities.rst``; matrix in
+``docs/platform_support.rst``. Nightly: ``nightly-version-matrix.sh`` real
+(no spectra), ``nightly-large-dataset.sh`` runs pairs with the fixture
+variable, else exits 70 naming ``D-006``.
+
+*Goldens reviewed by me* (I am the reviewer the ``REVIEW.json`` records
+name): the four pairs share PIN rows (6670; 3886 target, 2784 decoy -- the
+same spectra, top 1 each) and differ in what passes q <= 0.01 (PSMs 1008,
+1036, 1013, 1053; peptides 592-602) as the advisories state; 9 decoy PSMs at
+the cutoff against about a thousand targets is a 1% FDR; 3 splits, 22
+features. The synthetic-PIN goldens (64 + 64 rows) pass nothing at 0.01 by
+construction. Plausible and internally consistent; accepted.
+
+*My runs:*
+
+* Matrix over ``scratch/fixture``: **GREEN -- RUN-PASSED 11, RUN-FAILED 0,
+  UNAVAILABLE 14, UNVERIFIED 36** (61 rows), 112 s.
+* Without the fixture variable: exit 3, the four Linux pairs UNVERIFIED
+  "REFUSED ... this is not a pass", 7 RUN-PASSED.
+* ``mvn -o -B -pl cometgui-app -am verify``: BUILD SUCCESS, all eleven
+  modules 0 failures; app 573 (91 opt-in skipped) -- unchanged, the matrix
+  classes do not run in a plain verify.
+* ``check_goldens.py``: exit 0.
+* ``verify-all-gates.sh --only workflows,docs,traceability,pipeline``:
+  workflows 23, docs 1, traceability 8, pipeline 26 steps (was 25), PASS.
+
+*My injection:* ``WeightsReader`` keeping at most two splits (anchor 0,
+``sha256sum -c`` FAILED; restored, OK; my first attempt was refused by
+Spotless for line length and never ran, so it was re-made formatted): matrix
+**RED -- 4 RUN-PASSED, 7 RUN-FAILED**, e.g. ``golden
+comet-2026.02.2_percolator-3.06.5: 'weights.splits' expected 3, observed 2``
+on every Percolator-bearing row. The agent's three (``-X`` always emitted;
+``PinMerger`` dropping a row; the Python reader skipping a manifest row) went
+red with their own words.
+
+*Findings carried:* (1) a dropped merged-PIN row is **not noticed by the
+product** -- its merge record counts rows read, not written; only the matrix's
+independent count caught it (escalated as a product gap); (2) PSM identifiers
+carry the absolute run path Comet builds from ``-N`` (goldens strip it; a
+product question); (3) ``ResultsCountsUiTest.theSyntheticRun`` erred once in
+the agent's verify (TestFX lookup during a scene change), passed 4/4 alone and
+in my verify -- routed to unit 9 under the flakiness policy; (4) Comet
+``-p``/``-q`` fixtures exist for linux-x86-64 only.
 
 Unit 7 sign-off
 ---------------
