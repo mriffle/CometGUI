@@ -70,6 +70,8 @@ MVN_OFFLINE=""
 ONLY=""
 CENSUS_ROOT=""
 GATES_CENSUS_ROOT=""
+GATES_PIT_ROOT=""
+GATES_PIT_MODULES=""
 # The tree whose target/ directories the gates stage's evidence census reads.
 # ROOT in every real build; only --gates-census-root changes it.
 EVIDENCE_ROOT="${ROOT}"
@@ -107,6 +109,24 @@ Options:
                    built incompletely or before a change cannot pass.  This
                    exists so that scripts/verify-test-gates.sh can prove the
                    census bites without running the whole build to reach it.
+  --gates-pit-root DIR
+                   Run ONLY the gates stage's mutation grading -- every
+                   critical package on its own at >= 80% with TIMED_OUT
+                   counted as detected and named (D-014, D-015), no mutations
+                   a failure, the report and switch checks -- over the PIT
+                   reports already in DIR's target/ directories, and exit.
+                   PIT is not run and nothing is built.  The same refusals as
+                   --gates-census-root: never the repository itself, never a
+                   directory inside it outside _build/, no other option except
+                   the one below, never BUILD OK.  A report older than its
+                   module's sources or POM, or the parent POM, is STALE.  This
+                   exists so that scripts/verify-test-gates.sh grades a
+                   sandbox with the code a real build grades with.
+  --gates-pit-modules M[,M]
+                   Only with --gates-pit-root: grade these modules' reports and
+                   no others.  A sandbox whose PIT ran over one module has no
+                   report for the rest; without this every module that
+                   switches the gate on must have one, as in a real build.
   --only ID[,ID]   Run only the named stages, in the order listed below.  This
                    exists so that the CI step scripts in scripts/ci/ can invoke
                    THIS script rather than reimplementing a stage: the local
@@ -924,10 +944,10 @@ gates_evidence_census() {
 
 # The PIT half of stage_gates, which runs PIT over the tree the build stage
 # produced and then grades it, and the stage's verdict.  Never reached from
-# --gates-census-root.  Like the census above, it adds to the caller's
-# `failures` and reads the caller's class_file, prefix and hit.
+# --gates-census-root or --gates-pit-root.  Like the census above, it adds to
+# the caller's `failures`.
 stage_gates_pit() {
-    echo "-- PIT: mutation testing over the critical packages (R-TEST-02, >= 80%)"
+    echo "-- PIT: mutation testing over the critical packages (R-TEST-02, >= 80% in each; D-014, D-015)"
     # Not part of `mvn verify` on purpose (see the pitest block in pom.xml), so
     # it is run here, against the classes the build stage already produced.  The
     # test-compile prefix is needed rather than the bare goal: a goal-only
@@ -951,9 +971,58 @@ stage_gates_pit() {
              die "PIT failed. Full log: _build/pitest.log"; }
     echo "   full PIT output: _build/pitest.log"
 
-    local pit_xml total killed score_x10 ran=0
-    for module in "${PRODUCT_MODULES[@]}"; do
-        pit_xml="${ROOT}/${module}/target/pit-reports/mutations.xml"
+    gates_mutation_grading
+
+    [ "${failures}" -eq 0 ] || die "${failures} test-gate evidence check(s) failed."
+    echo "OK: coverage measured and gated, architecture rules checked against a real import,"
+    echo "    every critical package at or above the R-TEST-02 mutation threshold."
+    echo "    The gates themselves are proved to fail on the defects they catch by"
+    echo "    bash scripts/verify-test-gates.sh (run separately: it builds a"
+    echo "    deliberately damaged copy of the tree under _build/)."
+}
+
+# The modules the mutation grading reads.  Empty means every product module,
+# which is what every real build grades; only --gates-pit-modules, which is
+# accepted only beside --gates-pit-root, narrows it, because a sandbox whose
+# PIT ran over one module has no reports for the others.
+PIT_SCOPE=()
+
+# THE MUTATION GRADING (R-TEST-02, as the owner decided it on 2026-11-05).
+#
+#   D-014  A TIMED_OUT mutant counts as detected, as PIT itself counts it: the
+#          tests noticed it by never finishing.  Grading KILLED alone made the
+#          gate read machine load, in the failing direction.  Every TIMED_OUT
+#          mutant is printed by name, so a hang that is really a broken test
+#          stays visible.  SURVIVED, NO_COVERAGE and every other status count
+#          against the score.
+#   D-015  Every critical package is graded ON ITS OWN at 80% or more.  A
+#          critical package is the Java package of a class PIT mutated (inner
+#          classes folded into their outer class), for every class under a
+#          <targetClasses> entry of the parent POM.  Grading per module let
+#          cometgui-params-comet's validation package sit at 37.5% inside a
+#          module at 88.7%, and the build pass.  The module-wide figure is
+#          printed, and grades nothing.
+#          A critical package with no mutations at all is a FAILURE, at two
+#          levels: a <targetClasses> entry that yields no mutation anywhere,
+#          and a Java package under one that compiles classes with code
+#          (real_classes_of) but carries no mutation.  "Nothing to score" is
+#          not a score.
+#
+# Reads EVIDENCE_ROOT (ROOT in every real build) and adds to the caller's
+# `failures`.  Reachable without running PIT through --gates-pit-root, so that
+# scripts/verify-test-gates.sh grades a sandbox with exactly this code.
+gates_mutation_grading() {
+    local -a scope=() graded=()
+    local module pit_xml total ran=0 class_file prefix hit
+    if [ "${#PIT_SCOPE[@]}" -gt 0 ]; then
+        scope=("${PIT_SCOPE[@]}")
+    else
+        scope=("${PRODUCT_MODULES[@]}")
+    fi
+
+    echo "-- PIT: every module that switches the mutation gate on produced a real report"
+    for module in "${scope[@]}"; do
+        pit_xml="${EVIDENCE_ROOT}/${module}/target/pit-reports/mutations.xml"
         if ! module_opts_in "${module}" "cometgui.mutation.skip"; then
             if [ -f "${pit_xml}" ]; then
                 echo "   UNEXPECTED ${module} produced a PIT report but its POM does not switch"
@@ -969,37 +1038,62 @@ stage_gates_pit() {
             continue
         fi
         total="$(grep -c '<mutation ' "${pit_xml}" || true)"
-        killed="$(grep -c "status='KILLED'" "${pit_xml}" || true)"
         if [ "${total}" -eq 0 ]; then
             echo "   VACUOUS  ${module}: PIT generated 0 mutations and still exited 0."
             echo "            A mutation score over an empty run is not a score."
             failures=$((failures + 1))
             continue
         fi
-        score_x10=$(( killed * 1000 / total ))
-        printf '   ok       %-28s %d/%d mutations killed = %d.%d%%\n' \
-            "${module}" "${killed}" "${total}" $(( score_x10 / 10 )) $(( score_x10 % 10 ))
-        if [ "${score_x10}" -lt 800 ]; then
-            echo "   BELOW    ${module} is under the R-TEST-02 threshold of 80%."
-            failures=$((failures + 1))
-        fi
+        printf '   ok       %-28s %d mutation(s) in target/pit-reports/mutations.xml\n' "${module}" "${total}"
+        graded+=("${module}")
         ran=$((ran + 1))
     done
     [ "${ran}" -gt 0 ] \
         || { echo "   NO MODULE RAN A MUTATION ANALYSIS AT ALL"; failures=$((failures + 1)); }
+    if [ "${#PIT_SCOPE[@]}" -gt 0 ]; then
+        printf '   scope    %s only (--gates-pit-modules); no other module is graded here\n' "${PIT_SCOPE[*]}"
+    fi
 
-    echo "-- PIT: a module holding critical-package code must have its gate switched on"
-    # The target packages are read out of pom.xml rather than repeated here, so
-    # that extending the list in the POM extends this check with it.
-    local -a mutation_prefixes=()
-    local mutation_drift=0
+    # The target packages are read out of the parent POM rather than repeated
+    # here, so that extending the list in the POM extends both checks below.
+    local -a target_globs=() mutation_prefixes=()
     while IFS= read -r prefix; do
+        [ -n "${prefix}" ] || continue
+        target_globs+=("${prefix}")
         mutation_prefixes+=("$(printf '%s' "${prefix%.\*}" | tr '.' '/')")
-    done < <(sed -n '/<targetClasses>/,/<\/targetClasses>/p' "${ROOT}/pom.xml" \
+    done < <(sed -n '/<targetClasses>/,/<\/targetClasses>/p' "${EVIDENCE_ROOT}/pom.xml" \
         | grep -o '<param>[^<]*</param>' | sed 's|</\?param>||g')
     [ "${#mutation_prefixes[@]}" -gt 0 ] \
-        || die "could not read <targetClasses> out of pom.xml; this check would pass vacuously."
+        || die "could not read <targetClasses> out of pom.xml; the mutation checks would pass vacuously."
+
+    if [ "${ran}" -gt 0 ]; then
+        local work grade_out grade_rc=0 counted
+        work="$(mktemp -d)"
+        {
+            if [ "${#PIT_SCOPE[@]}" -gt 0 ]; then printf 'mode\tscoped\n'; else printf 'mode\tfull\n'; fi
+            for prefix in "${target_globs[@]}"; do printf 'target\t%s\n' "${prefix}"; done
+            for module in "${graded[@]}"; do
+                printf 'report\t%s\t%s\n' "${module}" "${EVIDENCE_ROOT}/${module}/target/pit-reports/mutations.xml"
+            done
+            for module in "${PRODUCT_MODULES[@]}"; do
+                real_classes_of "${module}" >"${work}/${module}.classes"
+                printf 'classes\t%s\t%s\n' "${module}" "${work}/${module}.classes"
+            done
+        } >"${work}/manifest"
+        grade_out="$(pit_package_grading "${work}/manifest")" || grade_rc=$?
+        rm -rf -- "${work}"
+        counted="$(printf '%s\n' "${grade_out}" | sed -n 's/^#failures \([0-9][0-9]*\)$/\1/p' | tail -1)"
+        if [ "${grade_rc}" -ne 0 ] || [ -z "${counted}" ]; then
+            printf '%s\n' "${grade_out}" | grep -v '^#failures ' || true
+            die "the per-package mutation grading did not complete (exit ${grade_rc}); a grading that did not finish has graded nothing."
+        fi
+        printf '%s\n' "${grade_out}" | grep -v '^#failures ' || true
+        failures=$(( failures + counted ))
+    fi
+
+    echo "-- PIT: a module holding critical-package code must have its gate switched on"
     printf '   %d critical package prefix(es) read from pom.xml\n' "${#mutation_prefixes[@]}"
+    local mutation_drift=0
     for module in "${PRODUCT_MODULES[@]}"; do
         module_opts_in "${module}" "cometgui.mutation.skip" && continue
         hit=""
@@ -1022,13 +1116,233 @@ stage_gates_pit() {
     if [ "${mutation_drift}" -eq 0 ]; then
         echo "   ok       every module with critical-package code has its mutation gate on"
     fi
+}
 
-    [ "${failures}" -eq 0 ] || die "${failures} test-gate evidence check(s) failed."
-    echo "OK: coverage measured and gated, architecture rules checked against a real import,"
-    echo "    mutation score above the R-TEST-02 threshold."
-    echo "    The gates themselves are proved to fail on the defects they catch by"
-    echo "    bash scripts/verify-test-gates.sh (run separately: it builds a"
-    echo "    deliberately damaged copy of the tree under _build/)."
+# pit_package_grading <manifest> -- the per-package grading itself, in Python
+# because it parses XML, which this script otherwise refuses to do in bash.
+# The manifest is tab-separated: "mode full|scoped", one "target <glob>" per
+# <targetClasses> entry, one "report <module> <mutations.xml>" per graded
+# module, one "classes <module> <file>" per product module (its real_classes_of
+# list).  Prints the grading; its LAST line is "#failures N", which the caller
+# requires -- a grader that crashed part way has not graded anything.
+pit_package_grading() {
+    python3 -I - "$1" <<'PYTHON'
+import re
+import sys
+import xml.etree.ElementTree as ET
+from collections import defaultdict
+
+DETECTED = ("KILLED", "TIMED_OUT")  # D-014
+THRESHOLD = 80                      # R-TEST-02, per package (D-015)
+
+mode, targets, reports, class_lists = "full", [], [], []
+with open(sys.argv[1], encoding="utf-8") as handle:
+    for raw in handle:
+        field = raw.rstrip("\n").split("\t")
+        if field[0] == "mode":
+            mode = field[1]
+        elif field[0] == "target":
+            targets.append(field[1])
+        elif field[0] == "report":
+            reports.append((field[1], field[2]))
+        elif field[0] == "classes":
+            class_lists.append((field[1], field[2]))
+
+
+def glob_to_regex(glob):
+    # PIT's own glob: '*' is any run of characters, dots included.
+    return re.compile(
+        "^" + "".join(".*" if c == "*" else "." if c == "?" else re.escape(c) for c in glob) + "$")
+
+
+globs = [(glob, glob_to_regex(glob)) for glob in targets]
+
+
+def package_of(name):
+    outer = name.split("$", 1)[0]
+    return outer.rsplit(".", 1)[0] if "." in outer else "(default package)"
+
+
+def under_a_target(name):
+    return any(rx.match(name) for _, rx in globs)
+
+
+def percent(detected, total):
+    tenths = detected * 1000 // total
+    return "%d.%d%%" % (tenths // 10, tenths % 10)
+
+
+failures = 0
+packages = defaultdict(lambda: defaultdict(int))
+modules = {}
+undetected = defaultdict(list)
+timed_out = []
+target_hits = {glob: 0 for glob in targets}
+for module, path in reports:
+    counts = modules.setdefault(module, defaultdict(int))
+    for mutation in ET.parse(path).getroot().iter("mutation"):
+        status = mutation.get("status") or "(no status)"
+        name = (mutation.findtext("mutatedClass") or "").strip()
+        record = (name,
+                  (mutation.findtext("mutatedMethod") or "?").strip(),
+                  (mutation.findtext("lineNumber") or "?").strip(),
+                  (mutation.findtext("mutator") or "?").strip().rsplit(".", 1)[-1])
+        package = package_of(name)
+        for bucket in (packages[package], counts):
+            bucket[status] += 1
+            bucket["all"] += 1
+        for glob, rx in globs:
+            if rx.match(name):
+                target_hits[glob] += 1
+        if status == "TIMED_OUT":
+            timed_out.append(record)
+        elif status not in DETECTED:
+            undetected[package].append((status,) + record)
+
+graded_modules = set(modules)
+OTHER = lambda c: c["all"] - sum(c[s] for s in ("KILLED", "TIMED_OUT", "SURVIVED", "NO_COVERAGE"))
+
+print("-- PIT: every critical package graded on its own, >= %d%% (D-015); TIMED_OUT counts as detected (D-014)" % THRESHOLD)
+print("   %-8s %-46s %11s %7s   %s" % ("verdict", "package", "detected", "score",
+                                       "killed / timed out / survived / no coverage / other"))
+below = 0
+for package in sorted(packages):
+    c = packages[package]
+    detected = sum(c[s] for s in DETECTED)
+    passed = detected * 100 >= THRESHOLD * c["all"]
+    verdict = "PASS" if passed else "BELOW"
+    print("   %-8s %-46s %5d/%-5d %7s   %d / %d / %d / %d / %d" % (
+        verdict, package, detected, c["all"], percent(detected, c["all"]),
+        c["KILLED"], c["TIMED_OUT"], c["SURVIVED"], c["NO_COVERAGE"], OTHER(c)))
+    if not passed:
+        below += 1
+        print("            %s is under the R-TEST-02 threshold of %d%%; its undetected mutants:"
+              % (package, THRESHOLD))
+        for status, name, method, line, mutator in sorted(undetected[package], key=lambda r: (r[1], int(r[3]) if r[3].isdigit() else 0, r[2], r[4], r[0])):
+            print("              %-12s %s.%s line %s %s" % (status, name, method, line, mutator))
+failures += below
+print("   %d package(s) graded, %d at or above %d%%, %d below" % (
+    len(packages), len(packages) - below, THRESHOLD, below))
+
+print("-- PIT: TIMED_OUT mutants, counted as detected (D-014) and named, so a hang that is a broken test stays visible")
+if timed_out:
+    for name, method, line, mutator in sorted(timed_out, key=lambda r: (r[0], int(r[2]) if r[2].isdigit() else 0, r[1], r[3])):
+        print("   TIMED_OUT %s.%s line %s %s" % (name, method, line, mutator))
+else:
+    print("   none")
+
+print("-- PIT: no mutations is a failure (D-015), for a targetClasses entry and for a package with code")
+# Every class with code under a target, by package and by module.
+code = defaultdict(lambda: defaultdict(list))
+compiled_anywhere = {glob: set() for glob in targets}
+for module, listing in class_lists:
+    with open(listing, encoding="utf-8") as handle:
+        for rel in handle:
+            rel = rel.strip()
+            if not rel.endswith(".class"):
+                continue
+            name = rel[: -len(".class")].replace("/", ".")
+            for glob, rx in globs:
+                if rx.match(name):
+                    compiled_anywhere[glob].add(module)
+            if under_a_target(name):
+                code[package_of(name)][module].append(name)
+empty = 0
+for glob in targets:
+    if target_hits[glob]:
+        continue
+    homes = compiled_anywhere[glob]
+    if mode == "scoped" and homes and not (homes & graded_modules):
+        print("   outside  %s: no mutation here, and its classes are compiled only in %s, which this grading does not read"
+              % (glob, ", ".join(sorted(homes))))
+        continue
+    where = ("compiled in %s" % ", ".join(sorted(homes))) if homes else "matching no compiled class at all"
+    print("   EMPTY    %s: a targetClasses entry with no mutation anywhere this grading reads (%s)." % (glob, where))
+    print("            A critical package with nothing to score has not passed; D-015 makes it a failure.")
+    empty += 1
+unmutated = 0
+packages_with_code = 0
+for package in sorted(code):
+    homes = set(code[package]) & graded_modules
+    if not homes:
+        continue
+    packages_with_code += 1
+    if packages[package]["all"]:
+        continue
+    names = sorted(n for module in homes for n in code[package][module] if "$" not in n)
+    inner = sum(1 for module in homes for n in code[package][module] if "$" in n)
+    print("   NO MUTATIONS %s (%s): %d class(es) with code%s, and not one mutation."
+          % (package, ", ".join(sorted(homes)), len(names), (" and %d inner" % inner) if inner else ""))
+    for name in names:
+        print("              %s" % name)
+    print("            D-015: a critical package with no mutations at all is a failure, not a pass.")
+    unmutated += 1
+failures += empty + unmutated
+if empty == 0 and unmutated == 0:
+    print("   ok       %d targetClasses entr(ies) and %d package(s) with code read here, every one mutated"
+          % (sum(1 for g in targets if target_hits[g]), packages_with_code))
+
+print("-- PIT: module totals, printed for reading only -- D-015: the module-wide figure grades nothing")
+for module, _ in reports:
+    c = modules[module]
+    detected = sum(c[s] for s in DETECTED)
+    print("   module   %-28s %5d/%-5d detected = %7s (killed %d, timed out %d)   not graded" % (
+        module, detected, c["all"], percent(detected, c["all"]), c["KILLED"], c["TIMED_OUT"]))
+
+print("#failures %d" % failures)
+PYTHON
+}
+
+# gates_pit_currency -- --gates-pit-root only, and before the grading.  A real
+# build runs PIT straight before grading it, so its reports are current by
+# construction.  A sandbox's are whatever its last PIT run left, so here, and
+# only here, a report older than its module's sources or POM, or than the
+# parent POM, is STALE: it predates the change and grades code that no longer
+# exists.  Adds to the caller's `failures`.
+gates_pit_currency() {
+    local -a scope=()
+    local module report newer
+    if [ "${#PIT_SCOPE[@]}" -gt 0 ]; then
+        scope=("${PIT_SCOPE[@]}")
+    else
+        scope=("${PRODUCT_MODULES[@]}")
+    fi
+    echo "-- PIT evidence: every report was written after the last change to what it grades"
+    for module in "${scope[@]}"; do
+        report="${EVIDENCE_ROOT}/${module}/target/pit-reports/mutations.xml"
+        # Its absence is the grading's own MISSING (or nothing, for a module
+        # with the gate off), below.
+        [ -f "${report}" ] || continue
+        newer="$(find -H "${EVIDENCE_ROOT}/${module}/src" "${EVIDENCE_ROOT}/${module}/pom.xml" \
+            "${EVIDENCE_ROOT}/pom.xml" -type f -newer "${report}" -print 2>/dev/null | head -1 || true)"
+        if [ -n "${newer}" ]; then
+            echo "   STALE    ${module}: ${newer#"${EVIDENCE_ROOT}/"} is newer than"
+            echo "            ${report#"${EVIDENCE_ROOT}/"}; the mutation report predates the change."
+            failures=$((failures + 1))
+        else
+            printf '   ok       %-28s %s\n' "${module}" "${report#"${EVIDENCE_ROOT}/"}"
+        fi
+    done
+}
+
+# sandbox_evidence_root <option> <dir> <why the repository is refused> -- the
+# one refusal both sandbox options share.  Sets EVIDENCE_ROOT to DIR, resolved.
+# Compared with the repository itself, resolved, not with the working
+# directory: the refusal must not depend on where this was run from.  A
+# directory inside the repository is accepted only under _build/, where every
+# sandbox lives.
+sandbox_evidence_root() {
+    local option="$1" dir="$2" why="$3" repository
+    [ -d "${dir}" ] || die "${option}: no such directory: ${dir}"
+    EVIDENCE_ROOT="$(cd -- "${dir}" && pwd -P)"
+    repository="$(cd -- "${ROOT}" && pwd -P)"
+    [ "${EVIDENCE_ROOT}" != "${repository}" ] \
+        || die "${option} refuses the repository itself. ${why}"
+    case "${EVIDENCE_ROOT}/" in
+        "${repository}/_build/"?*) ;;
+        "${repository}/"*)
+            die "${option} refuses ${EVIDENCE_ROOT#"${repository}/"}: a directory inside the repository is accepted only under _build/, where sandboxes live." ;;
+    esac
 }
 
 # gates_evidence_currency -- --gates-census-root only, and before the census.
@@ -1111,12 +1425,17 @@ main() {
             --only) ONLY="${2:-}"; [ -n "${ONLY}" ] || die "--only needs a stage id"; shift 2 ;;
             --census-root) CENSUS_ROOT="${2:-}"; [ -n "${CENSUS_ROOT}" ] || die "--census-root needs a directory"; shift 2 ;;
             --gates-census-root) GATES_CENSUS_ROOT="${2:-}"; [ -n "${GATES_CENSUS_ROOT}" ] || die "--gates-census-root needs a directory"; shift 2 ;;
+            --gates-pit-root) GATES_PIT_ROOT="${2:-}"; [ -n "${GATES_PIT_ROOT}" ] || die "--gates-pit-root needs a directory"; shift 2 ;;
+            --gates-pit-modules) GATES_PIT_MODULES="${2:-}"; [ -n "${GATES_PIT_MODULES}" ] || die "--gates-pit-modules needs a module list"; shift 2 ;;
             -h|--help) usage; exit 0 ;;
             *) usage >&2; die "unknown option: $1" ;;
         esac
     done
 
     cd -- "${ROOT}"
+
+    [ -z "${GATES_PIT_MODULES}" ] || [ -n "${GATES_PIT_ROOT}" ] \
+        || die "--gates-pit-modules is accepted only beside --gates-pit-root; a real build grades every module."
 
     # --census-root: the format stage's file-set census alone, against another
     # tree.  Nothing else runs, nothing is built, and nothing is written.
@@ -1138,23 +1457,10 @@ main() {
     # itself and every other option, and it ends with its own verdict line,
     # never BUILD OK.
     if [ -n "${GATES_CENSUS_ROOT}" ]; then
-        [ -z "${ONLY}${CENSUS_ROOT}${MVN_OFFLINE}" ] \
+        [ -z "${ONLY}${CENSUS_ROOT}${MVN_OFFLINE}${GATES_PIT_ROOT}${GATES_PIT_MODULES}" ] \
             || die "--gates-census-root takes no other option; it is a census of a sandbox, not a build."
-        [ -d "${GATES_CENSUS_ROOT}" ] || die "--gates-census-root: no such directory: ${GATES_CENSUS_ROOT}"
-        EVIDENCE_ROOT="$(cd -- "${GATES_CENSUS_ROOT}" && pwd -P)"
-        # Compared with the repository itself, resolved, not with the working
-        # directory: the refusal must not depend on where this was run from.
-        # A directory inside the repository is accepted only under _build/,
-        # where every sandbox lives.
-        local repository
-        repository="$(cd -- "${ROOT}" && pwd -P)"
-        [ "${EVIDENCE_ROOT}" != "${repository}" ] \
-            || die "--gates-census-root refuses the repository itself. Its evidence is graded by a real build, bash scripts/build.sh, which runs this census after clean verify and then runs PIT."
-        case "${EVIDENCE_ROOT}/" in
-            "${repository}/_build/"?*) ;;
-            "${repository}/"*)
-                die "--gates-census-root refuses ${EVIDENCE_ROOT#"${repository}/"}: a directory inside the repository is accepted only under _build/, where sandboxes live." ;;
-        esac
+        sandbox_evidence_root --gates-census-root "${GATES_CENSUS_ROOT}" \
+            "Its evidence is graded by a real build, bash scripts/build.sh, which runs this census after clean verify and then runs PIT."
         printf 'Evidence census of %s (a sandbox: nothing is built here, and PIT is not run).\n\n' "${EVIDENCE_ROOT}"
         local failures=0
         gates_evidence_currency
@@ -1162,6 +1468,36 @@ main() {
         [ "${failures}" -eq 0 ] || die "${failures} test-gate evidence check(s) failed."
         printf '\nOK: the gates stage'"'"'s evidence census passed over %s.\n' "${EVIDENCE_ROOT}"
         printf '    A census of a sandbox, not a build: nothing was compiled or tested here.\n'
+        exit 0
+    fi
+
+    # --gates-pit-root: the gates stage's mutation grading alone, over the PIT
+    # reports a sandbox already holds.  PIT is not run, nothing is built,
+    # nothing is written.  The same refusals as --gates-census-root, for the
+    # same reason: it is not a way to skip anything in a real build.
+    if [ -n "${GATES_PIT_ROOT}" ]; then
+        [ -z "${ONLY}${CENSUS_ROOT}${MVN_OFFLINE}${GATES_CENSUS_ROOT}" ] \
+            || die "--gates-pit-root takes no other option but --gates-pit-modules; it grades a sandbox's reports, it is not a build."
+        sandbox_evidence_root --gates-pit-root "${GATES_PIT_ROOT}" \
+            "Its PIT reports are graded by a real build, bash scripts/build.sh, which runs PIT in its gates stage and then this grading."
+        if [ -n "${GATES_PIT_MODULES}" ]; then
+            local wanted_module known entry
+            IFS=',' read -r -a PIT_SCOPE <<< "${GATES_PIT_MODULES}"
+            for wanted_module in "${PIT_SCOPE[@]}"; do
+                known=0
+                for entry in "${PRODUCT_MODULES[@]}"; do
+                    [ "${entry}" = "${wanted_module}" ] && known=1
+                done
+                [ "${known}" -eq 1 ] || die "--gates-pit-modules: no such product module '${wanted_module}'."
+            done
+        fi
+        printf 'Mutation grading of %s (a sandbox: PIT is not run here; its existing reports are graded).\n\n' "${EVIDENCE_ROOT}"
+        local failures=0
+        gates_pit_currency
+        gates_mutation_grading
+        [ "${failures}" -eq 0 ] || die "${failures} mutation-gate check(s) failed."
+        printf '\nOK: the gates stage'"'"'s mutation grading passed over %s.\n' "${EVIDENCE_ROOT}"
+        printf '    A grading of a sandbox'"'"'s reports, not a build: nothing was compiled, tested or mutated here.\n'
         exit 0
     fi
 

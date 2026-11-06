@@ -160,7 +160,9 @@ declare -a COVERED=()
 #                2026-11-05, when FIX-BUILD-TIME replaced the two whole
 #                sandbox builds of controls 7 and 8 with one (control C) and
 #                the census alone, adding twelve assertions on the census's
-#                picture and currency.  shell: 30 on 2026-08-30,
+#                picture and currency; 68 on 2026-11-05, when Phase 15 unit 3
+#                added control M, nineteen assertions on the per-package
+#                mutation grading (D-014, D-015).  shell: 30 on 2026-08-30,
 #                when phase 02 unit 10 first shipped it.  workflows: 9 on
 #                2026-08-29, 23 on 2026-10-01, measured by phase 05 unit 12 --
 #                it had grown to 19 and then 23 without the floor following.
@@ -294,11 +296,11 @@ gate_spec() {
             ;;
         tests)
             GATE_ITEMS="3, 4"
-            GATE_DEFECT="a JavaFX import in the domain, a ProcessBuilder outside the process service, a truncated ArchUnit import, an untested class in a gated package sized so the ratio really falls below 0.90, an untested view-model sized against the package rule, a covered class whose test asserts nothing so its mutations survive, a module whose coverage was never measured and a class excluded from the coverage report -- each graded by scripts/build.sh's own evidence census over a sandbox built once (--gates-census-root), which must accept the clean sandbox, refuse the working tree, and report old or missing evidence STALE or NO EVIDENCE beside the defect rather than read it"
+            GATE_DEFECT="a JavaFX import in the domain, a ProcessBuilder outside the process service, a truncated ArchUnit import, an untested class in a gated package sized so the ratio really falls below 0.90, an untested view-model sized against the package rule from the sandbox's own report, a covered class whose test asserts nothing so its mutations survive, a module whose coverage was never measured and a class excluded from the coverage report -- each graded by scripts/build.sh's own evidence census over a sandbox built once (--gates-census-root), which must accept the clean sandbox, refuse the working tree, and report old or missing evidence STALE or NO EVIDENCE beside the defect rather than read it; and, graded by scripts/build.sh's own mutation grading over real PIT runs (--gates-pit-root, D-014 and D-015), a package at 0% inside a module PIT's own threshold passes, a package whose only non-KILLED mutant is a real TIMED_OUT (which must pass, the mutant named), a targetClasses entry that matches nothing, a critical package excluded from PIT, and a report older than the POM -- the clean module accepted and the working tree refused"
             GATE_SCRIPT="scripts/verify-test-gates.sh"
             GATE_ARGS=()
             GATE_PROOF=("Every gate rejected its defect and accepted the clean tree.")
-            GATE_FLOOR=49
+            GATE_FLOOR=68
             GATE_UNIT="assertions"
             ;;
         provenance)

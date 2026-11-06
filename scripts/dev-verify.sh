@@ -5,7 +5,7 @@
 #
 #   bash scripts/dev-verify.sh                  what changed vs HEAD
 #   bash scripts/dev-verify.sh --since main     what changed vs a ref
-#   bash scripts/dev-verify.sh --mutation       ... and PIT, incrementally
+#   bash scripts/dev-verify.sh --mutation       ... and PIT over the changed classes
 #   bash scripts/dev-verify.sh --help
 #
 # THIS IS NOT A GATE.  It exists because `scripts/build.sh` takes ~23 minutes,
@@ -22,10 +22,12 @@
 #     coat of paint, so this script proves that tests actually executed during
 #     THIS run rather than reading the exit code.
 #
-# It changes no POM and no gate script.  The PIT knobs it uses -- withHistory,
-# historyInputFile, threads -- are command-line properties of pitest-maven
-# 1.30.0 (verified in the plugin descriptor), so the committed configuration is
-# untouched and the gate run is unaffected.
+# It changes no POM and no gate script.  The PIT knobs it uses -- targetClasses,
+# failWhenNoMutations, reportsDirectory, threads -- are command-line properties
+# of pitest-maven 1.30.0, so the committed configuration is untouched and the
+# gate run is unaffected.  (It used PIT's history flags until Phase 15;
+# pitest 1.30.0 refuses them unless a history plugin is installed, and none
+# is.  See --mutation.)
 
 set -Eeuo pipefail
 
@@ -34,18 +36,6 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly ROOT
 readonly M2REPO="${ROOT}/_build/m2repo"
 readonly WORKDIR="${ROOT}/_build/dev-verify"
-
-# Modules whose POM switches the mutation gate on.  Kept in step with the
-# `cometgui.mutation.skip` property; verified against the POMs at run time
-# rather than trusted, because a stale list here would silently skip PIT.
-readonly MUTATION_MODULES=(
-    cometgui-domain
-    cometgui-provenance
-    cometgui-process
-    cometgui-tools
-    cometgui-install
-    cometgui-workflow
-)
 
 SINCE=""
 FORCED_MODULES=()
@@ -69,8 +59,10 @@ ${SCRIPT_NAME} -- run only what the current change can break.
 
   --since <ref>     compare against <ref> (default: the working tree vs HEAD)
   --module <name>   force a module into the set (repeatable); skips detection
-  --mutation        also run PIT over the affected mutation-gated modules,
-                    incrementally, using a history file under _build/
+  --mutation        also run PIT over the production classes this change
+                    touched (and the class a changed test is named after) in
+                    each affected mutation-gated module, and print
+                    scripts/build.sh's per-package grading of that run
   --threads <n>     PIT threads (default: half the cores, capped at 32)
   --verify          run 'verify' instead of 'test' (adds failsafe and JaCoCo
                     checks for the selected modules)
@@ -293,7 +285,7 @@ else
 
     if [ "${DRY_RUN}" -eq 1 ]; then
         note "WOULD RUN: mvn -B -o -pl ${REACTOR} ${MVN_GOAL}"
-        [ "${RUN_MUTATION}" -eq 1 ] && note "WOULD RUN: PIT with a history file, over the mutation-gated subset"
+        [ "${RUN_MUTATION}" -eq 1 ] && note "WOULD RUN: PIT over the changed classes of the mutation-gated subset"
         NOT_RUN+=("everything -- this was a --dry-run")
         banner "What this run did NOT do"
         NOT_RUN+=("Spotless, Checkstyle and SpotBugs")
@@ -354,20 +346,38 @@ else
     printf '   elapsed: %ss\n' "$(( $(date +%s) - STARTED_AT ))"
 
     # ------------------------------------------------------------ optional PIT
+    # PIT OVER THE CLASSES THIS CHANGE TOUCHED, not over whole modules.
+    #
+    # Until Phase 15 this ran PIT per module with -DhistoryInputFile and
+    # -DhistoryOutputFile, for incremental analysis.  pitest 1.30.0 no longer
+    # implements history itself: it hands it to a history plugin, and with none
+    # installed every run dies with "History has been enabled but no history
+    # plugin has been installed/activated" (pitest-entry's
+    # ErroringHistoryFactory).  pitest ships no such plugin, and adding one
+    # from elsewhere is a dependency and a POM change this inner loop has no
+    # business making.  So the flag now does what every brief since Phase 06
+    # told agents to do by hand: PIT over the changed production classes (and
+    # the class a changed test is named after), with -DtargetClasses, in a
+    # reactor built with -am (never -pl alone: siblings would resolve from
+    # _build/m2repo, which holds whatever was last installed).  Upstream
+    # modules match none of the classes and write nothing; the report goes to
+    # _build/dev-verify/, so the working tree's own target/pit-reports is not
+    # overwritten with a partial run.
     if [ "${RUN_MUTATION}" -eq 1 ]; then
-        banner "PIT, incrementally, over the affected mutation-gated modules"
+        banner "PIT over the changed classes of the affected mutation-gated modules"
+        mapfile -t TARGET_GLOBS < <(sed -n '/<targetClasses>/,/<\/targetClasses>/p' "${ROOT}/pom.xml" \
+            | grep -o '<param>[^<]*</param>' | sed 's|</\?param>||g')
+        [ "${#TARGET_GLOBS[@]}" -gt 0 ] \
+            || die "could not read <targetClasses> out of pom.xml; refusing to guess which classes are critical."
         declare -a PIT_MODULES=()
         for m in "${JAVA_MODULES[@]}"; do
-            for g in "${MUTATION_MODULES[@]}"; do
-                if [ "${m}" = "${g}" ]; then
-                    # Verify against the POM rather than trusting the list above.
-                    if grep -q '<cometgui.mutation.skip>false</cometgui.mutation.skip>' "${ROOT}/${m}/pom.xml"; then
-                        PIT_MODULES+=("${m}")
-                    else
-                        note "${m} is in this script's list but its POM no longer switches mutation on; skipping and saying so."
-                    fi
-                fi
-            done
+            # The switch is read from the POM, never from a list kept here: the
+            # list this script once kept had missed three modules.
+            if grep -q '<cometgui.mutation.skip>false</cometgui.mutation.skip>' "${ROOT}/${m}/pom.xml"; then
+                PIT_MODULES+=("${m}")
+            else
+                note "${m}: its POM does not switch the mutation gate on; PIT is not run there."
+            fi
         done
 
         if [ "${#PIT_MODULES[@]}" -eq 0 ]; then
@@ -379,32 +389,102 @@ else
                 PIT_THREADS=$(( cores / 2 )); [ "${PIT_THREADS}" -gt 32 ] && PIT_THREADS=32
                 [ "${PIT_THREADS}" -lt 1 ] && PIT_THREADS=1
             fi
-            mkdir -p -- "${WORKDIR}/pit-history"
+            # A tree the grading in scripts/build.sh can read (--gates-pit-root
+            # accepts a directory under _build/): links to the sources, POMs and
+            # compiled classes, and the targeted run's own report.
+            PIT_ROOT="${WORKDIR}/pit-root"
+            rm -rf -- "${PIT_ROOT}"
+            mkdir -p -- "${PIT_ROOT}"
+            ln -s "${ROOT}/pom.xml" "${PIT_ROOT}/pom.xml"
+            for d in "${ROOT}"/cometgui-*/; do
+                mod="$(basename -- "${d}")"
+                mkdir -p -- "${PIT_ROOT}/${mod}/target"
+                ln -s "${ROOT}/${mod}/pom.xml" "${PIT_ROOT}/${mod}/pom.xml"
+                [ -d "${ROOT}/${mod}/src" ] && ln -s "${ROOT}/${mod}/src" "${PIT_ROOT}/${mod}/src"
+                [ -d "${ROOT}/${mod}/target/classes" ] && ln -s "${ROOT}/${mod}/target/classes" "${PIT_ROOT}/${mod}/target/classes"
+            done
+            PIT_RED=0
             for m in "${PIT_MODULES[@]}"; do
-                hist="${WORKDIR}/pit-history/${m}.history"
-                printf '\n   %s  (threads=%s, history=%s)\n' "${m}" "${PIT_THREADS}" \
-                    "$( [ -f "${hist}" ] && echo "reusing $(wc -c < "${hist}") bytes" || echo "none yet -- this run is full" )"
-                mvn -B -o -Dmaven.repo.local="${M2REPO}" -pl "${m}" \
+                # The production classes this change touched in ${m}, under a
+                # critical target: a changed main source is its class; a changed
+                # test FooTest/FooTests/FooIT is Foo, where Foo exists.
+                mapfile -t CHANGED_CLASSES < <(python3 -I - "${ROOT}" "${m}" "${TARGET_GLOBS[@]}" -- "${CHANGED[@]:-}" <<'PYTHON'
+import os
+import re
+import sys
+
+root, module = sys.argv[1], sys.argv[2]
+split = sys.argv.index("--")
+globs = [re.compile("^" + "".join(".*" if c == "*" else re.escape(c) for c in g) + "$")
+         for g in sys.argv[3:split]]
+found = set()
+for path in sys.argv[split + 1:]:
+    if not path.startswith(module + "/") or not path.endswith(".java"):
+        continue
+    for tree, is_test in (("/src/main/java/", False), ("/src/test/java/", True)):
+        if tree not in path:
+            continue
+        rel = path.split(tree, 1)[1][: -len(".java")]
+        if is_test:
+            rel = re.sub(r"(Tests?|IT)$", "", rel)
+            if not os.path.isfile(os.path.join(root, module, "src/main/java", rel + ".java")):
+                continue
+        elif not os.path.isfile(os.path.join(root, path)):
+            continue
+        name = rel.replace("/", ".")
+        if name.endswith("package-info"):
+            continue
+        if any(rx.match(name) for rx in globs):
+            found.add(name)
+for name in sorted(found):
+    print(name)
+PYTHON
+)
+                if [ "${#CHANGED_CLASSES[@]}" -eq 0 ]; then
+                    note "${m}: no changed class under a critical target (and no test named after one); PIT not run there."
+                    NOT_RUN+=("PIT in ${m} -- nothing this change touched there is under <targetClasses>")
+                    continue
+                fi
+                filter=""
+                for c in "${CHANGED_CLASSES[@]}"; do
+                    filter="${filter:+${filter},}${c},${c}\$*"
+                done
+                report_dir="${PIT_ROOT}/${m}/target/pit-reports"
+                printf '\n   %s  (threads=%s) -- %s class(es):\n' "${m}" "${PIT_THREADS}" "${#CHANGED_CLASSES[@]}"
+                printf '     %s\n' "${CHANGED_CLASSES[@]}"
+                pit_rc=0
+                mvn -B -o -Dmaven.repo.local="${M2REPO}" -pl "${m}" -am \
                     -Dcometgui.pit.threads="${PIT_THREADS}" \
-                    -DhistoryInputFile="${hist}" -DhistoryOutputFile="${hist}" \
+                    -DtargetClasses="${filter}" -DfailWhenNoMutations=false \
+                    -DreportsDirectory="${report_dir}" \
                     test-compile org.pitest:pitest-maven:mutationCoverage \
-                    > "${WORKDIR}/pit-${m}.log" 2>&1 \
-                    || { sed -n '/ERROR/p' "${WORKDIR}/pit-${m}.log" | head -20
-                         die "PIT failed in ${m}. Full log: ${WORKDIR}/pit-${m}.log"; }
-                xml="${ROOT}/${m}/target/pit-reports/mutations.xml"
-                [ -f "${xml}" ] || die "PIT exited 0 in ${m} but wrote no mutations.xml."
-                total="$(grep -c '<mutation ' "${xml}" || true)"
-                killed="$(grep -c "status='KILLED'" "${xml}" || true)"
-                [ "${total}" -gt 0 ] || die "PIT generated 0 mutations in ${m} and exited 0. That is a vacuous pass."
-                printf '     %s/%s killed\n' "${killed}" "${total}"
+                    > "${WORKDIR}/pit-${m}.log" 2>&1 || pit_rc=$?
+                xml="${report_dir}/mutations.xml"
+                if [ ! -f "${xml}" ] || [ "$(grep -c '<mutation ' "${xml}" || true)" -eq 0 ]; then
+                    [ "${pit_rc}" -eq 0 ] || sed -n '/ERROR/p' "${WORKDIR}/pit-${m}.log" | head -20
+                    die "PIT generated no mutation of the changed classes in ${m} (exit ${pit_rc}). That is not a pass: nothing was graded. Full log: ${WORKDIR}/pit-${m}.log"
+                fi
+                # The grading, by scripts/build.sh's own code, of what ran:
+                # per package and with TIMED_OUT named, over these classes only.
+                bash "${ROOT}/scripts/build.sh" --gates-pit-root "${PIT_ROOT}" --gates-pit-modules "${m}" \
+                    > "${WORKDIR}/pit-${m}-grading.log" 2>&1 || true
+                printf '     graded by scripts/build.sh over THESE CLASSES ONLY -- not the package'"'"'s score, not the gate:\n'
+                sed -n '/^-- PIT: every critical package graded on its own/,/^-- PIT: no mutations is a failure/p' \
+                    "${WORKDIR}/pit-${m}-grading.log" | sed '$d' | sed 's/^/  /'
+                if [ "${pit_rc}" -ne 0 ]; then
+                    sed -n '/ERROR/p' "${WORKDIR}/pit-${m}.log" | head -20
+                    printf '     PIT exited %s in %s (its own 80%% threshold over these classes, or a test failure). Full log: %s\n' \
+                        "${pit_rc}" "${m}" "${WORKDIR}/pit-${m}.log"
+                    PIT_RED=1
+                fi
             done
             NOT_RUN+=("PIT in every module except: ${PIT_MODULES[*]}")
-            NOT_RUN+=("a HISTORY-FREE PIT run -- the incremental result is an inner-loop
-       signal; the gate run in scripts/build.sh uses no history file")
+            NOT_RUN+=("PIT over any class this change did not touch -- the gate in scripts/build.sh
+       runs PIT over every critical package and grades each one whole")
         fi
     else
-        NOT_RUN+=("PIT entirely (no --mutation). Measured 2026-09-18: the gates stage
-       is 647s of build.sh's 1020s, and verify-all-gates.sh is a further 3875s.")
+        NOT_RUN+=("PIT entirely (no --mutation). Measured 2026-11-05: PIT over the reactor
+       takes about 100 minutes at 16 threads.")
     fi
 fi
 
@@ -423,4 +503,8 @@ printf '   A unit is signed off, and a phase gate is graded, by:\n'
 printf '       bash scripts/build.sh && bash scripts/verify-all-gates.sh\n'
 printf '   run in full, on a quiet tree.\n\n'
 
+if [ "${PIT_RED:-0}" -ne 0 ]; then
+    printf '   PIT went red above (see its log). Exit 5.\n\n'
+    exit 5
+fi
 [ "${RAN_SOMETHING}" -eq 1 ] || exit 0

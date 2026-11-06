@@ -195,7 +195,8 @@ collide with, in the same commit; "it has its own sandbox" is not the argument
 (``ONBOARDING.rst``, *What parallel agents actually share*).
 
 **Numeric targets come from the specification, not from taste.** The mutation
-score gate (``R-TEST-02``) is >= 80% over the critical packages with no
+score gate (``R-TEST-02``) is >= 80% in each critical package, graded on its
+own (``D-015``) with a timed-out mutant counted as detected (``D-014``), with no
 surviving mutation that can disable a checksum, invert a q-value comparison,
 drop an output, suppress a validation error, pass an unsupported option or
 leak a secret; coverage starts at >= 90% line and >= 85% branch on core

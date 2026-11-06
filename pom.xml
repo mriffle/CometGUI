@@ -852,6 +852,12 @@
               <!-- q-value filters and result parsing -->
               <param>org.cometgui.results.filtering.*</param>
               <param>org.cometgui.results.parser.*</param>
+              <!-- Added by phase 15 (approved in its brief): the export of the
+                   filtered tables, left out of the targets at phase 09.  An
+                   export that writes the wrong rows, or the raw table, is a
+                   required output gone wrong.  Adding a package STRENGTHENS
+                   this gate; the list is never narrowed. -->
+              <param>org.cometgui.results.export.*</param>
               <!-- command builders, version and capability rules, secret
                    redaction in the process service -->
               <param>org.cometgui.tools.*</param>

@@ -289,31 +289,84 @@ checked, 0 failures``.
 Mutation -- PIT
 ---------------
 
-:Threshold: **>= 80% mutation score** over the critical packages
-   (``mutationThreshold=80``).
+:Threshold: **>= 80% in every critical package, each graded on its own**
+   (``D-015``), with a ``TIMED_OUT`` mutant counted as detected (``D-014``).
+   Score = (``KILLED`` + ``TIMED_OUT``) / every mutation of the package;
+   ``SURVIVED``, ``NO_COVERAGE`` and every other status count against it.
 :Where the number comes from: ``R-TEST-02`` -- ">= 80% mutation score in those
    packages, with **no** surviving mutation that can disable checksum
    verification, invert a q-value comparison, drop a required output, suppress
-   a validation error, pass an unsupported option to a tool, or leak a secret".
-:Target packages: eleven prefixes listed in ``pom.xml`` -- the domain, both
-   parameter modules, provenance, results filtering and parsing, tools,
-   install registry/verify/probe, and workflow state. A later phase adds its
-   packages; it does not narrow the list.
+   a validation error, pass an unsupported option to a tool, or leak a secret";
+   the two owner decisions of 2026-11-05 (``DECISIONS.rst``) say how it is
+   counted and over what.
+:What a critical package is: the **Java package** of each class PIT mutates
+   (inner classes folded into their outer class), for every class under a
+   ``<targetClasses>`` entry of the parent ``pom.xml``. An entry such as
+   ``org.cometgui.params.comet.*`` covers several Java packages (parser,
+   writer, validation ...), and each is graded separately -- grading per entry
+   or per module is what let the validation package sit at 37.5% inside a
+   module at 88.7%.
+:Target packages: the ``<targetClasses>`` list in ``pom.xml`` -- the domain,
+   both parameter modules, provenance, results filtering, parsing and export,
+   tools, install registry/verify/probe/download/archive/cache/manager, and
+   workflow state. A later phase adds its packages; it does not narrow the
+   list.
 :Configured in: ``pom.xml`` (``pitest-maven`` 1.30.0 with
    ``pitest-junit5-plugin`` 1.2.3), the ``mutation`` profile, and
    ``cometgui.mutation.skip=false`` in each module with critical-package
-   code: as of Phase 09, ``cometgui-domain``, ``cometgui-process``,
-   ``cometgui-provenance``, ``cometgui-tools``, ``cometgui-install``,
-   ``cometgui-params-comet``, ``cometgui-params-percolator``,
-   ``cometgui-results`` and ``cometgui-workflow``.
-:Runs with: ``bash scripts/build.sh --only gates``, which invokes the goal
-   directly and then fails if the report has no real mutations in it.
+   code: ``cometgui-domain``, ``cometgui-process``, ``cometgui-provenance``,
+   ``cometgui-tools``, ``cometgui-install``, ``cometgui-params-comet``,
+   ``cometgui-params-percolator``, ``cometgui-results`` and
+   ``cometgui-workflow``.
+:Runs with: ``bash scripts/build.sh`` (or ``--only gates``), which runs PIT over
+   the reactor and then grades the reports with ``gates_mutation_grading``.
+
+What the gates stage prints and fails on, in order:
+
+* every module that switches the gate on has a ``mutations.xml`` with real
+  mutations in it (``MISSING``, ``VACUOUS``), and no module without the switch
+  has one (``UNEXPECTED``);
+* one line per critical package, sorted: ``PASS`` or ``BELOW``, detected/all,
+  the score, and the KILLED / TIMED_OUT / SURVIVED / NO_COVERAGE / other
+  counts. A ``BELOW`` package is a counted failure, and its undetected mutants
+  are listed under it (status, class, method, line, mutator);
+* **every** ``TIMED_OUT`` mutant by name -- class, method, line, mutator -- so
+  a hang that is really a broken test stays visible even though it counts as
+  detected;
+* **no mutations is a failure**, at two levels: a ``<targetClasses>`` entry
+  that yields no mutation anywhere (``EMPTY``), and a Java package under one
+  that compiles classes with code but carries no mutation (``NO MUTATIONS``,
+  naming the package, its module and its classes);
+* each module's total, marked **not graded**: it is printed for reading, and
+  grades nothing;
+* a module that compiles critical-package code with its switch off
+  (``OFF``).
+
+PIT's own ``mutationThreshold=80`` stays in the POM. It is module-wide, so it
+cannot fail a build in which every package is at or above 80% (the module's
+weighted average then is too), and it is not what the build is graded on.
 
 PIT is not part of a plain ``mvn verify`` because it re-runs the suite once per
 mutation. It is not optional either: the build script re-derives from the
 compiled classes which modules ought to have the gate switched on, and fails a
-module that has critical-package code with its switch off. On 2026-08-29:
-``cometgui-domain 22/22 mutations killed = 100.0%``.
+module that has critical-package code with its switch off.
+
+**Grading without running PIT.** ``bash scripts/build.sh --gates-pit-root DIR
+[--gates-pit-modules M[,M]]`` runs only that grading, the same function, over
+the reports a sandbox already holds. It refuses the repository itself, any
+directory inside it outside ``_build/``, and every other option, reports a
+``mutations.xml`` older than its module's sources or POM or the parent POM as
+``STALE``, and ends with its own verdict line, never ``BUILD OK``.
+``--gates-pit-modules`` narrows it to the modules a sandbox ran PIT in; a real
+build grades every module. The ``tests`` control grades its sandbox this way.
+
+**In the inner loop.** ``bash scripts/dev-verify.sh --mutation`` runs PIT over
+the production classes the change touched (and the class a changed test is
+named after), with ``-am``, writing its report under ``_build/dev-verify/``,
+and prints this grading of that run -- over those classes only, which is not a
+package's score and not the gate. It used PIT's incremental history until
+Phase 15; pitest 1.30.0 refuses history unless a history plugin is installed,
+and none is.
 
 Documentation -- strict Sphinx
 ------------------------------
@@ -461,10 +514,26 @@ pass is worse than no aggregator at all.
        ratio is 0.00, but expected minimum is 0.80``.
 
    * - PIT
-     - A test suite weakened until mutations survive.
-     - ``Mutation score of 27 is below threshold of 80``, from a run that
-       reported ``Generated 22 mutations Killed 6 (27%)`` -- while the
-       weakened suite itself still passed, so only the mutation gate saw it.
+     - A covered class whose test asserts nothing (control 6); and, graded by
+       ``scripts/build.sh --gates-pit-root`` over real PIT runs of
+       ``cometgui-domain`` (control M): a new package at 0% inside a module
+       that stays above 80%; a package whose only non-``KILLED`` mutant is a
+       real ``TIMED_OUT`` (a loop its mutant never leaves); a critical
+       package excluded from PIT in the module's POM; a ``<targetClasses>``
+       entry that matches nothing; and the parent POM changed after the
+       report was written.
+     - Control 6: ``Mutation score of N is below threshold of 80``, with
+       ``Mutations with no coverage 0``, while the coverage gate accepts the
+       same defect. Control M: ``BELOW    org.cometgui.domain.weakpackagecontrol
+       0/N 0.0%`` and exactly one failure, while PIT's own module threshold
+       passes and the module line reads above 80% and ``not graded``; the
+       timed-out package ``PASS`` at 100% although ``KILLED`` alone is 75%,
+       with ``TIMED_OUT org.cometgui.domain.timedoutcontrol.StepCounter.stepsTo
+       line N MathMutator``; ``NO MUTATIONS org.cometgui.domain.secrets
+       (cometgui-domain)``; ``EMPTY
+       org.cometgui.domain.nosuchcontrolpackage.*``; ``STALE ... pom.xml is
+       newer than``; the restored module accepted, every package at or above
+       80%; and the working tree refused.
 
    * - Coverage measurement
      - A module with classes but no execution data at all -- the vacuous pass
@@ -694,7 +763,12 @@ without running the whole build to reach it: it builds its sandbox once
 census function the gates stage executes and nothing else. That option refuses
 the repository itself and every other option, reports a module that was never
 built as ``NO EVIDENCE`` and evidence older than its sources as ``STALE``, and
-is never a build.
+is never a build. Its control M grades the mutation gate the same way, over
+real PIT runs of ``cometgui-domain`` in the sandbox, with ``bash
+scripts/build.sh --gates-pit-root <sandbox> --gates-pit-modules
+cometgui-domain``. Control 5 runs after control C, so that it sizes its
+injection from the sandbox's own ``cometgui-ui`` ``jacoco.xml``, never the
+working tree's; a missing report is a harness error.
 
 On 2026-08-29 the nine controls graded 123 individual
 checks in 4 m 58 s. Phase 02 added a tenth, ``shell``

@@ -41,8 +41,20 @@
 #      that defect present, a module that was never built, or whose
 #      evidence predates its sources, is reported beside it, not
 #      silently accepted
+#   M  scripts/build.sh's mutation grading, as the owner decided it on
+#      2026-11-05, over real PIT runs of cometgui-domain graded through
+#      --gates-pit-root: a package below 80% inside a module above it is
+#      red (D-015) while PIT's own module threshold passes; a package
+#      whose only non-KILLED mutant is a real TIMED_OUT passes, and the
+#      mutant is named (D-014); a targetClasses entry and a package with
+#      code that yield no mutation are each red; a report older than the
+#      POM is STALE; the clean module passes; the working tree is refused
 #   S  The harness itself: a control whose defect was NOT injected is
 #      reported as a harness failure, not as a pass
+#
+# ORDER.  0, 1, 2, 3, 4, 6, C, 7, 8, then 5 and M, then S.  Control 5 runs
+# after C because C's whole-sandbox build is what gives it a cometgui-ui
+# jacoco.xml of this run's own to size from (Phase 15).
 #
 # WHERE IT WORKS.  Never in the working tree.  It builds a copy of the modules,
 # POMs and rule sets under _build/test-gate-sandbox/ and damages that, so a
@@ -117,6 +129,14 @@ readonly VIEWMODEL_HOST="${VIEWMODEL_PKG}/NonNullProperty.java"
 readonly MUTATION_CONTROL="${DOMAIN_PKG}/UnassertedControl.java"
 readonly MUTATION_CONTROL_TEST="cometgui-domain/src/test/java/org/cometgui/domain/build/UnassertedControlTest.java"
 
+# Control M's injections: each a NEW Java package under the org.cometgui.domain.*
+# target, because D-015 grades packages.  The first scores 0% inside a module
+# that stays above 80%; the second holds a mutant that never finishes.
+readonly WEAK_PACKAGE_CONTROL="cometgui-domain/src/main/java/org/cometgui/domain/weakpackagecontrol/WeakPackageControl.java"
+readonly WEAK_PACKAGE_CONTROL_TEST="cometgui-domain/src/test/java/org/cometgui/domain/weakpackagecontrol/WeakPackageControlTest.java"
+readonly TIMED_OUT_CONTROL="cometgui-domain/src/main/java/org/cometgui/domain/timedoutcontrol/StepCounter.java"
+readonly TIMED_OUT_CONTROL_TEST="cometgui-domain/src/test/java/org/cometgui/domain/timedoutcontrol/StepCounterTest.java"
+
 # The three gates of unit 2 are off in the sandbox; see the header comment.
 readonly -a QUIET=(
     "-Dspotless.check.skip=true"
@@ -145,6 +165,11 @@ Usage:
                                             verify-all-gates.sh runs the whole
                                             harness, and its floor fails a run
                                             this short
+  bash scripts/${SCRIPT_NAME} --mutation-only run controls 0, M and S alone:
+                                            the per-package mutation grading
+                                            in scripts/build.sh, for checking
+                                            a change to it.  NOT the gate,
+                                            for the same reasons
 
 It needs a populated ${M2REPO#"${ROOT}/"} and a built tree (run
 bash scripts/build.sh first), the project-local toolchain in tools/, the
@@ -431,6 +456,79 @@ assert_census_counted() {
     assert_log_matches "$1" "$2" "^FATAL: $3 test-gate evidence check\\(s\\) failed\\.\$"
 }
 
+# THE MUTATION GRADING, REACHED WITHOUT RUNNING PIT OVER THE REACTOR.
+#
+# scripts/build.sh grades PIT per critical package (D-015) with TIMED_OUT
+# counted as detected and named (D-014), and fails a critical package with no
+# mutations.  PIT over the whole reactor takes well over an hour, so the
+# controls below run PIT over cometgui-domain alone and grade the sandbox's
+# report with the working tree's own scripts/build.sh:
+#
+#   bash scripts/build.sh --gates-pit-root _build/test-gate-sandbox \
+#       --gates-pit-modules cometgui-domain
+#
+# which executes the very function its gates stage runs after PIT in a real
+# build (gates_mutation_grading), not a copy, after a currency check a sandbox
+# needs: a report older than its module's sources or the parent POM is STALE.
+grading_run() {
+    local log="$1" rc=0
+    bash "${ROOT}/scripts/build.sh" --gates-pit-root "${SANDBOX}" \
+        --gates-pit-modules cometgui-domain >"${log}" 2>&1 || rc=$?
+    return "${rc}"
+}
+
+# assert_grading_fails <label> <expected diagnostic, an ERE> <log>
+assert_grading_fails() {
+    local label="$1" expected="$2" log="$3" rc=0
+    grading_run "${log}" || rc=$?
+    if [ "${rc}" -eq 0 ]; then
+        record_fail "${label}: scripts/build.sh's mutation grading exited 0 with the defect present (log: ${log#"${ROOT}/"})"
+        return
+    fi
+    if ! grep -qE -- "${expected}" "${log}"; then
+        record_fail "${label}: failed, but without the expected diagnostic '${expected}' (log: ${log#"${ROOT}/"})"
+        printf '         %s\n' "$(grep -E -- '^   [A-Z]{5}|^FATAL' "${log}" | head -3 | cut -c1-140)"
+        return
+    fi
+    record_pass "${label}: rejected, exit ${rc}"
+    printf '         %s\n' "$(grep -E -- "${expected}" "${log}" | head -1 | cut -c1-160)"
+}
+
+# assert_grading_passes <label> <log>
+assert_grading_passes() {
+    local label="$1" log="$2" rc=0
+    grading_run "${log}" || rc=$?
+    if [ "${rc}" -ne 0 ] || ! grep -qF -- "OK: the gates stage's mutation grading passed over" "${log}"; then
+        record_fail "${label}: the mutation grading did not accept the sandbox (exit ${rc}; log: ${log#"${ROOT}/"})"
+        printf '         %s\n' "$(grep -E -- '^   [A-Z]{5}|^FATAL' "${log}" | head -3 | cut -c1-140)"
+        return
+    fi
+    record_pass "${label}: exit 0"
+}
+
+# assert_grading_counted <label> <log> <n> -- the grading failed for exactly n
+# reasons, so the expected line cannot be the only one that happened to match.
+assert_grading_counted() {
+    assert_log_matches "$1" "$2" "^FATAL: $3 mutation-gate check\\(s\\) failed\\.\$"
+}
+
+# pit_detected_total <mutations.xml> -- "<detected> <total>", detected being
+# KILLED + TIMED_OUT, as PIT's own threshold and (D-014) build.sh count it.
+pit_detected_total() {
+    local xml="$1"
+    [ -s "${xml}" ] || die "HARNESS ERROR: no PIT report at ${xml#"${ROOT}/"} to size against."
+    python3 - "${xml}" <<'PYTHON'
+import sys
+import xml.etree.ElementTree as ET
+
+mutations = ET.parse(sys.argv[1]).getroot().findall("mutation")
+if not mutations:
+    raise SystemExit("no <mutation> elements in %s; nothing to size against" % sys.argv[1])
+detected = sum(1 for m in mutations if m.get("status") in ("KILLED", "TIMED_OUT"))
+print(detected, len(mutations))
+PYTHON
+}
+
 # Harness falsifiability: a control whose defect was never written to disk must
 # be a harness failure, not a silent pass.
 assert_injected() {
@@ -613,21 +711,24 @@ write_generated_class() {
 # in the sandbox, and an injection that is merely large enough is an injection
 # that will be one line too small the next time somebody adds a test.
 
-# jacoco_report_of <module> -- the JaCoCo XML to size from: the sandbox's own,
-# if a control has already produced one this run, otherwise the working tree's.
-# There is no third option: a size that cannot be measured must stop the
-# harness, because a guessed one is exactly the silent under-injection that
-# brought this script here.
+# jacoco_report_of <module> -- the sandbox's own JaCoCo XML for a module, the
+# one a control earlier in this run produced: control 0's for cometgui-domain
+# (control 4), control C's whole-sandbox build's for cometgui-ui (control 5,
+# which runs after C for exactly this reason).
+#
+# THE SANDBOX'S, AND NEVER THE WORKING TREE'S, for the reason pit_report_of
+# gives: the working tree's report is whatever its last build left, and a
+# control sized from evidence that is not this run's measurement of these
+# sources is a control that can silently stop injecting enough.  Until Phase
+# 15 control 5 sized from the working tree's cometgui-ui report, because no
+# earlier control measured the UI module.  A missing report stops the harness:
+# a guessed size is exactly the silent under-injection that brought this
+# script here.
 jacoco_report_of() {
-    local module="$1" candidate
-    for candidate in "${SANDBOX}/${module}/target/site/jacoco/jacoco.xml" \
-                     "${ROOT}/${module}/target/site/jacoco/jacoco.xml"; do
-        if [ -s "${candidate}" ]; then
-            printf '%s\n' "${candidate}"
-            return 0
-        fi
-    done
-    die "HARNESS ERROR: no JaCoCo report for ${module} in the sandbox or the working tree, so this control cannot be sized from the module. Run bash scripts/build.sh first."
+    local module="$1" candidate="${SANDBOX}/$1/target/site/jacoco/jacoco.xml"
+    [ -s "${candidate}" ] \
+        || die "HARNESS ERROR: no JaCoCo report for ${module} in the sandbox (${candidate#"${ROOT}/"}). The working tree's is not read: it is whatever the last build there left."
+    printf '%s\n' "${candidate}"
 }
 
 # jacoco_covered_lines <module> [<package, in VM form>] -- covered LINE count
@@ -1335,6 +1436,242 @@ PYTHON
     restore_from_tree "cometgui-domain/pom.xml"
 }
 
+control_mutation_grading() {
+    banner "M  the mutation gate as the owner decided it: per package (D-015), TIMED_OUT detected (D-014)"
+    # PIT's own mutationThreshold, and scripts/build.sh until Phase 15, graded
+    # a MODULE.  D-015 (2026-11-05): every critical package on its own, >= 80%,
+    # and a critical package with no mutations is a failure.  D-014: a
+    # TIMED_OUT mutant is detected, and named.  Each part below injects the
+    # defect only that rule can see, runs real PIT over cometgui-domain in the
+    # sandbox -- no mutations.xml here is constructed or edited by hand -- and
+    # grades the report with scripts/build.sh's own grading (grading_run).
+    # Every PIT run below is ALSO required to pass PIT's own module-wide
+    # threshold, which is what proves the per-package rule is the only thing
+    # that sees the defect.
+    local pit_args=(-pl cometgui-domain clean test-compile org.pitest:pitest-maven:mutationCoverage)
+
+    # ---- M1: a package below 80% inside a module above it ------------------
+    # SIZED FROM THE PRISTINE MODULE (control 0's report), like control 6: the
+    # injected package must score 0% while the module stays comfortably above
+    # 80%, so the survivors it adds must stay well under what would pull the
+    # module down.  With D detected of T, the module stays at or above 80% for
+    # up to D*100/80 - T survivors; half of that is injected.
+    local detected total room survivors statements
+    read -r detected total <<<"$(pit_detected_total "${BASELINE_PIT_REPORT}")" \
+        || die "HARNESS ERROR: control M could not size its injection from cometgui-domain's PIT report (see above). An injection of guessed size proves nothing."
+    [ -n "${total}" ] || die "HARNESS ERROR: control M read no mutation count from ${BASELINE_PIT_REPORT#"${ROOT}/"}."
+    room=$(( detected * 100 / 80 - total ))
+    [ "${room}" -ge 12 ] \
+        || die "HARNESS ERROR: cometgui-domain detects ${detected} of ${total} mutations, which leaves room for only ${room} survivors before the MODULE falls below 80%; a weak package cannot be hidden inside it, so this control cannot be built here."
+    survivors=$(( room / 2 ))
+    statements=$(( survivors - 1 ))
+    sizing "cometgui-domain detects ${detected} of ${total} mutations; the module stays at or above 80% for up to ${room} more survivors." \
+           "A new package of ${statements} mutable statements (${survivors} mutations, every one surviving) is injected: the package at 0%, the module at about $(( detected * 100 / (total + survivors) ))%."
+    uncovered_class_source WeakPackageControl "${statements}" \
+        | write_generated_class "${WEAK_PACKAGE_CONTROL}" org.cometgui.domain.weakpackagecontrol
+    write_class "${WEAK_PACKAGE_CONTROL_TEST}" 'package org.cometgui.domain.weakpackagecontrol;
+
+import org.junit.jupiter.api.Test;
+
+/** Temporary test written by scripts/verify-test-gates.sh. Never committed. */
+class WeakPackageControlTest {
+
+    /** Runs every statement of {@link WeakPackageControl} and checks nothing it computed. */
+    @Test
+    void runsTheCodeAndAssertsNothingAboutIt() {
+        WeakPackageControl.uncounted(3L);
+    }
+}'
+    assert_injected "a weak package" "${WEAK_PACKAGE_CONTROL}"
+    assert_injected "the weak package's test" "${WEAK_PACKAGE_CONTROL_TEST}"
+
+    assert_passes "PIT's own module-wide threshold accepts a module hiding a package at 0%" \
+        "${LOGS}/M1-weak-package-pit.log" "${pit_args[@]}"
+    assert_grading_fails "scripts/build.sh's per-package grading rejects it, naming the package" \
+        '^   BELOW    org\.cometgui\.domain\.weakpackagecontrol +0/[1-9][0-9]* +0\.0% ' \
+        "${LOGS}/M1-weak-package-grading.log"
+    assert_grading_counted "and for that reason alone: one mutation-gate check failed" \
+        "${LOGS}/M1-weak-package-grading.log" 1
+    assert_log_matches "while the module-wide figure, printed beside it, is above 80% and grades nothing" \
+        "${LOGS}/M1-weak-package-grading.log" \
+        '^   module   cometgui-domain +[0-9]+/[0-9]+ +detected = +(8[0-9]|9[0-9]|100)\.[0-9]% .*not graded$'
+    rm -rf -- "${SANDBOX}/$(dirname -- "${WEAK_PACKAGE_CONTROL}")" "${SANDBOX}/$(dirname -- "${WEAK_PACKAGE_CONTROL_TEST}")"
+    assert_removed "a weak package" "${WEAK_PACKAGE_CONTROL}"
+    assert_removed "the weak package's test" "${WEAK_PACKAGE_CONTROL_TEST}"
+
+    # ---- M2: a TIMED_OUT mutant is detected, and named ---------------------
+    # A REAL timeout, not an edited report.  StepCounter.stepsTo walks a long
+    # from 0 up to its target.  PIT's math mutant of "position + 1" walks it
+    # DOWN instead, so the loop runs for 2^64 steps: PIT stops it at its time
+    # limit and reports TIMED_OUT.  The test kills each of the other three
+    # mutants (the negated condition, "steps - 1", "return 0").  So the package
+    # holds 3 KILLED and 1 TIMED_OUT: 75% read as KILLED alone -- below the
+    # threshold, which is how build.sh read it before D-014 -- and 100% read
+    # as PIT and the owner read it.
+    write_class "${TIMED_OUT_CONTROL}" 'package org.cometgui.domain.timedoutcontrol;
+
+/** Temporary class written by scripts/verify-test-gates.sh. Never committed. */
+public final class StepCounter {
+
+    private StepCounter() {}
+
+    /**
+     * Counts the steps from zero to a target, one at a time.
+     *
+     * @param target a positive number of steps
+     * @return how many steps it took
+     */
+    public static long stepsTo(long target) {
+        long position = 0;
+        long steps = 0;
+        while (position != target) {
+            position = position + 1;
+            steps = steps + 1;
+        }
+        return steps;
+    }
+}'
+    write_class "${TIMED_OUT_CONTROL_TEST}" 'package org.cometgui.domain.timedoutcontrol;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
+
+/** Temporary test written by scripts/verify-test-gates.sh. Never committed. */
+class StepCounterTest {
+
+    @Test
+    void countsEveryStep() {
+        assertEquals(3L, StepCounter.stepsTo(3L));
+    }
+}'
+    assert_injected "a class whose mutant never finishes" "${TIMED_OUT_CONTROL}"
+    assert_injected "its test" "${TIMED_OUT_CONTROL_TEST}"
+
+    assert_passes "PIT runs the module with a mutant that never finishes" \
+        "${LOGS}/M2-timed-out-pit.log" "${pit_args[@]}"
+    assert_grading_passes "scripts/build.sh's grading accepts a package whose only non-KILLED mutant TIMED_OUT" \
+        "${LOGS}/M2-timed-out-grading.log"
+    assert_log_matches "and names that mutant as TIMED_OUT: class, method, line, mutator" \
+        "${LOGS}/M2-timed-out-grading.log" \
+        '^   TIMED_OUT org\.cometgui\.domain\.timedoutcontrol\.StepCounter\.stepsTo line [0-9]+ MathMutator$'
+    # The package must be one that KILLED alone would fail: otherwise "it
+    # passed" proves nothing about how TIMED_OUT was read.
+    local line killed timed_out_count all
+    line="$(grep -E '^   PASS     org\.cometgui\.domain\.timedoutcontrol ' "${LOGS}/M2-timed-out-grading.log" | head -1 || true)"
+    if [[ "${line}" =~ \ ([0-9]+)/([0-9]+)\ +[0-9.]+%\ +([0-9]+)\ /\ ([0-9]+)\ / ]]; then
+        all="${BASH_REMATCH[2]}"
+        killed="${BASH_REMATCH[3]}"
+        timed_out_count="${BASH_REMATCH[4]}"
+        if [ "${BASH_REMATCH[1]}" -eq "${all}" ] && [ "${timed_out_count}" -ge 1 ] \
+            && [ $(( killed * 100 )) -lt $(( 80 * all )) ]; then
+            record_pass "the package PASSES at ${BASH_REMATCH[1]}/${all} only because its ${timed_out_count} TIMED_OUT mutant(s) count: KILLED alone is ${killed}/${all}, below 80%"
+            printf '         %s\n' "$(printf '%s' "${line}" | cut -c1-160)"
+        else
+            record_fail "the timed-out package's numbers do not make the point: ${line} (all mutants detected, at least one TIMED_OUT, and KILLED alone below 80% are all required)"
+        fi
+    else
+        record_fail "no PASS line for org.cometgui.domain.timedoutcontrol in ${LOGS#"${ROOT}/"}/M2-timed-out-grading.log"
+    fi
+    rm -rf -- "${SANDBOX}/$(dirname -- "${TIMED_OUT_CONTROL}")" "${SANDBOX}/$(dirname -- "${TIMED_OUT_CONTROL_TEST}")"
+    assert_removed "a class whose mutant never finishes" "${TIMED_OUT_CONTROL}"
+    assert_removed "its test" "${TIMED_OUT_CONTROL_TEST}"
+
+    # ---- M3: a targetClasses entry that yields no mutation anywhere ---------
+    # The other level of "no mutations is a failure": an entry in the parent
+    # POM's targetClasses that matches nothing.  Graded first WITHOUT re-running
+    # PIT: the report now predates the parent POM, and must be STALE rather
+    # than read.
+    python3 - "${SANDBOX}/pom.xml" <<'PYTHON'
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    text = handle.read()
+anchor = "<param>org.cometgui.domain.*</param>\n"
+if text.count(anchor) != 1:
+    raise SystemExit("the parent pom.xml does not hold exactly one org.cometgui.domain.* target")
+text = text.replace(anchor, anchor + "              <param>org.cometgui.domain.nosuchcontrolpackage.*</param>\n", 1)
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(text)
+PYTHON
+    assert_modified "a target that matches nothing" "pom.xml"
+    assert_grading_fails "with the parent POM changed and PIT not re-run, the report is STALE, not read" \
+        '^   STALE    cometgui-domain: pom\.xml is newer than$' \
+        "${LOGS}/M3-empty-target-stale-grading.log"
+    assert_passes "PIT's own module-wide threshold accepts a target entry that matches nothing" \
+        "${LOGS}/M3-empty-target-pit.log" "${pit_args[@]}"
+    assert_grading_fails "scripts/build.sh's grading rejects a targetClasses entry with no mutation anywhere" \
+        '^   EMPTY    org\.cometgui\.domain\.nosuchcontrolpackage\.\*: a targetClasses entry with no mutation anywhere' \
+        "${LOGS}/M3-empty-target-grading.log"
+    assert_grading_counted "and for that reason alone: one mutation-gate check failed" \
+        "${LOGS}/M3-empty-target-grading.log" 1
+    restore_from_tree "pom.xml"
+
+    # ---- M4: a critical package with code and no mutations -----------------
+    # The quiet form: the package is excluded from PIT in the module's POM.
+    # Its tests still run and pass, PIT's module threshold is met over what is
+    # left, and before D-015 nothing said a critical package had left the
+    # sample -- the mutation-testing twin of control 8.
+    python3 - "${SANDBOX}/cometgui-domain/pom.xml" <<'PYTHON'
+import sys
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    text = handle.read()
+marker = "  </properties>\n"
+if marker not in text or "<build>" in text:
+    raise SystemExit("cometgui-domain/pom.xml is not shaped as control M expects (one properties block, no build block)")
+injected = marker + """
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <configuration>
+          <excludedClasses>
+            <param>org.cometgui.domain.secrets.*</param>
+          </excludedClasses>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+"""
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(text.replace(marker, injected, 1))
+PYTHON
+    assert_modified "a critical package excluded from PIT" "cometgui-domain/pom.xml"
+    assert_passes "PIT's own module-wide threshold accepts a module with a critical package excluded" \
+        "${LOGS}/M4-no-mutations-pit.log" "${pit_args[@]}"
+    assert_grading_fails "scripts/build.sh's grading rejects a critical package with code and no mutations" \
+        '^   NO MUTATIONS org\.cometgui\.domain\.secrets \(cometgui-domain\): [1-9][0-9]* class\(es\) with code' \
+        "${LOGS}/M4-no-mutations-grading.log"
+    assert_grading_counted "and for that reason alone: one mutation-gate check failed" \
+        "${LOGS}/M4-no-mutations-grading.log" 1
+    restore_from_tree "cometgui-domain/pom.xml"
+
+    # ---- the clean counterpart of all four ---------------------------------
+    assert_passes "PIT over the restored module" "${LOGS}/M-clean-pit.log" "${pit_args[@]}"
+    assert_grading_passes "scripts/build.sh's grading accepts the pristine module" "${LOGS}/M-clean-grading.log"
+    assert_log_matches "and graded every one of its packages, each at or above 80%" \
+        "${LOGS}/M-clean-grading.log" '^   ([1-9][0-9]*) package\(s\) graded, \1 at or above 80%, 0 below$'
+
+    # And it is no way round a real build: over the working tree it refuses,
+    # from the repository and from elsewhere.
+    local rc=0 rc2=0 elsewhere
+    bash "${ROOT}/scripts/build.sh" --gates-pit-root "${ROOT}" >"${LOGS}/M-refuses-working-tree.log" 2>&1 || rc=$?
+    elsewhere="$(mktemp -d)"
+    ( cd -- "${elsewhere}" && bash "${ROOT}/scripts/build.sh" --gates-pit-root "${ROOT}" ) \
+        >"${LOGS}/M-refuses-working-tree-elsewhere.log" 2>&1 || rc2=$?
+    rmdir -- "${elsewhere}"
+    if [ "${rc}" -ne 0 ] && grep -qF -- '--gates-pit-root refuses the repository itself' "${LOGS}/M-refuses-working-tree.log" \
+        && [ "${rc2}" -ne 0 ] && grep -qF -- '--gates-pit-root refuses the repository itself' "${LOGS}/M-refuses-working-tree-elsewhere.log"; then
+        record_pass "--gates-pit-root refuses the working tree, run from it (exit ${rc}) and from ${elsewhere} (exit ${rc2})"
+    else
+        record_fail "--gates-pit-root did not refuse the working tree from both directories (exit ${rc} from the repository, ${rc2} from elsewhere; logs: ${LOGS#"${ROOT}/"}/M-refuses-working-tree*.log)"
+    fi
+}
+
 control_harness_self_test() {
     banner "S  the harness itself: an un-injected control must be a harness failure"
     # Every control above calls assert_injected or assert_modified before it
@@ -1476,10 +1813,12 @@ preflight() {
 main() {
     PREFLIGHT_ONLY=0
     CENSUS_ONLY=0
+    MUTATION_ONLY=0
     case "${1:-}" in
         -h|--help) usage; exit 0 ;;
         --preflight) PREFLIGHT_ONLY=1 ;;
         --census-only) CENSUS_ONLY=1 ;;
+        --mutation-only) MUTATION_ONLY=1 ;;
         "") ;;
         *) usage >&2; die "unknown option: $1" ;;
     esac
@@ -1500,18 +1839,34 @@ main() {
     build_sandbox
     if [ "${CENSUS_ONLY}" -eq 1 ]; then
         printf '\n--census-only: controls C, 7, 8 and S alone. This is NOT the gate.\n'
+        control_census_picture
+        control_unmeasured_coverage
+        control_class_left_the_coverage_sample
+    elif [ "${MUTATION_ONLY}" -eq 1 ]; then
+        # Control 0 runs PIT over the pristine domain (control M sizes from
+        # it), and its architecture run compiles every module, which the
+        # grading's no-mutation check reads; control C is not needed for that.
+        printf '\n--mutation-only: controls 0, M and S alone. This is NOT the gate.\n'
+        control_baseline
+        control_mutation_grading
     else
         control_baseline
         control_javafx_in_domain
         control_processbuilder_outside_process_service
         control_truncated_import
         control_untested_class_in_gated_package
-        control_untested_viewmodel
         control_unasserted_test
+        control_census_picture
+        control_unmeasured_coverage
+        control_class_left_the_coverage_sample
+        # After C, and only after it: control 5 sizes its injection from the
+        # sandbox's own cometgui-ui jacoco.xml, which C's whole-sandbox build
+        # is the first thing in this run to produce.  Never the working
+        # tree's.  Its own `-pl cometgui-ui -am` builds were already paid for
+        # before the reorder; no second whole-sandbox build was added.
+        control_untested_viewmodel
+        control_mutation_grading
     fi
-    control_census_picture
-    control_unmeasured_coverage
-    control_class_left_the_coverage_sample
     control_harness_self_test
 
     printf '\n===============================================================================\n'
