@@ -1,0 +1,637 @@
+{
+  "schema": 1,
+  "about": "The performance suite's measurements, the sizes of what it generates, and per runner profile the thresholds and the baseline they were derived from (Phase 15 unit 8; PHASE-15 exit gate item 4). Read by scripts/perf/performance.py; documented in docs/developer/testing.rst, Performance, whose baseline table check-doc holds equal to this file.",
+  "parameters": {
+    "params.unknowns": 20000,
+    "params.enzymes": 2000,
+    "hash.bytes": 2147483648,
+    "reopen.runs": 50,
+    "reopen.spectrumBytes": 67108864,
+    "percolator.version": "3.07.1",
+    "fixture.comet": "2026.03.0",
+    "fixture.percolator": "3.07.1"
+  },
+  "measurements": [
+    {
+      "id": "startup-first-window",
+      "spec": "a",
+      "what": "application startup to the first usable window",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.performance.PerformanceStartup",
+      "repeats": {
+        "full": 7,
+        "quick": 3
+      },
+      "ceiling": {
+        "value": 10000,
+        "why": "ten seconds from launch to a window is where a desktop application reads as hung and is started twice"
+      }
+    },
+    {
+      "id": "params-import",
+      "spec": "b",
+      "what": "importing, parsing and validating a large Comet parameter file",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.performance.PerformanceParameters",
+      "repeats": {
+        "full": 30,
+        "quick": 10
+      },
+      "ceiling": {
+        "value": 2000,
+        "why": "an import the scientist waits on; two seconds for a 1.6 MB file is a visible stall in the editor"
+      }
+    },
+    {
+      "id": "results-open",
+      "spec": "c",
+      "what": "opening a run of 1 000 000 PSMs and 400 000 peptides (cold)",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceResults",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 15000,
+        "why": "the documented interface budget for the cold open (ResultsLargeFixtureUiTest.OPEN_BUDGET, docs/developer/results_model.rst)"
+      }
+    },
+    {
+      "id": "results-psm-filter",
+      "spec": "c",
+      "what": "a PSM q-value filter change on 1 000 000 PSMs",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceResults",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 4000,
+        "why": "the documented interface budget for a filter change (ResultsLargeFixtureUiTest.FILTER_BUDGET)"
+      }
+    },
+    {
+      "id": "results-psm-sort-numeric",
+      "spec": "c",
+      "what": "sorting 219 777 passing PSMs by score, first use",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceResults",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 6000,
+        "why": "the documented interface budget for a numeric sort (ResultsLargeFixtureUiTest.NUMERIC_SORT_BUDGET)"
+      }
+    },
+    {
+      "id": "results-psm-sort-text",
+      "spec": "c",
+      "what": "sorting 219 777 passing PSMs by peptide, first use",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceResults",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 15000,
+        "why": "the documented interface budget for a text sort (ResultsLargeFixtureUiTest.TEXT_SORT_BUDGET)"
+      }
+    },
+    {
+      "id": "results-psm-page",
+      "spec": "c",
+      "what": "a page move in the PSM table",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceResults",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 2500,
+        "why": "the documented interface budget for a page move (ResultsLargeFixtureUiTest.PAGE_BUDGET)"
+      }
+    },
+    {
+      "id": "results-peptide-show",
+      "spec": "c",
+      "what": "showing the 400 000-row peptide table",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceResults",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 4000,
+        "why": "showing an open table is a query, as a filter change is: the filter budget (ResultsLargeFixtureUiTest.FILTER_BUDGET)"
+      }
+    },
+    {
+      "id": "results-peptide-filter",
+      "spec": "c",
+      "what": "a peptide q-value filter change on 400 000 peptides",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceResults",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 4000,
+        "why": "the documented interface budget for a filter change (ResultsLargeFixtureUiTest.FILTER_BUDGET)"
+      }
+    },
+    {
+      "id": "hash-throughput",
+      "spec": "d",
+      "what": "hashing a 2 GiB generated file, MD5 and SHA-256 in one pass",
+      "unit": "MiB/s",
+      "better": "higher",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.performance.PerformanceHashing",
+      "repeats": {
+        "full": 5,
+        "quick": 3
+      },
+      "ceiling": {
+        "value": 100,
+        "why": "below 100 MiB/s a 4 GB spectrum file takes more than 40 s to hash, and every run hashes every input and output"
+      }
+    },
+    {
+      "id": "comet-fixture",
+      "spec": "e",
+      "what": "Comet's execution time over the named fixture (the run-comet step)",
+      "unit": "s",
+      "better": "lower",
+      "part": "fixture",
+      "informational": true,
+      "class": "org.cometgui.app.matrix.PerformanceFixture",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": null,
+        "why": "informational: the specification gives Comet's execution time no threshold; it is Comet's, not CometGUI's"
+      }
+    },
+    {
+      "id": "percolator-fixture",
+      "spec": "f",
+      "what": "Percolator's execution time over the named fixture's merged PIN (the run-percolator step)",
+      "unit": "s",
+      "better": "lower",
+      "part": "fixture",
+      "class": "org.cometgui.app.matrix.PerformanceFixture",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 30,
+        "why": "Percolator over two K562 files' PSMs; thirty seconds is ten times a healthy run and a step the scientist would notice"
+      }
+    },
+    {
+      "id": "percolator-synthetic",
+      "spec": "f",
+      "what": "Percolator's execution time over CometGUI's synthetic PIN",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.matrix.PerformancePercolator",
+      "repeats": {
+        "full": 15,
+        "quick": 5
+      },
+      "ceiling": {
+        "value": 5000,
+        "why": "128 PSMs; five seconds would mean the run is dominated by something other than Percolator's work"
+      }
+    },
+    {
+      "id": "gui-heap-peak",
+      "spec": "g",
+      "what": "peak retained GUI heap above the baseline while the large tables are used",
+      "unit": "MiB",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceResults",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 64,
+        "why": "the documented heap budget for the large result tables (AC-RES-10; ResultsLargeFixtureUiTest.HEAP_GROWTH_BUDGET_MB; the model's own -Xmx64m)"
+      }
+    },
+    {
+      "id": "cancel-fake-tool",
+      "spec": "h",
+      "what": "Cancel to the process tree gone: the stand-in Percolator and its child",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceProjects",
+      "repeats": {
+        "full": 15,
+        "quick": 5
+      },
+      "ceiling": {
+        "value": 1000,
+        "why": "a Cancel the scientist presses should end the stage within a second; a shell and its child need only a signal"
+      }
+    },
+    {
+      "id": "cancel-comet",
+      "spec": "h",
+      "what": "Cancel to the process tree gone: a real Comet search over the named fixture",
+      "unit": "ms",
+      "better": "lower",
+      "part": "fixture",
+      "class": "org.cometgui.app.matrix.PerformanceFixture",
+      "repeats": {
+        "full": 5,
+        "quick": 2
+      },
+      "ceiling": {
+        "value": 5000,
+        "why": "the process service's termination grace is five seconds, after which it kills forcibly; a cancel that needs the grace ignored the signal"
+      }
+    },
+    {
+      "id": "project-reopen",
+      "spec": "i",
+      "what": "reopening a project of 50 sealed runs: lock, both run lists, the newest run opened",
+      "unit": "ms",
+      "better": "lower",
+      "part": "no-spectra",
+      "class": "org.cometgui.app.gui.PerformanceProjects",
+      "repeats": {
+        "full": 15,
+        "quick": 5
+      },
+      "ceiling": {
+        "value": 2000,
+        "why": "the Results and Provenance sections list the runs when the application opens; two seconds of empty sections is visible"
+      }
+    }
+  ],
+  "profiles": {
+    "shared-xeon-6226r-64": {
+      "description": "The shared 64-core development host this project is built on (a container; other tenants may load it). NOT the dedicated runner PHASE-15 exit gate item 4 names: its thresholds prove the suite can grade and go red, and are a baseline for this host only.",
+      "dedicated": false,
+      "match": {
+        "cpuModel": "Intel(R) Xeon(R) Gold 6226R CPU @ 2.90GHz",
+        "cpus": 64,
+        "os": "Linux",
+        "arch": "x86_64",
+        "memoryGiB": [
+          369.0,
+          384.0
+        ]
+      },
+      "thresholds": {
+        "startup-first-window": {
+          "value": 7000,
+          "rationale": "twice the median (3496 ms) and 1.9 times the slowest sample (3649 ms); under the 10 s at which a start reads as hung. A 2x slower start is a regression a scientist notices on every launch.",
+          "shownRed": {
+            "injection": "CometGuiApplication.start parks the JavaFX thread 5 s before the theme is applied",
+            "observed": "8485 ms, N=3",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "params-import": {
+          "value": 600,
+          "rationale": "about three times the median (184 ms) and 1.6 times the slowest sample, the first, cold one (382 ms); a third of the 2 s at which the editor visibly stalls.",
+          "shownRed": {
+            "injection": "CometParamsParser keeps an unknown parameter only after scanning every one kept so far for its name (quadratic in 20 000 unknowns)",
+            "observed": "6236 ms, N=10",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "results-open": {
+          "value": 8000,
+          "rationale": "2.7 times the median (2981 ms) and 2.2 times the slowest (3583 ms), and 1.3 times the slowest open with 32 of the 64 cores kept busy by another tenant (6283 ms); about half the documented 15 s open budget, so a doubled cold open is red long before a scientist would call the table unresponsive.",
+          "shownRed": {
+            "injection": "DiskIndex.build parks 3 s before indexing a table (two tables per open)",
+            "observed": "9347 ms, N=2",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "results-psm-filter": {
+          "value": 2000,
+          "rationale": "twice the median (918 ms; most of it the robot typing the cutoff) and 1.9 times the slowest (1046 ms); half the documented 4 s filter budget.",
+          "shownRed": {
+            "injection": "DiskResultStore.query parks 1.5 s before every query",
+            "observed": "2323 ms, N=8",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "results-psm-sort-numeric": {
+          "value": 2000,
+          "rationale": "twice the median (991 ms) and 1.5 times the slowest, the first (1324 ms); a third of the documented 6 s numeric sort budget.",
+          "shownRed": {
+            "injection": "DiskResultStore parks 6 s before building a sort file",
+            "observed": "7150 ms, N=2",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "results-psm-sort-text": {
+          "value": 7500,
+          "rationale": "2.3 times the median (3228 ms) and 2.2 times the slowest (3441 ms), and 1.4 times the slowest with 32 cores kept busy by another tenant (5477 ms); half the documented 15 s text sort budget.",
+          "shownRed": {
+            "injection": "DiskResultStore parks 6 s before building a sort file",
+            "observed": "9337 ms, N=2",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "results-psm-page": {
+          "value": 1000,
+          "rationale": "twice the median (459 ms) and 1.6 times the slowest (641 ms); 40% of the documented 2.5 s page budget.",
+          "shownRed": {
+            "injection": "DiskResultStore.query parks 1.5 s before every query",
+            "observed": "1979 ms, N=8",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "results-peptide-show": {
+          "value": 1800,
+          "rationale": "twice the median (865 ms) and twice the slowest (917 ms); under half the 4 s a query may take.",
+          "shownRed": {
+            "injection": "DiskResultStore.query parks 1.5 s before every query",
+            "observed": "2107 ms, N=2",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "results-peptide-filter": {
+          "value": 2000,
+          "rationale": "twice the median (940 ms) and 1.8 times the slowest (1134 ms); half the documented 4 s filter budget.",
+          "shownRed": {
+            "injection": "DiskResultStore.query parks 1.5 s before every query",
+            "observed": "2301 ms, N=8",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "hash-throughput": {
+          "value": 150,
+          "rationale": "at least 0.58 of the median (258 MiB/s) and 0.6 of the slowest sample (251 MiB/s): a hasher that read the file twice, or digested it twice, halves the throughput and is red; above the 100 MiB/s below which a 4 GB spectrum takes over 40 s.",
+          "shownRed": {
+            "injection": "StreamingHashService.hash(Path) opens and digests the file twice (correct digests, two reads)",
+            "observed": "127 MiB/s, N=3",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "percolator-fixture": {
+          "value": 4.5,
+          "rationale": "twice the median (2.14 s) and twice the slowest (2.21 s); well under the 30 s a scientist would notice as a slow Percolator step.",
+          "shownRed": {
+            "injection": "PercolatorSteps.RunPercolator parks 3 s after Percolator exits",
+            "observed": "5.17 s, N=2",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "percolator-synthetic": {
+          "value": 1500,
+          "rationale": "2.8 times the median (532 ms) and 2.6 times the slowest (579 ms), and 1.4 times the slowest with 32 cores kept busy by another tenant (1090 ms; Percolator runs three threads); under a third of the 5 s ceiling, so a fixed delay of a second added to every tool run is red.",
+          "shownRed": {
+            "injection": "ToolRunner.run parks 1.2 s after the tool exits",
+            "observed": "1769 ms, N=5",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "gui-heap-peak": {
+          "value": 16,
+          "rationale": "about three times the median (4.93 MiB) and 1.7 times the slowest sample of two full runs (9.30 MiB; the peak creeps by about 0.6 MiB per run opened, see the findings); a quarter of the documented 64 MB budget, so a store that keeps rows on the heap is red whatever the noise of a collection.",
+          "shownRed": {
+            "injection": "ResultStores.IN_MEMORY_ROW_LIMIT raised to 10 000 000, so the large tables are held on the heap",
+            "observed": "909 MiB, N=2",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "cancel-fake-tool": {
+          "value": 250,
+          "rationale": "a floor rather than a multiple: the median (7.78 ms) is a signal and two exits, and on this shared host a scheduler delay of tens of milliseconds is noise, not the product; 250 ms is 13 times the slowest sample (19.0 ms) and a quarter of the 1 s a Cancel may take.",
+          "shownRed": {
+            "injection": "StartedProcess.requestCancellation waits up to 3 s for the tool to exit by itself before signalling it",
+            "observed": "3009 ms, N=5",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "cancel-comet": {
+          "value": 500,
+          "rationale": "five times the median (94.1 ms) and the slowest (100 ms): Comet ends on the first signal; a tenth of the 5 s termination grace, so a cancellation that waited for the grace, or for Comet, is red.",
+          "shownRed": {
+            "injection": "StartedProcess.requestCancellation waits up to 3 s for the tool to exit by itself before signalling it",
+            "observed": "1596 ms, N=2 (Comet finished its search inside the wait)",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        },
+        "project-reopen": {
+          "value": 400,
+          "rationale": "a floor over the noise of 50 run directories read from a shared disk: about seven times the median (59.0 ms) and 3.4 times the slowest (118 ms); a fifth of the 2 s at which empty sections are visible, so a reopen that re-reads every run's inputs is red.",
+          "shownRed": {
+            "injection": "ProvenanceReader.list re-hashes every run's recorded spectrum file (50 x 64 MiB)",
+            "observed": "12682 ms, N=5",
+            "date": "2026-11-06",
+            "mode": "--quick --only"
+          }
+        }
+      },
+      "baseline": {
+        "recorded": "2026-11-06 20:48:17 UTC",
+        "commit": "ba49bc2",
+        "host": {
+          "cpuModel": "Intel(R) Xeon(R) Gold 6226R CPU @ 2.90GHz",
+          "cpus": 64,
+          "memoryGiB": 376.5,
+          "os": "Linux",
+          "arch": "x86_64",
+          "kernel": "6.8.0-147-generic",
+          "governor": "schedutil",
+          "jdk": "openjdk version \"25.0.4.1\" 2026-08-18 LTS / OpenJDK Runtime Environment (build 25.0.4.1+1-LTS)",
+          "github": false
+        },
+        "load": {
+          "wallSeconds": 384.2,
+          "before": {
+            "loadavg1": 4.1,
+            "loadavg5": 4.27,
+            "cgroupUsageUsec": 922750722773
+          },
+          "after": {
+            "loadavg1": 4.98,
+            "loadavg5": 5.81,
+            "cgroupUsageUsec": 924234093616
+          },
+          "containerCpusBusyMean": 3.86,
+          "loadavg1Max": 14.36,
+          "loadavg1Mean": 6.72,
+          "samples": 40
+        },
+        "measurements": {
+          "startup-first-window": {
+            "n": 7,
+            "median": 3495.969,
+            "min": 3335.035,
+            "max": 3649.194,
+            "spreadPercent": 9.0
+          },
+          "params-import": {
+            "n": 30,
+            "median": 184.418,
+            "min": 164.6,
+            "max": 381.544,
+            "spreadPercent": 117.6
+          },
+          "results-open": {
+            "n": 5,
+            "median": 2981.453,
+            "min": 2943.309,
+            "max": 3583.08,
+            "spreadPercent": 21.5
+          },
+          "results-psm-filter": {
+            "n": 20,
+            "median": 918.49,
+            "min": 689.053,
+            "max": 1046.303,
+            "spreadPercent": 38.9
+          },
+          "results-psm-sort-numeric": {
+            "n": 5,
+            "median": 990.897,
+            "min": 952.342,
+            "max": 1323.766,
+            "spreadPercent": 37.5
+          },
+          "results-psm-sort-text": {
+            "n": 5,
+            "median": 3227.619,
+            "min": 3164.786,
+            "max": 3440.506,
+            "spreadPercent": 8.5
+          },
+          "results-psm-page": {
+            "n": 20,
+            "median": 458.933,
+            "min": 381.789,
+            "max": 640.834,
+            "spreadPercent": 56.4
+          },
+          "results-peptide-show": {
+            "n": 5,
+            "median": 864.58,
+            "min": 768.785,
+            "max": 917.163,
+            "spreadPercent": 17.2
+          },
+          "results-peptide-filter": {
+            "n": 20,
+            "median": 940.44,
+            "min": 677.809,
+            "max": 1134.275,
+            "spreadPercent": 48.5
+          },
+          "hash-throughput": {
+            "n": 5,
+            "median": 257.537,
+            "min": 251.393,
+            "max": 258.253,
+            "spreadPercent": 2.7
+          },
+          "comet-fixture": {
+            "n": 5,
+            "median": 3.997,
+            "min": 3.963,
+            "max": 4.12,
+            "spreadPercent": 3.9
+          },
+          "percolator-fixture": {
+            "n": 5,
+            "median": 2.144,
+            "min": 2.13,
+            "max": 2.209,
+            "spreadPercent": 3.7
+          },
+          "percolator-synthetic": {
+            "n": 15,
+            "median": 531.709,
+            "min": 508.767,
+            "max": 578.982,
+            "spreadPercent": 13.2
+          },
+          "gui-heap-peak": {
+            "n": 5,
+            "median": 4.926,
+            "min": 3.628,
+            "max": 6.259,
+            "spreadPercent": 53.4
+          },
+          "cancel-fake-tool": {
+            "n": 15,
+            "median": 7.784,
+            "min": 7.212,
+            "max": 19.041,
+            "spreadPercent": 152.0
+          },
+          "cancel-comet": {
+            "n": 5,
+            "median": 94.14,
+            "min": 91.616,
+            "max": 100.439,
+            "spreadPercent": 9.4
+          },
+          "project-reopen": {
+            "n": 15,
+            "median": 59.023,
+            "min": 45.418,
+            "max": 118.098,
+            "spreadPercent": 123.1
+          }
+        }
+      }
+    }
+  }
+}

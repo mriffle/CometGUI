@@ -480,9 +480,12 @@ Javadoc.)
 
 **These are local gates on one host**, set from measurement with margin.
 The specification's *Performance and resource tests* require thresholds from
-stable dedicated nightly runners; those, and ``AC-RES-10`` as a whole, are
-Phase 15's (``scripts/ci/nightly-performance.sh`` and
-``nightly-large-dataset.sh`` are still stubs).
+stable dedicated nightly runners. Phase 15 built that suite
+(:ref:`dev-testing-performance`, ``scripts/perf/run-performance.sh``): the
+same large fixture, opened, filtered, sorted and paged through the interface
+with the peak retained heap, repeated and graded against a runner profile's
+thresholds. No dedicated runner exists; the one recorded profile is the shared
+development host.
 
 ``finalise-results``
 ====================

@@ -642,9 +642,11 @@ method = "checkedInFiles"
 note = "Phase 10 unit 4. Unit test: the same comparison over the checked-in weights Percolator 3.06.5, 3.07.1 and 3.09 wrote for CometGUI's synthetic PIN, and the constructed two- and four-split files."
 
 [[ac."AC-RES-10".evidence]]
-kind = "planned"
-phase = "15"
-note = "Phase 15 owns the specification's thresholds, set on stable dedicated nightly runners (Performance and resource tests); scripts/ci/nightly-performance.sh and nightly-large-dataset.sh are still stubs. Phase 10 built the large fixture, the disk-backed store and local budget tests, below."
+kind = "check"
+command = "bash scripts/perf/run-performance.sh --part no-spectra"
+file = "scripts/perf/performance-data.json"
+contains = "\"id\": \"gui-heap-peak\""
+note = "Phase 15 unit 8, gate item 4. The performance suite opens, filters, sorts and pages the large fixture's 1 000 000 PSMs and 400 000 peptides in the Results section through the robot, repeated, with the peak retained heap (gui-heap-peak, against the 64 MB budget) and every count checked against the generator's manifest, graded against a runner profile's thresholds (docs/developer/testing.rst, Performance). The one recorded profile is the shared development host, NOT the dedicated nightly runner the specification names, which does not exist: that half is unverified. Opt-in; run nightly, red on GitHub-hosted runners (no profile) until a dedicated runner's profile is recorded. Phase 10's local budget tests, below, still run in every build."
 
 [[ac."AC-RES-10".evidence]]
 kind = "test"

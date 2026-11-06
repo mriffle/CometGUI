@@ -26,8 +26,10 @@
 # be added to mark a step as allowed to fail, or to swallow its exit status
 # (scripts/ci/check-workflows.sh refuses both).  Phase 15 replaces them one
 # at a time: the tool manifest verification (R-TEST-08) is real since unit 5,
-# the version matrix since unit 6 and determinism since unit 7 (the fixture
-# half of each waits on D-006).
+# the version matrix since unit 6, determinism since unit 7 and performance
+# since unit 8 (the fixture half of each waits on D-006; performance is also
+# red on every runner with no recorded profile, which is every GitHub-hosted
+# runner until a dedicated one exists).
 #
 # scripts/ci/run-pipeline-locally.sh runs every step below on this machine and
 # requires each stub to fail and each real step to pass.
@@ -146,15 +148,50 @@ jobs:
         run: bash scripts/ci/nightly-determinism-fixture.sh
 
   performance:
-    name: "Nightly (Linux): performance (stub, Phase 15)"
+    # PHASE-15 gate item 4, real since Phase 15 unit 8: the performance suite's
+    # spectra-free half -- startup, a large parameter file, the large result
+    # tables and the peak GUI heap (AC-RES-10), multi-gigabyte hashing,
+    # Percolator over the synthetic PIN, Cancel on a stand-in tool and project
+    # reopen -- each measured through the product, repeated, and graded against
+    # the thresholds of THIS RUNNER'S PROFILE (scripts/perf/performance-data.json).
+    # RED ON GITHUB-HOSTED RUNNERS, BY DESIGN: no profile is recorded for a
+    # shared 2-4 core runner, so after measuring and reporting everything the
+    # step exits 4, "no baseline for this runner profile" -- never a silent
+    # pass on thresholds measured elsewhere.  It turns green on a dedicated
+    # runner once that runner's profile is recorded (docs/developer/testing.rst,
+    # "Performance").  Needs the project JDK, Maven and font stack; no spectra.
+    name: "Nightly (Linux): performance (gate item 4; red until a dedicated runner's profile exists)"
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 120
     steps:
       - name: Check out the repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
+      - name: Project-local JDK and Maven (no setup-java)
+        run: bash scripts/ci/toolchain.sh
+
+      - name: Project-local font stack for the headless JavaFX tests
+        run: bash scripts/ci/fontstack.sh
+
       - name: Performance metrics
         run: bash scripts/ci/nightly-performance.sh
+
+  performance-fixture:
+    # The performance suite's fixture part: Comet's (informational) and
+    # Percolator's execution time over a real dataset and Cancel during a real
+    # Comet search.  It takes the version matrix's one named input,
+    # COMETGUI_MATRIX_FIXTURE, and none exists on a runner: D-006's CI fixture
+    # is OPEN, so the step exits 70 through stub-lib.sh, naming what it waits
+    # for -- red, in its own job, never green.
+    name: "Nightly (Linux): performance over a dataset (waits on D-006's CI fixture)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Performance metrics over a real dataset
+        run: bash scripts/ci/nightly-performance-fixture.sh
 
   gui-tests:
     name: "Nightly (Linux): GUI suites (stub, Phase 15)"

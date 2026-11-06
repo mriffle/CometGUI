@@ -1711,6 +1711,417 @@ exercised (the product does not offer them); Percolator 3.09, a local binary on
 Linux, is not part of the suite. The fixture half has never run on a CI runner
 (``D-006``).
 
+.. _dev-testing-performance:
+
+Performance -- gate item 4
+--------------------------
+
+:Checks: the specification's nine measurements (*Performance and resource
+   tests*), each through the product's own code path, each repeated to a median
+   and a range, and every one but Comet's execution time graded against a
+   threshold of the runner's *profile*; ``AC-RES-10`` ("Result tables remain
+   responsive on the large performance fixture within the documented heap
+   budget"). PHASE-15 exit gate item 4.
+:Fails: exit 1 when a median is beyond its threshold -- the line names the
+   measurement, the threshold, the observed median and the profile -- when a
+   check of the measured work fails (a count, a digest, the window's title, a
+   tree not gone, an attempt not ``CANCELLED``), or when a planned measurement
+   wrote no record; exit 4, ``NO BASELINE FOR THIS RUNNER PROFILE``, on a host
+   no recorded profile matches -- every measurement still runs and is reported,
+   and none is graded; exit 3 when the fixture part was requested and no
+   fixture was named. Exit 0 only when every planned measurement passed (or is
+   informational) on a recorded profile.
+:Configured in: ``scripts/perf/performance-data.json`` (the measurements, the
+   sizes of what is generated, and per profile the thresholds, their rationale,
+   the injection that showed each red, and the baseline), ``scripts/perf/performance.py``
+   (the plan, the grading, the host and its load; standard library only), and
+   seven opt-in JUnit classes in ``cometgui-app``:
+   ``org.cometgui.app.performance.Performance{Startup,Parameters,Hashing}``,
+   ``org.cometgui.app.gui.Performance{Results,Projects}`` and
+   ``org.cometgui.app.matrix.Performance{Percolator,Fixture}``, named so that no
+   plain ``mvn verify`` or ``scripts/build.sh`` selects them, and disabled
+   without ``-Dcometgui.perf=true`` (P15-5).
+:Runs with: ``bash scripts/perf/run-performance.sh`` -- the one entry point; the
+   nightly's ``performance`` job (``scripts/ci/nightly-performance.sh``,
+   ``--part no-spectra``) and ``performance-fixture`` job
+   (``scripts/ci/nightly-performance-fixture.sh``, waiting on ``D-006``).
+
+**How to run it.** ::
+
+    COMETGUI_MATRIX_FIXTURE=scratch/fixture bash scripts/perf/run-performance.sh   # all nine
+    bash scripts/perf/run-performance.sh --part no-spectra        # what the nightly runs
+    bash scripts/perf/run-performance.sh --part no-spectra --quick   # fewer repeats, same thresholds
+    bash scripts/perf/run-performance.sh --only hash-throughput   # one measurement
+    bash scripts/perf/run-performance.sh --profile NAME           # assert a profile (must match the host)
+    bash scripts/perf/run-performance.sh --self-test              # the grading, no Maven
+    bash scripts/perf/run-performance.sh --check-doc              # this section against the data
+
+The report is ``_build/performance/performance-report.txt`` (and ``.json``):
+the host (CPU model, CPUs visible, memory, kernel, frequency governor, JDK), the
+load while the suite ran (the host's load average before, after and sampled
+every ten seconds, and this container's CPU use from cgroup ``cpu.stat``), the
+profile and why it was chosen, and per measurement its verdict, N, median,
+range, threshold and the words of any red. Every sample and every check is in
+``_build/performance/measurements/<id>.json``. ``--work DIR`` puts the
+generated files elsewhere (about 3.5 GB at most; emptied at the end).
+
+**What is measured, and through what.** Every sample is the product's own code
+doing the work a scientist waits on; every record carries checks that the work
+was the real work.
+
+``startup-first-window`` (a)
+   A fresh JVM runs the application's own ``main`` (``CometGuiLauncher``),
+   headless with the module's Monocle recipe read from ``cometgui-app/pom.xml``
+   and the project font stack; timed from just before the process service
+   starts it to the line it prints *from the JavaFX application thread* once the
+   shell's stage is showing. JVM start, class loading, the composition root and
+   the first layout are inside the number. Check: titled ``CometGUI``, the shell
+   as its root, 1280 by 800.
+``params-import`` (b)
+   The Comet Parameters section's import (``ParameterFilesViewModel.importFile``):
+   read, parsed by the release's parser, adopted into a fresh session and
+   validated. The file is generated: Comet 2026.03.0's complete ``comet -q``
+   output with all fifteen variable modifications set, the enzyme table
+   extended to 2000 rows and 20 000 unknown parameters, each with a comment
+   (1.6 MB, 24 195 lines). Checks: ``IMPORTED``; every unknown parameter, every
+   enzyme row and fifteen modifications held by the model.
+``results-*`` (c) and ``gui-heap-peak`` (g)
+   Phase 10's large performance fixture (1 000 000 target PSMs and 400 000
+   target peptides, synthetic, ``scripts/fixtures/large-results-fixture.py``;
+   the local copy if its digests hold, else generated into the work directory)
+   copied into a fresh constructed run per repeat, so every open is cold, and
+   driven through the real composition root by the robot, timed from the first
+   event to the answer on screen as ``ResultsLargeFixtureUiTest`` times its
+   budgets: the run selected (``results-open``: both tables hashed, indexed and
+   mapped); four PSM filter changes; a numeric and a text sort, each first use;
+   four page moves; the peptide table shown; four peptide filter changes. Every
+   count shown is checked against the generator's manifest, every page position
+   against the arithmetic, and the table never holds more than one page. The
+   heap: the used heap after a forced collection, before the first run is
+   opened and after every action; a repeat's sample is the most it stood above
+   that baseline, which the documented budget (64 MB) bounds.
+``hash-throughput`` (d)
+   ``RunWiring.hasher()`` -- the engine's one hasher, a cache over the
+   single-pass ``StreamingHashService`` -- over a 2 GiB file of seeded
+   pseudo-random bytes generated in the work directory, a fresh hasher per
+   sample so the cache never answers. Check: every sample's MD5 and SHA-256
+   equal the JDK's, computed while the file was written. The file has just been
+   written, so it is read from the page cache: what is measured is the hasher,
+   not the disk.
+``comet-fixture`` (e) and ``percolator-fixture`` (f)
+   The whole search through the run port (``RunWiring.port``, as the Run
+   section starts it) over the named fixture, in a fresh project per sample,
+   with the product's default parameters and settings; the samples are the
+   engine's ``run-comet`` and ``run-percolator`` steps, as its transitions date
+   them. Comet's is informational, by the specification. Check: every search
+   succeeded.
+``percolator-synthetic`` (f)
+   Percolator 3.07.1, installed from its pinned URL by the Tool Manager, over
+   CometGUI's own synthetic PIN, with the command ``PercolatorCommands`` builds
+   from the default settings, through ``ToolRunner``. Checks: exit 0; the
+   product's readers parse 64 target and 64 decoy PSMs and three splits.
+``cancel-fake-tool`` and ``cancel-comet`` (h)
+   From the run's Cancel (``RunHandle.cancel``; the run port's
+   ``ActiveRun.cancel``, what the Run section's button calls) to every process of
+   the snapshotted tree gone. The fake tool is the stand-in Percolator of the
+   GUI tests, which starts ``/bin/sleep`` and waits for it; the real one is
+   Comet over the fixture, once its process has run for a second. Checks: the
+   tree gone, the attempt ``CANCELLED``.
+``project-reopen`` (i)
+   A project of 50 sealed runs, each made by the engine with the stand-in
+   tools and a 64 MiB generated spectrum file, reopened as a relaunched
+   application does: a new ``ProjectSession``, the Results and Provenance
+   sections' ports, and timed: the lock taken, both run lists read, and the
+   most recent run opened in both. Checks: 50 listed in each, every record
+   sealed, the record opened without a problem.
+
+**Runner profiles, and what a verdict means.** A threshold measured on one
+machine says nothing about another, so every threshold belongs to a *runner
+profile*: a host fingerprint (CPU model, CPUs visible, memory within 2%, OS and
+architecture) with its thresholds, the rationale for each, the injection that
+showed each red, and the baseline it was derived from. ``performance.py``
+detects the profile from the host; ``--profile NAME`` asserts one, which must
+also match the host.
+
+``PASS``
+   The median is within the profile's threshold and every check held.
+``RED``
+   A median beyond its threshold (named with the threshold and the observed
+   value), a failed check, or a planned measurement with no record.
+``INFO``
+   Comet's execution time: the specification makes it informational. Its
+   checks are still graded.
+``NO-BASELINE``
+   Measured and reported on a host no profile matches. The run ends ``NO
+   BASELINE FOR THIS RUNNER PROFILE``, exit 4 -- every GitHub-hosted runner
+   today. It is never green.
+``REFUSED``
+   A fixture measurement with no fixture named (exit 3, never green).
+
+**The fixture.** Comet's and Percolator's times over spectra and Cancel during
+a real Comet search take the version matrix's one named input,
+``COMETGUI_MATRIX_FIXTURE``; there is no default, and without it they are
+``REFUSED``. Everything else generates its own data at run time and deletes it,
+so the ``no-spectra`` part needs nothing ``D-006`` governs.
+
+**How a threshold is set.** From a full run on the profile's host
+(``performance.py propose --report DIR --name NAME`` applies the rule and
+prints a candidate profile for review): for a time, at least twice the median
+*and* one and a half times the slowest sample; for a throughput, at most 0.6 of
+the median and 0.8 of the slowest. Then two limits, both checked by the data's
+own validation: never looser than the level at which a scientist would see a
+regression (each measurement's ``ceiling`` -- the documented interface budgets
+of ``ResultsLargeFixtureUiTest`` for the result tables, the 64 MB heap budget of
+``AC-RES-10``, the process service's 5 s termination grace for cancellation),
+and never tighter than the noise this host showed under load: the ``no-spectra``
+part was run with 32 of the 64 cores kept busy by a stand-in co-tenant
+(load average 37, this container's CPUs busy 33.9 on average), and where its
+slowest sample came near the rule's figure the threshold was raised to clear it
+by a quarter (``results-open``, ``results-psm-sort-text``,
+``percolator-synthetic``). Sub-second measurements whose rule figure is a few
+milliseconds (``cancel-fake-tool``, ``project-reopen``) carry an absolute floor
+instead, stated in their rationale. And every threshold was **shown red**: a
+production-code injection pushed the measurement over it and the suite named the
+measurement, the threshold and the observed value. A threshold no injection can
+push over is a defect; the data refuses a threshold with no recorded red, no
+rationale, a value looser than its ceiling, or a baseline median beyond it.
+
+.. performance-baseline-table-start
+
+.. list-table:: Runner profile ``shared-xeon-6226r-64`` -- baseline 2026-11-06 20:48:17 UTC at ``ba49bc2`` (machine-readable: ``scripts/perf/performance-data.json``)
+   :header-rows: 1
+   :widths: 5 18 4 9 14 28 22
+
+   * - Spec
+     - Measurement
+     - N
+     - Median
+     - Range
+     - Threshold, and why
+     - Shown red by
+   * - (a)
+     - ``startup-first-window``: application startup to the first usable window
+     - 7
+     - 3496 ms
+     - 3335 ms to 3649 ms
+     - at most 7000 ms: twice the median (3496 ms) and 1.9 times the slowest sample (3649 ms); under the 10 s at which a start reads as hung. A 2x slower start is a regression a scientist notices on every launch.
+     - CometGuiApplication.start parks the JavaFX thread 5 s before the theme is applied (observed 8485 ms, N=3)
+   * - (b)
+     - ``params-import``: importing, parsing and validating a large Comet parameter file
+     - 30
+     - 184 ms
+     - 165 ms to 382 ms
+     - at most 600 ms: about three times the median (184 ms) and 1.6 times the slowest sample, the first, cold one (382 ms); a third of the 2 s at which the editor visibly stalls.
+     - CometParamsParser keeps an unknown parameter only after scanning every one kept so far for its name (quadratic in 20 000 unknowns) (observed 6236 ms, N=10)
+   * - (c)
+     - ``results-open``: opening a run of 1 000 000 PSMs and 400 000 peptides (cold)
+     - 5
+     - 2981 ms
+     - 2943 ms to 3583 ms
+     - at most 8000 ms: 2.7 times the median (2981 ms) and 2.2 times the slowest (3583 ms), and 1.3 times the slowest open with 32 of the 64 cores kept busy by another tenant (6283 ms); about half the documented 15 s open budget, so a doubled cold open is red long before a scientist would call the table unresponsive.
+     - DiskIndex.build parks 3 s before indexing a table (two tables per open) (observed 9347 ms, N=2)
+   * - (c)
+     - ``results-psm-filter``: a PSM q-value filter change on 1 000 000 PSMs
+     - 20
+     - 918 ms
+     - 689 ms to 1046 ms
+     - at most 2000 ms: twice the median (918 ms; most of it the robot typing the cutoff) and 1.9 times the slowest (1046 ms); half the documented 4 s filter budget.
+     - DiskResultStore.query parks 1.5 s before every query (observed 2323 ms, N=8)
+   * - (c)
+     - ``results-psm-sort-numeric``: sorting 219 777 passing PSMs by score, first use
+     - 5
+     - 991 ms
+     - 952 ms to 1324 ms
+     - at most 2000 ms: twice the median (991 ms) and 1.5 times the slowest, the first (1324 ms); a third of the documented 6 s numeric sort budget.
+     - DiskResultStore parks 6 s before building a sort file (observed 7150 ms, N=2)
+   * - (c)
+     - ``results-psm-sort-text``: sorting 219 777 passing PSMs by peptide, first use
+     - 5
+     - 3228 ms
+     - 3165 ms to 3441 ms
+     - at most 7500 ms: 2.3 times the median (3228 ms) and 2.2 times the slowest (3441 ms), and 1.4 times the slowest with 32 cores kept busy by another tenant (5477 ms); half the documented 15 s text sort budget.
+     - DiskResultStore parks 6 s before building a sort file (observed 9337 ms, N=2)
+   * - (c)
+     - ``results-psm-page``: a page move in the PSM table
+     - 20
+     - 459 ms
+     - 382 ms to 641 ms
+     - at most 1000 ms: twice the median (459 ms) and 1.6 times the slowest (641 ms); 40% of the documented 2.5 s page budget.
+     - DiskResultStore.query parks 1.5 s before every query (observed 1979 ms, N=8)
+   * - (c)
+     - ``results-peptide-show``: showing the 400 000-row peptide table
+     - 5
+     - 865 ms
+     - 769 ms to 917 ms
+     - at most 1800 ms: twice the median (865 ms) and twice the slowest (917 ms); under half the 4 s a query may take.
+     - DiskResultStore.query parks 1.5 s before every query (observed 2107 ms, N=2)
+   * - (c)
+     - ``results-peptide-filter``: a peptide q-value filter change on 400 000 peptides
+     - 20
+     - 940 ms
+     - 678 ms to 1134 ms
+     - at most 2000 ms: twice the median (940 ms) and 1.8 times the slowest (1134 ms); half the documented 4 s filter budget.
+     - DiskResultStore.query parks 1.5 s before every query (observed 2301 ms, N=8)
+   * - (d)
+     - ``hash-throughput``: hashing a 2 GiB generated file, MD5 and SHA-256 in one pass
+     - 5
+     - 258 MiB/s
+     - 251 MiB/s to 258 MiB/s
+     - at least 150 MiB/s: at least 0.58 of the median (258 MiB/s) and 0.6 of the slowest sample (251 MiB/s): a hasher that read the file twice, or digested it twice, halves the throughput and is red; above the 100 MiB/s below which a 4 GB spectrum takes over 40 s.
+     - StreamingHashService.hash(Path) opens and digests the file twice (correct digests, two reads) (observed 127 MiB/s, N=3)
+   * - (e)
+     - ``comet-fixture``: Comet's execution time over the named fixture (the run-comet step)
+     - 5
+     - 4.00 s
+     - 3.96 s to 4.12 s
+     - informational: informational: the specification gives Comet's execution time no threshold; it is Comet's, not CometGUI's
+     - --
+   * - (f)
+     - ``percolator-fixture``: Percolator's execution time over the named fixture's merged PIN (the run-percolator step)
+     - 5
+     - 2.14 s
+     - 2.13 s to 2.21 s
+     - at most 4.50 s: twice the median (2.14 s) and twice the slowest (2.21 s); well under the 30 s a scientist would notice as a slow Percolator step.
+     - PercolatorSteps.RunPercolator parks 3 s after Percolator exits (observed 5.17 s, N=2)
+   * - (f)
+     - ``percolator-synthetic``: Percolator's execution time over CometGUI's synthetic PIN
+     - 15
+     - 532 ms
+     - 509 ms to 579 ms
+     - at most 1500 ms: 2.8 times the median (532 ms) and 2.6 times the slowest (579 ms), and 1.4 times the slowest with 32 cores kept busy by another tenant (1090 ms; Percolator runs three threads); under a third of the 5 s ceiling, so a fixed delay of a second added to every tool run is red.
+     - ToolRunner.run parks 1.2 s after the tool exits (observed 1769 ms, N=5)
+   * - (g)
+     - ``gui-heap-peak``: peak retained GUI heap above the baseline while the large tables are used
+     - 5
+     - 4.93 MiB
+     - 3.63 MiB to 6.26 MiB
+     - at most 16.0 MiB: about three times the median (4.93 MiB) and 1.7 times the slowest sample of two full runs (9.30 MiB; the peak creeps by about 0.6 MiB per run opened, see the findings); a quarter of the documented 64 MB budget, so a store that keeps rows on the heap is red whatever the noise of a collection.
+     - ResultStores.IN_MEMORY_ROW_LIMIT raised to 10 000 000, so the large tables are held on the heap (observed 909 MiB, N=2)
+   * - (h)
+     - ``cancel-fake-tool``: Cancel to the process tree gone: the stand-in Percolator and its child
+     - 15
+     - 7.78 ms
+     - 7.21 ms to 19.0 ms
+     - at most 250 ms: a floor rather than a multiple: the median (7.78 ms) is a signal and two exits, and on this shared host a scheduler delay of tens of milliseconds is noise, not the product; 250 ms is 13 times the slowest sample (19.0 ms) and a quarter of the 1 s a Cancel may take.
+     - StartedProcess.requestCancellation waits up to 3 s for the tool to exit by itself before signalling it (observed 3009 ms, N=5)
+   * - (h)
+     - ``cancel-comet``: Cancel to the process tree gone: a real Comet search over the named fixture
+     - 5
+     - 94.1 ms
+     - 91.6 ms to 100 ms
+     - at most 500 ms: five times the median (94.1 ms) and the slowest (100 ms): Comet ends on the first signal; a tenth of the 5 s termination grace, so a cancellation that waited for the grace, or for Comet, is red.
+     - StartedProcess.requestCancellation waits up to 3 s for the tool to exit by itself before signalling it (observed 1596 ms, N=2 (Comet finished its search inside the wait))
+   * - (i)
+     - ``project-reopen``: reopening a project of 50 sealed runs: lock, both run lists, the newest run opened
+     - 15
+     - 59.0 ms
+     - 45.4 ms to 118 ms
+     - at most 400 ms: a floor over the noise of 50 run directories read from a shared disk: about seven times the median (59.0 ms) and 3.4 times the slowest (118 ms); a fifth of the 2 s at which empty sections are visible, so a reopen that re-reads every run's inputs is red.
+     - ProvenanceReader.list re-hashes every run's recorded spectrum file (50 x 64 MiB) (observed 12682 ms, N=5)
+
+.. performance-baseline-table-end
+
+**The baseline** (2026-11-06, at ``ba49bc2`` with this unit's suite in the
+working tree): ``COMETGUI_MATRIX_FIXTURE=scratch/fixture bash
+scripts/perf/run-performance.sh``, full mode, every measurement, 384 s (Maven
+383 s; the classes: startup 27 s, parameters 7 s, hashing 50 s, the fixture 58 s,
+Percolator 16 s, projects 60 s, results 155 s). Host: Intel Xeon Gold 6226R at
+2.90 GHz, 64 CPUs visible, 376.5 GiB, Linux 6.8.0-147 x86-64, frequency
+governor ``schedutil``, OpenJDK 25.0.4.1 (Liberica, project-local), the
+project's Debian 12 font stack, headless Monocle. Load while it ran: the host's
+1-minute load average 4.1 before, 4.98 after, 6.72 on average and 14.36 at most
+(sampled every ten seconds); this container's CPUs busy (cgroup ``cpu.stat``)
+3.86 on average, most of it the suite. The data holds the same, and
+``performance-report.json`` of any run holds its own.
+
+.. warning::
+
+   **This shared host is not the dedicated runner, and gate item 4's "on the
+   dedicated runner" half is UNVERIFIABLE here.** The profile above
+   (``shared-xeon-6226r-64``, ``"dedicated": false``) is the development host
+   this project is built on: a container on a 64-core machine whose other
+   tenants come and go, with a ``schedutil`` frequency governor. Its PASS is
+   evidence that the suite measures the product's real paths, grades them and
+   goes red on a regression -- not the dedicated-runner verdict. No dedicated
+   runner exists. What one would need:
+
+   * **fixed hardware** -- one machine model, never a pool -- recorded as its
+     profile's fingerprint; a change of hardware is a new profile;
+   * **no co-tenants**: nothing else scheduled on it while the suite runs (no
+     other CI job, no shared container host), and the suite run serially;
+   * **a pinned CPU frequency**: the ``performance`` governor (or a fixed
+     frequency), turbo and deep C-states off, so that a sample does not depend
+     on the thermal state of the last one;
+   * **the same software stack** as the profile records: the project-local JDK
+     and font stack (``tools/env.sh``), the same kernel line, and a local disk
+     with room for the 3.5 GB work directory;
+   * **the named fixture** for the fixture part, which waits on ``D-006``'s CI
+     half like every spectra-needing job;
+   * **its own stored baseline**: a profile in ``performance-data.json``, made
+     from at least three full runs on that runner on different days (``propose``
+     on each; the thresholds from the slowest), reviewed like a golden, each
+     threshold shown red there with the injections recorded here, and kept by
+     ``check-doc``;
+   * **how its thresholds are derived**: exactly as above -- the rule, the
+     ceilings, the noise of a loaded run -- and on a dedicated machine the noise
+     term should shrink, so its thresholds can be tighter than this host's.
+
+**CI.** The nightly's ``performance`` job runs ``nightly-performance.sh``
+(``--part no-spectra``, full repeats) on ``ubuntu-latest``. **It is red there,
+by design:** a GitHub-hosted runner (2 or 4 shared cores) matches no profile,
+so after measuring and reporting everything the step exits 4, ``NO BASELINE FOR
+THIS RUNNER PROFILE``. It turns green when a dedicated runner and its profile
+exist. The ``performance-fixture`` job (``nightly-performance-fixture.sh``) is a
+stub naming ``D-006`` and the dedicated runner, exit 70, until both exist. The
+``pipeline`` control runs the nightly step on this host with
+``COMETGUI_PERFORMANCE_QUICK=1`` (set by ``run-pipeline-locally.sh``): every
+``no-spectra`` measurement, two to ten repeats instead of five to thirty, the
+same sizes and thresholds, graded against this host's profile -- about three
+minutes (238 s measured under the 32-core load above, Maven's build included),
+which is what this unit adds to that control.
+
+**Shown red** (2026-11-06; each injected into production code, the anchor gone
+and ``sha256sum -c`` FAILED while in, restored and ``sha256sum -c`` OK after;
+``--quick --only`` the measurements named; the measurements not named by an
+injection stayed green where they were run beside it): every row of the table
+above. Of note: the sort-file injection left ``results-open`` and
+``results-psm-filter`` green, and the index injection left the filter and page
+moves green, so each threshold answers to its own work; ``ResultStores``'
+in-memory limit raised to 10 000 000 put the 1 000 000-row table on the heap
+(909 MiB retained) while every *time* stayed within its threshold -- only the
+heap measurement sees that regression; and the first ``ToolRunner`` injection
+(a 0.8 s wait placed *before* awaiting the exit) did not go red, because it ran
+concurrently with Percolator -- it was moved after the exit, and the threshold
+was later raised and the injection re-made at 1.2 s.
+
+**Findings from building it.**
+
+* Choosing a run in the Results section's run selector **with the keyboard
+  opens every run it passes**: each arrow key selects, and each selection opens
+  that run's stores (hash, index, map). The first version of this suite timed
+  "opens" of 0.85 s that were warm (already indexed on the way past) and one of
+  15 s that was five opens; the run is now selected directly, as a click does.
+  A scientist arrowing through a project of large runs pays a cold open for
+  every run passed. Reported, not changed here (no product change in this unit).
+* The peak retained heap **creeps by about 0.6 MiB per run opened** in one
+  session (6.6, 7.6, 8.2, 8.7, 9.3 MiB over five runs in one baseline); small
+  against the 64 MB budget, but it does not return to the baseline when a run is
+  closed. Not traced.
+* ``cancel-comet``: Comet 2026.03.0 ends on the first signal (about 90 ms from
+  Cancel to gone); the cancellation injection (wait up to 3 s for the tool to
+  finish first) observed 1.6 s because the fixture's search finished inside the
+  wait.
+
+**What it does not cover.** The dedicated runner (above): no threshold here has
+been measured on one. Linux x86-64 only. The fixture part over one fixture (the
+``D-006`` local one) and one pair (Comet 2026.03.0, Percolator 3.07.1, the
+product's choice for a Limelight-enabled run); it has never run on a CI runner.
+The startup is headless (Monocle, software rendering); a desktop with a GPU and
+a window manager is not measured. The results tables are the synthetic large
+fixture; a real search of that size has not been run. Hashing is measured from
+the page cache, not from a cold disk.
+
+
 Falsifiability
 ==============
 
@@ -3892,7 +4303,10 @@ exists is worse than no page.
      - Every nightly step is a stub that exits 70 naming its phase. *Since
        then:* the tool manifest verification is real
        (:ref:`dev-manifest-verify`), and so is determinism's synthetic half
-       (:ref:`dev-testing-determinism`; its fixture half waits on ``D-006``).
+       (:ref:`dev-testing-determinism`; its fixture half waits on ``D-006``),
+       and the performance suite (:ref:`dev-testing-performance`), graded on
+       this shared host's profile and red on every runner with no profile --
+       no dedicated performance runner exists.
 
    * - Release acceptance on real installer artefacts
      - 14, 16

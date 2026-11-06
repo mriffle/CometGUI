@@ -38,6 +38,13 @@
 #      red. The same kind of rule again -- an expectation must trace to a
 #      written reason -- and it needs no network and no Maven. Verified by
 #      requiring its "determinism: OK -- N artefact(s)" with N > 0.
+#   P. Gate item 4's thresholds (Phase 15 unit 8): scripts/perf/performance.py
+#      check-doc -- the baseline table in the "Performance" section of
+#      docs/developer/testing.rst must be exactly the one the data renders, and
+#      the data must keep its rules (every graded measurement has a threshold
+#      per profile, with a written rationale and the injection that showed it
+#      red; none looser than its ceiling; no baseline median beyond it).
+#      Verified by requiring its "performance: OK -- N threshold(s)" with N > 0.
 #
 # The documentation tree is never written to from here; the generated page is
 # produced by the documentation build itself.
@@ -59,6 +66,11 @@
 # thread count varied, a control that changed nothing, a variation that never
 # reached the tool, a file no artefact names and a planned run never made.
 #
+# --self-test also runs performance.py --self-test: the grading red on each
+# threshold exceeded, a failed check and a missing record, never green with no
+# runner profile or with the fixture refused, the data refused for each broken
+# rule, and the document check red on a changed threshold.
+#
 # --self-test adds step 4: eight defects injected into copies of the project
 # under _build/traceability/negative/, each of which must be caught with its own
 # diagnostic -- a rule no phase delivers, a rule two phases deliver, an AC- with
@@ -79,6 +91,8 @@
 #   5  R-TEST-07: a golden is not covered by a reviewed explanation
 #   6  gate item 3: the document and the data state different determinism
 #      tolerances
+#   7  gate item 4: the document and the data state different performance
+#      thresholds or baseline, or the data breaks one of its rules
 #
 # Needs no network access.
 
@@ -287,6 +301,35 @@ if [ "${SELF_TEST}" -eq 1 ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# P. Gate item 4: the performance thresholds, the same in the document and data.
+# ---------------------------------------------------------------------------
+
+PERFORMANCE_LOG="${OUT_DIR}/performance-doc.log"
+printf '\n=== P  gate item 4: python scripts/perf/performance.py check-doc ===\n'
+performance_status=0
+run_tee "${PERFORMANCE_LOG}" "${PYTHON}" -B "${SCRIPTS_DIR}/perf/performance.py" check-doc \
+    || performance_status=$?
+if [ "${performance_status}" -ne 0 ]; then
+    printf '\ntraceability.sh: FAILED -- the performance baseline in docs/developer/testing.rst\n' >&2
+    printf 'traceability.sh: ("Performance") and scripts/perf/performance-data.json differ, or the data\n' >&2
+    printf 'traceability.sh: breaks a rule. Log: %s\n' "${PERFORMANCE_LOG}" >&2
+    exit 7
+fi
+THRESHOLDS="$(sed -n 's/^performance: OK -- the document states the data.s \([0-9]\{1,\}\) threshold(s).*/\1/p' -- "${PERFORMANCE_LOG}" | head -n 1)"
+[ -n "${THRESHOLDS}" ] && [ "${THRESHOLDS}" -gt 0 ] \
+    || die "performance.py check-doc exited 0 without reporting any threshold checked; see ${PERFORMANCE_LOG}" 3
+
+if [ "${SELF_TEST}" -eq 1 ]; then
+    printf '\n=== P  gate item 4: performance.py --self-test ===\n'
+    pst_status=0
+    run_tee "${OUT_DIR}/performance-selftest.log" "${PYTHON}" -B "${SCRIPTS_DIR}/perf/performance.py" \
+        --self-test || pst_status=$?
+    [ "${pst_status}" -eq 0 ] || { printf '\ntraceability.sh: SELF-TEST FAILED -- performance check\n' >&2; exit 4; }
+    grep -q '^performance: self-test OK -- ' -- "${OUT_DIR}/performance-selftest.log" \
+        || die "the performance self-test exited 0 without reporting OK" 3
+fi
+
+# ---------------------------------------------------------------------------
 # 4. --self-test -- prove the gate can fail (CONTRIBUTING.rst, gate conventions)
 # ---------------------------------------------------------------------------
 
@@ -373,6 +416,7 @@ sed -n 's/^traceability: evidence names /traceability.sh: evidence names /p' -- 
 printf 'traceability.sh: unit tests    %s passed\n' "${RAN}"
 printf 'traceability.sh: goldens       %s, each covered by a reviewed explanation (R-TEST-07)\n' "${GOLDENS}"
 printf 'traceability.sh: determinism   %s artefact tolerances, the same in the document and the data\n' "${TOLERANCES}"
+printf 'traceability.sh: performance   %s thresholds, the same in the document and the data\n' "${THRESHOLDS}"
 printf 'traceability.sh: rendered      %s (%s R- rows, %s AC- rows)\n' \
     "${RENDERED}" "${RENDERED_RULES}" "${RENDERED_CRITERIA}"
 printf 'traceability.sh: logs          %s, %s, %s\n' "${CHECK_LOG}" "${TESTS_LOG}" "${RENDER_LOG}"

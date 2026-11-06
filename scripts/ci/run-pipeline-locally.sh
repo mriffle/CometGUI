@@ -85,6 +85,12 @@ done
 # Do not litter the source tree with __pycache__ directories.
 export PYTHONDONTWRITEBYTECODE=1
 
+# The nightly performance step (scripts/ci/nightly-performance.sh) runs its
+# --quick mode here: every measurement, fewer repeats, the same sizes and the
+# same thresholds of this host's runner profile -- about three minutes rather
+# than about seven.  A nightly runner sets nothing and runs the full repeats.
+export COMETGUI_PERFORMANCE_QUICK=1
+
 cd -- "${PROJECT_ROOT}"
 rm -rf -- "${OUT}"
 mkdir -p -- "${OUT}"
