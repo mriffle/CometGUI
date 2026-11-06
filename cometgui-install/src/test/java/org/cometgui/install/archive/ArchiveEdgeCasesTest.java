@@ -603,6 +603,58 @@ class ArchiveEdgeCasesTest {
     }
 
     @Test
+    @DisplayName(
+            "a Zip64 size field whose eight bytes run past the end of its extra field is refused,"
+                    + " not read from the bytes after it")
+    void aZip64SizeFieldThatOverrunsItsExtraField() throws IOException {
+        byte[] zip = ArchiveFixtures.zip64Bytes(List.of(Entry.file("tool.bin", "payload")));
+        int marker = indexOfExtraFieldHeader(zip);
+        /* The extra field now declares only the field's four-byte header; its size stays 8. */
+        littleEndian(zip).putShort(centralHeaderOf(marker) + 30, (short) 4);
+        ExtractionRejectedException rejection = refuse(ArtefactKind.ZIP, zip, "overrun.zip");
+        assertTrue(
+                rejection
+                        .getMessage()
+                        .endsWith(
+                                "-- entry \"tool.bin\" declares the Zip64 size sentinel and carries"
+                                        + " no Zip64 extra field holding the real size"),
+                () -> "wrong message: " + rejection.getMessage());
+    }
+
+    @Test
+    @DisplayName(
+            "an extra field of another kind that ends the central directory is stepped over and"
+                    + " refused, and nothing past the directory's end is read")
+    void anExtraFieldThatEndsTheDirectory() throws IOException {
+        byte[] zip = ArchiveFixtures.zip64Bytes(List.of(Entry.file("tool.bin", "payload")));
+        int marker = indexOfExtraFieldHeader(zip);
+        int comment = ArchiveFixtures.ENTRY_COMMENT.getBytes(StandardCharsets.UTF_8).length;
+        ByteBuffer patched = littleEndian(zip);
+        patched.putShort(marker, (short) 0x9999);
+        patched.putShort(centralHeaderOf(marker) + 32, (short) 0);
+        /* The Zip64 record, which the locator 20 bytes before the end record points at. */
+        int record = (int) patched.getLong(zip.length - 22 - 20 + 8);
+        patched.putLong(record + 40, patched.getLong(record + 40) - comment);
+        ExtractionRejectedException rejection = refuse(ArtefactKind.ZIP, zip, "lastextra.zip");
+        assertTrue(
+                rejection
+                        .getMessage()
+                        .endsWith(
+                                "-- entry \"tool.bin\" declares the Zip64 size sentinel and carries"
+                                        + " no Zip64 extra field holding the real size"),
+                () -> "wrong message: " + rejection.getMessage());
+    }
+
+    private static ByteBuffer littleEndian(byte[] bytes) {
+        return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+    }
+
+    /** The central-directory record whose name ends where its extra field begins. */
+    private static int centralHeaderOf(int extraField) {
+        return extraField - "tool.bin".length() - 46;
+    }
+
+    @Test
     @DisplayName("a payload that starts like gzip but is not is refused by its bytes")
     void aPayloadThatOnlyLooksLikeGzip() throws IOException {
         ExtractionRejectedException rejection =

@@ -210,6 +210,20 @@ class StandardInputTest {
         assertArrayEquals(new byte[] {1, 2, 3}, reading.written.toByteArray());
     }
 
+    @Test
+    @DisplayName(
+            "a buffered pipe, as the JDK's is: a write the buffer swallowed and the flush then"
+                    + " refused is reported as not handed over")
+    void aBufferedPipeThatRefusesTheFlush() {
+        PipeProcess broken = new PipeProcess(true, true);
+        PipeProcess reading = new PipeProcess(false, true);
+
+        assertFalse(ProcessService.writeStandardInput(broken, new byte[] {1, 2, 3}));
+        assertTrue(broken.closed, "the pipe was left open");
+        assertTrue(ProcessService.writeStandardInput(reading, new byte[] {1, 2, 3}));
+        assertArrayEquals(new byte[] {1, 2, 3}, reading.written.toByteArray());
+    }
+
     /** A process whose standard input either takes the bytes or fails as a broken pipe does. */
     private static final class PipeProcess extends Process {
 
@@ -217,12 +231,24 @@ class StandardInputTest {
         private final java.io.ByteArrayOutputStream written = new java.io.ByteArrayOutputStream();
         private boolean closed;
 
+        private final boolean buffered;
+
         PipeProcess(boolean broken) {
+            this(broken, false);
+        }
+
+        PipeProcess(boolean broken, boolean buffered) {
             this.broken = broken;
+            this.buffered = buffered;
         }
 
         @Override
         public java.io.OutputStream getOutputStream() {
+            java.io.OutputStream pipe = pipe();
+            return buffered ? new java.io.BufferedOutputStream(pipe) : pipe;
+        }
+
+        private java.io.OutputStream pipe() {
             return new java.io.OutputStream() {
                 @Override
                 public void write(int oneByte) throws IOException {

@@ -279,4 +279,22 @@ class SortFileTest {
                 List.of(List.of(2, 1, 3, 0), List.of(0, 3, 1, 2)),
                 build(SortFile.KeyType.TEXT, prefixes, 1));
     }
+
+    @Test
+    @DisplayName(
+            "a text key with no texts at all -- a row naming no protein -- survives a spill and"
+                    + " sorts first, as it does in one chunk")
+    void anEmptyTextKeySurvivesASpill() throws IOException {
+        List<SortFile.Key> keys =
+                List.of(
+                        SortFile.Key.text(0, "b"),
+                        SortFile.Key.text(1),
+                        SortFile.Key.text(2, "a"),
+                        SortFile.Key.text(3));
+        List<List<Integer>> expected = List.of(List.of(1, 3, 2, 0), List.of(0, 2, 1, 3));
+
+        assertEquals(
+                expected, build(SortFile.KeyType.TEXT, keys, SortFile.CHUNK_BYTES), "one chunk");
+        assertEquals(expected, build(SortFile.KeyType.TEXT, keys, 1), "spilled, one key a run");
+    }
 }

@@ -116,6 +116,25 @@ class ProcessTreeTest {
     }
 
     @Test
+    @DisplayName(
+            "the walk up an ancestry stops at the unknown depth: a root found beyond it is not"
+                    + " trusted, so that descendant ties with the orphan")
+    void theWalkStopsAtTheUnknownDepth() {
+        FakeHandle root = new FakeHandle(100, null);
+        FakeHandle above = new FakeHandle(530, root);
+        FakeHandle middle = new FakeHandle(520, above);
+        FakeHandle below = new FakeHandle(510, middle);
+        FakeHandle far = new FakeHandle(500, below);
+        FakeHandle detached = new FakeHandle(900, null);
+        /* Two in the snapshot, so the unknown depth is 3; the root is four links above "far". */
+        root.setDescendants(List.of(detached, far));
+
+        List<Long> order = pidsOf(ProcessTree.terminationOrder(root));
+
+        assertEquals(List.of(900L, 500L, 100L), order, "both at the unknown depth, snapshot order");
+    }
+
+    @Test
     @DisplayName("destroyAll asks every handle to stop, in the order it was given")
     void destroyAllFollowsTheOrderGiven() {
         FakeHandle root = new FakeHandle(100, null);

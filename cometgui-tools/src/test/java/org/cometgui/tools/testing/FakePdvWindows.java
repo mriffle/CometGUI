@@ -73,6 +73,8 @@ public final class FakePdvWindows implements ProcessRunner {
 
     private final AtomicInteger starts = new AtomicInteger();
 
+    private volatile CountDownLatch shutdownHeld;
+
     /**
      * How many {@code /ready} polls each window answers {@code 503 loading} before {@code 200
      * ready}; {@link Integer#MAX_VALUE} for never.
@@ -105,6 +107,18 @@ public final class FakePdvWindows implements ProcessRunner {
      */
     public FakePdvWindows answeringSelect(Function<String, PdvControlAnswer> answer) {
         this.selectAnswer = answer;
+        return this;
+    }
+
+    /**
+     * Holds every {@code /shutdown} unanswered until the latch is released, as a PDV busy in its
+     * event thread would; the request is recorded when it arrives.
+     *
+     * @param release counted down by the test when {@code /shutdown} may be answered
+     * @return this
+     */
+    public FakePdvWindows holdingShutdownUntil(CountDownLatch release) {
+        this.shutdownHeld = Objects.requireNonNull(release, "release");
         return this;
     }
 
@@ -242,6 +256,7 @@ public final class FakePdvWindows implements ProcessRunner {
                     return select(request);
                 case "/shutdown":
                     record(request, "");
+                    awaitRelease(shutdownHeld);
                     events.add("control-server-stopped");
                     LoopbackHttp running = server;
                     new Thread(running::close, "fake-pdv-shutdown").start();
@@ -249,6 +264,19 @@ public final class FakePdvWindows implements ProcessRunner {
                 default:
                     record(request, "");
                     return new LoopbackHttp.Response(404, "no such context");
+            }
+        }
+
+        private void awaitRelease(CountDownLatch held) {
+            if (held == null) {
+                return;
+            }
+            try {
+                if (!held.await(60, TimeUnit.SECONDS)) {
+                    events.add("shutdown-hold-expired");
+                }
+            } catch (InterruptedException stopped) {
+                Thread.currentThread().interrupt();
             }
         }
 

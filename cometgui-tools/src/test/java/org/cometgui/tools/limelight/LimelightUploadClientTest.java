@@ -614,6 +614,38 @@ class LimelightUploadClientTest {
     }
 
     @Test
+    @DisplayName(
+            "an upload whose thread is interrupted: failed as interrupted at its first step, and"
+                    + " the interrupt is kept for the caller")
+    void anInterruptedUpload(@TempDir Path tmp) throws IOException {
+        Path file = Files.writeString(tmp.resolve("x.xml"), "<limelight_input/>");
+        try (ServerSocket silent = new ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))) {
+            LimelightUploadRequest request =
+                    new LimelightUploadRequest(
+                            LimelightServer.parse(
+                                    "http://127.0.0.1:" + silent.getLocalPort() + "/limelight"),
+                            PROJECT,
+                            file,
+                            "e".repeat(64));
+            Credential key = secrets.admit(KEY);
+
+            LimelightUploadOutcome outcome;
+            boolean stillInterrupted;
+            Thread.currentThread().interrupt();
+            try {
+                outcome = client().upload(request, key, LimelightUploadListener.NONE);
+            } finally {
+                stillInterrupted = Thread.interrupted();
+            }
+
+            Failed failed = assertInstanceOf(Failed.class, outcome);
+            assertEquals(LimelightUploadStep.AUTH_TEST, failed.step());
+            assertEquals("the upload was interrupted", failed.reason());
+            assertTrue(stillInterrupted, "the caller's interrupt was swallowed");
+        }
+    }
+
+    @Test
     @DisplayName("nobody listening: failed with the connection's own reason")
     void nobodyListening(@TempDir Path tmp) throws IOException {
         Path file = Files.writeString(tmp.resolve("x.xml"), "<limelight_input/>");

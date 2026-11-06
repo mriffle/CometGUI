@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -770,6 +771,37 @@ class PdvControllerTest {
                                 shutdown.controlServer()),
                 () -> assertTrue(shutdown.exited()),
                 () -> assertTrue(window.cancelled()));
+    }
+
+    @Test
+    @DisplayName(
+            "a shutdown whose caller is interrupted: /shutdown is given up as interrupted, the"
+                    + " process is still told to stop, no wait is made, and the interrupt is kept")
+    void anInterruptedShutdown() throws IOException, InterruptedException {
+        CountDownLatch release = new CountDownLatch(1);
+        pdv.holdingShutdownUntil(release);
+        PdvController controller = controller();
+        openReady(controller);
+        FakePdvWindows.Window window = pdv.windows().get(0);
+
+        PdvWindowShutdown shutdown;
+        boolean stillInterrupted;
+        Thread.currentThread().interrupt();
+        try {
+            shutdown = controller.shutdown(mzTab()).orElseThrow();
+        } finally {
+            stillInterrupted = Thread.interrupted();
+            release.countDown();
+        }
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                new PdvWindowShutdown(
+                                        "was interrupted", false, OptionalInt.empty()),
+                                shutdown),
+                () -> assertTrue(stillInterrupted, "the caller's interrupt was swallowed"),
+                () -> assertTrue(window.cancelled(), "the process was not told to stop"));
     }
 
     @Test

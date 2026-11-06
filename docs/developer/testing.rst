@@ -368,6 +368,352 @@ package's score and not the gate. It used PIT's incremental history until
 Phase 15; pitest 1.30.0 refuses history unless a history plugin is installed,
 and none is.
 
+Forbidden survivors: the audit
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:Date: 2026-11-06 (Phase 15, unit 4)
+:Run audited: unit 3's whole-reactor PIT run of 2026-11-06 at ``d70206a``
+   (16 threads): 76 undetected mutants in the 47 critical packages, 45
+   ``SURVIVED`` and 31 ``NO_COVERAGE``.
+
+The score is half of ``R-TEST-02``. The other half is that **no** surviving
+mutation may be one that can, in the shipped product:
+
+#. disable checksum verification;
+#. invert a q-value comparison;
+#. drop a required output;
+#. suppress a validation error;
+#. pass an unsupported option to a tool;
+#. leak a secret.
+
+**How a survivor is judged.** Read the mutated line in its method and ask what
+the mutant does to the product, not to the test suite. A survivor is either
+*equivalent* -- no input can tell it from the original, and the reason says
+which invariant makes that so -- or it changes behaviour, and then the reason
+says what changes (only a message's words; only a resource released on an
+error path; ...) and why that is none of the six. "Probably harmless" is not a
+reason. A survivor in one of the six classes is removed by a test that kills
+it, or by a production fix where it exposes a defect -- never by an exclusion,
+and the same rule is preferred for the rest wherever a test is reasonable.
+
+**Result.** Two of the 76 were in a forbidden class, and both are killed:
+``SecretToolCredentialStore.save`` not zeroing its copy of the secret once
+``secret-tool`` had it (*leak a secret*), and ``ZipArchiveReader``'s walk of a
+Zip64 extra field running past the field's end (*suppress a validation
+error*: a malformed archive unpacked instead of refused). One more survivor
+exposed a **defect**, now fixed: a Zip64 size field whose header claimed eight
+bytes the extra field did not hold was read from the bytes after it -- the
+entry's comment -- and the archive was unpacked. No survivor touched a q-value
+comparison or a command builder. The other candidates -- the truncation and
+step checks before the SHA-256, the export's row copy, the mzTab exporter's
+self-checks -- are equivalent or still fail the export (table below).
+
+Seventeen other survivors were killed by new tests: ``secret-tool``'s timeout,
+standard-error cap and interrupt; the completion thread's interrupts; the
+standard-input flush; the process-tree depth cap; the sort-file codec's empty
+text list; the export copier's one read per buffer; PDV's interrupted shutdown
+and figure-owner tie; Limelight's interrupted upload. **57 remain**, none in a
+forbidden class: 28 equivalent, the rest a message's words, a resource
+released on an error path, an interrupt restored on a thread nothing reads, or
+a race no test can drive. Package names are under ``org.cometgui``; mutators
+are PIT's, shortened (*boundary* is ``ConditionalsBoundaryMutator``, *void
+call* ``VoidMethodCallMutator``, and so on).
+
+.. list-table:: Undetected after unit 4 (lines as in the tree after it)
+   :header-rows: 1
+   :widths: 34 6 10 8 42
+
+   * - Class and method
+     - Line
+     - Mutator
+     - Status
+     - Reason
+   * - ``domain.tools.ToolVersion.compareTo``
+     - 214
+     - boundary
+     - survived
+     - Equivalent: the extra iteration compares ``componentAt(width)``, 0 against 0, for any two versions.
+   * - ``install.archive.ExtractionGuard.checkedRelativePath``
+     - 181
+     - boundary
+     - survived
+     - Equivalent: a backslash at index 0 was already refused as an absolute name above, so ``>= 0`` and ``> 0`` agree.
+   * - ``install.archive.ExtractionGuard.parentDirectoryOf``
+     - 603
+     - boundary
+     - survived
+     - Equivalent: a checked relative path never starts with ``/``, so ``lastSlash`` is never 0 (and ``resolve("")`` would be the destination anyway).
+   * - ``install.archive.ZipArchiveReader.read``
+     - 373
+     - boundary
+     - survived
+     - Equivalent: a file channel never answers a non-empty buffer with 0, so ``< 0`` and ``<= 0`` agree.
+   * - ``install.archive.ZipArchiveReader.zip64UncompressedSize``
+     - 340
+     - boundary
+     - survived
+     - Equivalent since the fix: a field header ending the extra field leaves no room for an eight-byte size, so ``<=`` and ``<`` both reach the refusal. Before the fix this survivor was the defect.
+   * - ``install.download.HttpDownloader.copy``
+     - 507
+     - boundary
+     - survived
+     - Equivalent: ``declaredTotal >= 0`` vs ``> 0`` differ only at a declared length of 0, where ``size < 0`` is false either way. The SHA-256 check follows regardless.
+   * - ``install.download.HttpDownloader.nextChunk``
+     - 579
+     - boundary
+     - survived
+     - Equivalent, as the line above: at a declared length of 0, ``onDisk < 0`` is false either way.
+   * - ``install.cache.InstallPipeline.<init>``
+     - 254
+     - void call
+     - survived
+     - Equivalent in the shipped code: all eight steps, ``VERIFY_SHA256`` among them, are given actions on the lines above, so the guard cannot fire; its refusal is tested directly.
+   * - ``install.archive.PkgPayloadReader.elementsOf``
+     - 245
+     - boundary
+     - survived
+     - Equivalent: ``NodeList.item(length)`` is null, not an element, so one walk too far adds nothing.
+   * - ``install.archive.PkgPayloadReader.read``
+     - 399
+     - boundary
+     - survived
+     - Equivalent: as ``ZipArchiveReader.read``.
+   * - ``install.archive.BoundedEntryStream.read``
+     - 90
+     - boundary
+     - survived
+     - Equivalent: subtracting a zero-byte read is a no-op.
+   * - ``params.comet.validation.VariableModRules.checkSlot``
+     - 204
+     - boundary
+     - survived
+     - Equivalent: reached only for a requirement code other than 0 and 1, where ``> 0`` and ``>= 0`` agree; the finding is raised either way, this chooses its words.
+   * - ``params.comet.parser.ParamsLineReader.declaration``
+     - 137
+     - boundary
+     - survived
+     - Equivalent: ``hash`` is never 0 here, a line starting with ``#`` being a comment already.
+   * - ``params.comet.parser.ParamsLineReader.declaration``
+     - 137
+     - boundary
+     - survived
+     - Equivalent: one character cannot be both ``#`` and ``=``, so ``hash`` never equals ``equals``.
+   * - ``tools.process.StartedProcess.joinUninterruptibly``
+     - 281
+     - void call
+     - survived
+     - Equivalent in effect: without ``join()`` the ``while (pump.isAlive())`` loop spins until the pump ends; same order, CPU only.
+   * - ``results.filtering.store.DiskResultStore.close``
+     - 365
+     - void call
+     - survived
+     - Equivalent: ``closed`` is set first and every method calls ``requireOpen``; clearing the map only drops references.
+   * - ``results.filtering.store.DiskResultStore.open``
+     - 182
+     - void call
+     - no coverage
+     - Error path: the raw table's channel failing to open just after its index did; the mapped index is then not released (a leak), nothing else.
+   * - ``results.filtering.store.DiskResultStore.positionOf``
+     - 333
+     - boundary
+     - survived
+     - Equivalent: a sort file is checked to be a permutation when opened (``NOT_A_PERMUTATION``), so the row is found before ``position == rows``.
+   * - ``results.filtering.store.DiskResultStore.readRow``
+     - 434
+     - math
+     - no coverage
+     - Message only (a row number in a refusal), and reached only if the raw table shrank after the same call checked it unchanged.
+   * - ``results.filtering.store.SortFile.build``
+     - 341
+     - primitive return
+     - survived
+     - Equivalent in the product: ``DiskResultStore`` ignores the spill count; tests read it through the chunk-size overload.
+   * - ``results.filtering.store.SortFile.build``
+     - 407
+     - void call
+     - survived
+     - Equivalent: the chunk is not read again after the last spill.
+   * - ``results.filtering.store.SortFile.open``
+     - 256
+     - void call
+     - no coverage
+     - Error path: releases the mapped arena only when mapping or checking a local sort file throws; a leak, nothing else.
+   * - ``results.filtering.store.SortFile.writeDescending``
+     - 493
+     - boundary
+     - survived
+     - Equivalent: position 0 has no predecessor, so its tie bit is never set and ``start >= 0`` stops where ``start > 0`` does.
+   * - ``results.filtering.store.DiskIndex.open``
+     - 161
+     - void call
+     - no coverage
+     - Error path: as ``SortFile.open``.
+   * - ``results.parser.ResultTableReader.closeQuietly``
+     - 331
+     - void call
+     - no coverage
+     - Diagnostic only: the suppressed exception of a refusal, when closing the reader also fails.
+   * - ``results.filtering.store.CheckedFiles$Writer.<init>``
+     - 108
+     - negate
+     - no coverage
+     - Error path: closing the temporary file's channel when positioning it fails, which needs a negative header size; every caller passes a constant. A leak only.
+   * - ``results.filtering.store.CheckedFiles$Writer.<init>``
+     - 109
+     - void call
+     - no coverage
+     - As the line above.
+   * - ``results.export.ForwardCopier.fill``
+     - 81
+     - boundary
+     - survived
+     - Equivalent: the loop above it exits only when ``read != 0``.
+   * - ``results.export.ResultExporter$TableCopy.writeTo``
+     - 528
+     - boundary
+     - survived
+     - Equivalent, so no output is dropped: ``pending`` is -1 or a row's offset, and a row starts after the header line (a table needs one), never at 0.
+   * - ``tools.pdv.PdvMzTabExporter$Export.changed``
+     - 1193
+     - null return
+     - no coverage
+     - The export still fails (``NullPointerException`` instead of ``SOURCE_CHANGED``); needs the table to change mid-export. Nothing is accepted.
+   * - ``tools.pdv.PdvMzTabExporter$Export.incomplete``
+     - 1177
+     - null return
+     - no coverage
+     - The export's check of its own mzTab, reached only by a writer defect; the mutant still fails it (``NullPointerException``).
+   * - ``tools.pdv.PdvMzTabExporter$Export.indexRows``
+     - 390
+     - math
+     - no coverage
+     - Message only, in a self-check whose two counts come from one reader.
+   * - ``tools.pdv.PdvMzTabExporter$Export.psmIdOf``
+     - 1235
+     - empty return
+     - no coverage
+     - Message only: how a refusal names a row whose table can no longer be read.
+   * - ``tools.pdv.PdvMzTabExporter$Export.readBack``
+     - 1117
+     - math
+     - no coverage
+     - Message only (a line number), in the self-check above.
+   * - ``tools.pdv.PdvMzTabExporter$Export.readBack``
+     - 1130
+     - math
+     - no coverage
+     - As the line above.
+   * - ``tools.comet.PepXmlSearchHitReader$Walk.refused``
+     - 728
+     - boundary
+     - survived
+     - Equivalent: a StAX line number is -1 or at least 1; message only.
+   * - ``tools.pdv.PngFigure.inflate``
+     - 282
+     - void call
+     - survived
+     - Equivalent: ``Inflater.end`` frees native memory only.
+   * - ``tools.pdv.PngFigure.paeth``
+     - 360
+     - boundary
+     - survived
+     - Equivalent: ``pa == pb`` with ``pa <= pc`` implies ``a == b``, so either branch returns the same value.
+   * - ``tools.pdv.derived.PdvController$Window.exited``
+     - 708
+     - void call
+     - survived
+     - Timer hygiene: after the window closes, a poll returns at its first check and a debounce finds nothing pending; no state changes.
+   * - ``tools.pdv.derived.PdvController$Window.fail``
+     - 678
+     - void call
+     - survived
+     - As the line above, after a failure.
+   * - ``tools.pdv.derived.PdvController$Window.poll``
+     - 594
+     - negate
+     - no coverage
+     - Defensive path: needs the controller's own JDK HTTP client to throw an unchecked exception. PDV is a viewer: none of the six.
+   * - ``tools.pdv.derived.PdvController$Window.poll``
+     - 591
+     - void call
+     - no coverage
+     - Restores the interrupt on a poller thread being shut down; nothing reads it.
+   * - ``tools.pdv.derived.PdvController$Window.poll``
+     - 595
+     - void call
+     - no coverage
+     - As ``poll`` line 594.
+   * - ``tools.pdv.derived.PdvController$Window.poll``
+     - 596
+     - void call
+     - no coverage
+     - As ``poll`` line 594.
+   * - ``tools.pdv.derived.PdvController$Window.schedule``
+     - 747
+     - void call
+     - no coverage
+     - Reached only if the controller closes between readiness and scheduling (a race); a selection's refusal words.
+   * - ``tools.pdv.derived.PdvController$Window.send``
+     - 766
+     - negate
+     - no coverage
+     - Unreachable: every way out of ``READY`` abandons the pending selection first; message only.
+   * - ``tools.pdv.derived.PdvController$Window.send``
+     - 788
+     - void call
+     - no coverage
+     - Restores the interrupt on the selection thread when ``shutdownNow`` interrupts a ``/select``; nothing reads it.
+   * - ``tools.pdv.derived.PdvController$Window.stillStarting``
+     - 641
+     - false return
+     - survived
+     - Words at most: the attempt was replaced first, so the one extra ``/ready`` the poll then sends to the abandoned port is discarded by ``starting()``, re-checked under the lock -- except that its refusal overwrites ``lastReadyAnswer`` until the new attempt's next poll does.
+   * - ``tools.pdv.derived.PdvController$Window.stillStarting``
+     - 655
+     - false return
+     - survived
+     - Equivalent in state: the window is already ``FAILED`` and its message written, so the extra ``/ready`` is discarded.
+   * - ``tools.pdv.PdvSpectrumSupport.notMzMl``
+     - 257
+     - void call
+     - survived
+     - Equivalent: ``XMLStreamReader.close`` frees parser state; the byte array behind it is not a resource.
+   * - ``tools.pdv.PdvMzTabExporter$Export$Rows.writeAll``
+     - 966
+     - math
+     - no coverage
+     - The export still fails (an index error instead of ``SOURCE_CHANGED``); needs the table to change mid-export.
+   * - ``tools.limelight.LimelightUploadClient.describe``
+     - 419
+     - negate
+     - survived
+     - Message only: an ``IOException`` with a blank, non-null message; such messages never hold the key.
+   * - ``tools.pdv.PdvMzTabRefs.columns``
+     - 120
+     - boundary
+     - survived
+     - Equivalent: the header's field 0 is ``PSH``, so a wanted column is never at index 0.
+   * - ``tools.pdv.derived.PdvController.close``
+     - 407
+     - void call
+     - survived
+     - Resource hygiene: the HTTP client's own threads after the controller closed; no product state.
+   * - ``tools.limelight.LimelightUploadClient$Counting$1.onError``
+     - 362
+     - void call
+     - no coverage
+     - Needs the file to fail mid-read during an upload; the client would then fail on its timeout instead of at once. Nothing is reported submitted.
+   * - ``tools.comet.PepXmlSearchHitReader$Source.open``
+     - 234
+     - void call
+     - no coverage
+     - Diagnostic only: the suppressed exception of a refusal.
+   * - ``tools.pdv.PdvMzTabExporter$Slots.nativeIdOf``
+     - 1310
+     - empty return
+     - no coverage
+     - Message only: a fallback name for a slot not in the map its slots come from.
+
 Documentation -- strict Sphinx
 ------------------------------
 

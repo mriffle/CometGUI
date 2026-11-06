@@ -326,15 +326,21 @@ final class ZipArchiveReader implements ArchiveReader {
          * below is at least four and the cursor always advances, whatever an attacker writes in the
          * extra field.  There is no input for which this does not terminate.
          *
-         * Its own comparison survives mutation and cannot do otherwise.  The four bytes are a
-         * header about to be read, so "<=" is the rule; the only input that separates it from "<"
-         * is an extra field ending in a bare header with no payload, and such a header cannot be
-         * the eight-byte size field being looked for -- so both forms reach the same refusal below.
+         * A field is read only if its payload lies inside the extra field: a size field whose
+         * header claims eight bytes the extra field does not hold is not a size field, and its
+         * "value" would be the bytes after it -- the entry's comment, or the next record.  Until
+         * Phase 15 that was not checked, and an entry whose extra field declared only a size
+         * field's four-byte header was unpacked with a size read from its comment.
+         *
+         * The loop's own comparison survives mutation and cannot do otherwise.  The four bytes are
+         * a header about to be read, so "<=" is the rule; the only input that separates it from
+         * "<" is an extra field ending in a bare header, which leaves no room inside the extra
+         * field for an eight-byte size -- so both forms reach the same refusal below.
          */
         while (cursor + 4 <= end) {
             int headerId = directory.getShort(cursor) & 0xFFFF;
             int dataSize = directory.getShort(cursor + 2) & 0xFFFF;
-            if (headerId == 0x0001 && dataSize >= 8) {
+            if (headerId == 0x0001 && dataSize >= 8 && cursor + 4 + dataSize <= end) {
                 return directory.getLong(cursor + 4);
             }
             cursor += 4 + dataSize;

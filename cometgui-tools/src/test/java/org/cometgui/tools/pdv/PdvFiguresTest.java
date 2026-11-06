@@ -280,7 +280,9 @@ class PdvFiguresTest {
                 () -> assertEquals("11", PdvFigures.owner("PEP11.png", List.of("1", "11"))),
                 () -> assertEquals("11", PdvFigures.owner("PEP11.png", List.of("11", "1"))),
                 () -> assertEquals("1", PdvFigures.owner("PEP1.png", List.of("11", "1"))),
-                () -> assertNull(PdvFigures.owner("PEP2.png", List.of("11", "1"))));
+                () -> assertNull(PdvFigures.owner("PEP2.png", List.of("11", "1"))),
+                () -> assertEquals("1:", PdvFigures.owner("PEP1.png", List.of("1:", "1"))),
+                () -> assertEquals("1", PdvFigures.owner("PEP1.png", List.of("1", "1:"))));
     }
 
     @Test

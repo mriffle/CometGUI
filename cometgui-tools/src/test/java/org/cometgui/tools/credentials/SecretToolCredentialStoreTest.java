@@ -16,6 +16,7 @@
 
 package org.cometgui.tools.credentials;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -30,11 +31,15 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.cometgui.domain.ports.EnvironmentReader;
+import org.cometgui.domain.ports.ProcessListener;
 import org.cometgui.domain.ports.ProcessRunner;
+import org.cometgui.domain.ports.RunningProcess;
+import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.secrets.Credential;
 import org.cometgui.domain.secrets.SessionCredentialStore;
 import org.cometgui.domain.secrets.SessionSecrets;
@@ -209,6 +214,171 @@ class SecretToolCredentialStoreTest {
         assertThrows(IllegalArgumentException.class, () -> store.save("", credential));
         assertThrows(IllegalArgumentException.class, () -> store.forget("\t"));
         assertEquals("", record(tool, "argv.record"));
+    }
+
+    // ------------------------------------------------- against a stand-in in this JVM --
+
+    @Test
+    @DisplayName("store: the copy of the secret handed to the tool is zeroed, answered or not")
+    void theHandedCopyIsZeroed(@TempDir Path tmp) throws IOException {
+        SessionSecrets secrets = new SessionSecrets();
+        byte[] expected = SECRET.getBytes(StandardCharsets.UTF_8);
+        InProcessTool stored = InProcessTool.answering(0, List.of());
+        InProcessTool refused = InProcessTool.answering(1, List.of("the keyring is locked"));
+        InProcessTool silent = InProcessTool.silent();
+
+        inProcess(tmp, stored, secrets, 30_000).save(ACCOUNT, secrets.admit(SECRET));
+        IOException refusal =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                inProcess(tmp, refused, secrets, 30_000)
+                                        .save(ACCOUNT, secrets.admit(SECRET)));
+        IOException hung =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                inProcess(tmp, silent, secrets, 50)
+                                        .save(ACCOUNT, secrets.admit(SECRET)));
+
+        for (InProcessTool tool : List.of(stored, refused, silent)) {
+            assertArrayEquals(expected, tool.inputAsHanded, "what the tool was handed");
+            assertArrayEquals(
+                    new byte[expected.length], tool.handed.get(0), "left in memory afterwards");
+        }
+        assertEquals(
+                "secret-tool could not store the credential for "
+                        + ACCOUNT
+                        + " (exit status 1): the keyring is locked",
+                refusal.getMessage());
+        assertEquals("secret-tool did not answer within 50 ms", hung.getMessage());
+    }
+
+    @Test
+    @DisplayName("a tool that does not answer in time is cancelled, not left running")
+    void aSilentToolIsCancelled(@TempDir Path tmp) {
+        InProcessTool silent = InProcessTool.silent();
+        SecretToolCredentialStore store = inProcess(tmp, silent, new SessionSecrets(), 50);
+
+        IOException hung = assertThrows(IOException.class, () -> store.find(ACCOUNT));
+
+        assertEquals("secret-tool did not answer within 50 ms", hung.getMessage());
+        assertEquals(1, silent.cancellations, "cancellations requested");
+    }
+
+    @Test
+    @DisplayName("a failure quotes the tool's first twenty lines of standard error, and no more")
+    void twentyLinesOfStandardError(@TempDir Path tmp) {
+        List<String> said = new ArrayList<>();
+        for (int line = 1; line <= 25; line++) {
+            said.add("complaint " + line);
+        }
+        SecretToolCredentialStore store =
+                inProcess(tmp, InProcessTool.answering(2, said), new SessionSecrets(), 30_000);
+
+        IOException failed = assertThrows(IOException.class, () -> store.find(ACCOUNT));
+
+        assertEquals(
+                "secret-tool could not look up the credential for "
+                        + ACCOUNT
+                        + " (exit status 2): "
+                        + String.join(" / ", said.subList(0, 20)),
+                failed.getMessage());
+    }
+
+    @Test
+    @DisplayName("interrupted while waiting for the tool: refused, and the interrupt is kept")
+    void anInterruptedWaitKeepsTheInterrupt(@TempDir Path tmp) {
+        SecretToolCredentialStore store =
+                inProcess(tmp, InProcessTool.silent(), new SessionSecrets(), 30_000);
+
+        Thread.currentThread().interrupt();
+        IOException interrupted;
+        boolean stillInterrupted;
+        try {
+            interrupted = assertThrows(IOException.class, () -> store.find(ACCOUNT));
+        } finally {
+            stillInterrupted = Thread.interrupted();
+        }
+
+        assertEquals("interrupted while waiting for secret-tool", interrupted.getMessage());
+        assertInstanceOf(InterruptedException.class, interrupted.getCause());
+        assertTrue(stillInterrupted, "the thread's interrupt was swallowed");
+    }
+
+    private static SecretToolCredentialStore inProcess(
+            Path tmp, InProcessTool tool, SessionSecrets secrets, long timeoutMillis) {
+        return new SecretToolCredentialStore(
+                tmp.resolve("secret-tool"),
+                tmp,
+                BUS,
+                tool,
+                secrets,
+                Duration.ofMillis(timeoutMillis));
+    }
+
+    /**
+     * {@code secret-tool} played in this JVM: it keeps the very array it is handed (and a copy of
+     * it as handed), answers at once with an exit status and some standard error -- or never
+     * answers -- and counts cancellations.
+     */
+    private static final class InProcessTool implements ProcessRunner, RunningProcess {
+
+        private final boolean answers;
+        private final int exitCode;
+        private final List<String> standardError;
+
+        /** The caller's own array, kept by reference on purpose: the store must zero it. */
+        private final List<byte[]> handed = new ArrayList<>();
+
+        private byte[] inputAsHanded;
+        private int cancellations;
+
+        private InProcessTool(boolean answers, int exitCode, List<String> standardError) {
+            this.answers = answers;
+            this.exitCode = exitCode;
+            this.standardError = List.copyOf(standardError);
+        }
+
+        static InProcessTool answering(int exitCode, List<String> standardError) {
+            return new InProcessTool(true, exitCode, standardError);
+        }
+
+        static InProcessTool silent() {
+            return new InProcessTool(false, -1, List.of());
+        }
+
+        @Override
+        public RunningProcess start(ToolCommand command, ProcessListener listener) {
+            if (answers) {
+                standardError.forEach(listener::onStandardError);
+                listener.onExit(exitCode);
+            }
+            return this;
+        }
+
+        @Override
+        public RunningProcess startWithInput(
+                ToolCommand command, byte[] standardInput, ProcessListener listener) {
+            handed.add(standardInput);
+            inputAsHanded = standardInput.clone();
+            return start(command, listener);
+        }
+
+        @Override
+        public boolean isAlive() {
+            return !answers && cancellations == 0;
+        }
+
+        @Override
+        public int waitForExit() {
+            return exitCode;
+        }
+
+        @Override
+        public void requestCancellation() {
+            cancellations++;
+        }
     }
 
     // ------------------------------------------------------------------- the choice --
