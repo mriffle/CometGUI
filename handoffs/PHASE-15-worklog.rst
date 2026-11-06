@@ -554,7 +554,53 @@ seen; the redundant second close on exit is harmless and left.
 Unit 5 sign-off
 ---------------
 
-Pending.
+**Accepted 2026-11-06 at** ``de8f979``, one round. One fresh agent.
+
+*Diff read* (8 files). ``scripts/ci/nightly-manifest-verify.sh`` is a wrapper
+over ``scripts/ci/manifest_verify.py`` (stdlib; reads the manifest through
+``toolmatrix.load``): each distinct URL downloaded once into a temporary
+directory, never executed; size, SHA-256 and MD5 compared whole; each pinned
+member read by the record's ``kind`` (ZIP, ``.deb``, ``.pkg`` with a
+DOCTYPE/ENTITY refusal). Releases: the GitHub listing of each repository,
+drafts and prereleases ignored, newest by ``published_at`` must be recorded.
+Verdicts ``RED (a)`` changed, ``RED (b)`` gone upstream in ``D-008``'s words,
+``RED (c)`` new release (exit 1), ``COULD NOT VERIFY`` (exit 3, never green).
+Retries only for transport failures and 5xx, three attempts, each printed;
+404/410/mismatch/403/429 never retried. ``scripts/ci/manifest/not-adopted.json``
+exists **empty**, with an entry discipline. ``--self-test``: loopback server
+with synthetic artefacts and a synthetic manifest, 27 cases and two grader
+self-controls. Nightly job renamed "tool manifest (R-TEST-08)"; new gate
+control ``manifest`` (PHASE-15 item 5, floor 30, writes only its own temp
+directory, so no ``gate_locks``).
+
+*My runs:*
+
+* The real job against upstream: **VERIFIED -- all 63 records and members
+  match**, 38 records, 25 members, 28 downloads (170 152 439 bytes), 4
+  release listings; every repository's newest release is recorded (exit 0).
+* ``check-workflows.sh``: exit 0.
+* ``verify-all-gates.sh --only workflows,docs,manifest,pipeline``: workflows
+  23, docs 1, manifest 30, pipeline 25 steps -- all PASS (pipeline 1228 s, most
+  of it the existing link check).
+
+*My injections* into ``manifest_verify.py`` (anchor 0, ``sha256sum -c``
+FAILED; restored, OK), graded by ``--self-test`` (exit 7 each):
+
+* digests compared by their first eight characters: "the pinned sha256
+  differs only in its last character -> red (a)" FAIL.
+* releases sorted oldest first: 13 cases FAIL, among them "an unknown newer
+  release -> red (c) naming the tag".
+
+The agent's 15 further injections (404 reported as success, newest release
+dropped, members skipped, MD5 or size uncompared, "could not verify" as
+green ...) are in its report.
+
+*Residue:* a stale "still a stub" Javadoc in
+``cometgui-install/.../UpstreamArtefactTest.java``; ``R-TEST-08`` has no test
+reference in ``docs/traceability-map.toml`` (unit 11); ``check-workflows.py``'s
+"stub in the PR pipeline" self-test uses ``nightly-determinism.sh`` and must
+be re-pointed when unit 7 makes that real; one ``api.github.com/rate_limit``
+call during the agent's survey, outside P15-5b's allowance, recorded.
 
 Unit 6 sign-off
 ---------------
