@@ -74,7 +74,8 @@
 #   5d  item 5 [recorded, unit 7 Q1]: another Results run no longer closes the
 #       window
 #   5e  item 5 [NEW]: the application's stop() no longer closes PDV's windows
-#       -- the live-window GUI test finds PDV still running after the exit
+#       -- the live-window GUI test finds PDV still running when the exit
+#       closes the Results section's run (which would end it a second way)
 #   6a  item 6 [recorded, unit 6 N1]: score and q-value columns swapped
 #   6b  item 6 [NEW]: the PEP column fed the q-value
 #   6c  item 6 [recorded, unit 5 M2]: accessions cut to the first protein --
@@ -1375,8 +1376,12 @@ control_5d() {
 
 control_5e() {
     begin_control "5e" "item 5 [NEW]: the application's stop() no longer closes PDV's windows"
+    # The exit also closes the Results section's run, which ends the window again -- later, on
+    # the Run section's threads, unwaited -- so whether PDV is gone after the exit says nothing.
+    # The test reads PDV's process at the moment that run closes; only stop() can have ended it by
+    # then (unit 9a of handoffs/PHASE-15-worklog.rst; docs/developer/testing.rst).
     inject_and_run "PDV outliving the application" "${APPLICATION}" "${APP}" "${SEL_LIVE_WINDOW}" regex \
-        'message: PDV ended \(1 failure\)|AssertionFailedError: the launched process ended ==> expected: <false> but was: <true>' \
+        'message: PDV was still running when the application.s exit closed the Results section.s run: stop\(\) did not end PDV itself ==> expected: <false> but was: <true>' \
         '        if (visualisation != null) {
             visualisation.closeAllWindows();
         }

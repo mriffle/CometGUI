@@ -58,7 +58,10 @@ public final class PdvDisplayObserver {
     /** What every report line starts with. */
     public static final String PREFIX = "PDVOBS displayed";
 
-    /** What the observer reports once it is listening. */
+    /**
+     * What the observer reports once it is listening -- or, instead, {@code PDVOBS error} if PDV
+     * had already drawn a PSM by then.
+     */
     public static final String ATTACHED = "PDVOBS attached";
 
     private static final long ATTACH_DEADLINE_NANOS = 180_000_000_000L;
@@ -108,6 +111,16 @@ public final class PdvDisplayObserver {
         Object pdv = frame;
         panel.addPropertyChangeListener(
                 "border", change -> SwingUtilities.invokeLater(() -> emit(snapshot(pdv))));
+        // PDV draws its first row by itself once its import ends; a test waits for that drawing's
+        // report before it selects anything. Had it already happened, there would be none.
+        if (panel.getBorder() instanceof TitledBorder drawn) {
+            emit(
+                    "PDVOBS error\tPDV had drawn \""
+                            + clean(drawn.getTitle())
+                            + "\" before the observer attached, so its own first drawing went"
+                            + " unreported");
+            return;
+        }
         emit(ATTACHED);
     }
 

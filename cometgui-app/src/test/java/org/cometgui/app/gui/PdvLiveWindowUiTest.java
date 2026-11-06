@@ -49,6 +49,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -57,6 +58,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import javafx.beans.InvalidationListener;
+import javafx.collections.ObservableList;
+import javafx.scene.Node;
+import javafx.scene.control.ComboBox;
 import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.config.ProjectSession;
 import org.cometgui.app.config.RunWiring;
@@ -303,6 +308,7 @@ class PdvLiveWindowUiTest {
 
         // ---- the next selection follows -------------------------------------------------------
         driver.clickOn("nav-results");
+        Node resultsRuns = driver.node(UiIds.RESULTS_RUN);
         ResultsSection.selectRow(driver, 1);
         driver.clickOn("nav-visualisation");
         assertEquals(
@@ -356,12 +362,22 @@ class PdvLiveWindowUiTest {
         workflowApi(run, jar, mzTab, first);
 
         // ---- the application's exit ends a window that is open --------------------------------
+        // stop() itself, before the exit closes the Results section's run: see livenessWhenEmptied
         driver.clickOn(UiIds.VISUALISATION_OPEN);
         int again = portOf(awaitReady(runId));
         CappedPdv.Launch reopened = processes.windows().get(processes.windows().size() - 1);
         assertTrue(reopened.process().isAlive());
+        CompletableFuture<Boolean> aliveAsResultsClosed =
+                livenessWhenEmptied(resultsRuns, reopened.process());
         app.stopApplication();
         STOPPED.set(true);
+        assertTrue(
+                aliveAsResultsClosed.isDone(),
+                "the application's exit did not close the Results section's run");
+        assertFalse(
+                aliveAsResultsClosed.join(),
+                "PDV was still running when the application's exit closed the Results section's"
+                        + " run: stop() did not end PDV itself");
         assertGone(reopened, again, mzTab);
         assertEquals(3, denovoLaunches(run).size(), "three windows, three events");
     }
@@ -458,6 +474,41 @@ class PdvLiveWindowUiTest {
                 UiIds.VISUALISATION_SELECTION,
                 text -> text.startsWith("Target PSM " + psmId + " "),
                 SELECT_BOUND);
+    }
+
+    /**
+     * Whether PDV's process is alive at the moment the Results section's run chooser is emptied:
+     * what the application's exit does when it closes the Results section, which empties the listed
+     * runs before it gives up the chosen one.
+     *
+     * <p>{@code R-PDV-04} ends a window when its result set closes <em>and</em> when the
+     * application exits, so the exit ends PDV twice over. {@code stop()} closes every window and
+     * waits for each process; then closing the Results section has the Visualisation section close
+     * the window again, asynchronously on the Run section's threads, and nobody waits for that.
+     * Without the first, the second still ends PDV, sometimes before the test looks -- the more so
+     * on a loaded host -- so "PDV is gone afterwards" cannot show that {@code stop()} ended it
+     * (Phase 15 unit 9a; {@code docs/developer/testing.rst}, the PDV harness). This moment can: the
+     * second path has not started yet, so PDV has ended by then only if {@code stop()} ended it.
+     *
+     * @param chooser the Results section's run chooser
+     * @param pdv the window's process
+     * @return completed, on the interface thread, when the chooser is first emptied
+     */
+    private static CompletableFuture<Boolean> livenessWhenEmptied(
+            Node chooser, StartedProcess pdv) {
+        CompletableFuture<Boolean> alive = new CompletableFuture<>();
+        driver.onFxThread(
+                () -> {
+                    ObservableList<?> runs = ((ComboBox<?>) chooser).getItems();
+                    runs.addListener(
+                            (InvalidationListener)
+                                    changed -> {
+                                        if (runs.isEmpty()) {
+                                            alive.complete(pdv.isAlive());
+                                        }
+                                    });
+                });
+        return alive;
     }
 
     private static HttpResponse<String> select(int port, String ref)

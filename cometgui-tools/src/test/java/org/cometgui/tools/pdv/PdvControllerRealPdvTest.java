@@ -202,8 +202,7 @@ class PdvControllerRealPdvTest {
             }
         }
         ready = controller.state(mzTab).orElseThrow();
-        String attached = runner.observed(line -> line.equals(PdvDisplayObserver.ATTACHED));
-        assertEquals(PdvDisplayObserver.ATTACHED, attached);
+        runner.awaitAttachedAndOpening();
     }
 
     private static PdvWindowState next(Duration bound) throws InterruptedException {
@@ -441,18 +440,45 @@ class PdvControllerRealPdvTest {
             observed.clear();
         }
 
-        String observed(java.util.function.Predicate<String> wanted) throws InterruptedException {
+        /**
+         * Waits for the observer to attach and for the report of PDV's own drawing of its first
+         * row, in whichever order they come.
+         *
+         * <p>PDV draws row 0 by itself when its import ends, on a thread of its own, and {@code
+         * /ready} can answer 200 before it has (54 ms before, in a quiet run measured by Phase 15
+         * unit 9a). Its report, read later on PDV's event thread, could otherwise arrive after the
+         * first selection's {@link #forgetDisplayed()} and be taken for that selection's drawing:
+         * row 0 is the first PSM selected, and the report can carry row 0's own peaks. A
+         * selection's report then always follows the selection.
+         */
+        void awaitAttachedAndOpening() throws InterruptedException {
             long deadline = System.nanoTime() + READY_BOUND.toNanos();
-            while (System.nanoTime() < deadline) {
+            boolean attached = false;
+            boolean opening = false;
+            while ((!attached || !opening) && System.nanoTime() < deadline) {
                 String line = observed.poll(1, TimeUnit.SECONDS);
-                if (line != null && wanted.test(line)) {
-                    return line;
+                if (line == null) {
+                    continue;
                 }
-                if (line != null && line.startsWith("PDVOBS error")) {
+                if (line.startsWith("PDVOBS error")) {
                     throw new AssertionError("the observer failed: " + line);
                 }
+                if (line.equals(PdvDisplayObserver.ATTACHED)) {
+                    attached = true;
+                } else if (line.startsWith(PdvDisplayObserver.PREFIX + "\trow=0\t")) {
+                    opening = true;
+                }
             }
-            throw new AssertionError("the observer did not report in time: " + log());
+            if (!attached || !opening) {
+                throw new AssertionError(
+                        (attached
+                                        ? "PDV's own drawing of its first row was not reported"
+                                        : "the observer did not attach")
+                                + " within "
+                                + READY_BOUND
+                                + ": "
+                                + log());
+            }
         }
 
         /** The next report of a drawing on that row. */
