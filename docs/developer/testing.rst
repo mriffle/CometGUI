@@ -2076,9 +2076,15 @@ stub naming ``D-006`` and the dedicated runner, exit 70, until both exist. The
 ``pipeline`` control runs the nightly step on this host with
 ``COMETGUI_PERFORMANCE_QUICK=1`` (set by ``run-pipeline-locally.sh``): every
 ``no-spectra`` measurement, two to ten repeats instead of five to thirty, the
-same sizes and thresholds, graded against this host's profile -- about three
-minutes (238 s measured under the 32-core load above, Maven's build included),
-which is what this unit adds to that control.
+same sizes and thresholds, graded against this host's profile. That is what
+this unit adds to that control: 374 s measured as its step on 2026-11-06 (the
+control 1674 s in all), and 238 s run alone under the 32-core load above, Maven's
+build included in both. Most of the difference is making the 50-run project
+for ``project-reopen`` -- 213 s in the control's run against 49 s in the
+baseline -- which writes and syncs thousands of small files and is at the mercy
+of the shared disk; in that same run ``cancel-fake-tool`` read 42 ms and
+``project-reopen`` 110 ms against the baseline's 8 ms and 58 ms, still well
+inside their floors. That is the noise the floors are for.
 
 **Shown red** (2026-11-06; each injected into production code, the anchor gone
 and ``sha256sum -c`` FAILED while in, restored and ``sha256sum -c`` OK after;

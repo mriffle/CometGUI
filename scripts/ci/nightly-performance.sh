@@ -34,7 +34,8 @@
 # COMETGUI_PERFORMANCE_QUICK=1 runs --quick: fewer repeats of every
 # measurement, the same sizes and the same thresholds.  The pipeline control
 # (scripts/ci/run-pipeline-locally.sh) sets it, so the local transcript costs
-# about three minutes rather than about seven; a nightly sets nothing.
+# four to six and a half minutes (238 s and 374 s measured) rather than about
+# seven to ten; a nightly sets nothing.
 #
 # Needs the project JDK, Maven and font stack (provisioned by the runner script
 # if absent), the network (GitHub's release host for Percolator; Maven's
