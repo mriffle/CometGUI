@@ -1,0 +1,12 @@
+{
+  "rule": "R-TEST-07: updating a golden requires a reviewed written explanation of why the scientific change is expected, recorded here. A golden whose SHA-256 is not below fails scripts/matrix/check_goldens.py.",
+  "reviews": [
+    {
+      "file": "fixture-a6ab63363a634d43da157f237c405908f96cdb067a5d918471b129ad75f806d9.linux-x86-64.json",
+      "sha256": "0b2c2230bbb39bcf460124f8a033c0e7799a5fdf491071138e27796f4e1a7add",
+      "date": "2026-11-06",
+      "reviewer": "written by the Phase 15 unit 6 agent from its matrix runs; reviewed at the unit 6 sign-off (handoffs/PHASE-15-worklog.rst)",
+      "explanation": "First golden for Percolator 3.07.1 over CometGUI's own synthetic PIN on linux-x86-64, recorded when the version matrix was built (Phase 15 unit 6). Through the product's command builder with its default settings, each table holds 64 rows and the weights 3 splits of features feat1, feat2, feat3 and the bias m0. Nothing passes q <= 0.01 (0): the synthetic targets are separated from the decoys by design only far enough for the capability probe, so the lowest target q-value is above 0.01 and at most 0.1 (17 at or below 0.1, 48 at or below 0.5). The table and weights digests are the same bytes Phase 09 recorded from these binaries in cometgui-results' parser/real/PROVENANCE.txt, which is the expectation: the same build, seed and input give the same output."
+    }
+  ]
+}

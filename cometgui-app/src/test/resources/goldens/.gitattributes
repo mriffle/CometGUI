@@ -1,0 +1,4 @@
+# Goldens are pinned by the SHA-256 their REVIEW.json records (R-TEST-07):
+# git must never convert their line endings on checkout (core.autocrlf on
+# GitHub's windows-latest runner), or every review record would stop matching.
+* -text

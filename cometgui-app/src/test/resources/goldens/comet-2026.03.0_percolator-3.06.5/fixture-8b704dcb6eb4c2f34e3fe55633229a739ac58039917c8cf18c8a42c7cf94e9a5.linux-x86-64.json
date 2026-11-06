@@ -1,0 +1,31 @@
+{
+  "key": "comet-2026.03.0_percolator-3.06.5",
+  "platform": "linux-x86-64",
+  "fixtureDigest": "8b704dcb6eb4c2f34e3fe55633229a739ac58039917c8cf18c8a42c7cf94e9a5",
+  "fixture": "the D-006 LOCAL fixture, scratch/fixture (two K562 mzML, crux-toolkit test/smoke-tests at commit fc6335cc, and the UniProt human proteome UP000005640, 20 652 records): NOT the CI fixture, never committed. Derived results only: counts, and digests of sorted identifier lists",
+  "comparison": "exact",
+  "why": "exact: measured stable on linux-x86-64 -- two complete matrix runs on 2026-11-06 gave identical values for every key, and three earlier runs that day agreed on every count. Comet with 4 threads writes byte-identical PINs run to run (measured) and Percolator with --seed 1 byte-identical tables, so nothing these values derive from varies on one platform. PSM identifiers are compared without the run directory Comet prefixes them with (the -N path the product passes). Exact equality is per platform: another platform's build could round a score differently, which is why the platform is part of the key and a new platform adds goldens rather than tolerances",
+  "expected": {
+    "pin.rows": 6670,
+    "pin.targetRows": 3886,
+    "pin.decoyRows": 2784,
+    "psms.tsv.rows": 3886,
+    "psms.tsv.passingDefaultCutoff": 1013,
+    "psms.tsv.selectedIdentifiersSha256": "0ac9b9eedbdd242dbdc537b56b43ff27d3de4fe67b6764f2c8437cfaa44fdf7b",
+    "peptides.tsv.rows": 2973,
+    "peptides.tsv.passingDefaultCutoff": 592,
+    "peptides.tsv.selectedIdentifiersSha256": "c71ef6e795ad9590a56628e9caa7da5c5e6196b3a91758e1c4028445bffe7012",
+    "decoy-psms.tsv.rows": 2784,
+    "decoy-psms.tsv.passingDefaultCutoff": 9,
+    "decoy-psms.tsv.selectedIdentifiersSha256": "7ac9fd232f9c4b078e4ece0285bb26a3591813de07517aeb0311c130c9485a17",
+    "decoy-peptides.tsv.rows": 2356,
+    "decoy-peptides.tsv.passingDefaultCutoff": 5,
+    "decoy-peptides.tsv.selectedIdentifiersSha256": "4b59a22e8863209eb606c890d6a72857f452e70e86d7cd172f62dac8631522c1",
+    "weights.splits": 3,
+    "weights.features": 22,
+    "pout.psms": 3886,
+    "pout.decoyPsms": 0,
+    "pout.peptides": 2973
+  },
+  "tolerances": {}
+}

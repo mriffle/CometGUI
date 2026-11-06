@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "about": "Phase 15 unit 6, the version matrix. What the matrix cannot derive from manifests/tools.json and the product: each platform's tier and the CI runner that would exercise it, the recorded reason for every combination the product does not offer, the features that need a runner nothing here has, and the advisory that explains every version difference the matrix observes. scripts/matrix/matrix.py refuses this file if a platform, a gap or an observed difference is not covered, and if an entry covers nothing (stale). docs/developer/testing.rst, 'Version matrix'.",
+  "platforms": {
+    "linux-x86-64": {
+      "tier": "1 -- fully supported (specification, Supported Platforms); the reference platform",
+      "ciRunner": "ubuntu-latest",
+      "ciWouldRun": "everything: install and probe each offered build, Comet -p/-q, Percolator over the synthetic PIN, and the (Comet, Percolator) pair runs over the fixture"
+    },
+    "linux-aarch64": {
+      "tier": "3 -- unsupported in release 1, not packaged; local-binary registration only (specification, Supported Platforms)",
+      "ciRunner": "ubuntu-24.04-arm",
+      "ciWouldRun": "install and probe Comet, PDV and the Limelight converter; no Percolator is published for it, so no pair runs"
+    },
+    "macos-x86-64": {
+      "tier": "2 -- best effort, not release-blocking (specification, Supported Platforms)",
+      "ciRunner": "macos-13",
+      "ciWouldRun": "install and probe Percolator 3.07.1 and 3.06.5, PDV and the converter, Percolator over the synthetic PIN; no managed Comet exists (D-011 A), so no pair runs"
+    },
+    "macos-aarch64": {
+      "tier": "1 -- fully supported (specification, Supported Platforms)",
+      "ciRunner": "macos-14",
+      "ciWouldRun": "install and probe Comet natively and Percolator under Rosetta 2 (D-004), PDV and the converter; Comet -p/-q against fixtures captured there; the synthetic PIN; the pair runs over the CI fixture once D-006 names one"
+    },
+    "windows-x86-64": {
+      "tier": "1 -- fully supported (specification, Supported Platforms)",
+      "ciRunner": "windows-latest",
+      "ciWouldRun": "install and probe each offered build (Percolator needs the Visual C++ runtime, an advisory), Comet -p/-q, the synthetic PIN, the pair runs over the CI fixture once D-006 names one, and the Thermo RAW smoke test (AC-TST-11)"
+    },
+    "windows-aarch64": {
+      "tier": "none -- not a platform of the specification's matrix; the product can name it (HostPlatform) and offers nothing there",
+      "ciRunner": "",
+      "ciWouldRun": "nothing: no artefact runs there"
+    }
+  },
+  "notOffered": [
+    {
+      "tool": "comet",
+      "version": "*",
+      "platform": "macos-x86-64",
+      "verdict": "UNAVAILABLE",
+      "decision": "D-011 option A (decided 2026-10-08)",
+      "reason": "upstream has never published an x86-64 macOS Comet: both macOS files are arm64 (Mach-O CPU type 0x0100000C), which an Intel Mac cannot run. The Tool Manager says so and offers local-binary registration of a Comet the user built (R-TOOL-08); option D, asking upstream for an x86-64 asset, is the owner's own action"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.09",
+      "platform": "linux-x86-64",
+      "verdict": "UNAVAILABLE",
+      "decision": "D-003 (decided 2026-08-30); R-PERC-12",
+      "reason": "3.09 publishes no Linux portable archive; its .deb requires GLIBC_2.38 and its .rpm needs Boost 1.66 libraries it does not ship, so Linux carries no managed 3.09 row. Not untested: a registered LOCAL 3.09 binary (the .rpm build with Boost 1.66) is exercised by the row local:percolator:3.09:linux-x86-64 where one is present -- a local binary, never a managed offer"
+    },
+    {
+      "tool": "percolator",
+      "version": "*",
+      "platform": "linux-aarch64",
+      "verdict": "UNAVAILABLE",
+      "decision": "specification, Supported Platforms (Linux aarch64 is tier 3)",
+      "reason": "Percolator publishes no aarch64 Linux build of any release; local-binary registration only"
+    },
+    {
+      "tool": "percolator",
+      "version": "3.09",
+      "platform": "macos-x86-64",
+      "verdict": "UNAVAILABLE",
+      "decision": "D-003 (decided 2026-08-30)",
+      "reason": "3.09's only macOS artefact is arm64 with a macOS 15.0 floor, which an Intel Mac cannot run; 3.07.1 and 3.06.5 (x86-64) are offered there"
+    },
+    {
+      "tool": "*",
+      "version": "*",
+      "platform": "windows-aarch64",
+      "verdict": "UNAVAILABLE",
+      "decision": "specification, Supported Platforms (not a platform of the matrix)",
+      "reason": "Windows on ARM is not a platform the product supports; no manifest record runs there and the product models no translation layer for it"
+    }
+  ],
+  "features": {
+    "THERMO_RAW_WINDOWS": {
+      "rowPrefix": "feature:thermo-raw",
+      "verdict": "UNVERIFIED",
+      "reason": "AC-TST-11: the Windows Thermo RAW smoke test is required 'when that feature ships'. It needs a Windows runner (nightly.yml's windows job; scripts/ci/nightly-windows-raw.sh is still a stub) and a Thermo RAW fixture, which D-006's OPEN CI half would have to supply. Comet reads RAW only on Windows, with CometWrapper.dll and the ThermoFisher.* companions beside it; there is no Windows machine here"
+    }
+  },
+  "local": [
+    {
+      "id": "local:percolator:3.09:linux-x86-64",
+      "wrapper": "scratch/percolator/3.09/run-percolator-3.09.sh",
+      "goldenKey": "percolator-3.09-local",
+      "reason": "a registered LOCAL Percolator 3.09 (the upstream .rpm's binary with Boost 1.66 beside it), registered through the Tool Manager's local-binary path; recorded separately because Linux has no managed 3.09 (D-003). It is gitignored scratch, never present on a CI runner"
+    }
+  ],
+  "advisories": [
+    {
+      "id": "matrix.comet-2026.03.0-index-search-type",
+      "kind": "comet-defaults",
+      "versions": ["2026.02.2", "2026.03.0"],
+      "text": "Comet 2026.03.0 changes index_search_type's default from 1 to -1 and no longer writes it into the -p defaults file; it changed what the parameter means (D-010). Both releases declare the same 118 parameter names to -q. The product reads each release's own schema and defaults from that release's binary and metadata, so nothing branches on the version; a 2026.02.2 parameter file migrates with a reviewable diff.",
+      "docs": "docs/developer/version_capabilities.rst, 'Version advisories the matrix records'"
+    },
+    {
+      "id": "matrix.percolator-3.06.5-learns-different-weights",
+      "kind": "percolator-synthetic-outputs",
+      "versions": ["3.06.5", "3.07.1"],
+      "text": "Over the same synthetic PIN and the same seed, Percolator 3.06.5 learns different weights from 3.07.1, so its scores, q-values and PEPs differ; the table format, the header and the weights file layout do not (3 splits, the same features). Known since Phase 09 (cometgui-results' PROVENANCE.txt). It is the 3.06-era behaviour D-003 asks to be carried as an advisory, not hidden.",
+      "docs": "docs/developer/version_capabilities.rst, 'Version advisories the matrix records'"
+    },
+    {
+      "id": "matrix.percolator-3.09-i-spline-pep",
+      "kind": "percolator-synthetic-outputs",
+      "versions": ["3.07.1", "3.09"],
+      "text": "Percolator 3.09 estimates PEP with I-splines (3.08's change, R-PERC-11's 3.07.1 advisory); over the synthetic PIN every column but posterior_error_prob is identical to 3.07.1's, and weights.txt is byte-identical.",
+      "docs": "docs/developer/version_capabilities.rst, 'Version advisories the matrix records'"
+    },
+    {
+      "id": "matrix.percolator-3.06.5-vs-3.09",
+      "kind": "percolator-synthetic-outputs",
+      "versions": ["3.06.5", "3.09"],
+      "text": "The two differences above combined: 3.06.5's different learned weights and 3.09's I-spline PEP.",
+      "docs": "docs/developer/version_capabilities.rst, 'Version advisories the matrix records'"
+    },
+    {
+      "id": "matrix.percolator-3.09-writes-no-pout-xml",
+      "kind": "percolator-capabilities",
+      "versions": ["3.06.5", "3.09"],
+      "text": "Percolator 3.09 removed XML I/O: its probe observes no XML_OUTPUT and no XML_DECOY_OUTPUT, so the product never passes -X to it and Limelight cannot be fed from it (R-PERC-03; the manifest's own advisory percolator.3-09-writes-no-pout-xml).",
+      "docs": "docs/developer/version_capabilities.rst, 'Version advisories the matrix records'"
+    },
+    {
+      "id": "matrix.percolator-3.09-writes-no-pout-xml-vs-3.07.1",
+      "kind": "percolator-capabilities",
+      "versions": ["3.07.1", "3.09"],
+      "text": "As above, against 3.07.1: the capability sets differ in XML_OUTPUT and XML_DECOY_OUTPUT only.",
+      "docs": "docs/developer/version_capabilities.rst, 'Version advisories the matrix records'"
+    },
+    {
+      "id": "matrix.pair-results-differ-by-percolator",
+      "kind": "pair-results-percolator",
+      "versions": ["3.06.5", "3.07.1"],
+      "text": "Over the same Comet search, Percolator 3.06.5 and 3.07.1 select different numbers of PSMs and peptides at the default 1% cut-off (different learned weights, above); the run's structure (row counts, decoy counts at the cut-off, 3 weight splits) is the same.",
+      "docs": "docs/developer/version_capabilities.rst, 'Version advisories the matrix records'"
+    },
+    {
+      "id": "matrix.pair-results-differ-by-comet",
+      "kind": "pair-results-comet",
+      "versions": ["2026.02.2", "2026.03.0"],
+      "text": "With the same Percolator, a search by Comet 2026.02.2 and by 2026.03.0 under each release's own defaults gives the same PIN row counts but differently scored PSMs, so Percolator selects different PSMs at 1%. Each release is searched with its own defaults; the matrix does not equalise them.",
+      "docs": "docs/developer/version_capabilities.rst, 'Version advisories the matrix records'"
+    }
+  ]
+}

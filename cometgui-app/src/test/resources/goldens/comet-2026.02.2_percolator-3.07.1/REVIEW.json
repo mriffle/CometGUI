@@ -1,0 +1,12 @@
+{
+  "rule": "R-TEST-07: updating a golden requires a reviewed written explanation of why the scientific change is expected, recorded here. A golden whose SHA-256 is not below fails scripts/matrix/check_goldens.py.",
+  "reviews": [
+    {
+      "file": "fixture-8b704dcb6eb4c2f34e3fe55633229a739ac58039917c8cf18c8a42c7cf94e9a5.linux-x86-64.json",
+      "sha256": "8c5bd8a63186ebd747ae9f6c1fe87cd0c79363423f99164aad00a3eb09c68b61",
+      "date": "2026-11-06",
+      "reviewer": "written by the Phase 15 unit 6 agent from its matrix runs; reviewed at the unit 6 sign-off (handoffs/PHASE-15-worklog.rst)",
+      "explanation": "First golden for comet 2026.02.2 with percolator 3.07.1 over the D-006 local fixture on linux-x86-64, recorded when the version matrix was built (Phase 15 unit 6). The whole workflow ran through the product's run port with the release's own Comet defaults, decoy_search = 1 and Percolator's defaults: 6670 merged PIN rows (3886 target, 2784 decoy), 3886 target PSMs of which 1036 pass q <= 0.01, 2973 peptides of which 602 pass, 9 decoy PSMs at the cut-off, 3 weight splits over 22 features. Expected scientifically: a 1% PSM FDR admits about one decoy per hundred targets (9 against 1036), Percolator's three cross-validation splits, and totals of the same order as Phase 00's end-to-end proof on this fixture (3897 PSMs, 2985 peptides). Values differ across the four pairs exactly as the matrix's advisories say (learned weights by Percolator release, scored PSMs by Comet release)."
+    }
+  ]
+}
