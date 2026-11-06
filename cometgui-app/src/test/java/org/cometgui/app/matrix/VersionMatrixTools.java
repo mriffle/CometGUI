@@ -59,6 +59,7 @@ import org.cometgui.params.percolator.schema.PercolatorSetting;
 import org.cometgui.results.filtering.PeptideQValueFilter;
 import org.cometgui.results.filtering.PsmQValueFilter;
 import org.cometgui.results.parser.LearnedWeights;
+import org.cometgui.results.parser.PercolatorOutputException;
 import org.cometgui.results.parser.ResultRow;
 import org.cometgui.results.parser.ResultTable;
 import org.cometgui.results.parser.ResultTableReader;
@@ -457,7 +458,7 @@ class VersionMatrixTools {
 
     /** Parses every table and the weights, with counts this test makes itself beside them. */
     private static void tables(PercolatorCommand command, Map<String, Object> metrics)
-            throws Exception {
+            throws IOException, PercolatorOutputException {
         for (PercolatorArtefact artefact :
                 List.of(
                         PercolatorArtefact.TARGET_PSMS,

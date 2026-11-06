@@ -46,6 +46,7 @@ import org.cometgui.domain.tools.ToolOffer;
 import org.cometgui.domain.tools.ToolOrigin;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.install.probe.HostRuntimeVersions;
+import org.junit.jupiter.api.function.Executable;
 
 /**
  * What the version matrix's three opt-in classes share (Phase 15 unit 6, gate item 1): the opt-in
@@ -136,11 +137,21 @@ final class MatrixSupport {
      * @throws IOException if it cannot be created
      */
     static Path rows() throws IOException {
+        return Files.createDirectories(report().resolve("rows"));
+    }
+
+    /**
+     * The report directory the runner handed in.
+     *
+     * @return the directory, absolute
+     * @throws IOException if it cannot be created
+     */
+    static Path report() throws IOException {
         String report = System.getProperty(REPORT, "");
         assertTrue(
                 !report.isBlank(),
                 "the version matrix needs -D" + REPORT + "=DIR (scripts/matrix/run-matrix.sh)");
-        return Files.createDirectories(Path.of(report).toAbsolutePath().resolve("rows"));
+        return Files.createDirectories(Path.of(report).toAbsolutePath());
     }
 
     /**
@@ -281,18 +292,6 @@ final class MatrixSupport {
         return RealSearch.sha256(file);
     }
 
-    /** A step of a row's check. */
-    @FunctionalInterface
-    interface Check {
-
-        /**
-         * Runs the check.
-         *
-         * @throws Exception anything; an exception or assertion fails the check
-         */
-        void run() throws Exception;
-    }
-
     /** One matrix row: observed values and named checks, written whether it passed or not. */
     static final class Row {
 
@@ -337,23 +336,28 @@ final class MatrixSupport {
          * @param check the assertions
          * @return whether it passed
          */
-        boolean check(String name, Check check) {
+        boolean check(String name, Executable check) {
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("name", name);
             try {
-                check.run();
+                check.execute();
                 entry.put("passed", true);
             } catch (Exception | AssertionError failed) {
-                String words =
-                        failed.getClass().getSimpleName()
-                                + ": "
-                                + String.valueOf(failed.getMessage());
-                entry.put("passed", false);
-                entry.put("detail", words);
-                failures.add(name + " -- " + words);
+                fail(entry, name, failed);
+            } catch (Error fatal) {
+                throw fatal;
+            } catch (Throwable other) {
+                fail(entry, name, other);
             }
             checks.add(entry);
             return failures.isEmpty();
+        }
+
+        private void fail(Map<String, Object> entry, String name, Throwable failed) {
+            String words = failed.getClass().getSimpleName() + ": " + failed.getMessage();
+            entry.put("passed", false);
+            entry.put("detail", words);
+            failures.add(name + " -- " + words);
         }
 
         /**

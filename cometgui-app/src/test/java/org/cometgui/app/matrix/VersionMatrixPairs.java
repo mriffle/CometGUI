@@ -152,7 +152,7 @@ class VersionMatrixPairs {
     @Test
     @DisplayName(
             "every (Comet, Percolator) pair offered here runs the whole workflow over the fixture")
-    void everyPair() throws Exception {
+    void everyPair() throws IOException, InterruptedException {
         String named = System.getProperty(MatrixSupport.FIXTURE, "");
         assertFalse(
                 named.isBlank(),

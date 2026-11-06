@@ -141,7 +141,7 @@ class VersionMatrixCensus {
         census.put("platforms", platforms);
         census.put("selections", selections);
         census.put("toolManager", managers);
-        Path file = MatrixSupport.rows().getParent().resolve("census.json");
+        Path file = MatrixSupport.report().resolve("census.json");
         Files.writeString(file, MatrixSupport.Json.write(census) + "\n", StandardCharsets.UTF_8);
     }
 
