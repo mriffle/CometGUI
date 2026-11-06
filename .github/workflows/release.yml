@@ -21,8 +21,9 @@
 #
 # Every step that would touch a real artefact is a stub that exits 70 and names
 # its owning phase.  The steps that can be honest today -- the strict
-# documentation build and the SBOM -- are real, and they are the same scripts
-# the pull-request pipeline runs.
+# documentation build and the SBOM, the same scripts the pull-request pipeline
+# runs, and since Phase 15 unit 5 the tool manifest verification (R-TEST-08),
+# the same script the nightly runs -- are real.
 #
 # WINDOWS AND MACOS ARE NAMED BUT UNVERIFIABLE HERE.  This environment has one
 # Linux machine, and GitHub has executed only one scheduled nightly here, so

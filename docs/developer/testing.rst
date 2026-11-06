@@ -145,7 +145,9 @@ the first of them and has built the scaffolding for two more.
      - Larger real data, version matrices, determinism, performance.
      - **Pipeline exists, work does not.** Every nightly step is a stub that
        exits 70 naming its owning phase. A green nightly today would mean
-       nothing; a red one names exactly what is missing.
+       nothing; a red one names exactly what is missing. *Since then:* Phase
+       15 replaces them one at a time; the tool manifest verification is real
+       (:ref:`dev-manifest-verify`).
 
    * - Release acceptance
      - The exact installer and package artefacts that will be published.
@@ -795,6 +797,143 @@ one is ``D-008``, still open. Phase 01 exit gate item 6 is therefore half met:
 every step is proved on this machine, and the "on a pull request" half is
 recorded as unmet rather than pretended.
 
+.. _dev-manifest-verify:
+
+Tool manifest verification -- ``R-TEST-08``
+-------------------------------------------
+
+:Checks: every artefact and companion record of ``manifests/tools.json``
+   against upstream, and every tool repository's newest release against the
+   tags the manifest records.
+:Fails: exit 1 when upstream changed, exit 3 when it could not verify -- both
+   red; exit 0 only when everything matched.
+:Configured in: ``scripts/ci/manifest_verify.py`` (standard library only),
+   ``scripts/ci/manifest/not-adopted.json``; the self-test is
+   ``scripts/ci/manifest_verify_selftest.py``.
+:Runs with: ``bash scripts/ci/nightly-manifest-verify.sh`` -- the nightly's
+   ``manifest-verify`` job and a release step; ``--self-test`` is the
+   ``manifest`` control of ``scripts/verify-all-gates.sh``.
+
+CometGUI redistributes no tool (``D-008``): the user's own copy downloads each
+one from upstream by pinned URL, size, SHA-256 and MD5. If upstream deletes a
+release asset, re-tags a release or rebuilds an asset in place, every *new*
+installation breaks and the project has no copy to fall back on. This job is
+what notices before a user does. It exists because exactly that happened to
+the PDV 2.6.0 pin while the specification was being written, and nothing
+noticed.
+
+**What it does.** Each distinct URL is downloaded once (the five PDV rows share
+one, for instance), streamed into a temporary directory outside the repository,
+hashed, and deleted; nothing downloaded is executed or extracted to disk. Its
+size, SHA-256 and MD5 are compared in full with every record that pins it.
+Where a record pins an archive member -- ``member`` and its digests on a
+Percolator ZIP record, ``members`` on a companion -- the member is read out of
+the archive in memory, by the reader the record's ``kind`` names (``ZIP``,
+``DEB_PAYLOAD``: ``ar`` then ``data.tar.*``, ``PKG_PAYLOAD``: ``xar`` then the
+gzip ``070707`` cpio), and compared too. Then, for each GitHub repository the
+download URLs name, ``https://api.github.com/repos/<owner>/<repo>/releases`` is
+read; drafts and prereleases are ignored, the rest are ordered by publication
+date, and the newest must carry a tag the manifest records. On 2026-11-06 it
+checked 38 records and 25 members over 28 downloads (170,152,439 bytes) and four
+listings in 22 seconds, and every one matched.
+
+**Reading a red.** Each verdict is its own block, naming the record (tool,
+version, operating system, architecture, and the companion or member where
+there is one), the URL, and expected against actual:
+
+``RED (a) CHECKSUM OR SIZE CHANGED``
+   The bytes at the pinned URL are not the bytes the manifest pins. Each of
+   size, SHA-256 and MD5 is printed expected-against-actual, with
+   ``<-- CHANGED`` on those that differ. Upstream rebuilt or replaced the
+   asset under the same name. Do **not** update the digest to match: the
+   product would then install a binary nobody has probed. Fetch it, find out
+   what changed, and re-pin it through the same review a new version gets.
+``RED (b) GONE UPSTREAM -- D-008 upstream availability failure``
+   HTTP 404 or 410, or a redirect to nothing. Worded as the product's own
+   ``ArtefactUnavailableException`` is: an availability failure, not a corrupt
+   download -- the asset was removed or re-tagged, and every new install of
+   that record fails until the manifest changes.
+``RED (c) NEW UPSTREAM RELEASE``
+   A repository's newest published release carries a tag the manifest does not
+   record. It names the tag, its date, the tools and the recorded tags. Adopt
+   it (a manifest change with its probes and evidence), or record it in
+   ``scripts/ci/manifest/not-adopted.json``.
+``COULD NOT VERIFY``
+   No verdict could be reached for that check: a persistent transport failure,
+   a rate-limited API, an archive the reader cannot open. This is never green.
+   If there is also a red verdict, the exit status is 1 and both are printed.
+
+**What is retried, and why that hides nothing.** Only transport failures, at
+most three attempts, each from byte zero and each printed with its cause: a
+refused, reset or aborted connection, a body shorter than its declared length,
+a socket timeout, a DNS failure, HTTP 500/502/503/504. None of those is a fact
+about the artefact. A 404, a 410, a redirect to nothing, a size or digest
+mismatch, a missing member and a rate limit are **never** retried: each is a
+verdict, or a fact a second request cannot change, and asking twice for a
+verdict is how a flaky upstream gets averaged into a green one. The self-test
+counts the requests to prove it.
+
+**The not-adopted list.** ``scripts/ci/manifest/not-adopted.json`` records a
+newer upstream release the project has decided not to adopt, one entry per
+release: ``repository``, ``tag``, a ``reason`` of at least 40 characters a
+reader can act on, and the ISO ``date`` it was decided. **Empty is the correct
+state**, and it was empty when this job was written, because every
+repository's newest release was already recorded. An entry is refused (exit 2)
+if its reason is a placeholder, its date is in the future, the manifest
+already records its tag, or it no longer matches an unrecorded newer release:
+a stale entry is a place for the next release to hide. It is a reviewed change
+to a committed file, never a flag.
+
+**The self-test**, ``bash scripts/ci/nightly-manifest-verify.sh --self-test``,
+touches no upstream host and never reads ``manifests/tools.json``. It builds
+its own small artefacts -- a bare executable, ZIPs (one with a member named
+``../my_build/src/percolator``, as the real 3.06.5 macOS archive has), a
+``.deb``, a ``.pkg`` -- a synthetic manifest pinning them and synthetic releases
+listings, serves them from a loopback HTTP server that redirects downloads as
+GitHub does, and runs the real verifier against it, once per case, with one
+defect injected each time. Each case is graded on its exit status, on the
+exact lines it must print, and on the number of requests the server saw. The
+cases: a clean world (verified, the shared URL fetched once); one byte
+altered, the size changed, a pinned SHA-256 differing only in its last
+character and an MD5 alone (each red (a) naming the record); 404, 410 and a
+redirect with no ``Location`` (each red (b), in the availability words,
+requested once); an unknown newer tag (red (c) naming it), and known tags out
+of date order, a newer draft and a newer prerelease (each green); a connection
+reset and a 503 that persist (could not verify after exactly three attempts),
+one reset then the asset (green, the retry printed), a rate-limited API (could
+not verify, requested once) and every host refusing (could not verify); a
+wrong member pin in a ZIP, a traversal-named ZIP member, a ``.deb`` and a
+``.pkg``, and a pinned member absent (each red (a)); every kind of red at once
+(each named); the not-adopted list honoured, and refused with a placeholder
+reason, a future date or a stale entry; a manifest with a non-https URL
+refused; and the wrapper refusing an unknown option. Two more grade the
+grader: the byte-altered case run **without** its defect, and run with a 404
+instead, must each be reported as a harness failure -- otherwise a grader that
+passes everything would look exactly like a verifier that catches everything.
+30 cases, about two seconds.
+
+**Why the self-test is its own control.** Every other ``scripts/ci/*.sh``
+gate's self-test -- the SBOM, the dependency scan, the workflow checker -- is
+a control of ``scripts/verify-all-gates.sh`` in its own right, graded on its
+markers and a floor, and this one follows that pattern (``manifest``, PHASE-15
+item 5, floor 30). The ``pipeline`` control was the other candidate, but it
+grades the workflows' step classification, and it now runs the *real* job --
+twice, nightly and release, about 170 MB each -- so it needs the network and
+goes red whenever upstream changes. The self-test is loopback-only, takes
+seconds, writes nothing but its own temporary directory, so it holds no
+``gate_locks`` lock, and stays a deterministic proof that the job **can** go
+red even on a day when upstream is down.
+
+**What it does not cover.** The job reads the first 100 entries of each
+releases listing, which GitHub orders newest first; a repository that
+published more than 100 releases since the newest recorded one would have
+older new tags left unnamed, though the newest would still be red. It holds
+no credential (no workflow may), so it shares GitHub's limit of 60
+unauthenticated API requests an hour per address with whatever else runs on
+the runner's address; it uses four, and a refusal is "could not verify", not
+green. The release workflow's Windows and macOS entries run it too, and have
+never run.
+
 Falsifiability
 ==============
 
@@ -926,6 +1065,19 @@ pass is worse than no aggregator at all.
        later phase *is* a stub, and each must exit 70 rather than 0.
      - A stub that exited 0 fails ``run-pipeline-locally.sh``, which classifies
        each step before running it.
+
+   * - Tool manifest verification (Phase 15, ``manifest``)
+     - ``bash scripts/ci/nightly-manifest-verify.sh --self-test``: 28 cases
+       against a loopback server and a synthetic manifest -- bytes, size and
+       pins altered, 404/410/a redirect to nothing, an unknown newer release,
+       persistent transport failures, wrong member pins in a ZIP, ``.deb`` and
+       ``.pkg`` -- and two controls on its own grader
+       (:ref:`dev-manifest-verify`).
+     - The exact lines, e.g. ``RED (a) CHECKSUM OR SIZE CHANGED: comet 1.0.0
+       linux x86-64``; ``RED (b) GONE UPSTREAM -- D-008 upstream availability
+       failure``; ``RED (c) NEW UPSTREAM RELEASE: wenbostar/PDV published
+       v2.1.0``; and the server's request count where "never retried" is the
+       claim.
 
    * - ``LICENSE``
      - Five damaged copies: truncated, altered title, CRLF-expanded, a wrong
@@ -2960,7 +3112,9 @@ exists is worse than no page.
 
    * - Nightly regression, determinism, performance, version matrix
      - 15
-     - Every nightly step is a stub that exits 70 naming its phase.
+     - Every nightly step is a stub that exits 70 naming its phase. *Since
+       then:* the tool manifest verification is real
+       (:ref:`dev-manifest-verify`).
 
    * - Release acceptance on real installer artefacts
      - 14, 16

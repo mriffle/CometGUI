@@ -47,8 +47,12 @@
 #
 # NETWORK.  The dependency-scan control needs https://api.osv.dev.  That is
 # deliberate and is not an offline mode waiting to be added: an offline
-# dependency scan is not a dependency scan.  Everything else runs offline once
-# tools/, .venv/ and _build/m2repo exist.
+# dependency scan is not a dependency scan.  The pipeline control runs the
+# real tool manifest verification (R-TEST-08, since Phase 15 unit 5), which
+# needs github.com and api.github.com for the same reason; its self-test, the
+# manifest control, is loopback only.  The e2e control needs the tools'
+# release hosts too.  Everything else runs offline once tools/, .venv/ and
+# _build/m2repo exist.
 #
 # THE WORKING TREE IS NEVER TOUCHED.  Every sub-harness damages a copy under
 # _build/.  This script writes only _build/all-gate-logs/.
@@ -103,6 +107,7 @@ readonly -a ALL_GATES=(
     traceability
     sbom
     depscan
+    manifest
     pipeline
     quality
     shell
@@ -262,9 +267,22 @@ gate_spec() {
             GATE_FLOOR=16
             GATE_UNIT="cases"
             ;;
+        manifest)
+            GATE_PHASE="15"
+            GATE_ITEMS="5"
+            GATE_DEFECT="R-TEST-08's manifest verification against a loopback server serving synthetic artefacts, releases listings and a synthetic manifest (no upstream host, manifests/tools.json untouched): one byte altered, the size changed, a pinned SHA-256 differing in its last character alone and an MD5 alone, each red (a) naming the record; HTTP 404, 410 and a redirect to nothing, each red (b) in D-008's availability words and requested once; an unknown newer release red (c) naming its tag, while known tags out of date order, a newer draft and a newer prerelease stay green; a persistent connection reset and a persistent 503 (exactly 3 attempts), a rate-limited releases API (not retried) and every host refusing, each COULD NOT VERIFY and never green, and one reset followed by the asset green with the retry printed; a pinned member wrong in a ZIP, a traversal-named ZIP member, a .deb and a .pkg, and a member absent, each red; every red at once, each named; the not-adopted list honoured, and refused with a placeholder reason, a future date or a stale entry; a non-https record refused; and, as controls on the grader, a case with its defect not injected and a red with another defect's words, each reported as a HARNESS FAILURE"
+            GATE_SCRIPT="scripts/ci/nightly-manifest-verify.sh"
+            GATE_ARGS=(--self-test)
+            GATE_PROOF=(
+                "manifest-verify: self-test OK --"
+                "H1 a case whose defect was not injected: reported as a HARNESS FAILURE (expected exit 1, got 0)"
+            )
+            GATE_FLOOR=30
+            GATE_UNIT="cases"
+            ;;
         pipeline)
             GATE_ITEMS="6"
-            GATE_DEFECT="none injected: every nightly and release step whose work belongs to a later phase is a stub, and each MUST exit 70 rather than 0 -- the silent pass this phase was told not to ship"
+            GATE_DEFECT="none injected: every nightly and release step whose work belongs to a later phase is a stub, and each MUST exit 70 rather than 0 -- the silent pass this phase was told not to ship; every real step MUST exit 0, among them, since Phase 15 unit 5, the real tool manifest verification, which downloads every pinned artefact (about 170 MB, twice: nightly and release) and reads the GitHub releases listings, so it needs the network and is red whenever upstream has changed"
             GATE_SCRIPT="scripts/ci/run-pipeline-locally.sh"
             GATE_ARGS=(nightly release)
             GATE_PROOF=("0 unexpected." "OK -- every executed step behaved as its classification requires.")
@@ -546,6 +564,8 @@ gate_count() {
             sed -n 's/.*self-test OK -- \([0-9][0-9]*\) damaged SBOM(s) rejected.*/\1/p' -- "${log}" | head -1 ;;
         depscan)
             sed -n 's/.*self-test OK -- \([0-9][0-9]*\)\/[0-9][0-9]* cases.*/\1/p' -- "${log}" | head -1 ;;
+        manifest)
+            sed -n 's/.*manifest-verify: self-test OK -- \([0-9][0-9]*\)\/[0-9][0-9]* cases.*/\1/p' -- "${log}" | head -1 ;;
         pipeline)
             sed -n 's/.*workflow(s); \([0-9][0-9]*\) executed on this machine; 0 unexpected.*/\1/p' -- "${log}" | head -1 ;;
         quality)
@@ -584,8 +604,8 @@ usage() {
     cat <<USAGE
 ${SCRIPT_NAME} -- run every falsifiability control the project has and prove
 that every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07,
-PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12, PHASE-13 and PHASE-14 gate
-still fails on the defect it exists to catch.
+PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12, PHASE-13, PHASE-14 and
+PHASE-15 gate still fails on the defect it exists to catch.
 
 Usage:
   bash scripts/${SCRIPT_NAME}                 run every control
@@ -621,7 +641,10 @@ WHEN TO RUN IT.
 
 WHAT IT NEEDS.  A built tree (run bash scripts/build.sh first) for tools/,
 .venv/ and _build/m2repo; the project-local font stack; network access to
-https://api.osv.dev for the dependency-scan control; and, for the e2e control,
+https://api.osv.dev for the dependency-scan control; network access to
+github.com (and where it redirects release downloads) and api.github.com for
+the pipeline control, whose nightly and release runs include the real tool
+manifest verification; and, for the e2e control,
 the D-006 local fixture under scratch/ and network access to github.com and
 *.githubusercontent.com, where the tools' pinned release URLs are served.
 
@@ -669,7 +692,8 @@ list_gates() {
     printf '  The ITEM column is phase-qualified: 01:n is an item of PHASE-01, 02:n of\n'
     printf '  PHASE-02, 04:n of PHASE-04, 05:n of PHASE-05, 06:n of PHASE-06, 07:n of\n'
     printf '  PHASE-07, 08:n of PHASE-08, 09:n of PHASE-09, 10:n of PHASE-10, 11:n of\n'
-    printf '  PHASE-11, 12:n of PHASE-12, 13:n of PHASE-13, 14:n of PHASE-14.\n'
+    printf '  PHASE-11, 12:n of PHASE-12, 13:n of PHASE-13, 14:n of PHASE-14, 15:n of\n'
+    printf '  PHASE-15.\n'
     printf '  Every phase numbers its items\n'
     printf '  from one, so the phase is always named rather than inferred.\n'
     printf '  PHASE-01 items: 1 one documented build command; 2 strict documentation\n'
@@ -768,6 +792,8 @@ list_gates() {
     printf '  comparison, a dropped provenance entry and a bypassed downstream stage each\n'
     printf '  failing the canonical test; 6 no fixed sleep; 7 the bridge-absence check\n'
     printf '  failing on a build that includes the bridge.\n'
+    printf '  PHASE-15 items (only item 5 has a control here): 5 the manifest\n'
+    printf '  verification job demonstrably failing when a checksum is altered.\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'
@@ -775,7 +801,8 @@ list_gates() {
     printf '  phases/PHASE-07-comet-param-ui.rst, phases/PHASE-08-workflow-comet.rst,\n'
     printf '  phases/PHASE-09-percolator.rst, phases/PHASE-10-results.rst,\n'
     printf '  phases/PHASE-11-pdv.rst, phases/PHASE-12-limelight.rst,\n'
-    printf '  phases/PHASE-13-provenance-ui.rst and phases/PHASE-14-e2e.rst.\n\n'
+    printf '  phases/PHASE-13-provenance-ui.rst, phases/PHASE-14-e2e.rst and\n'
+    printf '  phases/PHASE-15-hardening.rst.\n\n'
 }
 
 # preflight SELECTED...  -- every sub-harness must be there and executable
@@ -1094,7 +1121,7 @@ main() {
     mkdir -p -- "${LOGS}"
 
     printf '===============================================================================\n'
-    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12, PHASE-13 and PHASE-14 gate must be seen to fail\n' "${SCRIPT_NAME}"
+    printf ' %s -- every PHASE-01, PHASE-02, PHASE-04, PHASE-05, PHASE-06, PHASE-07, PHASE-08, PHASE-09, PHASE-10, PHASE-11, PHASE-12, PHASE-13, PHASE-14 and PHASE-15 gate must be seen to fail\n' "${SCRIPT_NAME}"
     printf '===============================================================================\n'
     printf '  repository   %s\n' "${ROOT}"
     printf '  controls     %d of %d\n' "${#selected[@]}" "${#ALL_GATES[@]}"
@@ -1162,7 +1189,7 @@ main() {
     # rather than a wildcard: a missing phase is visible as a missing line.
     local phase items
     printf '\n'
-    for phase in 01 02 04 05 06 07 08 09 10 11 12 13 14; do
+    for phase in 01 02 04 05 06 07 08 09 10 11 12 13 14 15; do
         items="$(printf '%s\n' "${COVERED[@]}" \
             | sed -n "s/^${phase} //p" | tr ',' '\n' | tr -d ' ' \
             | grep -E '^[0-9]+$' | sort -un | paste -sd, - || true)"

@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "comment": "Upstream releases seen by scripts/ci/manifest_verify.py (R-TEST-08) and deliberately NOT adopted into manifests/tools.json. EMPTY IS THE CORRECT STATE. An entry silences the 'new upstream release' red for exactly one tag of one repository, so it is a reviewable change to a checked-in file, never a command-line flag. Every entry needs: repository (owner/repo exactly as the manifest's download URLs name it), tag (the release tag), reason (why this release is not adopted, in at least 40 characters a reader can act on), date (ISO, when that was decided; never in the future). An entry whose tag the manifest records, or that matches no unrecorded newer release any more, fails the job: a stale entry is a place for the next release to hide.",
+  "entries": []
+}

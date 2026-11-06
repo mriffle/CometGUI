@@ -1,17 +1,53 @@
 #!/usr/bin/env bash
 #
-# nightly-manifest-verify.sh -- DELIBERATE STUB installed by PHASE-01.
+# nightly-manifest-verify.sh -- R-TEST-08, the tool manifest verification job.
 #
-# R-TEST-08 is the job that would have caught the PDV 2.6.0 pin going stale. It needs the tool manifest, which PHASE-05 owns; PHASE-15 delivers R-TEST-08 itself.
+# Downloads every artefact manifests/tools.json pins (each distinct URL once,
+# into a temporary directory, never executed), checks its size, SHA-256 and
+# MD5 -- and each pinned archive member's -- against the manifest, and checks
+# that every tool repository's newest published GitHub release is one the
+# manifest records.  CometGUI redistributes no tool (D-008), so an asset that
+# vanishes or changes upstream breaks installation for every new user; this
+# job is the only thing that notices first.  The work is done by
+# scripts/ci/manifest_verify.py (standard library only); see its docstring and
+# docs/developer/testing.rst, "Tool manifest verification".
 #
-# Exits 70 (never 0) via scripts/ci/stub-lib.sh, naming PHASE-15 as the owner.
-# Replacing this file with the real check is PHASE-15's work; making it exit 0
-# to turn a pipeline green is a gate weakening and a rejection at sign-off.
+# Usage:
+#   bash scripts/ci/nightly-manifest-verify.sh
+#   bash scripts/ci/nightly-manifest-verify.sh --manifest PATH [--not-adopted PATH]
+#   bash scripts/ci/nightly-manifest-verify.sh --self-test   # loopback only, no upstream
+#   bash scripts/ci/nightly-manifest-verify.sh --help
+#
+# Network (P15-5b): the manifest's download URLs and wherever GitHub redirects
+# them, and https://api.github.com/repos/<owner>/<repo>/releases for the
+# repositories those URLs name.  Nothing else.  --self-test touches neither.
+#
+# Exit status (manifest_verify.py's, unchanged):
+#   0  VERIFIED          every record and member matches; every newest release recorded
+#   1  UPSTREAM CHANGED  (a) a size or digest changed, (b) an artefact is gone
+#                        upstream, (c) a new upstream release is unrecorded
+#   2  misuse, or the manifest or the not-adopted list refused
+#   3  COULD NOT VERIFY  a check could not be completed -- never green
+#   7  --self-test only: a case did not behave as required
 
 set -Eeuo pipefail
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-exec bash "${SCRIPT_DIR}/stub-lib.sh" \
-    --script "nightly-manifest-verify.sh" \
-    --phase  "PHASE-15" \
-    --owns   "verify that every managed tool URL and checksum in the manifest is still reachable and unchanged, and fail loudly when an artefact disappears, changes checksum, or is superseded by a new upstream release (R-TEST-08)" \
-    --spec   "specification.rst, R-TEST-08"
+PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+
+# The project virtualenv where it exists; otherwise the runner's own Python 3
+# (the CI job provisions nothing: the verifier is standard library only).
+# "python" is tried last for the Windows runner, and only if it is Python 3.
+PYTHON=""
+for candidate in "${PROJECT_ROOT}/.venv/bin/python" "$(command -v python3 || true)" "$(command -v python || true)"; do
+    if [ -n "${candidate}" ] && [ -x "${candidate}" ] \
+        && "${candidate}" -c 'import sys; sys.exit(sys.version_info < (3, 8))' 2>/dev/null; then
+        PYTHON="${candidate}"
+        break
+    fi
+done
+[ -n "${PYTHON}" ] || { printf 'nightly-manifest-verify.sh: no Python 3.8 or newer\n' >&2; exit 2; }
+
+# -I: isolated (no user site, no PYTHON* variables, no current directory on the
+# path); -B: no __pycache__ in the source tree.
+exec "${PYTHON}" -I -B "${SCRIPT_DIR}/manifest_verify.py" "$@"

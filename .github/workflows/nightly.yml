@@ -24,7 +24,8 @@
 # stub is its own red line naming its owner.  The run as a whole stays red
 # until Phase 15 replaces the stubs; that is the honest state, and nothing may
 # be added to mark a step as allowed to fail, or to swallow its exit status
-# (scripts/ci/check-workflows.sh refuses both).
+# (scripts/ci/check-workflows.sh refuses both).  Phase 15 replaces them one
+# at a time: the tool manifest verification (R-TEST-08) is real since unit 5.
 #
 # scripts/ci/run-pipeline-locally.sh runs every step below on this machine and
 # requires each stub to fail and each real step to pass.
@@ -121,7 +122,13 @@ jobs:
         run: bash scripts/ci/nightly-gui-tests.sh
 
   manifest-verify:
-    name: "Nightly (Linux): tool manifest (stub, Phase 15)"
+    # R-TEST-08, real since Phase 15 unit 5.  Downloads every artefact
+    # manifests/tools.json pins (about 170 MB), checks size, SHA-256, MD5 and
+    # each pinned archive member, and reads the GitHub releases listing of every
+    # tool repository: red on a changed or vanished artefact or an unrecorded
+    # newer release (exit 1), red when it could not verify (exit 3), never green
+    # by default.  Standard-library Python only, so it needs no provisioning.
+    name: "Nightly (Linux): tool manifest (R-TEST-08)"
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
