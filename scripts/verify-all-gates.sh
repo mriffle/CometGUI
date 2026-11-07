@@ -197,7 +197,9 @@ declare -a COVERED=()
 #                2026-10-23, phase 14 unit 9's first shipping count; 50 the
 #                same day, when the orchestrator added the smoke and its
 #                self-test to control P.  flakiness: 39 on 2026-11-07,
-#                phase 15 unit 9's first shipping count.)
+#                phase 15 unit 9's first shipping count; 40 the same day,
+#                when the orchestrator's sign-off added the same-line retry
+#                case.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -293,7 +295,7 @@ gate_spec() {
                 "flakiness-check: self-test OK --"
                 "H1 a case whose defect was not injected: reported as a HARNESS FAILURE"
             )
-            GATE_FLOOR=39
+            GATE_FLOOR=40
             GATE_UNIT="cases"
             ;;
         pipeline)

@@ -448,11 +448,13 @@ def check(root: Path) -> tuple[list[Problem], Census]:
                 line = re.sub(r"<!--.*?-->", "", line)
             elif line.lstrip().startswith("#"):
                 continue
-            hit = retry_tokens.search(line)
-            if hit and hit.group(0) == "maven.test.failure.ignore" and grader:
-                census.count("maven.test.failure.ignore in a harness that grades each testcase")
-                continue
-            if hit:
+            # Every token on the line is graded, not only the first: a permitted
+            # maven.test.failure.ignore in a grading harness must not carry a retry
+            # past the check on the same line (found at the orchestrator's sign-off).
+            for hit in retry_tokens.finditer(line):
+                if hit.group(0) == "maven.test.failure.ignore" and grader:
+                    census.count("maven.test.failure.ignore in a harness that grades each testcase")
+                    continue
                 problems.append(Problem("RETRY", f"{path}:{number}",
                                         f"'{hit.group(0)}' -- an unconditional retry or an ignored "
                                         "failure hides instability; a flaky test is a defect to fix"))
@@ -975,6 +977,10 @@ def cases():
         ("-Dsurefire.rerunFailingTestsCount in .mvn/maven.config",
          lambda r: (r / ".mvn/maven.config").open("a").write("-Dsurefire.rerunFailingTestsCount=2\n"),
          {"RETRY": ".mvn/maven.config"}),
+        ("a rerun on the same line as a grading harness's permitted maven.test.failure.ignore",
+         lambda r: _edit(r, "scripts/verify-pdv-gates.sh", "-Dmaven.test.failure.ignore=true \\",
+                         "-Dmaven.test.failure.ignore=true -Dsurefire.rerunFailingTestsCount=2 \\"),
+         {"RETRY": "'rerunFailingTestsCount'"}),
         ("testFailureIgnore in a module POM",
          lambda r: _edit(r, "cometgui-ui/pom.xml", "<reuseForks>false</reuseForks>",
                          "<reuseForks>false</reuseForks>\n          <testFailureIgnore>true</testFailureIgnore>"),
