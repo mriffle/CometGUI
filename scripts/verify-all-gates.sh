@@ -55,7 +55,11 @@
 # _build/m2repo exist.
 #
 # THE WORKING TREE IS NEVER TOUCHED.  Every sub-harness damages a copy under
-# _build/.  This script writes only _build/all-gate-logs/.
+# _build/.  This script writes only _build/all-gate-logs/.  The pipeline
+# control, whose nightly matrix, determinism and performance steps and release
+# packaging run Maven, has run every step in its own `git archive HEAD`
+# checkout, _build/ci-pipeline-sandbox, since Phase 15 unit 10: before that it
+# rewrote the working tree's cometgui-*/target under any build beside it.
 #
 # SIDE BY SIDE, SIZED BY CORES (2026-11-05).  The controls can run
 # concurrently, up to a job count:
@@ -110,6 +114,7 @@ readonly -a ALL_GATES=(
     manifest
     flakiness
     pipeline
+    hardening
     quality
     shell
     tests
@@ -199,7 +204,10 @@ declare -a COVERED=()
 #                self-test to control P.  flakiness: 39 on 2026-11-07,
 #                phase 15 unit 9's first shipping count; 40 the same day,
 #                when the orchestrator's sign-off added the same-line retry
-#                case.)
+#                case.  hardening: 35 on 2026-11-07, phase 15 unit 10's first
+#                shipping count.  pipeline: 24 when first floored; 31 on
+#                2026-11-07, raised by phase 15 unit 10 to the count every
+#                run since unit 8 has graded.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -300,12 +308,30 @@ gate_spec() {
             ;;
         pipeline)
             GATE_ITEMS="6"
-            GATE_DEFECT="none injected: every nightly and release step whose work belongs to a later phase is a stub, and each MUST exit 70 rather than 0 -- the silent pass this phase was told not to ship; every real step MUST exit 0, among them, since Phase 15 unit 5, the real tool manifest verification, which downloads every pinned artefact (about 170 MB, twice: nightly and release) and reads the GitHub releases listings, so it needs the network and is red whenever upstream has changed, and, since Phase 15 unit 7, the determinism suite's synthetic half (every offered Percolator installed from upstream and run twelve times over the synthetic PIN), and, since Phase 15 unit 8, the performance suite's spectra-free half in its quick mode (COMETGUI_PERFORMANCE_QUICK=1: every measurement, fewer repeats, graded against this host's runner profile; 374 s measured as a step of this control)"
+            GATE_DEFECT="none injected: every nightly and release step whose work belongs to a later phase is a stub, and each MUST exit 70 rather than 0 -- the silent pass this phase was told not to ship; every real step MUST exit 0, among them, since Phase 15 unit 5, the real tool manifest verification, which downloads every pinned artefact (about 170 MB, twice: nightly and release) and reads the GitHub releases listings, so it needs the network and is red whenever upstream has changed, and, since Phase 15 unit 7, the determinism suite's synthetic half (every offered Percolator installed from upstream and run twelve times over the synthetic PIN), and, since Phase 15 unit 8, the performance suite's spectra-free half in its quick mode (COMETGUI_PERFORMANCE_QUICK=1: every measurement, fewer repeats, graded against this host's runner profile; 374 s measured as a step of this control); since Phase 15 unit 10 every step runs in a git archive of HEAD, _build/ci-pipeline-sandbox, the checkout a runner would make, never in the working tree"
             GATE_SCRIPT="scripts/ci/run-pipeline-locally.sh"
             GATE_ARGS=(nightly release)
-            GATE_PROOF=("0 unexpected." "OK -- every executed step behaved as its classification requires.")
-            GATE_FLOOR=24
+            GATE_PROOF=(
+                "0 unexpected."
+                "OK -- every executed step behaved as its classification requires."
+                "runs from its root, never from the working tree."
+            )
+            GATE_FLOOR=31
             GATE_UNIT="steps executed and classified"
+            ;;
+        hardening)
+            GATE_PHASE="15"
+            GATE_ITEMS="1,2,3,4,6"
+            GATE_DEFECT="in a git-archive sandbox, each proved to reach the compiled class or the script it targets before grading: PercolatorCommands requesting -X from a build without XML_OUTPUT (the version matrix's tools part, real binaries from upstream) and matrix.py's manifest reader skipping a row; PercolatorSettings giving the seed from the clock (the determinism suite's synthetic half) and the determinism data's N made 4 (check-doc); a synthetic PIT report with one package below 80% inside a module above it (build.sh --gates-pit-root; the real-PIT proof is the tests control's M); StreamingHashService digesting every chunk twice more and ProcessTree sending no polite stop (run-performance.sh --only, each beside the other's clean measurement), and a runner with no profile graded NO BASELINE; a release-critical test entered in the quarantine register; and a census of every workflow step -- a PHASE-15 stub that waits for neither D-006 nor a runner made red twice; each with its clean counterpart, and a control H on the harness itself. Item 5 is the manifest control's"
+            GATE_SCRIPT="scripts/verify-hardening-gates.sh"
+            GATE_ARGS=()
+            GATE_PROOF=(
+                "Every gate rejected its defect and accepted the clean tree."
+                "PHASE-15 exit gate items 1, 2, 3, 4 and 6 were proved here"
+                "an injection that reached the source but not the bytecode as a HARNESS FAILURE"
+            )
+            GATE_FLOOR=35
+            GATE_UNIT="controls"
             ;;
         quality)
             GATE_ITEMS="1, 6"
@@ -519,6 +545,20 @@ gate_spec() {
 #   sbom-out   sbom.sh deletes and rewrites _build/sbom/, which the sbom
 #              control and the pipeline's release step run, and the depscan
 #              control reads _build/sbom/cometgui-sbom.json.
+#
+# The pipeline control holds both although, since Phase 15 unit 10, it runs
+# every step in its own checkout (_build/ci-pipeline-sandbox) and writes
+# neither in the working tree -- nor cometgui-*/target, nor anything but
+# _build/ci-transcript/, which no other control reads (measured by that unit:
+# docs/_build, docs/_generated, the generated traceability page, _build/sbom,
+# _build/package and every module's target/ byte-for-byte unchanged by a run).
+# The locks are kept because dropping them would buy no time -- the tests
+# control is the long pole -- and one measured run is not an audit.
+#
+# The hardening control (Phase 15 unit 10) holds none: it writes only
+# _build/hardening-gate-* and the tests' own temporary directories, and reads
+# _build/m2repo offline (its control C digests it, the working tree's git
+# status and its cometgui-*/target before and after).
 gate_locks() {
     case "$1" in
         docs|traceability) echo "docs-tree" ;;
@@ -616,6 +656,8 @@ gate_count() {
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
         e2e)
             sed -n 's/.*SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed.*/\1/p' -- "${log}" | head -1 ;;
+        hardening)
+            sed -n 's/^SUMMARY: \([0-9][0-9]*\) control(s) passed, 0 failed$/\1/p' -- "${log}" | head -1 ;;
     esac
 }
 
@@ -664,7 +706,9 @@ WHAT IT NEEDS.  A built tree (run bash scripts/build.sh first) for tools/,
 https://api.osv.dev for the dependency-scan control; network access to
 github.com (and where it redirects release downloads) and api.github.com for
 the pipeline control, whose nightly and release runs include the real tool
-manifest verification; and, for the e2e control,
+manifest verification; network access to github.com and where it redirects for
+the hardening control, whose version matrix installs every offered Linux build
+from its pinned URL; and, for the e2e control,
 the D-006 local fixture under scratch/ and network access to github.com and
 *.githubusercontent.com, where the tools' pinned release URLs are served.
 
@@ -812,9 +856,14 @@ list_gates() {
     printf '  comparison, a dropped provenance entry and a bypassed downstream stage each\n'
     printf '  failing the canonical test; 6 no fixed sleep; 7 the bridge-absence check\n'
     printf '  failing on a build that includes the bridge.\n'
-    printf '  PHASE-15 items (only items 5 and 6 have a control here): 5 the manifest\n'
-    printf '  verification job demonstrably failing when a checksum is altered; 6 no\n'
-    printf '  release-critical test quarantined (the flakiness policy, enforced).\n'
+    printf '  PHASE-15 items: 1 every offered version/platform combination with a passing\n'
+    printf '  matrix run, every other one recorded unavailable; 2 the mutation gate at\n'
+    printf '  >= 80%% in each critical package (hardening grades it cheaply, the tests\n'
+    printf '  control over real PIT runs); 3 determinism repeats within the written\n'
+    printf '  tolerance; 4 performance thresholds on a recorded runner profile; 5 the\n'
+    printf '  manifest verification job demonstrably failing when a checksum is altered\n'
+    printf '  (the manifest control alone); 6 no release-critical test quarantined (the\n'
+    printf '  flakiness policy, enforced).\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'

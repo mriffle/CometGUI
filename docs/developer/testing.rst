@@ -55,29 +55,39 @@ Commands
 
    * - ``bash scripts/verify-all-gates.sh``
      - **Prove every gate still fails on the defect it exists to catch.** Runs
-       all seventeen falsifiability controls and exits non-zero if any control
-       stops biting. About an hour since Phases 05 and 06 (3875 s recorded in
-       ``scripts/dev-verify.sh``), Phase 07's ``paramui`` adds about
-       twenty minutes, Phase 08's ``workflow`` about eight, Phase 09's
-       ``percolator`` about eleven and Phase 10's ``results`` about ten.
-       Run it before signing off a phase. Since 2026-11-05 it runs controls
-       side by side where the machine has the cores (see below).
+       all twenty-four falsifiability controls and exits non-zero if any
+       control stops biting. About 91 minutes on the 64-core development host
+       since 2026-11-05, when it began to run controls side by side where the
+       machine has the cores (see below) -- the ``tests`` control alone is
+       about 90 of them -- and many hours serially. Run it before signing off
+       a phase, not as routine.
 
    * - ``bash scripts/verify-all-gates.sh --jobs N``
      - Up to ``N`` controls at once; ``1`` is serial, and so is the default at
        four cores or fewer. ``COMETGUI_GATE_JOBS=N`` does the same.
 
    * - ``bash scripts/verify-all-gates.sh --list``
-     - The seventeen controls, what each injects, and the command that proves
-       it.
+     - The twenty-four controls, what each injects, and the command that
+       proves it.
 
    * - ``bash scripts/verify-all-gates.sh --only NAME``
      - One control. Names: ``license``, ``workflows``, ``docs``,
        ``traceability``, ``sbom``, ``depscan``, ``pipeline``, ``quality``,
        ``shell``, ``tests``, ``provenance``, ``install``, ``params``,
-       ``paramui``, ``workflow``, ``percolator``, ``results``, and since
-       Phase 15 ``manifest`` and ``flakiness`` (``--list`` has them all).
-       Repeatable, or comma-separated.
+       ``paramui``, ``workflow``, ``percolator``, ``results``, ``pdv``,
+       ``limelight``, ``provenanceui``, ``e2e``, and since Phase 15
+       ``manifest``, ``flakiness`` and ``hardening`` (``--list`` has them
+       all). Repeatable, or comma-separated.
+
+   * - ``bash scripts/verify-hardening-gates.sh``
+     - Phase 15's own harness (the ``hardening`` control): the version matrix,
+       the per-package mutation grading, the determinism suite and its written
+       tolerance, two performance thresholds and the no-baseline verdict, the
+       quarantine register, and a census of every Phase-15-owned pipeline step,
+       each shown red on its defect in a ``git archive HEAD`` sandbox. About
+       ten minutes; needs network, no spectra. ``--worktree`` grades the
+       working tree's tracked files instead of ``HEAD``. See
+       :ref:`dev-hardening-falsifiability`.
 
    * - ``bash scripts/ci/docs-build.sh``
      - The documentation gate on its own: both strict Sphinx builds. About 6 s.
@@ -809,10 +819,25 @@ CI definitions
    ``bash scripts/ci/run-pipeline-locally.sh`` executes the steps themselves,
    reading them out of the workflow files rather than a copy.
 
-**The pipelines have never run on GitHub.** There is no git remote and creating
-one is ``D-008``, still open. Phase 01 exit gate item 6 is therefore half met:
-every step is proved on this machine, and the "on a pull request" half is
-recorded as unmet rather than pretended.
+**No pull-request pipeline has run on GitHub.** The remote has existed since
+``D-008`` was decided on 2026-08-30 and ``main`` is pushed; a scheduled nightly
+has run there, but no pull request has been opened. Phase 01 exit gate item 6
+is therefore half met: every step is proved on this machine, and the "on a pull
+request" half is recorded as unmet rather than pretended.
+
+**Where the local run runs.** On a runner, ``actions/checkout`` makes a fresh
+checkout and every step builds in it. ``run-pipeline-locally.sh`` makes the
+same checkout -- ``git archive HEAD`` into ``_build/ci-pipeline-sandbox``,
+afresh each time -- reads the steps from *its* workflow files and runs each
+step's own command from its root, with ``tools/``, ``scratch/``, ``.venv/`` and
+``_build/m2repo`` linked in read-only. Until Phase 15 unit 10 it ran them in the
+working tree, where the nightly matrix, determinism and performance steps
+rewrote ``cometgui-*/target`` under any Maven build beside them, and where the
+release no-test-bridge step inspected whatever archive an earlier build had
+left in ``_build/package`` (on 2026-11-07, one from 2026-10-23) instead of
+building one from ``HEAD``. The step scripts did not change: each finds its root
+from its own location, so on a runner it builds in the checkout and here in
+the sandbox. Uncommitted changes are not exercised, and the transcript says so.
 
 .. _dev-manifest-verify:
 
@@ -2524,7 +2549,7 @@ catch, requires the narrowest command that should catch it to exit non-zero
 once the defect is removed. Every harness damages a copy under ``_build/``;
 the working tree is never touched.
 
-``bash scripts/verify-all-gates.sh`` runs all seventeen in one command. It injects
+``bash scripts/verify-all-gates.sh`` runs all twenty-four in one command. It injects
 nothing itself -- it delegates -- and it fails if a sub-harness is missing or
 not executable rather than skipping it, because a skipped control counted as a
 pass is worse than no aggregator at all.
@@ -2635,16 +2660,21 @@ pass is worse than no aggregator at all.
        endpoint lies.
 
    * - CI definitions
-     - Nine damaged copies of ``.github/``: a renamed step script, a dropped
-       required step, ``continue-on-error``, a trailing ``|| true``, a
-       ``git push`` added to ``release.yml``.
+     - Twenty-three damaged copies of ``.github/``: among them a renamed step
+       script, a dropped required step, ``continue-on-error``, a trailing ``||
+       true``, a ``git push`` added to ``release.yml``, and an action pinned to
+       a tag.
      - e.g. ``names scripts/ci/traceability.sh, which does not exist``.
 
    * - CI stubs
-     - None injected. Every nightly and release step whose work belongs to a
-       later phase *is* a stub, and each must exit 70 rather than 0.
+     - None injected by the ``pipeline`` control: every nightly and release
+       step whose work is not done *is* a stub, and each must exit 70 rather
+       than 0. Since Phase 15 the ``hardening`` control's census also requires
+       every PHASE-15 stub to say it waits for ``D-006`` or a runner, and
+       shows that red twice (:ref:`dev-hardening-falsifiability`).
      - A stub that exited 0 fails ``run-pipeline-locally.sh``, which classifies
-       each step before running it.
+       each step before running it -- in its own ``git archive HEAD`` checkout,
+       never the working tree, since Phase 15 unit 10.
 
    * - Tool manifest verification (Phase 15, ``manifest``)
      - ``bash scripts/ci/nightly-manifest-verify.sh --self-test``: 28 cases
@@ -2802,6 +2832,26 @@ pass is worse than no aggregator at all.
        run's Comet trees, unchanged ... mtime`` for the rerun, and ``...
        UP000005640_9606.fasta: not declared as an input`` at step 28.
 
+   * - Version matrix, mutation grading, determinism, performance and the
+       quarantine register (Phase 15, ``hardening``)
+     - ``scripts/verify-hardening-gates.sh``: in a ``git archive HEAD``
+       sandbox, ``-X`` requested from a build without ``XML_OUTPUT`` and the
+       matrix's manifest reader skipping a row (item 1); a synthetic PIT
+       report with one package below 80% inside a module above it (item 2,
+       cheaply; the real-PIT proof is ``tests``' control M); the seed taken
+       from the clock and a field removed in the data but not the document
+       (item 3); hashing made three times slower and cancellation without its
+       polite stop, and a runner with no profile (item 4); a release-critical
+       test in the quarantine register (item 6); and a census of every
+       workflow step in which a PHASE-15 stub must wait on ``D-006`` or a
+       runner. Item 5 is the ``manifest`` control's. See
+       :ref:`dev-hardening-falsifiability`.
+     - Each verdict's own words, e.g. ``RUN-FAILED
+       offer:percolator:3.07.1:linux-x86-64 the same build without XML_OUTPUT
+       in its probed set: -X left out, and said so`` with the Comet rows still
+       ``RUN-PASSED``; ``RED cancel-fake-tool -- ... median 5034 ms over N=5 is
+       over its threshold 250 ms`` with ``hash-throughput`` ``PASS`` beside it.
+
 **The harnesses are themselves falsifiable.** Each proves the defect really
 reached the sandbox before grading the control -- the file exists and differs
 from the pristine state -- and reports a control whose defect was *not*
@@ -2829,7 +2879,10 @@ non-zero, is killed, or whose worker dies before recording an exit status is a
 failure. Controls that write the same working-tree files hold a common lock
 (``gate_locks``: ``docs``, ``traceability`` and ``pipeline`` share
 ``docs/_build`` and the generated pages; ``sbom``, ``depscan`` and
-``pipeline`` share ``_build/sbom``) and never overlap, and a concurrent run
+``pipeline`` share ``_build/sbom``) and never overlap -- ``pipeline`` keeps
+both locks although since Phase 15 unit 10 it runs every step in its own
+checkout and writes neither, because dropping them would buy no time -- and a
+concurrent run
 fingerprints the four resources every control only reads -- ``_build/m2repo``,
 ``tools/``, ``scratch/`` and ``.venv/`` -- before and after, and fails if one
 changed. The audit behind both is in ``handoffs/FIX-BUILD-TIME-worklog.rst``.
@@ -4533,6 +4586,131 @@ its world and the headless GUI's three real runs), the thirteen
 ``cometgui-app`` controls 33-69 s each, the ``cometgui-provenance`` and
 ``cometgui-workflow`` controls 7-17 s, and control H 14 s. No process was left
 for the script to end. The floor in ``verify-all-gates.sh`` is 96.
+
+.. _dev-hardening-falsifiability:
+
+The hardening harness (Phase 15, ``hardening``)
+-----------------------------------------------
+
+``bash scripts/verify-hardening-gates.sh`` proves that Phase 15's exit gate
+items fail on the defects they exist to catch. It is registered in
+``scripts/verify-all-gates.sh`` as ``hardening`` (PHASE-15 items 1, 2, 3, 4 and
+6) and is **not** a stage of ``scripts/build.sh``. It is deliberately lean: no
+spectra, seven Maven runs, each ``-pl cometgui-app -am test`` restricted to the
+opt-in classes a suite names -- the version matrix's tools part, the
+determinism suite's synthetic half, two performance measurements in quick mode.
+
+It works in two copies of ``git archive HEAD`` (``--worktree``: the tracked
+files as they are on disk, said loudly): ``_build/hardening-gate-sandbox``,
+where Maven runs, with ``tools/``, ``scratch/``, ``.venv/`` and
+``_build/m2repo`` linked in read-only; and ``_build/hardening-gate-tree``, a
+plain copy for the script-only controls. Each Maven injection's anchor must
+match exactly once and be gone after; after the run and before grading, the
+damaged class's compiled form must differ from the clean baseline and every
+other compiled class be identical to it; the red must carry its own words;
+then the file is restored and ``sha256sum -c`` proves it, and the next clean
+run's bytecode proves the restoration reached the classes. A script or data
+injection is proved by its digest and its anchor.
+
+.. list-table:: The controls
+   :header-rows: 1
+   :widths: 8 46 46
+
+   * - Control
+     - Defect, or what is run
+     - Graded on
+   * - ``6a``, ``6b``
+     - Item 6. The real ``flakiness_check.py`` over the plain copy; then
+       (new) a complete seven-field register entry naming
+       ``TierACanonicalScenarioTest``.
+     - ``flakiness-check: OK ... no release-critical test quarantined`` with
+       ``0 entries``; then ``RED [RELEASE-CRITICAL] scripts/ci/quarantine.toml:
+       org.cometgui.app.e2e.tiera.TierACanonicalScenarioTest is
+       release-critical (end-to-end, failure-path map, gate harness,
+       traceability)``.
+   * - ``K``, ``Ka``, ``Kb``
+     - The census (new): every ``run:`` step of every workflow, read through
+       ``check-workflows.py --list-steps`` and classified exactly as
+       ``run-pipeline-locally.sh`` classifies it; every stub run in an empty
+       environment; every PHASE-15 stub required to wait on ``D-006`` or a
+       runner. Then ``--waits-for`` removed from ``nightly-large-dataset.sh``,
+       and ``nightly-determinism.sh`` made a PHASE-15 stub.
+     - ``census: OK`` -- on 2026-11-07, 36 step scripts in five workflows, 22
+       real and 14 stubs, four of them PHASE-15's (the large dataset, the
+       determinism and performance fixture halves, the Windows RAW test); then
+       ``census: RED -- scripts/ci/nightly-large-dataset.sh is a PHASE-15
+       stub ... that does not say it waits for D-006 or a runner``, and the
+       same for ``nightly-determinism.sh``.
+   * - ``1a``, ``1c``, ``1b``
+     - Item 1. ``run-matrix.sh --part tools --offline``, clean (the bytecode
+       baseline); ``matrix.py``'s manifest reader skipping Percolator 3.06.5
+       for Windows, graded by ``matrix.py grade`` over 1a's report;
+       ``PercolatorCommands`` requesting ``-X`` from a build without
+       ``XML_OUTPUT`` (both recorded, unit 6).
+     - ``VERDICT GREEN`` with every managed Linux row ``RUN-PASSED``; ``only in
+       the product [('percolator', '3.06.5', 'windows-x86-64')]``; both managed
+       Percolator rows ``RUN-FAILED`` at ``the same build without XML_OUTPUT in
+       its probed set: -X left out, and said so``, Comet ``RUN-PASSED``.
+   * - ``3a``, ``3b``, ``3c``
+     - Item 3. ``run-matrix.sh --part determinism-synthetic``, clean;
+       ``PercolatorSettings.valueText`` giving the seed from the clock
+       (recorded, unit 7); ``determinism.py check-doc`` clean, then (new) the
+       data removing a pepXML field under a name the document does not state.
+     - ``VERDICT GREEN``; ``repeat-2 (repeat): artefact synthetic-psms DIFFERS
+       -- out/psms.tsv``; ``fields removed differ -- only in the document
+       ['msms_pipeline_analysis date'], only in the data
+       ['msms_pipeline_analysis date and time']``.
+   * - ``2``
+     - Item 2, cheaply (new): ``build.sh --gates-pit-root`` over a shadow of
+       the sandbox holding a *synthetic* ``cometgui-domain`` report written by
+       the harness -- every package mutated and killed; then the smallest
+       package's mutations all ``SURVIVED`` with the module still above 80%.
+       The real-PIT proof is the ``tests`` control's M, not repeated.
+     - ``OK: the gates stage's mutation grading passed``; then ``BELOW`` and
+       ``... is under the R-TEST-02 threshold of 80%`` naming the package, the
+       module line ``not graded``.
+   * - ``4a``, ``4b``, ``4c``
+     - Item 4. ``run-performance.sh --part no-spectra --quick --only
+       hash-throughput,cancel-fake-tool``: ``StreamingHashService`` digesting
+       every chunk twice more; ``ProcessTree.destroyAll`` sending no polite
+       stop (both recorded, unit 8); clean; and the clean records graded with
+       ``--profile github-ubuntu-latest``.
+     - ``RED hash-throughput -- ... is under its threshold`` with
+       ``cancel-fake-tool`` ``PASS`` in the same run, and the reverse; both
+       ``PASS``; ``NO BASELINE FOR THIS RUNNER PROFILE``, exit 4.
+   * - ``H``
+     - The harness on itself: an anchor that is missing, a replacement equal
+       to its anchor, a green graded as red, a red graded on another defect's
+       words, and 1b's injection compared with the baseline with no build
+       after it.
+     - Each reported as a ``HARNESS FAILURE``, never as a control that bit.
+   * - ``C``
+     - Every restoration, and what is shared.
+     - Every damaged file passes ``sha256sum -c``; the repository's
+       ``org/cometgui`` jars, the working tree's ``git status`` and every file
+       under its ``cometgui-*/target`` unchanged.
+
+Item 5 is delegated to the ``manifest`` control (a checksum altered, ``RED
+(a)``, against a loopback server) and item 6's check of the check to the
+``flakiness`` control; neither is repeated.
+
+**The harness caught itself once.** Its first draft made 3c's defect the data's
+``repeats`` set to 4; ``determinism.py`` refuses that data before ``check-doc``
+reads it (exit 2, "the synthetic part repeats its baseline 3 time(s), fewer
+than repeats = 4"), and the harness reported a ``HARNESS FAILURE -- red with
+exit 2, not the 1 its verdict means`` rather than a pass. The field rename
+replaced it.
+
+What it does not cover: spectra (the fixture halves of the matrix, determinism
+and performance are their own suites' and wait for ``D-006``'s CI fixture);
+macOS and Windows; the dedicated performance runner; the fourteen other
+performance measurements, whose reds unit 8 recorded one by one.
+
+Measured on 2026-11-07 by ``bash scripts/verify-hardening-gates.sh --worktree``
+on the tree of unit 10 (64 cores, load about 7): 35 controls in 619 s (10 m 19
+s) -- 1a 123 s (the sandbox's first build), 1b 61 s, 3a 56 s, 3b 54 s, 4a 116
+s, 4b 113 s, 4c 86 s, everything else a few seconds. The floor in
+``verify-all-gates.sh`` is 35.
 
 Traps
 =====

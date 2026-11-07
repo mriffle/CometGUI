@@ -49,8 +49,9 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <p><strong>The network test does not run in the ordinary build</strong>, and the ordinary build
  * must not depend on reaching GitHub: a suite that goes red because a release host is having a bad
- * afternoon teaches people to ignore it. {@code R-TEST-08}'s nightly manifest verification is Phase
- * 15's, and {@code scripts/ci/nightly-manifest-verify.sh} is correctly still a stub.
+ * afternoon teaches people to ignore it. {@code R-TEST-08}'s nightly manifest verification is
+ * {@code scripts/ci/nightly-manifest-verify.sh}, real since Phase 15 unit 5, which checks every
+ * pinned artefact against upstream in its own job.
  *
  * <h2>The gate is visible, and it is not vacuous</h2>
  *

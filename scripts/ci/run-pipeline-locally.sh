@@ -37,6 +37,29 @@
 # Anything else -- a stub that passed, a real step that failed -- fails this
 # script, and it says which.
 #
+# WHERE THE STEPS RUN (since Phase 15 unit 10).  Never in the working tree.
+# On a runner, actions/checkout makes a fresh checkout and every step builds
+# in it; the nightly matrix, determinism and performance steps and the release
+# packaging run Maven there and rewrite its cometgui-*/target, which is fine
+# on a runner and was not here: run in the working tree, this script rewrote
+# the module target/ directories under any Maven build beside it (it crashed
+# one at Phase 15 unit 8) and inspected whatever packaged archive an earlier
+# build had left in _build/package.  So this script makes the checkout the
+# runner would make -- `git archive HEAD`, extracted into
+# _build/ci-pipeline-sandbox, afresh on every invocation -- reads the steps
+# out of THAT tree's workflow files, and runs each step's own command, as
+# written, from that tree's root.  The step scripts are unchanged: each finds
+# its root from its own location, so on a runner it builds in the checkout and
+# here in the sandbox.  The sandbox differs from a runner's checkout in two
+# ways, both said in the transcript: it holds no .git (a script asking git for
+# HEAD finds the working tree's repository above it, whose HEAD it is), and
+# tools/, scratch/, .venv/ and _build/m2repo are linked in from the working
+# tree when they exist, read as every gate harness reads them, where a runner
+# provisions the first, third and fourth with its own steps and has no
+# scratch/.  Uncommitted changes are NOT exercised, and the transcript names
+# them.  Everything the steps write lands in the sandbox; this script itself
+# writes only _build/ci-transcript/.
+#
 # Usage:
 #   bash scripts/ci/run-pipeline-locally.sh                 # all five
 #   bash scripts/ci/run-pipeline-locally.sh pull-request
@@ -60,10 +83,11 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 OUT="${PROJECT_ROOT}/_build/ci-transcript"
 TRANSCRIPT="${OUT}/transcript.txt"
+CHECKOUT="${PROJECT_ROOT}/_build/ci-pipeline-sandbox"
 STUB_EXIT=70
 
 die() { printf 'run-pipeline-locally.sh: %s\n' "$1" >&2; exit "${2:-2}"; }
-usage() { sed -n '3,53p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,78p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 declare -a WORKFLOWS=()
 while [ "$#" -gt 0 ]; do
@@ -96,6 +120,27 @@ cd -- "${PROJECT_ROOT}"
 rm -rf -- "${OUT}"
 mkdir -p -- "${OUT}"
 
+# The runner's checkout, made here: HEAD's tracked files, nothing else, plus
+# the gitignored toolchain, data and repository linked in where they exist.
+command -v git >/dev/null 2>&1 || die "no git: the steps run in a git archive of HEAD"
+rm -rf -- "${CHECKOUT}"
+mkdir -p -- "${CHECKOUT}"
+git -C "${PROJECT_ROOT}" archive HEAD | tar -x -C "${CHECKOUT}" \
+    || die "git archive HEAD could not be extracted into ${CHECKOUT#"${PROJECT_ROOT}/"}"
+LINKED=""
+for shared in tools scratch .venv; do
+    if [ -e "${PROJECT_ROOT}/${shared}" ]; then
+        ln -s -- "${PROJECT_ROOT}/${shared}" "${CHECKOUT}/${shared}"
+        LINKED="${LINKED}${LINKED:+, }${shared}/"
+    fi
+done
+mkdir -p -- "${CHECKOUT}/_build"
+if [ -d "${PROJECT_ROOT}/_build/m2repo" ]; then
+    ln -s -- "${PROJECT_ROOT}/_build/m2repo" "${CHECKOUT}/_build/m2repo"
+    LINKED="${LINKED}${LINKED:+, }_build/m2repo"
+fi
+UNCOMMITTED="$(git -C "${PROJECT_ROOT}" status --porcelain --untracked-files=no | head -20)"
+
 emit() { printf '%s\n' "$*" | tee -a -- "${TRANSCRIPT}"; }
 
 FAILURES=0
@@ -111,6 +156,13 @@ RAN=0
     printf ' host       %s\n' "$(uname -srm)"
     printf ' git HEAD   %s\n' "$(git -C "${PROJECT_ROOT}" rev-parse --short HEAD 2>/dev/null || echo '(no git)')"
     printf ' git remote %s\n' "$(git -C "${PROJECT_ROOT}" remote -v | head -1 || true)"
+    printf ' checkout   %s -- git archive of that HEAD, made afresh; every step\n' "${CHECKOUT#"${PROJECT_ROOT}/"}"
+    printf '            runs from its root, never from the working tree. Linked in, read\n'
+    printf '            only: %s. No .git.\n' "${LINKED:-nothing}"
+    if [ -n "${UNCOMMITTED}" ]; then
+        printf ' NOTE       the working tree has uncommitted changes; they are NOT exercised:\n'
+        printf '%s\n' "${UNCOMMITTED}" | sed 's/^/              /'
+    fi
     printf '\n'
     printf ' WHAT THIS IS EVIDENCE FOR, AND WHAT IT IS NOT.\n'
     printf '\n'
@@ -141,7 +193,7 @@ cat -- "${TRANSCRIPT}"
 
 is_stub() {
     local script="$1"
-    [ -f "${PROJECT_ROOT}/${script}" ] && grep -q 'stub-lib\.sh' -- "${PROJECT_ROOT}/${script}"
+    [ -f "${CHECKOUT}/${script}" ] && grep -q 'stub-lib\.sh' -- "${CHECKOUT}/${script}"
 }
 
 for workflow in "${WORKFLOWS[@]}"; do
@@ -168,7 +220,7 @@ for workflow in "${WORKFLOWS[@]}"; do
             case "${value}" in
                 actions/checkout@*)
                     emit "    SKIPPED  a GitHub action; not runnable locally. The checkout that this"
-                    emit "             step would perform is the working tree this script is running in."
+                    emit "             step would perform is ${CHECKOUT#"${PROJECT_ROOT}/"}, git archive HEAD."
                     ;;
                 *)
                     emit "    SKIPPED  a GitHub action; not runnable locally. It does something only"
@@ -208,7 +260,7 @@ for workflow in "${WORKFLOWS[@]}"; do
         started="$(date +%s)"
         got=0
         # shellcheck disable=SC2086
-        ( cd -- "${PROJECT_ROOT}" && eval "${value}" ) >"${log}" 2>&1 || got=$?
+        ( cd -- "${CHECKOUT}" && eval "${value}" ) >"${log}" 2>&1 || got=$?
         elapsed=$(( $(date +%s) - started ))
         RAN=$((RAN + 1))
 
@@ -236,7 +288,7 @@ for workflow in "${WORKFLOWS[@]}"; do
             emit "           macOS entries are named so a later phase switches them on rather than"
             emit "           writes them. Unverified is not passed."
         fi
-    done < <("${PYTHON}" "${SCRIPT_DIR}/check-workflows.py" --root "${PROJECT_ROOT}" --list-steps "${workflow}")
+    done < <("${PYTHON}" "${CHECKOUT}/scripts/ci/check-workflows.py" --root "${CHECKOUT}" --list-steps "${workflow}")
 done
 
 emit ""

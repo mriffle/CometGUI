@@ -125,8 +125,10 @@
 #       findings, so rule-keyed value migrations never apply
 #
 #   9   item 9 [recorded, units 2 and 6]: PIT over cometgui-params-comet in the
-#       sandbox, scored as scripts/build.sh scores it (status='KILLED' over all
-#       mutations in mutations.xml; TIMED_OUT is not killed), PER PACKAGE for
+#       sandbox, scored KILLED-only (status='KILLED' over all mutations in
+#       mutations.xml; TIMED_OUT is not killed) -- stricter than
+#       scripts/build.sh, which since Phase 15 unit 3 counts TIMED_OUT as
+#       detected (D-014) and grades every critical package (D-015) -- PER PACKAGE for
 #       parser, writer and validation and for the module, each >= 80 %, with
 #       EVERY non-killed mutant in those three packages listed by class, line,
 #       mutator and status.  Its negative control removes every validation test
@@ -1727,8 +1729,10 @@ run_pit() {
 # score_pit XML -- prints, for each graded package and the module, a line
 #   GRADE <name> <killed> <total> <score x10> OK|BELOW|VACUOUS
 # and then every non-killed mutant in the graded packages.  The arithmetic is
-# scripts/build.sh's: status='KILLED' over every <mutation> element, integer
-# per mille.
+# status='KILLED' over every <mutation> element, integer per mille: the score
+# scripts/build.sh used before Phase 15 unit 3, kept here because it is the
+# stricter one (build.sh now counts TIMED_OUT as detected, D-014), so this
+# control can only be harder to pass than the build's own gate.
 score_pit() {
     python3 - "$1" "${PIT_PREFIX}" "${PIT_THRESHOLD_X10}" "${PIT_PACKAGES[@]}" <<'PYTHON'
 import sys

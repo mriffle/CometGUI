@@ -194,7 +194,7 @@ jobs:
         run: bash scripts/ci/nightly-performance-fixture.sh
 
   gui-tests:
-    name: "Nightly (Linux): GUI suites (stub, Phase 15)"
+    name: "Nightly (Linux): GUI suites (waits on D-006's CI fixture and a display)"
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
