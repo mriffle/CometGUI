@@ -194,6 +194,15 @@ its own sandbox must be added to ``gate_locks`` with the controls it would
 collide with, in the same commit; "it has its own sandbox" is not the argument
 (``ONBOARDING.rst``, *What parallel agents actually share*).
 
+**A flaky test is a defect, fixed at its cause.** Never a retry
+(``rerunFailingTestsCount``, a retry extension, a harness loop until green),
+never a widened bound without measured evidence that the bound was wrong, and
+never a ``@Disabled`` or exclusion without an entry in
+``scripts/ci/quarantine.toml`` -- which may not name a release-critical test at
+all. Reproduce it on purpose first, then make the test wait on observable
+state. ``bash scripts/ci/flakiness-check.sh`` enforces it in the pull-request
+pipeline; the policy is ``docs/developer/testing.rst``, *Flakiness policy*.
+
 **Numeric targets come from the specification, not from taste.** The mutation
 score gate (``R-TEST-02``) is >= 80% in each critical package, graded on its
 own (``D-015``) with a timed-out mutant counted as detected (``D-014``), with no

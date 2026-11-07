@@ -75,8 +75,9 @@ Commands
      - One control. Names: ``license``, ``workflows``, ``docs``,
        ``traceability``, ``sbom``, ``depscan``, ``pipeline``, ``quality``,
        ``shell``, ``tests``, ``provenance``, ``install``, ``params``,
-       ``paramui``, ``workflow``, ``percolator``, ``results``. Repeatable, or
-       comma-separated.
+       ``paramui``, ``workflow``, ``percolator``, ``results``, and since
+       Phase 15 ``manifest`` and ``flakiness`` (``--list`` has them all).
+       Repeatable, or comma-separated.
 
    * - ``bash scripts/ci/docs-build.sh``
      - The documentation gate on its own: both strict Sphinx builds. About 6 s.
@@ -85,6 +86,14 @@ Commands
      - The traceability report gate on its own, without Sphinx. About 1 s.
        Since Phase 15 unit 6 it also enforces ``R-TEST-07``'s review rule over
        the goldens (``scripts/matrix/check_goldens.py``).
+
+   * - ``bash scripts/ci/flakiness-check.sh``
+     - The flakiness policy (PHASE-15 gate item 6): red on any unconditional
+       retry, any test disabled without an entry in
+       ``scripts/ci/quarantine.toml``, and any entry naming a release-critical
+       test. About 2 s; a step of the pull-request pipeline and of
+       ``build.sh``'s ``workflows`` stage. ``--self-test`` (39 cases, about 40
+       s) is the ``flakiness`` gate control. See :ref:`dev-testing-flakiness`.
 
    * - ``COMETGUI_MATRIX_FIXTURE=scratch/fixture bash scripts/matrix/run-matrix.sh``
      - The version matrix (PHASE-15 gate item 1): every offered build installed
@@ -2126,6 +2135,382 @@ The startup is headless (Monocle, software rendering); a desktop with a GPU and
 a window manager is not measured. The results tables are the synthetic large
 fixture; a real search of that size has not been run. Hashing is measured from
 the page cache, not from a cold disk.
+
+
+.. _dev-testing-flakiness:
+
+Flakiness policy -- gate item 6
+-------------------------------
+
+``specification.rst``, *Flakiness policy*: "A flaky test is a defect. Do not
+hide instability with unconditional retries. A temporarily quarantined flaky
+test must have an issue and owner, captured diagnostics, a stated reason and a
+fix plan. Release-critical scientific end-to-end tests may not remain
+quarantined at release." PHASE-15 exit gate item 6: "No release-critical test
+is quarantined." This section is the policy in words;
+``scripts/ci/flakiness-check.sh`` (over ``scripts/ci/flakiness_check.py``,
+standard library only) holds the tree to it.
+
+What counts as flaky
+~~~~~~~~~~~~~~~~~~~~
+
+A test is flaky when its outcome on unchanged code depends on something the
+test does not control: timing, load, scheduling, garbage collection, the
+order of other tests, a random value, the machine's state. That includes a
+falsifiability control that bites on one run and not the next (``pdv`` 5e,
+below), and a test that is green for the wrong reason only under some timing
+-- the project's signature defect. One red run with no change is enough to call
+it flaky; "passed on re-run" is evidence of the defect, not of its absence.
+
+What may be done about one
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#. **Fix it at its cause**, which is the only fix. Reproduce it on purpose
+   first -- load the host, or widen the window with a test-only latch or
+   delay -- so that the red is seen to come from the suspected cause; then make
+   the test wait on the observable state it needs, or fix the product if the
+   product is what is wrong. The assertion is not edited. A bound (a timeout,
+   a heap budget) moves only with measured evidence that the bound itself was
+   wrong, and the evidence is written down beside it.
+#. **Quarantine it, temporarily**, only when it cannot be fixed yet, and never
+   when it fails because of the product. A quarantine is an entry in
+   ``scripts/ci/quarantine.toml`` with all seven fields -- ``test``,
+   ``issue`` (an issue URL or a ``handoffs/`` file), ``owner``,
+   ``diagnostics`` (the captured run, committed under
+   ``scripts/ci/quarantine/``), ``reason``, ``fix_plan`` and ``since`` (a
+   date, never in the future) -- together with the ``@Disabled`` it explains.
+   The register is **empty**, which is the correct state.
+
+A release-critical test may not be quarantined at all.
+
+What is release-critical
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Computed by the check from the tree on every run, never a list kept by hand
+(``bash scripts/ci/flakiness-check.sh --list-release-critical``; 279 classes
+on 2026-11-07). A test class is release-critical when any of these names it:
+
+* the failure-path map, ``scripts/e2e/failure-paths.toml`` (``AC-TST-09``) --
+  40 classes;
+* the end-to-end tiers: every class under ``app/e2e/tiera/`` and
+  ``app/e2e/tierb/``, and every class meta-annotated ``@EndToEnd``
+  (``AC-TST-06``..``08``) -- 8;
+* a real binary: every test class whose name says it runs a real tool
+  (``Real...``, ``...RealBinary...``, ``...RealPdv...``, ``...RealTest``) --
+  45;
+* a gate harness: every test class ``scripts/verify-*-gates.sh`` or the
+  ``scripts/e2e/``, ``scripts/matrix/`` and ``scripts/perf/`` scripts name --
+  234;
+* the traceability map: every class ``docs/traceability-map.toml`` gives as
+  test evidence for a requirement or criterion (the project is finished only
+  when every ``AC-`` passes its named test) -- 101.
+
+A register entry naming such a class, or a method or nested class of one, is
+red ``[RELEASE-CRITICAL]``.
+
+What is forbidden
+~~~~~~~~~~~~~~~~~
+
+Each is red with its own words:
+
+* **Unconditional retries and ignored failures** (``[RETRY]``):
+  surefire's or failsafe's ``rerunFailingTestsCount`` (element, property or
+  ``-D``), ``testFailureIgnore`` / ``maven.test.failure.ignore`` in any POM,
+  ``.mvn/`` file, script or workflow; JUnit retry mechanisms --
+  ``@RetryingTest``, ``@RepeatedIfExceptionsTest``, ``@Flaky``, the
+  junit-pioneer or rerunner-jupiter dependency, and any implementation of
+  ``TestExecutionExceptionHandler`` or ``InvocationInterceptor``.
+  ``@RepeatedTest`` is not a retry -- every repetition must pass -- and is
+  allowed.
+* **Loop-until-green in a harness** (``[HARNESS-RETRY]``): ``until`` or
+  ``while !`` on a test runner, a runner followed by ``&& break`` or
+  ``|| continue`` inside a loop, ``if <runner>; then ... break``, and a Python
+  loop around a runner subprocess that breaks or returns on exit status 0.
+  A *network transport* retry is not a test retry and is allowed where it is:
+  ``manifest_verify.py`` retries a transfer (never a verdict), at most three
+  times, each printed, and ``curl --retry`` fetches an artefact.
+* **Disabling without a register entry** (``[UNREGISTERED]``): ``@Disabled``,
+  ``@DisabledIf``/``@EnabledIf``, a system-property or environment condition
+  on a property the policy does not recognise, a ``@Tag`` it does not
+  recognise (``@Tag("quarantine")``), a new ``ExecutionCondition``, a
+  surefire or failsafe exclusion (``excludes``, ``excludesFile``, ``groups``,
+  ``excludedGroups``, ``skip``, ``skipTests``, ``test``) in a POM, and
+  ``-Dtest=!...``, ``-DexcludedGroups=``, ``-Dgroups=`` in a script.
+* **A platform condition that turns a test off on Linux** (``[PLATFORM]``),
+  the platform every pipeline runs on: quarantine by another name.
+* **An opt-in nothing runs** (``[OPT-IN]``): a recognised opt-in property whose
+  runner no longer sets it.
+* **An assumption that skips on timing** (``[TIMING-ASSUMPTION]``): a condition
+  that reads a ``Duration``, the clock, an elapsed time or a timeout. A test
+  that skips itself when it is slow hides exactly what this policy exists to
+  expose.
+
+The recognised legitimate conditions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Listed in the check by name, each with why it is not a quarantine; anything
+else needs a register entry. Counted on 2026-11-07:
+
+* **Platform scoping** -- ``@EnabledOnOs`` (116) that includes ``LINUX`` and
+  ``@DisabledOnOs`` (25) that excludes it: the test exercises a POSIX or
+  Linux fact (permission bits, ``/proc``, the Linux binaries) and runs on every
+  pipeline.
+* **The documented opt-in properties** (16 ``@EnabledIfSystemProperty`` and
+  the one ``ExecutionCondition``), each with what runs it, which the check
+  verifies sets ``-D<property>=``: ``cometgui.e2e`` (``EndToEndExtension``;
+  ``verify-e2e-gates.sh``, ``release-e2e-canonical.sh``), ``cometgui.matrix``
+  (``matrix.py``, ``determinism.py``), ``cometgui.perf`` (``performance.py``),
+  ``cometgui.limelight.sandbox.url`` (``nightly-limelight-sandbox.sh``) and
+  ``cometgui.install.upstream``, which no script sets: its three tests
+  (``UpstreamInstallUiTest``, ``CometReleaseInstallTest``,
+  ``UpstreamArtefactTest``) download from the tools' real release URLs and are
+  run by hand as ``docs/developer/limelight_integration.rst`` says. The nightly
+  manifest verification (``R-TEST-08``) checks the same artefacts
+  automatically; that these three run on no schedule is stated here rather
+  than hidden.
+* **The tag** ``e2e`` (``EndToEndExtension.TAG``), which selects; nothing in
+  the tree excludes a group.
+* **Eight assumptions**, by file and condition: the four Tier A/B step chains
+  (``failedStep == null`` -- a step after one that failed, which already fails
+  the class), a JVM whose file-name encoding cannot spell a non-ASCII name
+  (three; surefire sets ``C.UTF-8``), and a user who can write a read-only
+  directory (root).
+* ``-Dmaven.test.failure.ignore=true`` **in a falsifiability harness** (20
+  uses, ten harnesses): only in a ``scripts/verify-*-gates.sh`` that defines
+  both ``assert_testcase`` and ``verify_classes_ran``. Its dirty runs are meant
+  to fail; the flag lets Maven finish so each named test's outcome is read
+  from the surefire XML after every named test is proved to have run. Nothing
+  is ignored.
+
+The check, and where it runs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``bash scripts/ci/flakiness-check.sh`` scans every test source (965 files),
+POM (14), script (118) and workflow in about 2 s: exit 0 green, 1 red with
+every problem printed, 2 refused (no register, or nothing to scan -- never
+green). It also refuses a failure-path map id ``Outer$Nested#method`` whose
+method name another class of the same outer declares (``[AMBIGUOUS-ID]``; see
+the nested-report audit below). It is a step of the pull-request pipeline
+(``check-workflows.py`` requires it) and of ``build.sh``'s ``workflows``
+stage.
+
+``--self-test`` copies the tree's sources, scripts and POMs into a temporary
+directory and injects each forbidden shape into its own copy: 33 defects, each
+red with its own kind and words; the clean copy and a fully registered
+quarantine of an ordinary test green; a missing register and a tree with no
+test sources refused; and three controls on the grader (a case whose defect
+was not injected, a red graded against another case's words, an injection that
+wrote nothing), each a harness failure; and the exit status of the command
+itself -- 39 cases, about 40 s. It is the ``flakiness`` control of
+``verify-all-gates.sh`` (PHASE-15 item 6, floor 39; 39 cases in 42 s
+beside three other controls), which only reads the working tree. Because its first case is the clean tree, the control is also red
+whenever the tree itself breaks the policy.
+
+How to quarantine, if it must be done
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#. Capture the failing run's surefire report and console into
+   ``scripts/ci/quarantine/<Test>-<date>.log`` and commit it.
+#. Open an issue, or write the defect into the phase work log.
+#. Add ``@Disabled("<one line: why, and the register>")`` and the
+   ``[[quarantine]]`` entry with all seven fields, in one commit.
+#. ``bash scripts/ci/flakiness-check.sh`` must be green. If it says
+   ``[RELEASE-CRITICAL]``, the test cannot be quarantined: fix it.
+
+The entry is removed in the commit that fixes the test; an entry that covers
+nothing needing it -- no ``@Disabled``, unrecognised condition or exclusion --
+is red as stale.
+
+Known instances, and their state
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every test called flaky, intermittent or timing-dependent in ``STATUS.rst``
+and ``handoffs/`` up to 2026-11-07:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 16 40 14
+
+   * - Test
+     - Seen
+     - Cause
+     - State
+   * - ``ProcessTree`` cancellation order (Phase 03)
+     - Phase 03 unit 2b
+     - A property true only because a race is always won: an injected
+       snapshot-after-destroy passed every test.
+     - Fixed (Phase 03): the order is asserted as a fact.
+   * - ``ProgressReachesTheInterfaceThreadTest`` (Phase 05)
+     - Phases 06, 12-13 gates
+     - The test listened on an unmodifiable view it did not keep; JavaFX
+       observes the source weakly, so a collection dropped the listener (12/30
+       red with a 1 MB young generation).
+     - Fixed (FIX-P12-P13).
+   * - Phase 10's large-fixture GUI test
+     - Phase 10 unit 8
+     - Pressing Last disabled the focused button and focus fell into the
+       table.
+     - Fixed (Phase 10 unit 9).
+   * - A wait in step 9 (Phase 14)
+     - Phase 14 unit 9
+     - Recorded only as "a flaky wait in step 9 fixed" in the unit 9
+       sign-off (``handoffs/PHASE-14-worklog.rst``); no cause is written down.
+     - Fixed (Phase 14 unit 9).
+   * - ``RealAwkwardPathRunTest.longPaths``
+     - FIX-P14-P15
+     - The path length depended on JUnit's random ``@TempDir`` name (3998
+       bytes against 4000).
+     - Fixed (``4b17931``).
+   * - ``pdv`` controls 5b and 5e
+     - Phases 11, 13, 15 unit 4
+     - Graded by timing; see :ref:`dev-pdv-timing-controls`.
+     - Fixed (Phase 15 unit 9a).
+   * - ``ResultsCountsUiTest.theSyntheticRun``
+     - Phase 15 unit 6
+     - TestFX read the scene graph from the test thread.
+     - Fixed (unit 9), below.
+   * - ``VariableModificationEditorUiTest`` (``paramui`` 2v)
+     - Phases 08, 12, 14
+     - The same: ``bounds are not visible in Scene``.
+     - Fixed (unit 9), below.
+   * - ``ConsoleFloodUiTest.theRetainedHeapStaysWithinItsBound``
+     - Phase 15 unit 8
+     - The measurement counted dead space the collector left in place.
+     - Fixed (unit 9), below.
+   * - ``KeyboardOnlyNavigationUiTest``
+     - Phase 08
+     - Not flaky: deterministic, it fails on a machine with Comet installed
+       in the application-data folder. The GUI tests' data folder is
+       ``$XDG_DATA_HOME/cometgui`` inside the font stack, which nothing
+       creates, so no pipeline meets it.
+     - Open, in ``STATUS.rst`` (an isolation defect, tier 1's to route).
+
+None is quarantined.
+
+The TestFX driver read the scene from the test thread (unit 9)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Two flaky GUI tests, one cause. ``ResultsCountsUiTest.theSyntheticRun`` erred
+once (``IndexOutOfBoundsException: Index 0 out of bounds for length 0`` in
+``Parent.lookupAll``, from ``FxRobot.clickOn``); ``VariableModificationEditorUiTest``
+failed now and then with TestFX's ``bounds are not visible in Scene``.
+``TestFxUiDriver.clickOn`` called ``robot.clickOn("#id")``, and TestFX resolves
+the selector -- walking every ``Parent``'s child list -- and reads the node's
+bounds **on the calling thread, the test's**, while the application thread
+may be changing the scene: a table filled by a background query, a slot list
+rebuilt. The first is a child list emptied between the walk's size check and
+its ``get``; the second a node read in the middle of being moved.
+
+*Reproduced on purpose* by ``SceneChurnClickUiTest`` (cometgui-app), which
+keeps each window open all the time instead of for milliseconds: the
+application thread removes and re-adds the last child of a 200-child list
+without pause while a hundred clicks are made on another button; and, in a
+second case, moves a button out of its window and back within each of its
+tasks, so that a reader on that thread never sees it out of place. With the
+old driver: ``IndexOutOfBoundsException: Index 200 out of bounds for length
+200`` from the same frames as the original, 4 runs of 4; and ``bounds are not
+visible in Scene`` (2 of 3; the third the same torn read caught one check
+earlier as ``no nodes were visible``).
+
+*Fixed* in the driver, the test's own code: the node is revealed and its
+target point computed in one task on the application thread
+(``AbstractFxUiDriver.visibleCentreOf``: the centre of the part its window
+shows, refusing a hidden node or one wholly outside its window, as TestFX
+did), and TestFX is given only the point. No assertion changed. Evidence:
+``SceneChurnClickUiTest`` red on the old driver 4 runs of 4 (its second case 3
+of 3) and green on the new one 3 of 3 alone; on ``325472d``, ``mvn -o -B -pl
+cometgui-app -am verify`` BUILD
+SUCCESS in 2811 s (``cometgui-app`` 576 tests, 91 opt-in skipped, 0 failures;
+SpotBugs 0 in every module); the four classes of this unit together
+(``SceneChurnClickUiTest``, ``ResultsCountsUiTest``,
+``VariableModificationEditorUiTest``, ``ConsoleFloodUiTest``, 16 tests) five
+runs alone (load average 5 to 8), 16 of 16 each in about 147 s, and three
+beside 96 busy loops (load average about 100), 16 of 16 each in about 260 s;
+and every harness that grades a test clicking through this driver,
+``verify-all-gates.sh --only`` (four at once, 3111 s): ``paramui`` 87,
+``results`` 100, ``install`` 95, ``percolator`` 109, ``pdv`` 107,
+``limelight`` 130, ``provenanceui`` 96, ``e2e`` 50 and ``shell`` 30, all PASS.
+
+The flood test measured the collector, not the console (unit 8's residue)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``ConsoleFloodUiTest.theRetainedHeapStaysWithinItsBound`` read 22,440,392
+bytes (21 MB) against its 20 MB bound once in a reactor build, and about 8 MB
+alone. It measured ``MemoryMXBean.getHeapMemoryUsage().getUsed()`` after two
+requested collections. Each test class runs in its own JVM here
+(``reuseForks=false``), so nothing from an earlier class is retained, and the
+data folder holds no tool or project, so nothing loads in the background
+(checked: the tool list had been read before the first reading in every run).
+Two hypotheses were tested and one refuted:
+
+* *Fresh allocation buffers counted as used* -- refuted: the heap pools'
+  usage at the end of the collection equalled ``getUsed()`` to the byte, even
+  with another thread allocating in between.
+* *Dead space counted as used* -- confirmed. G1's full collection leaves the
+  dead objects of a region that is almost all live where they lie
+  (``MarkSweepDeadRatio``, 5%), still counted as used. Measured against the
+  JVM's own class histogram: 7,363,552 to 9,211,104 bytes of the heap at each
+  reading were dead, so the used growth read 6,610,488 to 9,798,008 bytes over
+  runs whose **live** growth was 6,874,064 to 7,054,408 bytes every time
+  (alone, beside 96 busy loops at a load average near 100, with and without
+  JaCoCo's agent). Widened on purpose with ``-XX:MarkSweepDeadRatio=90``, the
+  old measurement read 31,437,456 bytes and failed the test while the live
+  growth was 7,024,144 bytes.
+
+*Fixed* in the measurement: the test now sums the live objects of
+``GC.class_histogram`` (the ``DiagnosticCommand`` bean's
+``gcClassHistogram``: a full collection, then every live object by class),
+leaving out the collector's ``jdk.internal.vm.Filler`` objects. **The 20 MB
+bound is unchanged.** It still separates a bounded console from an unbounded
+one: with the eviction removed from ``BoundedMessageLog.append`` the live
+growth is 35,799,880 bytes (34 MB), red, and ``shell`` control 5b's regular
+expression still matches. With ``MarkSweepDeadRatio=90`` the fixed test is
+green (2 of 2). Evidence: the fixed test green 3 runs of 3 alone, 2 of 2 with ``MarkSweepDeadRatio=90``,
+and in the eight repeats of the driver's evidence above (five alone, three at a
+load average near 100); ``shell`` 30 PASS, control 5b red with its own words.
+
+Surefire reports of ``@Nested`` classes: the audit (unit 9)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Surefire 3.5.6 writes one ``TEST-<outer>.xml`` per outer class, with each
+nested class's cases inside it and their ``classname`` set to the nested
+class's display name. Measured: a whole-class run keeps every nested class's
+cases in that file, in a module that reuses forks and in one that does not;
+a selection naming two nested classes of one outer
+(``-Dtest='Outer$A#m,Outer$B#n'``) keeps both in ``cometgui-params-percolator``
+(forks reused), but in ``cometgui-ui`` or ``cometgui-app``
+(``reuseForks=false``) each nested class is its own fork and the second
+report **overwrites** the first (``SectionIdTest``: one case left of two). A
+bare class selector in a list (``-Dtest=A,B``) runs its nested tests in both
+kinds of module.
+
+What was checked:
+
+* **Every selection** in the 64 tracked scripts -- 1,739 selectors, from every
+  quoted string and assignment, gate harness variables expanded -- for two
+  classes of one outer in a ``reuseForks=false`` module, and for a method name
+  selected in two classes of one outer: **none**. The provenanceui harness,
+  which once had such selections, splits them per nested class and refuses a
+  run whose XML holds fewer cases than Maven counted.
+* **Every grader that reads a surefire report.** The ten falsifiability
+  harnesses with ``assert_testcase`` refuse an absent testcase as a harness
+  error, and ``verify_classes_ran`` requires every named method to have run,
+  so an overwritten report is loud, never a verdict. ``verify-provenance-gates.sh``
+  requires each class's ``tests=`` count to be at least 1 from whole-class
+  runs; ``verify-test-gates.sh`` and ``build.sh`` read whole-build reports;
+  ``nightly-limelight-sandbox.sh`` reads one class with no nested classes.
+  ``scripts/matrix/`` and ``scripts/perf/`` grade the files their classes
+  write, not surefire's reports.
+* **Method names shared between nested classes** of one outer: 22 in the
+  tree, none selected twice by any harness. ``failure_paths.py`` grades the
+  failure-path map's two nested ids
+  (``HttpDownloaderTest$Failures#aRefusedConnectionIsANetworkFailure``,
+  ``AwkwardPathTest$ThroughTheService#theWorkingDirectory``) by method name
+  in whole-module reports; both names are unique in their outer classes today,
+  and the flakiness check now keeps them so (``[AMBIGUOUS-ID]``).
+
+No grader reads a result that may have been overwritten; nothing needed
+repair.
 
 
 Falsifiability
