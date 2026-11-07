@@ -55,6 +55,15 @@
 # them to "check" entries once those gates exist -- that is a real improvement
 # to make, not a defect to hide.
 #
+# 2026-11-07 (Phase 15, unit 11): the paragraphs above are the Phase 01 record.
+# AC-TST-01..04, -10, -11, AC-RES-10 and AC-REL-01 now name what exists, and
+# each keeps a "planned" entry for phase 15 where part of it is not met (the
+# workflow packages outside PIT, D-006's CI fixture, no Windows runner, no
+# dedicated performance runner). This file has no R- half: the generator
+# refuses any top-level table but [meta] and [ac], and R-TEST-02/07/08 are
+# owned through PHASE-15's :Delivers: field; their checks appear under the
+# criteria they serve (R-TEST-07 under AC-TST-10, R-TEST-08 under AC-REL-01).
+#
 # Keep entries in specification order. Run `bash scripts/ci/traceability.sh`
 # after editing.
 
@@ -666,6 +675,11 @@ class = "org.cometgui.app.gui.ResultsLargeFixtureUiTest"
 method = "theLargeFixture"
 note = "Phase 10 unit 8, gate item 6. GUI test: the large fixture as a run's target PSM table opens, filters, sorts and pages in the Results section within documented budgets (open 15 s, filter 4 s, sorts 6 s and 15 s, page 2.5 s; measured 3.4 s, 0.7-1.0 s, 1.3 s, 3.4 s, 0.4-0.6 s), the table never holds more than one page of 200 items, and the heap grows by less than 64 MB (measured 3 MB). Local evidence on the phase 10 Linux host only."
 
+[[ac."AC-RES-10".evidence]]
+kind = "planned"
+phase = "15"
+note = "The specification bases these thresholds on stable dedicated nightly runners (Performance and resource tests). None exists: the one runner profile is the shared development host, so PHASE-15 gate item 4's dedicated-runner half is unverifiable, and the nightly performance job is red by design on any runner without a profile, every GitHub-hosted runner among them (exit 4); it has not yet run on GitHub (Phase 15 is not pushed)."
+
 # --- AC-VIS -----------------------------------------------------------------
 
 [[ac."AC-VIS-01".evidence]]
@@ -1143,44 +1157,71 @@ note = "Phase 09 unit 5. Unit test with a fake binary: a build without SEED_OPTI
 # --- AC-TST -----------------------------------------------------------------
 
 [[ac."AC-TST-01".evidence]]
+kind = "check"
+command = "bash scripts/build.sh --only gates"
+file = "scripts/build.sh"
+contains = "pit_package_grading() {"
+note = "Phase 15 unit 3 (D-014, D-015). Whether the tests are meaningful is measured by mutation: every Java package under PIT's targetClasses is graded on its own, (KILLED + TIMED_OUT) / all >= 80%. At unit 3's sign-off (2026-11-06, d70206a) 47 packages were graded, all at or above 80%, the lowest tools.pdv.derived at 89.7%; unit 4 audited every one of the 76 undetected mutants (docs/developer/testing.rst, Forbidden survivors: the audit)."
+
+[[ac."AC-TST-01".evidence]]
+kind = "check"
+command = "bash scripts/verify-test-gates.sh"
+file = "scripts/verify-test-gates.sh"
+contains = "weakpackagecontrol"
+note = "Phase 15 unit 3, control M: over real PIT runs of cometgui-domain, a 0% package inside a module above 80% is BELOW (PIT's own module threshold passes), a real TIMED_OUT counts as detected, an empty target and a package with code and no mutations each fail."
+
+[[ac."AC-TST-01".evidence]]
 kind = "planned"
 phase = "15"
+note = "Not complete: org.cometgui.workflow.{engine,steps,storage} -- the command builders and stage invalidation rules the specification's mutation list names -- are not in PIT's targets. PIT over cometgui-workflow with them ran more than 2 h 45 min unfinished; Phase 15 escalated the cost to tier 1 (handoffs/PHASE-15-worklog.rst, Blockers escalated)."
 
 [[ac."AC-TST-02".evidence]]
 kind = "check"
 command = "bash scripts/verify-test-gates.sh"
 file = "scripts/verify-test-gates.sh"
 contains = "verify-test-gates"
-note = "The JaCoCo gate. The specification's initial thresholds (>= 90% line, >= 85% branch on core domain, parameter and provenance logic; >= 80% line on view-model logic) are configured in pom.xml and enforced by mvn verify; scripts/verify-test-gates.sh proves the gate fails when an untested class is added to a gated package."
+note = "The JaCoCo gate. The specification's initial thresholds (>= 90% line, >= 85% branch on core domain, parameter and provenance logic; >= 80% line on view-model logic) are configured in pom.xml and enforced by mvn verify, switched on in cometgui-domain, -provenance, -params-comet, -params-percolator (core) and cometgui-ui (view-model); scripts/verify-test-gates.sh proves the gate fails when an untested class is added to a gated package."
 
 [[ac."AC-TST-02".evidence]]
 kind = "planned"
 phase = "15"
-note = "Phase 15 closes the criterion when the gates cover the whole implemented system rather than the packages that exist in phase 01."
+note = "Not closed: Phase 15 changed no coverage rule. Whether cometgui-results (q-value filtering) and cometgui-workflow (stage invalidation) hold core domain logic under the specification's 90/85 rule was left by cometgui-workflow/pom.xml to the phase that added the engine and is recorded nowhere since; tier 1 to decide."
+
+[[ac."AC-TST-03".evidence]]
+kind = "check"
+command = "bash scripts/build.sh --only gates"
+file = "scripts/build.sh"
+contains = "pit_package_grading() {"
+note = "The PIT gate as the owner decided it (D-014, D-015; Phase 15 unit 3): each critical Java package graded on its own at >= 80% with TIMED_OUT counted detected and named, no mutations a failure, the module total printed and not graded. 47 of 47 packages at or above 80% at unit 3's sign-off (2026-11-06). The forbidden-survivor half is unit 4's audit of all 76 undetected mutants: 2 in a forbidden class, both killed by new tests; 57 remain, none forbidden, each with its reason in docs/developer/testing.rst (Forbidden survivors: the audit) -- an audit by reading, not an automated check."
 
 [[ac."AC-TST-03".evidence]]
 kind = "check"
 command = "bash scripts/verify-test-gates.sh"
 file = "scripts/verify-test-gates.sh"
-contains = "verify-test-gates"
-note = "The PIT gate. R-TEST-02's >= 80% mutation score is configured over the critical packages with failWhenNoMutations left on; scripts/verify-test-gates.sh proves the gate fails when a mutation survives."
+contains = "weakpackagecontrol"
+note = "The PIT gate's falsifiability: control 6 (a covered class whose test asserts nothing) and control M (Phase 15 unit 3) over real PIT runs -- a package below 80% inside a module above it red, a TIMED_OUT not read as a miss, EMPTY and NO MUTATIONS failures."
 
 [[ac."AC-TST-03".evidence]]
 kind = "planned"
 phase = "15"
-note = "Phase 15 closes the criterion when the gates cover the whole implemented system rather than the packages that exist in phase 01."
+note = "Not complete: the critical packages of org.cometgui.workflow.{engine,steps,storage} (command builders, stage invalidation) are not mutation-gated -- measured at more than 2 h 45 min of PIT, escalated to tier 1 as a cost question (handoffs/PHASE-15-worklog.rst, Blockers escalated). The forbidden-survivor audit is not repeated automatically: a new survivor is graded only by the 80% score."
+
+[[ac."AC-TST-04".evidence]]
+kind = "test"
+class = "org.cometgui.archtests.LayeringRulesTest"
+note = "Every rule the specification's Architecture tests section names -- the domain without JavaFX, the UI on the domain and application APIs only, tool adapters and provenance/hashing without UI, the parameter parser and writer without JavaFX, no cycles between the major layers, process creation confined to the process service (R-PROC-02) -- plus the project's own UI rules; runs in every mvn verify."
+
+[[ac."AC-TST-04".evidence]]
+kind = "test"
+class = "org.cometgui.archtests.ClassImportCensusTest"
+note = "The rules are only as good as the import they run on: a floor of imported classes, at least one class from every product module, and a rule that matches no class fails rather than passing vacuously."
 
 [[ac."AC-TST-04".evidence]]
 kind = "check"
 command = "bash scripts/verify-test-gates.sh"
 file = "scripts/verify-test-gates.sh"
 contains = "verify-test-gates"
-note = "The ArchUnit suite in cometgui-archtests, checked against a class import whose size and per-module composition are themselves asserted; scripts/verify-test-gates.sh proves the rules fail on a JavaFX dependency in the domain and on a ProcessBuilder outside the process service."
-
-[[ac."AC-TST-04".evidence]]
-kind = "planned"
-phase = "15"
-note = "Phase 15 closes the criterion when the gates cover the whole implemented system rather than the packages that exist in phase 01."
+note = "scripts/verify-test-gates.sh proves the rules fail on a JavaFX dependency in the domain, on a ProcessBuilder outside the process service, and on a truncated class import."
 
 [[ac."AC-TST-05".evidence]]
 kind = "test"
@@ -1278,12 +1319,40 @@ contains = "check-failure-paths.sh"
 note = "Phase 14 unit 9, control 4 (gate item 4): every ordinary mapped test run fresh, and the checker graded over exactly that run's reports plus both tiers' (--scope all)."
 
 [[ac."AC-TST-10".evidence]]
+kind = "check"
+command = "COMETGUI_MATRIX_FIXTURE=<fixture dir> bash scripts/matrix/run-matrix.sh --part pairs"
+file = "scripts/matrix/run-matrix.sh"
+contains = "--part tools|pairs|all"
+note = "Phase 15 unit 6 (R-TEST-07). Every offered (Comet, Percolator) pair on Linux x86-64 run end to end over a named real-spectra fixture through the product's run port, exact invariants asserted and every derived value compared with goldens keyed by tool pair, fixture digest and platform, each covered by a reviewed explanation (scripts/matrix/check_goldens.py, run by scripts/ci/traceability.sh). Run locally only, over the D-006 LOCAL fixture: GREEN at the unit 6 sign-off (2026-11-06), 11 RUN-PASSED, 0 RUN-FAILED."
+
+[[ac."AC-TST-10".evidence]]
+kind = "test"
+class = "org.cometgui.app.matrix.VersionMatrixPairs"
+method = "everyPair"
+note = "Phase 15 unit 6: the pair runs the matrix grades. Opt-in (-Dcometgui.matrix=true, set by run-matrix.sh); refused, never passed, without a fixture."
+
+[[ac."AC-TST-10".evidence]]
+kind = "check"
+command = "COMETGUI_MATRIX_FIXTURE=<fixture dir> bash scripts/matrix/run-matrix.sh --part determinism"
+file = "scripts/matrix/run-matrix.sh"
+contains = "--part determinism|determinism-synthetic"
+note = "Phase 15 unit 7 (gate item 3): the pinned real-data run repeated N = 3 per pair, plus thread-count variations and a seed control, every artefact compared under the written tolerance (no numeric tolerance anywhere). GREEN over the D-006 local fixture at the unit 7 sign-off (2026-11-06); the synthetic half runs in the nightly."
+
+[[ac."AC-TST-10".evidence]]
+kind = "test"
+class = "org.cometgui.app.matrix.DeterminismPairs"
+method = "everyPairAsPlanned"
+note = "Phase 15 unit 7: the real-data determinism runs. Opt-in (-Dcometgui.matrix=true)."
+
+[[ac."AC-TST-10".evidence]]
 kind = "planned"
 phase = "15"
+note = "The NIGHTLY half is not met. D-006's CI fixture is open, so the real-data nightly jobs -- nightly-large-dataset.sh, nightly-determinism-fixture.sh, nightly-performance-fixture.sh -- are stubs that exit 70 naming D-006; no real-data regression has run on a CI runner, and Phase 15 is not pushed, so even its no-spectra nightly jobs have not run on GitHub. Linux x86-64 only."
 
 [[ac."AC-TST-11".evidence]]
 kind = "planned"
 phase = "15"
+note = "No evidence. Comet reads Thermo RAW only on Windows, and this project has no Windows runner and no RAW fixture (D-006's CI fixture set holds none). scripts/ci/nightly-windows-raw.sh is a stub that exits 70 naming both; the version matrix records the combination UNVERIFIED. The criterion applies when that feature ships."
 
 [[ac."AC-TST-12".evidence]]
 kind = "check"
@@ -1328,8 +1397,25 @@ note = "Phase 16 signs the criterion off when \"evidence\" means a passing test 
 # --- AC-REL -----------------------------------------------------------------
 
 [[ac."AC-REL-01".evidence]]
-kind = "planned"
-phase = "15"
+kind = "check"
+command = "bash scripts/ci/sbom.sh"
+file = "scripts/ci/sbom_verify.py"
+contains = "sbom-verify: PASSED -- the SBOM describes the project the POMs describe."
+note = "Phase 01. The CycloneDX SBOM of the reactor, test scope included, cross-checked against the POMs (an empty components array fails); every build plugin pinned. build.sh's supplychain stage and a pull-request and release step. Run 2026-11-07 for Phase 15 unit 11: PASSED, 31 components."
+
+[[ac."AC-REL-01".evidence]]
+kind = "check"
+command = "bash scripts/ci/dependency-scan.sh"
+file = "scripts/ci/dependency-scan.py"
+contains = "dependency-scan: canary control OK"
+note = "Phase 01. Every coordinate of the SBOM (and the plugin artifactItems it cannot see) queried against OSV, with a known-vulnerable canary that must be found; zero unaccepted vulnerabilities, every allowlist entry with a reason and a date. Run 2026-11-07 for Phase 15 unit 11: PASSED, 20 coordinates, allowlist empty, canary 8 advisories."
+
+[[ac."AC-REL-01".evidence]]
+kind = "check"
+command = "bash scripts/ci/nightly-manifest-verify.sh"
+file = "scripts/ci/manifest_verify.py"
+contains = "RED (a) CHECKSUM OR SIZE CHANGED"
+note = "Phase 15 unit 5, R-TEST-08 (listed here because the map has no R- half): every pinned tool artefact -- the product's downloaded runtime dependencies -- checked against upstream by size, SHA-256 and MD5, members included, and red when one changes, disappears or is superseded by a newer release; --self-test is the manifest gate control. Run 2026-11-07 for Phase 15 unit 11: VERIFIED, 63 records and members. A nightly and release step; not yet run on GitHub (Phase 15 is not pushed)."
 
 [[ac."AC-REL-02".evidence]]
 kind = "human"

@@ -76,8 +76,9 @@ What has been run, and where: the version matrix
 ================================================
 
 The table above says what upstream publishes. This one says what has actually
-been **run**: the result of the version matrix (Phase 15), last run on
-**2026-11-06** on Linux x86-64, the only kind of machine this project has. Every
+been **run**: the result of the version matrix (Phase 15), first run on
+2026-11-06 and last on **2026-11-07** (at ``91fc9a7``, over the local test
+data), on Linux x86-64, the only kind of machine this project has. Every
 combination is one of four things:
 
 * **run** -- installed from its upstream download by CometGUI's own Tool
@@ -87,7 +88,7 @@ combination is one of four things:
   yet. Unverified is not the same as working;
 * (a combination that was run and failed would say so; none did.)
 
-.. list-table:: Version matrix, 2026-11-06
+.. list-table:: Version matrix, 2026-11-07
    :header-rows: 1
    :widths: 16 21 21 21 21
 
@@ -128,9 +129,18 @@ combination is one of four things:
      - **unavailable** -- no ARM Linux Percolator is published
      - **unavailable**
      - unverified (not supported in release 1)
+   * - Windows on ARM
+     - **unavailable** -- not a platform CometGUI supports
+     - **unavailable**
+     - **unavailable**
+     - **unavailable**
 
-The full list -- one row per tool, version and platform, 61 rows, with the
-reason for each -- is the matrix's own report, which the developer
+In all: 11 run, 14 unavailable, 36 unverified. "Run" is
+one Linux machine, a developer's, not a clean computer of the kind a scientist
+would install on, and no automatic nightly job has run the search half yet: it
+needs a shared test data set that has not been chosen (``D-006``). The full
+list -- one row per tool, version and platform, 61 rows, with the reason for
+each -- is the matrix's own report, which the developer
 documentation explains at :ref:`dev-testing-version-matrix`. Where the
 versions behave differently (different defaults, a different number of
 results from the same data), the differences are listed at

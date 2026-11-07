@@ -14,16 +14,21 @@ every gate -- the defect that proves the gate actually bites.
 
 .. note::
 
-   **This page describes the state after Phase 01.** Phase 01 installed the
-   gates before there was code to hide behind them, so almost everything below
-   is a gate over a nearly empty tree. **Phase 15** (*Version Matrix,
-   Performance and Hardening*, ``phases/PHASE-15-hardening.rst``) completes it
-   with the real-tool, GUI, packaged and nightly suites. Where this page says
-   something does not exist yet it names the phase that owns it, and
-   `What is not tested yet`_ collects them.
+   **This page describes the state on 2026-11-07, after Phase 15's work
+   units** (*Version Matrix, Performance and Hardening*,
+   ``phases/PHASE-15-hardening.rst``; the phase's own sign-off is tier 1's and
+   is recorded in ``STATUS.rst``, not here). Phase 01 wrote the page and
+   installed the gates before there was code to hide behind them; Phases 02-14
+   added a harness each; Phase 15 added the tool manifest verification, the
+   version matrix, determinism, performance, the flakiness policy, the
+   per-package mutation grading and its own harness. Only Linux x86-64 has run
+   any of it. What remains open is collected in `What is not tested yet`_.
 
-   Every number, threshold, command and diagnostic on this page was produced by
-   running the thing on 2026-08-29, not copied from another document.
+   Every number on this page carries its date and where it came from: a run
+   recorded in a phase work log's sign-off, ``STATUS.rst``, or a command run
+   for this page. A number dated 2026-08-29 is Phase 01's measurement of a
+   much smaller tree, kept as the record of what was first seen; the build
+   prints the current figure.
 
 .. contents:: Contents
    :depth: 2
@@ -41,26 +46,38 @@ Commands
 
    * - ``bash scripts/build.sh``
      - **The one documented build command.** Bootstraps ``tools/`` and
-       ``.venv`` if needed, then runs all eleven stages: compile, unit tests,
-       package, artefact verification, formatting and static-analysis
-       evidence, coverage/architecture/mutation gates, integration tests,
-       the strict documentation build, SBOM and dependency scan, and the CI
-       workflow check. 87 s and ``11/11 stages OK`` on the development
-       machine.
+       ``.venv`` if needed, then runs all eleven stages: toolchain, font
+       stack, Python, ``mvn clean verify`` (compile, every module's tests,
+       package), artefact verification, formatting and static-analysis
+       evidence, coverage/architecture/mutation gates, integration tests, the
+       strict documentation build, SBOM and dependency scan, and the CI
+       workflow and flakiness checks. ``11/11`` in 9353 s (156 min) at
+       ``c9d037c``, tier 1's run of 2026-11-05 (``STATUS.rst``). PIT over the
+       reactor alone took 105 min at 16 threads in Phase 15 unit 3's
+       whole-reactor run. It was 87 s over Phase 01's tree.
+
+   * - ``bash scripts/dev-verify.sh``
+     - **The inner loop, never a gate.** Maps the change to the modules it can
+       break and runs only their tests (``--dry-run`` shows the selection,
+       ``--verify`` adds SpotBugs and JaCoCo, ``--mutation`` adds PIT over the
+       changed classes and prints the per-package grading of that run).
 
    * - ``bash scripts/build.sh --only gates``
      - Just the JaCoCo, ArchUnit and PIT stage, against the classes an earlier
-       build already produced. 8 s. This is also exactly what the
-       pull-request pipeline runs, through ``scripts/ci/test-gates.sh``.
+       build already produced -- PIT over the reactor included, so it is not
+       quick. This is also exactly what the pull-request pipeline runs,
+       through ``scripts/ci/test-gates.sh``.
 
    * - ``bash scripts/verify-all-gates.sh``
      - **Prove every gate still fails on the defect it exists to catch.** Runs
        all twenty-four falsifiability controls and exits non-zero if any
-       control stops biting. About 91 minutes on the 64-core development host
-       since 2026-11-05, when it began to run controls side by side where the
-       machine has the cores (see below) -- the ``tests`` control alone is
-       about 90 of them -- and many hours serially. Run it before signing off
-       a phase, not as routine.
+       control stops biting. The twenty-one before Phase 15 took 91 minutes
+       four at a time on the 64-core development host (tier 1, ``c9d037c``,
+       2026-11-05; ``tests`` 5454 s of it); Phase 15's three were measured
+       alone -- ``manifest`` about 2 s, ``flakiness`` about 40 s,
+       ``hardening`` 603 s -- and all twenty-four have not yet run together.
+       Serial, at four cores or fewer, it is many hours. Run once per phase,
+       at the exit gate, not as routine.
 
    * - ``bash scripts/verify-all-gates.sh --jobs N``
      - Up to ``N`` controls at once; ``1`` is serial, and so is the default at
@@ -111,77 +128,101 @@ Commands
        other combination recorded by name. Opt-in; about two minutes. See
        :ref:`dev-testing-version-matrix`.
 
+   * - ``bash scripts/matrix/run-matrix.sh --part determinism``
+     - Determinism (PHASE-15 gate item 3), with the fixture as above; opt-in.
+       See :ref:`dev-testing-determinism`.
+
+   * - ``bash scripts/perf/run-performance.sh``
+     - Performance (PHASE-15 gate item 4), graded against a runner profile;
+       opt-in. See :ref:`dev-testing-performance`.
+
+   * - ``bash scripts/ci/nightly-manifest-verify.sh``
+     - Every pinned tool artefact checked against upstream (``R-TEST-08``);
+       about 22 s and 170 MB. See :ref:`dev-manifest-verify`.
+
 ``scripts/verify-all-gates.sh`` is deliberately **not** a stage of
-``scripts/build.sh``. It costs about twelve minutes where the whole build costs
-under three, and a gate people are tempted to skip is a gate that rots. It
-belongs in the nightly pipeline and in a phase sign-off, not in the
-edit-compile loop.
+``scripts/build.sh``. Together they take about four hours on this host
+(``STATUS.rst``), and by the owner's standing build-economy rule both run once
+per phase, at the exit gate, by tier 1 -- not in the edit-compile loop, where
+``scripts/dev-verify.sh`` and one control at a time (``--only NAME``) are the
+tools.
 
 Testing philosophy
 ==================
 
 ``specification.rst``, *Testing Strategy*, distinguishes seven kinds of test
-and says plainly that unit testing alone is insufficient. Phase 01 has reached
-the first of them and has built the scaffolding for two more.
+and says plainly that unit testing alone is insufficient. Every kind now
+exists on Linux x86-64; what is missing is other platforms and the CI half of
+everything that needs spectra.
 
 .. list-table::
    :header-rows: 1
-   :widths: 22 34 44
+   :widths: 22 30 48
 
    * - Kind
      - What the specification asks for
-     - State after Phase 01
+     - State on 2026-11-07
 
    * - Fast unit tests
      - Every local and CI build; no network, no native tools.
-     - **Running.** 54 tests over four modules, in ``mvn verify``.
+     - **Running**, in ``mvn verify``: 10 419 tests in twelve modules at
+       ``a3f2ff5`` (every module's count in Phase 15 unit 1's sign-off), with
+       the headless GUI suite below among them. Phase 01 had 54.
 
    * - Component / integration
      - Filesystem, process, parser and install boundaries, with controlled
        fixtures and fake executables.
-     - **Not written.** Needs the process service (Phase 03) and the fake
-       executables the specification describes.
+     - **Running**, in the same ``mvn verify``: the process service and
+       workflow engine against fake executables (Phases 03 and 08; the
+       stand-in tools are also what the GUI tests run), the installer
+       against a loopback artefact server (Phase 05).
 
    * - Real-tool integration
      - Real pinned Comet, Percolator, converter and PDV binaries on small
        real fixtures.
-     - **Not written**, and asserted to be absent rather than assumed:
-       ``scripts/ci/integration-tests.sh`` searches every module test source
-       root for ``*IT.java``, ``*ITCase.java`` and ``Integration*Test.java``
-       and fails the moment one appears without failsafe wired up. Needs
-       Phase 05 (tool registry), Phase 08 (workflow engine) and ``D-006``
-       (whose data may be a fixture -- open).
+     - **Running on Linux.** Ordinary surefire classes named for it
+       (``Real...``, 45 classes on 2026-11-07 by the flakiness check's count),
+       in ``mvn verify``; and the version matrix over every Linux build
+       (:ref:`dev-testing-version-matrix`). ``scripts/ci/integration-tests.sh``
+       still guards only the ``*IT`` naming, which nothing uses.
 
    * - GUI tests
      - Drive JavaFX controls, verify UI state and validation.
-     - **Recipe proven, suite not written.** Two headless JavaFX tests run in
-       ``cometgui-ui``; see `The headless JavaFX recipe`_. Phase 14 owns the
-       suite. *Since then:* later phases wrote the GUI suite
-       (``*UiTest`` in ``cometgui-app``), and Phase 14 the end-to-end tier
-       over it -- see :ref:`dev-e2e-harness`.
+     - **Running**, headless on Linux: the ``*UiTest`` classes in
+       ``cometgui-app`` and the JavaFX tests of ``cometgui-ui``
+       (`The headless JavaFX recipe`_),
+       and Phase 14's Tier A end-to-end tier over them
+       (:ref:`dev-e2e-harness`, opt-in).
 
    * - Packaged end-to-end
      - Start the packaged application in a clean environment and drive a real
        workflow.
-     - **Not written.** Phase 14. *Since then:* Phase 14's Tier B runs both
-       end-to-end scenarios against the installed Linux archive, opt-in and
-       Linux only; macOS and Windows packaging has never been executed. See
-       :ref:`dev-e2e-harness`.
+     - **Linux only, opt-in, not in CI.** Phase 14's Tier B runs both
+       end-to-end scenarios against the installed Linux archive; macOS and
+       Windows packaging has never been executed (:ref:`dev-e2e-gaps`).
 
    * - Nightly / scientific regression
      - Larger real data, version matrices, determinism, performance.
-     - **Pipeline exists, work does not.** Every nightly step is a stub that
-       exits 70 naming its owning phase. A green nightly today would mean
-       nothing; a red one names exactly what is missing. *Since then:* Phase
-       15 replaces them one at a time; the tool manifest verification is real
-       (:ref:`dev-manifest-verify`).
+     - **Real where no spectra are needed; waiting on** ``D-006`` **where they
+       are.** Real: the tool manifest (:ref:`dev-manifest-verify`), the
+       matrix's tools part, determinism's synthetic half and the performance
+       suite's no-spectra part -- the last red by design on any runner
+       without a profile, every GitHub runner among them
+       (:ref:`dev-testing-performance`).
+       Stubs that exit 70: the large dataset, the fixture halves of
+       determinism and performance, the GUI tests, the Windows RAW test and
+       the Limelight sandbox (``D-007``); see `What is not tested yet`_.
+       Phase 15's work is not pushed yet, so GitHub's scheduled nightly
+       still runs the stubs of ``fabbbcf``.
 
    * - Release acceptance
      - The exact installer and package artefacts that will be published.
-     - **Not written.** Phases 14 and 16. *Since then:* the no-test-bridge
-       check is a real release step (:ref:`dev-e2e-no-bridge`); the smoke and
-       end-to-end release steps remain stubs waiting for ``D-006``'s CI
-       fixture and Phase 16's release artefact.
+     - **Partly real.** The no-test-bridge check (:ref:`dev-e2e-no-bridge`),
+       the tool manifest, the documentation build and the SBOM are real
+       release steps; packaging, checksums, the smoke test, the three
+       end-to-end steps, signing and publishing are stubs waiting for
+       Phase 16's release artefact and, for the end-to-end steps, ``D-006``'s
+       CI fixture.
 
 Two rules from ``CONTRIBUTING.rst`` apply to every test anyone adds:
 
@@ -195,7 +236,12 @@ Two rules from ``CONTRIBUTING.rst`` apply to every test anyone adds:
 The gates that exist today
 ==========================
 
-Eleven gates, all wired into ``mvn verify`` or ``scripts/build.sh``. Every
+The eleven build gates from Spotless to the CI definitions are wired into
+``mvn verify`` or ``scripts/build.sh``; the five sections after them are
+Phase 15's, run from their own scripts, the nightly and the gate harnesses
+(the flakiness check is also a step of ``build.sh``'s ``workflows`` stage).
+Where a section quotes a count from 2026-08-29 it is Phase 01's, over a tree a
+fraction of today's size. Every
 version is pinned exactly in ``pom.xml``, and the two static analysers are
 pinned *separately from their Maven plugins* (Checkstyle 14.0.0, SpotBugs
 4.10.4) so a plugin's bundled default cannot drift underneath the gate.
@@ -338,8 +384,15 @@ Mutation -- PIT
 :Target packages: the ``<targetClasses>`` list in ``pom.xml`` -- the domain,
    both parameter modules, provenance, results filtering, parsing and export,
    tools, install registry/verify/probe/download/archive/cache/manager, and
-   workflow state. A later phase adds its packages; it does not narrow the
-   list.
+   workflow state -- 47 Java packages graded at Phase 15 unit 3's sign-off,
+   all at or above 80%, the lowest ``tools.pdv.derived`` at 89.7%. A later
+   phase adds its packages; it does not narrow the list. **Not in it:**
+   ``org.cometgui.workflow.{engine,steps,storage}``, where the command
+   builders and stage invalidation ``R-TEST-02`` names live. PIT over
+   ``cometgui-workflow`` with them ran more than 2 h 45 min without finishing
+   (against 20 min for ``workflow.state`` alone), so Phase 15 did not add them
+   and escalated the cost to tier 1 (``handoffs/PHASE-15-worklog.rst``,
+   *Blockers escalated*).
 :Configured in: ``pom.xml`` (``pitest-maven`` 1.30.0 with
    ``pitest-junit5-plugin`` 1.2.3), the ``mutation`` profile, and
    ``cometgui.mutation.skip=false`` in each module with critical-package
@@ -760,8 +813,9 @@ Documentation -- strict Sphinx
 :Runs with: ``bash scripts/ci/docs-build.sh``.
 
 Both builds verify their output rather than trusting the exit code:
-``sphinx-build`` can exit 0 having written nothing. On 2026-08-29: build 1,
-49 source documents, 51 HTML pages; build 2, 31 documents, 34 pages.
+``sphinx-build`` can exit 0 having written nothing. On 2026-11-07 (run for
+this page): build 1, 55 source documents, 57 HTML pages; build 2, 89
+documents, 92 pages (Phase 01: 49 and 31).
 
 Documents are **discovered, never listed**, so a document added later is
 covered without editing the script.
@@ -783,10 +837,16 @@ Traceability -- ``R-DOC-03``
    makes an incomplete map a *documentation build* failure rather than merely a
    script failure.
 
-On 2026-08-29: ``94 R- rules, 78 AC- criteria, all mapped and verified``;
-``0 automated, 5 partial, 65 planned, 8 human sign-off``; 48 generator unit
-tests pass. The generated page is :doc:`traceability`; it is produced during
-the documentation build so it cannot silently diverge from the code. Fix the
+On 2026-11-07 (``bash scripts/ci/traceability.sh``, after Phase 15 unit 11's
+map entries): ``100 R- rules, 80 AC- criteria, all mapped and verified``;
+``52 automated, 10 partial, 10 planned, 8 human sign-off``, the evidence
+naming 172 JUnit tests and 13 check files; 48 generator unit tests pass
+(Phase 01's first run: 94 rules, 78 criteria, 0 automated). "Partial" means a
+check exists and a ``planned`` entry names what is still missing; the
+generator refuses a ``planned`` entry for a phase ``STATUS.rst`` records as
+PASSED. The map has only an ``AC-`` half: an ``R-`` rule's owner is the phase
+whose ``:Delivers:`` names it. The generated page is :doc:`traceability`; it
+is produced during the documentation build so it cannot silently diverge from the code. Fix the
 generator or its input, never the generated page.
 
 Supply chain -- SBOM and dependency scan
@@ -803,9 +863,13 @@ Supply chain -- SBOM and dependency scan
    ``scripts/ci/security/allowlist.json``.
 :Runs with: ``bash scripts/build.sh`` (``supplychain`` stage).
 
-On 2026-08-29: 26 components, JSON and XML agreeing on all 26 purls; 15
-coordinates scanned plus one canary. The canary is the interesting part -- see
-`Traps`_.
+On 2026-11-07 (``scripts/ci/sbom.sh`` and ``scripts/ci/dependency-scan.sh``,
+run for this page): 31 components -- 12 reactor modules, 5 declared
+third-party dependencies, 14 resolved transitive ones -- JSON and XML agreeing
+on all 31 purls; 20 coordinates scanned, none with an unaccepted
+vulnerability, the allowlist empty, and the canary answered with 8 advisories
+(Phase 01's first run: 26 components, 15 coordinates). The canary is the
+interesting part -- see `Traps`_.
 
 CI definitions
 --------------
@@ -819,11 +883,14 @@ CI definitions
    ``bash scripts/ci/run-pipeline-locally.sh`` executes the steps themselves,
    reading them out of the workflow files rather than a copy.
 
-**No pull-request pipeline has run on GitHub.** The remote has existed since
-``D-008`` was decided on 2026-08-30 and ``main`` is pushed; a scheduled nightly
-has run there, but no pull request has been opened. Phase 01 exit gate item 6
-is therefore half met: every step is proved on this machine, and the "on a pull
-request" half is recorded as unmet rather than pretended.
+**What has run on GitHub** (the repository's Actions listing, read
+2026-11-07). The pull-request pipeline has run once, on pull request #1 at
+``686f9bc`` on 2026-09-02: success, all 15 steps green (``STATUS.rst``, *Phase
+01 item 6*); every step it has gained since -- the flakiness check among them
+-- has run only on this machine. The nightly has run on its schedule 68 times,
+last on 2026-11-06 at ``fabbbcf``, red as the owner decided while its stubs
+stand; Phase 15's commits are not pushed, so none of its real nightly jobs has
+run there. The release workflow has never run.
 
 **Where the local run runs.** On a runner, ``actions/checkout`` makes a fresh
 checkout and every step builds in it. ``run-pipeline-locally.sh`` makes the
@@ -2236,7 +2303,8 @@ on 2026-11-07). A test class is release-critical when any of these names it:
   234;
 * the traceability map: every class ``docs/traceability-map.toml`` gives as
   test evidence for a requirement or criterion (the project is finished only
-  when every ``AC-`` passes its named test) -- 101.
+  when every ``AC-`` passes its named test) -- 105 (101 before Phase 15 unit
+  11 named four more; the total stays 279, all four already counted).
 
 A register entry naming such a class, or a method or nested class of one, is
 red ``[RELEASE-CRITICAL]``.
@@ -2319,7 +2387,7 @@ The check, and where it runs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``bash scripts/ci/flakiness-check.sh`` scans every test source (965 files),
-POM (14), script (118) and workflow in about 2 s: exit 0 green, 1 red with
+POM (14), script (119) and workflow in about 2 s: exit 0 green, 1 red with
 every problem printed, 2 refused (no register, or nothing to scan -- never
 green). It also refuses a failure-path map id ``Outer$Nested#method`` whose
 method name another class of the same outer declares (``[AMBIGUOUS-ID]``; see
@@ -4839,76 +4907,105 @@ exactly the failure this recipe exists to prevent, and exactly what a
 "did not throw" assertion would have let through.
 
 This is the **Linux** recipe. Nothing here has been executed on Windows or
-macOS; Phase 00 established that and Phase 14 owns proving it elsewhere.
+macOS (still true on 2026-11-07); running the GUI and packaged tiers there is
+Phase 16's (``AC-TST-07``).
 
 What is not tested yet
 ======================
 
 Stated plainly, because a documentation page that implies more coverage than
-exists is worse than no page.
+exists is worse than no page. The state on 2026-11-07; each row's detail is in
+the section it points to, and "owner" is whoever the record names -- where none
+is named, the row says so.
 
 .. list-table::
    :header-rows: 1
-   :widths: 40 18 42
+   :widths: 30 18 52
 
    * - Not tested
-     - Owning phase
-     - Why not yet
+     - Owner
+     - Why not, and what waits on it
 
-   * - Anything the application actually does
-     - 02--13
-     - There is no application yet. Each gated module carries one small class
-       with real branching and real tests, so the gates are not vacuous. They
-       are scaffolding and are marked as such; later phases replace rather
-       than extend them.
+   * - macOS and Windows, anywhere
+     - Phase 16 (``AC-TST-07``); a runner of each platform
+     - This project has one Linux x86-64 host. Every macOS and Windows
+       combination the product offers is ``UNVERIFIED`` in the version matrix
+       (:doc:`../platform_support`), the
+       Comet ``-p``/``-q`` fixtures exist only for ``linux-x86-64``, and no
+       suite, GUI test or packaged tier has run on either. The only
+       executions there are two single hosted-runner jobs: Percolator 3.07.1
+       on Windows, and the macOS Gatekeeper check, which left Gatekeeper's
+       question open (:doc:`tool_registry`, *What has been observed, and what
+       has not*).
 
-   * - Component tests with fake executables
-     - 03, 08
-     - Needs the process service.
+   * - The dedicated performance runner
+     - none recorded; needs a machine
+     - None exists, so PHASE-15 gate item 4's "on the dedicated runner" half
+       is unverifiable; the one profile is this shared host. The nightly
+       ``performance`` job is red by design on any runner without a profile,
+       every GitHub runner among them (exit 4), and
+       ``nightly-performance-fixture.sh`` is a stub. What such a runner
+       needs: :ref:`dev-testing-performance`.
 
-   * - Real-tool integration tests
-     - 05, 08, and ``D-006``
-     - No pinned Comet, Percolator, converter or PDV binary exists yet, and
-       whose spectra and FASTA may be used as a fixture is an open owner
-       decision.
+   * - Anything over spectra in CI: ``D-006``'s CI fixture is **open**
+     - the owner (``D-006``)
+     - No CI job may use the local fixture. Waiting on it, each a stub that
+       exits 70 naming it: ``nightly-large-dataset.sh`` (the matrix's pair
+       runs), ``nightly-determinism-fixture.sh``,
+       ``nightly-performance-fixture.sh`` (and the dedicated runner),
+       ``nightly-gui-tests.sh`` (and a display), ``nightly-windows-raw.sh``
+       (and a Windows runner), and ``release-e2e-canonical.sh``,
+       ``release-e2e-limelight.sh`` and ``release-e2e-noxml.sh`` (and Phase
+       16's release artefact). Locally, with the ``D-006`` local fixture,
+       everything here but the Windows RAW test has run on Linux.
 
-   * - The GUI suite, and packaged end-to-end tests
-     - 14
-     - The recipe is proven; the controls to drive do not exist. *Since
-       then:* written, Linux only; what remains open is listed in
-       :ref:`dev-e2e-gaps`.
+   * - Thermo RAW
+     - none recorded; needs a Windows runner and a RAW fixture (``D-006``)
+     - Comet reads RAW only on Windows. The matrix records the Windows smoke
+       test ``UNVERIFIED`` (``AC-TST-11``, "when that feature ships") and
+       ``nightly-windows-raw.sh`` is a stub.
 
-   * - Nightly regression, determinism, performance, version matrix
-     - 15
-     - Every nightly step is a stub that exits 70 naming its phase. *Since
-       then:* the tool manifest verification is real
-       (:ref:`dev-manifest-verify`), and so is determinism's synthetic half
-       (:ref:`dev-testing-determinism`; its fixture half waits on ``D-006``),
-       and the performance suite (:ref:`dev-testing-performance`), graded on
-       this shared host's profile and red on every runner with no profile --
-       no dedicated performance runner exists.
+   * - Mutation testing of ``org.cometgui.workflow.{engine,steps,storage}``
+     - tier 1 (escalated by Phase 15)
+     - The command builders and stage invalidation ``R-TEST-02`` names are not
+       graded: PIT over them ran more than 2 h 45 min unfinished, against a
+       15-minute allowance (`Mutation -- PIT`_). ``workflow.state`` is graded.
+
+   * - Coverage rules beyond the five modules that have one
+     - not decided by any phase
+     - The 90/85 rule is on in ``cometgui-domain``, ``-provenance``,
+       ``-params-comet`` and ``-params-percolator``, the view-model rule in
+       ``cometgui-ui``. The specification gives adapters no number; whether
+       ``cometgui-results`` (q-value filtering) and ``cometgui-workflow``
+       count as core domain logic was left by ``cometgui-workflow/pom.xml``
+       to "the phase that adds the engine" and is recorded nowhere since.
 
    * - Release acceptance on real installer artefacts
-     - 14, 16
-     - Nothing is packaged yet. *Since then:* Phase 14 packages and tests a
-       Linux archive locally; no CI job runs it, and no macOS or Windows
-       artefact has been built (:ref:`dev-e2e-ci`).
+     - Phase 16
+     - Packaging, checksums, the smoke test, signing and publishing are stubs;
+       Phase 14 packages and tests a Linux archive locally only
+       (:ref:`dev-e2e-ci`).
 
-   * - Coverage gates on adapter, workflow, install and app modules
-     - the phase that fills each module
-     - The specification gives those modules no numeric target and says
-       adapters are covered by real integration tests instead. The rules are
-       written and inert; turning one on is the job of the phase that adds the
-       code.
+   * - The pull-request pipeline as it stands
+     - whoever opens the next pull request
+     - It ran once, on 2026-09-02 (`CI definitions`_); every step since has run
+       only here.
 
-   * - Windows and macOS, anywhere
-     - 05, 09, 14, 15
-     - This environment has one Linux machine and no remote. The workflow
-       files name the runners and the matrix so a later phase turns them on
-       rather than discovering they were never written.
+Product gaps the tests found -- each reported upward, none fixed yet, and no
+test changed to hide one:
 
-   * - CI on an actual pull request
-     - blocked on ``D-008``
-     - There is no git remote and creating one is an owner decision. Every
-       pipeline step is proved locally instead, and Phase 01 records gate
-       item 6 as half met.
+* **The merged PIN's row count is not checked by the product.** Its merge
+  record counts rows read, not written, so a dropped row still gives a
+  successful run; only the version matrix's own count saw it (Phase 15 unit 6,
+  escalated; :ref:`dev-testing-version-matrix`).
+* **PSM identifiers carry the absolute run path** Comet builds from ``-N``;
+  the goldens strip it and determinism normalises it (unit 6, a product
+  question).
+* ``KeyboardOnlyNavigationUiTest`` **fails on a machine with Comet installed in
+  the application-data folder** -- deterministic, an isolation defect; open in
+  ``STATUS.rst``, tier 1's to route (:ref:`dev-testing-flakiness`).
+* **The Results run chooser opens every run it passes** on keyboard navigation,
+  each a cold open of a large run (unit 8, reported;
+  :ref:`dev-testing-performance`).
+* **The retained GUI heap creeps** by about 0.6 MiB per run opened in one
+  session and does not return when a run closes (unit 8, not traced).

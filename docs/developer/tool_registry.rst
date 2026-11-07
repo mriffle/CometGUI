@@ -787,7 +787,8 @@ atomic move and the real probe, and it runs the real binaries. What it does not
 prove is that upstream is still reachable. A separate opt-in run fetches every
 Linux artefact the Tool Manager offers from its real URL -- 123 059 863 bytes
 from six URLs across three repositories, both Comet releases among them -- and
-a nightly manifest check belongs to Phase 15.
+since Phase 15 the nightly tool manifest verification checks every pinned
+artefact of every platform against upstream (:ref:`dev-manifest-verify`).
 
 **Every Comet release is installed and identified by data.**
 ``CometReleaseInstallTest`` installs each Comet row the manifest names for
