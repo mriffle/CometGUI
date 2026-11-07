@@ -119,7 +119,7 @@ Commands
        retry, any test disabled without an entry in
        ``scripts/ci/quarantine.toml``, and any entry naming a release-critical
        test. About 2 s; a step of the pull-request pipeline and of
-       ``build.sh``'s ``workflows`` stage. ``--self-test`` (40 cases, about 40
+       ``build.sh``'s ``workflows`` stage. ``--self-test`` (44 cases, about 45
        s) is the ``flakiness`` gate control. See :ref:`dev-testing-flakiness`.
 
    * - ``COMETGUI_MATRIX_FIXTURE=scratch/fixture bash scripts/matrix/run-matrix.sh``
@@ -2402,10 +2402,14 @@ quarantine of an ordinary test green; a missing register and a tree with no
 test sources refused; and three controls on the grader (a case whose defect
 was not injected, a red graded against another case's words, an injection that
 wrote nothing), each a harness failure; and the exit status of the command
-itself -- 40 cases, about 40 s (the fortieth, a rerun on the same line as a
+itself -- 44 cases, about 45 s (the fortieth, a rerun on the same line as a
 grading harness's permitted ``maven.test.failure.ignore``, was added at the
-unit 9 sign-off, when that shape passed the check). It is the ``flakiness``
-control of ``verify-all-gates.sh`` (PHASE-15 item 6, floor 40), which only reads the working tree. Because its first case is the clean tree, the control is also red
+unit 9 sign-off, when that shape passed the check; the last four -- a runner
+run again after ``||``, ``scripts/build.sh`` run again after ``||``, a
+one-line ``if <runner>; then break; fi`` in a loop, and ``<runner> && exit
+0`` in a loop -- at the tier-1 phase sign-off, when each of those shapes
+passed it). It is the ``flakiness``
+control of ``verify-all-gates.sh`` (PHASE-15 item 6, floor 44), which only reads the working tree. Because its first case is the clean tree, the control is also red
 whenever the tree itself breaks the policy.
 
 How to quarantine, if it must be done

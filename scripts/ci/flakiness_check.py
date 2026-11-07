@@ -25,7 +25,11 @@ What is red, each with its own words (``KIND`` in brackets):
   extension points a retry or a swallowed failure is built from);
 * ``[HARNESS-RETRY]`` a loop in a script that runs a test runner again until
   it passes: ``until``/``while !`` on a runner, a runner followed by
-  ``&& break``/``|| continue``, an ``if <runner>; then ... break``, and in
+  ``&& break``/``&& exit 0``/``&& return 0``/``|| continue``, an ``if
+  <runner>; then ... break`` (or ``exit 0``/``return 0``, on the same line or
+  after it), and -- in or out of a loop -- a runner whose ``||`` runs a runner
+  again (``mvn test || mvn test``); ``scripts/build.sh`` and ``dev-verify.sh``
+  are runners; and in
   Python a loop around a runner subprocess that breaks or returns on a zero
   exit status;
 * ``[UNREGISTERED]`` any test-disabling construct that is neither one of the
@@ -160,8 +164,13 @@ PIPELINE_OS = "LINUX"
 #: printed; curl --retry fetches an artefact.  Neither is matched by the
 #: harness-retry rules, which look for a TEST RUNNER being run again.
 TEST_RUNNER = re.compile(
-    r"(?<![\w-])(mvn|mvnw|run_maven|maven_run|surefire|pytest|gradle|gradlew)(?![\w-])"
-    r"|scripts/verify-[a-z0-9-]+\.sh|run-pipeline-locally\.sh|run-matrix\.sh|run-performance\.sh")
+    r"(?<![\w-])(mvn|mvnw|run_maven|run_mvn|maven_run|surefire|pytest|gradle|gradlew)(?![\w-])"
+    r"|scripts/verify-[a-z0-9-]+\.sh|scripts/build\.sh|dev-verify\.sh|run-pipeline-locally\.sh"
+    r"|run-matrix\.sh|run-performance\.sh")
+
+#: What a loop body does to stop repeating once the run it guards succeeded:
+#: leave the loop, or leave the script or function with success.
+LOOP_EXIT = r"\b(break|exit\s+0|return\s+0)\b"
 
 PLACEHOLDER = re.compile(r"\b(TODO|TBD|FIXME|XXX|placeholder|n/?a|none|unknown)\b|^\s*[-?.]*\s*$",
                          re.IGNORECASE)
@@ -731,18 +740,31 @@ def harness_retries(path: str, lines: list[str]) -> list[Problem]:
                 depth += 1
             if re.search(r"\bdone\b", line):
                 depth = max(0, depth - 1)
+            # A runner retried on its own failure, in or out of a loop:
+            # "mvn test || mvn test".  The command after "||" must itself BE a
+            # runner, not a message that names one ("|| die 'no mvn'").
+            ran, _, otherwise = line.partition("||")
+            if otherwise and TEST_RUNNER.search(ran) and \
+                    re.match(r"\s*(\w+=\S*\s+)*(bash\s+|sh\s+|\./)?(" + TEST_RUNNER.pattern + r")",
+                             otherwise):
+                problems.append(Problem("HARNESS-RETRY", f"{path}:{number}",
+                                        "a test runner run again when it fails"))
             if depth and TEST_RUNNER.search(line):
-                if re.search(r"&&\s*break\b|\|\|\s*continue\b", line):
+                if re.search(r"&&\s*" + LOOP_EXIT + r"|\|\|\s*continue\b", line):
                     problems.append(Problem("HARNESS-RETRY", f"{path}:{number}",
                                             "a test runner whose success ends the loop that repeats it"))
                 elif re.search(r"\bif\b.*;\s*then\b", line):
-                    for follow in lines[number:number + 6]:
-                        if re.search(r"\bfi\b|\belse\b|\belif\b", follow):
-                            break
-                        if re.search(r"\bbreak\b", follow):
+                    # The body starts after "then" on this line ("if mvn test;
+                    # then break; fi") and runs on until fi, else or elif.
+                    rest = re.split(r";\s*then\b", line, maxsplit=1)[1]
+                    for follow in [rest] + lines[number:number + 6]:
+                        body = re.split(r"\b(fi|else|elif)\b", follow, maxsplit=1)[0]
+                        if re.search(LOOP_EXIT, body):
                             problems.append(Problem("HARNESS-RETRY", f"{path}:{number}",
                                                     "a test runner whose success breaks the loop "
                                                     "that repeats it"))
+                            break
+                        if body != follow:
                             break
     elif path.endswith(".py"):
         for number, raw in enumerate(lines, 1):
@@ -1000,6 +1022,21 @@ def cases():
         ("a harness that breaks its loop when the test run succeeds",
          lambda r: _edit(r, "scripts/verify-shell-gates.sh", "\nset -",
                          "\nfor attempt in 1 2 3; do\n    mvn -o -B test && break\ndone\nset -"),
+         {"HARNESS-RETRY": "ends the loop"}),
+        ("a harness that runs Maven again when it fails (||)",
+         lambda r: _edit(r, "scripts/verify-shell-gates.sh", "\nset -", "\nmvn -o -B test || mvn -o -B test\nset -"),
+         {"HARNESS-RETRY": "run again when it fails"}),
+        ("a harness that re-runs the build when it fails (scripts/build.sh ||)",
+         lambda r: _edit(r, "scripts/verify-shell-gates.sh", "\nset -",
+                         "\nbash scripts/build.sh || bash scripts/build.sh\nset -"),
+         {"HARNESS-RETRY": "run again when it fails"}),
+        ("a harness whose one-line if breaks its loop when the test run succeeds",
+         lambda r: _edit(r, "scripts/verify-shell-gates.sh", "\nset -",
+                         "\nfor attempt in 1 2 3; do\n    if mvn -o -B test; then break; fi\ndone\nset -"),
+         {"HARNESS-RETRY": "breaks the loop"}),
+        ("a harness that exits 0 from its loop when the test run succeeds",
+         lambda r: _edit(r, "scripts/verify-shell-gates.sh", "\nset -",
+                         "\nfor attempt in 1 2 3; do\n    mvn -o -B test && exit 0\ndone\nset -"),
          {"HARNESS-RETRY": "ends the loop"}),
         ("a Python harness that loops on Maven until its exit status is 0",
          lambda r: _edit(r, "scripts/perf/performance.py", "\nimport ",

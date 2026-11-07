@@ -204,7 +204,9 @@ declare -a COVERED=()
 #                self-test to control P.  flakiness: 39 on 2026-11-07,
 #                phase 15 unit 9's first shipping count; 40 the same day,
 #                when the orchestrator's sign-off added the same-line retry
-#                case.  hardening: 35 on 2026-11-07, phase 15 unit 10's first
+#                case; 44 on 2026-11-07, when tier 1's sign-off added four
+#                harness-retry shapes (a runner rerun after ||, build.sh as a
+#                runner, a one-line if ... then break, && exit 0).  hardening: 35 on 2026-11-07, phase 15 unit 10's first
 #                shipping count.  pipeline: 24 when first floored; 31 on
 #                2026-11-07, raised by phase 15 unit 10 to the count every
 #                run since unit 8 has graded.)
@@ -303,7 +305,7 @@ gate_spec() {
                 "flakiness-check: self-test OK --"
                 "H1 a case whose defect was not injected: reported as a HARNESS FAILURE"
             )
-            GATE_FLOOR=40
+            GATE_FLOOR=44
             GATE_UNIT="cases"
             ;;
         pipeline)

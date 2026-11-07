@@ -47,7 +47,7 @@
 #       quarantined.  6b (NEW): a register entry naming
 #       TierACanonicalScenarioTest, complete in all seven fields -- RED
 #       [RELEASE-CRITICAL] naming it.  The check's own falsifiability is the
-#       flakiness control (flakiness-check.sh --self-test, 40 cases); this
+#       flakiness control (flakiness-check.sh --self-test, 44 cases); this
 #       control does not repeat it.
 #   K   the census (NEW), on the plain copy: every run step of every workflow
 #       in .github/workflows/, read through check-workflows.py --list-steps,
@@ -644,7 +644,7 @@ since = 2026-11-01"
     restore tree "${QUARANTINE}"
     rm -f -- "${TREE}/scripts/ci/quarantine/hardening-gate-6b.log"
     rmdir -- "${TREE}/scripts/ci/quarantine" 2>/dev/null || true
-    printf '   the check'"'"'s own 40 cases are the flakiness control'"'"'s; not repeated here\n'
+    printf '   the check'"'"'s own 44 cases are the flakiness control'"'"'s; not repeated here\n'
     end_control
 }
 
