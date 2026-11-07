@@ -838,6 +838,14 @@ left in ``_build/package`` (on 2026-11-07, one from 2026-10-23) instead of
 building one from ``HEAD``. The step scripts did not change: each finds its root
 from its own location, so on a runner it builds in the checkout and here in
 the sandbox. Uncommitted changes are not exercised, and the transcript says so.
+Measured on 2026-11-07 (``--only pipeline`` at ``0c42108``): 31 steps in 1701
+s, the link check 1110 s of it; the sandbox's first Maven build now lands in
+the version-matrix step (110 s, against 38 s in the warm working tree) and the
+no-test-bridge step builds the archive it inspects (54 s). A digest of every
+file under the working tree's ``cometgui-*/target`` (10 008 files) was
+byte-for-byte the same before and after, and a listing of every other
+working-tree file (path, size, time) differed only in a file edited by hand
+during the run.
 
 .. _dev-manifest-verify:
 
@@ -4706,10 +4714,12 @@ and performance are their own suites' and wait for ``D-006``'s CI fixture);
 macOS and Windows; the dedicated performance runner; the fourteen other
 performance measurements, whose reds unit 8 recorded one by one.
 
-Measured on 2026-11-07 by ``bash scripts/verify-hardening-gates.sh --worktree``
-on the tree of unit 10 (64 cores, load about 7): 35 controls in 619 s (10 m 19
-s) -- 1a 123 s (the sandbox's first build), 1b 61 s, 3a 56 s, 3b 54 s, 4a 116
-s, 4b 113 s, 4c 86 s, everything else a few seconds. The floor in
+Measured on 2026-11-07: ``bash scripts/verify-all-gates.sh --only hardening`` at
+``0c42108``, run while the ``pipeline`` control ran beside it in another
+invocation (64 cores, load 2-7): **35 controls in 603 s** (10 m 3 s), every
+shared resource unchanged; the first run, ``--worktree`` on the same tree, took
+619 s -- 1a 123 s (the sandbox's first build), 1b 61 s, 3a 56 s, 3b 54 s, 4a
+116 s, 4b 113 s, 4c 86 s, everything else a few seconds. The floor in
 ``verify-all-gates.sh`` is 35.
 
 Traps

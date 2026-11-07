@@ -5,12 +5,12 @@
 #
 # WHY THIS EXISTS.  PHASE-01 exit gate item 6 is "CI runs the pull-request
 # pipeline on a pull request and its failure modes are demonstrated, not
-# assumed."  Half of that cannot be met here and must not be faked: GITHUB HAS
-# NEVER EXECUTED ANYTHING IN THIS REPOSITORY.  A remote does exist now -- D-008
-# was decided on 2026-08-30 -- but nothing has been pushed to it: the Actions
-# API reported 0 workflow runs on 2026-08-30, and this environment holds no
-# push credential of any kind.  A local transcript is evidence that the steps
-# work on a machine, and it is not evidence that a runner ever ran them.
+# assumed."  Half of that cannot be met here and must not be faked: NO PULL
+# REQUEST HAS EVER BEEN OPENED, so GitHub has never run the pull-request
+# pipeline on one.  The remote exists (D-008, decided 2026-08-30) and main is
+# pushed; GitHub has run a scheduled nightly and dispatched platform workflows,
+# and none of that is a pull request.  A local transcript is evidence that the
+# steps work on a machine, and it is not evidence that a runner ever ran them.
 #
 # The other half is met literally.  This script reads the steps OUT OF THE
 # WORKFLOW FILES -- via `check-workflows.py --list-steps`, not out of a copy of
@@ -169,13 +169,13 @@ RAN=0
     printf ' PHASE-01 exit gate item 6 reads: "CI runs the pull-request pipeline on a pull\n'
     printf ' request and its failure modes are demonstrated, not assumed."\n'
     printf '\n'
-    printf '   NOT MET   "on a pull request". No pull request has been opened, so these\n'
-    printf '             files. A remote exists -- D-008 was decided on 2026-08-30, and\n'
-    printf '             the git remote line above is it -- but nothing has been pushed\n'
-    printf '             to it: the Actions API reported 0 workflow runs on 2026-08-30,\n'
-    printf '             and this environment holds no push credential of any kind. The\n'
-    printf '             item closes when a branch is pushed, a pull request is opened,\n'
-    printf '             and a runner executes these files. Not before.\n'
+    printf '   NOT MET   "on a pull request". No pull request has been opened, so GitHub\n'
+    printf '             has never run the pull-request pipeline on one. A remote exists\n'
+    printf '             -- D-008 was decided on 2026-08-30, and the git remote line\n'
+    printf '             above is it -- and main is pushed; GitHub has run a scheduled\n'
+    printf '             nightly and dispatched platform workflows, none of them a pull\n'
+    printf '             request. The item closes when a pull request is opened and a\n'
+    printf '             runner executes these files on it. Not before.\n'
     printf '\n'
     printf '   MET       Every step that CAN run here has been executed on this machine,\n'
     printf '             with its exact command, and each behaved as it must: real steps\n'
@@ -284,7 +284,7 @@ for workflow in "${WORKFLOWS[@]}"; do
             noted_job="${job}"
             emit "    NOTE   this job's matrix is '${runner}'. Only the Linux entry runs here, for"
             emit "           every step of this job: there is no non-Linux machine in this"
-            emit "           environment and, with no remote, nowhere to run one. The Windows and"
+            emit "           environment, and this transcript runs nothing on a runner. The Windows and"
             emit "           macOS entries are named so a later phase switches them on rather than"
             emit "           writes them. Unverified is not passed."
         fi
@@ -301,9 +301,9 @@ if [ "${FAILURES}" -ne 0 ]; then
     exit 1
 fi
 emit "  OK -- every executed step behaved as its classification requires."
-emit "  Still unmet: 'on a pull request'. A remote exists (D-008, decided 2026-08-30),"
-emit "  but GitHub has executed nothing in this repository -- 0 workflow runs as of"
-emit "  2026-08-30 -- and every step above ran on this machine, not on a runner."
+emit "  Still unmet: 'on a pull request'. A remote exists (D-008, decided 2026-08-30)"
+emit "  and main is pushed, but no pull request has been opened, and every step above"
+emit "  ran on this machine, in ${CHECKOUT#"${PROJECT_ROOT}/"}, not on a runner."
 emit ""
 printf '\nrun-pipeline-locally.sh: transcript at %s\n' "${TRANSCRIPT#"${PROJECT_ROOT}/"}"
 exit 0
