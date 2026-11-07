@@ -551,8 +551,20 @@ for a in doc["artefacts"]:
         print(a["url"])
 ' "${ROOT}/manifests/tools.json" | LC_ALL=C sort -u)"
     [ -n "${urls}" ] || die "manifests/tools.json names no Linux x86-64 artefact to install" 3
+    # A reachability check, not a grading: a transport failure or an answer
+    # other than 200 is asked again, at most three times in all, and every
+    # attempt that failed is printed with what curl saw (GitHub answers a burst
+    # of requests from one host with 429 now and then).
+    local attempt answer
     while read -r url; do
-        if curl -sSfIL --max-time 60 -o /dev/null -- "${url}" 2>/dev/null; then
+        answer=""
+        for attempt in 1 2 3; do
+            answer="$(curl -sSIL --max-time 60 -o /dev/null -w '%{http_code}' -- "${url}" 2>&1)" || true
+            [ "${answer##*$'\n'}" = "200" ] && break
+            printf '  network  attempt %d of 3 for %s: %s\n' "${attempt}" "${url}" "${answer//$'\n'/ }" >&2
+            [ "${attempt}" -lt 3 ] && sleep 5
+        done
+        if [ "${answer##*$'\n'}" = "200" ]; then
             printf '  network  ok   %s\n' "${url}"
         else
             printf '  network  FAIL %s\n' "${url}" >&2
