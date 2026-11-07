@@ -929,7 +929,43 @@ builds one from ``HEAD`` in the sandbox (54 s).
 Unit 11 sign-off
 ----------------
 
-Pending.
+**Accepted 2026-11-07 at** ``998291d``, one round. One fresh agent.
+
+*Diff read* (documentation and the map only): ``testing.rst`` reframed for the
+state on 2026-11-07 (Commands table, testing-philosophy table, gate counts,
+the CI-definitions section corrected -- PR #1 ran ``pull-request.yml`` green on
+2026-09-02, the nightly has run 68 times, the release workflow never -- and
+*What is not tested yet* rewritten with owners); ``platform_support.rst``
+matrix confirmed against a fresh matrix run (GREEN 11/0/14/36), a Windows on
+ARM row added; ``traceability-map.toml``: AC-TST-04 and AC-REL-01 automated;
+AC-TST-01, -02, -03, -10 and AC-RES-10 partial, each keeping a planned
+phase-15 entry naming what is unmet (AC-RES-10 **downgraded** from automated:
+no dedicated runner); AC-TST-11 planned. ``tool_registry.rst`` stale line
+removed. The map has no ``R-`` half -- the generator accepts only ``[meta]``
+and ``[ac]`` -- so ``R-TEST-02/07/08`` are owned through PHASE-15's
+``:Delivers:``, as before.
+
+*My runs:* ``verify-all-gates.sh --only docs,traceability``: docs 1,
+traceability 8, PASS; ``traceability.sh``: 52 automated, 10 partial, 10
+planned, 8 human (before: 51, 8, 13, 8); 172 tests and 13 check files named.
+Five numbers spot-checked against this log: 47 graded packages (unit 3), 76
+undetected of which 45 survived (unit 4), 279 release-critical classes and
+the self-test's 40 cases (unit 9), the baseline host's 64 CPUs and 376.5 GiB
+(unit 8) -- all agree.
+
+*Repaired by me* (``scripts/build.sh``, text only): backticks inside the
+unquoted usage heredoc, since PHASE-01 unit 7, were executed, so ``--help``
+printed ``gates: command not found`` and ``BUILD FAILED in stage <none>``
+twice. Now quoted; ``--help`` exit 0, no such line; ``bash -n`` clean.
+
+*For tier 1:* six criteria keep a **planned, phase 15** entry for their unmet
+halves (AC-TST-01, -02, -03, -10, -11, AC-RES-10), because no later phase
+claims them; the generator fails ``PLAN-PHASE-PASSED`` if Phase 15 is
+recorded PASSED -- correct for a PARTIAL. **AC-TST-02**: no record decides
+whether ``cometgui-workflow`` and ``cometgui-results`` are "core domain logic"
+needing the 90/85 coverage rule; their POMs leave it to a phase that never
+took it. ``scripts/ci/integration-tests.sh``'s header still says no real-tool
+tests exist (comment).
 
 Rejections and rework
 =====================
