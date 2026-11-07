@@ -807,7 +807,65 @@ disk.
 Unit 9 sign-off
 ---------------
 
-Pending.
+**Accepted 2026-11-07 at** ``b5fa31e`` (agent ``325472d``, ``0a7797c``; my
+repair ``b5fa31e``), after **one defect found at sign-off and repaired by
+me**. One fresh agent.
+
+*Diff read* (13 files). Policy written in ``testing.rst`` (*Flakiness policy
+-- gate item 6*): flaky defined; the only handling a root-cause fix or a
+temporary register entry with seven fields; **release-critical computed** from
+five sources (279 classes: failure-path map, Tier A/B and ``@EndToEnd``,
+real-binary tests, classes the harnesses name, traceability evidence);
+forbidden shapes each with its own red; recognised legitimate conditions
+listed with why each is not quarantine; ten known instances audited (nine
+fixed, ``KeyboardOnlyNavigationUiTest`` open and deterministic, not flaky).
+``scripts/ci/flakiness-check.sh`` + ``flakiness_check.py`` (stdlib) and an
+**empty** ``scripts/ci/quarantine.toml``; wired into ``pull-request.yml``,
+``check-workflows.py`` and ``build.sh``'s ``workflows`` stage (about 2 s); new
+gate control ``flakiness`` (PHASE-15 item 6). Flaky tests fixed at their
+causes: ``TestFxUiDriver.clickOn`` read the node and its bounds on the test
+thread while the scene changed (``ResultsCountsUiTest``'s
+``IndexOutOfBounds`` and ``VariableModificationEditorUiTest``'s "bounds are
+not visible", one cause, reproduced by ``SceneChurnClickUiTest`` on the old
+driver; now aimed on the application thread); ``ConsoleFloodUiTest`` read
+"used heap after GC", which counts G1's dead space (7-9 MB), so it now sums
+live objects from the class histogram -- **the 20 MB bound unchanged**, red
+at 34 MB with the eviction removed. Nested-report audit: an overwrite needs
+one selection naming two nested classes of one outer in a ``reuseForks=false``
+module; none of 1 739 selectors does; nothing needed repair.
+
+*The defect I found* -- the check could be green with a retry present.
+``retry_tokens.search(line)`` took only the first token on a line; when that
+was the permitted ``maven.test.failure.ignore`` in a grading harness, the
+line was skipped, so ``-Dmaven.test.failure.ignore=true
+-Dsurefire.rerunFailingTestsCount=2`` on one line of
+``scripts/verify-pdv-gates.sh`` (a tree copy) passed: ``flakiness-check: OK``.
+**Repaired** (``b5fa31e``): every token on the line is graded; a self-test
+case for exactly that shape added -- **red on the old scan** (``FAIL 5 a
+rerun on the same line ... -> RETRY``, exit 7) and green on the new; floor
+39 -> 40; counts in ``testing.rst`` and the floor comment updated. My
+injection then: ``RED [RETRY] scripts/verify-pdv-gates.sh:691:
+'rerunFailingTestsCount'``.
+
+*My other injections* (tree copy from ``git archive``): ``@Disabled`` on
+``RealPercolatorRunTest#theProbedSets`` -> ``RED [UNREGISTERED]``;
+``@DisabledOnOs(LINUX)`` on ``PercolatorSettingsTest$Defaults#defaults`` ->
+``RED [PLATFORM] ... quarantine by another name``; the clean copy OK.
+
+*My runs:* ``flakiness-check.sh``: OK, 0 register entries;
+``--self-test``: **40/40**; ``mvn -o -B -pl cometgui-app -am verify``: BUILD
+SUCCESS, app 576 (573 + 3 new, 91 opt-in skipped); ``verify-all-gates.sh
+--only workflows,flakiness,shell,paramui,results,pdv,percolator,limelight,
+provenanceui,install,e2e`` (every harness grading a test that clicks through
+the changed driver): workflows 23, flakiness 40, shell 30, install 95,
+paramui 87, percolator 109, results 100, pdv 107, limelight 130, provenanceui
+96, e2e 50 -- **all PASS**, shared resources unchanged.
+
+*Residue:* for (a) and (c) the mechanism was reproduced in a new test, not in
+the original failing tests themselves (stated); the driver now clicks the
+first node with the id where TestFX clicked the first visible one (every GUI
+harness green with it); harness-retry detection is pattern-based (each shape
+held by a self-test case).
 
 Unit 10 sign-off
 ----------------
@@ -822,7 +880,12 @@ Pending.
 Rejections and rework
 =====================
 
-None yet.
+* **Unit 9** -- the flakiness check passed a retry written on the same line as
+  a permitted ``maven.test.failure.ignore`` (first-match scan). Found by my
+  injection at sign-off; repaired by me (``b5fa31e``) with a self-test case
+  red on the old code. Recorded in the unit 9 sign-off.
+* **My own hypothesis for pdv 5e** (unit 4 sign-off) was refuted by unit 9a;
+  the record keeps both.
 
 Deferred
 ========
