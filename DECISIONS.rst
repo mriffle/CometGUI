@@ -2,8 +2,8 @@
 Decisions
 =========
 
-:Updated: 2026-11-05 (D-014 and D-015, how the mutation gate scores, decided
-   by the owner on 2026-11-05; no decision now open)
+:Updated: 2026-11-07 (D-016 and D-017 raised by tier 1 at the Phase 15
+   sign-off; both OPEN)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -1082,3 +1082,53 @@ package ``R-TEST-02`` names as critical (the PIT ``targetClasses`` list) is
 graded on its own at 80% or more, with ``TIMED_OUT`` counted as in ``D-014``.
 A critical package with no mutations at all is a failure, not a pass. The
 module-wide figure may still be printed, but it grades nothing.
+
+----
+
+D-016 -- Whether the workflow module's code is mutation-tested
+==============================================================
+
+:Status: **OPEN**
+:Raised: 2026-11-07, by Phase 15 (``handoffs/PHASE-15-handoff.rst``, escalation 1)
+:Blocks: nothing in Phase 16's gate; ``R-TEST-02`` is met only in part until decided
+:Owner: Project owner
+
+**Question.** ``R-TEST-02`` names command builders and stage invalidation as
+critical code for mutation testing. Both live in ``org.cometgui.workflow.*``,
+which is not in PIT's target list. Phase 15 tried adding it: PIT ran for more
+than 2 h 45 min and had not finished, so it was left out under the
+build-economy rule. Every other critical package is graded (47 of 47 at or
+above 80% at the Phase 15 sign-off).
+
+**Options.**
+
+A. Add the whole workflow module. Costs at least 2 h 45 min more per full
+   build, probably more, and more on a 2- or 4-core CI runner.
+B. Add only the command-builder and stage-invalidation classes. The cost is
+   not yet measured; a phase agent would measure it before it is adopted.
+C. Leave it out, and record ``R-TEST-02`` as met only in part.
+
+**Recommendation.** B. It tests the code the requirement names, and the cost
+is measured before anything is committed to.
+
+----
+
+D-017 -- Whether the workflow and results modules count as core domain logic
+============================================================================
+
+:Status: **OPEN**
+:Raised: 2026-11-07, by Phase 15 (``handoffs/PHASE-15-handoff.rst``, escalation 2)
+:Blocks: ``AC-TST-02`` (coverage gates pass) being recorded as fully met
+:Owner: Project owner
+
+**Question.** The coverage rule holds "core domain logic" to 90% lines and 85%
+branches. No record says whether ``cometgui-workflow`` (the run pipeline) and
+``cometgui-results`` (reading Percolator's results) are core domain logic.
+
+**Options.** A. Yes: hold both to 90/85. B. No: keep their present module
+thresholds.
+
+**Recommendation.** A. Both already pass it with room to spare -- measured by
+tier 1 at the Phase 15 sign-off: workflow 97.4% lines and 94.3% branches,
+results 98.1% and 95.4% -- so it costs nothing today and stops either
+slipping later.

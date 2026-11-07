@@ -3,30 +3,25 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-11-05
-:Updated by: Main orchestrator, session 11 (build-time repair signed off;
-   owner resumed; **Phase 15 dispatched**)
-:Current phase: **15 -- IN PROGRESS** (dispatched 2026-11-05,
-   ``handoffs/PHASE-15-BRIEF.rst``). The owner resumed the project on
-   2026-11-05: *"Resume Phase 15"*, and decided ``D-014`` and ``D-015`` (the
-   mutation gate counts ``TIMED_OUT`` as detected and grades each critical
-   package at 80%). ``D-006``'s CI-fixture half is still open and the
-   owner's. **The owner will pause after it** (2026-11-05): *"Pause after
-   Phase 15 is signed off and pushed"* -- this overrides, for 15 to 16, the
-   standing instruction (2026-10-08) to push and move on.
-:Overall: Fifteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03, 04,
-   05, 08, 09, 10, 11, 12, 13 and 14 PARTIAL -- plus the Comet 2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every quality gate exist and have each
-   been seen to fail on a deliberate defect. **Build economy is a standing
-   owner rule**: the full ``scripts/build.sh`` plus
-   ``scripts/verify-all-gates.sh`` (**about 4 h 10 min since 2026-11-05**,
-   down from 10 h 52 min at Phase 14 -- build 156 min, the 21 controls 91
-   min four at a time; :ref:`status-fix-build-time`) runs once
-   per phase, at the exit gate, by tier 1. Open owner question: how ``build.sh`` scores the
-   mutation gate (``TIMED_OUT``, and module-wide versus per-package --
-   :ref:`status-p06-signed`) -- **decided 2026-11-05** as ``D-014`` and
-   ``D-015``, for Phase 15 to implement. No ``D-`` item is open; ``D-011`` option D, asking
-   UWPR for an Intel macOS Comet build, is the owner's own action. The nightly is red **by the owner's decision**
-   until Phase 15 replaces its stubs (:ref:`status-nightly-masking`).
+:Updated: 2026-11-07
+:Updated by: Main orchestrator, session 11 (**Phase 15 signed off and
+   pushed; paused by the owner**)
+:Current phase: **Paused by the owner after Phase 15** (2026-11-07). Owner,
+   2026-11-05: *"Pause after Phase 15 is signed off and pushed."* Phase 16
+   (documentation and release qualification) is NOT STARTED and has no
+   brief; nothing is dispatched until the owner says to resume.
+:Overall: Sixteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03,
+   04, 05, 08, 09, 10, 11, 12, 13, 14 and 15 PARTIAL -- plus the Comet
+   2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every
+   quality gate exist and have each been seen to fail on a deliberate defect.
+   **Build economy is a standing owner rule**: the full ``scripts/build.sh``
+   plus ``scripts/verify-all-gates.sh`` (about 4 h at Phase 15 -- build 144
+   min, the 24 controls 95 min four at a time) runs once per phase, at the
+   exit gate, by tier 1. **Open for the owner:** ``D-006`` (the CI fixture),
+   ``D-016`` (mutation-test the workflow module?) and ``D-017`` (workflow and
+   results as core domain logic?); ``D-011`` option D is the owner's own
+   action. The nightly stays red until ``D-006`` gives it a fixture
+   (:ref:`status-p15-signed`).
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -294,8 +289,12 @@ Phase board
        owner**.
    * - 15
      - Version matrix, performance and hardening
-     - IN PROGRESS
-     - Dispatched 2026-11-05 (``handoffs/PHASE-15-BRIEF.rst``).
+     - PARTIAL
+     - **Signed off 2026-11-07** at ``9c35e46`` plus a tier-1 repair: build
+       11/11, gates 24/24 (new ``hardening``, ``manifest``, ``flakiness``),
+       matrix GREEN on Linux, four tier-1 injections (:ref:`status-p15-signed`).
+       PARTIAL on the performance runner and platform. Then **paused by the
+       owner**.
    * - 16
      - Documentation and release qualification
      - NOT STARTED
@@ -3282,6 +3281,96 @@ runs the full build and gates once, at its exit.
 Housekeeping done in the same session: the phase board's 05 and 06 rows, stale
 since their sign-offs, now carry their grades; the specification's missing
 revision-11 history row was added.
+
+.. _status-p15-signed:
+
+Phase 15: version matrix, performance and hardening (signed off 2026-11-07)
+===========================================================================
+
+**PARTIAL.** Brief ``handoffs/PHASE-15-BRIEF.rst``; handoff
+``handoffs/PHASE-15-handoff.rst``; work log ``handoffs/PHASE-15-worklog.rst``.
+Twelve units, ``c54ba43`` to ``9c35e46``, and one tier-1 repair. ``D-014``
+and ``D-015`` are implemented. Then **paused by the owner**.
+
+**Exit gate.**
+
+#. Version matrix -- **met on Linux.** 11 combinations RUN-PASSED, 0
+   RUN-FAILED, 14 UNAVAILABLE (Intel macOS Comet, ``D-011``; Linux 3.09 as a
+   managed install, ``D-003``), 36 UNVERIFIED (every macOS, Windows and
+   aarch64 row; Thermo RAW).
+#. Mutation -- **met.** 47 critical packages, each at or above 80% with
+   ``TIMED_OUT`` counted and named; lowest ``tools.pdv.derived`` 89.7%. No
+   forbidden survivor. ``org.cometgui.workflow.*`` is not a target (``D-016``).
+#. Determinism -- **met on Linux.** Repeats and thread-count variations
+   agree; each field allowed to differ is tied to a Comet or Percolator
+   source line; no numeric tolerance.
+#. Performance -- **PARTIAL.** 16 thresholds, each seen red, and this host's
+   baseline. There is no dedicated performance runner, so that half is
+   unverifiable; a runner with no baseline exits 4, never green.
+#. Manifest job -- **met.** Downloads every pinned artefact and member and
+   reads each tool's releases list.
+#. Flakiness policy -- **met** after the tier-1 repair below. Quarantine
+   register empty.
+
+**Tier 1's run at** ``9c35e46``: ``scripts/build.sh`` 11/11 in 8635 s;
+``verify-all-gates.sh`` (4 jobs) **24 of 24 in 95 min** (``hardening`` 35,
+``manifest`` 30 and ``flakiness`` 40 new; ``tests`` 68 in 5535 s); version
+matrix with ``COMETGUI_MATRIX_FIXTURE=scratch/fixture`` GREEN, as above.
+Whole run about 4 h.
+
+**Tier 1's own checks:**
+
+* ``ToolOffer``: a ``FAILED`` offer allowed with no reason. Red:
+  ``ToolOfferTest.requiredWhenFailed``. Restored, ``sha256sum -c`` OK.
+* ``ZipArchiveReader``: the extra-field bounds check removed. Red:
+  ``ArchiveEdgeCasesTest.aZip64SizeFieldThatOverrunsItsExtraField``.
+  Restored, ``sha256sum -c`` OK.
+* Manifest verifier, over a copy of ``tools.json`` with three checksums
+  changed by one hex digit (a record sharing its URL with four others, a
+  companion member, an archive member): all three named, ``UPSTREAM CHANGED
+  -- 3 changed``, exit 1.
+* Flakiness check, nine violations in exported copies: an unregistered
+  ``@Disabled``, a rerun count in ``.mvn/maven.config`` and an ignored
+  failure were red. **Four shapes passed:** ``mvn test || mvn test``;
+  ``bash scripts/build.sh || bash scripts/build.sh``; ``if mvn test; then
+  break; fi`` on one line inside a loop; ``mvn test && exit 0`` inside a
+  loop.
+
+**The tier-1 repair** (commit after ``9c35e46``). The harness-retry scan now
+catches all four, and ``scripts/build.sh`` and ``dev-verify.sh`` count as
+test runners. The clean tree stays green; no message that only names
+``mvn`` after ``||`` is flagged. Four self-test cases were added, each red
+on the old scan. Floor 40 to 44. Rerun: ``flakiness`` 44 in 42 s, ``docs``,
+``shell``, ``hardening`` and ``build.sh --only workflows`` green.
+
+**Decisions.** Tier 1 confirms P15-1 (a critical package is the Java package
+of each mutated class) and P15-4 (goldens hold derived results from the local
+fixture, keyed by its digest). Raised for the owner: ``D-016`` (mutation-test
+the workflow module?) and ``D-017`` (are workflow and results core domain
+logic?). ``D-006``'s CI fixture is still open.
+
+**Nightly.** The Phase 15 stubs are replaced. The real-data half of four jobs
+(large dataset, determinism, performance, Windows RAW) still exits 70, now
+naming ``D-006``; the nightly stays red until a CI fixture exists.
+
+**Residue, for Phase 16** (product changes unless marked):
+
+* The product does not check the merged-PIN row count.
+* PSM identifiers carry the absolute run path.
+* Keyboard navigation in the Results run chooser opens every run it passes.
+* Retained GUI heap grows about 0.6 MiB per run opened.
+* The probe's message for a non-zero exit omits the status, so a failed
+  install's reason does too; the reason is also lost on restart.
+* ``CometCapabilityProbe`` leaves workspaces in ``/tmp`` under PIT.
+* ``SecretToolCredentialStore`` does not cancel ``secret-tool`` when
+  interrupted.
+* ``ZipArchiveReader`` throws an unchecked exception on an extra-field
+  length past the directory.
+* Test: ``KeyboardOnlyNavigationUiTest`` fails on a machine with Comet in
+  the application-data folder.
+* Six acceptance criteria keep a "planned, phase 15" entry for their unmet
+  halves (AC-TST-01, -02, -03, -10, -11, AC-RES-10); Phase 16 re-homes them.
+* Platform: nothing ran on macOS or Windows.
 
 .. _status-fix-build-time:
 

@@ -3,7 +3,7 @@ PHASE-15: Version Matrix, Performance and Hardening
 ===================================================
 
 :Phase: 15
-:Status: IN PROGRESS (dispatched 2026-11-05)
+:Status: PARTIAL (signed off 2026-11-07; see STATUS.rst, status-p15-signed)
 :Depends on: 14
 :Blocked by decisions: none -- D-002 and D-003 both DECIDED
 :Delivers: R-TEST-02, R-TEST-07, R-TEST-08
