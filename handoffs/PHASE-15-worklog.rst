@@ -870,7 +870,61 @@ held by a self-test case).
 Unit 10 sign-off
 ----------------
 
-Pending.
+**Accepted 2026-11-07 at** ``88cd38d`` (``e0a85da``, ``0c42108``,
+``88cd38d``), one round. One fresh agent.
+
+*Diff read* (8 files). ``scripts/verify-hardening-gates.sh``, registered as
+control ``hardening`` (PHASE-15 items 1, 2, 3, 4, 6; floor 35; **24 controls
+in all now**; no gate lock -- it writes only ``_build/hardening-gate-*`` and
+checks the shared resources, ``git status`` and the working tree's
+``cometgui-*/target`` before and after). Two ``git archive HEAD`` sandboxes
+(``--worktree`` for unpushed injections); each Maven injection proved by the
+damaged class differing from baseline and the other 1271 classes identical.
+Item 1: matrix tools part clean, ``-X`` without ``XML_OUTPUT`` red on both
+managed Percolator rows, the reader skipping a row red. Item 2: ``build.sh
+--gates-pit-root`` over a synthetic report (BELOW on the weakest package
+inside a module still >= 80%); real-PIT proof delegated to ``tests`` control
+M. Item 3: synthetic determinism clean, seed from the clock red, check-doc
+clean and red on an undocumented field. Item 4: ``--quick --only
+hash-throughput,cancel-fake-tool`` -- each injection red with the other
+green beside it, and the no-profile verdict exit 4. Item 5 delegated to
+``manifest``. Item 6: the real check OK with the register empty, and a
+complete entry for ``TierACanonicalScenarioTest`` red ``RELEASE-CRITICAL``.
+**Census**: every workflow step read through ``check-workflows.py
+--list-steps``; each stub run in an empty environment must exit 70; each
+PHASE-15 stub must wait on ``D-006`` or a runner (36 scripts, 22 real, 14
+stubs, 4 of them Phase 15's). Harness self-controls H1-H5.
+**The pipeline control is off the working tree**: ``run-pipeline-locally.sh``
+runs every step in a fresh ``git archive HEAD`` sandbox
+(``_build/ci-pipeline-sandbox``) with ``tools/``, ``scratch/``, ``.venv`` and
+``_build/m2repo`` linked; the step scripts are unchanged, finding their root
+from their own location (in place on a runner); floor 24 -> 31. Also:
+``nightly-windows-raw.sh`` gains ``--waits-for`` (a Windows runner, ``D-006``);
+stale wording fixed (``verify-param-gates.sh``, ``UpstreamArtefactTest``
+Javadoc, ``testing.rst``).
+
+*My injections -- into the gates the harness covers*, run with ``--worktree``
+(``sha256sum -c`` FAILED while in; restored, OK):
+``performance.py``'s comparison made ``over = False`` (no threshold can
+fail) and ``determinism.py``'s raw-difference branch turned into "within
+tolerance": **SUMMARY 31 passed, 4 failed** -- 4a and 4b "HARNESS FAILURE --
+the check PASSED with the defect present", 3a "the clean run is not green",
+3b "red, but without its expected diagnostic"; H1-H5 all reported as harness
+failures as designed.
+
+*My clean runs:* digest of all **10 008** files under the working tree's
+``cometgui-*/target``; ``verify-all-gates.sh --only
+hardening,pipeline,workflows,docs,traceability``: **hardening 35** (601 s),
+pipeline 31 steps (2115 s, now in its sandbox), workflows 23, docs 1,
+traceability 8 -- PASS, shared resources unchanged; digest after:
+**identical** (``cmp``). The unit 8 finding is closed.
+
+*Judged:* the preflight's three attempts at each pinned URL before calling
+the network down is a reachability probe, not a test retry -- every failed
+attempt is printed and three failures still stop the run (exit 3); the
+flakiness check accepts it. *Noted:* the old pipeline's no-test-bridge
+release step had been inspecting a leftover archive from 2026-10-23; it now
+builds one from ``HEAD`` in the sandbox (54 s).
 
 Unit 11 sign-off
 ----------------
