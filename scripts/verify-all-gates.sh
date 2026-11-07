@@ -108,6 +108,7 @@ readonly -a ALL_GATES=(
     sbom
     depscan
     manifest
+    flakiness
     pipeline
     quality
     shell
@@ -195,7 +196,8 @@ declare -a COVERED=()
 #                phase 13 unit 7's first shipping count.  e2e: 48 on
 #                2026-10-23, phase 14 unit 9's first shipping count; 50 the
 #                same day, when the orchestrator added the smoke and its
-#                self-test to control P.)
+#                self-test to control P.  flakiness: 39 on 2026-11-07,
+#                phase 15 unit 9's first shipping count.)
 #   GATE_UNIT    what that number counts, for the summary line
 #
 # gate_count NAME LOG echoes the number of controls the harness reported, or
@@ -279,6 +281,19 @@ gate_spec() {
                 "H1 a case whose defect was not injected: reported as a HARNESS FAILURE (expected exit 1, got 0)"
             )
             GATE_FLOOR=30
+            GATE_UNIT="cases"
+            ;;
+        flakiness)
+            GATE_PHASE="15"
+            GATE_ITEMS="6"
+            GATE_DEFECT="the specification's flakiness policy over copies of the tree (scripts/ci/flakiness_check.py --self-test; the working tree is only read): surefire's rerun-failing-tests count in a POM's surefire configuration, as a POM property and in .mvn/maven.config, the ignore-test-failures switch in a module POM, a JUnit retry annotation and an extension that intercepts a test's exception, each red RETRY; a harness re-running Maven until it passes, a loop broken by a passing run and a Python loop on Maven's exit status, each red HARNESS-RETRY; an unregistered @Disabled on a method and on a class, a platform condition that turns a test off on Linux, an unrecognised opt-in property and a quarantine tag, a surefire exclusion and excluded groups on a command line, an unrecognised assumption, and an opt-in no harness sets any more, each red with its own words; an assumption that skips on timing red; a register entry with no owner, no fix plan, no issue, a placeholder reason, uncaptured diagnostics, a future date, one that quarantines nothing and one whose class carries only a recognised condition, each red REGISTER; a failure-path test, a Tier A scenario and a test a gate harness grades, each quarantined with a complete entry and each red RELEASE-CRITICAL; a failure-path id another nested class's method shares, red AMBIGUOUS-ID; a missing register and a tree with no test sources refused; the clean tree and a fully registered ordinary quarantine green; and, as controls on the grader, a case with its defect not injected, a red with another defect's words and an injection that changed nothing, each reported as a HARNESS FAILURE"
+            GATE_SCRIPT="scripts/ci/flakiness-check.sh"
+            GATE_ARGS=(--self-test)
+            GATE_PROOF=(
+                "flakiness-check: self-test OK --"
+                "H1 a case whose defect was not injected: reported as a HARNESS FAILURE"
+            )
+            GATE_FLOOR=39
             GATE_UNIT="cases"
             ;;
         pipeline)
@@ -567,6 +582,8 @@ gate_count() {
             sed -n 's/.*self-test OK -- \([0-9][0-9]*\)\/[0-9][0-9]* cases.*/\1/p' -- "${log}" | head -1 ;;
         manifest)
             sed -n 's/.*manifest-verify: self-test OK -- \([0-9][0-9]*\)\/[0-9][0-9]* cases.*/\1/p' -- "${log}" | head -1 ;;
+        flakiness)
+            sed -n 's/.*flakiness-check: self-test OK -- \([0-9][0-9]*\)\/[0-9][0-9]* cases.*/\1/p' -- "${log}" | head -1 ;;
         pipeline)
             sed -n 's/.*workflow(s); \([0-9][0-9]*\) executed on this machine; 0 unexpected.*/\1/p' -- "${log}" | head -1 ;;
         quality)
@@ -793,8 +810,9 @@ list_gates() {
     printf '  comparison, a dropped provenance entry and a bypassed downstream stage each\n'
     printf '  failing the canonical test; 6 no fixed sleep; 7 the bridge-absence check\n'
     printf '  failing on a build that includes the bridge.\n'
-    printf '  PHASE-15 items (only item 5 has a control here): 5 the manifest\n'
-    printf '  verification job demonstrably failing when a checksum is altered.\n'
+    printf '  PHASE-15 items (only items 5 and 6 have a control here): 5 the manifest\n'
+    printf '  verification job demonstrably failing when a checksum is altered; 6 no\n'
+    printf '  release-critical test quarantined (the flakiness policy, enforced).\n'
     printf '  D-001 is the GPL-3.0 licence obligation, a phase deliverable rather than a\n'
     printf '  numbered gate item.  See phases/PHASE-01-build-skeleton.rst,\n'
     printf '  phases/PHASE-02-app-shell.rst, phases/PHASE-04-provenance-core.rst,\n'

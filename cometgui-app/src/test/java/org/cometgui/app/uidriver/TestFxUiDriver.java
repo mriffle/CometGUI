@@ -17,8 +17,12 @@
 package org.cometgui.app.uidriver;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
+import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
+import javafx.stage.Window;
 import org.testfx.api.FxRobot;
 
 /**
@@ -30,12 +34,13 @@ import org.testfx.api.FxRobot;
  * the spike documents -- a TestFX robot's clicks stop arriving when another test class has already
  * owned the toolkit in the same JVM, and the tempting "fix" is to weaken the assertion.
  *
- * <p><strong>What is used, and what is not.</strong> Only {@link FxRobot}: its identifier lookup,
- * its {@code clickOn} and its {@code push}. TestFX's own {@code FxToolkit} does not start the
- * application here -- {@link RunningApplication#launchedByMain()} does, through the product's own
- * {@code main} -- so what this class contributes is synthetic input and nothing else. That keeps
- * the two drivers comparable: they drive the same application, started the same way, and differ
- * only in how a click and a key press are made.
+ * <p><strong>What is used, and what is not.</strong> Only {@link FxRobot}: its identifier lookup
+ * (made on the application thread), its {@code clickOn} at a point computed there, and its {@code
+ * push}. TestFX's own {@code FxToolkit} does not start the application here -- {@link
+ * RunningApplication#launchedByMain()} does, through the product's own {@code main} -- so what this
+ * class contributes is synthetic input and nothing else. That keeps the two drivers comparable:
+ * they drive the same application, started the same way, and differ only in how a click and a key
+ * press are made.
  *
  * <p>No TestFX type appears in {@link FxUiDriver}, which is the whole point of the interface: a
  * test names {@code clickOn("nav-results")}, not a robot.
@@ -59,11 +64,30 @@ public final class TestFxUiDriver extends AbstractFxUiDriver {
         return robot.lookup("#" + id).<Node>tryQuery().orElse(null);
     }
 
+    /**
+     * Clicks the node, aimed on the application thread.
+     *
+     * <p>Not {@code robot.clickOn("#" + id)}: TestFX would resolve the selector and read the node's
+     * bounds on this, the test's, thread, while the application thread may be changing the scene.
+     * That erred once in {@code ResultsCountsUiTest} with an {@code IndexOutOfBoundsException}
+     * inside {@code Parent.lookupAll}, and {@code SceneChurnClickUiTest} reproduces it on demand.
+     * The robot is given the point alone, after the node was revealed and the point computed in one
+     * task on the application thread.
+     */
     @Override
     public void clickOn(String id) {
         Node target = node(id);
-        onFxThread(() -> reveal(target));
-        robot.clickOn("#" + id);
+        AtomicReference<Window> window = new AtomicReference<>();
+        Point2D centre =
+                callOnFxThread(
+                        () -> {
+                            reveal(target);
+                            Point2D aim = visibleCentreOf(target);
+                            window.set(target.getScene().getWindow());
+                            return aim;
+                        });
+        robot.targetWindow(window.get());
+        robot.clickOn(centre, MouseButton.PRIMARY);
         barrier();
     }
 

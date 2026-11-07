@@ -21,12 +21,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeoutException;
 import javafx.stage.Stage;
+import javax.management.JMException;
+import javax.management.ObjectName;
 import org.cometgui.app.bootstrap.CometGuiApplication;
 import org.cometgui.app.config.ApplicationServices;
 import org.cometgui.app.uidriver.FxUiDriver;
@@ -106,18 +107,21 @@ class ConsoleFloodUiTest {
      * {@code Text} node per paragraph, and {@code setText} records an undoable change holding the
      * previous document as well, so several megabytes is expected rather than surprising.
      *
-     * <p><strong>Why 20 MB is the number.</strong> The measured growth on this build is 8,595,680
-     * bytes (8.2 MB), which the failure message prints if this ever trips, so the bound is about
-     * two and a half times what is actually retained -- enough headroom for garbage-collection and
-     * just-in-time-compilation noise, and no more.
+     * <p><strong>Why 20 MB is the number.</strong> The bound was set at Phase 02 at about two and a
+     * half times the growth then measured, 8,595,680 bytes (8.2 MB), as headroom for collection and
+     * compilation noise and no more. Since Phase 15 unit 9 the growth is counted in live objects
+     * ({@link #liveHeapBytes()}, which says why), and measures 6,874,064 to 7,054,408 bytes (6.6 to
+     * 6.7 MB) over five runs, whatever the collector's dead-space setting; the bound is unchanged,
+     * so the headroom is now about three times.
      *
      * <p>It is also decisively below what an <em>unbounded</em> console costs for the same flood.
      * That is not a calculation: deleting the eviction from {@code BoundedMessageLog.append} and
-     * running this test again gives 38,078,880 bytes (36 MB) of retained growth, and it is 36 MB
-     * only because the document cap is still holding the rendered text down -- 250,001 rendered
-     * lines would be 10 MB of characters plus a quarter of a million {@code Text} nodes on top. So
-     * this assertion distinguishes a bounded console from an unbounded one, which is what the gate
-     * item is for, rather than merely recording today's number.
+     * running this test again gives 35,799,880 bytes (34 MB) of live growth (38,078,880 bytes, 36
+     * MB, under the old used-bytes measurement), and it is that small only because the document cap
+     * is still holding the rendered text down -- 250,001 rendered lines would be 10 MB of
+     * characters plus a quarter of a million {@code Text} nodes on top. So this assertion
+     * distinguishes a bounded console from an unbounded one, which is what the gate item is for,
+     * rather than merely recording today's number.
      */
     private static final long HEAP_GROWTH_BOUND_BYTES = 20L * 1024 * 1024;
 
@@ -147,9 +151,9 @@ class ConsoleFloodUiTest {
         driver.clickOn(UiIds.navigationEntry(SectionId.CONSOLE));
         console = (ConsolePane) driver.node(UiIds.CONSOLE_PANE);
 
-        long before = usedHeapBytes();
+        long before = liveHeapBytes();
         flood();
-        heapGrowthBytes = usedHeapBytes() - before;
+        heapGrowthBytes = liveHeapBytes() - before;
     }
 
     @AfterAll
@@ -355,26 +359,68 @@ class ConsoleFloodUiTest {
     }
 
     /**
-     * The heap in use, after asking for a collection twice so that the flood's garbage -- every
-     * discarded message and every superseded document -- is not counted as retained.
+     * The bytes of every live object on the heap, counted by the JVM's own class histogram.
      *
-     * <p><strong>Why the management bean and not {@code System.gc()}.</strong> The measurement
-     * needs a collection to have happened, or it would report garbage as retention and the bound
-     * below would mean nothing. {@code System.gc()} is what SpotBugs reports as {@code DM_GC} --
-     * "extremely dubious except in benchmarking code" -- and this project does not answer a
-     * SpotBugs finding with an exclusion. {@link MemoryMXBean#gc()} is the platform's own
-     * management operation for the same request, meant for monitoring and measurement code, and
-     * {@link MemoryMXBean#getHeapMemoryUsage()} reports the heap directly rather than by
-     * subtracting {@code freeMemory} from {@code totalMemory}. Two rounds, because the first can
-     * leave objects that only became unreachable during it.
+     * <p><strong>Why not the heap's used bytes (Phase 15 unit 9).</strong> This test once measured
+     * {@code MemoryMXBean.getHeapMemoryUsage().getUsed()} after two requested collections, and in
+     * one reactor build read 22,440,392 bytes (21 MB) against its 20 MB bound where it reads about
+     * 8 MB alone. The used figure after a full collection is not what is retained: G1's full
+     * collection leaves the dead objects of a region that is almost all live where they lie, rather
+     * than move the region ({@code MarkSweepDeadRatio}, 5% by default), and they stay counted as
+     * used. Measured on this build, that dead space is 7,363,552 to 9,211,104 bytes (7.0 to 8.8 MB)
+     * of the heap at each reading, so the difference of two readings carries its change as well as
+     * the flood's: the used growth read 6,610,488 to 9,798,008 bytes over runs whose live growth
+     * was 6,874,064 to 7,054,408 bytes every time. Widened on purpose with {@code
+     * -XX:MarkSweepDeadRatio=90}, the old measurement read 31,437,456 bytes (29 MB) and failed this
+     * test while the live growth was 7,024,144 bytes: it was measuring the collector's choice of
+     * which regions to compact, not the console.
      *
-     * @return used heap in bytes
+     * <p><strong>What is counted instead.</strong> The diagnostic command {@code
+     * GC.class_histogram} (the {@code gcClassHistogram} operation of the platform's {@code
+     * DiagnosticCommand} bean) collects the whole heap and then lists every live object by class.
+     * The rows are summed, except the collector's own filler objects ({@code
+     * jdk.internal.vm.Filler...}), which are that same dead space formatted to be walkable. A
+     * histogram this method cannot read fails the test rather than reading as zero.
+     *
+     * @return the bytes of the live objects
      */
-    private static long usedHeapBytes() {
-        MemoryMXBean memory = ManagementFactory.getMemoryMXBean();
-        for (int round = 0; round < 2; round++) {
-            memory.gc();
+    private static long liveHeapBytes() {
+        String histogram;
+        try {
+            histogram =
+                    (String)
+                            ManagementFactory.getPlatformMBeanServer()
+                                    .invoke(
+                                            new ObjectName(
+                                                    "com.sun.management:type=DiagnosticCommand"),
+                                            "gcClassHistogram",
+                                            new Object[] {new String[0]},
+                                            new String[] {String[].class.getName()});
+        } catch (JMException unavailable) {
+            throw new IllegalStateException(
+                    "the JVM's class histogram could not be taken, so the retained heap cannot"
+                            + " be measured",
+                    unavailable);
         }
-        return memory.getHeapMemoryUsage().getUsed();
+        long bytes = 0;
+        int rows = 0;
+        for (String line : histogram.split("\n")) {
+            String[] fields = line.trim().split("\\s+");
+            if (fields.length >= 4 && fields[0].endsWith(":")) {
+                rows++;
+                if (!fields[3].contains("jdk.internal.vm.Filler")) {
+                    bytes += Long.parseLong(fields[2]);
+                }
+            }
+        }
+        assertTrue(
+                rows > 100 && bytes > 0,
+                "the class histogram listed "
+                        + rows
+                        + " classes and "
+                        + bytes
+                        + " bytes, which is not a heap that holds a running application:\n"
+                        + histogram.lines().limit(5).toList());
+        return bytes;
     }
 }

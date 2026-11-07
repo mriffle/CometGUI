@@ -62,7 +62,7 @@ readonly STAGES=(
     "integration:Real-tool integration tests on Linux"
     "docs:Strict Sphinx build and the traceability report"
     "supplychain:SBOM generation and dependency vulnerability scan"
-    "workflows:CI workflow definitions match the scripts they invoke"
+    "workflows:CI workflow definitions match the scripts they invoke; the flakiness policy"
 )
 
 # ----------------------------------------------------------------- plumbing --
@@ -1415,6 +1415,9 @@ stage_supplychain() {
 
 stage_workflows() {
     bash "${ROOT}/scripts/ci/check-workflows.sh"
+    # PHASE-15 exit gate item 6: no retry, no unregistered quarantine, no
+    # release-critical test quarantined.  About 2 s; reads the tree only.
+    bash "${ROOT}/scripts/ci/flakiness-check.sh"
 }
 
 # -------------------------------------------------------------------- main --

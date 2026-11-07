@@ -1,0 +1,28 @@
+# CometGUI -- the quarantine register (specification.rst, "Flakiness policy";
+# PHASE-15 exit gate item 6).  Read by scripts/ci/flakiness_check.py.
+#
+# EMPTY IS THE CORRECT STATE.  A flaky test is a defect, fixed at its cause.
+# An entry here is a temporary state for a test that cannot be fixed yet, and
+# the ONLY thing that lets a test-disabling construct (@Disabled, an
+# unrecognised condition or tag, a surefire exclusion) through the check.
+# The policy and the procedure are in docs/developer/testing.rst,
+# "Flakiness policy".
+#
+# Every entry needs all seven fields, none a placeholder:
+#
+#   [[quarantine]]
+#   test        = "org.cometgui.module.SomeTest"       # or ...SomeTest#method, ...SomeTest$Nested
+#   issue       = "https://github.com/mriffle/CometGUI/issues/123"   # or a handoffs/ file
+#   owner       = "who fixes it"
+#   diagnostics = "scripts/ci/quarantine/SomeTest-2026-11-07.log"   # committed, non-empty
+#   reason      = "what fails, how often, and the cause as far as it is known"
+#   fix_plan    = "what will be done to make it pass for the right reason"
+#   since       = 2026-11-07                           # never in the future
+#
+# The check refuses an entry that names a RELEASE-CRITICAL test (every test
+# the failure-path map names, every Tier A/B scenario, every real-binary test,
+# every test a gate harness grades, every test the traceability map gives as
+# evidence -- `bash scripts/ci/flakiness-check.sh --list-release-critical`),
+# and an entry that disables nothing (stale).  Quarantine is never a fix for a
+# test that fails because of the product.
+schema = 1

@@ -595,4 +595,50 @@ abstract class AbstractFxUiDriver implements FxUiDriver {
                 screen.getMinX() + screen.getWidth() / 2,
                 screen.getMinY() + screen.getHeight() / 2);
     }
+
+    /**
+     * The centre of the part of a node its window shows, in screen coordinates -- what TestFX aims
+     * at -- worked out on the JavaFX application thread. Called on that thread.
+     *
+     * <p>TestFX's own {@code clickOn("#id")} resolves the selector and reads the node's bounds from
+     * the calling thread, walking every child list of the scene while the application thread may be
+     * changing one; that is how {@code ResultsCountsUiTest} once died inside {@code
+     * Parent.lookupAll} (Phase 15 unit 9, {@code SceneChurnClickUiTest}). Here every read is made
+     * on the application thread, and TestFX is handed only the resulting point. The refusals are
+     * TestFX's, kept: a node that is not visible, or that lies wholly outside its window, is not
+     * clicked.
+     *
+     * @param node the node to aim at
+     * @return the centre of its visible part, in screen coordinates
+     * @throws AssertionError if the node is hidden, in no window, or wholly outside it
+     */
+    static Point2D visibleCentreOf(Node node) {
+        Scene scene = node.getScene();
+        if (scene == null || scene.getWindow() == null) {
+            return fail("#" + node.getId() + " is in no window, so it cannot be clicked");
+        }
+        for (Node above = node; above != null; above = above.getParent()) {
+            if (!above.isVisible()) {
+                return fail("#" + node.getId() + " is not visible, so it cannot be clicked");
+            }
+        }
+        Bounds screen = node.localToScreen(node.getBoundsInLocal());
+        double left = scene.getWindow().getX() + scene.getX();
+        double top = scene.getWindow().getY() + scene.getY();
+        double minX = Math.max(screen == null ? Double.NaN : screen.getMinX(), left);
+        double minY = Math.max(screen == null ? Double.NaN : screen.getMinY(), top);
+        double maxX =
+                Math.min(screen == null ? Double.NaN : screen.getMaxX(), left + scene.getWidth());
+        double maxY =
+                Math.min(screen == null ? Double.NaN : screen.getMaxY(), top + scene.getHeight());
+        if (screen == null || !(maxX > minX && maxY > minY)) {
+            return fail(
+                    "#"
+                            + node.getId()
+                            + " is not visible in its window (its bounds on screen are "
+                            + screen
+                            + "), so it cannot be clicked");
+        }
+        return new Point2D((minX + maxX) / 2, (minY + maxY) / 2);
+    }
 }

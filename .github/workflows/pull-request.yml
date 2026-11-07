@@ -117,3 +117,9 @@ jobs:
 
       - name: CI definitions match the scripts they invoke
         run: bash scripts/ci/check-workflows.sh
+
+      # The specification's "Flakiness policy" (PHASE-15 exit gate item 6):
+      # no unconditional retry anywhere, no test disabled without an entry in
+      # scripts/ci/quarantine.toml, and no release-critical test in it.
+      - name: Flakiness policy -- no retries, no unregistered or release-critical quarantine
+        run: bash scripts/ci/flakiness-check.sh

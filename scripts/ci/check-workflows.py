@@ -370,6 +370,8 @@ PR_ALSO_REQUIRED = [
     ("artefacts.sh", "exit code 0 proves nothing; this checks the jars and test reports exist"),
     ("format-evidence.sh", "proves Spotless, Checkstyle and SpotBugs inspected the code rather than nothing"),
     ("check-workflows.sh", "this check itself, so the workflows are verified by the pipeline they define"),
+    ("flakiness-check.sh", "the specification's flakiness policy (PHASE-15 gate item 6): no retry, no "
+                           "unregistered quarantine, no release-critical test quarantined"),
 ]
 
 NIGHTLY_REQUIRED = [
