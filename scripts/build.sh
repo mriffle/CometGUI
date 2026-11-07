@@ -132,7 +132,7 @@ Options:
                    THIS script rather than reimplementing a stage: the local
                    gate and the pull-request pipeline then cannot drift into
                    running different commands.  An unknown ID is a fatal error.
-                   Stages are not independent -- `gates` reads what `build`
+                   Stages are not independent -- "gates" reads what "build"
                    wrote -- so a selection that skips a producer only makes
                    sense inside one CI job on one checkout, which is how the
                    workflows use it.
