@@ -727,7 +727,82 @@ expressions behind them; the fixture half has never run on a CI runner
 Unit 8 sign-off
 ---------------
 
-Pending.
+**Accepted 2026-11-07 at** ``b8384ad`` (``765f81f``, ``b8384ad``), one round.
+One fresh agent.
+
+*Diff read* (21 files; test-side Java and scripts, no production code).
+``scripts/perf/run-performance.sh`` (``--part``, ``--quick``, ``--only``,
+``--profile``, ``--self-test``, ``--check-doc``) runs seven opt-in
+``Performance*`` classes in ``cometgui-app`` (disabled unless
+``-Dcometgui.perf=true``) and ``scripts/perf/performance.py`` grades them
+against ``scripts/perf/performance-data.json``, keyed by runner profile, and
+records the host and its load. The nine measurements of the specification go
+through the product's own code (startup to the shell window in a fresh JVM;
+``ParameterFilesViewModel.importFile`` on a generated 1.6 MB file; the large
+fixture opened, filtered, sorted and paged through the GUI; retained heap;
+``RunWiring.hasher()`` on a 2 GiB generated file; Comet informational and
+Percolator through the run port; cancellation to the tree gone, fake tool and
+real Comet; a 50-run project reopened). Thresholds: at least twice the median
+and 1.5 x the worst sample, never looser than a user-visible ceiling; the data
+is refused if a threshold lacks a recorded red, a rationale, or sits below its
+own median. **No recorded profile -> ``NO BASELINE FOR THIS RUNNER
+PROFILE``, exit 4**; the docs say plainly that this shared host is not the
+dedicated runner and that half of gate item 4 is unverifiable, with what such
+a runner needs. Nightly ``nightly-performance.sh`` real (honestly red on
+GitHub runners: no profile); ``nightly-performance-fixture.sh`` exits 70
+naming ``D-006``. ``check-doc`` keeps ``testing.rst``'s baseline table equal
+to the data (``traceability.sh`` step P). ``AC-RES-10`` mapped to the check.
+
+*My runs* (host load average 6.8 before, 7.9 after):
+
+* the whole suite with the fixture: **GREEN -- 16 PASS, 1 INFO** (Comet
+  4.22 s, informational): startup 3535 ms (threshold 7000), import 186 (600),
+  results open 3113 (8000), PSM filter 904 (2000), numeric sort 972 (2000),
+  text sort 3350 (7500), page 489 (1000), peptides shown 795 (1800), peptide
+  filter 921 (2000), hashing 253 MiB/s (>= 150), Percolator fixture 2.21 s
+  (4.5), synthetic 548 ms (1500), heap 5.78 MiB (16), cancel fake 7.84 ms
+  (250), cancel Comet 93.9 ms (500), reopen 59.3 ms (400) -- within a few
+  percent of the agent's baseline;
+* ``--profile github-ubuntu-latest``: **NO BASELINE FOR THIS RUNNER
+  PROFILE**, exit 4; the fixture part without the fixture: **REFUSED**, exit 3;
+* ``verify-all-gates.sh --only workflows,pipeline,docs,traceability``:
+  workflows 23, docs 1, traceability 8, pipeline 31 steps (1711 s), PASS;
+* ``mvn -o -B -pl cometgui-app -am verify``: **BUILD SUCCESS**, app 573 (91
+  opt-in skipped). My first attempt ran beside the ``pipeline`` control and a
+  surefire fork died starting at 23:31:56 (572 tests, BUILD FAILURE) -- **my
+  collision, not the unit's**: see the finding below. Re-run alone: green.
+
+*My injections* (anchor 0, ``sha256sum -c`` FAILED; restored, OK), each
+graded with ``--only``:
+
+* ``StreamingHashService`` running two wasted SHA-256 passes per chunk:
+  **RED hash-throughput -- median 112 MiB/s ... under its threshold 150
+  MiB/s**.
+* ``ProcessTree.destroyAll`` sending no polite stop, so only the forcible
+  escalation ends a cancelled tree: **RED cancel-fake-tool 5008 ms over 250
+  ms; RED cancel-comet 1551 ms over 500 ms**.
+
+The agent's seventeen (one per threshold) are in its report and the docs.
+
+*Finding, for unit 10 and tier 1 -- the pipeline control now writes the
+working tree.* Since units 6-8 the nightly matrix, determinism and
+performance steps run Maven in the working tree (``-pl cometgui-app -am
+test``), rewriting ``cometgui-*/target``. ``run-pipeline-locally.sh`` runs
+them, so the ``pipeline`` control is no longer read-only towards the working
+tree, which the FIX-BUILD-TIME audit assumed. No other control reads the
+working tree's ``target/`` today, so the gate suite itself is safe; but any
+Maven run in the working tree beside the ``pipeline`` control can collide (as
+mine did), and an agent's or tier 1's ``build.sh`` must not overlap it. Unit
+10 records this in ``gate_locks``/the harness comments or moves those steps
+into a sandbox.
+
+*Residue:* ``ConsoleFloodUiTest.theRetainedHeapStaysWithinItsBound`` measured
+21 MB against 20 MB once in the agent's verify, 3/3 alone -- routed to unit 9;
+keyboard navigation in the Results run chooser opens every run it passes
+(product behaviour, reported); retained GUI heap creeps about 0.6 MiB per run
+opened in one session (not traced); the quick step costs 374 s inside the
+``pipeline`` control, 213 s of it building the 50-run project on a shared
+disk.
 
 Unit 9 sign-off
 ---------------
