@@ -5,9 +5,8 @@ PHASE-16: Documentation and Release Qualification
 :Phase: 16
 :Status: NOT STARTED
 :Depends on: 15
-:Blocked by decisions: D-018 (where the trimmed FASTA is kept) blocks only
-   the last step of the CI fixture work; D-009 must be settled before
-   release. D-001, D-004, D-006 and D-008 are DECIDED
+:Blocked by decisions: none open. D-009 must be settled before release.
+   D-001, D-004, D-006, D-008 and D-018 are DECIDED
 :Delivers: R-DOC-01, R-DOC-02, R-DOC-06
 :Contributes to: R-DOC-03, R-DOC-04, R-DOC-05, R-SEC-01
 :Proves: AC-DOC-01, AC-DOC-02, AC-REL-02, AC-REL-03, AC-UX-01..06, AC-TST-07
@@ -106,13 +105,20 @@ The step, in order:
    condition ``D-006`` already sets for the spectra: fetched by checksum,
    never committed, the CRLF defence applied on the runner.
 
-**Where the trimmed FASTA itself is kept is** ``D-018`` **and is the
-owner's.** ``D-006`` rules that the project does not redistribute spectrum or
-FASTA data, so no agent commits the FASTA or picks a host for it. Steps 1 to
-6 do not depend on the answer; steps 7 and 8 do.
+**The trimmed FASTA is committed to the repository** (``D-018``, option A,
+decided 2026-11-12), with UniProt's attribution (CC BY 4.0) and the release
+it was made from, and it is entered in the licence audit. **The two K562
+mzML files are not committed**: the owner allows small test files in the
+repository only where no licence is violated, and the terms these files are
+redistributed under have never been established (``D-006``, amendment to
+part 1). They stay fetched by checksum.
 
-No Thermo RAW fixture comes out of this. The Windows RAW smoke test
-(``AC-TST-11``) stays a stub.
+**Thermo RAW.** No RAW fixture comes out of the steps above. By the owner's
+plan (``D-006``), a search for a very small RAW file runs before this phase
+starts. If one is found, this document is amended to add it to CI; if not,
+the Windows RAW job is taken out of the nightly and ``AC-TST-11`` is
+recorded as not met and outstanding. Until tier 1 records which, the Windows
+RAW smoke test stays the stub it is.
 
 Out of scope
 ------------

@@ -4,7 +4,8 @@ Decisions
 
 :Updated: 2026-11-12 (D-016 decided, option B; D-017 decided, option A;
    D-006's CI fixture decided -- the K562 pair, as it is, with a trimmed
-   FASTA; D-018 raised, OPEN)
+   FASTA; D-006 part 1 amended -- small test files may be kept in the
+   repository where the licence permits; D-018 raised and decided, option A)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -538,10 +539,11 @@ automate screen coordinates -- in production or in tests.
 D-006 -- Test fixture data and licensing
 ========================================
 
-:Status: **DECIDED** -- redistribution ruled out and the local-testing
-   fixture delegated 2026-08-30; the CI spectra decided 2026-11-12 (the same
-   two K562 files). Not yet wired into any CI job. A Thermo RAW fixture is
-   not covered
+:Status: **DECIDED** -- the local-testing fixture delegated 2026-08-30; the
+   CI spectra decided 2026-11-12 (the same two K562 files) with a trimmed
+   FASTA; **part 1 amended 2026-11-12**: small test files may be kept in the
+   repository where no licence is violated. Not yet wired into any CI job.
+   A Thermo RAW fixture is being looked for
 :Raised: 2026-08-28
 :Blocks: Phases 00, 14, 16
 :Owner: Project owner
@@ -654,14 +656,53 @@ What follows from it, and what it does not settle:
   ``phases/PHASE-16-release.rst`` (*The CI fixture*). It replaces the FASTA
   in the table above for local testing and CI alike, so the fixture's digest
   changes and every golden is regenerated once, with its review record.
-* **Where the trimmed FASTA is kept is** ``D-018``. The whole proteome is
-  served from ``current_release/``, whose bytes change at every UniProt
-  release, after which a pinned checksum can no longer be fetched at all; a
-  trimmed file made from it needs a home that does not move. Part 1 above
-  rules out redistributing FASTA data, so no agent picks a host or commits
-  the file.
-* **No Thermo RAW fixture.** The pair is mzML. The Windows RAW smoke test
-  (``AC-TST-11``) still has no fixture and no runner, and stays a stub.
+* **Where the trimmed FASTA is kept is** ``D-018``, decided the same day:
+  it is committed. The whole proteome is served from ``current_release/``,
+  whose bytes change at every UniProt release, after which a pinned checksum
+  can no longer be fetched at all; a trimmed file made from it needs a home
+  that does not move.
+* **No Thermo RAW fixture yet.** The pair is mzML. See the amendment below
+  for the owner's plan.
+
+**AMENDMENT TO PART 1 (2026-11-12).** The owner: *"Assuming it doesn't
+violate any licenses, we can host our small test mzMLs, FASTA, and RAWs in
+our repository for CI purposes."* Part 1's rule against redistributing
+spectrum or FASTA data no longer holds for small CI test files whose licence
+permits it. It still holds for anything else. File by file:
+
+* **The trimmed FASTA is committed** (``D-018``, option A). UniProt's licence
+  is CC BY 4.0 and addresses redistribution explicitly
+  (``docs/feasibility/fixture-candidates.rst``); the file carries UniProt's
+  attribution and the release it was made from.
+* **The two K562 mzML files stay fetched by checksum and are not committed.**
+  The owner's condition is not met for them: Phase 00 found that the Crux
+  repository's Apache-2.0 grant is written over Crux, and that nothing
+  documents where these instrument files came from or under what terms they
+  are redistributed (``fixture-candidates.rst``, *Licence -- and the caveat
+  that matters*). Fetching them from the commit-pinned URL is unaffected and
+  that URL does not move. Committing them needs their provenance and terms
+  established first, which is the owner's to pursue, not an agent's to
+  assume.
+* **A RAW file is committed only if its own licence permits it**, read from
+  the source for that file, never assumed from the archive it sits in.
+* **Phase 16's licence audit records every data file the repository holds**,
+  with its source, licence and attribution (``AC-REL-03``, a human sign-off).
+
+**The owner's plan for a Thermo RAW fixture (2026-11-12).** Before Phase 16
+starts, one agent with no other job looks for very small RAW files from a
+reputable public source (ProteomeXchange, PRIDE): under 10 MB, ideally two,
+one is enough, and it must give real identifications from Comet and
+Percolator against a small FASTA. It was dispatched the same day and works
+only under ``scratch/raw-scout/``. Comet reads RAW only on Windows, so on
+this host a candidate is judged by converting it to mzML and searching that;
+that Comet on Windows reads the file itself is shown later, on a runner.
+
+* **If suitable files are found**, Phase 16 is amended to add them to CI.
+* **If none is found**, the RAW part of CI is shelved, in the owner's words
+  because *"we don't want tests to always fail"*, and kept on record as an
+  outstanding item. Shelving means the job is taken out of the nightly and
+  ``AC-TST-11`` is recorded as not met, with the reason. It never means a
+  step that exits 0 having tested nothing.
 * **The filterer is not adopted.** It remains available if the owner later
   wants a fixture cut from a full-size run. If so: a selection of confident
   identifications only would leave Percolator too few decoys and poor matches
@@ -1202,7 +1243,7 @@ shows the raised gate going red on a deliberate defect; until then
 D-018 -- Where the trimmed fixture FASTA is kept
 ================================================
 
-:Status: **OPEN**
+:Status: **DECIDED 2026-11-12** -- option A, to be implemented in Phase 16
 :Raised: 2026-11-12, by tier 1, from the owner's direction that the fixture
    use a trimmed FASTA (``D-006``)
 :Blocks: the last two steps of Phase 16's CI fixture work (regenerating the
@@ -1244,3 +1285,10 @@ D. **The owner hosts the file** somewhere stable outside the repository (a
 **Recommendation.** A. It is the only option with no moving part, the licence
 allows it, and the file is small. B is the choice if the rule against
 redistributing is to hold without exception, and it needs a spike first.
+
+**DECISION (2026-11-12).** A, by the owner's amendment to ``D-006`` part 1
+the same day: *"Assuming it doesn't violate any licenses, we can host our
+small test mzMLs, FASTA, and RAWs in our repository for CI purposes."* The
+trimmed FASTA is committed with UniProt's attribution (CC BY 4.0) and the
+UniProt release it was made from, and is recorded in the licence audit. It
+does not exist yet; Phase 16 makes it.
