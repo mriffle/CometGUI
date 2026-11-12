@@ -526,12 +526,12 @@ call* ``VoidMethodCallMutator``, and so on).
      - survived
      - Equivalent: a checked relative path never starts with ``/``, so ``lastSlash`` is never 0 (and ``resolve("")`` would be the destination anyway).
    * - ``install.archive.ZipArchiveReader.read``
-     - 373
+     - 402
      - boundary
      - survived
      - Equivalent: a file channel never answers a non-empty buffer with 0, so ``< 0`` and ``<= 0`` agree.
    * - ``install.archive.ZipArchiveReader.zip64UncompressedSize``
-     - 340
+     - 369
      - boundary
      - survived
      - Equivalent since the fix: a field header ending the extra field leaves no room for an eight-byte size, so ``<=`` and ``<`` both reach the refusal. Before the fix this survivor was the defect.
