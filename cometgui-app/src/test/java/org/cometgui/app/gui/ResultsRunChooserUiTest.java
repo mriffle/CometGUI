@@ -29,9 +29,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javafx.geometry.Bounds;
+import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Labeled;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.skin.ComboBoxListViewSkin;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
+import javafx.scene.robot.Robot;
 import org.cometgui.app.config.RunWiring;
 import org.cometgui.app.testing.InstalledComet;
 import org.cometgui.app.testing.ResultRuns;
@@ -60,6 +66,9 @@ import org.junit.jupiter.api.io.TempDir;
  * way to the one they wanted (Phase 15 unit 8's finding).
  *
  * <h2>How the opens are counted</h2>
+ *
+ * <p>The last two tests are the other two ways a choice is committed: Space, and the mouse (a click
+ * by the toolkit's own robot on a run's cell in the open list).
  *
  * <p>The application is the real one, launched with its real composition root over a project of
  * four constructed runs. Every time the Results section starts opening a run it says so in its
@@ -299,6 +308,63 @@ class ResultsRunChooserUiTest {
         assertAll(
                 () -> assertEquals(List.of("run-c"), opened(), "runs opened"),
                 () -> assertEquals("run-c", showing()),
+                () -> assertEquals(List.of(), listenerFailures, "listener failures"));
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("Space commits a walk as Enter does: the run stopped on is opened, once")
+    void spaceCommits() {
+        focusTheChooser();
+        forget();
+        assertEquals("run-c", showing(), "the run the last test opened");
+        driver.press(KeyCode.DOWN);
+        driver.press(KeyCode.DOWN);
+        assertEquals("run-b", chooserShows(), "one run down from run-c");
+        assertEquals(List.of(), opened(), "runs opened while walking");
+
+        driver.press(KeyCode.SPACE);
+        ResultsSection.awaitOpened(driver, "run-b", ResultsSection.OPEN_BOUND);
+        ResultsSection.settle(driver, ResultsSection.QUERY_BOUND);
+        assertAll(
+                () -> assertFalse(listIsOpen(), "the list is closed"),
+                () -> assertEquals(List.of("run-b"), opened(), "runs opened"),
+                () -> assertEquals("run-b", chooserShows()));
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("a mouse click on a run in the open list opens that run, once")
+    void aClickOnARunOpensIt() {
+        forget();
+        driver.clickOn("results-run");
+        assertTrue(listIsOpen(), "a click on the chooser opens its list");
+        assertEquals(List.of(), opened(), "runs opened by opening the list");
+
+        ComboBox<?> chooser = (ComboBox<?>) driver.node("results-run");
+        List<String> pressed = new ArrayList<>();
+        driver.onFxThread(
+                () -> {
+                    Node list = ((ComboBoxListViewSkin<?>) chooser.getSkin()).getPopupContent();
+                    for (Node node : list.lookupAll(".list-cell")) {
+                        ListCell<?> cell = (ListCell<?>) node;
+                        if (!cell.isEmpty() && cell.getText().startsWith("run-d -- ")) {
+                            pressed.add(cell.getText());
+                            Bounds onScreen = cell.localToScreen(cell.getBoundsInLocal());
+                            Robot robot = new Robot();
+                            robot.mouseMove(onScreen.getCenterX(), onScreen.getCenterY());
+                            robot.mousePress(MouseButton.PRIMARY);
+                            robot.mouseRelease(MouseButton.PRIMARY);
+                        }
+                    }
+                });
+        assertEquals(1, pressed.size(), () -> "the list shows run-d once: " + pressed);
+        ResultsSection.awaitOpened(driver, "run-d", ResultsSection.OPEN_BOUND);
+        ResultsSection.settle(driver, ResultsSection.QUERY_BOUND);
+        assertAll(
+                () -> assertFalse(listIsOpen(), "the list is closed"),
+                () -> assertEquals(List.of("run-d"), opened(), "runs opened"),
+                () -> assertEquals("run-d", chooserShows()),
                 () -> assertEquals(List.of(), listenerFailures, "listener failures"));
     }
 }
