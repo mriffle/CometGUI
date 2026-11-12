@@ -78,12 +78,13 @@ import org.junit.jupiter.api.io.TempDir;
  *       table's nine columns, for a rebuild caught half way. Measured on these runs: 20 then 20
  *       with the fix; 227 then 875 without it.
  *   <li>the live heap may not grow by more than {@value #HEAP_SLACK_MIB} MiB over the {@value
- *       #OPENS} opens. Measured on these runs: 0.4 MB with the fix (about 3 kB an open, of which
- *       about half is this test's own robot recording the events it fired and the rest the
- *       toolkit's short-circuit binding stubs on the columns' {@code resizable} and {@code visible}
- *       properties, 56 bytes each, which the toolkit drops when those properties next change); 12.9
- *       MB without it. In the K562 trace two readings of an unchanged section differed by up to 2.1
- *       MB with the cells on screen, which is what the bound leaves room for.
+ *       #OPENS} opens. Measured on these runs: 0.4 MB with the fix, about 3 kB an open -- nearly
+ *       half of it the toolkit's own short-circuit binding stubs on the columns' {@code resizable}
+ *       and {@code visible} properties (about 30 an open, which the toolkit drops when those
+ *       properties next change), a little of it the events this test's robot records, the rest
+ *       inside the difference between two readings; 12.9 MB without the fix. In the K562 trace two
+ *       readings of an unchanged section differed by up to 2.1 MB with the cells on screen, which
+ *       is what the bound leaves room for.
  * </ul>
  */
 class ResultsHeapOverOpenedRunsUiTest {

@@ -2252,11 +2252,18 @@ was later raised and the injection re-made at 1.2 s.
   fix; 227 then 875 and +12.9 MB without). What is left is about 1.4 kB an
   open of the toolkit's own short-circuit binding stubs on the columns'
   ``resizable`` and ``visible`` properties, which it drops when those
-  properties next change; not changed. One repeat of the performance suite
-  changes the visible columns more than once (the run opened, the peptide
-  table chosen), and 0.6 MiB is three to four sets of nine headers at about
-  20 kB each. The ``gui-heap-peak`` baseline and threshold in the table above
-  were measured before the fix and are unchanged.
+  properties next change; not changed. The performance suite itself, run
+  with the fix (``--only gui-heap-peak``, five repeats, 2026-11-12, host load
+  average 50 to 59): 3.9, 4.3, 4.7, 5.0, 5.5 MiB, median 5.0 (and 3.7, 4.8,
+  5.1, 5.5, 5.8 in a second run), against the baseline's 6.6 to 9.3. About 0.4
+  MiB a repeat is still added there, and that is the test, not the product:
+  between the second and fifth repeats the live heap grew 1.14 MB, of which
+  0.97 MB was TestFX's own record of every event its robot fired
+  (``MouseEvent``, ``PickResult``, ``Point3D``, ``KeyEvent`` and the list
+  nodes holding them, in ``FiredEvents.events``), and the three more live
+  column headers a repeat are held as the targets of those recorded events
+  (the same heap-dump search). The ``gui-heap-peak`` baseline and threshold
+  in the table above were measured before the fix and are unchanged.
 * ``cancel-comet``: Comet 2026.03.0 ends on the first signal (about 90 ms from
   Cancel to gone); the cancellation injection (wait up to 3 s for the tool to
   finish first) observed 1.6 s because the fixture's search finished inside the
