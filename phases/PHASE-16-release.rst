@@ -3,7 +3,8 @@ PHASE-16: Documentation and Release Qualification
 =================================================
 
 :Phase: 16
-:Status: IN PROGRESS (dispatched 2026-11-12)
+:Status: IN PROGRESS (dispatched 2026-11-12; paused by the owner the same
+   day after unit 2 of 16 -- see ``handoffs/PHASE-16-handoff.rst``)
 :Depends on: 15
 :Blocked by decisions: none open. D-009 must be settled before release.
    D-001, D-004, D-006, D-008, D-018 and D-019 are DECIDED

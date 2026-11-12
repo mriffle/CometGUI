@@ -101,7 +101,8 @@ authoritative for its own scope and exit gate.
      - Documentation and Release Qualification
      - 15
      - D-009. D-001, D-004, D-006, D-008, D-018 and D-019 DECIDED
-     - IN PROGRESS (dispatched 2026-11-12)
+     - IN PROGRESS (dispatched 2026-11-12; paused by the owner the same day
+       after unit 2 of 16)
 
 Ordering notes
 ==============

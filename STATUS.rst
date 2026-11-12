@@ -7,13 +7,26 @@ Project Status
 :Updated by: Main orchestrator, session 12 (**``D-016``, ``D-017`` and
    ``D-006``'s CI fixture decided; a trimmed-FASTA step added to Phase 16;
    ``D-018`` decided; Thermo RAW files found and ``D-019`` decided; **Phase
-   16 dispatched**)
+   16 dispatched, then paused by the owner after its second unit**)
 :Current phase: **Phase 16 (documentation and release qualification), IN
-   PROGRESS.** The owner resumed on 2026-11-12: *"Proceed with phase 16."*
-   One phase orchestrator, briefed by ``handoffs/PHASE-16-BRIEF.rst``; it is
-   the only phase live in the tree. ``main`` was pushed at ``feefd33`` before
-   it started. The phase may push branches named ``phase16/...`` to run
-   workflows on GitHub's Windows and macOS runners, and nothing else.
+   PROGRESS and PAUSED BY THE OWNER after unit 2 of 16.** The owner resumed
+   on 2026-11-12 (*"Proceed with phase 16"*) and paused it the same day: *"I
+   want to pause phase 16 after it finishes its current unit's work. I will
+   continue it later."* **No agent is live in the tree and nothing is
+   running. Do not resume until the owner says so.** Units 1 (the Windows RAW
+   trial) and 2 (the trimmed FASTA and its acceptance check) are accepted by
+   the phase orchestrator; units 3 to 16 have not started; no exit-gate item
+   is met and **the phase is not signed off** -- tier 1 has run no full build
+   and no sign-off on it. The pause record is
+   ``handoffs/PHASE-16-handoff.rst``; a resume dispatches a fresh
+   orchestrator from ``handoffs/PHASE-16-BRIEF.rst`` plus that record, and
+   its first act is unit 3. **Four things wait on tier 1 or the owner before
+   units 5 and 7**: the proposed floors for the trimmed FASTA, Percolator's
+   "too few negative samples" warning on one-result-per-spectrum runs,
+   splitting unit 5, and the documents the phase found wrong and may not
+   edit (work log, *Blockers escalated*). ``main`` is pushed with the pause
+   recorded. One branch was pushed for runner evidence,
+   ``phase16/raw-trial-1``, with one run on it.
 :Overall: Sixteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03,
    04, 05, 08, 09, 10, 11, 12, 13, 14 and 15 PARTIAL -- plus the Comet
    2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every
@@ -329,7 +342,9 @@ Phase board
        Thermo RAW fixture (9), both added by the owner that day. Expected
        grade PARTIAL: six UX activities, the licence audit's sign-off,
        ``D-009`` and a person's clean-machine run are not an agent's to
-       complete.
+       complete. **PAUSED by the owner 2026-11-12 after unit 2 of 16**, at
+       ``0659194``; no gate item met, not signed off
+       (``handoffs/PHASE-16-handoff.rst``).
 
 Status values are ``NOT STARTED``, ``IN PROGRESS``, ``PARTIAL`` (with the
 residue named), ``BLOCKED`` (with the decision or dependency named), or
@@ -4849,6 +4864,27 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-11-12
+     - 16
+     - **Phase 16 paused by the owner** (*"I want to pause phase 16 after it
+       finishes its current unit's work. I will continue it later."*). The
+       phase orchestrator finished and accepted unit 2, wrote the pause
+       record ``handoffs/PHASE-16-handoff.rst`` and stopped at ``0659194``;
+       units 3 to 16 not started. **Unit 1:** Comet for Windows reads
+       ``ph050213_18.raw`` directly on a GitHub Windows runner (run
+       ``43150059739`` on ``phase16/raw-trial-1``, which tier 1 re-read:
+       completed, success) -- 873 PSMs / 761 peptides at 1% with Comet
+       2026.02.2 and 894 / 767 with 2026.03.0, as the phase reports them.
+       **Unit 2:** the trimmed FASTA is committed,
+       ``fixtures/human-k562-subset/``, 3,698 records (698 identified plus
+       3,000 background), 2,539,164 bytes; its acceptance check is green on
+       it and red on the identified proteins alone. Nothing reads it yet.
+       Tier 1 checked only that the tree is clean, nothing is running, the
+       run's status and the FASTA's digest and record count; **no sign-off,
+       no full build, no tier-1 injection**. Open for tier 1 at the resume:
+       the proposed floors, Percolator's "too few negative samples" warning,
+       the split of unit 5, and the corrections the phase escalated to
+       ``DECISIONS.rst`` and the phase document.
    * - 2026-11-12
      - 16
      - Owner resumed (*"Proceed with phase 16"*). ``main`` pushed at
