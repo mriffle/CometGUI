@@ -130,15 +130,24 @@ Three things do.
 
 The third settles it: the source is release 2026_02.
 
-**Whether the source can still be fetched.** Yes, on 2026-11-12, from the QfO
-address above. That directory is replaced once a year (its README), so the
-address is not permanent either. EMBL-EBI also keeps
-``previous_releases/qfo_release-2026_02/QfO_release_2026_02.tar.gz`` (2.2 GB)
-beside it; this unit listed that archive and did not open it, so that it holds
-the same file is likely and **not verified**. UniProt itself keeps no
-per-proteome file for a past release: ``previous_releases/release-2026_02/``
-holds only whole-database archives of 1.6 GB and more. This is why the subset
-is committed (``D-018``) rather than rebuilt from a download.
+**Whether the source can still be fetched.** Yes, on 2026-11-12, from two
+places at EMBL-EBI, and from nowhere at UniProt.
+
+* The QfO address above. That directory is replaced once a year (its README),
+  so the address is not permanent.
+* The archive
+  ``https://ftp.ebi.ac.uk/pub/databases/reference_proteomes/previous_releases/qfo_release-2026_02/QfO_release_2026_02.tar.gz``
+  (2,358,805,957 bytes). Its member ``Eukaryota/UP000005640_9606.fasta.gz``
+  was extracted on 2026-11-12 and is the same bytes, SHA-256
+  ``cf49a88c...4024``. An archive of a past release is the nearest thing to a
+  fixed address the source has; getting one 7.8 MB file out of it means
+  downloading 2.4 GB.
+* UniProt itself keeps no per-proteome file for a past release:
+  ``previous_releases/release-2026_02/`` holds only whole-database archives
+  of 1.6 GB and more.
+
+This is why the subset is committed (``D-018``) rather than rebuilt from a
+download.
 
 .. _dev-test-fixtures-selection:
 
@@ -1218,8 +1227,6 @@ What this page does not establish
 * **The floors are a proposal** until tier 1 confirms them, and so is the
   decision to report Percolator's negative-sample warning without failing on
   it.
-* **The archive copy of the source was not opened.** That
-  ``QfO_release_2026_02.tar.gz`` holds the source bytes is not verified.
 * **The series is one sample at each size.** The background rule is fixed, so
   each size is one particular set of records; another rule would give other
   counts at the same size.

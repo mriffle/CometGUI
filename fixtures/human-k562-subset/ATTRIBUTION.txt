@@ -44,11 +44,14 @@ proves anything about this one. Three things do:
     download.
 
 Where the source can still be had. From the QfO address above, until EMBL-EBI
-replaces that directory, which its README says happens once a year. EMBL-EBI
-also keeps QfO_release_2026_02.tar.gz (2.2 GB) under
+replaces that directory, which its README says happens once a year; and, for
+as long as EMBL-EBI keeps its archive, inside QfO_release_2026_02.tar.gz
+(2,358,805,957 bytes) under
 https://ftp.ebi.ac.uk/pub/databases/reference_proteomes/previous_releases/qfo_release-2026_02/
-UniProt itself keeps no per-proteome file for a past release. That is why this
-subset is committed rather than rebuilt from a download.
+whose member Eukaryota/UP000005640_9606.fasta.gz was extracted on 2026-11-12
+and is the same bytes. UniProt itself keeps no per-proteome file for a past
+release. That is why this subset is committed rather than rebuilt from a
+download.
 
 The committed file
 ------------------
