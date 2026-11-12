@@ -1,0 +1,117 @@
+uniprot-human-2026_02-k562-subset.fasta -- attribution and provenance
+======================================================================
+
+What this file is
+-----------------
+A SUBSET of the UniProt reference proteome of Homo sapiens (human): proteome
+UP000005640, NCBI taxonomy identifier 9606, canonical sequences. It is NOT
+the proteome: it holds 3,698 of its 20,652 records. The records it holds are
+UniProt's own, each copied byte for byte and in the order of UniProt's file.
+
+It is the protein database of CometGUI's test fixture, cut to suit the two
+K562 spectrum files that fixture searches. Do not use it for anything else: a
+search of other spectra against it would be a search against a database
+chosen to contain these spectra's answers.
+
+Source
+------
+Provider:        The UniProt Consortium (EMBL-EBI, SIB Swiss Institute of
+                 Bioinformatics, Protein Information Resource)
+Source file:     UP000005640_9606.fasta, decompressed from
+                 UP000005640_9606.fasta.gz
+UniProt release: 2026_02 (10-Jun-2026)
+Served file:     UP000005640_9606.fasta.gz, 7,752,225 bytes,
+                 SHA-256 cf49a88c4812dabbd934cb3e2e00b449e70375816e4d47cda7cc5b77b0754024
+Decompressed:    13,731,881 bytes, 20,652 records (20,329 UniProtKB/Swiss-Prot,
+                 323 UniProtKB/TrEMBL),
+                 SHA-256 2329a517bec9bd7269f9ce3b9252d8b959ae98bc41405a945c2d6134b284d5a0
+Downloaded:      2026-08-29, from
+                 https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000005640/UP000005640_9606.fasta.gz
+                 while current_release/relnotes.txt announced release 2026_02.
+
+How the release is known. That address serves a different file after each
+UniProt release (2026_04 since 04-Nov-2026: 7,740,211 bytes), so it no longer
+proves anything about this one. Three things do:
+
+  * the gzip header of the served file is dated 2026-04-16 07:26:06 UTC;
+  * the same bytes -- the same SHA-256 -- were downloaded again on 2026-11-12
+    from EMBL-EBI's reference-proteomes directory for the Quest for Orthologs,
+      https://ftp.ebi.ac.uk/pub/databases/reference_proteomes/QfO/Eukaryota/UP000005640_9606.fasta.gz
+    whose Last-Modified is 16 Apr 2026 07:26:06 GMT and whose README says
+    "Based on UniProt Release 2026_02";
+  * UniProt's previous_releases/release-2026_02/ directory is dated
+    2026-09-01 and its release 2026_03 is dated 02-Sep-2026: both after the
+    download.
+
+Where the source can still be had. From the QfO address above, until EMBL-EBI
+replaces that directory, which its README says happens once a year. EMBL-EBI
+also keeps QfO_release_2026_02.tar.gz (2.2 GB) under
+https://ftp.ebi.ac.uk/pub/databases/reference_proteomes/previous_releases/qfo_release-2026_02/
+UniProt itself keeps no per-proteome file for a past release. That is why this
+subset is committed rather than rebuilt from a download.
+
+The committed file
+------------------
+Name:     uniprot-human-2026_02-k562-subset.fasta
+Bytes:    2,539,164
+Records:  3,698 (3,655 UniProtKB/Swiss-Prot, 43 UniProtKB/TrEMBL)
+SHA-256:  bd252b62568d88881e0d13bcdfaa6b9db96666af0ba08fc51863fcd7bdec1b34
+MD5:      40a072e9d364a904bf460ea2b4f449af
+Line endings: LF only. .gitattributes marks this directory "-text" so that
+no checkout, on any platform, converts them; the SHA-256 above holds on
+Windows as on Linux.
+
+Licence
+-------
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+UniProt's copyright statement, reproduced as its terms require, from
+https://ftp.uniprot.org/pub/databases/uniprot/previous_releases/LICENSE
+(read 2026-11-12; https://www.uniprot.org/help/license says the same):
+
+    We have chosen to apply the Creative Commons Attribution 4.0 International
+    (CC BY 4.0) License (https://creativecommons.org/licenses/by/4.0/) to all
+    copyrightable parts of our databases.
+
+    All databases and documents in the UniProt FTP directory may be copied and
+    redistributed freely, without advance permission, provided that this copyright
+    statement is reproduced with each copy.
+
+The README of the directory the source was re-downloaded from adds, under the
+same first paragraph:
+
+    (c) 2002-2026 UniProt Consortium
+
+Changes made: a subset of 3,698 of 20,652 records, selected by the two rules
+below, otherwise unaltered. The source was decompressed with gzip; no record
+was edited, reordered or added, and every kept record is the source's bytes.
+
+  * 698 records are the proteins behind the confident identifications of the
+    two K562 spectrum files: every protein Percolator names for a target PSM
+    or a target peptide with a q-value of 0.01 or less, in a search of both
+    files against the whole source by any Comet and Percolator pair CometGUI
+    offers on Linux x86-64 (Comet 2026.02.2 and 2026.03.0, Percolator 3.06.5
+    and 3.07.1), with Comet reporting five results per spectrum and one.
+  * 3,000 records are background: the other records of the source ranked by
+    the SHA-256 of their accession, the first 3,000 taken.
+
+accessions.tsv, beside this file, lists every kept accession and which of the
+two it was kept as. scripts/fixtures/fixture_fasta.py holds both rules and
+rebuilds this file from the source and that list, byte for byte:
+
+    bash scripts/fixtures/fixture-fasta.sh verify --source UP000005640_9606.fasta
+
+docs/developer/test_fixtures.rst records why 3,000, with the measurements.
+
+How to cite UniProt
+-------------------
+The UniProt Consortium. UniProt: the Universal Protein Knowledgebase in 2025.
+Nucleic Acids Research 53 (D1), D609-D617 (2025). doi:10.1093/nar/gkae1010
+
+Why it is here
+--------------
+It is the protein database of CometGUI's test fixture (DECISIONS.rst, D-006
+and D-018): the two K562 mzML files, 20100614_Velos1_TaGe_SA_K562_3.mzML and
+_4.mzML of crux-toolkit's smoke tests, searched against this file. The
+spectrum files are fetched by checksum and are not in this repository.
