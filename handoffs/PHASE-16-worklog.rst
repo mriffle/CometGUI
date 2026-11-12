@@ -129,7 +129,8 @@ Work units
        compared with 906 / 787. Fallback ``ph280213_36.raw`` only if the
        first cannot be read. No ThermoRawFileParser. A failed read is red.
      - Gate 9 step 1; ``AC-TST-11``; ``D-019``
-     - pending
+     - **Accepted 2026-11-12.** Both Comet releases read the file on a
+       Windows runner; see *Unit 1* below.
    * - 2
      - **The trimmed FASTA.** The list of what the change touches; the source
        FASTA by checksum with its UniProt release; a committed selection
@@ -248,10 +249,105 @@ Sign-offs
 
 Written as each unit lands.
 
+Unit 1 -- the RAW trial (accepted 2026-11-12)
+---------------------------------------------
+
+Agent commits ``5980502`` (the WH8102 proteome under
+``fixtures/synechococcus-wh8102/`` with ``ATTRIBUTION.txt``, a ``fixtures/**
+-text`` rule in ``.gitattributes``, a UniProt entry in ``docs/citations.rst``)
+and ``6dae9f5`` (``scripts/spikes/windows-raw-trial/``: ``trial.py``,
+``run.sh``, ``workflow.yml`` as a template outside ``.github/workflows/``).
+
+**What I ran and saw.**
+
+* The diff, both commits; ``trial.py``'s verdict function read in full: READ
+  is decided from a PIN of at least 1,000 rows with targets and decoys in a
+  directory created empty, never from an exit code.
+* The FASTA: ``sha256sum`` ``b4c8aaf4...1750d``, 1,080,427 bytes, 2,513
+  records, no CR byte, ``cmp`` equal to the scout's copy, ``git check-attr``
+  ``text: unset``.
+* ``run.sh --check-only`` in my own directory: exit 0, 11 downloads, every
+  size and SHA-256 equal to its pin (both Comet releases with their three
+  Thermo companions, the Percolator 3.07.1 archive, both RAW files).
+* ``scripts/ci/check-workflows.sh``: PASSED, five workflows, unchanged.
+  ``scripts/ci/docs-build.sh``: PASSED (58 and 95 pages).
+* **Injection A**, into ``manifests/tools.json``: the pinned SHA-256 of Comet
+  2026.03.0's ``comet.win64.exe`` changed in its first hex digit (anchor gone,
+  ``sha256sum -c`` FAILED). ``--check-only``: exit 3, ``PIN MISMATCH for Comet
+  2026.03.0: comet.win64.exe -- HARD STOP``. **Injection B**, into
+  ``trial.py``: the RAW file's pin changed in its last digit. Exit 3, ``PIN
+  MISMATCH for RAW file (primary, D-019): ph050213_18.raw``. Both restored,
+  ``sha256sum -c`` OK, tree clean.
+
+**The trial itself**, run ``43150059739`` (see *Runner runs relied on*):
+green in 59 s on ``Windows-2025Server-10.0.26100``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 12 16 14 14 28
+
+   * - Comet
+     - Read
+     - PIN rows (target / decoy)
+     - PSMs, q < 0.01
+     - Peptides, q < 0.01
+     - Against the Linux mzML search with the same release
+   * - 2026.02.2
+     - READ
+     - 17,655 (9,674 / 7,981)
+     - 873
+     - 761
+     - 906 / 787 (``D-019``): -33 / -26
+   * - 2026.03.0
+     - READ
+     - 17,655 (9,674 / 7,981)
+     - 894
+     - 767
+     - 920 / 797 (the agent's measurement): -26 / -30
+
+Comet exited 0 and printed nothing about an empty scan or a charge. It loaded
+3,531 spectra against 3,624 from the converted mzML: reading the RAW file
+itself it searched 239 scans as 1+ and 1,646 as 2+ and 3+ (162 and 1,731 from
+the mzML), so the two paths assign charge differently and the counts differ by
+about 3%. The fallback file was not needed and was not searched. Five
+assemblies ``ThermoFisher.CommonCore.RawFileReader.dll`` references are
+neither beside Comet nor in the GAC (``OpenMcdf``, ``OpenMcdf.Extensions``,
+``System.IO.FileSystem.AccessControl``, ``System.Security.AccessControl``,
+``System.Security.Principal.Windows``); the read succeeded without them.
+
+**Consequence.** Gate item 9's first step is done: Comet on Windows opens
+``ph050213_18.raw``. Unit 11 builds the product-level test, and its golden is
+taken from a runner, not from ``D-019``'s figures.
+
+**Reported by the agent, for tier 1** (documents neither of us may edit):
+``D-019``'s 906 / 787 is Comet 2026.02.2's figure and 2026.03.0 gives 920 /
+797 from the same mzML; the search report says every scan was searched as 2+
+and 3+ where 162 were searched as 1+; the manifest's Windows row for Comet
+2026.02.2 has an empty ``requiredHostLibraries`` although its binary imports
+the same four Visual C++ runtime libraries as 2026.03.0's; ``CONTRIBUTING.rst``
+still asks a unit agent for a green ``scripts/build.sh``; ``ONBOARDING.rst``
+still says specification revision 10 and ``D-001``..``D-008``.
+
 Runner runs relied on
 =====================
 
 Every pushed branch and every run, with its URL, commits and conclusion.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 22 56
+
+   * - Branch
+     - Commits
+     - Run and conclusion
+   * - ``phase16/raw-trial-1``
+     - ``6dae9f5`` plus trigger commit ``25abc52`` (adds
+       ``.github/workflows/phase16-raw-trial.yml``, a copy of
+       ``scripts/spikes/windows-raw-trial/workflow.yml``, 63 lines, nothing
+       else)
+     - https://github.com/mriffle/CometGUI/actions/runs/43150059739 --
+       ``phase16-raw-trial``, job ``130956861567``, **success**, 2026-11-12
+       03:43-03:44 UTC. The ``RAW-TRIAL|`` lines of its log are the result.
 
 Rejections and rework
 =====================
