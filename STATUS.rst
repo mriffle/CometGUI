@@ -6,7 +6,7 @@ Project Status
 :Updated: 2026-11-12
 :Updated by: Main orchestrator, session 12 (**``D-016``, ``D-017`` and
    ``D-006``'s CI fixture decided; a trimmed-FASTA step added to Phase 16;
-   ``D-018`` decided; Thermo RAW files found and ``D-019`` raised; Phase 16
+   ``D-018`` decided; Thermo RAW files found and ``D-019`` decided; Phase 16
    still paused by the owner**)
 :Current phase: **Paused by the owner after Phase 15** (2026-11-07). Owner,
    2026-11-05: *"Pause after Phase 15 is signed off and pushed."* Phase 16
@@ -39,9 +39,11 @@ Project Status
    conversion to mzML on this host. Phase 16 is amended to add a RAW fixture
    to CI (*The Thermo RAW fixture*; exit gate item 9), starting with a trial
    on a Windows runner, because nothing yet shows Comet on Windows reads
-   these files. **Open for the owner:** ``D-019`` (which RAW file;
-   recommendation A, ``ph050213_18.raw`` alone); ``D-009`` before release;
-   ``D-011`` option D is the owner's own action.
+   these files. The owner chose the file: ``ph050213_18.raw`` (``D-019``,
+   option A), and had the search report kept
+   (``docs/feasibility/small-thermo-raw-files.rst``). No ``D-`` item is
+   open. **Still for the owner:** ``D-009`` before release; ``D-011`` option
+   D is the owner's own action.
    The nightly stays red until the fixture is wired into its jobs
    (:ref:`status-p15-signed`).
 
@@ -4863,8 +4865,11 @@ Change log
        and ``PXD000211`` (licence *EBI terms of use*, so fetched, not
        committed). Tier 1 re-derived the best file's size, checksum, licence
        and counts and they agree. **Phase 16 amended again**: *The Thermo
-       RAW fixture* and exit gate item 9. ``D-019`` raised (which file),
-       OPEN. Nothing is implemented; all of it goes into the Phase 16 brief.
+       RAW fixture* and exit gate item 9. ``D-019`` raised (which file) and
+       **decided, option A**: ``ph050213_18.raw``. The search report is kept
+       at the owner's request as
+       ``docs/feasibility/small-thermo-raw-files.rst``. No ``D-`` item is
+       open. Nothing is implemented; all of it goes into the Phase 16 brief.
        **Phase 16 is still paused**: no brief written, no phase dispatched,
        no build run.
    * - 2026-10-30

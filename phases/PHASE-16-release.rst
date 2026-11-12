@@ -5,9 +5,8 @@ PHASE-16: Documentation and Release Qualification
 :Phase: 16
 :Status: NOT STARTED
 :Depends on: 15
-:Blocked by decisions: D-019 (which RAW file is the fixture) blocks the RAW
-   fixture work only. D-009 must be settled before release. D-001, D-004,
-   D-006, D-008 and D-018 are DECIDED
+:Blocked by decisions: none open. D-009 must be settled before release.
+   D-001, D-004, D-006, D-008, D-018 and D-019 are DECIDED
 :Delivers: R-DOC-01, R-DOC-02, R-DOC-06
 :Contributes to: R-DOC-03, R-DOC-04, R-DOC-05, R-SEC-01
 :Proves: AC-DOC-01, AC-DOC-02, AC-REL-02, AC-REL-03, AC-UX-01..06, AC-TST-07
@@ -121,8 +120,10 @@ The Thermo RAW fixture
 
 Added 2026-11-12, by the owner's plan in ``D-006``: a search made before
 this phase found Thermo RAW files under 10 MB that give real
-identifications. Which file is used is ``D-019`` and is the owner's; the
-candidates, their checksums and what was measured are recorded there.
+identifications. The owner chose ``ph050213_18.raw`` from PRIDE project
+``PXD002914`` (``D-019``, option A); its checksum, the fallback file and
+what was measured are recorded there, and the search report is
+``docs/feasibility/small-thermo-raw-files.rst``.
 
 What the search measured is **not** what this phase must show. Comet reads
 RAW only on Windows, so each candidate was converted to mzML on Linux and

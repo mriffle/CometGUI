@@ -6,7 +6,7 @@ Decisions
    D-006's CI fixture decided -- the K562 pair, as it is, with a trimmed
    FASTA; D-006 part 1 amended -- small test files may be kept in the
    repository where the licence permits; D-018 raised and decided, option A;
-   RAW files found, D-019 raised, OPEN)
+   RAW files found, D-019 raised and decided, option A)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -1304,7 +1304,8 @@ does not exist yet; Phase 16 makes it.
 D-019 -- Which Thermo RAW file is the CI fixture
 ================================================
 
-:Status: **OPEN**
+:Status: **DECIDED 2026-11-12** -- option A, ``ph050213_18.raw``, to be
+   implemented in Phase 16
 :Raised: 2026-11-12, by tier 1, from the RAW search the owner asked for
    (``D-006``)
 :Blocks: Phase 16's RAW fixture work and exit gate item 9; nothing else
@@ -1327,7 +1328,8 @@ every file and the first setting tried: ``peptide_mass_tolerance_upper =
 agent's, read from the files Percolator wrote; tier 1 re-derived the first
 row itself (size, SHA-256, the PRIDE ``license`` field, PIN rows, both
 counts, the FASTA's record count) and it agrees. The agent's full report is
-``scratch/raw-scout/report.rst``, which is not under version control.
+kept, at the owner's request, as
+``docs/feasibility/small-thermo-raw-files.rst``.
 
 ``PXD002914``, *Low temperature adaptation in marine Synechococcus*: LTQ
 Velos, gel fractions of a whole-cell lysate. FASTA: UniProt
@@ -1399,3 +1401,16 @@ D. None. Shelve the RAW job as in ``D-006``.
 
 **Recommendation.** A, with ``ph280213_36.raw`` as the fallback if the
 Windows runner cannot read the first because of its empty MS1 scans.
+
+**DECISION (2026-11-12).** The owner chose A: *"Let's go with your
+recommendation for D-019 (ph050213_18.raw)."* One file,
+``ph050213_18.raw`` from ``PXD002914``, fetched by checksum from PRIDE and
+not committed, searched against the *Synechococcus* WH8102 proteome with the
+seven ion-trap values above. ``ph280213_36.raw`` is the fallback the
+recommendation named, used only if the Windows runner cannot read the first;
+a file outside this entry's table is a new question for the owner. Nothing
+is implemented, and the Windows path is still unproven: Phase 16 tries it on
+a runner first (``phases/PHASE-16-release.rst``, *The Thermo RAW fixture*).
+
+The owner also asked that the search report be kept as useful beyond this
+project; it is committed as ``docs/feasibility/small-thermo-raw-files.rst``.
