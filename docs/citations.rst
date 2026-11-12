@@ -161,13 +161,16 @@ and Unit ontologies.
 UniProt
 =======
 
-One protein sequence database from UniProt is kept in the CometGUI source
-repository, as test data. It is not part of the installed application, and
-CometGUI never chooses a database for you: you always supply your own FASTA.
+Two protein sequence databases from UniProt are kept in the CometGUI source
+repository, as test data: one whole proteome and a subset of another. Neither
+is part of the installed application, and CometGUI never chooses a database
+for you: you always supply your own FASTA.
 
    The UniProt Consortium. UniProt: the Universal Protein Knowledgebase in
    2025. *Nucleic Acids Research* **53** (D1), D609--D617 (2025).
    ``doi:10.1093/nar/gkae1010``
+
+**The** *Synechococcus* **proteome.**
 
 * **What:** the reference proteome of *Synechococcus* sp. strain WH8102, which
   UniProt now names *Parasynechococcus marenigrum* (strain WH8102) -- proteome
@@ -189,3 +192,36 @@ CometGUI never chooses a database for you: you always supply your own FASTA.
   RAW file on Windows. That file, ``ph050213_18.raw`` of PRIDE project
   ``PXD002914``, is downloaded for the test and is not in the repository
   (``DECISIONS.rst``, ``D-019``).
+
+**A subset of the human proteome.**
+
+* **What:** 3,698 of the 20,652 records of the human reference proteome --
+  proteome ``UP000005640``, taxonomy identifier 9606, canonical sequences:
+  2,539,164 bytes, SHA-256
+  ``bd252b62568d88881e0d13bcdfaa6b9db96666af0ba08fc51863fcd7bdec1b34``. **It is
+  not the proteome.** Each record it holds is UniProt's, unaltered and in
+  UniProt's order.
+* **Where:**
+  ``fixtures/human-k562-subset/uniprot-human-2026_02-k562-subset.fasta``, with
+  ``ATTRIBUTION.txt`` beside it, which reproduces UniProt's copyright statement
+  and states the changes made, and ``accessions.tsv``, which lists the records
+  kept.
+* **From:** UniProt release 2026_02 (10-Jun-2026): the file
+  ``UP000005640_9606.fasta.gz`` (SHA-256
+  ``cf49a88c4812dabbd934cb3e2e00b449e70375816e4d47cda7cc5b77b0754024``),
+  downloaded on 2026-08-29 from UniProt's ``current_release`` directory and
+  found again, the same bytes, on 2026-11-12 in EMBL-EBI's reference-proteome
+  directory for the Quest for Orthologs, whose README says it is based on
+  that release.
+* **Changes made:** a subset. 698 records are the proteins identified at a
+  q-value of 0.01 or less when the test's two spectrum files are searched
+  against the whole proteome; 3,000 more are a background chosen by a fixed
+  rule over the accession. :doc:`developer/test_fixtures` gives both rules
+  and what was measured to choose them.
+* **Licence:** `Creative Commons Attribution 4.0 International (CC BY 4.0)
+  <https://creativecommons.org/licenses/by/4.0/>`__, as above.
+* **What it is for:** it is the database CometGUI's tests search two human
+  K562 spectrum files against. Those files, from the Crux toolkit's smoke
+  tests, are downloaded for the tests and are not in the repository
+  (``DECISIONS.rst``, ``D-006`` and ``D-018``). It was chosen to contain what
+  those two files identify, so it is of no use for any other search.

@@ -37,6 +37,7 @@ pages describe the implementation that satisfies them.
    provenance_ui
    security
    testing
+   test_fixtures
    e2e_harness
    traceability
    releasing
