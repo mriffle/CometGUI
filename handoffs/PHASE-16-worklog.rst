@@ -151,6 +151,137 @@ P16-7 -- where committed fixture data lives
    of accessions it was made from beside it, because the phase document
    requires that list to be committed and it is what pins the file's digest.
 
+``D-020`` decided, and the order (2026-11-12)
+---------------------------------------------
+
+Tier 1's message, received while unit 3 ran: the owner decided ``D-020``,
+option A -- *"re: D-020: yes, it is acceptable."* I checked the record
+before acting on it: tier 1's commit ``f369f6e`` changes only
+``DECISIONS.rst``, ``STATUS.rst``, the phase document and
+``phases/index.rst``, and ``D-020`` reads DECIDED. No ``D-`` item is open.
+
+* The order is P16-3's again: 3, 4, 3b, 5a to 5e, 6, 7, then 8 to 16. The
+  detour in the brief's resume section applied only while ``D-020`` was
+  open.
+* The committed FASTA and its floors stand. The acceptance check prints
+  Percolator's warning wherever Percolator gives it and does not grade it.
+* **A documentation duty comes with the decision:** the pages that describe
+  the fixture say plainly that its one-result-per-spectrum runs carry the
+  warning, why, and that the owner accepted it under ``D-020``.
+  ``docs/developer/test_fixtures.rst`` (which still says the question is put
+  to tier 1) is corrected in **unit 5d**, the unit that next touches it;
+  ``docs/developer/testing.rst`` in **unit 5e**; the user-facing statement
+  in **unit 12**.
+
+P16-9 -- PSM identifiers are their own unit, and the determinism tolerance gets stricter
+   Unit 3's item B was stopped at its hard stop and is dispatched as **unit
+   3b**, after unit 4 and before 5a, so that the goldens are regenerated
+   once over the product as it will ship (P16-3's reason). The fix removes
+   the run directory from every identifier, so the seven tolerated fields
+   "the run's own directory" in ``scripts/matrix/determinism-data.json``
+   stop being true. They are **removed**, with the same rows of the table in
+   ``testing.rst``: the tolerance gets stricter, which is the allowed
+   direction. Nothing is added to it. No golden moves (identifier digests
+   are taken without the directory); if one would, the unit stops.
+
+The split of unit 5 (recorded 2026-11-12, before any part is dispatched)
+------------------------------------------------------------------------
+
+Decision **P16-8**. Unit 5 is five units, 5a to 5e, each with its own fresh
+agent and its own sign-off, serial. (Drafted while ``D-020`` was open; the
+owner decided it before any part was dispatched.) The split follows the inventory in
+``docs/developer/test_fixtures.rst`` (*What the change of FASTA touches*) and
+is bounded by the four rulings in the brief's resume section. Each part
+measures the test time it adds or removes, module by module, against the
+same tests at its starting commit; the build must not grow.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 6 50 44
+
+   * - Part
+     - What it moves
+     - Acceptance, beyond the standing rules
+   * - 5a
+     - **The seams, and the tests that search the proteome's first 1,000
+       records.** ``RealSearch``, ``RealCometSearch``, ``RealComet``,
+       ``CometIndexRealBinaryTest``, ``CometAdapterRealBinaryTest``,
+       ``LimelightFixtures``' FASTA, the validation corpus
+       (``corpus.json``, ``ValidationCorpusRealBinaryTest``,
+       ``MigratedFileRealBinaryTest``), the committed index headers under
+       ``fixtures/comet-index`` with ``IndexHeaders`` and
+       ``IndexDescriptions``, and every test behind ``subset()``. The gate
+       harnesses that name the three fixture files for these tests
+       (``param``, ``percolator``, ``provenanceui``, ``workflow``).
+     - The input is the committed FASTA, read from ``fixtures/``; whether a
+       test searches all 3,698 records or a cut is decided by measured test
+       time and recorded. Index headers and every pinned count are taken
+       again **from the real binaries** (both Comet releases), never typed
+       to match; the 42 validation verdicts are run again. Nothing behind
+       ``subset()`` reads ``UP000005640_9606.fasta`` afterwards.
+   * - 5b
+     - **The tests that cancel a search.** ``RealCancellationTest``,
+       ``RealCancelUiTest``, ``ProvenanceSectionUiTest``,
+       ``RealProvenanceGateTest``'s cancelled run, and the ``cancel-comet``
+       performance measurement.
+     - A search that lasts long enough from the same spectra and the
+       committed FASTA, **by search settings**; never a sleep, a stand-in
+       binary or the whole proteome. The window is measured at 2 cores
+       (``taskset -c 0-1``) and at this host's count, several times, and
+       recorded; **if no settings hold a window on two cores, the part stops
+       and the timings go to tier 1.** Each test is shown red with
+       cancellation broken in production code. The ``cancel-comet``
+       threshold is taken again by the recorded procedure
+       (``testing.rst``), not edited.
+   * - 5c
+     - **Phase 00's search outputs.** ``scripts/feasibility/run_scientific_path.sh``
+       run once against the committed FASTA; the digests and counts in
+       ``K562Run``, both ``LimelightFixtures``, ``PdvMzTabsFidelityTest``,
+       ``RealK562``/``RealK562Test``, ``ResultsFixtures``, ``K562Outputs``,
+       ``ProjectLimelightUploadPortTest``, ``PROVENANCE.txt`` and
+       ``WEIGHTS-SUMMARY.txt`` taken from the new files; the gate harnesses
+       ``pdv``, ``limelight``, ``results`` and ``tests`` where they quote
+       them.
+     - Recorded as a change of input. Every pinned count is checked against
+       the product's own readers **and** an independent count, as the
+       present ones were. **The tests that do not run on a runner because
+       these outputs are not there are listed by count and by name**, in
+       ``test_fixtures.rst``; nothing hides that. The old outputs are kept
+       aside until the part is accepted, then removed, so nothing can still
+       be reading them.
+   * - 5d
+     - **One fixture, its fetch, and what is graded against it.** One fetch
+       script (spectra by checksum from the pinned commit, CRLF defence,
+       the committed FASTA copied beside them); the Tier A and Tier B
+       applications and ``verify-e2e-gates.sh``; the four pair goldens
+       regenerated once, each with its review record; ``matrix-data.json``'s
+       advisories checked; the performance baseline and the
+       ``percolator-fixture`` threshold by the recorded procedure; the
+       matrix and determinism suites' refusal messages.
+     - ``fixture-fasta.sh describe`` and the acceptance check (with its
+       self-test) green on the directory the fetch script makes. Matrix,
+       determinism and the end-to-end tiers green on it. A golden is
+       regenerated because its input changed and for no other reason; each
+       difference from the old golden is explained in its review record.
+       Percolator's warning is printed wherever Percolator gives it,
+       whatever ``D-020``'s answer.
+   * - 5e
+     - **The words, and the proof that nothing is left.** ``testing.rst``,
+       the seven developer pages and ``docs/decoys.rst`` that quote the old
+       fixture; ``traceability-map.toml``'s commands; and a committed check
+       that no test, script, gate or job reads the whole proteome, a file
+       cut from it or an output of a search against it.
+     - The check is red on a planted reference and green on the tree, and
+       its one allowed exception is ``fixture-fasta.sh verify --source``.
+       ``scratch/fixture/UP000005640_9606.fasta`` is moved aside and the
+       affected modules' ``verify`` and the affected ``--only`` gates still
+       pass.
+
+**Order:** 5a, 5b, 5c, 5d, 5e. 5a first because every later part reads
+through its seams; 5d after 5c so that the goldens are regenerated once, over
+tests that already stand on the committed FASTA; 5e last because it proves
+the other four.
+
 Work units
 ==========
 
@@ -192,16 +323,31 @@ Work units
        ``KeyboardOnlyNavigationUiTest`` isolated from an installed Comet.
        Each with a test that proves the value and is red on the old code.
      - Brief obligation 12; ``status-p15-signed``
-     - dispatched 2026-11-12 at ``b76704a``
+     - **Accepted 2026-11-12** at ``8446134``: four of five items; the PSM
+       identifiers are carried to unit 3b. See *Unit 3* below.
+   * - 3b
+     - **PSM identifiers without the absolute run path** (unit 3's item B,
+       P16-9). No path in a PIN's SpecId, a Percolator PSMId or an export,
+       for runs made from now on; runs made before still open and work;
+       every consumer proved on real binaries; the determinism tolerance's
+       seven "run's own directory" fields removed; the matrix green against
+       the unchanged goldens.
+     - Brief obligation 12; ``R-CMT-03``, ``R-CMT-04``, ``R-PROC-04``
+     - not started
    * - 4
      - **Residue B, install and tools.** The probe's message for a non-zero
        exit carries the status; a failed install's reason survives a restart;
        ``CometCapabilityProbe`` leaves no workspace behind;
        ``SecretToolCredentialStore`` cancels ``secret-tool`` when interrupted;
        ``ZipArchiveReader`` reports an extra-field length past the directory
-       as its checked failure. Each with a test red on the old code.
+       as its checked failure. Each with a test red on the old code. **Added
+       at the resume:** the manifest's Windows row for Comet 2026.02.2
+       (``requiredHostLibraries`` from the binary's import table, with a
+       test). **Carried from unit 3:** the two GUI tests that still launch
+       through ``main``; the Provenance section's run selector; the
+       chooser's untested abandon cases.
      - Brief obligation 12; ``status-p15-signed``
-     - not started (paused after unit 2)
+     - dispatched 2026-11-12 at the commit that records unit 3
    * - 5
      - **One fixture.** Local testing and CI read the K562 pair with the
        committed trimmed FASTA; one fetch script (checksum, CRLF defence);
@@ -209,7 +355,8 @@ Work units
        baseline and every test that pinned a count from the old fixture
        moved; the matrix, determinism and end-to-end tiers green on it.
      - Gate 8; step 7; ``R-TEST-07``
-     - not started (paused after unit 2)
+     - **Split into 5a to 5e** (P16-8, *The split of unit 5*); none
+       started
    * - 6
      - ``D-016`` **option B and** ``D-017`` **option A.** The added PIT wall
        clock measured before adoption (stop above about fifteen minutes);
@@ -518,6 +665,132 @@ file clears it by 93 PSMs and the identified proteins alone miss it by 86 to
 111. The check passes from a background of 1,000 records (1.2 MB); 3,000 was
 chosen for margin. All of it is measured on Linux x86-64 only.
 
+Unit 3 -- Residue A: results and workflow (accepted 2026-11-12; item B carried to unit 3b)
+------------------------------------------------------------------------------------------
+
+One fresh agent, one round. Agent commits ``02fb2b9`` (A), ``5973c9e`` and
+``8446134`` (C), ``bac5531`` (E), ``585c86c``, ``01624db`` and ``f5bd984``
+(D), ``326e6e5`` (the workflow harness's control 3b). Tier 1's ``f369f6e``
+(``D-020`` decided) landed between them and touches only tier 1's files.
+
+**What was built** (the diff, read in full for production code and the
+harness; 16 files, +1741 -45).
+
+* **A, the merged PIN's rows** (``R-CMT-06``). ``PinMerger`` reads back the
+  file it wrote through ``PinReader``, counts its data rows and compares
+  them with the rows read; a difference is the new checked
+  ``PinMergeRowCountException`` stating both counts, no merged file is left,
+  and ``merge-pin`` fails in those words (``SearchSteps.MergePin``). The
+  record's total is the written file's count. A test seam,
+  ``PinMerger.Output``, lets a test put a lossy stream before the disk.
+* **C, the Results run chooser.** ``ResultsPane``: an arrow on the closed
+  chooser opens its list and changes nothing; arrows in the list open no
+  run; Enter, Space or a click on a run opens that one; Escape puts the
+  chooser back on the open run.
+* **D, the retained heap: a leak, traced and fixed.** Each discarded column
+  header stayed reachable from the pane's long-lived heading button through
+  the old ``LabelSkin``'s listener on the button's layout bounds (the
+  agent's heap-dump trace: 1,260 of 1,280 live headers on that one path
+  after 150 opens). ``ResultsPane.headingMoved`` disposes the skin of the
+  label a heading leaves.
+* **E, the test defect.** ``KeyboardOnlyNavigationUiTest`` starts the
+  application over its own empty data directory
+  (``ParameterEditorApp.launchOver``) and asserts nothing is listed as
+  installed and nothing was created there.
+* ``scripts/verify-workflow-gates.sh`` control 3b (a header written for
+  every input): the product's own read-back now refuses that file, so the
+  control is graded on the merge's words and on gates 1 and 3 both red. The
+  same defect is injected; the control count is unchanged.
+
+**Not built: item B (PSM identifiers).** The agent investigated it, measured
+a fix with both Comet releases (working directory ``<run>/outputs/comet``
+and ``-N<base>``; the PIN is byte-identical but for the directory), and
+stopped at its brief's hard stop: seven tolerated fields of
+``scripts/matrix/determinism-data.json`` ("the run's own directory") would
+stop being true. No golden and no pinned count moves. Its record is
+``scratch/p16/u3/item-B-investigation.txt``. Carried to **unit 3b**
+(decision P16-9).
+
+**What I ran and saw**, at ``8446134``.
+
+* ``bash scripts/dev-verify.sh --since 91efc6d --verify`` (the whole
+  reactor, which is what four changed modules close over): BUILD SUCCESS in
+  63 min; tests run / skipped per module -- domain 1238 / 0, provenance 709
+  / 2, process 286 / 0, results 1312 / 0, tools 1140 / 1, install 1071 / 2,
+  params-comet 2123 / 0, params-percolator 68 / 0, workflow 1039 / 0, ui 843
+  / 0, app 584 / 91 (the opt-in suites), archtests 40 / 0; 0 failures, 0
+  errors. The five new or changed classes ran: ``PinMergerTest`` 17,
+  ``RealMergeRowLossTest`` 1, ``KeyboardOnlyNavigationUiTest`` 4,
+  ``ResultsRunChooserUiTest`` 7, ``ResultsHeapOverOpenedRunsUiTest`` 1.
+* **Injection A**, into ``PinMerger`` (production): the comparison
+  ``written != read`` made ``written > read``, so a lost row is tolerated
+  (anchor gone, ``sha256sum -c`` FAILED). ``PinMergerTest``: 17 run, **2
+  red** (``theOnlyRowLost``, ``aRowLostOnTheWayToTheDisk``; the doubled-row
+  case stays green, as it should). ``RealMergeRowLossTest``: 1 run, **1
+  red**, "expected: <... was not written completely: 6472 data rows were
+  read ...> but was: <a merge of 6472 input rows cannot hold 6471>" -- the
+  record's own constructor still refuses the sum, a second guard the agent
+  did not mention. Restored, ``sha256sum -c`` OK.
+* **Injection C**, into ``ResultsPane``: the value listener's
+  ``if (!run.isShowing())`` made unconditional, so every arrow in the open
+  list opens a run. ``ResultsRunChooserUiTest``: 7 run, **6 red**, e.g.
+  "two runs up from run-a ==> expected: <run-c> but was: <run-d>".
+  Restored, OK.
+* **Injection D**, into ``ResultsPane``: ``discarded.setSkin(null)``
+  deleted. ``ResultsHeapOverOpenedRunsUiTest``: 1 run, **1 red**, "live
+  column headers 173 then 776; live heap 163499624 then 175174000 bytes,
+  over 120 runs opened". Restored, OK.
+* **E** is a change to a test, so there is no production injection. I read
+  the diff and the agent's four logs (``_build/p16u3/e-*.log``): with a
+  Comet installed in a redirected copy of the folder, the old test passed 4
+  of 4 twice; the new assertion on the old launch was red ("expected: <[]>
+  but was: <[CometGUI-managed: installed]>"); the new test passed 4 of 4.
+  **So the failure Phase 15 recorded does not occur**, and what was fixed is
+  the isolation. I did not repeat the redirected install.
+* ``bash scripts/verify-all-gates.sh --only
+  workflow,results,shell,docs,traceability,flakiness,quality`` (four at a
+  time): **7 passed, 0 failed, 1023 s** -- workflow 110, results 100, shell
+  30, quality 42, flakiness 44, traceability 8, docs 1, each at its floor;
+  ``_build/m2repo``, ``tools``, ``scratch`` and ``.venv`` unchanged. These
+  are the three harnesses that name a file the unit changed, and the four
+  that read tests, scripts and pages in general.
+* The version matrix over the present fixture
+  (``COMETGUI_MATRIX_FIXTURE=scratch/fixture bash scripts/matrix/run-matrix.sh
+  --offline``): RUN-PASSED 11, RUN-FAILED 0, UNAVAILABLE 14, UNVERIFIED 36,
+  GREEN against the committed goldens -- the merge's read-back changed no
+  result.
+* Not repeated: the agent's PIT run over ``org.cometgui.tools.comet``
+  (38 of 38 killed, its log ``_build/p16u3/pit.log``); unit 6's ``--only
+  tests`` grades that package again. ``SearchSteps`` and ``ResultsPane`` are
+  outside PIT's targets.
+
+**Cost.** About 45 s more in the reactor ``verify`` (the agent's figure; in
+my run the four new classes took 6.9, 13.9, 15.8 and 13.1 s). No gate's
+count or floor changed.
+
+**Carried, and where.**
+
+* Item B: unit 3b.
+* ``SectionNavigationUiTest`` and ``AccessibleNameEnumerationUiTest`` still
+  launch through ``main`` and read the machine's application-data folder;
+  the Provenance section's own run selector was not examined; "a click
+  elsewhere or focus leaving the chooser abandons the walk" is claimed by
+  ``ResultsPane``'s comment and tested by nothing. All three: unit 4, items
+  G and H.
+* The ``gui-heap-peak`` threshold's rationale in
+  ``scripts/perf/performance-data.json`` still cites the creep. It is pinned
+  data; it is retaken with the baseline in unit 5d.
+* ``scripts/dev-verify.sh`` told this unit that its change to
+  ``verify-workflow-gates.sh`` maps to ``verify-shell-gates.sh`` -- the
+  wrong-gate mapping tier 1 listed. Unit 16 touches the script; fixed there
+  with a test of the mapping.
+* For tier 1: ``STATUS.rst``'s residue line "``KeyboardOnlyNavigationUiTest``
+  fails on a machine with Comet in the application-data folder" was a
+  prediction and is not what happens (the test passed there; it was
+  unisolated). The Limelight XML's ``conversion_program arguments``
+  attribute carries the run's absolute paths whatever is done about PSM
+  identifiers; nothing in the residue list covers it.
+
 Runner runs relied on
 =====================
 
@@ -565,9 +838,8 @@ Deferred
 
 Anything explicitly not done in this phase, with the reason and where it goes.
 
-**Units 3 to 16: not started.** The owner paused the phase after unit 2
-(2026-11-12). Nothing of theirs exists in the tree. They wait for the owner
-to resume; the pause handoff says where to pick up.
+Nothing is deferred out of the phase so far. (At the pause, units 3 to 16
+had not started; the owner resumed the phase the same day.)
 
 Blockers escalated
 ==================
