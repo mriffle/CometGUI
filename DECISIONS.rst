@@ -2,8 +2,8 @@
 Decisions
 =========
 
-:Updated: 2026-11-07 (D-016 and D-017 raised by tier 1 at the Phase 15
-   sign-off; both OPEN)
+:Updated: 2026-11-12 (D-016 decided, option B; D-017 decided, option A;
+   D-006's CI fixture kept open by the owner)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -1088,9 +1088,10 @@ module-wide figure may still be printed, but it grades nothing.
 D-016 -- Whether the workflow module's code is mutation-tested
 ==============================================================
 
-:Status: **OPEN**
+:Status: **DECIDED 2026-11-12** -- option B, to be implemented in Phase 16
 :Raised: 2026-11-07, by Phase 15 (``handoffs/PHASE-15-handoff.rst``, escalation 1)
-:Blocks: nothing in Phase 16's gate; ``R-TEST-02`` is met only in part until decided
+:Blocks: nothing in Phase 16's gate; ``R-TEST-02`` is met only in part until
+   option B is implemented
 :Owner: Project owner
 
 **Question.** ``R-TEST-02`` names command builders and stage invalidation as
@@ -1111,12 +1112,22 @@ C. Leave it out, and record ``R-TEST-02`` as met only in part.
 **Recommendation.** B. It tests the code the requirement names, and the cost
 is measured before anything is committed to.
 
+**DECISION (2026-11-12).** The owner chose B: *"option b is fine."* The
+command-builder and stage-invalidation classes of ``org.cometgui.workflow.*``
+become PIT targets, each of their packages graded on its own at 80% or more
+as in ``D-015``, with ``TIMED_OUT`` counted as in ``D-014``. The rest of the
+workflow module stays out of the target list. The added wall clock is
+measured by a phase agent and recorded before the targets are adopted; if it
+turns out to be large, that is reported to the owner rather than absorbed.
+Nothing is implemented yet -- the project was paused when this was answered
+-- so ``R-TEST-02`` stays met only in part until Phase 16 lands it.
+
 ----
 
 D-017 -- Whether the workflow and results modules count as core domain logic
 ============================================================================
 
-:Status: **OPEN**
+:Status: **DECIDED 2026-11-12** -- option A, to be implemented in Phase 16
 :Raised: 2026-11-07, by Phase 15 (``handoffs/PHASE-15-handoff.rst``, escalation 2)
 :Blocks: ``AC-TST-02`` (coverage gates pass) being recorded as fully met
 :Owner: Project owner
@@ -1132,3 +1143,10 @@ thresholds.
 tier 1 at the Phase 15 sign-off: workflow 97.4% lines and 94.3% branches,
 results 98.1% and 95.4% -- so it costs nothing today and stops either
 slipping later.
+
+**DECISION (2026-11-12).** The owner chose A: *"yes."* ``cometgui-workflow``
+and ``cometgui-results`` are core domain logic and are held to 90% lines and
+85% branches. Nothing is implemented yet -- the project was paused when this
+was answered. Phase 16 raises the two module thresholds in the build and
+shows the raised gate going red on a deliberate defect; until then
+``AC-TST-02`` is not recorded as fully met.

@@ -3,9 +3,9 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-11-07
-:Updated by: Main orchestrator, session 11 (**Phase 15 signed off and
-   pushed; paused by the owner**)
+:Updated: 2026-11-12
+:Updated by: Main orchestrator, session 12 (**``D-016`` and ``D-017``
+   decided; still paused by the owner**)
 :Current phase: **Paused by the owner after Phase 15** (2026-11-07). Owner,
    2026-11-05: *"Pause after Phase 15 is signed off and pushed."* Phase 16
    (documentation and release qualification) is NOT STARTED and has no
@@ -17,11 +17,14 @@ Project Status
    **Build economy is a standing owner rule**: the full ``scripts/build.sh``
    plus ``scripts/verify-all-gates.sh`` (about 4 h at Phase 15 -- build 144
    min, the 24 controls 95 min four at a time) runs once per phase, at the
-   exit gate, by tier 1. **Open for the owner:** ``D-006`` (the CI fixture),
-   ``D-016`` (mutation-test the workflow module?) and ``D-017`` (workflow and
-   results as core domain logic?); ``D-011`` option D is the owner's own
-   action. The nightly stays red until ``D-006`` gives it a fixture
-   (:ref:`status-p15-signed`).
+   exit gate, by tier 1. **Decided 2026-11-12, not yet implemented:**
+   ``D-016`` option B (mutation-test the workflow module's command builders
+   and stage invalidation only, cost measured first) and ``D-017`` option A
+   (workflow and results are core domain logic, held to 90/85); both are
+   Phase 16 work. **Open for the owner:** ``D-006`` (the CI fixture), kept
+   open on 2026-11-12 (*"I don't know yet, keep this open"*); ``D-011``
+   option D is the owner's own action. The nightly stays red until ``D-006``
+   gives it a fixture (:ref:`status-p15-signed`).
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -3347,7 +3350,9 @@ on the old scan. Floor 40 to 44. Rerun: ``flakiness`` 44 in 42 s, ``docs``,
 of each mutated class) and P15-4 (goldens hold derived results from the local
 fixture, keyed by its digest). Raised for the owner: ``D-016`` (mutation-test
 the workflow module?) and ``D-017`` (are workflow and results core domain
-logic?). ``D-006``'s CI fixture is still open.
+logic?). ``D-006``'s CI fixture is still open. *Since, 2026-11-12:* the owner
+decided ``D-016`` (option B) and ``D-017`` (option A) and kept ``D-006``
+open; both decisions are to be implemented in Phase 16.
 
 **Nightly.** The Phase 15 stubs are replaced. The real-data half of four jobs
 (large dataset, determinism, performance, Windows RAW) still exits 70, now
@@ -4816,6 +4821,14 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-11-12
+     - 16
+     - Owner decided ``D-016`` (option B: mutation-test the workflow
+       module's command builders and stage invalidation only, cost measured
+       first) and ``D-017`` (option A: workflow and results are core domain
+       logic, 90/85), and kept ``D-006``'s CI fixture open. Neither decision
+       is implemented; both go into the Phase 16 brief. **Still paused**: no
+       brief written, nothing dispatched, no build run.
    * - 2026-10-30
      - 14+
      - **E12 repair signed off** at ``35f5b2e`` (11/11 affected gates, four
