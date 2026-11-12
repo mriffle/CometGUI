@@ -5,8 +5,9 @@ PHASE-16: Documentation and Release Qualification
 :Phase: 16
 :Status: NOT STARTED
 :Depends on: 15
-:Blocked by decisions: none open. D-009 must be settled before release.
-   D-001, D-004, D-006, D-008 and D-018 are DECIDED
+:Blocked by decisions: D-019 (which RAW file is the fixture) blocks the RAW
+   fixture work only. D-009 must be settled before release. D-001, D-004,
+   D-006, D-008 and D-018 are DECIDED
 :Delivers: R-DOC-01, R-DOC-02, R-DOC-06
 :Contributes to: R-DOC-03, R-DOC-04, R-DOC-05, R-SEC-01
 :Proves: AC-DOC-01, AC-DOC-02, AC-REL-02, AC-REL-03, AC-UX-01..06, AC-TST-07
@@ -113,12 +114,49 @@ repository only where no licence is violated, and the terms these files are
 redistributed under have never been established (``D-006``, amendment to
 part 1). They stay fetched by checksum.
 
-**Thermo RAW.** No RAW fixture comes out of the steps above. By the owner's
-plan (``D-006``), a search for a very small RAW file runs before this phase
-starts. If one is found, this document is amended to add it to CI; if not,
-the Windows RAW job is taken out of the nightly and ``AC-TST-11`` is
-recorded as not met and outstanding. Until tier 1 records which, the Windows
-RAW smoke test stays the stub it is.
+.. _phase16-raw-fixture:
+
+The Thermo RAW fixture
+----------------------
+
+Added 2026-11-12, by the owner's plan in ``D-006``: a search made before
+this phase found Thermo RAW files under 10 MB that give real
+identifications. Which file is used is ``D-019`` and is the owner's; the
+candidates, their checksums and what was measured are recorded there.
+
+What the search measured is **not** what this phase must show. Comet reads
+RAW only on Windows, so each candidate was converted to mzML on Linux and
+that was searched. Nothing yet shows that Comet on Windows opens any of
+these files. The steps, in order:
+
+#. **Try it on a Windows runner before building anything.** Comet for
+   Windows, with its Thermo companions, reads the chosen RAW file directly
+   and the search is carried through Percolator. The counts are compared
+   with those in ``D-019``. Known risks to look at: empty MS1 scans, MS2
+   scans that carry no precursor charge, and an old RAW format version in
+   one candidate set.
+#. **If it reads**, the Windows RAW smoke test replaces its stub: the file
+   is fetched by checksum on the runner, searched through the product
+   against the FASTA of its organism, and held to a reviewed golden taken
+   from a runner (``R-TEST-07``). These are low-resolution ion-trap spectra,
+   so the search needs its own parameter set, recorded with the fixture; the
+   seven values the search used are in ``D-019``.
+#. **If it does not read**, the next candidate in ``D-019`` is tried. If
+   none reads, the RAW job is taken out of the nightly and ``AC-TST-11`` is
+   recorded as not met and outstanding, as the owner directed. It is never
+   made to exit 0 having tested nothing.
+
+**The RAW file is fetched, not committed.** Its archive states its licence
+as *EBI terms of use*, which is not a grant this project can read as
+permission to redistribute; the owner's condition for keeping a test file in
+the repository is therefore not met (``D-006``, amendment to part 1). The
+FASTA for its organism is UniProt's (CC BY 4.0) and is committed with
+attribution, whole if it is already small.
+
+**No RAW converter enters the project.** The search used ThermoRawFileParser
+in a scratch directory to judge candidates. It ships Thermo's RawFileReader
+licence, which forbids combining the reader with GPL software, and CometGUI
+is GPL-3.0. The product and its tests reach RAW only through Comet.
 
 Out of scope
 ------------
@@ -159,6 +197,11 @@ running the check. An item that cannot be verified has not passed.
    FASTA's acceptance check passes and has been seen to fail on an
    over-filtered FASTA; no job fetches the whole proteome
    (:ref:`phase16-ci-fixture`).
+9. The Windows RAW smoke test searches the RAW fixture on a Windows runner,
+   through the product, and passes against a reviewed golden
+   (:ref:`phase16-raw-fixture`). If no candidate can be read and the job is
+   shelved as the owner directed, this item is **not met** and is named as
+   residue; it is not reworded to pass.
 
 Risks and notes
 ---------------

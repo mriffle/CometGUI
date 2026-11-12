@@ -5,7 +5,8 @@ Decisions
 :Updated: 2026-11-12 (D-016 decided, option B; D-017 decided, option A;
    D-006's CI fixture decided -- the K562 pair, as it is, with a trimmed
    FASTA; D-006 part 1 amended -- small test files may be kept in the
-   repository where the licence permits; D-018 raised and decided, option A)
+   repository where the licence permits; D-018 raised and decided, option A;
+   RAW files found, D-019 raised, OPEN)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -703,6 +704,11 @@ that Comet on Windows reads the file itself is shown later, on a runner.
   outstanding item. Shelving means the job is taken out of the nightly and
   ``AC-TST-11`` is recorded as not met, with the reason. It never means a
   step that exits 0 having tested nothing.
+* **Outcome (2026-11-12): suitable files were found.** Nine RAW files under
+  10 MB, in two PRIDE projects, each give hundreds of identifications at 1%
+  FDR. Phase 16 is amended (``phases/PHASE-16-release.rst``, *The Thermo RAW
+  fixture*; exit gate item 9). Which file is used is ``D-019``. None is
+  committed: both projects state their licence as *EBI terms of use*.
 * **The filterer is not adopted.** It remains available if the owner later
   wants a fixture cut from a full-size run. If so: a selection of confident
   identifications only would leave Percolator too few decoys and poor matches
@@ -1292,3 +1298,104 @@ small test mzMLs, FASTA, and RAWs in our repository for CI purposes."* The
 trimmed FASTA is committed with UniProt's attribution (CC BY 4.0) and the
 UniProt release it was made from, and is recorded in the licence audit. It
 does not exist yet; Phase 16 makes it.
+
+----
+
+D-019 -- Which Thermo RAW file is the CI fixture
+================================================
+
+:Status: **OPEN**
+:Raised: 2026-11-12, by tier 1, from the RAW search the owner asked for
+   (``D-006``)
+:Blocks: Phase 16's RAW fixture work and exit gate item 9; nothing else
+:Owner: Project owner
+
+**Question.** The search found Thermo RAW files that meet the owner's
+criteria -- under 10 MB, from PRIDE, real identifications from Comet and
+Percolator against a small FASTA. Whose data becomes the fixture is not an
+agent's choice. Which file, and one or two?
+
+**What was measured, and how.** Comet cannot read RAW on Linux, so each file
+was converted to mzML with ThermoRawFileParser in a scratch directory and
+that was searched: Comet 2026.02.2, then Percolator 3.07.1 (3.09 gave the
+same counts). All are low-resolution ion-trap runs, so seven Comet values
+were changed from the project's feasibility parameters, the same seven for
+every file and the first setting tried: ``peptide_mass_tolerance_upper =
+3.0``, ``peptide_mass_tolerance_lower = -3.0``, ``peptide_mass_units = 0``,
+``isotope_error = 0``, ``fragment_bin_tol = 1.0005``, ``fragment_bin_offset
+= 0.4``, ``theoretical_fragment_ions = 1``. The figures are the search
+agent's, read from the files Percolator wrote; tier 1 re-derived the first
+row itself (size, SHA-256, the PRIDE ``license`` field, PIN rows, both
+counts, the FASTA's record count) and it agrees. The agent's full report is
+``scratch/raw-scout/report.rst``, which is not under version control.
+
+``PXD002914``, *Low temperature adaptation in marine Synechococcus*: LTQ
+Velos, gel fractions of a whole-cell lysate. FASTA: UniProt
+``UP000001422_84588`` (strain WH8102), 2,513 records, 1.08 MB. Files at
+``https://ftp.pride.ebi.ac.uk/pride/data/archive/2015/10/PXD002914/``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 12 10 18 36
+
+   * - File
+     - Bytes
+     - MS2
+     - PSMs / peptides at q < 0.01
+     - SHA-256
+   * - ``ph050213_18.raw``
+     - 9,961,477
+     - 2,060
+     - 906 / 787
+     - ``b5ebbb2e24dcbdbeeb44ddff690c102f7901a43c5d004edc501dadf9c9e01c6c``
+   * - ``ph280213_36.raw``
+     - 8,796,695
+     - 2,562
+     - 509 / 467
+     - ``c283a0ca7d5f2f6631abf5c2cc08be19f725b7bd6af7707fd00c70c68f25572c``
+   * - ``ph280213_35.raw``
+     - 9,470,344
+     - 2,830
+     - 475 / 360
+     - ``75b9eb0db660bda39e38a82a31d2a1bef35aacdc27f2f41f78c67c360850d60a``
+   * - ``ph071212_DV_07.raw``
+     - 9,419,062
+     - 2,609
+     - 420 / 348
+     - ``858672c364532f0b76175fc56209a56290679da7202162fdf1173e0040201270``
+
+``PXD000211``, an Arabidopsis membrane-fraction study on an LCQ Deca XP
+(2008): five files of 7.8 to 9.9 MB giving 239 to 571 PSMs. Its FASTA is the
+Arabidopsis proteome, 27,368 records and 14.4 MB, and its RAW files are an
+old format version.
+
+Two CC0 files on MassIVE were also searched. Percolator trains on them but
+reports no peptide at 1%, and MassIVE refused downloads with HTTP 429 after
+five files, so they are not candidates.
+
+**What is not known.** That Comet on Windows opens any of these files. The
+conversion shows the spectra can be identified; it does not show the Windows
+path. ``ph050213_18.raw`` has 1,032 empty MS1 scans, every ``PXD002914``
+file has a few empty MS2 scans, and no MS2 scan carries a precursor charge.
+``PXD002914`` holds two strains and does not say which file is which; all
+four were searched against WH8102 only.
+
+**Licence.** Both projects state *EBI terms of use* in PRIDE's per-project
+``license`` field. That is not CC0 and is not read here as permission to
+redistribute, so whichever file is chosen is fetched by checksum from PRIDE
+and not committed. PRIDE publishes an MD5 for each file, and all nine match.
+
+**Options.**
+
+A. ``ph050213_18.raw`` alone. The strongest single file, with a FASTA that
+   is small without any trimming.
+B. ``ph050213_18.raw`` and ``ph280213_35.raw`` as a pair (1,466 PSMs and 982
+   peptides in one Percolator run). Twice the download for a second file the
+   smoke test does not need: runs of several files are already covered by
+   the mzML pair.
+C. A ``PXD000211`` file. Works, but brings a 14 MB FASTA to trim and the
+   oldest RAW format of the set.
+D. None. Shelve the RAW job as in ``D-006``.
+
+**Recommendation.** A, with ``ph280213_36.raw`` as the fallback if the
+Windows runner cannot read the first because of its empty MS1 scans.
