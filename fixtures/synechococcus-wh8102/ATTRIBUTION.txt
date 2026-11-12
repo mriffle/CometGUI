@@ -1,0 +1,69 @@
+UP000001422_84588.fasta -- attribution and provenance
+======================================================
+
+What this file is
+-----------------
+The UniProt reference proteome of Synechococcus sp. strain WH8102, which
+UniProt now names Parasynechococcus marenigrum (strain WH8102): proteome
+UP000001422, NCBI taxonomy identifier 84588, organism mnemonic PARMW.
+It is the whole file as UniProt serves it, decompressed and otherwise
+unaltered -- no record was added, removed, reordered or edited.
+
+Source
+------
+Provider:        The UniProt Consortium (EMBL-EBI, SIB Swiss Institute of
+                 Bioinformatics, Protein Information Resource)
+UniProt release: 2026_04 (04-Nov-2026), as stated by
+                 https://ftp.uniprot.org/pub/databases/uniprot/current_release/relnotes.txt
+                 and by the reference_proteomes README on the day of download
+Download URL:    https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Bacteria/UP000001422/UP000001422_84588.fasta.gz
+Downloaded:      2026-11-12
+Served file:     UP000001422_84588.fasta.gz, 512,556 bytes,
+                 SHA-256 2742498ee344ca5b56bde95d2514bef0fbf232de754a833ea20d5a4fa080fc98
+
+The download URL is under current_release/, whose content is replaced at
+every UniProt release. After release 2026_04 it will serve different bytes,
+and UniProt keeps no per-proteome file for a past release. That is why the
+file is committed here rather than fetched.
+
+The committed file
+------------------
+Name:     UP000001422_84588.fasta
+Bytes:    1,080,427
+Records:  2,513 (419 UniProtKB/Swiss-Prot, 2,094 UniProtKB/TrEMBL)
+SHA-256:  b4c8aaf48778566e87b0517af6f861bf0b93b33a3ebd95fd071bab9a6dd1750d
+MD5:      c6288a4c3ba56a6cdf4de58e47b065aa
+Line endings: LF only. .gitattributes marks this directory "-text" so that
+no checkout, on any platform, converts them; the SHA-256 above holds on
+Windows as on Linux.
+
+Licence
+-------
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+UniProt's copyright statement, reproduced as its terms require, from
+https://ftp.uniprot.org/pub/databases/uniprot/previous_releases/LICENSE
+(read 2026-11-12; https://www.uniprot.org/help/license says the same):
+
+    We have chosen to apply the Creative Commons Attribution 4.0 International
+    (CC BY 4.0) License (https://creativecommons.org/licenses/by/4.0/) to all
+    copyrightable parts of our databases.
+
+    All databases and documents in the UniProt FTP directory may be copied and
+    redistributed freely, without advance permission, provided that this copyright
+    statement is reproduced with each copy.
+
+Changes made: none to the sequence records. The file was decompressed with
+gzip and renamed from .fasta.gz to .fasta.
+
+How to cite UniProt
+-------------------
+The UniProt Consortium. UniProt: the Universal Protein Knowledgebase in 2025.
+Nucleic Acids Research 53 (D1), D609-D617 (2025). doi:10.1093/nar/gkae1010
+
+Why it is here
+--------------
+It is the protein database for CometGUI's Thermo RAW test file,
+ph050213_18.raw of PRIDE project PXD002914 (DECISIONS.rst, D-019). The RAW
+file itself is fetched by checksum and is not in this repository.

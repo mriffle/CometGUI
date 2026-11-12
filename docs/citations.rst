@@ -14,8 +14,9 @@ Citations and attribution
    third-party component or format records it here. The PDV, CasanovoGUI and
    mzTab entries were added by Phase 11 (PDV Integration) on 2026-10-11, and
    the Limelight entries by Phase 12 (Limelight Conversion and Upload) on
-   2026-10-12. Comet, Percolator and the bundled Java runtime are not yet
-   listed.
+   2026-10-12, and the UniProt entry by Phase 16 (Documentation and Release
+   Qualification) on 2026-11-12. Comet, Percolator and the bundled Java
+   runtime are not yet listed.
 
 How to cite CometGUI and, more importantly, the tools behind it when results
 produced with this application are published -- and what CometGUI takes from
@@ -156,3 +157,35 @@ Standards Initiative's:
 
 Its controlled-vocabulary terms (``MS:...``, ``UO:...``) are from the PSI-MS
 and Unit ontologies.
+
+UniProt
+=======
+
+One protein sequence database from UniProt is kept in the CometGUI source
+repository, as test data. It is not part of the installed application, and
+CometGUI never chooses a database for you: you always supply your own FASTA.
+
+   The UniProt Consortium. UniProt: the Universal Protein Knowledgebase in
+   2025. *Nucleic Acids Research* **53** (D1), D609--D617 (2025).
+   ``doi:10.1093/nar/gkae1010``
+
+* **What:** the reference proteome of *Synechococcus* sp. strain WH8102, which
+  UniProt now names *Parasynechococcus marenigrum* (strain WH8102) -- proteome
+  ``UP000001422``, taxonomy identifier 84588 -- whole and unaltered: 2,513
+  records, 1,080,427 bytes, SHA-256
+  ``b4c8aaf48778566e87b0517af6f861bf0b93b33a3ebd95fd071bab9a6dd1750d``.
+* **Where:** ``fixtures/synechococcus-wh8102/UP000001422_84588.fasta``, with
+  ``ATTRIBUTION.txt`` beside it, which reproduces UniProt's copyright statement
+  as its terms require.
+* **From:** UniProt release 2026_04 (04-Nov-2026), downloaded on 2026-11-12
+  from
+  ``https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Bacteria/UP000001422/UP000001422_84588.fasta.gz``.
+  That address serves a different file after each UniProt release, which is
+  why the file is committed rather than downloaded when needed.
+* **Licence:** `Creative Commons Attribution 4.0 International (CC BY 4.0)
+  <https://creativecommons.org/licenses/by/4.0/>`__, which UniProt applies to
+  all copyrightable parts of its databases (https://www.uniprot.org/help/license).
+* **What it is for:** it is the database for the test that searches a Thermo
+  RAW file on Windows. That file, ``ph050213_18.raw`` of PRIDE project
+  ``PXD002914``, is downloaded for the test and is not in the repository
+  (``DECISIONS.rst``, ``D-019``).

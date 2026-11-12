@@ -54,3 +54,12 @@ cometgui-params-comet/src/main/resources/org/cometgui/params/comet/parser/defaul
 # the rule above: set here, not beside the file, because that directory is a
 # test resource root.
 cometgui-app/src/test/resources/org/cometgui/app/gui/*.params -text
+
+# Committed fixture data (Phase 16, decision P16-7): a FASTA with its
+# attribution file beside it, under fixtures/<name>/.  Each FASTA is pinned by
+# SHA-256 -- in its ATTRIBUTION.txt and in every script that reads it -- and is
+# handed to Comet on a Windows runner, where core.autocrlf=true would otherwise
+# rewrite all of its line endings on checkout and the digest would no longer be
+# the one recorded.  -text stores and checks out these files byte for byte on
+# every platform.
+fixtures/** -text
