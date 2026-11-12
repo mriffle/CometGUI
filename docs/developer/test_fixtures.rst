@@ -669,9 +669,9 @@ It prints one block for each pair in each configuration and ends::
 
 The report is ``_build/fixture-acceptance/fixture-acceptance.txt`` and
 ``.json``, beside every run's directory. ``--out DIR`` puts it elsewhere;
-``--require-committed`` also refuses a FASTA that is not the committed file's
-bytes; ``--grade REPORT --fixture DIR`` grades an existing report again
-without searching. ``--offline`` is for a machine whose ``_build/m2repo``
+``--require-committed`` also refuses a FASTA that is not the committed
+fixture's (below); ``--grade REPORT --fixture DIR`` grades an existing report
+again without searching. ``--offline`` is for a machine whose ``_build/m2repo``
 already holds the build's dependencies; the tools are downloaded from GitHub
 either way.
 
@@ -681,6 +681,18 @@ the FASTA is the committed one. That is deliberate: the check exists to judge
 a file *before* it is committed, and its own controls are candidates. A job
 that must run on the committed file and no other passes the flag.
 
+"The committed fixture FASTA" means one thing: a file whose SHA-256 is the
+digest the committed accession list pins (``subset-sha256`` in
+``accessions.tsv``, read by ``fixture_fasta.py``'s own reader). It never means
+"the same bytes as the file in this checkout", because a checkout that rewrote
+the file, or a commit that changed the FASTA without its list, would then
+vouch for itself. With the flag the check is refused, exit 3, before anything
+is searched, when the FASTA given differs from the pin, and also when the
+committed file in the checkout differs from it; each refusal names the file
+and both digests. Without the flag the report says ``NOT the committed fixture
+FASTA`` for any other bytes and adds a ``WARNING`` line when the checkout's
+own file is not its pin.
+
 **How long it takes.** About 130 s on this host for the committed file (134
 and 129 s in two runs: eight runs of the workflow and four conversions; Comet
 2.6 s a file). The runs are serial on any machine
@@ -689,18 +701,23 @@ cores or fewer -- and Comet uses the matrix's four threads.
 
 Exit status: 0 green; 1 red; 2 misuse; 3 refused -- no fixture named, the
 directory or a spectrum file missing, a spectrum file that is not the K562
-file of that name, no FASTA or more than one -- having searched nothing; 7 a
-self-test control did not behave as required.
+file of that name, no FASTA or more than one, or with ``--require-committed``
+a FASTA or a checkout that is not the pinned bytes -- having searched nothing;
+7 a self-test control did not behave as required.
 
 What its red looks like
 -----------------------
 
 ``bash scripts/fixtures/check-fixture.sh --self-test _build/fixture --offline``
-proves the check can fail. It first runs 32 graded cases over constructed
-measurements -- each floor one below, a failed attempt, a missing run, a count
-the product reads differently -- and the refusals, none of which searches
-anything (``--self-test-grading`` runs these alone, in a second). Then it cuts
-two FASTA files from the one in the directory with the committed accession
+proves the check can fail. It first runs 44 cases that search nothing
+(``--self-test-grading`` runs these alone, in a second): 32 graded over
+constructed measurements -- each floor one below, a failed attempt, a missing
+run, a count the product reads differently; 4 refusals of a fixture; and 8 of
+the committed FASTA's identity, over copies of the committed file and list
+under ``_build/`` -- a candidate that differs from the pin, a checkout whose
+file differs from its pin, that file or the list missing, each refused under
+``--require-committed`` and never called the committed fixture FASTA. Then it
+cuts two FASTA files from the one in the directory with the committed accession
 list, puts each in a directory of its own with the spectra, and runs the whole
 check on each:
 

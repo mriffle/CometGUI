@@ -95,8 +95,14 @@ Usage
 
 ``DIR`` holds the two K562 mzML files and exactly one ``*.fasta``. The report
 is ``_build/fixture-acceptance/`` unless ``--out`` says otherwise.
-``--require-committed`` also requires the FASTA to be the committed fixture's
-bytes; without it any candidate is judged and the report says which it was.
+``--require-committed`` also requires the FASTA to be the committed fixture's:
+its SHA-256 must equal the digest the committed accession list pins
+(``subset-sha256`` in ``fixtures/human-k562-subset/accessions.tsv``, read by
+``fixture_fasta.py``'s own reader), and the committed file in this checkout
+must equal that pin too. Either mismatch is REFUSED, naming the file and both
+digests, before anything is searched. Without the flag any candidate is judged
+and the report says which it was; it calls a FASTA "the committed fixture
+FASTA" only when it equals the pin.
 
 ``--self-test DIR`` proves the check can go red, on two FASTA files it cuts
 from the one in ``DIR`` with the committed accession list, each in a directory
@@ -117,8 +123,9 @@ Exit status
 0   every criterion met for every pair in both configurations
 1   RED: a criterion failed, or a run has no verdict
 2   misuse
-3   REFUSED: no fixture was named, or a file is missing; nothing was searched
-    and this is not a pass
+3   REFUSED: no fixture was named, a file is missing, or ``--require-committed``
+    was given and the FASTA or the checkout is not the pinned bytes; nothing
+    was searched and this is not a pass
 7   a self-test control did not behave as required
 ==  ===========================================================================
 
@@ -216,6 +223,75 @@ def load_floors(path: Path = FLOORS_FILE) -> dict:
 # The fixture
 # ===========================================================================
 
+def committed_state(fasta_sha: str, committed: tuple = None) -> dict:
+    """Whether a FASTA with this SHA-256 is the committed fixture FASTA, judged against the PIN.
+
+    The pin is ``subset-sha256`` of the committed accession list, read with ``fixture_fasta``'s
+    own reader: the one place the project records the digest. It is never the digest of whatever
+    bytes this checkout holds -- a checkout that rewrote the file, or a commit that changed the
+    FASTA without its list, must not be able to vouch for itself.
+
+    ``committed`` is the self-test's seam and nothing else's: a ``(fasta, accession list)`` pair
+    standing for the committed files, so that a COPY can be injured. No option, environment
+    variable or caller outside ``self_test_committed`` sets it; left out, it is the real pair.
+    """
+    fasta, accessions = committed if committed is not None else (
+        fixture_fasta.FIXTURE_FASTA, fixture_fasta.FIXTURE_ACCESSIONS)
+    state = {"committedFasta": Path(fasta), "accessions": Path(accessions), "pin": None, "pinProblem": None,
+             "onDisk": None, "isCommitted": False, "checkoutIntact": False}
+    try:
+        _, meta = fixture_fasta.read_list(accessions)
+        state["pin"] = meta["subset-sha256"]
+    except fixture_fasta.Refused as refused:
+        state["pinProblem"] = str(refused)
+        return state
+    if Path(fasta).is_file():
+        state["onDisk"] = matrix.sha256_of(fasta)
+    state["isCommitted"] = fasta_sha == state["pin"]
+    state["checkoutIntact"] = state["onDisk"] == state["pin"]
+    return state
+
+
+def shown(path: Path) -> str:
+    path = Path(path)
+    return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+
+
+def refuse_unless_committed(candidate: Path, fasta_sha: str, state: dict) -> None:
+    """``--require-committed``: Refused, by name, unless the checkout's file and the candidate equal the pin."""
+    if state["pin"] is None:
+        raise Refused(f"--require-committed was given and the pinned digest cannot be read: {state['pinProblem']}")
+    if state["onDisk"] is None:
+        raise Refused(f"--require-committed was given and the committed fixture FASTA "
+                      f"{shown(state['committedFasta'])} is not in this checkout; its accession list "
+                      f"{shown(state['accessions'])} pins SHA-256 {state['pin']}")
+    if not state["checkoutIntact"]:
+        raise Refused(f"the committed fixture FASTA in this checkout, {shown(state['committedFasta'])}, does not "
+                      f"match its pin: its SHA-256 is {state['onDisk']}, and {shown(state['accessions'])} pins "
+                      f"{state['pin']} (subset-sha256). The checkout rewrote the file, or the FASTA was changed "
+                      "without its list; --require-committed was given")
+    if not state["isCommitted"]:
+        raise Refused(f"{candidate} is not the committed fixture FASTA: its SHA-256 is {fasta_sha}, and "
+                      f"{shown(state['accessions'])} pins {state['pin']} (subset-sha256) for "
+                      f"{shown(state['committedFasta'])}; --require-committed was given")
+
+
+def identity_lines(state: dict) -> list:
+    """What the report says about the FASTA's identity: "the committed fixture FASTA" only at the pin."""
+    if state["isCommitted"]:
+        lines = [f"the committed fixture FASTA: its SHA-256 is the one {shown(state['accessions'])} pins"]
+    elif state["pin"] is None:
+        lines = [f"NOT known to be the committed fixture FASTA: the pinned digest cannot be read "
+                 f"({state['pinProblem']})"]
+    else:
+        lines = [f"NOT the committed fixture FASTA (pinned SHA-256 {state['pin']}): a candidate, judged as one"]
+    if state["pin"] is not None and not state["checkoutIntact"]:
+        lines.append(f"WARNING: {shown(state['committedFasta'])} in this checkout "
+                     + (f"has SHA-256 {state['onDisk']}, which is not its pin" if state["onDisk"]
+                        else "is missing"))
+    return lines
+
+
 def read_fixture(named: str) -> dict:
     """The fixture as named, or Refused, naming what is missing."""
     if not named:
@@ -249,12 +325,11 @@ def read_fixture(named: str) -> dict:
         raise Refused(f"{fasta} is empty")
     digest, files = matrix.fixture_digest(directory)
     fasta_sha = matrix.sha256_of(fasta)
-    committed = fixture_fasta.FIXTURE_FASTA
-    is_committed = committed.is_file() and matrix.sha256_of(committed) == fasta_sha
+    state = committed_state(fasta_sha)
     records = sum(1 for line in fasta.read_bytes().split(b"\n") if line.startswith(b">"))
     return {"directory": directory, "digest": digest, "files": files, "spectra": spectra,
             "fasta": fasta, "fastaSha256": fasta_sha, "fastaBytes": fasta.stat().st_size,
-            "fastaRecords": records, "isCommitted": is_committed}
+            "fastaRecords": records, "isCommitted": state["isCommitted"], "committed": state}
 
 
 # ===========================================================================
@@ -552,8 +627,7 @@ def render(verdict: dict, fixture: dict, seconds) -> str:
         f" digest   {fixture['digest']}",
         f" FASTA    {fixture['fasta'].name}: {fixture['fastaRecords']} records, {fixture['fastaBytes']} bytes, "
         f"SHA-256 {fixture['fastaSha256']}",
-        "          " + ("the committed fixture FASTA" if fixture["isCommitted"] else
-                        "NOT the committed fixture FASTA: a candidate, judged as one"),
+        *("          " + line for line in identity_lines(fixture["committed"])),
         f" host     {verdict.get('host', '?')}; {verdict.get('runs', 0)} run(s) expected"
         + (f"; Maven {seconds} s" if seconds is not None else ""),
         "",
@@ -588,9 +662,8 @@ def check(named: str, out: Path, offline: bool, require_committed: bool, report_
     """Runs (or re-grades) the check: ``(exit, verdict, fixture)``."""
     floors = load_floors()
     fixture = read_fixture(named)
-    if require_committed and not fixture["isCommitted"]:
-        raise Refused(f"{fixture['fasta']} (SHA-256 {fixture['fastaSha256']}) is not the committed fixture "
-                      f"FASTA {fixture_fasta.FIXTURE_FASTA.relative_to(ROOT)}, and --require-committed was given")
+    if require_committed:
+        refuse_unless_committed(fixture["fasta"], fixture["fastaSha256"], fixture["committed"])
     seconds = None
     if report_only and not out.is_dir():
         raise Refused(f"the report directory {out} does not exist: there is nothing to grade")
@@ -606,7 +679,9 @@ def check(named: str, out: Path, offline: bool, require_committed: bool, report_
     text = render(verdict, fixture, seconds)
     (out / "fixture-acceptance.txt").write_text(text, encoding="utf-8")
     summary = {"exit": verdict["exit"], "fixtureDigest": fixture["digest"], "fastaSha256": fixture["fastaSha256"],
-               "isCommitted": fixture["isCommitted"], "mavenSeconds": seconds, "problems": verdict["problems"],
+               "isCommitted": fixture["isCommitted"], "pinnedSha256": fixture["committed"]["pin"],
+               "checkoutIntact": fixture["committed"]["checkoutIntact"], "mavenSeconds": seconds,
+               "problems": verdict["problems"],
                "results": verdict["results"]}
     (out / "fixture-acceptance.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     sys.stdout.write(text)
@@ -670,7 +745,10 @@ def self_test_grading() -> int:
         runs, problems = expected_runs(census, raw, floors)
         verdict = judge(runs, measured, floors, "d" * 64, problems)
         fixture = {"directory": Path("/synthetic"), "digest": "d" * 64, "fasta": Path("synthetic.fasta"),
-                   "fastaRecords": 1, "fastaBytes": 1, "fastaSha256": "0" * 64, "isCommitted": False}
+                   "fastaRecords": 1, "fastaBytes": 1, "fastaSha256": "0" * 64, "isCommitted": False,
+                   "committed": {"committedFasta": Path("synthetic.fasta"), "accessions": Path("synthetic.tsv"),
+                                 "pin": "1" * 64, "pinProblem": None, "onDisk": "1" * 64, "isCommitted": False,
+                                 "checkoutIntact": True}}
         verdict.update(host=census["host"], runs=len(runs))
         text = render(verdict, fixture, None)
         ok = verdict["exit"] == expect_exit and (needle is None or needle in text)
@@ -794,17 +872,23 @@ def self_test_grading() -> int:
         print(f"  {'ok  ' if ok else 'FAIL'}  {name}  (exit {status}, required {expected}"
               + (f", words {needle!r}" if needle else "") + ")")
         failures += 0 if ok else 1
-    refusals = self_test_refusals()
+    refused, refusals = self_test_refusals()
     failures += refusals
+    identity, wrong = self_test_committed()
+    failures += wrong
     if failures:
         print(f"fixture-acceptance: self-test FAILED -- {failures} control(s) did not behave as required")
         return EXIT_SELF_TEST
-    print(f"fixture-acceptance: grading self-test OK -- {len(cases)} graded cases and the refusals")
+    print(f"fixture-acceptance: grading self-test OK -- {len(cases)} graded cases, {refused} refusals of a "
+          f"fixture and {identity} cases of the committed FASTA's identity; nothing was searched")
     return EXIT_GREEN
 
 
-def self_test_refusals() -> int:
-    """No fixture, a missing directory, a missing file: each refused by name, having searched nothing."""
+def self_test_refusals() -> tuple:
+    """No fixture, a missing directory, a missing file: each refused by name, having searched nothing.
+
+    Returns ``(cases, failures)``.
+    """
     work = ROOT / "_build" / "fixture-acceptance-selftest" / "refusals"
     if work.exists():
         shutil.rmtree(work)
@@ -814,11 +898,12 @@ def self_test_refusals() -> int:
     no_fasta.mkdir()
     (no_fasta / "20100614_Velos1_TaGe_SA_K562_3.mzML").write_bytes(b"not the K562 file\n")
     failures = 0
-    for name, named, needle in (
+    refusals = (
             ("no fixture named", "", "no fixture was named"),
             ("a directory that does not exist", str(work / "absent"), "does not exist"),
             ("a directory without the spectra", str(empty), "MISSING: 20100614_Velos1_TaGe_SA_K562_3.mzML"),
-            ("a spectrum file that is not the K562 file", str(no_fasta), "is not the K562 file of that name")):
+            ("a spectrum file that is not the K562 file", str(no_fasta), "is not the K562 file of that name"))
+    for name, named, needle in refusals:
         try:
             read_fixture(named)
             ok, said = False, "(accepted)"
@@ -827,7 +912,92 @@ def self_test_refusals() -> int:
         print(f"  {'ok  ' if ok else 'FAIL'}  {name} -> REFUSED, exit {EXIT_REFUSED}, words {needle!r}"
               + ("" if ok else f"; it said: {said}"))
         failures += 0 if ok else 1
-    return failures
+    return len(refusals), failures
+
+
+def self_test_committed() -> tuple:
+    """``--require-committed`` and the report's identity line, over COPIES of the committed pair.
+
+    The committed FASTA and its accession list are copied under ``_build/`` and the copies injured;
+    the real files are only read. Each case names what must be refused (or accepted) and the words
+    the refusal or the report must carry, the pinned digest among them. Returns ``(cases, failures)``.
+    """
+    work = ROOT / "_build" / "fixture-acceptance-selftest" / "committed"
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir(parents=True)
+    real_fasta, real_list = fixture_fasta.FIXTURE_FASTA, fixture_fasta.FIXTURE_ACCESSIONS
+    _, meta = fixture_fasta.read_list(real_list)
+    pin = meta["subset-sha256"]
+    records = fixture_fasta.read_records(real_fasta)
+    whole = b"".join(record for _, _, record in records)
+    injured_bytes = b"".join(record for _, _, record in records[:-1])
+
+    def pair(name, fasta_bytes, with_list=True):
+        directory = work / name
+        directory.mkdir()
+        fasta = directory / real_fasta.name
+        if fasta_bytes is not None:
+            fasta.write_bytes(fasta_bytes)
+        accessions = directory / real_list.name
+        if with_list:
+            shutil.copyfile(real_list, accessions)
+        return fasta, accessions
+
+    intact = pair("intact", whole)
+    injured = pair("checkout-injured", injured_bytes)
+    absent = pair("checkout-missing", None)
+    unpinned = pair("list-missing", whole, with_list=False)
+    candidate = work / "candidate-one-record-short.fasta"
+    candidate.write_bytes(injured_bytes)
+    whole_sha, injured_sha = fixture_fasta.sha256_bytes(whole), fixture_fasta.sha256_bytes(injured_bytes)
+    setup = []
+    if whole_sha != pin:
+        setup.append(f"the committed FASTA in this checkout has SHA-256 {whole_sha}, not its pin {pin}: these "
+                     "cases need the real pair intact to copy from")
+    if injured_sha == pin or injured_sha == whole_sha:
+        setup.append("the injury changed nothing")
+
+    # (name, candidate file, candidate SHA-256, committed pair, refused?, words required, words forbidden)
+    cases = (
+        ("the committed bytes, an intact checkout -> accepted, and called the committed fixture FASTA",
+         intact[0], whole_sha, intact, False, ["the committed fixture FASTA: its SHA-256 is the one"], ["NOT", "WARNING"]),
+        ("a candidate that differs from the pin, an intact checkout -> REFUSED, both digests named",
+         candidate, injured_sha, intact, True,
+         ["is not the committed fixture FASTA", injured_sha, pin, str(candidate)], []),
+        ("the same candidate without --require-committed -> the report says NOT the committed fixture FASTA",
+         candidate, injured_sha, intact, None, ["NOT the committed fixture FASTA", pin], ["WARNING"]),
+        ("the checkout's committed file differs from its pin, and that file is the candidate -> REFUSED, "
+         "the file and both digests named",
+         injured[0], injured_sha, injured, True,
+         ["in this checkout", "does not match its pin", injured_sha, pin, real_fasta.name], []),
+        ("the same without --require-committed -> never called the committed fixture FASTA; a WARNING names it",
+         injured[0], injured_sha, injured, None,
+         ["NOT the committed fixture FASTA", "WARNING", injured_sha, pin], ["the committed fixture FASTA: its"]),
+        ("the checkout's committed file differs from its pin, the candidate is the pinned bytes -> REFUSED",
+         intact[0], whole_sha, injured, True, ["does not match its pin", injured_sha, pin], []),
+        ("the committed file is missing from the checkout -> REFUSED",
+         intact[0], whole_sha, absent, True, ["is not in this checkout", pin], []),
+        ("the accession list that holds the pin is missing -> REFUSED",
+         intact[0], whole_sha, unpinned, True, ["the pinned digest cannot be read", "does not exist"], []),
+    )
+    failures = len(setup)
+    for problem in setup:
+        print(f"  FAIL  {problem}")
+    for name, file, sha, committed, refused, required, forbidden in cases:
+        state = committed_state(sha, committed)
+        said, was_refused = "\n".join(identity_lines(state)), False
+        if refused is not None:
+            try:
+                refuse_unless_committed(file, sha, state)
+            except Refused as refusal:
+                said, was_refused = str(refusal), True
+        ok = (refused is None or was_refused == refused) and all(word in said for word in required) \
+            and not any(word in said for word in forbidden)
+        outcome = "reported" if refused is None else (f"REFUSED, exit {EXIT_REFUSED}" if refused else "accepted")
+        print(f"  {'ok  ' if ok else 'FAIL'}  {name} ({outcome})" + ("" if ok else f"; it said: {said}"))
+        failures += 0 if ok else 1
+    return len(cases), failures
 
 
 def self_test(named: str, out: Path, offline: bool) -> int:

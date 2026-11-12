@@ -32,17 +32,26 @@
 #   bash scripts/fixtures/check-fixture.sh --self-test-grading  # no Maven, no network
 #   bash scripts/fixtures/check-fixture.sh --help
 #
-# --self-test DIR cuts the OVER-FILTERED FASTA (the identified proteins only)
-# from the FASTA in DIR with the committed accession list, runs the whole check
-# on it and requires it RED on decoy-psms and percolator-trained with one
-# result per spectrum, and on nothing else.
+# --require-committed refuses, before anything is searched, a FASTA whose
+# SHA-256 is not the digest the committed accession list pins, and a checkout
+# whose committed FASTA does not equal that pin; without it any candidate is
+# judged and the report says which it was.
+#
+# --self-test DIR cuts two FASTA files from the one in DIR with the committed
+# accession list and runs the whole check on each.  The OVER-FILTERED FASTA
+# (the identified proteins only) must be RED on psms-above-1pct in the matrix
+# configuration for every pair, and on no criterion of another name; the
+# background only (the identified proteins left out) must be RED on
+# psms-at-1pct and peptides-at-1pct in both configurations.  It first runs
+# what --self-test-grading runs: the cases that search nothing.
 #
 # Network: the pinned upstream URLs of every offered Comet and Percolator and
 # of the Limelight converter (GitHub), as the version matrix; Maven's
 # repository unless --offline.  The runs are serial on any machine.
 #
 # Exit status (fixture_acceptance.py's): 0 green; 1 red; 2 misuse; 3 REFUSED
-# (no fixture named, or a file missing -- nothing was searched, never green);
+# (no fixture named, a file missing, or with --require-committed a FASTA or a
+# checkout that is not the pinned bytes -- nothing was searched, never green);
 # 7 a self-test control did not behave as required.
 
 set -Eeuo pipefail
@@ -50,7 +59,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
 case "${1:-}" in
-    -h|--help) sed -n '7,45p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '7,55p' -- "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
 esac
 
 PYTHON=""
