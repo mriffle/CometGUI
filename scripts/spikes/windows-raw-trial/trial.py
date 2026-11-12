@@ -1330,7 +1330,8 @@ def host_report(t, releases, percolator):
     wanted = set(percolator["host_libraries"])
     for release in releases:
         wanted.update(release["host_libraries"])
-    # Comet 2026.02.2's row names none, but its import table is the same.
+    # Named here as well, so the report lists them even if a row is edited;
+    # mscoree.dll is the .NET Framework's loader, which no row lists.
     wanted.update(["MSVCP140.dll", "VCRUNTIME140.dll", "VCRUNTIME140_1.dll",
                    "mscoree.dll"])
     for name in sorted(wanted, key=str.lower):

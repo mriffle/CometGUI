@@ -238,12 +238,22 @@
           "note": "no Comet binary for windows-x86-64 has ever been run anywhere in this project. This capability is additionally gated on the three Thermo companion downloads below: an install missing any of them must not advertise it (R-TOOL-02)."
         }
       ],
-      "advisories": [],
+      "advisories": [
+        {
+          "id": "comet.windows-needs-visual-cpp-runtime",
+          "text": "comet.win64.exe is the bare executable and ships no Visual C++ runtime: its import table names MSVCP140.dll, MSVCP140_ATOMIC_WAIT.dll, VCRUNTIME140.dll and VCRUNTIME140_1.dll, which the host must already provide; their absence is a loader failure naming the DLL. It also loads the .NET Framework (mscoree.dll) to read Thermo RAW files."
+        }
+      ],
       "minimumHostRequirements": {
         "glibc": null,
         "glibcxx": null,
         "macos": null,
-        "requiredHostLibraries": []
+        "requiredHostLibraries": [
+          "MSVCP140.dll",
+          "MSVCP140_ATOMIC_WAIT.dll",
+          "VCRUNTIME140.dll",
+          "VCRUNTIME140_1.dll"
+        ]
       },
       "minimumCometGuiVersion": "0.1.0"
     },

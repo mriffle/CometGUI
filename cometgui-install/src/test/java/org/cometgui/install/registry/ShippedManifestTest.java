@@ -992,27 +992,48 @@ class ShippedManifestTest {
 
     @Test
     @DisplayName(
-            "Comet 2026.03.0 on Windows declares the Visual C++ runtime its import table names")
-    void comet202603OnWindowsDeclaresTheVisualCppRuntime() throws IOException {
-        ArtefactRecord comet = recordFor(shipped(), ToolName.COMET, "2026.03.0", WINDOWS_X86_64);
-        assertAll(
+            "every Windows Comet release declares the Visual C++ runtime its import table names,"
+                    + " and tells the scientist")
+    void cometOnWindowsDeclaresTheVisualCppRuntime() throws IOException {
+        List<Executable> assertions = new ArrayList<>();
+        List<String> releases = new ArrayList<>();
+        for (ArtefactRecord comet : shipped().artefacts()) {
+            if (comet.tool() != ToolName.COMET || !comet.platform().equals(WINDOWS_X86_64)) {
+                continue;
+            }
+            releases.add(comet.version().text());
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    List.of(
+                                            "MSVCP140.dll",
+                                            "MSVCP140_ATOMIC_WAIT.dll",
+                                            "VCRUNTIME140.dll",
+                                            "VCRUNTIME140_1.dll"),
+                                    comet.minimumHostRequirements().requiredHostLibraries(),
+                                    comet.describe()
+                                            + ": read from comet.win64.exe's PE import table (the"
+                                            + " 2026.03.0 binary on 2026-10-04, the 2026.02.2"
+                                            + " binary on 2026-11-12); the api-ms-win-crt-* and"
+                                            + " mscoree.dll imports are the operating system's"
+                                            + " own and are not listed, as bcrypt.dll is not for"
+                                            + " Percolator. WindowsCometImportTableTest holds the"
+                                            + " same list to the binaries themselves"));
+            assertions.add(
+                    () ->
+                            assertEquals(
+                                    List.of("comet.windows-needs-visual-cpp-runtime"),
+                                    comet.advisories().stream().map(ToolAdvisory::id).toList(),
+                                    comet.describe()
+                                            + ": and the scientist is told so at selection time"));
+        }
+        assertions.add(
                 () ->
                         assertEquals(
-                                List.of(
-                                        "MSVCP140.dll",
-                                        "MSVCP140_ATOMIC_WAIT.dll",
-                                        "VCRUNTIME140.dll",
-                                        "VCRUNTIME140_1.dll"),
-                                comet.minimumHostRequirements().requiredHostLibraries(),
-                                "read from comet.win64.exe's PE import table on 2026-10-04; the"
-                                        + " api-ms-win-crt-* and mscoree.dll imports are the"
-                                        + " operating system's own and are not listed, as"
-                                        + " bcrypt.dll is not for Percolator"),
-                () ->
-                        assertEquals(
-                                List.of("comet.windows-needs-visual-cpp-runtime"),
-                                comet.advisories().stream().map(ToolAdvisory::id).toList(),
-                                "and the scientist is told so at selection time"));
+                                List.of("2026.02.2", "2026.03.0"),
+                                releases,
+                                "both Comet releases publish a Windows build"));
+        assertAll(assertions);
     }
 
     private static List<String> otherPlatformsGating() throws IOException {

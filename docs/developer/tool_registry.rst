@@ -622,12 +622,25 @@ rather than acted on by dropping a requirement the specification states.
 Both releases' ThermoFisher libraries are byte-identical (the same SHA-256 on
 both rows); ``CometWrapper.dll`` changed (4 411 392 to 4 494 336 B).
 
-**Comet 2026.03.0 declares its Visual C++ runtime.** ``comet.win64.exe``
+**Every Windows Comet row declares its Visual C++ runtime.** ``comet.win64.exe``
 imports ``MSVCP140.dll``, ``MSVCP140_ATOMIC_WAIT.dll``, ``VCRUNTIME140.dll``
-and ``VCRUNTIME140_1.dll``, so its record lists them as required host libraries
-with an advisory, exactly as the Windows Percolator rows do. The 2026.02.2
-binary imports the same four and its record lists none; that row is left as it
-was and the gap is reported, not silently repaired.
+and ``VCRUNTIME140_1.dll`` in both releases, so each record lists them as
+required host libraries with an advisory, exactly as the Windows Percolator
+rows do. The 2026.03.0 row has said so since it was added; the 2026.02.2 row
+listed nothing until Phase 16, when its own import table was read (2026-11-12)
+and found to name the same four.
+
+**The list is held to the binary, not to a list typed beside it.**
+``WindowsCometImportTableTest`` reads each Windows Comet row's pinned binary
+from the artefact mirror, checks its SHA-256 against the row, parses its PE
+import directory, sets aside the libraries Windows itself supplies --
+``KERNEL32.dll``, ``WS2_32.dll``, ``mscoree.dll`` and the Universal C Runtime's
+``api-ms-win-crt-*`` API sets -- and requires what is left to be exactly the
+row's ``requiredHostLibraries``. The set-aside list is typed by hand and the
+classification is total, so a binary that starts importing something new is red
+until someone decides which kind it is. It asks every Windows Comet row the
+manifest names; a release added later fails it until its binary is in the
+mirror.
 
 .. _dev-tool-registry-no-intel-mac-comet:
 
