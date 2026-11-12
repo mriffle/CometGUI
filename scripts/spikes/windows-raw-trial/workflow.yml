@@ -1,0 +1,63 @@
+# CometGUI -- the Windows RAW trial (PHASE-16, work unit 1).
+#
+# THIS IS A TEMPLATE, AND IT IS DELIBERATELY NOT UNDER .github/workflows/.
+# GitHub runs nothing from here.  The phase orchestrator copies it to
+# .github/workflows/ on a pushed branch named phase16/raw-trial-<n> and
+# nowhere else (handoffs/PHASE-16-worklog.rst, decision P16-1), so that main
+# never gains a workflow that starts on a push.
+#
+# WHAT IT ANSWERS.  Whether Comet for Windows, with its Thermo companion
+# libraries beside it, opens ph050213_18.raw directly -- the file D-019 chose
+# on counts measured from a copy converted to mzML on Linux.  The whole trial
+# is scripts/spikes/windows-raw-trial/trial.py; its header says what it does,
+# what it prints and what each exit status means.  No CometGUI code runs.
+#
+# HOW TO READ THE RESULT.  The job log carries the full transcript, and the
+# result is the lines that begin RAW-TRIAL| -- one RAW-TRIAL|result| line for
+# each Comet release and file, and one RAW-TRIAL|verdict| line.  The job is
+# green only if every Comet release read the file and Percolator reported
+# PSMs and peptides at q < 0.01 for each.  A count that differs from D-019's
+# is printed, not failed.
+#
+# NOTHING IS UPLOADED.  There is no artifact step: this project's workflow
+# check allows the upload action in two named workflows only, and the RAW
+# file, the PIN and every other spectrum-derived file must not leave the
+# runner.  Everything needed is printed to the job log.
+#
+# The rules every workflow here obeys hold for this one too: one step is one
+# `bash scripts/...` invocation, the only action is the pinned checkout,
+# permissions are read-only, and there is no secret.  It is written in the
+# YAML subset scripts/ci/check-workflows.py parses, which is why the branch
+# filter is a block sequence and not a flow sequence.
+
+name: phase16-raw-trial
+
+on:
+  push:
+    branches:
+      - 'phase16/raw-trial-*'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  trial:
+    # About 28 MB of downloads, two searches of about two thousand spectra and
+    # two Percolator runs: minutes.  trial.py puts its own timeout on every
+    # process, so a hung program is recorded as a timeout and not left for the
+    # runner to kill.
+    name: Comet for Windows reads a Thermo RAW file directly
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      # Pinned to the commit actions/checkout v5 resolved to on 2026-08-29 --
+      # the same commit every workflow in .github/workflows/ pins.
+      - name: Check out the repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Windows RAW trial (Comet, then Percolator, bare tools)
+        run: bash scripts/spikes/windows-raw-trial/run.sh
