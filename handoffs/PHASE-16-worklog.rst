@@ -102,6 +102,14 @@ P16-6 -- serial, and one scratch directory per agent
    flight is not an agent in the tree; the orchestrator may wait on one while
    the next unit runs, and records it.
 
+P16-7 -- where committed fixture data lives
+   Under ``fixtures/<name>/`` at the repository root: the FASTA, a plain-text
+   attribution file beside it naming UniProt, CC BY 4.0, the proteome
+   identifier and the release, and nothing else. Spectrum files are never
+   there. Each is also entered in ``docs/citations.rst`` and the licence
+   audit. A fetch script assembles a working fixture directory (fetched
+   spectra plus a copy of the committed FASTA) outside ``fixtures/``.
+
 Work units
 ==========
 
