@@ -6,7 +6,10 @@ Decisions
    D-006's CI fixture decided -- the K562 pair, as it is, with a trimmed
    FASTA; D-006 part 1 amended -- small test files may be kept in the
    repository where the licence permits; D-018 raised and decided, option A;
-   RAW files found, D-019 raised and decided, option A)
+   RAW files found, D-019 raised and decided, option A. Later the same day,
+   from Phase 16's first two units: what was measured is added to D-006,
+   D-018 and D-019, and **D-020 is raised and OPEN** -- Percolator's
+   too-few-negatives warning on the trimmed FASTA)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -661,7 +664,10 @@ What follows from it, and what it does not settle:
   it is committed. The whole proteome is served from ``current_release/``,
   whose bytes change at every UniProt release, after which a pinned checksum
   can no longer be fetched at all; a trimmed file made from it needs a home
-  that does not move.
+  that does not move. *Corrected by measurement, Phase 16:* "at all" is
+  wrong. ``current_release/`` did move (to 2026_04), but the 2026_02 bytes
+  the fixture pins are still served by EMBL-EBI's archive of that release.
+  The decision stands on the rest of its reasoning.
 * **No Thermo RAW fixture yet.** The pair is mzML. See the amendment below
   for the owner's plan.
 
@@ -713,7 +719,12 @@ that Comet on Windows reads the file itself is shown later, on a runner.
   wants a fixture cut from a full-size run. If so: a selection of confident
   identifications only would leave Percolator too few decoys and poor matches
   to train on, so such a set keeps a deliberate share of both and is accepted
-  only after the filtered file has itself been searched.
+  only after the filtered file has itself been searched. *That prediction was
+  tier 1's, and the FASTA half of it was measured in Phase 16 and is wrong
+  in kind:* against the identified proteins alone Percolator still trains
+  and has as many decoys; what changes is that more PSMs pass 1% and fewer
+  are rejected (``docs/developer/test_fixtures.rst``). The rule that a
+  filtered set is accepted only on a search of it is what caught this.
 
 **Phase 00, 2026-08-29.** Six costed candidates with real sizes, parsed MS2
 counts and licence URLs are in ``docs/feasibility/fixture-candidates.rst``.
@@ -1299,6 +1310,16 @@ trimmed FASTA is committed with UniProt's attribution (CC BY 4.0) and the
 UniProt release it was made from, and is recorded in the licence audit. It
 does not exist yet; Phase 16 makes it.
 
+**Made (Phase 16, unit 2, 2026-11-12).**
+``fixtures/human-k562-subset/uniprot-human-2026_02-k562-subset.fasta``: 3,698
+records (the 698 proteins behind a confident identification, and 3,000
+others chosen by a fixed rule), 2,539,164 bytes, SHA-256 ``bd252b62...1b34``,
+cut from UniProt release 2026_02 and rebuilt byte for byte from the committed
+accession list. How it was sized and what it is held to are in
+``docs/developer/test_fixtures.rst``. Tier 1 re-ran its acceptance check and
+confirmed the floors (``STATUS.rst``). One consequence is the owner's to
+weigh: ``D-020``.
+
 ----
 
 D-019 -- Which Thermo RAW file is the CI fixture
@@ -1414,3 +1435,109 @@ a runner first (``phases/PHASE-16-release.rst``, *The Thermo RAW fixture*).
 
 The owner also asked that the search report be kept as useful beyond this
 project; it is committed as ``docs/feasibility/small-thermo-raw-files.rst``.
+
+**The Windows trial (Phase 16, unit 1, 2026-11-12): it reads.** Comet for
+Windows opened ``ph050213_18.raw`` directly on a GitHub Windows runner, with
+both Comet releases, and Percolator 3.07.1 trained on the result (run
+``43150059739`` on branch ``phase16/raw-trial-1``). The fallback was not
+needed.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 39 39
+
+   * - Comet
+     - RAW read on Windows: PSMs / peptides at q < 0.01
+     - Converted mzML on Linux: PSMs / peptides at q < 0.01
+   * - 2026.02.2
+     - 873 / 761
+     - 906 / 787
+   * - 2026.03.0
+     - 894 / 767
+     - 920 / 797
+
+Two things in this entry are narrower than they read. The 906 / 787 in the
+table above is Comet 2026.02.2's figure only. And reading the RAW file
+itself, Comet loads fewer spectra than from the converted mzML (3,531
+against 3,624) and assigns charge differently, so the direct read gives
+about 3% fewer identifications. That is a difference between two ways of
+reading the file, not a fault. The golden for the smoke test is therefore
+taken from a Windows runner, never from the figures above. The figures in
+this paragraph are the phase's; tier 1 has confirmed only that the run
+completed successfully and re-reads its log at the phase's sign-off.
+
+----
+
+D-020 -- Whether Percolator's too-few-negatives warning is acceptable in the CI fixture
+=======================================================================================
+
+:Status: **OPEN** -- raised 2026-11-12
+:Raised: 2026-11-12, by Phase 16's second unit, through tier 1
+:Blocks: Phase 16's switch of the tests and goldens to the trimmed FASTA
+   (and the CI wiring that follows it); nothing else in the phase
+:Owner: Project owner
+
+**Question.** With the trimmed FASTA, Percolator prints a warning on one
+kind of run. Is a CI fixture that always produces that warning acceptable?
+
+**What happens.** The fixture is searched two ways. With five results per
+spectrum there is no warning. With **one result per spectrum** -- the
+configuration that is converted for Limelight -- Percolator prints::
+
+    Warning : the number of negative samples read is too small to perform a correct classification.
+
+It prints this when it is given 105 decoy PSMs or fewer: five for each of
+the 21 features in Comet's PIN. The two K562 files hold 1,338 MS2 spectra,
+and most are identified, so few spectra have a decoy as their best match:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 22 22 22
+
+   * - FASTA
+     - Decoy PSMs, one result per spectrum
+     - Warning
+     - PSMs / peptides at 1%
+   * - Whole human proteome (20,652 records)
+     - 120
+     - no
+     - 1051--1075 / 620--623
+   * - Committed trimmed FASTA (3,698 records)
+     - 97
+     - yes
+     - 1087--1092 / 637--644
+   * - Every other size tried, 698 to 8,698 records
+     - 90 to 105
+     - yes
+     - --
+
+Percolator then trains as usual -- three cross-validation bins, non-zero
+weights -- in every one of the 72 runs measured, and every one-result run
+converts to Limelight XML that validates. The whole proteome clears the line
+by only 15 decoys. No trimmed size clears it, and the series shows no trend
+that says a larger one would.
+
+**Why an agent may not answer it.** Whether a result made under that warning
+is good enough to stand as the project's reference result is a scientific
+judgment, and it follows from the owner's own decision to trim the FASTA.
+
+**Options.**
+
+A. **Accept it.** The fixture exists to show that the pipeline runs and that
+   its numbers do not drift, not to make a statistical claim. The warning is
+   printed by the acceptance check wherever Percolator gives it, the decoy
+   count is held to a floor, and the documentation says plainly that the
+   fixture's one-result runs carry it. Nothing changes in what was built.
+B. **Add spectra** so that more than 105 decoys appear: a third mzML file.
+   That is a new fixture file, which is the owner's choice of data
+   (``D-006``); none has been looked for or measured, and every count and
+   golden would be taken from the larger set.
+C. **Keep the whole proteome for the one-result runs only.** The warning
+   goes, by a margin of 15 decoys. CI again downloads the 13.7 MB file the
+   owner asked to stop using, and the project carries two FASTA files.
+
+**Recommendation.** A.
+
+**How the phase proceeds meanwhile.** The units that do not depend on the
+answer run first. The unit that moves the tests and regenerates the goldens
+waits for it.

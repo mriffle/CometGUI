@@ -22,6 +22,17 @@ Small Thermo RAW files for a Windows RAW smoke test -- scouting report
    ``D-019``). Every count here comes from RAW files converted to mzML on
    Linux; none shows that Comet on Windows reads the RAW file itself.
 
+   **Added 2026-11-12, after the report was written.** Phase 16 then tried
+   the chosen file on a GitHub Windows runner, and Comet for Windows read it
+   directly: 873 PSMs and 761 peptides at q < 0.01 with Comet 2026.02.2, and
+   894 and 767 with 2026.03.0, about 3% under the converted-mzML figures for
+   the same release because the two paths load slightly different spectra
+   and assign charge differently. Two statements below are narrower than
+   they read: the 906 / 787 for ``ph050213_18.raw`` is Comet 2026.02.2's
+   figure (2026.03.0 gives 920 / 797 from the same mzML), and Comet did not
+   search every scan of that file as 2+ and 3+ -- it searched 162 of them as
+   1+.
+
 .. contents:: Contents
    :depth: 2
    :local:

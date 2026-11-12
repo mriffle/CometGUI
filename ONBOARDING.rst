@@ -40,7 +40,7 @@ Three things make this harder than "shell out to a binary":
    checksum is recorded, and the test suite must independently prove the
    application's claims rather than assert that nothing threw.
 
-The full requirements live in ``specification.rst`` (revision 10). It is the
+The full requirements live in ``specification.rst`` (revision 21). It is the
 authority on *what* to build. This document is the authority on *how the work
 is run*.
 
@@ -378,7 +378,7 @@ is ``BLOCKED``/``PARTIAL`` with the residue named in ``STATUS.rst``.
 Decisions
 =========
 
-Decisions ``D-001``..``D-008`` in ``DECISIONS.rst`` are questions an agent
+Decisions ``D-001``..``D-020`` in ``DECISIONS.rst`` are questions an agent
 **must not answer on its own**: licensing, redistribution, which platforms the
 product promises, whose data is used as a fixture, which server a test uploads
 to. Each names the phase it blocks.

@@ -7,26 +7,25 @@ Project Status
 :Updated by: Main orchestrator, session 12 (**``D-016``, ``D-017`` and
    ``D-006``'s CI fixture decided; a trimmed-FASTA step added to Phase 16;
    ``D-018`` decided; Thermo RAW files found and ``D-019`` decided; **Phase
-   16 dispatched, then paused by the owner after its second unit**)
+   16 dispatched, paused by the owner after its second unit, and resumed
+   the same day; ``D-020`` raised and OPEN**)
 :Current phase: **Phase 16 (documentation and release qualification), IN
-   PROGRESS and PAUSED BY THE OWNER after unit 2 of 16.** The owner resumed
-   on 2026-11-12 (*"Proceed with phase 16"*) and paused it the same day: *"I
-   want to pause phase 16 after it finishes its current unit's work. I will
-   continue it later."* **No agent is live in the tree and nothing is
-   running. Do not resume until the owner says so.** Units 1 (the Windows RAW
-   trial) and 2 (the trimmed FASTA and its acceptance check) are accepted by
-   the phase orchestrator; units 3 to 16 have not started; no exit-gate item
-   is met and **the phase is not signed off** -- tier 1 has run no full build
-   and no sign-off on it. The pause record is
-   ``handoffs/PHASE-16-handoff.rst``; a resume dispatches a fresh
-   orchestrator from ``handoffs/PHASE-16-BRIEF.rst`` plus that record, and
-   its first act is unit 3. **Four things wait on tier 1 or the owner before
-   units 5 and 7**: the proposed floors for the trimmed FASTA, Percolator's
-   "too few negative samples" warning on one-result-per-spectrum runs,
-   splitting unit 5, and the documents the phase found wrong and may not
-   edit (work log, *Blockers escalated*). ``main`` is pushed with the pause
-   recorded. One branch was pushed for runner evidence,
-   ``phase16/raw-trial-1``, with one run on it.
+   PROGRESS.** Dispatched 2026-11-12, paused by the owner the same day after
+   unit 2 of 16, and **resumed by the owner** (*"Resume phase 16"*). A second
+   phase orchestrator runs from ``handoffs/PHASE-16-BRIEF.rst`` (its *Resume*
+   section) and the pause record ``handoffs/PHASE-16-handoff.rst``; it is the
+   only agent live in the tree. Units 1 (the Windows RAW trial) and 2 (the
+   trimmed FASTA and its acceptance check) are accepted by the first
+   orchestrator; no exit-gate item is met and the phase is not signed off.
+   **Before the resume tier 1 ran the trimmed FASTA's acceptance check and
+   its self-test itself and confirmed the proposed floors** (change log).
+   **``D-020`` is OPEN and with the owner:** with the trimmed FASTA,
+   Percolator warns that its negative samples are too few on
+   one-result-per-spectrum runs. The units that move the tests and goldens
+   to the trimmed FASTA and wire it into CI (5, 7, part of 10) wait for the
+   answer; the rest run first. ``main`` is pushed with this recorded. The
+   phase may push branches named ``phase16/...`` for runner evidence, and
+   nothing else; one exists, ``phase16/raw-trial-1``.
 :Overall: Sixteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03,
    04, 05, 08, 09, 10, 11, 12, 13, 14 and 15 PARTIAL -- plus the Comet
    2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every
@@ -342,9 +341,10 @@ Phase board
        Thermo RAW fixture (9), both added by the owner that day. Expected
        grade PARTIAL: six UX activities, the licence audit's sign-off,
        ``D-009`` and a person's clean-machine run are not an agent's to
-       complete. **PAUSED by the owner 2026-11-12 after unit 2 of 16**, at
-       ``0659194``; no gate item met, not signed off
-       (``handoffs/PHASE-16-handoff.rst``).
+       complete. Paused by the owner 2026-11-12 after unit 2 of 16, at
+       ``0659194``, and **resumed by the owner the same day** with a second
+       orchestrator. No gate item met yet. ``D-020`` (OPEN) holds back the
+       switch to the trimmed FASTA only.
 
 Status values are ``NOT STARTED``, ``IN PROGRESS``, ``PARTIAL`` (with the
 residue named), ``BLOCKED`` (with the decision or dependency named), or
@@ -4864,6 +4864,32 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-11-12
+     - 16
+     - **Phase 16 resumed by the owner** (*"Resume phase 16"*). Before
+       dispatching, tier 1 settled what the pause left with it. **The
+       floors are confirmed**: on its own copy of the K562 pair and the
+       committed FASTA, ``check-fixture.sh --offline --require-committed``
+       was green (60 criteria, the counts the work log records) and
+       ``--self-test`` red on the identified proteins alone, on
+       ``psms-above-1pct`` with five results per spectrum and on nothing
+       else. They stand on Linux x86-64 only; a red on another platform's
+       runner comes to tier 1 and no floor moves to meet it. **``D-020``
+       raised, OPEN**: Percolator's "too few negative samples" warning on
+       one-result-per-spectrum runs against every trimmed FASTA measured;
+       recommendation A (accept and record); the fixture-dependent units
+       wait for the owner. **Unit 5's split is bounded by four rulings** in
+       the brief's *Resume* section: nothing depends on the whole proteome
+       afterwards; the first-1,000-record tests draw on the committed FASTA;
+       the cancelling tests get a long search from settings, never a sleep;
+       Phase 00's search outputs are made again once, and the tests that
+       cannot run on a runner are named. **Corrected from the phase's
+       measurements**: ``D-006`` and ``D-018`` (the 2026_02 proteome can
+       still be fetched; what over-filtering actually does), ``D-019`` (the
+       Windows trial; 906 / 787 is one Comet release's figure), the phase
+       document, ``ONBOARDING.rst`` and ``CLAUDE.md`` (specification
+       revision 21, ``D-001``..``D-020``), and the note on the RAW search
+       report. A second orchestrator dispatched; ``main`` pushed first.
    * - 2026-11-12
      - 16
      - **Phase 16 paused by the owner** (*"I want to pause phase 16 after it

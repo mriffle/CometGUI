@@ -225,3 +225,146 @@ person, item by item, with the material you prepared for them; the injections
 you used; and anything escalated. Report only when finished or genuinely
 blocked; the owner wants no interim pauses. Short and factual; every claim is
 re-run, not read.
+
+.. _p16b-resume:
+
+Resume -- 2026-11-12, for the second orchestrator
+=================================================
+
+The owner paused this phase after its second unit and has resumed it:
+*"Resume phase 16"*. You are a fresh orchestrator and the only agent live in
+the tree. Everything above still binds you, except where this section says
+otherwise. It is written and owned by tier 1.
+
+**Read, after the list above:** ``handoffs/PHASE-16-handoff.rst`` (the pause
+record) and ``handoffs/PHASE-16-worklog.rst`` in full, then
+``docs/developer/test_fixtures.rst``. The work log is now yours: continue
+it, keep its sixteen unit numbers, and keep your predecessor's design
+decisions ``P16-1`` to ``P16-7`` unless you record why one changes. At the
+end you replace the pause handoff with the phase-end handoff the brief asks
+for; what the pause record says about units 1 and 2 goes into it.
+
+**Units 1 and 2 are accepted** by your predecessor. You do not redo them.
+Tier 1 re-reads both at the phase's sign-off.
+
+**One thing above is no longer true:** a ``D-`` item is open. ``D-020``
+(``DECISIONS.rst``) -- read it.
+
+Tier 1's answers to what was escalated
+--------------------------------------
+
+#. **The floors are confirmed** as proposed, in
+   ``scripts/fixtures/fixture-acceptance.json``. Tier 1 ran the acceptance
+   check and its self-test itself on its own copy of the fixture and saw
+   what the work log records. Three conditions:
+
+   * No floor moves, and the committed FASTA does not change, without tier
+     1. A floor is never set from the run it is judging.
+   * They were measured on Linux x86-64 only. If the check is red on a
+     runner of another platform, that is a finding: record the counts and
+     bring them to tier 1. Do not adjust anything to make it green.
+   * Only one criterion catches over-filtering, by a margin of 93 PSMs.
+     Keep the self-test (red on the identified proteins alone) in whatever
+     runs the check in CI, so that margin is watched.
+
+#. **Percolator's warning is** ``D-020``, **open, and the owner has been
+   asked.** The owner's answer comes to you from tier 1 as a message. Until
+   it does:
+
+   * Do not start any unit, or part of one, that regenerates a golden, a
+     pinned digest or a pinned count from the trimmed FASTA, or that wires
+     that fixture into a CI job. That is unit 5 in all its parts, unit 7,
+     and the fixture-dependent part of unit 10.
+   * Run what does not depend on it, in this order unless you record a
+     reason: 3, 4, 6, then 8 and 9, 11, and 12 to 16 as far as each can go
+     without the fixture.
+   * If you reach the point where nothing else can proceed and no answer
+     has come, bring the work log up to date and end your turn saying
+     exactly that. Do not guess the answer and do not proceed on the
+     recommendation.
+   * Whatever the answer, the acceptance check goes on printing the warning
+     wherever Percolator gives it.
+
+#. **Unit 5 is split, by you, before any of it is dispatched.** Four
+   rulings bound the split:
+
+   * **Nothing in the tree depends on the whole proteome when unit 5 is
+     done** -- no test, script, gate or job reads it, a file cut from it, or
+     an output of a search against it. The one exception is
+     ``fixture-fasta.sh verify --source``, the proof that the committed
+     FASTA can be rebuilt. The phase document now says this.
+   * **The tests that search the proteome's first 1,000 records** take their
+     input from the committed FASTA instead. Whether they search all of it
+     or a cut of it is yours to decide, by measured test time, and recorded.
+     The committed index headers and every count pinned from that search
+     are taken again from the real binaries, never edited by hand to match.
+   * **The tests that cancel a search** must still catch Comet while it is
+     really searching. Give them a search that lasts long enough from the
+     same spectra and the committed FASTA, by search settings. Never a
+     sleep, never a stand-in for a binary where the real one was used, never
+     the whole proteome. Each is shown red with cancellation broken in
+     production code. The ``cancel-comet`` performance threshold is taken
+     again by the recorded procedure, not loosened by hand. If no settings
+     give a window that holds on a two-core runner, stop and bring tier 1
+     the timings.
+   * **Phase 00's search outputs** (``scratch/scientific-path``) are made
+     again by the same script against the committed FASTA, once, in a part
+     of their own, and the digests and counts the tests pin are taken from
+     the new files. This is a change of input, recorded as one; the counts
+     are checked against the product's own readers and an independent count,
+     as the present ones were. **Say, by count and by name, which tests do
+     not run on a runner because those outputs are not there.** Making them
+     run on a runner is not required by gate item 8; hiding that they do not
+     is forbidden. If a nightly job that names ``D-006`` needs them, the job
+     makes them.
+
+   Each part is its own unit with its own agent and sign-off, serial as
+   always. Measure the test-time cost of each part and record it: the build
+   must not grow (*Build economy*).
+
+#. **Documents found wrong.** Tier 1 has corrected the ones it owns:
+   ``DECISIONS.rst`` (``D-006``, ``D-018``, ``D-019``), the phase document,
+   ``ONBOARDING.rst``, ``CLAUDE.md`` and the note at the head of
+   ``docs/feasibility/small-thermo-raw-files.rst``. The rest are phase work;
+   place each in a unit and record where:
+
+   * the manifest's Windows row for Comet 2026.02.2, whose
+     ``requiredHostLibraries`` is empty although the binary imports the same
+     Visual C++ runtime libraries as 2026.03.0's -- with the unit that
+     handles install and tools (4), from the binary's own import table, with
+     a test;
+   * ``docs/developer/testing.rst`` calling the matrix pair runs "Limelight
+     enabled" -- unit 16;
+   * ``CONTRIBUTING.rst``: the single-page documentation check it offers
+     refuses pages outside ``docs/feasibility``; and *Before you report a
+     unit done* asks for a green ``scripts/build.sh``, which contradicts the
+     owner's build economy -- reword it to what a unit actually runs and to
+     who runs the full build and when (unit 13);
+   * ``scripts/dev-verify.sh`` pointing a changed shell script at the wrong
+     gate -- fix it where you next touch the script, with a test of the
+     mapping.
+
+Practical notes from your predecessor
+-------------------------------------
+
+* A foreground command here is moved to the background after about three
+  minutes. Wait in calls shorter than that, or on a detached command that
+  writes an exit file. **Never end your turn while your own agent or your
+  own check is running.**
+* A gate run's log goes under ``_build/``, never ``scratch/``: the run
+  fingerprints ``scratch/`` and fails itself.
+* ``scratch/p16/tier1/`` is tier 1's. Leave it alone.
+
+Pushing
+-------
+
+Unchanged: you alone, branches named ``phase16/...`` only. ``main`` is
+pushed by tier 1, and was before you started. One branch exists already,
+``phase16/raw-trial-1``; number yours on from it.
+
+The owner may pause again
+-------------------------
+
+If tier 1 relays a pause, finish the unit in progress, sign it off, commit,
+write a pause handoff as your predecessor did, push nothing more, and
+report.

@@ -4,10 +4,13 @@ PHASE-16: Documentation and Release Qualification
 
 :Phase: 16
 :Status: IN PROGRESS (dispatched 2026-11-12; paused by the owner the same
-   day after unit 2 of 16 -- see ``handoffs/PHASE-16-handoff.rst``)
+   day after unit 2 of 16; **resumed by the owner 2026-11-12** from
+   ``handoffs/PHASE-16-handoff.rst`` and the brief's resume section)
 :Depends on: 15
-:Blocked by decisions: none open. D-009 must be settled before release.
-   D-001, D-004, D-006, D-008, D-018 and D-019 are DECIDED
+:Blocked by decisions: **D-020 is OPEN** (Percolator's warning on the
+   trimmed FASTA) and blocks steps 7 and 8 of *The CI fixture*; nothing
+   else. D-009 must be settled before release. D-001, D-004, D-006, D-008,
+   D-018 and D-019 are DECIDED
 :Delivers: R-DOC-01, R-DOC-02, R-DOC-06
 :Contributes to: R-DOC-03, R-DOC-04, R-DOC-05, R-SEC-01
 :Proves: AC-DOC-01, AC-DOC-02, AC-REL-02, AC-REL-03, AC-UX-01..06, AC-TST-07
@@ -87,6 +90,14 @@ The step, in order:
    in which everything passes 1% proves nothing about the filters. The
    background is chosen by a recorded, deterministic rule and sized by
    measurement, not by guess.
+
+   *Measured, 2026-11-12 (unit 2), and the reason given above is wrong in
+   kind.* Against the identified proteins alone Percolator still trains and
+   has as many decoys. What over-filtering does is flatter the search: more
+   PSMs pass 1% and fewer are rejected, so the filters have less to reject.
+   The step and its conclusion stand -- a background is needed -- and the
+   acceptance check is red on the over-filtered file for the measured
+   reason, the count of rejected PSMs (``docs/developer/test_fixtures.rst``).
 #. **Accept the trimmed FASTA only on a search of it.** The K562 pair is run
    against it through the product's own workflow, for every Comet and
    Percolator pair the version matrix offers. Percolator must train and
@@ -105,6 +116,19 @@ The step, in order:
 #. **Wire the fetch into the CI jobs** that name ``D-006`` today, under every
    condition ``D-006`` already sets for the spectra: fetched by checksum,
    never committed, the CRLF defence applied on the runner.
+
+**State at the resume (2026-11-12).** Steps 1 to 6 are done: the trimmed
+FASTA is ``fixtures/human-k562-subset/``, 3,698 records and 2.5 MB, and tier
+1 has confirmed the floors of its acceptance check by running it. Steps 7
+and 8 wait on ``D-020``.
+
+**After step 7 nothing in the tree depends on the whole proteome** -- no
+test, script, gate or job reads it or a file cut from it. The one exception
+is the proof that the committed FASTA can be rebuilt from its source. This
+covers three things the inventory found beyond the goldens: the tests that
+search the proteome's first 1,000 records, the tests that cancel a search
+and relied on the whole proteome to make it long enough, and the outputs of
+Phase 00's whole-proteome search that many tests read by digest.
 
 **The trimmed FASTA is committed to the repository** (``D-018``, option A,
 decided 2026-11-12), with UniProt's attribution (CC BY 4.0) and the release
@@ -131,7 +155,8 @@ RAW only on Windows, so each candidate was converted to mzML on Linux and
 that was searched. Nothing yet shows that Comet on Windows opens any of
 these files. The steps, in order:
 
-#. **Try it on a Windows runner before building anything.** Comet for
+#. *(Done 2026-11-12, unit 1: Comet for Windows reads the chosen file; see
+   ``D-019``.)* **Try it on a Windows runner before building anything.** Comet for
    Windows, with its Thermo companions, reads the chosen RAW file directly
    and the search is carried through Percolator. The counts are compared
    with those in ``D-019``. Known risks to look at: empty MS1 scans, MS2
