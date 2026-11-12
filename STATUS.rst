@@ -4,8 +4,8 @@ Project Status
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-11-12
-:Updated by: Main orchestrator, session 12 (**``D-016`` and ``D-017``
-   decided; still paused by the owner**)
+:Updated by: Main orchestrator, session 12 (**``D-016``, ``D-017`` and
+   ``D-006``'s CI fixture decided; still paused by the owner**)
 :Current phase: **Paused by the owner after Phase 15** (2026-11-07). Owner,
    2026-11-05: *"Pause after Phase 15 is signed off and pushed."* Phase 16
    (documentation and release qualification) is NOT STARTED and has no
@@ -21,10 +21,14 @@ Project Status
    ``D-016`` option B (mutation-test the workflow module's command builders
    and stage invalidation only, cost measured first) and ``D-017`` option A
    (workflow and results are core domain logic, held to 90/85); both are
-   Phase 16 work. **Open for the owner:** ``D-006`` (the CI fixture), kept
-   open on 2026-11-12 (*"I don't know yet, keep this open"*); ``D-011``
-   option D is the owner's own action. The nightly stays red until ``D-006``
-   gives it a fixture (:ref:`status-p15-signed`).
+   Phase 16 work. So is ``D-006``'s CI fixture, decided the same day: **the
+   two K562 mzML files of the local fixture, as they are** (*"yes, use the
+   K562 pair as the CI fixture"*). No ``D-`` item is open. **Still for the
+   owner:** where CI gets a stable copy of the FASTA (UniProt's
+   ``current_release/`` changes under a pinned checksum), to be raised with
+   options when the fetch is built; ``D-009`` before release; ``D-011``
+   option D is the owner's own action. The nightly stays red until the
+   fixture is wired into its jobs (:ref:`status-p15-signed`).
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -3351,8 +3355,8 @@ of each mutated class) and P15-4 (goldens hold derived results from the local
 fixture, keyed by its digest). Raised for the owner: ``D-016`` (mutation-test
 the workflow module?) and ``D-017`` (are workflow and results core domain
 logic?). ``D-006``'s CI fixture is still open. *Since, 2026-11-12:* the owner
-decided ``D-016`` (option B) and ``D-017`` (option A) and kept ``D-006``
-open; both decisions are to be implemented in Phase 16.
+decided ``D-016`` (option B), ``D-017`` (option A) and ``D-006``'s CI half
+(the K562 pair, as it is); all three are to be implemented in Phase 16.
 
 **Nightly.** The Phase 15 stubs are replaced. The real-data half of four jobs
 (large dataset, determinism, performance, Windows RAW) still exits 70, now
@@ -4826,9 +4830,14 @@ Change log
      - Owner decided ``D-016`` (option B: mutation-test the workflow
        module's command builders and stage invalidation only, cost measured
        first) and ``D-017`` (option A: workflow and results are core domain
-       logic, 90/85), and kept ``D-006``'s CI fixture open. Neither decision
-       is implemented; both go into the Phase 16 brief. **Still paused**: no
-       brief written, nothing dispatched, no build run.
+       logic, 90/85), and first kept ``D-006``'s CI fixture open. Later the
+       same day, having asked about trimming a set with
+       ``mriffle/miller-mzml-filterer`` and been shown that the local files
+       are already an excerpt, the owner **decided ``D-006``'s CI half: the
+       K562 pair, as it is**. The FASTA's stable source and a Thermo RAW
+       fixture are not settled by it. None of the three is implemented; all
+       go into the Phase 16 brief. **Still paused**: no brief written,
+       nothing dispatched, no build run.
    * - 2026-10-30
      - 14+
      - **E12 repair signed off** at ``35f5b2e`` (11/11 affected gates, four

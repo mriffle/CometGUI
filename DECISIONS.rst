@@ -3,7 +3,7 @@ Decisions
 =========
 
 :Updated: 2026-11-12 (D-016 decided, option B; D-017 decided, option A;
-   D-006's CI fixture kept open by the owner)
+   D-006's CI fixture decided -- the K562 pair, as it is)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -537,8 +537,10 @@ automate screen coordinates -- in production or in tests.
 D-006 -- Test fixture data and licensing
 ========================================
 
-:Status: **PARTLY DECIDED 2026-08-30.** Redistribution ruled out and the
-   local-testing fixture delegated; the CI fixture set is explicitly deferred
+:Status: **DECIDED** -- redistribution ruled out and the local-testing
+   fixture delegated 2026-08-30; the CI spectra decided 2026-11-12 (the same
+   two K562 files). Not yet wired into any CI job. A Thermo RAW fixture is
+   not covered
 :Raised: 2026-08-28
 :Blocks: Phases 00, 14, 16
 :Owner: Project owner
@@ -621,6 +623,43 @@ Washington code from the same group as Comet.
 * **Phase 16's licence audit still records what the tests fetch**, with URL,
   licence and checksum. Not redistributing lightens the obligation; it does
   not remove the need to say where the data came from.
+
+**DECISION (2026-11-12), the CI half.** The owner: *"yes, use the K562 pair
+as the CI fixture."* The two mzML files in the table above are the CI
+spectra, unchanged and unfiltered. The owner had first asked about cutting a
+smaller set with ``mriffle/miller-mzml-filterer``; tier 1 reported that these
+files are already an excerpt (1,338 MS2 scans, 20.5 MB together, about 1,026
+PSMs at 1% FDR, a search of a few seconds), so there is nothing worth
+trimming, and the owner chose them as they are. Part 3 above is closed by
+this.
+
+What follows from it, and what it does not settle:
+
+* **Every condition of the local fixture carries over to CI unchanged.** The
+  files are fetched by checksum from the pinned ``crux-toolkit`` commit into
+  the job's workspace, never committed and never cached into the repository;
+  the CRLF defence applies on the runner as it does here.
+* **Not implemented.** The project was paused when this was answered. The
+  nightly jobs that name ``D-006`` still exit 70, and wiring the fetch into
+  them is work for the Phase 16 brief. The nightly stays red until then.
+* **The reviewed goldens should apply as they are**, because they are keyed
+  by the fixture's digest and the fixture is the same -- *provided the FASTA
+  is byte-identical too*. That is to be shown on a runner, not assumed.
+* **The FASTA is not settled by this answer.** The owner named the spectra.
+  The local fixture's FASTA is the UniProt human reference proteome from
+  ``current_release/``, whose bytes change at every UniProt release, after
+  which the pinned checksum can no longer be fetched at all. On a schedule
+  that is a nightly that goes red at each release and goldens that stop
+  matching. Where CI gets a stable copy is a question for the owner, raised
+  with options when the fetch is built; no agent picks a host or commits the
+  file.
+* **No Thermo RAW fixture.** The pair is mzML. The Windows RAW smoke test
+  (``AC-TST-11``) still has no fixture and no runner, and stays a stub.
+* **The filterer is not adopted.** It remains available if the owner later
+  wants a fixture cut from a full-size run. If so: a selection of confident
+  identifications only would leave Percolator too few decoys and poor matches
+  to train on, so such a set keeps a deliberate share of both and is accepted
+  only after the filtered file has itself been searched.
 
 **Phase 00, 2026-08-29.** Six costed candidates with real sizes, parsed MS2
 counts and licence URLs are in ``docs/feasibility/fixture-candidates.rst``.
