@@ -47,7 +47,6 @@ import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.ScriptedRunner;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -670,10 +669,13 @@ class CometCapabilityProbeTest {
                                             .probe(ToolName.COMET, VERSION, LINUX, binary));
             Path workspace = parentOf(runner.commands().get(0).workingDirectory());
             String name = String.valueOf(workspace.getFileName());
-            Assumptions.assumeFalse(
-                    Files.isWritable(locked.get(0)),
-                    "this user can write a r-xr-xr-x directory (root?), so tidying cannot be made"
-                            + " to fail this way");
+            /*
+             * NOT AN ASSUMPTION, AND NEVER A SKIP.  A user who can write a r-xr-xr-x directory
+             * (root) is a user for whom the probe's tidying succeeds after all; the test then
+             * holds the probe to that outcome instead -- nothing left -- so on every machine it
+             * asserts what the probe did with the workspace, and where.
+             */
+            boolean undeletable = !Files.isWritable(locked.get(0));
 
             assertAll(
                     () ->
@@ -682,12 +684,20 @@ class CometCapabilityProbeTest {
                                             .endsWith("It exited 126 saying: no banner"),
                                     "the tidying failure must not replace the diagnostic: "
                                             + refused.getMessage()),
-                    () -> assertEquals(List.of(name), names(parent)),
+                    () ->
+                            assertEquals(
+                                    undeletable ? List.of(name) : List.of(),
+                                    names(parent),
+                                    "what is left in the directory the probe was given, by a"
+                                            + " probe that "
+                                            + (undeletable ? "could not" : "could")
+                                            + " empty its workspace"),
                     () -> assertTrue(name.startsWith("cometgui-comet-probe-"), name),
                     () ->
                             assertEquals(
-                                    "still here",
-                                    Files.readString(workspace.resolve("defaults/held/open.log"))),
+                                    undeletable,
+                                    Files.exists(workspace.resolve("defaults/held/open.log")),
+                                    "the file the probe had no permission to remove"),
                     () ->
                             assertTrue(
                                     Files.notExists(
@@ -701,8 +711,11 @@ class CometCapabilityProbeTest {
              * undeletable entry there.
              */
             for (Path held : locked) {
-                Files.setPosixFilePermissions(held, PosixFilePermissions.fromString("rwx------"));
-                deleteTree(parentOf(parentOf(held)));
+                if (Files.exists(held)) {
+                    Files.setPosixFilePermissions(
+                            held, PosixFilePermissions.fromString("rwx------"));
+                    deleteTree(parentOf(parentOf(held)));
+                }
             }
         }
     }
