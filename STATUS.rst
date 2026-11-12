@@ -5,7 +5,8 @@ Project Status
 :Project: CometGUI -- Comet + Percolator desktop workflow
 :Updated: 2026-11-12
 :Updated by: Main orchestrator, session 12 (**``D-016``, ``D-017`` and
-   ``D-006``'s CI fixture decided; still paused by the owner**)
+   ``D-006``'s CI fixture decided; a trimmed-FASTA step added to Phase 16;
+   ``D-018`` raised; still paused by the owner**)
 :Current phase: **Paused by the owner after Phase 15** (2026-11-07). Owner,
    2026-11-05: *"Pause after Phase 15 is signed off and pushed."* Phase 16
    (documentation and release qualification) is NOT STARTED and has no
@@ -23,12 +24,15 @@ Project Status
    (workflow and results are core domain logic, held to 90/85); both are
    Phase 16 work. So is ``D-006``'s CI fixture, decided the same day: **the
    two K562 mzML files of the local fixture, as they are** (*"yes, use the
-   K562 pair as the CI fixture"*). No ``D-`` item is open. **Still for the
-   owner:** where CI gets a stable copy of the FASTA (UniProt's
-   ``current_release/`` changes under a pinned checksum), to be raised with
-   options when the fetch is built; ``D-009`` before release; ``D-011``
-   option D is the owner's own action. The nightly stays red until the
-   fixture is wired into its jobs (:ref:`status-p15-signed`).
+   K562 pair as the CI fixture"*), **with a FASTA trimmed to suit them
+   rather than the whole proteome** -- a step the owner added to Phase 16
+   (``phases/PHASE-16-release.rst``, *The CI fixture*; new exit gate item
+   8). The trimmed FASTA changes the fixture's digest, so every golden is
+   regenerated once, with its review record. **Open for the owner:**
+   ``D-018`` (where the trimmed FASTA is kept; recommendation A, commit it);
+   ``D-009`` before release; ``D-011`` option D is the owner's own action.
+   The nightly stays red until the fixture is wired into its jobs
+   (:ref:`status-p15-signed`).
 
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
@@ -4834,10 +4838,13 @@ Change log
        same day, having asked about trimming a set with
        ``mriffle/miller-mzml-filterer`` and been shown that the local files
        are already an excerpt, the owner **decided ``D-006``'s CI half: the
-       K562 pair, as it is**. The FASTA's stable source and a Thermo RAW
-       fixture are not settled by it. None of the three is implemented; all
-       go into the Phase 16 brief. **Still paused**: no brief written,
-       nothing dispatched, no build run.
+       K562 pair, as it is**, and then directed that the FASTA be trimmed to
+       suit them rather than the whole proteome. **Phase 16 amended**: *The
+       CI fixture* added to its scope, a deliverable and exit gate item 8.
+       ``D-018`` raised (where the trimmed FASTA is kept), OPEN. A Thermo
+       RAW fixture is not settled. Nothing is implemented; all of it goes
+       into the Phase 16 brief. **Still paused**: no brief written, nothing
+       dispatched, no build run.
    * - 2026-10-30
      - 14+
      - **E12 repair signed off** at ``35f5b2e`` (11/11 affected gates, four

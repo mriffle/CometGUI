@@ -3,7 +3,8 @@ Decisions
 =========
 
 :Updated: 2026-11-12 (D-016 decided, option B; D-017 decided, option A;
-   D-006's CI fixture decided -- the K562 pair, as it is)
+   D-006's CI fixture decided -- the K562 pair, as it is, with a trimmed
+   FASTA; D-018 raised, OPEN)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -645,14 +646,20 @@ What follows from it, and what it does not settle:
 * **The reviewed goldens should apply as they are**, because they are keyed
   by the fixture's digest and the fixture is the same -- *provided the FASTA
   is byte-identical too*. That is to be shown on a runner, not assumed.
-* **The FASTA is not settled by this answer.** The owner named the spectra.
-  The local fixture's FASTA is the UniProt human reference proteome from
-  ``current_release/``, whose bytes change at every UniProt release, after
-  which the pinned checksum can no longer be fetched at all. On a schedule
-  that is a nightly that goes red at each release and goldens that stop
-  matching. Where CI gets a stable copy is a question for the owner, raised
-  with options when the fetch is built; no agent picks a host or commits the
-  file.
+* **The FASTA is not the whole proteome.** The owner, later on 2026-11-12:
+  *"We shouldn't use a FASTA for the whole proteome, it's unnecessarily
+  large. Add to phase 16 a step to get the FASTA and suitably filter it for
+  our data, so that our CI will still run successfully, but not with an
+  overly large FASTA."* The step is written into
+  ``phases/PHASE-16-release.rst`` (*The CI fixture*). It replaces the FASTA
+  in the table above for local testing and CI alike, so the fixture's digest
+  changes and every golden is regenerated once, with its review record.
+* **Where the trimmed FASTA is kept is** ``D-018``. The whole proteome is
+  served from ``current_release/``, whose bytes change at every UniProt
+  release, after which a pinned checksum can no longer be fetched at all; a
+  trimmed file made from it needs a home that does not move. Part 1 above
+  rules out redistributing FASTA data, so no agent picks a host or commits
+  the file.
 * **No Thermo RAW fixture.** The pair is mzML. The Windows RAW smoke test
   (``AC-TST-11``) still has no fixture and no runner, and stays a stub.
 * **The filterer is not adopted.** It remains available if the owner later
@@ -1189,3 +1196,51 @@ and ``cometgui-results`` are core domain logic and are held to 90% lines and
 was answered. Phase 16 raises the two module thresholds in the build and
 shows the raised gate going red on a deliberate defect; until then
 ``AC-TST-02`` is not recorded as fully met.
+
+----
+
+D-018 -- Where the trimmed fixture FASTA is kept
+================================================
+
+:Status: **OPEN**
+:Raised: 2026-11-12, by tier 1, from the owner's direction that the fixture
+   use a trimmed FASTA (``D-006``)
+:Blocks: the last two steps of Phase 16's CI fixture work (regenerating the
+   goldens and wiring the fetch into CI); not the trimming itself
+:Owner: Project owner
+
+**Question.** Phase 16 makes a small FASTA from the UniProt human reference
+proteome, trimmed to suit the K562 spectra. CI and local testing must then
+get exactly that file, byte for byte, for as long as the goldens live. Where
+does it come from?
+
+**Why an agent may not answer it.** ``D-006`` part 1: *"We won't be
+redistributing the data in this project"*, and the entry records that as
+covering spectrum and FASTA data alike. Committing the file, or uploading it
+anywhere, is redistribution. UniProt's licence (CC BY 4.0) permits it with
+attribution; whether the project does it is the owner's rule to change.
+
+**Options.**
+
+A. **Commit the trimmed FASTA to the repository**, with UniProt's
+   attribution and the release it was made from. An exception to ``D-006``
+   part 1 for this one file; the spectra stay fetched, never committed. The
+   file never moves, CI downloads nothing from UniProt, and a clean clone
+   has it.
+B. **Commit only the list of accessions; rebuild the file in each job** from
+   UniProt, entry by entry at pinned entry versions. Nothing is
+   redistributed. Every run then depends on UniProt answering some hundreds
+   or thousands of requests, and whether UniProt serves old entry versions
+   in a form that reproduces the bytes has **not been tested**.
+C. **Commit only the list; download the whole current proteome in each job
+   and filter it.** Nothing is redistributed, but the result changes whenever
+   UniProt revises one of the kept sequences, so the checksum and the goldens
+   break at unpredictable releases -- and every job still downloads the
+   whole proteome, which is what the owner asked to stop.
+D. **The owner hosts the file** somewhere stable outside the repository (a
+   release asset, an archive with a DOI), fetched by checksum like the
+   spectra. Still redistribution, by the owner rather than the repository.
+
+**Recommendation.** A. It is the only option with no moving part, the licence
+allows it, and the file is small. B is the choice if the rule against
+redistributing is to hold without exception, and it needs a spike first.

@@ -5,7 +5,9 @@ PHASE-16: Documentation and Release Qualification
 :Phase: 16
 :Status: NOT STARTED
 :Depends on: 15
-:Blocked by decisions: D-001, D-004, D-006, D-008
+:Blocked by decisions: D-018 (where the trimmed FASTA is kept) blocks only
+   the last step of the CI fixture work; D-009 must be settled before
+   release. D-001, D-004, D-006 and D-008 are DECIDED
 :Delivers: R-DOC-01, R-DOC-02, R-DOC-06
 :Contributes to: R-DOC-03, R-DOC-04, R-DOC-05, R-SEC-01
 :Proves: AC-DOC-01, AC-DOC-02, AC-REL-02, AC-REL-03, AC-UX-01..06, AC-TST-07
@@ -45,6 +47,72 @@ In scope
   project-built tool binaries.
 * Scheduling and recording the six human UX-validation activities and the
   defects they produce.
+* **The CI fixture** (added by the owner, 2026-11-12): the K562 spectra
+  fetched into the CI jobs that wait for them, and a FASTA trimmed to suit
+  those spectra in place of the whole human proteome. See
+  :ref:`phase16-ci-fixture`.
+* The two decisions the owner took on 2026-11-12 and Phase 15 left
+  unimplemented: ``D-016`` option B and ``D-017`` option A
+  (``DECISIONS.rst``).
+
+.. _phase16-ci-fixture:
+
+The CI fixture
+--------------
+
+Two owner decisions of 2026-11-12 (``DECISIONS.rst``, ``D-006``).
+
+**The spectra** are the two K562 mzML files of the local fixture, unchanged
+and unfiltered: *"yes, use the K562 pair as the CI fixture."*
+
+**The FASTA** is not the whole proteome. The owner: *"We shouldn't use a
+FASTA for the whole proteome, it's unnecessarily large. Add to phase 16 a
+step to get the FASTA and suitably filter it for our data, so that our CI
+will still run successfully, but not with an overly large FASTA."*
+
+The step, in order:
+
+#. **Measure what the change touches before making it.** The reviewed
+   goldens are keyed by the fixture's digest, so a different FASTA
+   invalidates every one of them; the performance baseline and any test that
+   pins a count from the present fixture move too. List them first.
+#. **Get the source FASTA** -- the UniProt human reference proteome the local
+   fixture already uses -- by checksum, recording the UniProt release.
+#. **Search the K562 pair against it** and take the proteins behind the
+   confident identifications.
+#. **Keep those proteins and a background of others.** A FASTA holding only
+   the identified proteins is over-filtered: Comet's decoys are made from the
+   FASTA, so almost every spectrum would match a true target, Percolator
+   would have too few decoys and poor matches to train on, and a result set
+   in which everything passes 1% proves nothing about the filters. The
+   background is chosen by a recorded, deterministic rule and sized by
+   measurement, not by guess.
+#. **Accept the trimmed FASTA only on a search of it.** The K562 pair is run
+   against it through the product's own workflow, for every Comet and
+   Percolator pair the version matrix offers. Percolator must train and
+   write its results; confident PSMs and peptides at 1% must clear a floor;
+   decoy PSMs must be present; PSMs must fall on both sides of the 1% line;
+   the Limelight conversion must still validate. The phase proposes the
+   floors from what it measures and tier 1 confirms them. **The check is
+   shown red on a deliberately over-filtered FASTA** -- identified proteins
+   only -- before it is trusted.
+#. **Make it reproducible.** The selection is a committed script and a
+   committed list of accessions, with the UniProt release it was made from.
+#. **Use one fixture, not two.** Local testing and CI share the trimmed
+   FASTA, so there is one set of goldens. They are regenerated once, each
+   with its review record (``R-TEST-07``); a golden is never regenerated to
+   make a red run green.
+#. **Wire the fetch into the CI jobs** that name ``D-006`` today, under every
+   condition ``D-006`` already sets for the spectra: fetched by checksum,
+   never committed, the CRLF defence applied on the runner.
+
+**Where the trimmed FASTA itself is kept is** ``D-018`` **and is the
+owner's.** ``D-006`` rules that the project does not redistribute spectrum or
+FASTA data, so no agent commits the FASTA or picks a host for it. Steps 1 to
+6 do not depend on the answer; steps 7 and 8 do.
+
+No Thermo RAW fixture comes out of this. The Windows RAW smoke test
+(``AC-TST-11``) stays a stub.
 
 Out of scope
 ------------
@@ -58,6 +126,8 @@ Deliverables
 * Release artefacts for each tier-1 platform with checksums and SBOM.
 * ``docs/developer/releasing.rst`` and a release checklist.
 * Recorded UX session findings, triaged as defects.
+* The trimmed FASTA's selection script and accession list, its acceptance
+  check, and the goldens regenerated for it with their review records.
 
 Exit gate
 ---------
@@ -78,6 +148,11 @@ running the check. An item that cannot be verified has not passed.
 6. All six UX-validation activities are complete, with findings triaged.
 7. No release-critical test is quarantined and every release gate in the
    pipeline passes.
+8. The CI jobs that waited on ``D-006`` search the K562 pair against the
+   trimmed FASTA on a runner and pass against reviewed goldens; the trimmed
+   FASTA's acceptance check passes and has been seen to fail on an
+   over-filtered FASTA; no job fetches the whole proteome
+   (:ref:`phase16-ci-fixture`).
 
 Risks and notes
 ---------------

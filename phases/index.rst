@@ -100,7 +100,7 @@ authoritative for its own scope and exit gate.
    * - `16 <PHASE-16-release.rst>`_
      - Documentation and Release Qualification
      - 15
-     - D-006, D-009. D-001, D-004 and D-008 DECIDED
+     - D-009, D-018. D-001, D-004, D-006 and D-008 DECIDED
      - NOT STARTED
 
 Ordering notes
