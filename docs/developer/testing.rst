@@ -2217,8 +2217,13 @@ was later raised and the injection re-made at 1.2 s.
   that run's stores (hash, index, map). The first version of this suite timed
   "opens" of 0.85 s that were warm (already indexed on the way past) and one of
   15 s that was five opens; the run is now selected directly, as a click does.
-  A scientist arrowing through a project of large runs pays a cold open for
-  every run passed. Reported, not changed here (no product change in this unit).
+  A scientist arrowing through a project of large runs paid a cold open for
+  every run passed. Reported, not changed in that unit. *Fixed in Phase 16
+  (unit 3):* the chooser opens a run only when a choice is committed -- Enter,
+  Space or a click on a run -- and walking its list opens none
+  (``ResultsRunChooserUiTest``, which counts the runs the section starts
+  opening; red on the old chooser at "runs opened ==> expected: <[]> but was:
+  <[run-c]>").
 * The peak retained heap **creeps by about 0.6 MiB per run opened** in one
   session (6.6, 7.6, 8.2, 8.7, 9.3 MiB over five runs in one baseline); small
   against the 64 MB budget, but it does not return to the baseline when a run is
@@ -5005,8 +5010,5 @@ test changed to hide one:
 * ``KeyboardOnlyNavigationUiTest`` **fails on a machine with Comet installed in
   the application-data folder** -- deterministic, an isolation defect; open in
   ``STATUS.rst``, tier 1's to route (:ref:`dev-testing-flakiness`).
-* **The Results run chooser opens every run it passes** on keyboard navigation,
-  each a cold open of a large run (unit 8, reported;
-  :ref:`dev-testing-performance`).
 * **The retained GUI heap creeps** by about 0.6 MiB per run opened in one
   session and does not return when a run closes (unit 8, not traced).

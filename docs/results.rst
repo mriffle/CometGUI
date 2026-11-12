@@ -32,6 +32,11 @@ Choosing what to look at
 Percolator result table, newest first, and shows the newest. Each entry names
 the run, when it was created and how it ended (or "executing now"). Choose
 another run to see its results; **Read the runs again** reads the list afresh.
+With the keyboard, **Up** or **Down** opens the list and moves through it
+without opening anything; **Enter** or **Space** opens the run you stopped on,
+and **Escape** closes the list and leaves the open run as it is. With the
+mouse, a click on a run opens it. A run is opened only when you choose it, so
+moving past large runs costs nothing.
 The list is also read when CometGUI starts and when a run starts or ends, so a
 run that has just finished appears without a restart.
 

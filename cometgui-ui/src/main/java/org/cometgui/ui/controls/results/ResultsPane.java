@@ -37,16 +37,21 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
+import javafx.scene.control.Skin;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.skin.ComboBoxListViewSkin;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
@@ -91,6 +96,29 @@ import org.cometgui.ui.viewmodel.results.WeightsViewModel;
  * the rows of the page whose keys are selected are selected in the table again. So a selection
  * survives a filter change, a sort and a page move however the table is redrawn.
  *
+ * <h2>The run chooser opens a run when a choice is made, not while the list is walked</h2>
+ *
+ * <p>Opening a run hashes, indexes and maps its tables, which for a large run takes seconds. A
+ * JavaFX combo box changes its value on every arrow key -- with its list closed and with it open --
+ * so a view that opened whatever the value became would open every run a keyboard user passes on
+ * the way to the one they want. Here the value is only what the chooser <em>shows</em>; a run is
+ * opened when the choice is committed:
+ *
+ * <ul>
+ *   <li>Up or Down on the closed chooser opens its list and changes nothing;
+ *   <li>in the open list the arrow keys move through the runs, and none is opened;
+ *   <li>Enter, Space or a click on a run closes the list and opens the run then shown -- that one
+ *       run, once;
+ *   <li>Escape, a click elsewhere or leaving the chooser closes the list and puts the chooser back
+ *       on the run that is open. (The toolkit's pop-up takes the keys before the chooser sees them
+ *       and handles Escape itself, so the rule is kept the other way round: a closing list is a
+ *       choice only when Enter, Space or a click on a run closed it, and those are watched on the
+ *       list itself.)
+ * </ul>
+ *
+ * <p>A value set while the list is closed -- by a test or an assistive technology acting on the
+ * control directly -- is a committed choice and opens that run.
+ *
  * <h2>A thin view</h2>
  *
  * <p>Every text shown is a view-model's, every action calls a view-model method. Nothing here reads
@@ -130,6 +158,12 @@ public final class ResultsPane extends ScrollPane {
 
     /** Set while the view moves a control itself, so that the move is not taken as a choice. */
     private boolean updating;
+
+    /**
+     * Set when Enter, Space or a click on a run is closing the run chooser's list: only then is the
+     * run it shows a choice.
+     */
+    private boolean committingRunChoice;
 
     /**
      * The section's content.
@@ -340,16 +374,99 @@ public final class ResultsPane extends ScrollPane {
                         return null;
                     }
                 });
+        run.addEventFilter(KeyEvent.KEY_PRESSED, this::runChoiceKeyPressed);
+        run.skinProperty().addListener((observable, before, after) -> watchRunList(after));
+        watchRunList(run.getSkin());
+        run.showingProperty()
+                .addListener(
+                        (observable, was, showing) -> {
+                            if (showing) {
+                                committingRunChoice = false;
+                            } else if (committingRunChoice) {
+                                committingRunChoice = false;
+                                commitRunChoice();
+                            } else {
+                                showRuns();
+                            }
+                        });
+        run.setCellFactory(
+                list -> {
+                    ListCell<ResultsRun> cell =
+                            new ListCell<>() {
+                                @Override
+                                protected void updateItem(ResultsRun item, boolean empty) {
+                                    super.updateItem(item, empty);
+                                    setText(empty || item == null ? null : item.label());
+                                }
+                            };
+                    cell.addEventFilter(
+                            MouseEvent.MOUSE_PRESSED,
+                            pressed -> committingRunChoice = !cell.isEmpty());
+                    return cell;
+                });
         run.valueProperty()
                 .addListener(
                         (observable, before, after) -> {
-                            if (!updating && after != null) {
-                                results.choose(after);
+                            // While the list is open the value only follows the arrow keys; the
+                            // choice is made when the list closes.
+                            if (!run.isShowing()) {
+                                commitRunChoice();
                             }
                         });
         results.runsProperty().addListener((observable, before, after) -> showRuns());
         results.chosenRunProperty().addListener((observable, before, after) -> showRuns());
         showRuns();
+    }
+
+    /**
+     * The run chooser's keys: an arrow on the closed chooser opens its list instead of changing the
+     * run, and Enter or Space in the open list makes the run shown the choice.
+     */
+    private void runChoiceKeyPressed(KeyEvent pressed) {
+        KeyCode code = pressed.getCode();
+        if (run.isShowing()) {
+            if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
+                committingRunChoice = true;
+            }
+            return;
+        }
+        boolean arrow =
+                code == KeyCode.UP
+                        || code == KeyCode.DOWN
+                        || code == KeyCode.KP_UP
+                        || code == KeyCode.KP_DOWN;
+        if (arrow && !pressed.isAltDown()) {
+            // Alt with an arrow is the toolkit's own key for opening the list; left to it.
+            run.show();
+            pressed.consume();
+        }
+    }
+
+    /**
+     * Watches the chooser's list for the keys that make a choice. While the list is open the
+     * toolkit hands every key to the list first, and the list closes itself on Enter and Space
+     * before the chooser is told, so the keys are seen here or not at all.
+     */
+    private void watchRunList(Skin<?> skin) {
+        if (skin instanceof ComboBoxListViewSkin<?> listSkin) {
+            listSkin.getPopupContent()
+                    .addEventFilter(
+                            KeyEvent.KEY_PRESSED,
+                            pressed -> {
+                                KeyCode code = pressed.getCode();
+                                if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
+                                    committingRunChoice = true;
+                                }
+                            });
+        }
+    }
+
+    /** Opens the run the chooser shows, if it is not the one already open. */
+    private void commitRunChoice() {
+        ResultsRun shown = run.getValue();
+        if (!updating && shown != null) {
+            results.choose(shown);
+        }
     }
 
     private void buildTableChoice() {
