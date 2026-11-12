@@ -303,6 +303,16 @@ A cancelled install is not a failure: the row goes back to *not installed* and
 carries no reason. Pressing **Install** again on a failed row starts a fresh
 attempt, and the reason is cleared while it runs.
 
+**The reason is still there after you close CometGUI and open it again.** It
+is kept, already redacted, in a small text file in CometGUI's own tool cache --
+``cache/failures/`` under the application-data folder, one file for each build
+whose last attempt failed -- and the row reads it back. The console line is
+not written again: it reports an attempt, and reopening the application makes
+none. The file is removed when you press **Install** on that row again, and a
+build that has since been installed never shows an older failure. If the file
+cannot be written, the reason is shown for the rest of the session and the row
+reads *not installed* after a restart.
+
 .. _tool-manager-diagnostics:
 
 When a build will not run here
@@ -342,10 +352,6 @@ Percolator of your own is registered from the Percolator section --
 **There is no Refresh.** Rows are read when the section is built and again
 around an install. A tool installed or removed outside CometGUI while it is
 running is not noticed until the application is restarted.
-
-**A failed install's reason lasts as long as the application.** It is held in
-memory, like the attempt itself: after a restart the row reads *not installed*
-again, and **Install** starts afresh.
 
 **Advisories hang off an artefact record, so a release with none here shows
 none.** Percolator 3.09 publishes nothing for Linux. The row is still there,

@@ -376,6 +376,138 @@ class ToolCacheTest {
                 () -> cache.verify(Nulls.of(org.cometgui.install.registry.ArtefactRecord.class)));
     }
 
+    // ------------------------------------------------- why the last install attempt failed --
+
+    private static org.cometgui.install.registry.ArtefactRecord percolator() {
+        return CacheFixtures.bareExecutable(
+                ToolName.PERCOLATOR,
+                "3.07.1",
+                CacheFixtures.bytes("the binary"),
+                "bin/percolator",
+                List.of());
+    }
+
+    private static List<String> names(Path directory) throws IOException {
+        try (java.util.stream.Stream<Path> entries = Files.list(directory)) {
+            return entries.map(entry -> String.valueOf(entry.getFileName())).sorted().toList();
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "a failed attempt's reason is kept beside the locks, keyed like them, and read back"
+                    + " exactly as it was written")
+    void aFailureIsRecordedAndReadBack() throws IOException {
+        ToolCache cache = cache();
+        Path file = temporary.resolve("root/cache/failures/percolator__3.7.1__linux-x86-64.txt");
+        String reason = "Install step 6 of 8, PROBE, failed: it exited with status 3\n";
+
+        java.util.Optional<String> before = cache.recordedFailure(percolator());
+        cache.recordFailure(percolator(), reason);
+
+        assertEquals(java.util.Optional.empty(), before, "nothing is recorded to begin with");
+        assertEquals(
+                file, cache.failureFile(ToolName.PERCOLATOR, ToolVersion.parse("3.07.1"), LINUX));
+        assertEquals(reason, Files.readString(file, StandardCharsets.UTF_8));
+        assertEquals(java.util.Optional.of(reason), cache.recordedFailure(percolator()));
+        assertEquals(
+                List.of("percolator__3.7.1__linux-x86-64.txt"),
+                names(file.getParent()),
+                "the record and nothing else: the temporary name it was written under is gone");
+    }
+
+    @Test
+    @DisplayName("a later failure replaces the record, and clearing it leaves none")
+    void aFailureIsReplacedAndCleared() throws IOException {
+        ToolCache cache = cache();
+        cache.recordFailure(percolator(), "the first reason");
+        cache.recordFailure(percolator(), "the second reason");
+        java.util.Optional<String> replaced = cache.recordedFailure(percolator());
+
+        cache.clearFailure(percolator());
+        java.util.Optional<String> cleared = cache.recordedFailure(percolator());
+        cache.clearFailure(percolator());
+
+        assertEquals(java.util.Optional.of("the second reason"), replaced);
+        assertEquals(java.util.Optional.empty(), cleared);
+        assertEquals(
+                List.of(),
+                names(temporary.resolve("root/cache/failures")),
+                "clearing twice is not an error, and nothing is left");
+    }
+
+    @Test
+    @DisplayName("a blank reason is refused by name, and a blank record on disk is no record")
+    void aBlankFailureIsNoFailure() throws IOException {
+        ToolCache cache = cache();
+
+        IllegalArgumentException refused =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> cache.recordFailure(percolator(), " \t"));
+        Path file = cache.failureFile(ToolName.PERCOLATOR, ToolVersion.parse("3.07.1"), LINUX);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, " \n", StandardCharsets.UTF_8);
+
+        assertEquals(
+                "the reason an install of percolator 3.07.1 linux-x86-64 failed must not be blank",
+                refused.getMessage());
+        assertEquals(java.util.Optional.empty(), cache.recordedFailure(percolator()));
+    }
+
+    @Test
+    @DisplayName("a record that is there and cannot be read is an I/O failure, not an absence")
+    void anUnreadableFailureRecordIsNotAnAbsence() throws IOException {
+        ToolCache cache = cache();
+        Path file = cache.failureFile(ToolName.PERCOLATOR, ToolVersion.parse("3.07.1"), LINUX);
+        Files.createDirectories(file);
+
+        assertThrows(IOException.class, () -> cache.recordedFailure(percolator()));
+    }
+
+    @Test
+    @DisplayName("the failure record's arguments are required by name")
+    void theFailureRecordRejectsNulls() {
+        ToolCache cache = cache();
+        assertEquals(
+                "record",
+                assertThrows(
+                                NullPointerException.class,
+                                () ->
+                                        cache.recordFailure(
+                                                Nulls.of(
+                                                        org.cometgui.install.registry.ArtefactRecord
+                                                                .class),
+                                                "why"))
+                        .getMessage());
+        assertEquals(
+                "reason",
+                assertThrows(
+                                NullPointerException.class,
+                                () -> cache.recordFailure(percolator(), Nulls.of(String.class)))
+                        .getMessage());
+        assertEquals(
+                "record",
+                assertThrows(
+                                NullPointerException.class,
+                                () ->
+                                        cache.recordedFailure(
+                                                Nulls.of(
+                                                        org.cometgui.install.registry.ArtefactRecord
+                                                                .class)))
+                        .getMessage());
+        assertEquals(
+                "record",
+                assertThrows(
+                                NullPointerException.class,
+                                () ->
+                                        cache.clearFailure(
+                                                Nulls.of(
+                                                        org.cometgui.install.registry.ArtefactRecord
+                                                                .class)))
+                        .getMessage());
+    }
+
     /*
      * Builds a complete cache entry by hand rather than by running the installer: a verification
      * checked against an entry the installer wrote would agree with the installer about any mistake

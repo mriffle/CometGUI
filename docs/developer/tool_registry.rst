@@ -422,6 +422,7 @@ file system and step 7 is a rename rather than an interruptible copy::
     <root>/cache/downloads/<key>/                 artefacts being fetched
     <root>/cache/staging/<id>/                    an install being built
     <root>/cache/locks/<key>.lock                 the R-TOOL-05 lock files
+    <root>/cache/failures/<key>.txt               why the last install attempt failed
 
 The version directory is the **normalised** version, because two spellings of
 one version (``3.09`` and ``3.09.0``) must not become two directories; the
@@ -436,6 +437,17 @@ what the marker records every time it is asked whether a tool is installed --
 because a cached answer is a second place the truth can live. A marker whose
 recorded digest no longer matches the file on disk makes the entry
 *not installed*, not installed-with-a-warning.
+
+**A failed attempt leaves its reason, and nothing else.** ``ManagedToolManager``
+writes the reason a row shows -- the failing step and the cause's own words,
+through the one redactor -- to ``cache/failures/<key>.txt`` as the attempt
+fails, and removes it as the next attempt for that build starts. It is beside
+the lock rather than in the tool directory because a failed attempt has no tool
+directory, and making one to hold a reason would put a directory where
+``R-TOOL-04`` says none may look installed. A manager that has started nothing
+itself reads the file back (redacting it again, since it has been on disk
+between two runs), so the row still says why after a restart; an installed
+entry outranks it, and a file that cannot be read is no failure on record.
 
 An install halted after each of the eight steps in turn -- in a second JVM, by
 ``Runtime.halt``, so there is no unwinding and no ``finally`` -- leaves

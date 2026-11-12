@@ -146,12 +146,16 @@ class FailedInstallReasonTest {
         return new ArtefactManifest(shipped.schemaVersion(), rows);
     }
 
+    /** One run of the application over this test's application-data directory. */
+    private record Session(
+            ManagedToolManager manager, ToolManagerViewModel viewModel, List<String> logged) {}
+
     /**
-     * Installs one row through the Tool Manager view-model, on the calling thread, and collects
-     * what the port, the row and the log then say.
+     * Opens the application's Tool Manager over this test's application-data directory: a new cache
+     * object, installer, manager and view-model each time, sharing nothing with an earlier session
+     * but the directory on disk.
      */
-    private Said install(ArtefactManifest manifest, ArtefactFetcher fetcher, String rowKey)
-            throws IOException {
+    private Session open(ArtefactManifest manifest, ArtefactFetcher fetcher) throws IOException {
         HashService hashes = new StreamingHashService();
         ToolCache cache = new ToolCache(temporary.resolve("cache"), hashes);
         ProcessService processes = new ProcessService(Clock.systemUTC());
@@ -178,15 +182,30 @@ class FailedInstallReasonTest {
                 new ToolManagerViewModel(
                         manager, Runnable::run, Runnable::run, new ScriptedChooser(), logged::add);
         viewModel.refresh();
-        ToolRowViewModel row = rowOf(viewModel, rowKey);
-        viewModel.install(row);
+        return new Session(manager, viewModel, logged);
+    }
+
+    /**
+     * Installs one row through the Tool Manager view-model, on the calling thread, and collects
+     * what the port, the row and the log then say.
+     */
+    private Said install(ArtefactManifest manifest, ArtefactFetcher fetcher, String rowKey)
+            throws IOException {
+        Session session = open(manifest, fetcher);
+        session.viewModel().install(rowOf(session.viewModel(), rowKey));
+        return said(session, rowKey);
+    }
+
+    /** What a session's port, row and log say about one row, as they stand. */
+    private static Said said(Session session, String rowKey) {
+        ToolRowViewModel row = rowOf(session.viewModel(), rowKey);
         ToolOffer offer =
-                manager.offers().stream()
+                session.manager().offers().stream()
                         .filter(candidate -> candidate.tool() == row.offer().tool())
                         .filter(candidate -> candidate.version().equals(row.offer().version()))
                         .findFirst()
                         .orElseThrow();
-        return new Said(offer, rowOf(viewModel, rowKey).failureText(), List.copyOf(logged));
+        return new Said(offer, row.failureText(), List.copyOf(session.logged()));
     }
 
     private static ToolRowViewModel rowOf(ToolManagerViewModel viewModel, String key) {
@@ -295,6 +314,63 @@ class FailedInstallReasonTest {
                             + " recognises: 1 line(s) of output were searched, standard error"
                             + " first; it exited with status 3 (install step 6, PROBE)");
         }
+    }
+
+    /*
+     * CLOSED AND REOPENED (Phase 16 unit 4).  Until then the reason lived in the manager's memory
+     * and a restart turned the row back into "not installed".  The second session here is a new
+     * manager, installer, cache object and view-model over the same application-data directory,
+     * with a fetcher that fails the test if anything is fetched: what it says, it read from disk.
+     * The console line is not written again -- it reports an attempt, and this session made none.
+     */
+    @Test
+    @DisplayName(
+            "closed and reopened: the port and the Tool Manager's row still say why the install"
+                    + " failed, word for word, and the console is not told a second time")
+    void theReasonIsStillThereAfterARestart() throws IOException {
+        ArtefactRecord record = comet();
+        Path broken = temporary.resolve("comet.linux.exe");
+        Files.writeString(
+                broken,
+                "#!/bin/sh\necho 'comet: this build cannot start here' >&2\nexit 3\n",
+                StandardCharsets.US_ASCII);
+        ArtefactManifest manifest = pinning(record, broken);
+        Said before;
+        try (LoopbackArtefactServer served =
+                new LoopbackArtefactServer().serve(record.url(), broken)) {
+            before = install(manifest, served, COMET_ROW);
+        }
+
+        Session reopened =
+                open(
+                        manifest,
+                        request -> {
+                            throw new AssertionError(
+                                    "the reopened application fetched " + request.source());
+                        });
+        Said after = said(reopened, COMET_ROW);
+
+        String reason =
+                "Install step 6 of 8, PROBE, failed: comet 2026.03.0 linux-x86-64 was not"
+                        + " installed: the installed build was not accepted by the probe: comet"
+                        + " 2026.03.0 linux-x86-64 printed no version this build recognises: 1"
+                        + " line(s) of output were searched, standard error first; it exited with"
+                        + " status 3 (install step 6, PROBE)";
+        assertAll(
+                () -> saidEverywhere(before, "comet 2026.03.0", reason),
+                () -> assertEquals(ToolInstallState.FAILED, after.offer().state()),
+                () -> assertEquals(Optional.of(reason), after.offer().failureReason(), "the port"),
+                () -> assertEquals(Optional.of(reason), after.row(), "the Tool Manager's row"),
+                () ->
+                        assertEquals(
+                                "CometGUI-managed: the last install attempt did not succeed",
+                                rowOf(reopened.viewModel(), COMET_ROW).stateText(),
+                                "and the row's own words for its state"),
+                () ->
+                        assertEquals(
+                                List.of(),
+                                after.log(),
+                                "the console's line reports an attempt; this session made none"));
     }
 
     /*

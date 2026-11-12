@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
@@ -48,6 +49,7 @@ import org.cometgui.install.registry.ArtefactRecord;
  *   &lt;root&gt;/cache/downloads/&lt;key&gt;/                  artefacts being fetched
  *   &lt;root&gt;/cache/staging/&lt;id&gt;/                     an install being built
  *   &lt;root&gt;/cache/locks/&lt;key&gt;.lock                  the R-TOOL-05 lock files
+ *   &lt;root&gt;/cache/failures/&lt;key&gt;.txt               why the last install attempt failed
  * </pre>
  *
  * <p><strong>The root is a constructor argument and this class never looks at a home
@@ -88,6 +90,9 @@ public final class ToolCache {
 
     /** The directory under the root that holds everything an install can throw away. */
     public static final String CACHE_DIRECTORY = "cache";
+
+    /** The directory under {@link #CACHE_DIRECTORY} that holds failed attempts' reasons. */
+    private static final String FAILURES_DIRECTORY = "failures";
 
     /** Distinguishes the staging directories of two installs running in one JVM. */
     private static final AtomicInteger STAGING_SEQUENCE = new AtomicInteger();
@@ -194,6 +199,94 @@ public final class ToolCache {
      */
     public Path lockFile(ToolName tool, ToolVersion version, HostPlatform platform) {
         return workingRoot().resolve("locks").resolve(key(tool, version, platform) + ".lock");
+    }
+
+    /**
+     * Where the reason one tool build's last install attempt failed is kept.
+     *
+     * <p>Beside the lock and the downloads, keyed the same way, because it is the same kind of
+     * thing: a fact about installing one artefact that is not the installed tool. It is
+     * deliberately <strong>not</strong> in the tool directory. That directory exists only once an
+     * install has succeeded, and {@link #verify} is the one authority on what is in it; a failed
+     * attempt has no tool directory to write into, and making one to hold its reason would put a
+     * directory where {@code R-TOOL-04} says none may appear to be installed.
+     *
+     * @param tool which tool
+     * @param version which release of it
+     * @param platform which build
+     * @return {@code <root>/cache/failures/<key>.txt}
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public Path failureFile(ToolName tool, ToolVersion version, HostPlatform platform) {
+        return workingRoot()
+                .resolve(FAILURES_DIRECTORY)
+                .resolve(key(tool, version, platform) + ".txt");
+    }
+
+    /**
+     * Records why the last install attempt of one artefact failed, so the reason outlives the
+     * process that met it.
+     *
+     * <p>The text is written as it is given and read back as it was written. <strong>Whoever calls
+     * this redacts first</strong> ({@code R-SEC-03}): this file is on disk, outside any run, and
+     * nothing that looks like a credential may reach it. Written to a temporary name and renamed
+     * into place, for the reason {@link #writeMarker} gives: a reader never sees half a reason.
+     *
+     * @param record the artefact whose install failed
+     * @param reason why, already redacted
+     * @throws IOException if it cannot be written
+     * @throws IllegalArgumentException if {@code reason} is blank -- a failure with no reason is
+     *     what this record exists to prevent
+     * @throws NullPointerException if either argument is {@code null}
+     */
+    public void recordFailure(ArtefactRecord record, String reason) throws IOException {
+        Objects.requireNonNull(record, "record");
+        Objects.requireNonNull(reason, "reason");
+        if (reason.isBlank()) {
+            throw new IllegalArgumentException(
+                    "the reason an install of " + record.describe() + " failed must not be blank");
+        }
+        Path target = failureFile(record.tool(), record.version(), record.platform());
+        Files.createDirectories(workingRoot().resolve(FAILURES_DIRECTORY));
+        Path temporary =
+                target.resolveSibling(target.getFileName() + "." + UUID.randomUUID() + ".tmp");
+        Files.writeString(temporary, reason, StandardCharsets.UTF_8);
+        Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /**
+     * Why the last install attempt of one artefact failed, if a failure is on record.
+     *
+     * @param record the artefact
+     * @return the recorded reason exactly as it was written, or empty when none is recorded or the
+     *     record is blank
+     * @throws IOException if the record is there and cannot be read
+     * @throws NullPointerException if {@code record} is {@code null}
+     */
+    public Optional<String> recordedFailure(ArtefactRecord record) throws IOException {
+        Objects.requireNonNull(record, "record");
+        String reason;
+        try {
+            reason =
+                    Files.readString(
+                            failureFile(record.tool(), record.version(), record.platform()),
+                            StandardCharsets.UTF_8);
+        } catch (NoSuchFileException noneRecorded) {
+            return Optional.empty();
+        }
+        return Optional.of(reason).filter(text -> !text.isBlank());
+    }
+
+    /**
+     * Forgets why an earlier install attempt of one artefact failed, when a new attempt starts.
+     *
+     * @param record the artefact; doing nothing if no failure is recorded for it
+     * @throws IOException if the record cannot be removed
+     * @throws NullPointerException if {@code record} is {@code null}
+     */
+    public void clearFailure(ArtefactRecord record) throws IOException {
+        Objects.requireNonNull(record, "record");
+        Files.deleteIfExists(failureFile(record.tool(), record.version(), record.platform()));
     }
 
     /**

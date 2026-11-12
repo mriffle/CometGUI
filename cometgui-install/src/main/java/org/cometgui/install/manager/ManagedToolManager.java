@@ -151,6 +151,12 @@ public final class ManagedToolManager implements ToolManager {
      * removed when the install finished or was cancelled, because in both of those cases {@link
      * ToolCache#verify} is then the whole truth. The reason lives in the same entry as the state
      * rather than in a map beside it, so the two cannot disagree about which attempt they describe.
+     *
+     * <p><strong>A failed attempt's reason is also kept on disk</strong>, in the tool cache ({@link
+     * ToolCache#recordFailure}), so that it survives a restart: a manager that has started nothing
+     * itself reads it back, and a row whose last attempt failed in an earlier session still says
+     * why. It is written when the attempt fails and removed when the next attempt for the same
+     * build starts, so what is on disk is always about the last attempt that ran to an end.
      */
     private final Map<String, Attempt> attempts = new ConcurrentHashMap<>();
 
@@ -288,6 +294,7 @@ public final class ManagedToolManager implements ToolManager {
         Cancellation cancellation = new Cancellation();
         String entry = keyOf(record);
         attempts.put(entry, Attempt.RUNNING);
+        forgetEarlierFailure(record);
         installThreads.execute(() -> runInstall(record, listener, cancellation, entry));
         return cancellation;
     }
@@ -582,20 +589,11 @@ public final class ManagedToolManager implements ToolManager {
                     Optional.of(marker.releaseTag()));
         }
         if (attempt != null) {
-            return new ToolOffer(
-                    record.tool(),
-                    record.version(),
-                    ToolOrigin.MANAGED,
-                    ToolInstallState.FAILED,
-                    record.capabilities(),
-                    record.advisories(),
-                    Optional.empty(),
-                    Optional.empty(),
-                    OptionalLong.of(wholeDownloadOf(record)),
-                    List.of(),
-                    Optional.empty(),
-                    Optional.empty(),
-                    Optional.of(attempt.reason()));
+            return failedOffer(record, attempt.reason());
+        }
+        Optional<String> earlier = earlierFailure(record);
+        if (earlier.isPresent()) {
+            return failedOffer(record, earlier.get());
         }
         return managedOffer(
                 record,
@@ -603,6 +601,77 @@ public final class ManagedToolManager implements ToolManager {
                 record.capabilities(),
                 Optional.empty(),
                 Optional.empty());
+    }
+
+    private static ToolOffer failedOffer(ArtefactRecord record, String reason) {
+        return new ToolOffer(
+                record.tool(),
+                record.version(),
+                ToolOrigin.MANAGED,
+                ToolInstallState.FAILED,
+                record.capabilities(),
+                record.advisories(),
+                Optional.empty(),
+                Optional.empty(),
+                OptionalLong.of(wholeDownloadOf(record)),
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(reason));
+    }
+
+    /*
+     * WHY AN ATTEMPT MADE BEFORE THIS PROCESS STARTED FAILED.  Asked only for a build that is not
+     * installed and that this process has not itself tried: an installed entry outranks a failure
+     * recorded before it, and this session's own attempt outranks an earlier session's.
+     *
+     * Redacted again on the way in, although it was redacted before it was written.  The file is
+     * on disk between two runs of the application, where anything may have rewritten it, and the
+     * reason is shown in the window -- so what reaches the port has always been through the one
+     * redactor in this process, whatever wrote the file.
+     *
+     * A RECORD THAT CANNOT BE READ IS NOT A FAILURE ON RECORD.  The row then offers the install,
+     * exactly as an entry that cannot be verified does (installedEntries): propagating would
+     * blank the whole Tool Manager over one unreadable file that only ever held an explanation.
+     */
+    private Optional<String> earlierFailure(ArtefactRecord record) {
+        try {
+            return cache.recordedFailure(record).map(REDACTOR::redactText);
+        } catch (IOException unreadable) {
+            return Optional.empty();
+        }
+    }
+
+    /*
+     * THE REASON IS HELD FIRST AND KEPT SECOND.  The attempt map is what this session's rows are
+     * drawn from, so the reason is in it before anything touches the disk; writing it to the cache
+     * is what lets the next session say why, and a cache that cannot take one more small file must
+     * not cost this session the reason it already has.  The text is reasonFor's, so it has been
+     * through the redactor before it reaches the file (R-SEC-03).
+     */
+    private void recordFailure(ArtefactRecord record, String entry, String reason) {
+        attempts.put(entry, Attempt.failed(reason));
+        try {
+            cache.recordFailure(record, reason);
+        } catch (IOException notKept) {
+            /* This session's row still says why; only the next session's will not. */
+        }
+    }
+
+    /*
+     * A NEW ATTEMPT REPLACES THE OLD ONE'S REASON, ON DISK AS IN MEMORY.  Removed as the attempt
+     * starts rather than when it ends, so that an attempt the user cancels -- or one a crash cuts
+     * short -- leaves a build that is simply not installed, not one still carrying the reason of
+     * the attempt before.  If it cannot be removed the install goes ahead regardless: the install
+     * is what the user asked for, and it will write the lock and the staging directory into the
+     * same cache a moment later and say so itself if the cache cannot be written.
+     */
+    private void forgetEarlierFailure(ArtefactRecord record) {
+        try {
+            cache.clearFailure(record);
+        } catch (IOException notRemoved) {
+            /* The attempt now starting will replace it or outrank it. */
+        }
     }
 
     private static ToolOffer managedOffer(
@@ -767,8 +836,7 @@ public final class ManagedToolManager implements ToolManager {
                     record,
                     settlingFirst(listener, entry),
                     cancellation,
-                    (step, failure) ->
-                            attempts.put(entry, Attempt.failed(reasonFor(step, failure))));
+                    (step, failure) -> recordFailure(record, entry, reasonFor(step, failure)));
         } catch (IOException | RuntimeException stopped) {
             /*
              * NOTHING LEFT TO DO HERE, AND DELIBERATELY NO SECOND PLACE THAT WRITES THE STATE.
@@ -842,8 +910,9 @@ public final class ManagedToolManager implements ToolManager {
      *
      * A FAILED report changes nothing here, because the entry already holds it: ArtefactInstaller
      * tells the failure listener in runInstall the step and the exception before it sends FAILED,
-     * and that listener is the one writer of a failed attempt -- with its reason.  Writing FAILED
-     * again here would be a second writer of the same fact, and the one without the reason.
+     * and that listener is the one writer of a failed attempt -- with its reason, in memory and in
+     * the cache.  Writing FAILED again here would be a second writer of the same fact, and the one
+     * without the reason.
      */
     private void settle(String entry, InstallPhase terminal) {
         if (terminal != InstallPhase.FAILED) {
