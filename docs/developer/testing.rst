@@ -2227,7 +2227,36 @@ was later raised and the injection re-made at 1.2 s.
 * The peak retained heap **creeps by about 0.6 MiB per run opened** in one
   session (6.6, 7.6, 8.2, 8.7, 9.3 MiB over five runs in one baseline); small
   against the 64 MB budget, but it does not return to the baseline when a run is
-  closed. Not traced.
+  closed. Not traced in that unit. *Traced and fixed in Phase 16 (unit 3); it
+  was a leak, not a bounded cache.* The trace: three runs with the real K562
+  tables opened in turn 150 times in the launched application, the JVM's class
+  histogram (``GC.class_histogram``, live objects after a full collection)
+  every 30 opens, and a heap dump at the end searched for the shortest strong
+  path from a GC root to each instance. The live heap grew 174.8, 178.5, 183.8,
+  190.6, 194.9 MB -- about 168 kB an open, with no sign of a bound -- and all
+  of it was the table's column headers: 290, 548, 818, 1064, 1280 live
+  ``javafx.scene.control.skin.TableColumnHeader``, each with its label, skin,
+  text, rectangle and style state. Of the 1 280 in the dump, 1 260 were held
+  by one path: ``ResultsPane.sortButtons`` -> a heading ``Button`` -> its
+  ``layoutBounds`` property's listeners -> a ``LabeledSkinBase`` listener ->
+  a discarded ``LabelSkin`` -> its ``Label`` -> that label's parent, the
+  discarded header. The table builds new headers whenever its visible columns
+  change (every run opened, every table chosen, every column shown or hidden);
+  the new header's label takes the column's graphic -- the section's
+  long-lived heading button -- and the old label's skin never removes the
+  listener it put on it. ``ResultsPane`` now disposes the skin of the label a
+  heading button leaves (``headingMoved``). After the fix, the same trace:
+  169.6, 168.2, 168.3, 168.3, 170.4 MB and 20, 17, 17, 17, 20 live headers.
+  ``ResultsHeapOverOpenedRunsUiTest`` holds it: live headers and live heap
+  before and after 120 more opens (20 then 20 headers and +0.4 MB with the
+  fix; 227 then 875 and +12.9 MB without). What is left is about 1.4 kB an
+  open of the toolkit's own short-circuit binding stubs on the columns'
+  ``resizable`` and ``visible`` properties, which it drops when those
+  properties next change; not changed. One repeat of the performance suite
+  changes the visible columns more than once (the run opened, the peptide
+  table chosen), and 0.6 MiB is three to four sets of nine headers at about
+  20 kB each. The ``gui-heap-peak`` baseline and threshold in the table above
+  were measured before the fix and are unchanged.
 * ``cancel-comet``: Comet 2026.03.0 ends on the first signal (about 90 ms from
   Cancel to gone); the cancellation injection (wait up to 3 s for the tool to
   finish first) observed 1.6 s because the fixture's search finished inside the
@@ -5014,5 +5043,3 @@ test changed to hide one:
 * **PSM identifiers carry the absolute run path** Comet builds from ``-N``;
   the goldens strip it and determinism normalises it (unit 6, a product
   question).
-* **The retained GUI heap creeps** by about 0.6 MiB per run opened in one
-  session and does not return when a run closes (unit 8, not traced).

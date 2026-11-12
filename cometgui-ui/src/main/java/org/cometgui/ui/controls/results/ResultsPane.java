@@ -29,14 +29,18 @@ import java.util.Set;
 import java.util.function.Function;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Labeled;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
@@ -151,6 +155,9 @@ public final class ResultsPane extends ScrollPane {
             new EnumMap<>(ResultsColumn.class);
 
     private final Map<ResultsColumn, Button> sortButtons = new EnumMap<>(ResultsColumn.class);
+
+    /** The header label each heading button is shown in: the table's current one. */
+    private final Map<ResultsColumn, Labeled> headerLabels = new EnumMap<>(ResultsColumn.class);
 
     private final Map<ResultsColumn, CheckBox> columnToggles = new EnumMap<>(ResultsColumn.class);
 
@@ -588,6 +595,8 @@ public final class ResultsPane extends ScrollPane {
             heading.setId(UiIds.resultsSort(column));
             named(heading, "Sort the table by " + column.label());
             heading.setOnAction(event -> table.sortBy(column));
+            heading.parentProperty()
+                    .addListener((observable, before, after) -> headingMoved(column, after));
             shown.setGraphic(heading);
             columns.put(column, shown);
             sortButtons.put(column, heading);
@@ -604,6 +613,53 @@ public final class ResultsPane extends ScrollPane {
                         event.consume();
                     }
                 });
+    }
+
+    /**
+     * Releases the header a heading button has just left.
+     *
+     * <p>The table builds a new set of column headers whenever the visible columns change -- on
+     * every run opened, every table chosen and every column shown or hidden -- and each new
+     * header's label takes the column's graphic, this pane's heading button, from the old one. The
+     * old label's skin had added a listener to the button's layout bounds and is not told to remove
+     * it, so the button, which lives as long as this pane, would keep every header the table ever
+     * discarded reachable: label, skin, header and their style state, about 20 kB a column (traced
+     * in a heap dump, Phase 16 unit 3: {@code sortButtons} to the button, its {@code layoutBounds}
+     * listeners, the old {@code LabelSkin}, its {@code Label}, that label's parent). Disposing the
+     * old label's skin removes the listener, and unbinding its graphic stops it following the
+     * column.
+     */
+    private void headingMoved(ResultsColumn column, Parent now) {
+        if (!(now instanceof Labeled label)) {
+            return;
+        }
+        Labeled left = headerLabels.put(column, label);
+        if (left == null || left == label) {
+            return;
+        }
+        if (left.getScene() == null) {
+            release(left);
+            return;
+        }
+        left.sceneProperty()
+                .addListener(
+                        new ChangeListener<>() {
+                            @Override
+                            public void changed(
+                                    ObservableValue<? extends Scene> observable,
+                                    Scene before,
+                                    Scene after) {
+                                if (after == null) {
+                                    left.sceneProperty().removeListener(this);
+                                    release(left);
+                                }
+                            }
+                        });
+    }
+
+    private static void release(Labeled discarded) {
+        discarded.graphicProperty().unbind();
+        discarded.setSkin(null);
     }
 
     private HBox buildColumnToggles() {
