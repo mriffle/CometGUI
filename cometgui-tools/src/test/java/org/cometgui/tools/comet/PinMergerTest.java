@@ -25,11 +25,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.ByteArrayOutputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 import org.cometgui.domain.ports.FileHashes;
@@ -44,8 +48,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * {@link PinMerger} on constructed PIN files: one header, every row byte for byte in input order,
- * the feature-column check naming both files, write-once, LF output, the record's hash. The real
- * per-file PINs are merged in {@link CometAdapterRealBinaryTest}.
+ * the feature-column check naming both files, write-once, LF output, the record's hash, and the
+ * count of what was written against what was read. The real per-file PINs are merged in {@link
+ * CometAdapterRealBinaryTest}.
  */
 class PinMergerTest {
 
@@ -60,6 +65,81 @@ class PinMergerTest {
         run = new RunLayout(directory.resolve("run"));
         for (Path made : run.directories()) {
             Files.createDirectories(made);
+        }
+    }
+
+    /**
+     * A disk that changes one line on the way: the merge writes every byte, and the file does not
+     * get them all (or gets some twice). Lines are counted from 0, the header.
+     */
+    private static class OneLineChanged extends FilterOutputStream {
+
+        private final int line;
+
+        private final int copies;
+
+        private final ByteArrayOutputStream held = new ByteArrayOutputStream();
+
+        private int current;
+
+        /**
+         * @param out the real file
+         * @param line the line to change
+         * @param copies how many times that line reaches the file: 0 loses it, 2 doubles it
+         */
+        OneLineChanged(OutputStream out, int line, int copies) {
+            super(out);
+            this.line = line;
+            this.copies = copies;
+        }
+
+        @Override
+        public void write(int value) throws IOException {
+            if (current != line) {
+                out.write(value);
+            } else {
+                held.write(value);
+            }
+            if (value == '\n') {
+                if (current == line) {
+                    for (int copy = 0; copy < copies; copy++) {
+                        out.write(held.toByteArray());
+                    }
+                }
+                current++;
+            }
+        }
+
+        @Override
+        public void write(byte[] bytes, int offset, int length) throws IOException {
+            for (int index = offset; index < offset + length; index++) {
+                write(bytes[index]);
+            }
+        }
+    }
+
+    /** A disk that loses the last byte written to it: the final row's line terminator. */
+    private static final class LastByteLost extends FilterOutputStream {
+
+        private int pending = -1;
+
+        LastByteLost(OutputStream out) {
+            super(out);
+        }
+
+        @Override
+        public void write(int value) throws IOException {
+            if (pending >= 0) {
+                out.write(pending);
+            }
+            pending = value & 0xff;
+        }
+
+        @Override
+        public void write(byte[] bytes, int offset, int length) throws IOException {
+            for (int index = offset; index < offset + length; index++) {
+                write(bytes[index]);
+            }
         }
     }
 
@@ -282,6 +362,145 @@ class PinMergerTest {
                                 () -> PinMerger.merge(run, List.of(first, missing), hashes))
                         .getMessage());
         assertEquals(List.of(), pinDirectoryListing());
+    }
+
+    @Test
+    @DisplayName("a row lost between the merge and the disk fails the merge, stating both counts")
+    void aRowLostOnTheWayToTheDisk() throws IOException {
+        Path first = pin("a.pin", lines(HEADER, target(1), decoy(1), target(2)));
+        Path second = pin("b.pin", lines(HEADER, decoy(5), target(5)));
+        // Line 4 of the merged file is the second input's first row, decoy(5): it never arrives.
+        List<Path> written = new ArrayList<>();
+        List<String> onDisk = new ArrayList<>();
+        PinMerger.Output lossy =
+                file -> {
+                    written.add(file);
+                    return new OneLineChanged(Files.newOutputStream(file), 4, 0) {
+                        @Override
+                        public void close() throws IOException {
+                            super.close();
+                            onDisk.add(Files.readString(file, StandardCharsets.ISO_8859_1));
+                        }
+                    };
+                };
+        PinMergeRowCountException lost =
+                assertThrows(
+                        PinMergeRowCountException.class,
+                        () -> PinMerger.merge(run, List.of(first, second), hashes, lossy));
+        assertEquals(
+                "the merged PIN file "
+                        + run.mergedPinFile()
+                        + " was not written completely: 5 data rows were read from the 2 per-file"
+                        + " PINs, but the file that was written holds 4. The merged file was"
+                        + " discarded, so Percolator is not run on an incomplete PIN",
+                lost.getMessage());
+        assertEquals(5, lost.rowsRead());
+        assertEquals(4, lost.rowsWritten());
+        assertEquals(run.mergedPinFile(), lost.output());
+        // The row was really lost: the file the merge wrote, as the disk held it when it was
+        // closed, is the merge of the inputs without that one row.
+        assertEquals(1, written.size(), "the merge opened one file to write");
+        assertEquals(
+                List.of(lines(HEADER, target(1), decoy(1), target(2), target(5))),
+                onDisk,
+                "what reached the disk");
+        assertFalse(Files.exists(run.mergedPinFile()), "no merged file is left");
+        assertEquals(List.of(), pinDirectoryListing(), "nor the temporary file");
+        assertEquals(List.of(), hashes.hashed(), "and nothing was hashed");
+    }
+
+    @Test
+    @DisplayName("a row written twice fails the merge too: 5 read, 6 written")
+    void aRowWrittenTwice() throws IOException {
+        Path first = pin("a.pin", lines(HEADER, target(1), decoy(1), target(2)));
+        Path second = pin("b.pin", lines(HEADER, decoy(5), target(5)));
+        PinMergeRowCountException doubled =
+                assertThrows(
+                        PinMergeRowCountException.class,
+                        () ->
+                                PinMerger.merge(
+                                        run,
+                                        List.of(first, second),
+                                        hashes,
+                                        file ->
+                                                new OneLineChanged(
+                                                        Files.newOutputStream(file), 1, 2)));
+        assertEquals(5, doubled.rowsRead());
+        assertEquals(6, doubled.rowsWritten());
+        assertEquals(
+                "the merged PIN file "
+                        + run.mergedPinFile()
+                        + " was not written completely: 5 data rows were read from the 2 per-file"
+                        + " PINs, but the file that was written holds 6. The merged file was"
+                        + " discarded, so Percolator is not run on an incomplete PIN",
+                doubled.getMessage());
+        assertEquals(List.of(), pinDirectoryListing());
+        assertEquals(List.of(), hashes.hashed());
+    }
+
+    @Test
+    @DisplayName("one row of one file, lost: the message counts in the singular")
+    void theOnlyRowLost() throws IOException {
+        Path only = pin("a.pin", lines(HEADER, target(1)));
+        PinMergeRowCountException lost =
+                assertThrows(
+                        PinMergeRowCountException.class,
+                        () ->
+                                PinMerger.merge(
+                                        run,
+                                        List.of(only),
+                                        hashes,
+                                        file ->
+                                                new OneLineChanged(
+                                                        Files.newOutputStream(file), 1, 0)));
+        assertEquals(
+                "the merged PIN file "
+                        + run.mergedPinFile()
+                        + " was not written completely: 1 data row was read from the 1 per-file"
+                        + " PIN, but the file that was written holds 0. The merged file was"
+                        + " discarded, so Percolator is not run on an incomplete PIN",
+                lost.getMessage());
+        assertEquals(List.of(), pinDirectoryListing());
+    }
+
+    @Test
+    @DisplayName("a written file cut short within its last row is refused and not left behind")
+    void theLastRowCutShort() throws IOException {
+        Path first = pin("a.pin", lines(HEADER, target(1), decoy(1)));
+        CometOutputException cut =
+                assertThrows(
+                        CometOutputException.class,
+                        () ->
+                                PinMerger.merge(
+                                        run,
+                                        List.of(first),
+                                        hashes,
+                                        file -> new LastByteLost(Files.newOutputStream(file))));
+        String message = cut.getMessage();
+        String prefix = "the PIN file " + run.pinInputsDirectory().resolve("merged.pin.");
+        String suffix =
+                ".part ends without a line terminator: line 3 is incomplete, so the file is"
+                        + " truncated";
+        assertEquals(prefix, message.substring(0, prefix.length()));
+        assertEquals(suffix, message.substring(message.length() - suffix.length()));
+        assertFalse(Files.exists(run.mergedPinFile()));
+        assertEquals(List.of(), pinDirectoryListing());
+        assertEquals(List.of(), hashes.hashed());
+    }
+
+    @Test
+    @DisplayName("the product's own output writes every row: the record's total is the file's")
+    void theRecordCountsTheWrittenFile() throws IOException {
+        Path first = pin("a.pin", lines(HEADER, target(1), decoy(1), target(2)));
+        Path second = pin("b.pin", lines(HEADER, decoy(5), target(5)));
+        PinMergeRecord record =
+                PinMerger.merge(run, List.of(first, second), hashes, PinMerger.TO_THE_FILE_SYSTEM);
+        List<String> merged = Files.readAllLines(run.mergedPinFile(), StandardCharsets.ISO_8859_1);
+        assertEquals(5, merged.size() - 1, "data rows in the file, counted here");
+        assertEquals(5, record.totalRows());
+        assertThrows(
+                NullPointerException.class,
+                () -> PinMerger.merge(run, List.of(first), hashes, null));
     }
 
     @Test

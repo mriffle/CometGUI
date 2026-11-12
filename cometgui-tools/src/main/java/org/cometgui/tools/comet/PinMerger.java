@@ -51,6 +51,12 @@ import org.cometgui.domain.run.RunLayout;
  *       temporary file; it never leaves a partial {@code merged.pin}.)
  *   <li><strong>LF line endings, always.</strong> Comet writes LF; a CRLF input's CRs are
  *       terminators, which {@link PinReader} drops, so the merged file never mixes the two.
+ *   <li><strong>Counted after it is written.</strong> When every input has been copied and the
+ *       temporary file closed, the file is read back from the disk through {@link PinReader} and
+ *       its data rows counted. That count -- what was written -- must equal the number of rows read
+ *       from the inputs; if it does not, the merge fails with a {@link PinMergeRowCountException}
+ *       stating both counts, and no merged file is left. The record's {@link
+ *       PinMergeRecord#totalRows()} is the count of the written file, not of what was read.
  *   <li><strong>Hashed once, by the one hash service</strong>, after the file is closed and moved,
  *       so the record's checksums are those of the bytes Percolator will read.
  * </ul>
@@ -59,6 +65,29 @@ import org.cometgui.domain.run.RunLayout;
  * a merge cannot produce a file validation would refuse.
  */
 public final class PinMerger {
+
+    /**
+     * How the merge opens the file it writes its rows to.
+     *
+     * <p>In the product this is the file system's own stream, {@link #TO_THE_FILE_SYSTEM}. It is a
+     * parameter so that a test can put a stream that loses bytes between the merge and the disk,
+     * and show that the merge notices: nothing else is meant to implement it.
+     */
+    @FunctionalInterface
+    public interface Output {
+
+        /**
+         * Opens a new, empty file for writing.
+         *
+         * @param file the file, which exists and is empty
+         * @return the stream the merged rows are written to; the merge closes it
+         * @throws IOException if the file cannot be opened
+         */
+        OutputStream open(Path file) throws IOException;
+    }
+
+    /** The file system's own stream: what every merge outside a test writes through. */
+    public static final Output TO_THE_FILE_SYSTEM = file -> Files.newOutputStream(file);
 
     private PinMerger() {}
 
@@ -72,13 +101,36 @@ public final class PinMerger {
      * @throws FileAlreadyExistsException if the merged file already exists
      * @throws CometOutputException if an input is missing, malformed or truncated, or the inputs'
      *     feature columns differ, naming the file or files
+     * @throws PinMergeRowCountException if the file that was written does not hold exactly the rows
+     *     that were read, stating both counts; no merged file is left
      * @throws IOException if the merged file cannot be written or hashed
      * @throws IllegalArgumentException if there is no input, or one file is given twice
      */
     public static PinMergeRecord merge(RunLayout run, List<Path> pins, HashService hashes)
             throws IOException {
+        return merge(run, pins, hashes, TO_THE_FILE_SYSTEM);
+    }
+
+    /**
+     * Merges PIN files as {@link #merge(RunLayout, List, HashService)} does, writing the rows
+     * through {@code output}.
+     *
+     * @param run the run
+     * @param pins the per-file PIN files, in input order
+     * @param hashes the hash service
+     * @param output how the file the rows are written to is opened
+     * @return the merge record
+     * @throws FileAlreadyExistsException if the merged file already exists
+     * @throws CometOutputException as {@link #merge(RunLayout, List, HashService)}
+     * @throws PinMergeRowCountException as {@link #merge(RunLayout, List, HashService)}
+     * @throws IOException if the merged file cannot be written or hashed
+     * @throws IllegalArgumentException if there is no input, or one file is given twice
+     */
+    public static PinMergeRecord merge(
+            RunLayout run, List<Path> pins, HashService hashes, Output output) throws IOException {
         Objects.requireNonNull(run, "run");
         Objects.requireNonNull(hashes, "hashes");
+        Objects.requireNonNull(output, "output");
         List<Path> inputs = List.copyOf(pins);
         if (inputs.isEmpty()) {
             throw new IllegalArgumentException("a PIN merge needs at least one PIN file");
@@ -96,10 +148,10 @@ public final class PinMerger {
         refuseExisting(target);
         Path temporary = Files.createTempFile(run.pinInputsDirectory(), "merged.pin.", ".part");
         List<PinMergeRecord.Input> merged = new ArrayList<>(inputs.size());
-        long total = 0;
+        long read = 0;
+        long written;
         try {
-            try (OutputStream out =
-                    new BufferedOutputStream(Files.newOutputStream(temporary), 65536)) {
+            try (OutputStream out = new BufferedOutputStream(output.open(temporary), 65536)) {
                 Path first = inputs.get(0);
                 PinHeader reference = null;
                 for (Path input : inputs) {
@@ -116,16 +168,38 @@ public final class PinMerger {
                             row = reader.nextRow();
                         }
                         merged.add(new PinMergeRecord.Input(input, reader.rows()));
-                        total += reader.rows();
+                        read += reader.rows();
                     }
                 }
+            }
+            written = rowsOf(temporary);
+            if (written != read) {
+                throw new PinMergeRowCountException(target, inputs.size(), read, written);
             }
             Files.move(temporary, target);
         } finally {
             Files.deleteIfExists(temporary);
         }
         FileHashes checksums = hashes.hash(target);
-        return new PinMergeRecord(merged, total, target, checksums);
+        return new PinMergeRecord(merged, written, target, checksums);
+    }
+
+    /**
+     * The data rows of a PIN file, counted by reading it from the disk: what a merge wrote, as
+     * distinct from what it read.
+     *
+     * @param pin the file, closed
+     * @return its data rows
+     * @throws CometOutputException if the file is not a well-formed PIN, naming the file and line
+     */
+    private static long rowsOf(Path pin) throws IOException {
+        try (PinReader reader = PinReader.open(pin)) {
+            String row = reader.nextRow();
+            while (row != null) {
+                row = reader.nextRow();
+            }
+            return reader.rows();
+        }
     }
 
     private static void refuseExisting(Path target) throws FileAlreadyExistsException {

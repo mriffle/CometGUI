@@ -816,7 +816,19 @@ configuration::
 order byte for byte, the feature columns required equal **in order** -- a
 renamed, swapped, missing or extra column fails the stage naming both files --
 and the merge recorded (each input and its row count, the total, the output and
-its SHA-256) in the step's ``stage.finished`` event.
+its SHA-256) in the step's ``stage.finished`` event. The total is counted from
+the merged file after it is written and closed, by reading it back, and must
+equal the rows read from the inputs. A merged file that lost or gained a row
+fails the stage, and the file is discarded (the counts here are an example)::
+
+    the merged PIN file <run>/inputs/pin/merged.pin was not written completely:
+    6472 data rows were read from the 2 per-file PINs, but the file that was
+    written holds 6471. The merged file was discarded, so Percolator is not run
+    on an incomplete PIN
+
+(``PinMergeRowCountException``; ``PinMergerTest.aRowLostOnTheWayToTheDisk`` and
+``RealMergeRowLossTest``, in which a stream between the merge and the disk
+really loses a row.)
 
 ``finalise-provenance`` re-hashes the archived ``comet.params`` after every
 search and requires the digest ``writeOnce`` returned and the run recorded

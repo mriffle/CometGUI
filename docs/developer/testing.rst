@@ -1208,7 +1208,8 @@ restored and ``sha256sum -c`` OK after): ``PercolatorCommands`` requesting
 at "-X requested exactly when XML_OUTPUT was observed"; ``PinMerger`` dropping
 the second file's first row -- every pair red at "merged PIN rows against the
 per-file PINs ==> expected: <6670> but was: <6669>" (the product's own run
-still succeeded: the merge record counts what it read, not what it wrote);
+still succeeded: the merge record counted what it read, not what it wrote --
+since Phase 16 unit 3 the merge counts the file it wrote and fails the stage);
 ``matrix.py``'s manifest reader skipping one Windows row -- red at "only in the
 product [('percolator', '3.06.5', 'windows-x86-64')]".
 ``bash scripts/matrix/run-matrix.sh --self-test`` grades fifteen synthetic
@@ -4998,10 +4999,6 @@ is named, the row says so.
 Product gaps the tests found -- each reported upward, none fixed yet, and no
 test changed to hide one:
 
-* **The merged PIN's row count is not checked by the product.** Its merge
-  record counts rows read, not written, so a dropped row still gives a
-  successful run; only the version matrix's own count saw it (Phase 15 unit 6,
-  escalated; :ref:`dev-testing-version-matrix`).
 * **PSM identifiers carry the absolute run path** Comet builds from ``-N``;
   the goldens strip it and determinism normalises it (unit 6, a product
   question).

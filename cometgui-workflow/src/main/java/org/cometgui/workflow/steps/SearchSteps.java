@@ -38,6 +38,7 @@ import org.cometgui.tools.comet.CometSearchCommands;
 import org.cometgui.tools.comet.PepXmlSummary;
 import org.cometgui.tools.comet.PinDecoyConfiguration;
 import org.cometgui.tools.comet.PinMergeRecord;
+import org.cometgui.tools.comet.PinMergeRowCountException;
 import org.cometgui.tools.comet.PinMerger;
 import org.cometgui.tools.comet.PinSummary;
 import org.cometgui.workflow.engine.DeclaredFile;
@@ -304,13 +305,36 @@ final class SearchSteps {
      * header, the feature columns checked, and the merge recorded -- inputs, row counts, output
      * hash -- in the step's {@code stage.finished} event ({@code R-CMT-06}, P8-12). A merged file
      * left by an earlier attempt is this step's own output and is replaced.
+     *
+     * <p>The merge counts the rows of the file it wrote and compares them with the rows it read; a
+     * merged file that lost or gained a row fails this step with both counts ({@link
+     * PinMergeRowCountException}), so Percolator is never trained on an incomplete PIN, and {@code
+     * merge.total-rows} is the count of the file as written.
      */
     static final class MergePin implements StepAction {
 
         private final CometRun run;
 
+        private final PinMerger.Output mergedFile;
+
         MergePin(CometRun run) {
+            this(run, PinMerger.TO_THE_FILE_SYSTEM);
+        }
+
+        private MergePin(CometRun run, PinMerger.Output mergedFile) {
             this.run = Objects.requireNonNull(run, "run");
+            this.mergedFile = Objects.requireNonNull(mergedFile, "mergedFile");
+        }
+
+        /**
+         * This step, writing the merged rows through another output: a test's, to lose a row on the
+         * way to the disk.
+         *
+         * @param other how the merged file is opened for writing
+         * @return the step
+         */
+        MergePin writingThrough(PinMerger.Output other) {
+            return new MergePin(run, other);
         }
 
         @Override
@@ -328,9 +352,11 @@ final class SearchSteps {
             Files.deleteIfExists(layout.mergedPinFile());
             PinMergeRecord record;
             try {
-                record = PinMerger.merge(layout, pins, run.hashes());
+                record = PinMerger.merge(layout, pins, run.hashes(), mergedFile);
             } catch (CometOutputException mismatch) {
                 throw new StepFailedException(mismatch.getMessage(), mismatch);
+            } catch (PinMergeRowCountException incomplete) {
+                throw new StepFailedException(incomplete.getMessage(), incomplete);
             }
             List<PinMergeRecord.Input> inputs = record.inputs();
             for (int index = 0; index < inputs.size(); index++) {

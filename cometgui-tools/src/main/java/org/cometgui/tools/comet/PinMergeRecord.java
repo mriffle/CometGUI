@@ -26,7 +26,8 @@ import org.cometgui.domain.ports.FileHashes;
  * row counts, output hash)").
  *
  * @param inputs each merged file with its data-row count, in merge order
- * @param totalRows the merged file's data rows: the sum of the inputs'
+ * @param totalRows the merged file's data rows, counted from the file after it was written; the
+ *     merge has checked that this is the sum of the inputs' ({@link PinMergeRowCountException})
  * @param output the merged file
  * @param hashes the merged file's MD5 and SHA-256, computed after it was closed and in place
  */
