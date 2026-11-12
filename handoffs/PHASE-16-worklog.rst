@@ -10,6 +10,9 @@ PHASE-16 work log -- Documentation and Release Qualification
    after it finishes its current unit's work. I will continue it later."*,
    relayed by tier 1). Units 1 and 2 are accepted; units 3 to 16 have not
    started. ``handoffs/PHASE-16-handoff.rst`` is the pause handoff.
+:Resumed: 2026-11-12, by the owner (*"Resume phase 16"*), with a second
+   phase orchestrator dispatched by tier 1 at ``b76704a``. From unit 3 on
+   this log is the second orchestrator's; see *Resume* below.
 
 Maintained by the phase orchestrator as the phase runs. One row per work unit.
 A unit is not done until it carries a sign-off entry naming what was run and
@@ -61,6 +64,37 @@ Facts established before design
   two single-purpose jobs of Phase 05 (Percolator 3.07.1 on Windows, the
   Gatekeeper check). ``scripts/ci/toolchain.sh`` and the ``jpackage`` argument
   files for both platforms have never executed there.
+
+Resume -- the second orchestrator (2026-11-12)
+==============================================
+
+``git status`` clean at ``b76704a`` on ``main``, equal to ``origin/main``; no
+Maven, Java or gate process in this container. **The host is shared and
+busy:** load average 44 on 64 cores at the start, none of it from this tree,
+so a timing-graded red is reproduced before it is believed or dismissed.
+``scratch/fixture`` holds both K562 mzML files and the whole proteome.
+``scratch/p16/orch/build-economy.txt`` was made again from the brief (the
+old copy differed by one trailing blank line).
+
+**What I read.** In full: the brief with its resume section,
+``ONBOARDING.rst``, ``CONTRIBUTING.rst``, ``phases/PHASE-16-release.rst``,
+the pause handoff, this log, ``handoffs/PHASE-15-handoff.rst``,
+``DECISIONS.rst`` ``D-016`` to ``D-020``, ``STATUS.rst``'s header and
+``status-p15-signed``. The longer documents (``docs/developer/testing.rst``,
+``docs/developer/test_fixtures.rst``, the specification's rules, ``D-006``,
+the Phase 14 handoff) are read section by section as each unit needs them,
+and each unit agent is sent to the sections it needs.
+
+**What binds the order now** (the brief's resume section): ``D-020`` is OPEN.
+Units 5 (every part), 7 and the fixture-dependent part of 10 do not start
+until tier 1 relays the owner's answer. The order is 3, 4, 6, then 8 and 9,
+11, and 12 to 16 as far as each goes without the fixture. Unit 5 is split
+before any of it is dispatched; the split is recorded here first.
+
+**How a unit agent is briefed.** Each gets
+``scratch/p16/orch/unit-standing.txt`` -- tier 1's *Build economy* section
+verbatim between two rules, and the standing rules -- and its own brief,
+``scratch/p16/orch/briefs/u<N>.txt``. Both are kept on disk for tier 1.
 
 Design decisions (orchestrator's, recorded before dispatch)
 ===========================================================
@@ -158,7 +192,7 @@ Work units
        ``KeyboardOnlyNavigationUiTest`` isolated from an installed Comet.
        Each with a test that proves the value and is red on the old code.
      - Brief obligation 12; ``status-p15-signed``
-     - not started (paused after unit 2)
+     - dispatched 2026-11-12 at ``b76704a``
    * - 4
      - **Residue B, install and tools.** The probe's message for a non-zero
        exit carries the status; a failed install's reason survives a restart;
