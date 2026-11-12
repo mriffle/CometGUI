@@ -52,38 +52,38 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <h2>What leaked</h2>
  *
- * <p>The results table rebuilds its column headers whenever its visible columns change, which
- * every opened run and every table chosen does. Each column's heading is a button this section
- * keeps for its lifetime, given to the table as the column's graphic; the header label a rebuild
- * discards had added a listener to that button's layout bounds and never removed it, so the button
- * kept every discarded header reachable. A heap dump taken after 150 opens of three runs with the
- * real K562 tables held 1 280 {@code TableColumnHeader}s, 1 260 of them on one path: the section's
- * heading buttons, a button's {@code layoutBounds} listeners, a discarded {@code LabelSkin}, its
- * {@code Label}, that label's parent. There the live heap grew by about 168 kB an open, 20 MB
- * over 120 opens, and never came back.
+ * <p>The results table rebuilds its column headers whenever its visible columns change, which every
+ * opened run and every table chosen does. Each column's heading is a button this section keeps for
+ * its lifetime, given to the table as the column's graphic; the header label a rebuild discards had
+ * added a listener to that button's layout bounds and never removed it, so the button kept every
+ * discarded header reachable. A heap dump taken after 150 opens of three runs with the real K562
+ * tables held 1 280 {@code TableColumnHeader}s, 1 260 of them on one path: the section's heading
+ * buttons, a button's {@code layoutBounds} listeners, a discarded {@code LabelSkin}, its {@code
+ * Label}, that label's parent. There the live heap grew by about 168 kB an open, 20 MB over 120
+ * opens, and never came back.
  *
  * <h2>What is measured, and why it does not depend on timing</h2>
  *
  * <p>The application is the real one over three constructed runs, opened in turn through the run
  * chooser {@value #WARM_UP} times to warm up and {@value #OPENS} times more. Before and after the
- * second stretch the JVM's own class histogram is taken ({@code GC.class_histogram}, which
- * collects the whole heap first and lists every live object): the bytes of all live objects, and
- * the number of live {@code TableColumnHeader}s. Both are counts of what the heap holds once
- * everything unreachable is gone, not of how long anything took, and each reading is the least of
- * {@value #READINGS} taken after consecutive opens, so that the cells a table happens to be
- * showing at one moment do not count as growth.
+ * second stretch the JVM's own class histogram is taken ({@code GC.class_histogram}, which collects
+ * the whole heap first and lists every live object): the bytes of all live objects, and the number
+ * of live {@code TableColumnHeader}s. Both are counts of what the heap holds once everything
+ * unreachable is gone, not of how long anything took, and each reading is the least of {@value
+ * #READINGS} taken after consecutive opens, so that the cells a table happens to be showing at one
+ * moment do not count as growth.
  *
  * <ul>
- *   <li>the live headers may not grow by more than {@value #HEADER_SLACK} -- two generations of
- *       the table's nine columns, for a rebuild caught half way. Measured on these runs: 20 then
- *       20 with the fix; 227 then 875 without it.
+ *   <li>the live headers may not grow by more than {@value #HEADER_SLACK} -- two generations of the
+ *       table's nine columns, for a rebuild caught half way. Measured on these runs: 20 then 20
+ *       with the fix; 227 then 875 without it.
  *   <li>the live heap may not grow by more than {@value #HEAP_SLACK_MIB} MiB over the {@value
  *       #OPENS} opens. Measured on these runs: 0.4 MB with the fix (about 3 kB an open, of which
  *       about half is this test's own robot recording the events it fired and the rest the
  *       toolkit's short-circuit binding stubs on the columns' {@code resizable} and {@code visible}
- *       properties, 56 bytes each, which the toolkit drops when those properties next change);
- *       12.9 MB without it. In the K562 trace two readings of an unchanged section differed by up
- *       to 2.1 MB with the cells on screen, which is what the bound leaves room for.
+ *       properties, 56 bytes each, which the toolkit drops when those properties next change); 12.9
+ *       MB without it. In the K562 trace two readings of an unchanged section differed by up to 2.1
+ *       MB with the cells on screen, which is what the bound leaves room for.
  * </ul>
  */
 class ResultsHeapOverOpenedRunsUiTest {
