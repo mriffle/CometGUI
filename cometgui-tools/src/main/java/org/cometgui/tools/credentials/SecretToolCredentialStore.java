@@ -203,7 +203,21 @@ public final class SecretToolCredentialStore implements CredentialStore {
                 input == null
                         ? processes.start(command, listener)
                         : processes.startWithInput(command, input, listener);
-        if (!listener.awaitExit(timeout)) {
+        boolean answered;
+        try {
+            answered = listener.awaitExit(timeout);
+        } catch (InterruptedException interrupted) {
+            /*
+             * AN INTERRUPTED CALL ENDS THE TOOL IT STARTED.  The caller has been told to stop
+             * waiting, and a secret-tool left behind would sit on a keyring prompt nobody is going
+             * to answer.  It is ended the one way this product ends a process, through the process
+             * service (R-PROC-02), and the interrupt is put back for whoever interrupted.
+             */
+            process.requestCancellation();
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted while waiting for secret-tool", interrupted);
+        }
+        if (!answered) {
             process.requestCancellation();
             throw new IOException(
                     "secret-tool did not answer within " + timeout.toMillis() + " ms");
@@ -280,13 +294,8 @@ public final class SecretToolCredentialStore implements CredentialStore {
             exited.countDown();
         }
 
-        boolean awaitExit(Duration limit) throws IOException {
-            try {
-                return exited.await(limit.toMillis(), TimeUnit.MILLISECONDS);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                throw new IOException("interrupted while waiting for secret-tool", interrupted);
-            }
+        boolean awaitExit(Duration limit) throws InterruptedException {
+            return exited.await(limit.toMillis(), TimeUnit.MILLISECONDS);
         }
     }
 }

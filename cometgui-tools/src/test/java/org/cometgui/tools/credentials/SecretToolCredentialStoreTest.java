@@ -35,6 +35,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.cometgui.domain.ports.EnvironmentReader;
 import org.cometgui.domain.ports.ProcessListener;
 import org.cometgui.domain.ports.ProcessRunner;
@@ -202,6 +207,111 @@ class SecretToolCredentialStoreTest {
         assertEquals("secret-tool did not answer within 300 ms", hung.getMessage());
     }
 
+    /*
+     * INTERRUPTED WHILE THE REAL TOOL HANGS (Phase 16 unit 4).  Until then an interrupted call
+     * returned its failure and left secret-tool running: nothing asked the process service to end
+     * it, so a keyring prompt nobody would answer outlived the call that started it.  The stand-in
+     * records its own process identifier and then becomes a sleep that would last five minutes;
+     * the test interrupts the calling thread and then watches that process, by its handle, until
+     * it has ended -- a bounded wait on the process's own state, not a pause of a guessed length.
+     */
+    @Test
+    @DisplayName(
+            "interrupted while the tool hangs: the tool is ended through the process service, the"
+                    + " call fails as an interrupted one, and the interrupt is kept")
+    void anInterruptedCallEndsTheTool(@TempDir Path tmp) throws Exception {
+        Path tool = tmp.resolve("secret-tool");
+        Path pidRecord = tmp.resolve("pid.record");
+        Files.writeString(
+                tool,
+                "#!/bin/bash\n"
+                        + "printf '%s\\n' \"$$\" > \"${0%/*}/pid.record\"\n"
+                        + "exec /bin/sleep 300\n");
+        Files.setPosixFilePermissions(tool, PosixFilePermissions.fromString("rwx------"));
+        SecretToolCredentialStore store =
+                new SecretToolCredentialStore(
+                        tool, tmp, BUS, PROCESSES, new SessionSecrets(), Duration.ofSeconds(120));
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+        AtomicBoolean interruptKept = new AtomicBoolean();
+        Thread caller =
+                new Thread(
+                        () -> {
+                            try {
+                                store.find(ACCOUNT);
+                            } catch (IOException | RuntimeException failed) {
+                                thrown.set(failed);
+                            }
+                            interruptKept.set(Thread.currentThread().isInterrupted());
+                        },
+                        "interrupted-secret-tool-caller");
+        ProcessHandle child = null;
+        try {
+            caller.start();
+            child = startedTool(pidRecord, Duration.ofSeconds(30));
+            boolean aliveBeforeTheInterrupt = child.isAlive();
+
+            caller.interrupt();
+            caller.join(TimeUnit.SECONDS.toMillis(30));
+            boolean callerReturned = !caller.isAlive();
+            boolean childEnded = ended(child, Duration.ofSeconds(30));
+
+            assertTrue(aliveBeforeTheInterrupt, "the stand-in was not running to be interrupted");
+            assertTrue(callerReturned, "the interrupted call did not return within 30 s");
+            assertTrue(
+                    childEnded,
+                    "secret-tool (pid "
+                            + child.pid()
+                            + ") was still running 30 s after the call that started it was"
+                            + " interrupted");
+            assertInstanceOf(IOException.class, thrown.get());
+            assertEquals("interrupted while waiting for secret-tool", thrown.get().getMessage());
+            assertInstanceOf(InterruptedException.class, thrown.get().getCause());
+            assertTrue(interruptKept.get(), "the calling thread's interrupt was swallowed");
+        } finally {
+            /* Whatever the product did, this test leaves no five-minute sleep behind it. */
+            if (child != null) {
+                child.destroyForcibly();
+            }
+            caller.interrupt();
+            caller.join(TimeUnit.SECONDS.toMillis(30));
+        }
+    }
+
+    /** The stand-in's process, once it has recorded its identifier; waits on that record. */
+    private static ProcessHandle startedTool(Path pidRecord, Duration limit)
+            throws IOException, InterruptedException {
+        long deadline = System.nanoTime() + limit.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (Files.exists(pidRecord)) {
+                String recorded = Files.readString(pidRecord, StandardCharsets.UTF_8).strip();
+                if (!recorded.isEmpty()) {
+                    return ProcessHandle.of(Long.parseLong(recorded))
+                            .orElseThrow(
+                                    () ->
+                                            new AssertionError(
+                                                    "the stand-in recorded pid "
+                                                            + recorded
+                                                            + " and no such process exists"));
+                }
+            }
+            Thread.sleep(10);
+        }
+        throw new AssertionError("the stand-in did not record its pid within " + limit);
+    }
+
+    /** Whether a process has ended, waiting on its own exit for at most {@code limit}. */
+    private static boolean ended(ProcessHandle process, Duration limit)
+            throws InterruptedException {
+        try {
+            process.onExit().get(limit.toMillis(), TimeUnit.MILLISECONDS);
+            return true;
+        } catch (TimeoutException stillRunning) {
+            return false;
+        } catch (ExecutionException impossible) {
+            throw new AssertionError("a process handle's exit future does not fail", impossible);
+        }
+    }
+
     @Test
     @DisplayName("a blank account is refused before anything starts")
     void blankAccounts(@TempDir Path tmp) throws IOException {
@@ -287,10 +397,12 @@ class SecretToolCredentialStoreTest {
     }
 
     @Test
-    @DisplayName("interrupted while waiting for the tool: refused, and the interrupt is kept")
+    @DisplayName(
+            "interrupted while waiting for the tool: refused, the tool is cancelled once, and the"
+                    + " interrupt is kept")
     void anInterruptedWaitKeepsTheInterrupt(@TempDir Path tmp) {
-        SecretToolCredentialStore store =
-                inProcess(tmp, InProcessTool.silent(), new SessionSecrets(), 30_000);
+        InProcessTool silent = InProcessTool.silent();
+        SecretToolCredentialStore store = inProcess(tmp, silent, new SessionSecrets(), 30_000);
 
         Thread.currentThread().interrupt();
         IOException interrupted;
@@ -304,6 +416,7 @@ class SecretToolCredentialStoreTest {
         assertEquals("interrupted while waiting for secret-tool", interrupted.getMessage());
         assertInstanceOf(InterruptedException.class, interrupted.getCause());
         assertTrue(stillInterrupted, "the thread's interrupt was swallowed");
+        assertEquals(1, silent.cancellations, "cancellations requested of the hanging tool");
     }
 
     private static SecretToolCredentialStore inProcess(
