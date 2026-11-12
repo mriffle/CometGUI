@@ -171,6 +171,55 @@ final class ParameterEditorApp {
     }
 
     /**
+     * Starts the application as its own {@code main} composes it -- the real Tool Manager over its
+     * own tool cache, the real default project -- with one difference: the application-data
+     * directory is the one the test names, not this machine's.
+     *
+     * <p>{@code CometGuiLauncher.main} reads the machine's application-data directory, which under
+     * this module's test configuration is {@code $XDG_DATA_HOME/cometgui}. Whatever is installed or
+     * kept there is then part of the test, and an application that finds a Comet there creates and
+     * locks its default project in it. A test that is about a fresh application starts it here,
+     * over a directory of its own.
+     *
+     * @param build the build the application names
+     * @param applicationData the application-data directory, absolute; it need not exist
+     * @return the running application
+     */
+    static ParameterEditorApp launchOver(BuildIdentity build, Path applicationData) {
+        if (!applicationData.isAbsolute()) {
+            throw new IllegalArgumentException(
+                    "the application-data directory must be absolute: " + applicationData);
+        }
+        ApplicationServices real = ApplicationServices.forThisHost();
+        ApplicationServices services =
+                new ApplicationServices(
+                        real.clock(),
+                        real.environment(),
+                        new DataDirectory(real.fileSystem(), applicationData),
+                        real.runIds(),
+                        real.glibcVersions(),
+                        real.processRunner().orElse(null),
+                        null,
+                        null);
+        ScriptedChooser chooser = new ScriptedChooser();
+        try {
+            Stage primary = FxToolkit.registerPrimaryStage();
+            javafx.application.Application started =
+                    FxToolkit.setupApplication(
+                            () ->
+                                    new CometGuiApplication(
+                                            services,
+                                            new BoundedMessageLog(),
+                                            () -> build,
+                                            owner -> chooser,
+                                            RunWiring.Setup.forThisApplication(services)));
+            return new ParameterEditorApp(chooser, RunningApplication.showing(primary), started);
+        } catch (TimeoutException timedOut) {
+            return fail("the application did not start", timedOut);
+        }
+    }
+
+    /**
      * The chooser the application asks; a test scripts it before the click that asks.
      *
      * @return the chooser
@@ -350,6 +399,44 @@ final class ParameterEditorApp {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static String shown(ComboBox box, Object item) {
         return item == null ? "" : box.getConverter().toString(item);
+    }
+
+    /** The real file system, with the application-data directory a test names. */
+    private static final class DataDirectory implements FileSystemAccess {
+
+        private final FileSystemAccess real;
+
+        private final Path applicationData;
+
+        DataDirectory(FileSystemAccess real, Path applicationData) {
+            this.real = Objects.requireNonNull(real, "real");
+            this.applicationData = Objects.requireNonNull(applicationData, "applicationData");
+        }
+
+        @Override
+        public boolean exists(Path path) {
+            return real.exists(path);
+        }
+
+        @Override
+        public boolean isReadable(Path path) {
+            return real.isReadable(path);
+        }
+
+        @Override
+        public boolean isDirectory(Path path) {
+            return real.isDirectory(path);
+        }
+
+        @Override
+        public void createDirectories(Path path) throws IOException {
+            real.createDirectories(path);
+        }
+
+        @Override
+        public Path applicationDataDirectory() {
+            return applicationData;
+        }
     }
 
     /** The real file system, except that some paths exist as readable files. */

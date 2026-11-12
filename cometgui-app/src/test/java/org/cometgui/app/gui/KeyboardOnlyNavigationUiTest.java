@@ -18,18 +18,27 @@ package org.cometgui.app.gui;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
+import javafx.scene.Node;
+import javafx.scene.control.Labeled;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.input.KeyCode;
 import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.RobotFxUiDriver;
 import org.cometgui.app.uidriver.RunningApplication;
 import org.cometgui.app.uidriver.TestFxUiDriver;
+import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.viewmodel.SectionId;
 import org.junit.jupiter.api.AfterAll;
@@ -39,6 +48,7 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -51,6 +61,17 @@ import org.junit.jupiter.params.provider.MethodSource;
  * FxUiDriver#clickOn(String)}, and nothing calls a view-model. Every section is reached with real
  * key presses delivered by a robot to whatever has the keyboard focus, which is the only way to
  * find out whether a keyboard user can get there.
+ *
+ * <h2>A fresh application, over a data directory of this test's own</h2>
+ *
+ * <p>The walk assumes a fresh application: nothing installed, no project, so that no section adds a
+ * tab stop before the navigation's. The application is therefore started over an empty
+ * application-data directory in this test's temporary directory ({@link
+ * ParameterEditorApp#launchOver}), with the application's own Tool Manager and default project
+ * otherwise -- not through {@code main}, which reads this machine's application-data directory and
+ * so makes whatever is installed there part of the test (and, finding a Comet there, creates and
+ * locks a project in it). The first test states the assumption as a value: the Tool Manager lists
+ * no build as installed, and the data directory is still not there.
  *
  * <h2>What the shell's keyboard design is, and how it is asserted</h2>
  *
@@ -72,11 +93,29 @@ import org.junit.jupiter.params.provider.MethodSource;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class KeyboardOnlyNavigationUiTest {
 
+    private static final BuildIdentity BUILD =
+            BuildIdentity.of("0.0.0-guitest", "unknown", Instant.parse("2026-11-12T00:00:00Z"));
+
+    /**
+     * What the Tool Manager says of a managed build nothing has installed: not installed, or one
+     * this host cannot be offered at all.
+     */
+    private static final Set<String> NOTHING_INSTALLED =
+            Set.of(
+                    "CometGUI-managed: not installed",
+                    "CometGUI-managed: not published for this platform",
+                    "CometGUI-managed: cannot run on this host");
+
+    @TempDir private static Path scratch;
+
+    private static Path applicationData;
+
     private static RunningApplication application;
 
     @BeforeAll
-    static void launchTheApplication() {
-        application = RunningApplication.launchedByMain();
+    static void launchTheApplication() throws IOException {
+        applicationData = scratch.toRealPath().resolve("application-data");
+        application = ParameterEditorApp.launchOver(BUILD, applicationData).application();
     }
 
     @AfterAll
@@ -102,12 +141,32 @@ class KeyboardOnlyNavigationUiTest {
     void tabFromAFreshApplicationLandsOnTheSelectedNavigationEntry() {
         FxUiDriver driver = new TestFxUiDriver(application);
 
+        application.awaitToolListRead();
+        List<String> states = toolStates(driver);
         assertAll(
                 "a fresh application",
                 () -> assertTrue(driver.isVisible(UiIds.sectionPane(SectionId.RUN))),
+                () -> assertEquals(SectionId.RUN.title(), driver.textOf(UiIds.SHELL_SECTION_TITLE)),
+                () ->
+                        assertFalse(
+                                states.isEmpty(),
+                                "the Tool Manager lists the builds it offers on this host"),
                 () ->
                         assertEquals(
-                                SectionId.RUN.title(), driver.textOf(UiIds.SHELL_SECTION_TITLE)));
+                                List.of(),
+                                states.stream()
+                                        .filter(state -> !NOTHING_INSTALLED.contains(state))
+                                        .toList(),
+                                "builds the application found installed. This test is about a"
+                                        + " fresh application, so it starts one over its own empty"
+                                        + " application-data directory, "
+                                        + applicationData
+                                        + "; a build found installed came from somewhere else"),
+                () ->
+                        assertFalse(
+                                Files.exists(applicationData),
+                                "a fresh application with nothing installed creates nothing in"
+                                        + " its application-data directory"));
 
         driver.tab();
 
@@ -275,6 +334,28 @@ class KeyboardOnlyNavigationUiTest {
                 List.of(UiIds.navigationEntry(expected)),
                 traversableEntries(driver),
                 "the selected entry must be the only traversable one");
+    }
+
+    /**
+     * What the Tool Manager says of each build it lists: the state line of every row, read from the
+     * scene.
+     *
+     * @param driver the driver to ask
+     * @return for example {@code "CometGUI-managed: not installed"}, one per row
+     */
+    private static List<String> toolStates(FxUiDriver driver) {
+        Node rows = driver.node(UiIds.TOOL_MANAGER_ROWS);
+        return driver.callOnFxThread(
+                () -> {
+                    List<String> states = new ArrayList<>();
+                    for (Node label : rows.lookupAll(".label")) {
+                        String text = ((Labeled) label).getText();
+                        if (text != null && text.startsWith("CometGUI-managed: ")) {
+                            states.add(text);
+                        }
+                    }
+                    return states;
+                });
     }
 
     /**

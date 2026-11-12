@@ -2491,11 +2491,18 @@ and ``handoffs/`` up to 2026-11-07:
      - Fixed (unit 9), below.
    * - ``KeyboardOnlyNavigationUiTest``
      - Phase 08
-     - Not flaky: deterministic, it fails on a machine with Comet installed
-       in the application-data folder. The GUI tests' data folder is
+     - Not flaky. Recorded since Phase 08 as failing on a machine with Comet
+       installed in the application-data folder (the GUI tests' is
        ``$XDG_DATA_HOME/cometgui`` inside the font stack, which nothing
-       creates, so no pipeline meets it.
-     - Open, in ``STATUS.rst`` (an isolation defect, tier 1's to route).
+       creates). Measured in Phase 16 (unit 3) with Comet 2026.03.0 installed
+       there by the Tool Manager: the test **passed**, 4 of 4 -- Run becomes a
+       tab stop only when a run can start, which needs chosen inputs -- but
+       the application read that folder and created and locked a project in
+       it. The isolation defect was real; the failure was a prediction.
+     - Fixed (Phase 16 unit 3): started over its own empty data directory;
+       the precondition is asserted, and is red on the old launch with a
+       Comet in the folder ("builds the application found installed ==>
+       expected: <[]> but was: <[CometGUI-managed: installed]>").
 
 None is quarantined.
 
@@ -5007,8 +5014,5 @@ test changed to hide one:
 * **PSM identifiers carry the absolute run path** Comet builds from ``-N``;
   the goldens strip it and determinism normalises it (unit 6, a product
   question).
-* ``KeyboardOnlyNavigationUiTest`` **fails on a machine with Comet installed in
-  the application-data folder** -- deterministic, an isolation defect; open in
-  ``STATUS.rst``, tier 1's to route (:ref:`dev-testing-flakiness`).
 * **The retained GUI heap creeps** by about 0.6 MiB per run opened in one
   session and does not return when a run closes (unit 8, not traced).

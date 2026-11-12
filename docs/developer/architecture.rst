@@ -1299,7 +1299,10 @@ application:
   every section reached with arrow keys, reading back the focus owner's
   identifier, which entries are traversable and which pane is showing. Both
   drivers. Method order is declared, because the first test is about a *fresh*
-  application.
+  application -- which is also why the application is started over an empty
+  application-data directory of the test's own (``ParameterEditorApp.launchOver``)
+  rather than through ``main``, which reads the machine's; the first test
+  asserts that the Tool Manager lists no build as installed.
 * ``AccessibleNameEnumerationUiTest`` -- **item 4**: walks the whole scene graph
   after ``applyCss()`` and ``layout()`` and requires a non-blank accessible name
   on every ``Control`` found. Not a list of identifiers to check, which would
