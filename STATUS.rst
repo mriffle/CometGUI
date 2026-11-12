@@ -6,12 +6,14 @@ Project Status
 :Updated: 2026-11-12
 :Updated by: Main orchestrator, session 12 (**``D-016``, ``D-017`` and
    ``D-006``'s CI fixture decided; a trimmed-FASTA step added to Phase 16;
-   ``D-018`` decided; Thermo RAW files found and ``D-019`` decided; Phase 16
-   still paused by the owner**)
-:Current phase: **Paused by the owner after Phase 15** (2026-11-07). Owner,
-   2026-11-05: *"Pause after Phase 15 is signed off and pushed."* Phase 16
-   (documentation and release qualification) is NOT STARTED and has no
-   brief; nothing is dispatched until the owner says to resume.
+   ``D-018`` decided; Thermo RAW files found and ``D-019`` decided; **Phase
+   16 dispatched**)
+:Current phase: **Phase 16 (documentation and release qualification), IN
+   PROGRESS.** The owner resumed on 2026-11-12: *"Proceed with phase 16."*
+   One phase orchestrator, briefed by ``handoffs/PHASE-16-BRIEF.rst``; it is
+   the only phase live in the tree. ``main`` was pushed at ``feefd33`` before
+   it started. The phase may push branches named ``phase16/...`` to run
+   workflows on GitHub's Windows and macOS runners, and nothing else.
 :Overall: Sixteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03,
    04, 05, 08, 09, 10, 11, 12, 13, 14 and 15 PARTIAL -- plus the Comet
    2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every
@@ -321,8 +323,13 @@ Phase board
        owner**.
    * - 16
      - Documentation and release qualification
-     - NOT STARTED
-     - --
+     - IN PROGRESS
+     - Dispatched 2026-11-12 (``handoffs/PHASE-16-BRIEF.rst``). Nine gate
+       items: the phase document's seven, plus the CI fixture (8) and the
+       Thermo RAW fixture (9), both added by the owner that day. Expected
+       grade PARTIAL: six UX activities, the licence audit's sign-off,
+       ``D-009`` and a person's clean-machine run are not an agent's to
+       complete.
 
 Status values are ``NOT STARTED``, ``IN PROGRESS``, ``PARTIAL`` (with the
 residue named), ``BLOCKED`` (with the decision or dependency named), or
@@ -4842,6 +4849,12 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-11-12
+     - 16
+     - Owner resumed (*"Proceed with phase 16"*). ``main`` pushed at
+       ``feefd33``. **Phase 16 dispatched** (``handoffs/PHASE-16-BRIEF.rst``):
+       one orchestrator, serial units, no full build until the exit gate. It
+       may push ``phase16/...`` branches for runner evidence only.
    * - 2026-11-12
      - 16
      - Owner decided ``D-016`` (option B: mutation-test the workflow
