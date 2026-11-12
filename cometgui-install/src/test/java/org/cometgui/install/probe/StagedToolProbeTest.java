@@ -167,8 +167,10 @@ class StagedToolProbeTest {
                                         + "loader. Available on this host:"
                                         + " none found. Alternatives: "
                                         + "percolator 3.07.1 linux-x86-64;"
-                                        + " percolator 3.06.5 linux-x86-64.",
-                                refused.getMessage()),
+                                        + " percolator 3.06.5 linux-x86-64."
+                                        + " It exited with status 127.",
+                                refused.getMessage(),
+                                "the loader's own exit status, 127, closes the diagnostic"),
                 () ->
                         assertEquals(
                                 List.of(),
@@ -217,8 +219,71 @@ class StagedToolProbeTest {
 
         assertEquals(
                 "percolator 3.07.1 linux-x86-64 printed no version this build recognises: 1"
-                        + " line(s) of output were searched, standard error first",
+                        + " line(s) of output were searched, standard error first; it exited with"
+                        + " status 0",
                 refused.getMessage());
+    }
+
+    /*
+     * THE EXIT STATUS OF A BUILD THAT WOULD NOT ANSWER (Phase 16 unit 4).  Until then a refusal
+     * that followed a run said nothing of how the run ended, so the reason a failed install
+     * recorded for "it printed something and exited 3" and for "it printed something and exited
+     * 0" was the same sentence.  Every refusal made after the process has exited now states the
+     * status; a refusal made without one -- a declared floor, a file that is not executable --
+     * has none to state.
+     */
+    @Test
+    @DisplayName("a build that prints no banner and exits non-zero is refused with its exit status")
+    void anIdentityRefusalCarriesTheExitStatus(@TempDir Path staged) throws IOException {
+        ArtefactRecord record = ProbeRecords.shippedPercolator("3.07.1");
+        Path executable = staged.resolve(record.executablePath());
+        Files.createDirectories(java.util.Objects.requireNonNull(executable.getParent(), "parent"));
+        Files.writeString(
+                executable, "#!/bin/sh\necho 'percolator: this build cannot start' >&2\nexit 3\n");
+        assertTrue(executable.toFile().setExecutable(true, true), "could not set the bit");
+        RecordingProber prober = new RecordingProber();
+
+        ProbeFailedException refused =
+                assertThrows(ProbeFailedException.class, () -> probe(prober).probe(record, staged));
+
+        assertAll(
+                () -> assertEquals(ProbeFailureKind.UNPARSEABLE_VERSION, refused.kind()),
+                () ->
+                        assertEquals(
+                                "percolator 3.07.1 linux-x86-64 printed no version this build"
+                                        + " recognises: 1 line(s) of output were searched,"
+                                        + " standard error first; it exited with status 3",
+                                refused.getMessage()),
+                () -> assertEquals(List.of(), prober.calls));
+    }
+
+    @Test
+    @DisplayName(
+            "a build that prints nothing and exits non-zero is a loadability refusal that ends"
+                    + " with its exit status")
+    void aSilentNonZeroExitCarriesTheExitStatus(@TempDir Path staged) throws IOException {
+        ArtefactRecord record = ProbeRecords.shippedPercolator("3.07.1");
+        Path executable = staged.resolve(record.executablePath());
+        Files.createDirectories(java.util.Objects.requireNonNull(executable.getParent(), "parent"));
+        Files.writeString(executable, "#!/bin/sh\nexit 7\n");
+        assertTrue(executable.toFile().setExecutable(true, true), "could not set the bit");
+        RecordingProber prober = new RecordingProber();
+
+        ProbeFailedException refused =
+                assertThrows(ProbeFailedException.class, () -> probe(prober).probe(record, staged));
+
+        assertAll(
+                () -> assertEquals(ProbeFailureKind.EXECUTION_FAILED, refused.kind()),
+                () ->
+                        assertEquals(
+                                "This build cannot run on this host: percolator exited without"
+                                        + " starting, and its output matched no loader failure"
+                                        + " this project recognises. Required: not named by the"
+                                        + " loader. Available on this host: none found."
+                                        + " Alternatives: percolator 3.06.5 linux-x86-64. It"
+                                        + " exited with status 7.",
+                                refused.getMessage()),
+                () -> assertEquals(List.of(), prober.calls));
     }
 
     @Test

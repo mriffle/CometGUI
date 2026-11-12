@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.Function;
 import org.cometgui.domain.tools.LoaderDiagnostic;
@@ -62,6 +63,11 @@ import org.cometgui.install.registry.ArtefactRecord;
  *   <li><strong>Capability.</strong> Delegated to {@link CapabilityProber}, which phase 05 unit 7
  *       implements in {@code org.cometgui.tools}.
  * </ol>
+ *
+ * <p>A stage that refuses after the binary has run and exited states the exit status in its
+ * refusal: the loadability diagnostic ends {@code It exited with status N.} and the identity
+ * stage's "printed no version" sentence ends {@code ; it exited with status N}. The capability
+ * probes in {@code org.cometgui.tools} word their own ({@code It exited N saying: ...}).
  *
  * <h2>Native binaries and JARs take different routes through stages 1 and 2</h2>
  *
@@ -239,7 +245,11 @@ public final class StagedToolProbe implements ToolProbe {
         LoadabilityResult started =
                 loadability.probe(executable, banner.arguments(), environment, context);
         if (started.failure().isPresent()) {
-            throw refusal(started.failure().get());
+            LoaderDiagnostic diagnostic = started.failure().get();
+            throw new ProbeFailedException(
+                    diagnostic.kind(),
+                    diagnostic.message()
+                            + exitedWith(started.exitCode(), " It exited with status ", "."));
         }
         return identify(record, banner, started);
     }
@@ -278,6 +288,7 @@ public final class StagedToolProbe implements ToolProbe {
             ArtefactRecord record, VersionBanner banner, LoadabilityResult started)
             throws ProbeFailedException {
         List<String> searched = started.output();
+        String howItEnded = exitedWith(started.exitCode(), "; it exited with status ", "");
         ToolVersion identified =
                 IdentityProbe.identify(banner, started.standardError(), started.standardOutput())
                         .orElseThrow(
@@ -289,7 +300,8 @@ public final class StagedToolProbe implements ToolProbe {
                                                         + " recognises: "
                                                         + searched.size()
                                                         + " line(s) of output were searched,"
-                                                        + " standard error first"));
+                                                        + " standard error first"
+                                                        + howItEnded));
         /*
          * A VERSION comparison, and deliberately not a row comparison -- the mirror image of the
          * keying mistake ManifestAlternatives had.  The question here is "is this binary the
@@ -317,5 +329,22 @@ public final class StagedToolProbe implements ToolProbe {
 
     private static ProbeFailedException refusal(LoaderDiagnostic diagnostic) {
         return new ProbeFailedException(diagnostic.kind(), diagnostic.message());
+    }
+
+    /*
+     * HOW THE RUN ENDED, WHERE THERE WAS A RUN THAT ENDED.  A refusal made after the process has
+     * exited says what it exited with, because that is the one fact about the run the rest of the
+     * sentence does not carry: "printed no version this build recognises" reads the same for a
+     * build that exited 0 and for one that died with 139, and a failed install records this
+     * message as its reason (ManagedToolManager).  Only the status is added -- an integer -- so
+     * nothing the tool printed reaches the message by this route.  A refusal with no exit to
+     * report -- the file was built for another processor, could not be started, or never
+     * finished -- gets nothing added, rather than a number that was never observed.
+     */
+    private static String exitedWith(OptionalInt exitCode, String before, String after) {
+        if (exitCode.isEmpty()) {
+            return "";
+        }
+        return before + exitCode.getAsInt() + after;
     }
 }

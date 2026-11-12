@@ -293,7 +293,71 @@ class FailedInstallReasonTest {
                             + " installed: the installed build was not accepted by the probe:"
                             + " comet 2026.03.0 linux-x86-64 printed no version this build"
                             + " recognises: 1 line(s) of output were searched, standard error"
-                            + " first (install step 6, PROBE)");
+                            + " first; it exited with status 3 (install step 6, PROBE)");
+        }
+    }
+
+    /*
+     * THE CAPABILITY STAGE, WHICH QUOTES WHAT THE TOOL PRINTED.  This stand-in answers -h with
+     * Comet's banner and so passes the first two stages; asked what it can do, it prints one line
+     * with no banner in it and exits 5.  The capability probe's refusal carries that exit status
+     * and that line, and the line is the one place in a probe's message where text this product
+     * did not write arrives -- so the token in it must be gone from all three places.  The staged
+     * path in the middle of the message is the installer's own, named afresh for every attempt,
+     * which is why the two halves are asserted around it.
+     */
+    @Test
+    @DisplayName(
+            "a build the capability probe cannot exercise: step 6, with the exit status and the"
+                    + " tool's own words -- redacted -- everywhere")
+    void aCapabilityRefusalCarriesTheExitStatusAndNoSecret() throws IOException {
+        String token = "s3cr3t-T0ken-value-1234567890";
+        ArtefactRecord record = comet();
+        Path broken = temporary.resolve("comet.linux.exe");
+        Files.writeString(
+                broken,
+                "#!/bin/sh\n"
+                        + "if [ \"$1\" = \"-h\" ]; then\n"
+                        + "  echo ' Comet version \"2026.03 rev. 0 (fa08489)\"' >&2\n"
+                        + "  exit 1\n"
+                        + "fi\n"
+                        + "echo 'no licence from https://licence.invalid/check?token="
+                        + token
+                        + "' >&2\n"
+                        + "exit 5\n",
+                StandardCharsets.US_ASCII);
+        try (LoopbackArtefactServer served =
+                new LoopbackArtefactServer().serve(record.url(), broken)) {
+            Said said = install(pinning(record, broken), served, COMET_ROW);
+
+            String reason = said.offer().failureReason().orElseThrow();
+            String opening =
+                    "Install step 6 of 8, PROBE, failed: comet 2026.03.0 linux-x86-64 was not"
+                            + " installed: the installed build was not accepted by the probe:"
+                            + " Comet 2026.03.0 at "
+                            + temporary.resolve("cache/cache/staging/comet__2026.3__linux-x86-64")
+                            + "/";
+            String closing =
+                    "/payload/bin/comet never printed its version banner in answer to -p, so it"
+                            + " did not run far enough to be asked what it can do; this is a"
+                            + " loadability failure and must not be reported as a missing"
+                            + " capability. It exited 5 saying: no licence from"
+                            + " https://licence.invalid/check?token=[REDACTED] (install step 6,"
+                            + " PROBE)";
+            assertAll(
+                    () -> saidEverywhere(said, "comet 2026.03.0", reason),
+                    () -> assertEquals(opening, reason.substring(0, opening.length()), reason),
+                    () ->
+                            assertEquals(
+                                    closing,
+                                    reason.substring(reason.length() - closing.length()),
+                                    reason),
+                    () ->
+                            assertFalse(
+                                    String.join("\n", said.log()).contains(token)
+                                            || said.row().orElseThrow().contains(token)
+                                            || said.offer().toString().contains(token),
+                                    "the token itself reached one of them"));
         }
     }
 

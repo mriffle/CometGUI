@@ -288,7 +288,10 @@ worded it. Three examples:
   (``D-008``), so this is worded as an *availability* failure, with the URL and
   the checksum it expected, and never as a corrupt download or a broken tool.
 * ``Install step 6 of 8, PROBE, failed: ...`` -- the build was downloaded and
-  unpacked, but running it on this machine did not work.
+  unpacked, but running it on this machine did not work. Where the build ran
+  and then stopped, the line says what it exited with -- ``it exited with
+  status 3`` -- because that number is often the only thing that tells one
+  such failure from another.
 
 The same line, prefixed with ``The install of <tool> <version> did not
 succeed.``, is written to the console as an error, once per failed attempt.
