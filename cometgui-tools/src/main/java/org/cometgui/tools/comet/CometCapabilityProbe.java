@@ -99,9 +99,11 @@ public final class CometCapabilityProbe {
 
     private final ToolRunner runner;
     private final List<CompanionGate> gates;
+    private final Path workspaceParent;
 
     /**
-     * Creates the probe.
+     * Creates the probe, with its workspace in the system temporary directory ({@code
+     * java.io.tmpdir}).
      *
      * @param runner how one invocation is run and collected
      * @param gates the companion rules read from the manifest row this install came from; empty
@@ -109,12 +111,55 @@ public final class CometCapabilityProbe {
      * @throws NullPointerException if either argument, or any gate, is {@code null}
      */
     public CometCapabilityProbe(ToolRunner runner, List<CompanionGate> gates) {
+        this(runner, gates, systemTemporaryDirectory());
+    }
+
+    /**
+     * Creates the probe with a chosen place for its workspace.
+     *
+     * <p><strong>This exists so that a test owns the directory its probe writes in</strong>, for
+     * the reason {@code org.cometgui.tools.percolator.PercolatorCapabilityProbe} gives for its own
+     * third argument. Each probe makes one {@code cometgui-comet-probe-*} workspace and deletes it
+     * when it is done. The product keeps that workspace in the system temporary directory, which
+     * every other process on the host shares; a test that let its probes write there could neither
+     * count them without counting somebody else's, nor keep a probe whose tidying failed -- a
+     * mutation removing it, a test JVM killed mid-probe -- from leaving its workspace behind in
+     * {@code /tmp}. Given a directory of its own, the test asserts on exactly that directory, and
+     * whatever a broken probe leaves goes when the test's own directory does. {@link
+     * #CometCapabilityProbe(ToolRunner, List)} is what the product uses.
+     *
+     * @param runner how one invocation is run and collected
+     * @param gates the companion rules read from the manifest row this install came from
+     * @param workspaceParent the existing directory each probe's workspace is created in
+     * @throws NullPointerException if any argument, or any gate, is {@code null}
+     */
+    public CometCapabilityProbe(
+            ToolRunner runner, List<CompanionGate> gates, Path workspaceParent) {
         this.runner = Objects.requireNonNull(runner, "runner");
         List<CompanionGate> copy = new ArrayList<>(Objects.requireNonNull(gates, "gates"));
         for (int index = 0; index < copy.size(); index++) {
             Objects.requireNonNull(copy.get(index), "gates[" + index + "]");
         }
         this.gates = List.copyOf(copy);
+        this.workspaceParent = Objects.requireNonNull(workspaceParent, "workspaceParent");
+    }
+
+    /*
+     * The directory Files.createTempDirectory(prefix) uses when it is given no directory, named
+     * explicitly so that the product's probe keeps writing exactly where it always has.
+     */
+    private static Path systemTemporaryDirectory() {
+        return Path.of(System.getProperty("java.io.tmpdir"));
+    }
+
+    /**
+     * Where this probe creates its workspace.
+     *
+     * @return the parent directory, the system temporary directory ({@code java.io.tmpdir}) for the
+     *     product's own probe
+     */
+    public Path workspaceParent() {
+        return workspaceParent;
     }
 
     /**
@@ -142,7 +187,7 @@ public final class CometCapabilityProbe {
                             + tool.id()
                             + "; a capability of one tool means nothing said of another");
         }
-        Path workspace = Files.createTempDirectory(WORKSPACE_PREFIX);
+        Path workspace = Files.createTempDirectory(workspaceParent, WORKSPACE_PREFIX);
         try {
             Set<ToolCapability> observed = EnumSet.noneOf(ToolCapability.class);
             observed.addAll(fromParameterFiles(workspace, version, executable));

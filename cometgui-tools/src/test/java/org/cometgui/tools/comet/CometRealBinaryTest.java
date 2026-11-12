@@ -38,6 +38,7 @@ import org.cometgui.domain.tools.HostPlatform;
 import org.cometgui.domain.tools.ToolCapability;
 import org.cometgui.domain.tools.ToolName;
 import org.cometgui.domain.tools.ToolVersion;
+import org.cometgui.tools.api.CompanionGate;
 import org.cometgui.tools.api.ToolRunOutcome;
 import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.process.ProcessService;
@@ -115,6 +116,16 @@ class CometRealBinaryTest {
         return new ToolRunner(new ProcessService(Clock.systemUTC()), Duration.ofSeconds(60));
     }
 
+    /**
+     * Where every capability probe of this class makes its workspace: a directory the test owns, so
+     * that a probe which failed to tidy up leaves nothing in the system temporary directory.
+     */
+    @TempDir private Path workspaces;
+
+    private CometCapabilityProbe probe(List<CompanionGate> gates) {
+        return new CometCapabilityProbe(runner(), gates, workspaces);
+    }
+
     private static Path directoryOf(Path file) {
         return Objects.requireNonNull(
                 file.getParent(), "the staged binary is written into a directory");
@@ -138,7 +149,7 @@ class CometRealBinaryTest {
         Path binary = stage(release, directory);
 
         Set<ToolCapability> observed =
-                new CometCapabilityProbe(runner(), List.of())
+                probe(List.of())
                         .probe(ToolName.COMET, ToolVersion.parse(release.version()), LINUX, binary);
 
         assertEquals(
@@ -162,7 +173,7 @@ class CometRealBinaryTest {
         }
 
         Set<ToolCapability> observed =
-                new CometCapabilityProbe(runner(), List.of(CometCompanionGates.thermoRawWindows()))
+                probe(List.of(CometCompanionGates.thermoRawWindows()))
                         .probe(ToolName.COMET, ToolVersion.parse(release.version()), LINUX, binary);
 
         assertFalse(
@@ -183,7 +194,7 @@ class CometRealBinaryTest {
         }
 
         Set<ToolCapability> observed =
-                new CometCapabilityProbe(runner(), List.of(CometCompanionGates.thermoRawWindows()))
+                probe(List.of(CometCompanionGates.thermoRawWindows()))
                         .probe(
                                 ToolName.COMET,
                                 ToolVersion.parse(release.version()),
@@ -203,7 +214,7 @@ class CometRealBinaryTest {
         Path binary = stage(release, directory);
 
         Set<ToolCapability> observed =
-                new CometCapabilityProbe(runner(), List.of(CometCompanionGates.thermoRawWindows()))
+                probe(List.of(CometCompanionGates.thermoRawWindows()))
                         .probe(
                                 ToolName.COMET,
                                 ToolVersion.parse(release.version()),

@@ -26,8 +26,10 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -43,8 +45,13 @@ import org.cometgui.tools.api.CompanionGate;
 import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.testing.Nulls;
 import org.cometgui.tools.testing.ScriptedRunner;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -112,8 +119,33 @@ class CometCapabilityProbeTest {
                 .thenWrites(writesParameters(COMPLETE_PARAMETERS), 0, List.of(BANNER));
     }
 
-    private static CometCapabilityProbe probe(ScriptedRunner runner, List<CompanionGate> gates) {
-        return new CometCapabilityProbe(new ToolRunner(runner, Duration.ofSeconds(5)), gates);
+    /**
+     * Where every probe of this class makes its workspace: a directory this test owns, never the
+     * system temporary directory every other process on the host shares. {@link #nothingIsLeft}
+     * holds each test to leaving it empty.
+     */
+    @TempDir private Path workspaces;
+
+    private CometCapabilityProbe probe(ScriptedRunner runner, List<CompanionGate> gates) {
+        return new CometCapabilityProbe(
+                new ToolRunner(runner, Duration.ofSeconds(5)), gates, workspaces);
+    }
+
+    /*
+     * EVERY PROBE IN THIS CLASS TIDIES UP AFTER ITSELF, answered or refused.  Checked after every
+     * test, over the directory the test owns, so a probe that stopped deleting its workspace fails
+     * every test that ran one -- and, because the directory is the test's, what it left goes with
+     * the directory instead of accumulating in /tmp.
+     */
+    @AfterEach
+    void nothingIsLeft() throws IOException {
+        assertEquals(List.of(), names(workspaces), "what the probes left in " + workspaces);
+    }
+
+    private static List<String> names(Path directory) throws IOException {
+        try (Stream<Path> entries = Files.list(directory)) {
+            return entries.map(entry -> String.valueOf(entry.getFileName())).sorted().toList();
+        }
     }
 
     private static Path executable(Path directory, List<String> companions) throws IOException {
@@ -368,7 +400,8 @@ class CometCapabilityProbeTest {
         Path binary = executable(directory, List.of());
         ScriptedRunner runner = new ScriptedRunner().thenNeverFinishes();
         CometCapabilityProbe probe =
-                new CometCapabilityProbe(new ToolRunner(runner, Duration.ofMillis(50)), List.of());
+                new CometCapabilityProbe(
+                        new ToolRunner(runner, Duration.ofMillis(50)), List.of(), workspaces);
 
         assertEquals(
                 "Comet 2026.02.2 at "
@@ -397,37 +430,287 @@ class CometCapabilityProbeTest {
     }
 
     @Test
-    @DisplayName("no temporary workspace is left behind, whether the probe answers or refuses")
-    void theWorkspaceIsCleanedUp(@TempDir Path directory) throws IOException {
-        Path temporary = Path.of(System.getProperty("java.io.tmpdir"));
-        long before = countProbeWorkspaces(temporary);
-        probe(cometThatAnswersBoth(), List.of())
-                .probe(
-                        ToolName.COMET,
-                        VERSION,
-                        LINUX,
-                        executable(directory.resolve("good"), List.of()));
-        ScriptedRunner bad = new ScriptedRunner().thenPrints(126, List.of("no banner"), List.of());
-        assertThrows(
-                IOException.class,
-                () ->
-                        probe(bad, List.of())
-                                .probe(
-                                        ToolName.COMET,
-                                        VERSION,
-                                        LINUX,
-                                        executable(directory.resolve("bad"), List.of())));
+    @DisplayName(
+            "the product's own probe makes its workspace in the system temporary directory, and a"
+                    + " test's in the directory it gives")
+    void theWorkspaceParent(@TempDir Path directory) {
+        ToolRunner runner = new ToolRunner(new ScriptedRunner(), Duration.ofSeconds(1));
+        Path system = Path.of(System.getProperty("java.io.tmpdir"));
 
-        assertEquals(before, countProbeWorkspaces(temporary));
+        assertAll(
+                () ->
+                        assertEquals(
+                                system,
+                                new CometCapabilityProbe(runner, List.of()).workspaceParent()),
+                () ->
+                        assertEquals(
+                                directory,
+                                new CometCapabilityProbe(runner, List.of(), directory)
+                                        .workspaceParent()),
+                () ->
+                        assertEquals(
+                                "workspaceParent",
+                                assertThrows(
+                                                NullPointerException.class,
+                                                () ->
+                                                        new CometCapabilityProbe(
+                                                                runner,
+                                                                List.of(),
+                                                                Nulls.of(Path.class)))
+                                        .getMessage()));
     }
 
-    private static long countProbeWorkspaces(Path temporary) throws IOException {
-        try (Stream<Path> entries = Files.list(temporary)) {
-            return entries.filter(
-                            entry ->
-                                    String.valueOf(entry.getFileName())
-                                            .startsWith("cometgui-comet-probe-"))
-                    .count();
+    /** What one run saw of the probe's workspace while the probe was still running. */
+    private record Sighting(Path directory, List<String> parentHeld, List<String> workspaceHeld) {
+
+        /** The probe's workspace: each of its two runs gets a directory of its own inside it. */
+        Path workspace() {
+            return directory.getParent();
+        }
+    }
+
+    /**
+     * An answer that first looks at the workspace the probe made -- from inside the run, which is
+     * the only moment it is guaranteed to exist -- and then plays {@code then}.
+     */
+    private static ScriptedRunner.Answer looking(
+            List<Sighting> sightings, ScriptedRunner.Answer then) {
+        return (command, listener) -> {
+            Path directory = command.workingDirectory();
+            Path workspace = directory.getParent();
+            sightings.add(new Sighting(directory, names(workspace.getParent()), names(workspace)));
+            then.play(command, listener);
+        };
+    }
+
+    private static ScriptedRunner.Answer writing(List<String> parameters) {
+        return (command, listener) -> {
+            writesParameters(parameters).accept(command);
+            listener.onStandardError(BANNER);
+            listener.onExit(0);
+        };
+    }
+
+    private static ScriptedRunner.Answer exits(int code, String standardError) {
+        return (command, listener) -> {
+            listener.onStandardError(standardError);
+            listener.onExit(code);
+        };
+    }
+
+    @Test
+    @DisplayName(
+            "each probe makes its workspace in the directory it is given, and nothing is left there"
+                    + " afterwards, whether the probe answers, refuses or cannot start the binary")
+    void theWorkspaceIsCleanedUp(@TempDir Path directory) throws IOException {
+        Path binary = executable(directory, List.of());
+        Path parent = Files.createDirectory(directory.resolve("probe workspaces"));
+        List<Sighting> sightings = new ArrayList<>();
+        ScriptedRunner answers =
+                new ScriptedRunner()
+                        .then(looking(sightings, writing(DEFAULT_PARAMETERS)))
+                        .then(looking(sightings, writing(COMPLETE_PARAMETERS)));
+        ScriptedRunner refuses =
+                new ScriptedRunner().then(looking(sightings, exits(126, "no banner")));
+        ScriptedRunner cannotStart =
+                new ScriptedRunner()
+                        .then(
+                                looking(
+                                        sightings,
+                                        (command, listener) -> {
+                                            throw new IOException("Permission denied");
+                                        }));
+
+        Set<ToolCapability> answered =
+                new CometCapabilityProbe(
+                                new ToolRunner(answers, Duration.ofSeconds(5)), List.of(), parent)
+                        .probe(ToolName.COMET, VERSION, LINUX, binary);
+        List<String> afterAnswer = names(parent);
+        IOException refused =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                new CometCapabilityProbe(
+                                                new ToolRunner(refuses, Duration.ofSeconds(5)),
+                                                List.of(),
+                                                parent)
+                                        .probe(ToolName.COMET, VERSION, LINUX, binary));
+        List<String> afterRefusal = names(parent);
+        IOException notStarted =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                new CometCapabilityProbe(
+                                                new ToolRunner(cannotStart, Duration.ofSeconds(5)),
+                                                List.of(),
+                                                parent)
+                                        .probe(ToolName.COMET, VERSION, LINUX, binary));
+        List<String> afterFailedStart = names(parent);
+
+        Path system = Path.of(System.getProperty("java.io.tmpdir"));
+        List<Executable> checks = new ArrayList<>();
+        checks.add(
+                () ->
+                        assertEquals(
+                                Set.of(
+                                        ToolCapability.PEPXML_OUTPUT,
+                                        ToolCapability.PIN_OUTPUT,
+                                        ToolCapability.COMPLETE_PARAMS_QUERY),
+                                answered));
+        checks.add(
+                () ->
+                        assertTrue(
+                                refused.getMessage().endsWith("It exited 126 saying: no banner"),
+                                refused.getMessage()));
+        checks.add(() -> assertEquals("Permission denied", notStarted.getMessage()));
+        checks.add(
+                () ->
+                        assertEquals(
+                                List.of("defaults", "complete", "defaults", "defaults"),
+                                sightings.stream()
+                                        .map(seen -> String.valueOf(seen.directory().getFileName()))
+                                        .toList(),
+                                "one look per run: two of the probe that answered, one each of the"
+                                        + " two that did not"));
+        for (Sighting sighting : sightings) {
+            Path workspace = sighting.workspace();
+            String name = String.valueOf(workspace.getFileName());
+            checks.add(
+                    () ->
+                            assertEquals(
+                                    parent,
+                                    workspace.getParent(),
+                                    "the workspace is made in the directory the probe was given"));
+            checks.add(
+                    () ->
+                            assertTrue(
+                                    name.startsWith("cometgui-comet-probe-"), workspace::toString));
+            checks.add(
+                    () ->
+                            assertEquals(
+                                    List.of(name),
+                                    sighting.parentHeld(),
+                                    "while the probe ran, its workspace was the one thing in the"
+                                            + " directory"));
+            checks.add(() -> assertTrue(Files.notExists(workspace), workspace + " is still there"));
+            checks.add(
+                    () ->
+                            assertTrue(
+                                    Files.notExists(system.resolve(name)),
+                                    "nothing of this probe's was put in " + system));
+        }
+        checks.add(
+                () ->
+                        assertEquals(
+                                List.of(
+                                        List.of("defaults"),
+                                        List.of("complete", "defaults"),
+                                        List.of("defaults"),
+                                        List.of("defaults")),
+                                sightings.stream().map(Sighting::workspaceHeld).toList(),
+                                "each option's run gets a directory of its own inside the"
+                                        + " workspace"));
+        checks.add(
+                () ->
+                        assertEquals(
+                                3,
+                                sightings.stream().map(Sighting::workspace).distinct().count(),
+                                "each probe makes a workspace of its own"));
+        checks.add(() -> assertEquals(List.of(), afterAnswer, "left by the answered probe"));
+        checks.add(() -> assertEquals(List.of(), afterRefusal, "left by the refused probe"));
+        checks.add(() -> assertEquals(List.of(), afterFailedStart, "left by the unstarted probe"));
+        assertAll(checks);
+    }
+
+    /*
+     * WHAT LEFT cometgui-comet-probe-* DIRECTORIES IN /tmp AFTER A BUILD (Phase 15 unit 2 counted
+     * 13; Phase 16 unit 4).  scripts/build.sh's PIT stage runs this module's tests against mutants
+     * of this probe, and the mutant that deletes the probe's call to its own tidying (or a minion
+     * PIT kills mid-probe on a timeout) leaves every workspace those tests make where the probe
+     * made it -- which was the shared system temporary directory.  A probe that cannot tidy is
+     * reproduced here without a mutant: the "binary" leaves a directory the probe has no
+     * permission to empty.  The verdict survives, as the probe's own design says it must, and the
+     * workspace stays where it was put: in the test's own directory, never in /tmp.
+     */
+    @Test
+    @EnabledOnOs(
+            value = {OS.LINUX, OS.MAC},
+            disabledReason = "the undeletable entry is made with POSIX permissions")
+    @DisplayName(
+            "a probe that cannot tidy its workspace keeps its verdict and leaves the workspace in"
+                    + " the directory it was given, not in the system temporary directory")
+    void aWorkspaceThatCannotBeTidiedStaysInItsParent(@TempDir Path directory) throws IOException {
+        Path binary = executable(directory, List.of());
+        Path parent = Files.createDirectory(directory.resolve("probe workspaces"));
+        List<Path> locked = new ArrayList<>();
+        ScriptedRunner runner =
+                new ScriptedRunner()
+                        .then(
+                                (command, listener) -> {
+                                    Path held =
+                                            Files.createDirectory(
+                                                    command.workingDirectory().resolve("held"));
+                                    Files.writeString(held.resolve("open.log"), "still here");
+                                    Files.setPosixFilePermissions(
+                                            held, PosixFilePermissions.fromString("r-xr-xr-x"));
+                                    locked.add(held);
+                                    listener.onStandardError("no banner");
+                                    listener.onExit(126);
+                                });
+        try {
+            IOException refused =
+                    assertThrows(
+                            IOException.class,
+                            () ->
+                                    new CometCapabilityProbe(
+                                                    new ToolRunner(runner, Duration.ofSeconds(5)),
+                                                    List.of(),
+                                                    parent)
+                                            .probe(ToolName.COMET, VERSION, LINUX, binary));
+            Path workspace = runner.commands().get(0).workingDirectory().getParent();
+            String name = String.valueOf(workspace.getFileName());
+            Assumptions.assumeFalse(
+                    Files.isWritable(locked.get(0)),
+                    "this user can write a r-xr-xr-x directory (root?), so tidying cannot be made"
+                            + " to fail this way");
+
+            assertAll(
+                    () ->
+                            assertTrue(
+                                    refused.getMessage()
+                                            .endsWith("It exited 126 saying: no banner"),
+                                    "the tidying failure must not replace the diagnostic: "
+                                            + refused.getMessage()),
+                    () -> assertEquals(List.of(name), names(parent)),
+                    () -> assertTrue(name.startsWith("cometgui-comet-probe-"), name),
+                    () ->
+                            assertEquals(
+                                    "still here",
+                                    Files.readString(workspace.resolve("defaults/held/open.log"))),
+                    () ->
+                            assertTrue(
+                                    Files.notExists(
+                                            Path.of(System.getProperty("java.io.tmpdir"))
+                                                    .resolve(name)),
+                                    "the system temporary directory got nothing"));
+        } finally {
+            /*
+             * Unlocked and removed wherever it is, so that a probe which put its workspace
+             * somewhere other than the directory it was given cannot leave this test's
+             * undeletable entry there.
+             */
+            for (Path held : locked) {
+                Files.setPosixFilePermissions(held, PosixFilePermissions.fromString("rwx------"));
+                deleteTree(held.getParent().getParent());
+            }
+        }
+    }
+
+    private static void deleteTree(Path root) throws IOException {
+        try (Stream<Path> walk = Files.walk(root)) {
+            for (Path entry : walk.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(entry);
+            }
         }
     }
 
