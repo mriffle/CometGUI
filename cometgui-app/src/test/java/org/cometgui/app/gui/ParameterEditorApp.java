@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.function.UnaryOperator;
 import javafx.scene.Node;
@@ -86,18 +87,62 @@ final class ParameterEditorApp {
      * Starts the application with a scripted chooser, a named build, and a file system in which the
      * given paths exist as readable files (every other question goes to the real one).
      *
+     * <p><strong>Never over this machine's application-data directory.</strong> The Tool Manager
+     * and the default project are the application's own, composed over {@link
+     * #unusedApplicationData()}: a path of this test JVM's own that does not exist. A test started
+     * here is about the parameter editor of a fresh application, so nothing is installed and --
+     * since an application with nothing installed creates nothing -- the directory is never made.
+     * Until Phase 16 this composed them over the machine's directory, which under this module's
+     * test configuration is {@code $XDG_DATA_HOME/cometgui} inside the font stack under {@code
+     * tools/}: whatever was installed there became part of every test started here.
+     *
      * @param build the build a saved file's header names
      * @param present the paths to report as readable files
      * @return the running application
      */
     static ParameterEditorApp launch(BuildIdentity build, Path... present) {
-        ApplicationServices real = ApplicationServices.forThisHost();
+        ApplicationServices isolated = servicesOver(unusedApplicationData());
         return launch(
                 build,
-                real.processRunner().orElse(null),
+                isolated.processRunner().orElse(null),
                 new BoundedMessageLog(),
-                RunWiring.Setup.forThisApplication(real),
+                RunWiring.Setup.forThisApplication(isolated),
                 present);
+    }
+
+    /**
+     * An application-data directory no application has ever used: a new name under this module's
+     * build directory, not created.
+     *
+     * @return the path, absolute; nothing is there
+     */
+    static Path unusedApplicationData() {
+        return Path.of("target", "gui-test-application-data", UUID.randomUUID().toString())
+                .toAbsolutePath();
+    }
+
+    /**
+     * This host's composition root with one difference: the application-data directory is the one
+     * given, not this machine's.
+     *
+     * @param applicationData the application-data directory, absolute; it need not exist
+     * @return the services
+     */
+    static ApplicationServices servicesOver(Path applicationData) {
+        if (!applicationData.isAbsolute()) {
+            throw new IllegalArgumentException(
+                    "the application-data directory must be absolute: " + applicationData);
+        }
+        ApplicationServices real = ApplicationServices.forThisHost();
+        return new ApplicationServices(
+                real.clock(),
+                real.environment(),
+                new DataDirectory(real.fileSystem(), applicationData),
+                real.runIds(),
+                real.glibcVersions(),
+                real.processRunner().orElse(null),
+                null,
+                null);
     }
 
     /**
@@ -186,21 +231,7 @@ final class ParameterEditorApp {
      * @return the running application
      */
     static ParameterEditorApp launchOver(BuildIdentity build, Path applicationData) {
-        if (!applicationData.isAbsolute()) {
-            throw new IllegalArgumentException(
-                    "the application-data directory must be absolute: " + applicationData);
-        }
-        ApplicationServices real = ApplicationServices.forThisHost();
-        ApplicationServices services =
-                new ApplicationServices(
-                        real.clock(),
-                        real.environment(),
-                        new DataDirectory(real.fileSystem(), applicationData),
-                        real.runIds(),
-                        real.glibcVersions(),
-                        real.processRunner().orElse(null),
-                        null,
-                        null);
+        ApplicationServices services = servicesOver(applicationData);
         ScriptedChooser chooser = new ScriptedChooser();
         try {
             Stage primary = FxToolkit.registerPrimaryStage();

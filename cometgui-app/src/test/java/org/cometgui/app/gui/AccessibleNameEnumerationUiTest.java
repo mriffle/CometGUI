@@ -20,6 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -29,6 +32,7 @@ import javafx.scene.control.Control;
 import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.RunningApplication;
 import org.cometgui.app.uidriver.TestFxUiDriver;
+import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.domain.log.MessageSeverity;
 import org.cometgui.ui.controls.AccessibleControls;
 import org.cometgui.ui.controls.UiIds;
@@ -37,6 +41,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Phase 02 exit-gate item 4: "Every control that exists has an accessible name; a test enumerates
@@ -311,6 +316,20 @@ class AccessibleNameEnumerationUiTest {
      */
     static final Set<String> SKIN_IDENTIFIERS = Set.of("list-view");
 
+    private static final BuildIdentity BUILD =
+            BuildIdentity.of("0.0.0-guitest", "unknown", Instant.parse("2026-11-12T00:00:00Z"));
+
+    /**
+     * This test's own directory. The application is started over an empty application-data
+     * directory inside it ({@link ParameterEditorApp#launchOver}), not through {@code main}, which
+     * reads this machine's application-data directory: the controls enumerated are then those of a
+     * fresh application wherever the test runs, and nothing is read from, or created in, a
+     * directory the test does not own. {@link #theApplicationIsAFreshOne} states that as a value.
+     */
+    @TempDir private static Path scratch;
+
+    private static Path applicationData;
+
     private static RunningApplication application;
 
     private static FxUiDriver driver;
@@ -318,8 +337,9 @@ class AccessibleNameEnumerationUiTest {
     private static List<Control> controls;
 
     @BeforeAll
-    static void launchTheApplicationAndWalkTheScene() {
-        application = RunningApplication.launchedByMain();
+    static void launchTheApplicationAndWalkTheScene() throws IOException {
+        applicationData = scratch.toRealPath().resolve("application-data");
+        application = ParameterEditorApp.launchOver(BUILD, applicationData).application();
         /*
          * The Tool Manager's rows are read off the interface thread and arrive after the window:
          * walk the scene once they are in it, so every row's controls are among those graded.
@@ -343,6 +363,14 @@ class AccessibleNameEnumerationUiTest {
         if (application != null) {
             application.stop();
         }
+    }
+
+    @Test
+    @DisplayName(
+            "the application enumerated is a fresh one over this test's own application-data"
+                    + " directory: nothing is listed as installed, and nothing was created there")
+    void theApplicationIsAFreshOne() {
+        FreshApplicationData.assertFresh(application, driver, applicationData);
     }
 
     @Test

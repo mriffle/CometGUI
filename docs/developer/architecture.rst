@@ -1281,6 +1281,23 @@ stage exists -- never on a sleep. Nothing is hand-built: no test constructs a
 ``ShellView``, and the composition root is the real one.
 ``RunningApplication.showing(stage)`` wraps a stage a test started itself, which
 is what the console flood test needs in order to supply the log it floods.
+
+**No GUI test in this package starts the application over the machine's
+application-data directory** (since Phase 16 unit 4). ``main`` reads that
+directory -- under this module's test configuration ``$XDG_DATA_HOME/cometgui``,
+inside the font stack under ``tools/`` -- so a test started through it makes
+whatever is installed there part of the test, and an application that finds a
+Comet there creates and locks a project in it. The gate tests below are started
+with ``ParameterEditorApp.launchOver`` over an empty directory in the test's own
+temporary directory, each with a test that states the assumption as a value
+(``FreshApplicationData.assertFresh``: the Tool Manager lists nothing as
+installed, and the directory was not created). The parameter-editor tests that
+start the application with ``ParameterEditorApp.launch(build, ...)`` and the
+console flood test get a directory name of their JVM's own under ``target/``
+that is never created. Every other GUI test supplies its own Tool Manager and
+project directory. What still goes through ``main`` is the test of ``main``
+itself, ``CometGuiApplicationStartupTest``, and the opt-in startup measurement
+of the performance suite, which times it.
 ``Application.launch`` may be called at most once per JVM, so
 ``reuseForks=false`` in ``cometgui-app/pom.xml`` gives each GUI test class its
 own JVM and its own application.
@@ -1294,6 +1311,8 @@ application:
 * ``SectionNavigationUiTest`` -- **items 1 (by mouse) and 2**: a synthetic click
   on each of the ten navigation entries, then that section's pane asserted
   showing *by its stable identifier* while the other nine are not. Both drivers.
+  Started over its own empty application-data directory, with the assumption
+  asserted.
 * ``KeyboardOnlyNavigationUiTest`` -- **item 1 (by keyboard alone)**: no
   ``clickOn`` is called anywhere in the class. Tab into the navigation, then
   every section reached with arrow keys, reading back the focus owner's
@@ -1308,7 +1327,8 @@ application:
   on every ``Control`` found. Not a list of identifiers to check, which would
   pass on the one day it matters. It also asserts a *floor* on how many controls
   were seen -- derived at 65, with this build's walk finding **91** -- so a walk
-  that found three and named all three cannot pass.
+  that found three and named all three cannot pass. Started over its own empty
+  application-data directory, with the assumption asserted.
 * ``ConsoleFloodUiTest`` -- **item 5**: the console *pane* inside the running
   application, flooded from a producer thread through the same path the process
   service will use. It asserts the retained model equals the log's capacity, the

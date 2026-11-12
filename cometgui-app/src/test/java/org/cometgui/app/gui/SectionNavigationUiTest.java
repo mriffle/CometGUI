@@ -23,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Stream;
 import javafx.scene.Node;
@@ -31,6 +34,7 @@ import org.cometgui.app.uidriver.FxUiDriver;
 import org.cometgui.app.uidriver.RobotFxUiDriver;
 import org.cometgui.app.uidriver.RunningApplication;
 import org.cometgui.app.uidriver.TestFxUiDriver;
+import org.cometgui.domain.build.BuildIdentity;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.view.SectionPane;
 import org.cometgui.ui.viewmodel.SectionId;
@@ -38,6 +42,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -60,6 +65,15 @@ import org.junit.jupiter.params.provider.MethodSource;
  * TestFX and again through plain {@code javafx.scene.robot.Robot}. That is what makes the {@code
  * FxUiDriver} abstraction worth having rather than a layer of indirection: the fallback phase 00
  * named is exercised on every build, so it cannot rot.
+ *
+ * <p><strong>A fresh application, over a data directory of this test's own.</strong> The
+ * application is the real one -- its own Tool Manager and default project -- started over an empty
+ * application-data directory in this test's temporary directory ({@link
+ * ParameterEditorApp#launchOver}), not through {@code main}, which reads this machine's
+ * application-data directory and so makes whatever is installed there part of the walk (and,
+ * finding a Comet there, creates and locks a project in it). {@link #theApplicationIsAFreshOne}
+ * states the assumption as a value. That {@code main} itself starts the application is {@code
+ * CometGuiApplicationStartupTest}'s to show.
  */
 class SectionNavigationUiTest {
 
@@ -76,11 +90,19 @@ class SectionNavigationUiTest {
                     "console",
                     "tool-manager");
 
+    private static final BuildIdentity BUILD =
+            BuildIdentity.of("0.0.0-guitest", "unknown", Instant.parse("2026-11-12T00:00:00Z"));
+
+    @TempDir private static Path scratch;
+
+    private static Path applicationData;
+
     private static RunningApplication application;
 
     @BeforeAll
-    static void launchTheApplication() {
-        application = RunningApplication.launchedByMain();
+    static void launchTheApplication() throws IOException {
+        applicationData = scratch.toRealPath().resolve("application-data");
+        application = ParameterEditorApp.launchOver(BUILD, applicationData).application();
     }
 
     @AfterAll
@@ -98,6 +120,15 @@ class SectionNavigationUiTest {
     static Stream<FxUiDriver> drivers() {
         assertNotNull(application, "the application must be running before a driver is built");
         return Stream.of(new TestFxUiDriver(application), new RobotFxUiDriver(application));
+    }
+
+    @Test
+    @DisplayName(
+            "the application walked is a fresh one over this test's own application-data"
+                    + " directory: nothing is listed as installed, and nothing was created there")
+    void theApplicationIsAFreshOne() {
+        FreshApplicationData.assertFresh(
+                application, new TestFxUiDriver(application), applicationData);
     }
 
     @Test

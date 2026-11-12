@@ -28,10 +28,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Stream;
-import javafx.scene.Node;
-import javafx.scene.control.Labeled;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.input.KeyCode;
 import org.cometgui.app.uidriver.FxUiDriver;
@@ -96,16 +93,6 @@ class KeyboardOnlyNavigationUiTest {
     private static final BuildIdentity BUILD =
             BuildIdentity.of("0.0.0-guitest", "unknown", Instant.parse("2026-11-12T00:00:00Z"));
 
-    /**
-     * What the Tool Manager says of a managed build nothing has installed: not installed, or one
-     * this host cannot be offered at all.
-     */
-    private static final Set<String> NOTHING_INSTALLED =
-            Set.of(
-                    "CometGUI-managed: not installed",
-                    "CometGUI-managed: not published for this platform",
-                    "CometGUI-managed: cannot run on this host");
-
     @TempDir private static Path scratch;
 
     private static Path applicationData;
@@ -142,7 +129,7 @@ class KeyboardOnlyNavigationUiTest {
         FxUiDriver driver = new TestFxUiDriver(application);
 
         application.awaitToolListRead();
-        List<String> states = toolStates(driver);
+        List<String> states = FreshApplicationData.toolStates(driver);
         assertAll(
                 "a fresh application",
                 () -> assertTrue(driver.isVisible(UiIds.sectionPane(SectionId.RUN))),
@@ -155,7 +142,10 @@ class KeyboardOnlyNavigationUiTest {
                         assertEquals(
                                 List.of(),
                                 states.stream()
-                                        .filter(state -> !NOTHING_INSTALLED.contains(state))
+                                        .filter(
+                                                state ->
+                                                        !FreshApplicationData.NOTHING_INSTALLED
+                                                                .contains(state))
                                         .toList(),
                                 "builds the application found installed. This test is about a"
                                         + " fresh application, so it starts one over its own empty"
@@ -334,28 +324,6 @@ class KeyboardOnlyNavigationUiTest {
                 List.of(UiIds.navigationEntry(expected)),
                 traversableEntries(driver),
                 "the selected entry must be the only traversable one");
-    }
-
-    /**
-     * What the Tool Manager says of each build it lists: the state line of every row, read from the
-     * scene.
-     *
-     * @param driver the driver to ask
-     * @return for example {@code "CometGUI-managed: not installed"}, one per row
-     */
-    private static List<String> toolStates(FxUiDriver driver) {
-        Node rows = driver.node(UiIds.TOOL_MANAGER_ROWS);
-        return driver.callOnFxThread(
-                () -> {
-                    List<String> states = new ArrayList<>();
-                    for (Node label : rows.lookupAll(".label")) {
-                        String text = ((Labeled) label).getText();
-                        if (text != null && text.startsWith("CometGUI-managed: ")) {
-                            states.add(text);
-                        }
-                    }
-                    return states;
-                });
     }
 
     /**

@@ -143,8 +143,14 @@ class ConsoleFloodUiTest {
             throws TimeoutException, InterruptedException {
         log = new BoundedMessageLog();
         Stage primary = FxToolkit.registerPrimaryStage();
-        FxToolkit.setupApplication(
-                () -> new CometGuiApplication(ApplicationServices.forThisHost(), log));
+        /*
+         * Over an application-data directory of this JVM's own that does not exist, not this
+         * machine's: the flood is about the console, and what is installed on the machine it runs
+         * on is no part of it.
+         */
+        ApplicationServices services =
+                ParameterEditorApp.servicesOver(ParameterEditorApp.unusedApplicationData());
+        FxToolkit.setupApplication(() -> new CometGuiApplication(services, log));
         application = RunningApplication.showing(primary);
         driver = new TestFxUiDriver(application);
 
