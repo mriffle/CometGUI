@@ -645,6 +645,116 @@ class ArchiveEdgeCasesTest {
                 () -> "wrong message: " + rejection.getMessage());
     }
 
+    /*
+     * AN EXTRA-FIELD LENGTH THAT RUNS PAST THE CENTRAL DIRECTORY (Phase 16 unit 4).  The walk over
+     * a Zip64 entry's extra field trusted the record's own length for where the field ends, so a
+     * length reaching past the directory sent it reading headers that are not there -- and the
+     * buffer answered with an IndexOutOfBoundsException, an unchecked exception from a reader of
+     * hostile input.  The fixture is anExtraFieldThatEndsTheDirectory's, whose one extra field is
+     * of another kind and ends exactly where the directory does, with the length made four bytes
+     * longer: room, by the record's own account, for one more header.
+     */
+    @Test
+    @DisplayName(
+            "a Zip64 entry's extra-field length that runs past the central directory is refused in"
+                    + " its own words, not thrown as an unchecked exception")
+    void anExtraFieldLengthPastTheDirectory() throws IOException {
+        byte[] zip = ArchiveFixtures.zip64Bytes(List.of(Entry.file("tool.bin", "payload")));
+        int marker = indexOfExtraFieldHeader(zip);
+        int comment = ArchiveFixtures.ENTRY_COMMENT.getBytes(StandardCharsets.UTF_8).length;
+        ByteBuffer patched = littleEndian(zip);
+        patched.putShort(marker, (short) 0x9999);
+        patched.putShort(centralHeaderOf(marker) + 30, (short) 16);
+        patched.putShort(centralHeaderOf(marker) + 32, (short) 0);
+        int record = (int) patched.getLong(zip.length - 22 - 20 + 8);
+        patched.putLong(record + 40, patched.getLong(record + 40) - comment);
+        Path artefact = Files.write(archives.resolve("pastextra.zip"), zip);
+
+        IOException refused =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                extractor.extractWholeArtefact(
+                                        ArtefactKind.ZIP, artefact, destination, "tool.bin"));
+
+        assertAll(
+                () -> assertEquals(ExtractionRejectedException.class, refused.getClass()),
+                () ->
+                        assertEquals(
+                                "the artefact \"pastextra.zip\" was rejected because its container"
+                                        + " structure is not readable -- entry \"tool.bin\""
+                                        + " declares an extra field of 16 bytes, which runs past"
+                                        + " the end of the central directory",
+                                refused.getMessage()),
+                () ->
+                        assertEquals(
+                                RejectionReason.MALFORMED_ARCHIVE,
+                                ((ExtractionRejectedException) refused).reason()),
+                () -> assertEquals(List.of(), listed(destination), "nothing was unpacked"));
+    }
+
+    @Test
+    @DisplayName(
+            "an ordinary entry's extra-field length that runs past the central directory is"
+                    + " refused too, where it used to be unpacked")
+    void anOrdinaryExtraFieldLengthPastTheDirectory() throws IOException {
+        byte[] zip = ArchiveFixtures.zipBytes(List.of(Entry.file("tool.bin", "payload")), true, "");
+        int header = centralDirectoryOffsetOf(zip);
+        littleEndian(zip).putShort(header + 30, (short) 1);
+
+        ExtractionRejectedException rejection = refuse(ArtefactKind.ZIP, zip, "ordinaryextra.zip");
+
+        assertAll(
+                () ->
+                        assertEquals(
+                                "the artefact \"ordinaryextra.zip\" was rejected because its"
+                                        + " container structure is not readable -- entry"
+                                        + " \"tool.bin\" declares an extra field of 1 bytes, which"
+                                        + " runs past the end of the central directory",
+                                rejection.getMessage()),
+                () -> assertEquals(List.of(), listed(destination), "nothing was unpacked"));
+    }
+
+    @Test
+    @DisplayName(
+            "a name length that runs past the central directory is refused in its own words, not"
+                    + " thrown as an unchecked exception")
+    void aNameLengthPastTheDirectory() throws IOException {
+        byte[] zip = ArchiveFixtures.zipBytes(List.of(Entry.file("tool.bin", "payload")), true, "");
+        int header = centralDirectoryOffsetOf(zip);
+        littleEndian(zip).putShort(header + 28, (short) 9);
+        Path artefact = Files.write(archives.resolve("pastname.zip"), zip);
+
+        IOException refused =
+                assertThrows(
+                        IOException.class,
+                        () ->
+                                extractor.extractWholeArtefact(
+                                        ArtefactKind.ZIP, artefact, destination, "tool.bin"));
+
+        assertAll(
+                () -> assertEquals(ExtractionRejectedException.class, refused.getClass()),
+                () ->
+                        assertEquals(
+                                "the artefact \"pastname.zip\" was rejected because its container"
+                                        + " structure is not readable -- record 1 of its central"
+                                        + " directory declares a name of 9 bytes, which runs past"
+                                        + " the end of the central directory",
+                                refused.getMessage()),
+                () -> assertEquals(List.of(), listed(destination), "nothing was unpacked"));
+    }
+
+    /** Where the classic end record says the central directory starts. */
+    private static int centralDirectoryOffsetOf(byte[] zip) {
+        return littleEndian(zip).getInt(zip.length - 22 + 16);
+    }
+
+    private static List<String> listed(Path directory) throws IOException {
+        try (java.util.stream.Stream<Path> entries = Files.list(directory)) {
+            return entries.map(entry -> String.valueOf(entry.getFileName())).sorted().toList();
+        }
+    }
+
     private static ByteBuffer littleEndian(byte[] bytes) {
         return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
     }

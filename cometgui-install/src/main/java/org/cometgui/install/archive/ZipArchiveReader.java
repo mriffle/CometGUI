@@ -287,9 +287,38 @@ final class ZipArchiveReader implements ArchiveReader {
             int commentLength = directory.getShort(position + 32) & 0xFFFF;
             long externalAttributes = directory.getInt(position + 38) & ZIP64_SENTINEL_32;
             long uncompressedSize = directory.getInt(position + 24) & ZIP64_SENTINEL_32;
+            /*
+             * A RECORD'S OWN LENGTHS ARE CHECKED AGAINST THE DIRECTORY BEFORE THEY ARE FOLLOWED.
+             * The name and the extra field are read below from where the record says they are, and
+             * a length that reaches past the directory used to be answered by the buffer itself --
+             * an IndexOutOfBoundsException, which is not an IOException and so was no refusal any
+             * caller of this reader handles.  Where the entry was not Zip64 the extra field was
+             * never read at all, and an archive whose last record lied about it was unpacked.
+             * Three lengths of at most 65535 beside a position below 64 MiB cannot overflow an int.
+             */
+            if (position + 46 + nameLength > directory.limit()) {
+                throw ExtractionRejectedException.artefact(
+                        RejectionReason.MALFORMED_ARCHIVE,
+                        artefactName,
+                        " -- record "
+                                + (index + 1)
+                                + " of its central directory declares a name of "
+                                + nameLength
+                                + " bytes, which runs past the end of the central directory");
+            }
             byte[] nameBytes = new byte[nameLength];
             directory.get(position + 46, nameBytes);
             String name = new String(nameBytes, StandardCharsets.UTF_8);
+            if (position + 46 + nameLength + extraLength > directory.limit()) {
+                throw ExtractionRejectedException.artefact(
+                        RejectionReason.MALFORMED_ARCHIVE,
+                        artefactName,
+                        " -- entry \""
+                                + name
+                                + "\" declares an extra field of "
+                                + extraLength
+                                + " bytes, which runs past the end of the central directory");
+            }
             if (uncompressedSize == ZIP64_SENTINEL_32) {
                 uncompressedSize =
                         zip64UncompressedSize(
