@@ -1,0 +1,261 @@
+{
+  "schema": 1,
+  "about": "The floors of the fixture acceptance check (PHASE-16, The CI fixture, step 5; Phase 16 unit 2), each with the measurement it was set from and the reasoning. Read by scripts/fixtures/fixture_acceptance.py; explained in docs/developer/test_fixtures.rst. PROPOSED by unit 2 from its own measurements; the phase orchestrator records them and tier 1 confirms them (handoffs/PHASE-16-worklog.rst, P16-4). A floor is a count a run must reach. It is never lowered to make a run pass: a red run means the FASTA, the tools or the product changed, and that is what has to be explained.",
+  "qValue": "0.01",
+  "measured": {
+    "date": "2026-11-12",
+    "host": "linux-x86-64",
+    "pairs": [
+      "comet-2026.02.2_percolator-3.06.5",
+      "comet-2026.02.2_percolator-3.07.1",
+      "comet-2026.03.0_percolator-3.06.5",
+      "comet-2026.03.0_percolator-3.07.1"
+    ],
+    "spectra": "20100614_Velos1_TaGe_SA_K562_3.mzML and _4.mzML (DECISIONS.rst, D-006): 1,338 MS2 spectra",
+    "wholeProteome": "UP000005640_9606.fasta, UniProt release 2026_02: 20652 records, 13731881 bytes, SHA-256 2329a517bec9bd7269f9ce3b9252d8b959ae98bc41405a945c2d6134b284d5a0",
+    "committedFixture": "fixtures/human-k562-subset/uniprot-human-2026_02-k562-subset.fasta: 3698 records (698 identified, 3000 background), 2539164 bytes, SHA-256 bd252b62568d88881e0d13bcdfaa6b9db96666af0ba08fc51863fcd7bdec1b34",
+    "identifiedProteinsOnly": "the 698 identified records of the committed file and nothing else: 563574 bytes, SHA-256 c57faacb53d5c04354ef49b345ca6b492786ad3a02a751b84170b7ff2b67bb1f",
+    "how": "every figure is from a run of this check (scripts/fixtures/check-fixture.sh) over a directory holding the K562 pair and that FASTA; the counts are deterministic on one platform"
+  },
+  "configurations": {
+    "matrix": {
+      "what": "exactly the version matrix's pair run: the Comet release's defaults with the fixture's FASTA, decoy_search = 1 and num_threads = 4; Comet's top five results for each spectrum; Percolator's defaults (seed 1). The reviewed goldens, the determinism suite and the performance suite are taken from this run.",
+      "cometEdits": {},
+      "converts": false
+    },
+    "top1": {
+      "what": "the same with num_output_lines = 1, then the product's Limelight conversion. One result per spectrum is what the end-to-end scenario sets before it converts: with the top five, Comet can report one spectrum twice with the same modified peptide and the pinned converter (v2.8.1) refuses the run, whatever the FASTA (handoffs/PHASE-14-worklog.rst, E5; measured again here against the whole proteome, 2026-11-12, all four pairs refused at scan 11483).",
+      "cometEdits": {
+        "num_output_lines": "1"
+      },
+      "converts": true
+    }
+  },
+  "floors": {
+    "matrix": {
+      "psms-at-1pct": {
+        "floor": 957,
+        "rule": "95% of the smallest whole-proteome count, rounded down",
+        "measured": {
+          "wholeProteome": {
+            "comet-2026.02.2_percolator-3.06.5": 1008,
+            "comet-2026.02.2_percolator-3.07.1": 1036,
+            "comet-2026.03.0_percolator-3.06.5": 1013,
+            "comet-2026.03.0_percolator-3.07.1": 1053
+          },
+          "committedFixture": {
+            "comet-2026.02.2_percolator-3.06.5": 1099,
+            "comet-2026.02.2_percolator-3.07.1": 1101,
+            "comet-2026.03.0_percolator-3.06.5": 1092,
+            "comet-2026.03.0_percolator-3.07.1": 1103
+          },
+          "identifiedProteinsOnly": {
+            "comet-2026.02.2_percolator-3.06.5": 1149,
+            "comet-2026.02.2_percolator-3.07.1": 1129,
+            "comet-2026.03.0_percolator-3.06.5": 1144,
+            "comet-2026.03.0_percolator-3.07.1": 1124
+          }
+        },
+        "why": "A trimmed FASTA keeps the proteins the spectra come from, so it must identify what the real search identifies: it may lose no more than a twentieth. A subset finds more, not fewer (the committed file and the identified-proteins-only file both do), so this floor is not what catches over-filtering; it catches a FASTA that has lost the identified proteins. The background alone, with the identified proteins left out, gives 0 here."
+      },
+      "peptides-at-1pct": {
+        "floor": 562,
+        "rule": "95% of the smallest whole-proteome count, rounded down",
+        "measured": {
+          "wholeProteome": {
+            "comet-2026.02.2_percolator-3.06.5": 599,
+            "comet-2026.02.2_percolator-3.07.1": 602,
+            "comet-2026.03.0_percolator-3.06.5": 592,
+            "comet-2026.03.0_percolator-3.07.1": 598
+          },
+          "committedFixture": {
+            "comet-2026.02.2_percolator-3.06.5": 648,
+            "comet-2026.02.2_percolator-3.07.1": 653,
+            "comet-2026.03.0_percolator-3.06.5": 646,
+            "comet-2026.03.0_percolator-3.07.1": 654
+          },
+          "identifiedProteinsOnly": {
+            "comet-2026.02.2_percolator-3.06.5": 668,
+            "comet-2026.02.2_percolator-3.07.1": 672,
+            "comet-2026.03.0_percolator-3.06.5": 670,
+            "comet-2026.03.0_percolator-3.07.1": 658
+          }
+        },
+        "why": "As for PSMs: the peptides the real search identifies must still be identified, to within a twentieth. The background alone gives 0 here."
+      },
+      "decoy-psms": {
+        "floor": 2644,
+        "rule": "95% of the whole-proteome count, rounded down",
+        "measured": {
+          "wholeProteome": {
+            "comet-2026.02.2_percolator-3.06.5": 2784,
+            "comet-2026.02.2_percolator-3.07.1": 2784,
+            "comet-2026.03.0_percolator-3.06.5": 2784,
+            "comet-2026.03.0_percolator-3.07.1": 2784
+          },
+          "committedFixture": {
+            "comet-2026.02.2_percolator-3.06.5": 2744,
+            "comet-2026.02.2_percolator-3.07.1": 2744,
+            "comet-2026.03.0_percolator-3.06.5": 2744,
+            "comet-2026.03.0_percolator-3.07.1": 2744
+          },
+          "identifiedProteinsOnly": {
+            "comet-2026.02.2_percolator-3.06.5": 2812,
+            "comet-2026.02.2_percolator-3.07.1": 2812,
+            "comet-2026.03.0_percolator-3.06.5": 2812,
+            "comet-2026.03.0_percolator-3.07.1": 2812
+          }
+        },
+        "why": "With five results for each spectrum Comet writes about as many decoy rows whatever the FASTA holds (2744 to 2812 over every size measured), so a count far below the real search's means decoys were not searched or the PIN lost rows, not that the FASTA is small. Percolator needs them to estimate every q-value."
+      },
+      "psms-above-1pct": {
+        "floor": 2691,
+        "rule": "95% of the smallest whole-proteome count, rounded down",
+        "measured": {
+          "wholeProteome": {
+            "comet-2026.02.2_percolator-3.06.5": 2878,
+            "comet-2026.02.2_percolator-3.07.1": 2850,
+            "comet-2026.03.0_percolator-3.06.5": 2873,
+            "comet-2026.03.0_percolator-3.07.1": 2833
+          },
+          "committedFixture": {
+            "comet-2026.02.2_percolator-3.06.5": 2788,
+            "comet-2026.02.2_percolator-3.07.1": 2786,
+            "comet-2026.03.0_percolator-3.06.5": 2795,
+            "comet-2026.03.0_percolator-3.07.1": 2784
+          },
+          "identifiedProteinsOnly": {
+            "comet-2026.02.2_percolator-3.06.5": 2580,
+            "comet-2026.02.2_percolator-3.07.1": 2600,
+            "comet-2026.03.0_percolator-3.06.5": 2585,
+            "comet-2026.03.0_percolator-3.07.1": 2605
+          }
+        },
+        "why": "THE FLOOR THAT CATCHES OVER-FILTERING. The PSMs a 1% filter rejects are the wrong and the weak matches. Take proteins out of the FASTA and there are fewer wrong candidates to outscore a weak true one, so more PSMs pass and fewer are left to reject: the rejected side shrinks from 2833-2878 (whole proteome) to 2580-2605 (identified proteins only), and recovers as background is added -- 2636-2663 with 250 background records, 2689-2695 with 500, 2733-2744 with 1000, 2725-2748 with 2000, 2784-2795 with 3000 (the committed file), 2764-2794 with 4000, 2807-2824 with 8000. A file must keep at least 95% of what the real search rejects. That is red for the identified proteins only (by 86 to 111), for 250 background records, and for one pair of four at 500; it is green from 1000 up."
+      }
+    },
+    "top1": {
+      "psms-at-1pct": {
+        "floor": 998,
+        "rule": "95% of the smallest whole-proteome count, rounded down",
+        "measured": {
+          "wholeProteome": {
+            "comet-2026.02.2_percolator-3.06.5": 1051,
+            "comet-2026.02.2_percolator-3.07.1": 1059,
+            "comet-2026.03.0_percolator-3.06.5": 1065,
+            "comet-2026.03.0_percolator-3.07.1": 1075
+          },
+          "committedFixture": {
+            "comet-2026.02.2_percolator-3.06.5": 1087,
+            "comet-2026.02.2_percolator-3.07.1": 1090,
+            "comet-2026.03.0_percolator-3.06.5": 1092,
+            "comet-2026.03.0_percolator-3.07.1": 1087
+          },
+          "identifiedProteinsOnly": {
+            "comet-2026.02.2_percolator-3.06.5": 1119,
+            "comet-2026.02.2_percolator-3.07.1": 1124,
+            "comet-2026.03.0_percolator-3.06.5": 1119,
+            "comet-2026.03.0_percolator-3.07.1": 1124
+          }
+        },
+        "why": "As in the matrix configuration: no more than a twentieth of the real search's identifications may be lost. The background alone gives 0 here, and Percolator 3.06.5 exits 1 on it."
+      },
+      "peptides-at-1pct": {
+        "floor": 589,
+        "rule": "95% of the smallest whole-proteome count, rounded down",
+        "measured": {
+          "wholeProteome": {
+            "comet-2026.02.2_percolator-3.06.5": 621,
+            "comet-2026.02.2_percolator-3.07.1": 620,
+            "comet-2026.03.0_percolator-3.06.5": 623,
+            "comet-2026.03.0_percolator-3.07.1": 623
+          },
+          "committedFixture": {
+            "comet-2026.02.2_percolator-3.06.5": 640,
+            "comet-2026.02.2_percolator-3.07.1": 637,
+            "comet-2026.03.0_percolator-3.06.5": 644,
+            "comet-2026.03.0_percolator-3.07.1": 640
+          },
+          "identifiedProteinsOnly": {
+            "comet-2026.02.2_percolator-3.06.5": 653,
+            "comet-2026.02.2_percolator-3.07.1": 660,
+            "comet-2026.03.0_percolator-3.06.5": 654,
+            "comet-2026.03.0_percolator-3.07.1": 661
+          }
+        },
+        "why": "As for PSMs. The background alone gives 0 here."
+      },
+      "decoy-psms": {
+        "floor": 80,
+        "rule": "two thirds of the whole-proteome count",
+        "measured": {
+          "wholeProteome": {
+            "comet-2026.02.2_percolator-3.06.5": 120,
+            "comet-2026.02.2_percolator-3.07.1": 120,
+            "comet-2026.03.0_percolator-3.06.5": 120,
+            "comet-2026.03.0_percolator-3.07.1": 120
+          },
+          "committedFixture": {
+            "comet-2026.02.2_percolator-3.06.5": 97,
+            "comet-2026.02.2_percolator-3.07.1": 97,
+            "comet-2026.03.0_percolator-3.06.5": 97,
+            "comet-2026.03.0_percolator-3.07.1": 97
+          },
+          "identifiedProteinsOnly": {
+            "comet-2026.02.2_percolator-3.06.5": 90,
+            "comet-2026.02.2_percolator-3.07.1": 90,
+            "comet-2026.03.0_percolator-3.06.5": 90,
+            "comet-2026.03.0_percolator-3.07.1": 90
+          }
+        },
+        "why": "With one result for each spectrum a spectrum is a decoy PSM only when a decoy outscores every target, so the count is small and depends on the FASTA: 120 against the whole proteome, 90 to 105 against every subset measured (90, 96, 105, 103, 98, 97, 95, 102 for 0, 250, 500, 1000, 2000, 3000, 4000 and 8000 background records -- no trend below the whole proteome). It is the same for all four pairs, because only Comet decides it. The floor is two thirds of the real search's rather than 95% because no subset reaches 95%, and it is not Percolator's own advisory minimum of 106 for the same reason (see reportedNotGraded). It is far enough above zero to fail a search that made no decoys."
+      },
+      "psms-above-1pct": {
+        "floor": 93,
+        "rule": "two thirds of the smallest whole-proteome count",
+        "measured": {
+          "wholeProteome": {
+            "comet-2026.02.2_percolator-3.06.5": 164,
+            "comet-2026.02.2_percolator-3.07.1": 156,
+            "comet-2026.03.0_percolator-3.06.5": 150,
+            "comet-2026.03.0_percolator-3.07.1": 140
+          },
+          "committedFixture": {
+            "comet-2026.02.2_percolator-3.06.5": 149,
+            "comet-2026.02.2_percolator-3.07.1": 146,
+            "comet-2026.03.0_percolator-3.06.5": 144,
+            "comet-2026.03.0_percolator-3.07.1": 149
+          },
+          "identifiedProteinsOnly": {
+            "comet-2026.02.2_percolator-3.06.5": 118,
+            "comet-2026.02.2_percolator-3.07.1": 113,
+            "comet-2026.03.0_percolator-3.06.5": 118,
+            "comet-2026.03.0_percolator-3.07.1": 113
+          }
+        },
+        "why": "The rejected side of the 1% line in the run the end-to-end scenario filters and converts. A count near 150 differs by up to 24 between the four pairs on one FASTA, where the matrix configuration's count near 2800 differs by 45 at most, so this floor is given the wider allowance and is not the one relied on to catch over-filtering: the identified proteins only give 113 to 118 and pass it. The committed file's 144 to 149 lies inside the whole proteome's own range (140 to 164) for every pair; with 2000 background records two pairs of four fall below it (133 and 126)."
+      }
+    }
+  },
+  "reportedNotGraded": {
+    "percolator-negative-sample-warning": {
+      "what": "Percolator prints 'Warning : the number of negative samples read is too small to perform a correct classification' when it is given 105 decoy PSMs or fewer: five for each of the 21 features of Comet's PIN (percolator src/Scores.cpp, rel-3-07-01: totalNumberOfDecoys_ <= getNumFeatures() * 5). It then trains as usual and exits 0.",
+      "measured": {
+        "decoyPsmsTop1ByBackgroundRecords": {
+          "0": 90,
+          "250": 96,
+          "500": 105,
+          "1000": 103,
+          "2000": 98,
+          "3000": 97,
+          "4000": 95,
+          "8000": 102,
+          "wholeProteome": 120
+        },
+        "warnedTop1": "every pair at every subset size, 0 to 8000 background records; no pair against the whole proteome",
+        "warnedMatrix": "never: 2744 to 2812 decoy PSMs at every size"
+      },
+      "why": "No trimmed FASTA can clear this warning: against the whole proteome these spectra give 120 decoy PSMs with one result per spectrum, 15 above Percolator's line, and against every subset measured -- up to 8698 of the proteome's 20652 records -- they give 90 to 105. Grading it would refuse every trimmed file and accept only the whole proteome, which the owner decided not to carry (DECISIONS.rst, D-006, 2026-11-12). So the check prints the warning wherever Percolator gave it, by name, and grades the count instead (decoy-psms, top1). What the warning costs was measured: on the committed file the top1 runs give 1087 to 1092 PSMs and 637 to 644 peptides at 1%, against 1051 to 1075 and 620 to 623 for the whole proteome. Whether a fixture whose one-result-per-spectrum runs carry this warning is acceptable is tier 1's to confirm with the floors."
+    }
+  }
+}

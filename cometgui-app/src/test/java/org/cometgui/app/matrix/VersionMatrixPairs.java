@@ -139,7 +139,7 @@ class VersionMatrixPairs {
     private static final long RUN_MINUTES = 30;
 
     /** Comet's threads in every pair run, so the configuration is the same on every host. */
-    private static final String COMET_THREADS = "4";
+    static final String COMET_THREADS = "4";
 
     @TempDir private static Path temporary;
 
@@ -560,12 +560,64 @@ class VersionMatrixPairs {
                     ExecutionException,
                     TimeoutException,
                     RunNotStartedException {
-        CometParameters model =
+        return runOnce(
+                engine,
+                projectDirectory,
+                fixture,
+                comet,
+                percolator,
+                every,
+                cometThreads,
+                settings,
+                Map.of());
+    }
+
+    /**
+     * {@link #runOnce(SessionEngine, Path, Fixture, ToolOffer, ToolOffer, List, String,
+     * PercolatorSettings)} with further Comet parameters set as a scientist would set them, after
+     * the three every run sets: the fixture acceptance run ({@link FixtureAcceptancePairs}) reports
+     * one result per spectrum for the run it converts to Limelight XML.
+     *
+     * @param engine the session's run port
+     * @param projectDirectory the session's project directory
+     * @param fixture the fixture
+     * @param comet the Comet build
+     * @param percolator the Percolator build
+     * @param every every Percolator build offered, for the product's resolution
+     * @param cometThreads the {@code num_threads} text
+     * @param settings the Percolator settings
+     * @param edits further Comet parameters, name to text, applied in iteration order
+     * @return the run, which exactly one new run directory holds
+     * @throws IOException if the project cannot be read
+     * @throws InterruptedException if interrupted while waiting
+     * @throws ExecutionException if the observer's result failed
+     * @throws TimeoutException if the run did not finish in time
+     * @throws RunNotStartedException if the product refused to start it
+     */
+    static Run runOnce(
+            SessionEngine engine,
+            Path projectDirectory,
+            Fixture fixture,
+            ToolOffer comet,
+            ToolOffer percolator,
+            List<ToolOffer> every,
+            String cometThreads,
+            PercolatorSettings settings,
+            Map<String, String> edits)
+            throws IOException,
+                    InterruptedException,
+                    ExecutionException,
+                    TimeoutException,
+                    RunNotStartedException {
+        CometParameters edited =
                 ReleaseDefaults.load(MetadataLoader.loadBundled(), comet.version())
                         .withText("database_name", fixture.fasta().toString(), ValueOrigin.USER)
                         .withText("decoy_search", "1", ValueOrigin.USER)
-                        .withText("num_threads", cometThreads, ValueOrigin.USER)
-                        .withWorkflowEnforcedOutputs();
+                        .withText("num_threads", cometThreads, ValueOrigin.USER);
+        for (Map.Entry<String, String> edit : edits.entrySet()) {
+            edited = edited.withText(edit.getKey(), edit.getValue(), ValueOrigin.USER);
+        }
+        CometParameters model = edited.withWorkflowEnforcedOutputs();
         PercolatorResolution resolution =
                 PercolatorResolver.resolve(every, EnumSet.of(DownstreamStage.LIMELIGHT_CONVERSION));
         PercolatorRequest request =
