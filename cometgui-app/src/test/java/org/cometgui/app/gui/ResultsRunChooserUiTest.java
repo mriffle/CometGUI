@@ -67,8 +67,11 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <h2>How the opens are counted</h2>
  *
- * <p>The last two tests are the other two ways a choice is committed: Space, and the mouse (a click
- * by the toolkit's own robot on a run's cell in the open list).
+ * <p>The fifth and sixth tests are the other two ways a choice is committed: Space, and the mouse
+ * (a click by the toolkit's own robot on a run's cell in the open list). The last two are the other
+ * two ways a walk is abandoned: a click somewhere else in the window, and the keyboard focus
+ * leaving the chooser. Each closes the list, opens nothing and puts the chooser back on the open
+ * run, as Escape does.
  *
  * <p>The application is the real one, launched with its real composition root over a project of
  * four constructed runs. Every time the Results section starts opening a run it says so in its
@@ -365,6 +368,68 @@ class ResultsRunChooserUiTest {
                 () -> assertFalse(listIsOpen(), "the list is closed"),
                 () -> assertEquals(List.of("run-d"), opened(), "runs opened"),
                 () -> assertEquals("run-d", chooserShows()),
+                () -> assertEquals(List.of(), listenerFailures, "listener failures"));
+    }
+
+    /** Opens the list from the open run and walks one run away from it, opening nothing. */
+    private static String walkOneRunAway(String open) {
+        focusTheChooser();
+        forget();
+        assertEquals(open, showing(), "the run that is open");
+        boolean last = open.equals(RUNS.get(RUNS.size() - 1));
+        driver.press(last ? KeyCode.UP : KeyCode.DOWN);
+        assertTrue(listIsOpen(), "an arrow on the closed chooser opens its list");
+        driver.press(last ? KeyCode.UP : KeyCode.DOWN);
+        String walkedTo = chooserShows();
+        assertAll(
+                "after walking one run away",
+                () -> assertTrue(listIsOpen(), "the list is still open"),
+                () ->
+                        assertEquals(
+                                RUNS.get(RUNS.indexOf(open) + (last ? -1 : 1)),
+                                walkedTo,
+                                "the run the chooser shows"),
+                () -> assertEquals(List.of(), opened(), "runs opened while walking"));
+        return walkedTo;
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("a click elsewhere abandons a walk: the list closes and no run is opened")
+    void aClickElsewhereAbandonsTheWalk() {
+        String open = showing();
+        String walkedTo = walkOneRunAway(open);
+
+        driver.clickOn("results-readiness");
+        ResultsSection.settle(driver, ResultsSection.QUERY_BOUND);
+        assertAll(
+                "after a click on the readiness line, with " + walkedTo + " shown in the list",
+                () -> assertFalse(listIsOpen(), "the list is closed"),
+                () -> assertEquals(List.of(), opened(), "runs opened"),
+                () -> assertEquals(open, showing(), "the open run is unchanged"),
+                () -> assertEquals(open, chooserShows(), "the chooser is back on it"),
+                () -> assertEquals(List.of(), listenerFailures, "listener failures"));
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("the focus leaving the chooser abandons a walk: the list closes and no run opens")
+    void theFocusLeavingAbandonsTheWalk() {
+        String open = showing();
+        String walkedTo = walkOneRunAway(open);
+
+        Node elsewhere = driver.node("results-table-choice");
+        driver.onFxThread(elsewhere::requestFocus);
+        ResultsSection.settle(driver, ResultsSection.QUERY_BOUND);
+        assertAll(
+                "after the focus moved to the table choice, with "
+                        + walkedTo
+                        + " shown in the list",
+                () -> assertEquals("results-table-choice", driver.focusedNodeId()),
+                () -> assertFalse(listIsOpen(), "the list is closed"),
+                () -> assertEquals(List.of(), opened(), "runs opened"),
+                () -> assertEquals(open, showing(), "the open run is unchanged"),
+                () -> assertEquals(open, chooserShows(), "the chooser is back on it"),
                 () -> assertEquals(List.of(), listenerFailures, "listener failures"));
     }
 }
