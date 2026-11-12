@@ -86,9 +86,14 @@ class FailedInstallReasonAfterRestartTest {
         return temporary.resolve("application data");
     }
 
-    /** Where the reason is kept between sessions, named by hand. */
+    /** The directory the reasons are kept in between sessions, named by hand. */
+    private Path failureRecords() {
+        return root().resolve("cache/failures");
+    }
+
+    /** Where this build's reason is kept between sessions, named by hand. */
     private Path failureRecord() {
-        return root().resolve("cache/failures/percolator__3.7.1__linux-x86-64.txt");
+        return failureRecords().resolve("percolator__3.7.1__linux-x86-64.txt");
     }
 
     private static ArtefactRecord percolator() throws IOException {
@@ -172,7 +177,7 @@ class FailedInstallReasonAfterRestartTest {
                 () ->
                         assertEquals(
                                 List.of("percolator__3.7.1__linux-x86-64.txt"),
-                                names(failureRecord().getParent()),
+                                names(failureRecords()),
                                 "one record, for the one build that failed, and no temporary"
                                         + " file beside it"),
                 () ->
@@ -223,7 +228,7 @@ class FailedInstallReasonAfterRestartTest {
             "a record that was rewritten outside the application is redacted on the way in, and"
                     + " a blank one is no failure at all")
     void aRecordFromOutsideIsRedactedOnTheWayIn() throws IOException {
-        Files.createDirectories(failureRecord().getParent());
+        Files.createDirectories(failureRecords());
         Files.writeString(
                 failureRecord(),
                 "Install step 1 of 8, DOWNLOAD_TO_TEMPORARY_FILE, failed: the request to"
@@ -337,7 +342,7 @@ class FailedInstallReasonAfterRestartTest {
             first.manager().install(ToolName.PERCOLATOR, PERCOLATOR_3_07_1, listener);
             assertEquals(InstallPhase.DONE, listener.awaitTerminal().phase());
         }
-        Files.createDirectories(failureRecord().getParent());
+        Files.createDirectories(failureRecords());
         Files.writeString(failureRecord(), PROBE_REASON, StandardCharsets.UTF_8);
 
         ToolOffer row = rowFor(reopened().manager().offers(), PERCOLATOR_3_07_1);
@@ -359,8 +364,8 @@ class FailedInstallReasonAfterRestartTest {
             "a cache that cannot keep the reason: this session still says why, the next offers"
                     + " the install, and a new attempt is not stopped by it")
     void aCacheThatCannotKeepTheReason() throws IOException, InterruptedException {
-        Path inTheWay = failureRecord().getParent();
-        Files.createDirectories(inTheWay.getParent());
+        Path inTheWay = failureRecords();
+        Files.createDirectories(root().resolve("cache"));
         Files.writeString(inTheWay, "not a directory", StandardCharsets.UTF_8);
 
         ToolOffer before = aSessionWhoseInstallFails();

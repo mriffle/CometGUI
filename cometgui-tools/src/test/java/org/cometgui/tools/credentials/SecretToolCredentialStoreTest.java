@@ -219,7 +219,7 @@ class SecretToolCredentialStoreTest {
     @DisplayName(
             "interrupted while the tool hangs: the tool is ended through the process service, the"
                     + " call fails as an interrupted one, and the interrupt is kept")
-    void anInterruptedCallEndsTheTool(@TempDir Path tmp) throws Exception {
+    void anInterruptedCallEndsTheTool(@TempDir Path tmp) throws IOException, InterruptedException {
         Path tool = tmp.resolve("secret-tool");
         Path pidRecord = tmp.resolve("pid.record");
         Files.writeString(

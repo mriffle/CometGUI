@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -465,7 +466,7 @@ class CometCapabilityProbeTest {
 
         /** The probe's workspace: each of its two runs gets a directory of its own inside it. */
         Path workspace() {
-            return directory.getParent();
+            return parentOf(directory);
         }
     }
 
@@ -477,8 +478,8 @@ class CometCapabilityProbeTest {
             List<Sighting> sightings, ScriptedRunner.Answer then) {
         return (command, listener) -> {
             Path directory = command.workingDirectory();
-            Path workspace = directory.getParent();
-            sightings.add(new Sighting(directory, names(workspace.getParent()), names(workspace)));
+            Path workspace = parentOf(directory);
+            sightings.add(new Sighting(directory, names(parentOf(workspace)), names(workspace)));
             then.play(command, listener);
         };
     }
@@ -667,7 +668,7 @@ class CometCapabilityProbeTest {
                                                     List.of(),
                                                     parent)
                                             .probe(ToolName.COMET, VERSION, LINUX, binary));
-            Path workspace = runner.commands().get(0).workingDirectory().getParent();
+            Path workspace = parentOf(runner.commands().get(0).workingDirectory());
             String name = String.valueOf(workspace.getFileName());
             Assumptions.assumeFalse(
                     Files.isWritable(locked.get(0)),
@@ -701,9 +702,13 @@ class CometCapabilityProbeTest {
              */
             for (Path held : locked) {
                 Files.setPosixFilePermissions(held, PosixFilePermissions.fromString("rwx------"));
-                deleteTree(held.getParent().getParent());
+                deleteTree(parentOf(parentOf(held)));
             }
         }
+    }
+
+    private static Path parentOf(Path path) {
+        return Objects.requireNonNull(path.getParent(), () -> path + " has no parent");
     }
 
     private static void deleteTree(Path root) throws IOException {

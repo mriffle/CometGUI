@@ -412,7 +412,7 @@ class ToolCacheTest {
         assertEquals(java.util.Optional.of(reason), cache.recordedFailure(percolator()));
         assertEquals(
                 List.of("percolator__3.7.1__linux-x86-64.txt"),
-                names(file.getParent()),
+                names(temporary.resolve("root/cache/failures")),
                 "the record and nothing else: the temporary name it was written under is gone");
     }
 
@@ -424,9 +424,9 @@ class ToolCacheTest {
         cache.recordFailure(percolator(), "the second reason");
         java.util.Optional<String> replaced = cache.recordedFailure(percolator());
 
-        cache.clearFailure(percolator());
+        cache.forgetFailure(percolator());
         java.util.Optional<String> cleared = cache.recordedFailure(percolator());
-        cache.clearFailure(percolator());
+        cache.forgetFailure(percolator());
 
         assertEquals(java.util.Optional.of("the second reason"), replaced);
         assertEquals(java.util.Optional.empty(), cleared);
@@ -446,7 +446,7 @@ class ToolCacheTest {
                         IllegalArgumentException.class,
                         () -> cache.recordFailure(percolator(), " \t"));
         Path file = cache.failureFile(ToolName.PERCOLATOR, ToolVersion.parse("3.07.1"), LINUX);
-        Files.createDirectories(file.getParent());
+        Files.createDirectories(temporary.resolve("root/cache/failures"));
         Files.writeString(file, " \n", StandardCharsets.UTF_8);
 
         assertEquals(
@@ -501,7 +501,7 @@ class ToolCacheTest {
                 assertThrows(
                                 NullPointerException.class,
                                 () ->
-                                        cache.clearFailure(
+                                        cache.forgetFailure(
                                                 Nulls.of(
                                                         org.cometgui.install.registry.ArtefactRecord
                                                                 .class)))

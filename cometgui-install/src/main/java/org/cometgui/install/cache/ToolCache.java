@@ -284,7 +284,7 @@ public final class ToolCache {
      * @throws IOException if the record cannot be removed
      * @throws NullPointerException if {@code record} is {@code null}
      */
-    public void clearFailure(ArtefactRecord record) throws IOException {
+    public void forgetFailure(ArtefactRecord record) throws IOException {
         Objects.requireNonNull(record, "record");
         Files.deleteIfExists(failureFile(record.tool(), record.version(), record.platform()));
     }

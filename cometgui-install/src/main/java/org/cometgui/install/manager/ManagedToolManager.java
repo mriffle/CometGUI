@@ -668,7 +668,7 @@ public final class ManagedToolManager implements ToolManager {
      */
     private void forgetEarlierFailure(ArtefactRecord record) {
         try {
-            cache.clearFailure(record);
+            cache.forgetFailure(record);
         } catch (IOException notRemoved) {
             /* The attempt now starting will replace it or outrank it. */
         }
