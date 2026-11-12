@@ -8,8 +8,8 @@ Decisions
    repository where the licence permits; D-018 raised and decided, option A;
    RAW files found, D-019 raised and decided, option A. Later the same day,
    from Phase 16's first two units: what was measured is added to D-006,
-   D-018 and D-019, and **D-020 is raised and OPEN** -- Percolator's
-   too-few-negatives warning on the trimmed FASTA)
+   D-018 and D-019, and D-020 is raised -- Percolator's too-few-negatives
+   warning on the trimmed FASTA -- **and decided, option A: acceptable**)
 
 Decisions an implementing agent **must not make on its own**. Each names what
 it blocks, the options with their costs, and a recommendation. ``D-009`` was
@@ -1471,10 +1471,10 @@ completed successfully and re-reads its log at the phase's sign-off.
 D-020 -- Whether Percolator's too-few-negatives warning is acceptable in the CI fixture
 =======================================================================================
 
-:Status: **OPEN** -- raised 2026-11-12
+:Status: **DECIDED 2026-11-12** -- option A, the warning is acceptable
 :Raised: 2026-11-12, by Phase 16's second unit, through tier 1
-:Blocks: Phase 16's switch of the tests and goldens to the trimmed FASTA
-   (and the CI wiring that follows it); nothing else in the phase
+:Blocks: nothing now. It held back Phase 16's switch of the tests and
+   goldens to the trimmed FASTA, and the CI wiring that follows it
 :Owner: Project owner
 
 **Question.** With the trimmed FASTA, Percolator prints a warning on one
@@ -1541,3 +1541,10 @@ C. **Keep the whole proteome for the one-result runs only.** The warning
 **How the phase proceeds meanwhile.** The units that do not depend on the
 answer run first. The unit that moves the tests and regenerates the goldens
 waits for it.
+
+**DECISION (2026-11-12).** The owner chose A: *"re: D-020: yes, it is
+acceptable."* The committed trimmed FASTA stands as it is. The acceptance
+check goes on printing the warning wherever Percolator gives it and does
+not grade it; the decoy count stays held to its floor; and the developer
+and user documentation say plainly that the fixture's one-result-per-spectrum
+runs carry the warning and why. The units that waited may now run.

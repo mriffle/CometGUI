@@ -100,8 +100,7 @@ authoritative for its own scope and exit gate.
    * - `16 <PHASE-16-release.rst>`_
      - Documentation and Release Qualification
      - 15
-     - **D-020 OPEN** (blocks the switch to the trimmed FASTA only); D-009.
-       D-001, D-004, D-006, D-008, D-018 and D-019 DECIDED
+     - D-009. D-001, D-004, D-006, D-008, D-018, D-019 and D-020 DECIDED
      - IN PROGRESS (dispatched 2026-11-12; paused after unit 2 of 16 and
        resumed by the owner the same day)
 

@@ -8,7 +8,7 @@ Project Status
    ``D-006``'s CI fixture decided; a trimmed-FASTA step added to Phase 16;
    ``D-018`` decided; Thermo RAW files found and ``D-019`` decided; **Phase
    16 dispatched, paused by the owner after its second unit, and resumed
-   the same day; ``D-020`` raised and OPEN**)
+   the same day; ``D-020`` raised and decided, option A**)
 :Current phase: **Phase 16 (documentation and release qualification), IN
    PROGRESS.** Dispatched 2026-11-12, paused by the owner the same day after
    unit 2 of 16, and **resumed by the owner** (*"Resume phase 16"*). A second
@@ -19,11 +19,13 @@ Project Status
    orchestrator; no exit-gate item is met and the phase is not signed off.
    **Before the resume tier 1 ran the trimmed FASTA's acceptance check and
    its self-test itself and confirmed the proposed floors** (change log).
-   **``D-020`` is OPEN and with the owner:** with the trimmed FASTA,
-   Percolator warns that its negative samples are too few on
-   one-result-per-spectrum runs. The units that move the tests and goldens
-   to the trimmed FASTA and wire it into CI (5, 7, part of 10) wait for the
-   answer; the rest run first. ``main`` is pushed with this recorded. The
+   **``D-020`` is DECIDED, option A** (owner, 2026-11-12: *"yes, it is
+   acceptable"*): with the trimmed FASTA, Percolator warns that its negative
+   samples are too few on one-result-per-spectrum runs, and the fixture
+   stands as it is; the check reports the warning and does not grade it. The
+   units that waited on it (5, 7, part of 10) may run, and the orchestrator
+   has been told. **No ``D-`` item is open.** ``main`` is pushed with this
+   recorded. The
    phase may push branches named ``phase16/...`` for runner evidence, and
    nothing else; one exists, ``phase16/raw-trial-1``.
 :Overall: Sixteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03,
@@ -343,8 +345,8 @@ Phase board
        ``D-009`` and a person's clean-machine run are not an agent's to
        complete. Paused by the owner 2026-11-12 after unit 2 of 16, at
        ``0659194``, and **resumed by the owner the same day** with a second
-       orchestrator. No gate item met yet. ``D-020`` (OPEN) holds back the
-       switch to the trimmed FASTA only.
+       orchestrator. No gate item met yet. ``D-020`` decided (A) the same
+       day; nothing is held back.
 
 Status values are ``NOT STARTED``, ``IN PROGRESS``, ``PARTIAL`` (with the
 residue named), ``BLOCKED`` (with the decision or dependency named), or
@@ -4864,6 +4866,14 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-11-12
+     - 16
+     - **``D-020`` decided, option A.** The owner: *"re: D-020: yes, it is
+       acceptable."* Percolator's too-few-negatives warning on the trimmed
+       FASTA's one-result-per-spectrum runs is accepted; the committed FASTA
+       and its floors stand; the check keeps reporting the warning. Relayed
+       to the phase orchestrator, which may now run units 5, 7 and the rest
+       of 10 in the work log's order.
    * - 2026-11-12
      - 16
      - **Phase 16 resumed by the owner** (*"Resume phase 16"*). Before

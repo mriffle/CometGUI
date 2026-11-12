@@ -7,10 +7,9 @@ PHASE-16: Documentation and Release Qualification
    day after unit 2 of 16; **resumed by the owner 2026-11-12** from
    ``handoffs/PHASE-16-handoff.rst`` and the brief's resume section)
 :Depends on: 15
-:Blocked by decisions: **D-020 is OPEN** (Percolator's warning on the
-   trimmed FASTA) and blocks steps 7 and 8 of *The CI fixture*; nothing
-   else. D-009 must be settled before release. D-001, D-004, D-006, D-008,
-   D-018 and D-019 are DECIDED
+:Blocked by decisions: none open. D-009 must be settled before release.
+   D-001, D-004, D-006, D-008, D-018, D-019 and D-020 are DECIDED (D-020,
+   2026-11-12: Percolator's warning on the trimmed FASTA is acceptable)
 :Delivers: R-DOC-01, R-DOC-02, R-DOC-06
 :Contributes to: R-DOC-03, R-DOC-04, R-DOC-05, R-SEC-01
 :Proves: AC-DOC-01, AC-DOC-02, AC-REL-02, AC-REL-03, AC-UX-01..06, AC-TST-07
@@ -120,7 +119,8 @@ The step, in order:
 **State at the resume (2026-11-12).** Steps 1 to 6 are done: the trimmed
 FASTA is ``fixtures/human-k562-subset/``, 3,698 records and 2.5 MB, and tier
 1 has confirmed the floors of its acceptance check by running it. Steps 7
-and 8 wait on ``D-020``.
+and 8 waited on ``D-020``, which the owner decided the same day: the warning
+is acceptable, and they may run.
 
 **After step 7 nothing in the tree depends on the whole proteome** -- no
 test, script, gate or job reads it or a file cut from it. The one exception
