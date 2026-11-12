@@ -56,9 +56,12 @@
 #   3a  item 3 [recorded, unit 4 injection 1]: the PIN feature columns compared
 #       as SETS, so two swapped columns merge; a RENAMED column must still be
 #       refused (stays green), on synthetic and on real PINs
-#   3b  item 3 [NEW]: the merge writes a header line for EVERY input -- red in
-#       the real run's one-header assertion; the real run's gate-1 assertions
-#       must stay green
+#   3b  item 3 [NEW]: the merge writes a header line for EVERY input -- since
+#       Phase 16 unit 3 the product reads back the file it wrote, so the merge
+#       itself refuses it: red in the real run (gate 1) in the merge's own
+#       words naming the second header's line, and in gate 3, which has no
+#       merged file to read.  (Before, only gate 3's one-header assertion saw
+#       it and gate 1 stayed green.)
 #   4a  item 4 [recorded, unit 3 injection 2]: "no decoys anywhere" judged only
 #       for an EMPTY FASTA -- red in the rule test and in the real pre-run
 #       block; gate 5's real block must stay green
@@ -1122,14 +1125,17 @@ control_3a() {
 
 control_3b() {
     begin_control "3b" "item 3 [NEW]: the merge writes a header for every input"
-    inject_and_run "a header written per input" "${PIN_MERGER}" "${SEL_2}" fixed \
-        'expected: <1> but was: <2>' \
+    # The second file's header is line 3556 of the merged file: one header and
+    # K562_3's 3554 rows come before it.  The merge reads back what it wrote
+    # (Phase 16 unit 3) and refuses a row whose Label is the word "Label".
+    inject_and_run "a header written per input" "${PIN_MERGER}" "${SEL_2}" regex \
+        'MERGE_PIN=the PIN file [^ ]*/inputs/pin/merged\.pin\.[^ /]*\.part line 3556 has the Label "Label", which is neither 1 nor -1' \
         '                            requireSameFeatures(first, reference, input, reader.header());' \
         '                            requireSameFeatures(first, reference, input, reader.header());
                             writeLine(out, String.join("\t", reader.header().columns()));'
-    assert_testcase "gate 3's merged-PIN method is the one that failed" failed \
+    assert_testcase "gate 3's merged-PIN method failed: the refused file was not left behind" failed \
         "${T_RUN}" gate3MergedPinHasOneHeaderAndTheSummedRows
-    assert_testcase "the real run itself, gate 1, stays green: nothing checks the merged header but gate 3" passed \
+    assert_testcase "the real run itself, gate 1, is red: the product's own merge refused the file" failed \
         "${T_RUN}" gate1TwoFilesFromAReadOnlyDirectory
     assert_no_processes_left "3b"
     restore_pristine "${PIN_MERGER}"

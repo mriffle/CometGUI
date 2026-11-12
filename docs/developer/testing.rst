@@ -3382,8 +3382,12 @@ phase, fails on a defect it exists to catch. It is registered in
    * - 3b
      - 3
      - New: a header line written for every merged input.
-     - ``RealCometRunTest#gate3...``: ``expected: <1> but was: <2>``; gate 1
-       stays green.
+     - Since Phase 16 unit 3 the merge reads back what it wrote, so the
+       product refuses the file: ``RealCometRunTest#gate1...`` red at
+       ``MERGE_PIN=the PIN file .../merged.pin.*.part line 3556 has the Label
+       "Label", which is neither 1 nor -1``, and ``gate3...`` red with no
+       merged file. (Before: ``gate3...`` alone, ``expected: <1> but was:
+       <2>``, gate 1 green.)
    * - 4a
      - 4
      - Recorded (unit 3): "no decoys anywhere" judged only for an empty FASTA.
