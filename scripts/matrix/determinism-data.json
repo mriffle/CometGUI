@@ -236,16 +236,7 @@
       "files": "outputs/comet/*.pin",
       "compare": "tsv",
       "why": "as comet-pepxml: the same queries in the same order with the same scores; the PIN carries no date, version or parameter",
-      "fields": [
-        {
-          "name": "SpecId: the run's own directory",
-          "pattern": "^{run}/",
-          "replace": "<run>/",
-          "column": "SpecId",
-          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Comet builds SpecId from the -N base",
-          "source": "Comet v2026.03.0 CometSearch/CometWritePercolator.cpp:121-125; Comet.cpp:140-146"
-        }
-      ],
+      "fields": [],
       "whenVaried": {}
     },
     {
@@ -255,16 +246,7 @@
       "files": "inputs/pin/merged.pin",
       "compare": "tsv",
       "why": "every row of every per-file PIN in input order, byte for byte (PinMerger)",
-      "fields": [
-        {
-          "name": "SpecId: the run's own directory",
-          "pattern": "^{run}/",
-          "replace": "<run>/",
-          "column": "SpecId",
-          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Comet builds SpecId from the -N base",
-          "source": "Comet v2026.03.0 CometSearch/CometWritePercolator.cpp:121-125; Comet.cpp:140-146"
-        }
-      ],
+      "fields": [],
       "whenVaried": {}
     },
     {
@@ -274,16 +256,7 @@
       "files": "outputs/percolator/psms.tsv",
       "compare": "tsv",
       "why": "one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision",
-      "fields": [
-        {
-          "name": "PSMId: the run's own directory",
-          "pattern": "^{run}/",
-          "replace": "<run>/",
-          "column": "PSMId",
-          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
-          "source": "Percolator rel-3-07-01 src/ResultHolder.cpp:42-52"
-        }
-      ],
+      "fields": [],
       "whenVaried": {
         "percolatorThreads": [
           {
@@ -307,16 +280,7 @@
       "files": "outputs/percolator/peptides.tsv",
       "compare": "tsv",
       "why": "one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision",
-      "fields": [
-        {
-          "name": "PSMId: the run's own directory",
-          "pattern": "^{run}/",
-          "replace": "<run>/",
-          "column": "PSMId",
-          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
-          "source": "Percolator rel-3-07-01 src/ResultHolder.cpp:42-52"
-        }
-      ],
+      "fields": [],
       "whenVaried": {
         "percolatorThreads": [
           {
@@ -340,16 +304,7 @@
       "files": "outputs/percolator/decoy-psms.tsv",
       "compare": "tsv",
       "why": "one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision",
-      "fields": [
-        {
-          "name": "PSMId: the run's own directory",
-          "pattern": "^{run}/",
-          "replace": "<run>/",
-          "column": "PSMId",
-          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
-          "source": "Percolator rel-3-07-01 src/ResultHolder.cpp:42-52"
-        }
-      ],
+      "fields": [],
       "whenVaried": {
         "percolatorThreads": [
           {
@@ -373,16 +328,7 @@
       "files": "outputs/percolator/decoy-peptides.tsv",
       "compare": "tsv",
       "why": "one seeded generator (seed 1 unless --seed) draws the cross-validation folds before training, nothing random is drawn inside the parallel training loops, the folds are merged in a fixed order and the values are printed at the stream's fixed default precision",
-      "fields": [
-        {
-          "name": "PSMId: the run's own directory",
-          "pattern": "^{run}/",
-          "replace": "<run>/",
-          "column": "PSMId",
-          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
-          "source": "Percolator rel-3-07-01 src/ResultHolder.cpp:42-52"
-        }
-      ],
+      "fields": [],
       "whenVaried": {
         "percolatorThreads": [
           {
@@ -424,13 +370,6 @@
           "replace": "<command_line/>",
           "why": "Percolator echoes its argument array, which names the run's own directory; the argument array itself is compared in provenance-json",
           "source": "Percolator rel-3-07-01 src/XMLInterface.cpp:440; Caller.cpp:98-105"
-        },
-        {
-          "name": "psm_id: the run's own directory",
-          "pattern": "((?:p:psm_id=\"|<psm_id>)){run}/",
-          "replace": "\\1<run>/",
-          "why": "the run's own directory: every run is a new run in a new directory (the product never reuses one), and the path is written into the content; Percolator copies Comet's SpecId",
-          "source": "Percolator rel-3-07-01 src/Scores.cpp:62-101"
         }
       ],
       "whenVaried": {

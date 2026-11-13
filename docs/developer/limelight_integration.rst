@@ -274,10 +274,19 @@ Phase 00's ``decoy-chain`` run over a concatenated target-decoy FASTA.
 The pout copy (P12-18)
 ----------------------
 
-Every CometGUI run passes Comet an **absolute** ``-N <run>/outputs/comet/<base>``,
-so the PIN ``SpecId`` and Percolator's ``psm_id`` carry that absolute path
-(Phase 00 used relative names, which hid it). The v2.8.1 converter cannot read
-such ids: it opens ``new File(<-d>, <id's file part> + ".pep.xml")``, which
+**Only a run made before Phase 16 unit 3b needs it.** Since then Comet is
+given the bare ``-N<base>`` in the run's ``outputs/comet``
+(:ref:`dev-workflow-psm-identifiers`), a run's ``psm_id`` values hold no
+directory, ``PoutForConverter.needsCopy`` is false and the converter is given
+the run's own ``pout.xml`` -- no copy is written or recorded
+(``RealLimelightConversionTest``). Earlier runs are not rewritten, so the copy
+stays for them, exactly as below (``RealIdentifiersTest`` converts such a run
+with the real converter).
+
+Until then every CometGUI run passed Comet an **absolute**
+``-N <run>/outputs/comet/<base>``, so the PIN ``SpecId`` and Percolator's
+``psm_id`` carry that absolute path (Phase 00 used relative names, which hid
+it). The v2.8.1 converter cannot read such ids: it opens ``new File(<-d>, <id's file part> + ".pep.xml")``, which
 concatenates an absolute child onto the directory; with ``-d /`` it finds the
 file and then fails "Unable to find any comet results", because it keys
 Comet's side by file name and Percolator's by the whole id.
@@ -291,9 +300,10 @@ count), records **both** files' MD5 and SHA-256 (roles ``percolator-xml`` and
 Limelight XML carries no PSM ids, so its content is unaffected; its
 ``conversion_program`` names the copy's path. Limits: the removal is global
 (the copy's ``<command_line>`` loses the directory too), and a run directory
-containing an XML-special character is refused. The rejected alternative, a
-relative Comet ``-N``, would change Phase 08's run model and Phase 11's
-``SpectrumReference`` and still leave existing runs needing the copy.
+containing an XML-special character is refused. The alternative rejected at
+the time, a relative Comet ``-N``, is what Phase 16 unit 3b then did, for
+another reason -- the identifiers carried the user's run directory into every
+table and export -- and, as foreseen, existing runs still need the copy.
 
 Compatibility and the offered action
 ====================================

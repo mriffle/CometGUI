@@ -277,13 +277,47 @@ def pout_elements(text: str) -> tuple:
     return text, psms, peptides
 
 
-def pout_key(block: str) -> tuple:
-    def tag(name):
-        found = re.search(rf"<{name}>([^<]*)</{name}>", block)
-        return found.group(1) if found else ""
+def pout_tag(block: str, name: str) -> str:
+    found = re.search(rf"<{name}>([^<]*)</{name}>", block)
+    return found.group(1) if found else ""
+
+
+def pout_scan(psm_id: str) -> str:
+    scan = re.search(r"_(\d+)_\d+_\d+$", psm_id)
+    return scan.group(1) if scan else ""
+
+
+def pout_psms(psms: list) -> dict:
+    """Each <psm> element's identifier -> (its svm_score, its exp_mass, its scan)."""
+    out = {}
+    for block in psms:
+        found = re.search(r'p:psm_id="([^"]*)"', block)
+        if found:
+            out[found.group(1)] = (pout_tag(block, "svm_score"), pout_tag(block, "exp_mass"),
+                                   pout_scan(found.group(1)))
+    return out
+
+
+def pout_key(block: str, psms: dict = None) -> tuple:
+    """Percolator's sort keys as a pout element shows them: the score texts, the mass and the scan.
+
+    A <psm> carries its scan in its own identifier.  A <peptide> lists every PSM of the peptide and
+    does not say which one it stands for, so with `psms` (pout_psms of the same document) its scan is
+    that of the PSMs among its own that carry the peptide's own score and mass: the one Percolator kept
+    for it, whose scan is the one Percolator sorted it by.  (Until Phase 16 unit 3b a run's identifiers
+    began with the run directory, written <run>/ by a named field, which the pattern below cannot read
+    past: the scan was then empty for every element, and a tie was a tie on the scores and mass alone.)
+    """
     first = re.search(r'(?:p:psm_id="|<psm_id>)([^"<]*)', block)
-    scan = re.search(r"_(\d+)_\d+_\d+$", first.group(1)) if first else None
-    return (tag("svm_score"), tag("q_value"), tag("pep"), tag("exp_mass"), scan.group(1) if scan else "")
+    scan = pout_scan(first.group(1)) if first else ""
+    if psms is not None:
+        own = (pout_tag(block, "svm_score"), pout_tag(block, "exp_mass"))
+        kept = sorted({psms[i][2] for i in re.findall(r"<psm_id>([^<]*)</psm_id>", block)
+                       if i in psms and psms[i][:2] == own})
+        if kept:
+            scan = ",".join(kept)
+    return (pout_tag(block, "svm_score"), pout_tag(block, "q_value"), pout_tag(block, "pep"),
+            pout_tag(block, "exp_mass"), scan)
 
 
 def sorted_psm_ids(block: str) -> str:
@@ -342,9 +376,10 @@ def normalised(artefact: dict, fields: list, side: Side, path: Path, tie_order: 
         text = apply_text_fields(text, fields, side.run)
         if tie_order:
             rest, psms, peptides = pout_elements(text)
+            kept = pout_psms(psms)
             psms = blocks_sorted(psms, [pout_key(b) for b in psms])
             peptides = [sorted_psm_ids(b) for b in peptides]
-            peptides = blocks_sorted(peptides, [pout_key(b) for b in peptides])
+            peptides = blocks_sorted(peptides, [pout_key(b, kept) for b in peptides])
             return rest.splitlines() + "".join(psms).splitlines() + "".join(peptides).splitlines()
         return text.splitlines()
     if kind in ("json", "jsonl-unordered"):
@@ -892,6 +927,65 @@ def self_test() -> int:
          result["verdict"] == "DIFFERS" and "offset 5" in result["detail"], result["detail"])
     missing = dict(raw, files="out/none.txt")
     case("an artefact the baseline did not write -> MISSING", compare(missing)["verdict"] == "MISSING")
+
+    # -- the pout comparison: a tie is a tie on Percolator's sort keys, the scan among them -------
+    pout = {"compare": "pout", "id": "p", "files": "out/pout.xml", "fields": [], "whenVaried": {
+        "percolatorThreads": [{"name": "tie order", "tieOrder": ["svm_score", "q_value", "pep"],
+                               "why": "w", "source": "s"}]}}
+
+    def psm(psm_id, score, mass):
+        return (f'    <psm p:psm_id="{psm_id}" p:decoy="false">\n      <svm_score>{score}</svm_score>\n'
+                f"      <q_value>0.2</q_value>\n      <pep>0.7</pep>\n      <exp_mass>{mass}</exp_mass>\n"
+                "    </psm>\n")
+
+    def peptide(sequence, score, mass, ids):
+        return (f'    <peptide p:peptide_id="{sequence}">\n      <svm_score>{score}</svm_score>\n'
+                f"      <q_value>0.2</q_value>\n      <pep>0.7</pep>\n      <exp_mass>{mass}</exp_mass>\n"
+                "      <psm_ids>\n" + "".join(f"        <psm_id>{i}</psm_id>\n" for i in ids)
+                + "      </psm_ids>\n    </peptide>\n")
+
+    def document(run, psms, peptides):
+        (run / "out" / "pout.xml").write_text(
+            "<percolator_output>\n  <psms>\n" + "".join(psms) + "  </psms>\n  <peptides>\n"
+            + "".join(peptides) + "  </peptides>\n</percolator_output>\n", encoding="utf-8")
+
+    # Two positional isomers: ranks 2 and 3 of scan 7 of file g, the same score and mass, so the
+    # two peptides they stand for are tied on score, scan and mass.  Each peptide also has a PSM
+    # of another scan with a lower score, and the first peptide's sorts before its own in text.
+    psms = [psm("g_7_3_2", "-0.5", "2105.9"), psm("g_7_3_3", "-0.5", "2105.9"),
+            psm("f_9_3_5", "-0.9", "2105.8"), psm("g_8_4_5", "-1.5", "2105.7")]
+    isomers = [peptide("AM[16]BMK", "-0.5", "2105.9", ["g_7_3_2", "f_9_3_5"]),
+               peptide("AMBM[16]K", "-0.5", "2105.9", ["g_7_3_3", "g_8_4_5"])]
+    document(run_a, psms, isomers)
+    document(run_b, psms, isomers)
+    case("the same pout XML -> identical", compare(pout)["verdict"] == "identical")
+    document(run_b, psms, isomers[::-1])
+    result = compare(pout)
+    case("two tied peptides swapped, nothing varied -> DIFFERS naming the element",
+         result["verdict"] == "DIFFERS" and "<peptide>" in result["detail"], result["detail"])
+    result = compare(pout, {"percolatorThreads"})
+    case("two peptides tied on score, mass and the scan of the PSM each stands for, swapped under a"
+         " varied thread count -> within tolerance, whatever other PSMs each lists",
+         result["verdict"] == "within tolerance", result["detail"])
+    # The same scores and mass, but the PSMs they stand for are of scans 7 and 8: Percolator sorts
+    # those by scan, so their order is not a tie's and a swap is a difference.
+    apart_psms = [psm("g_7_3_2", "-0.5", "2105.9"), psm("g_8_3_1", "-0.5", "2105.9")]
+    apart = [peptide("AM[16]BMK", "-0.5", "2105.9", ["g_7_3_2"]),
+             peptide("CCCK", "-0.5", "2105.9", ["g_8_3_1"])]
+    document(run_a, apart_psms, apart)
+    document(run_b, apart_psms, apart[::-1])
+    result = compare(pout, {"percolatorThreads"})
+    case("two peptides with equal scores and mass standing for PSMs of different scans, swapped under"
+         " a varied thread count -> DIFFERS", result["verdict"] == "DIFFERS", result["detail"])
+    document(run_b, apart_psms[::-1], apart)
+    result = compare(pout, {"percolatorThreads"})
+    case("two PSMs with equal scores and mass of different scans, swapped under a varied thread count"
+         " -> DIFFERS", result["verdict"] == "DIFFERS", result["detail"])
+    document(run_a, psms, isomers)
+    document(run_b, [psms[1], psms[0]] + psms[2:], isomers)
+    result = compare(pout, {"percolatorThreads"})
+    case("two PSMs of one scan with equal scores and mass, swapped under a varied thread count"
+         " -> within tolerance", result["verdict"] == "within tolerance", result["detail"])
     shutil.rmtree(work, ignore_errors=True)
 
     # -- the grading: control, carried setting, stray file, a run that never ran ---------------

@@ -246,7 +246,9 @@ ends with; ``error.txt`` is read. Every failure is named
 ``INVALID_FIGURE``, ``PDV_REPORTED_ERRORS``).
 
 ``PsmFigures`` maps the PSM to its spectrum: ``SpectrumReference`` gives the
-``-N`` base, scan and charge; the base names one of the run's spectrum files;
+``-N`` base, scan and charge; the base names one of the run's spectrum files
+(as the bare base, or as the absolute output base of a run made before Phase
+16 unit 3b: :ref:`dev-workflow-psm-identifiers`);
 the scan must be carried as ``scan=<n>`` by exactly one spectrum's native id,
 or the drawing is refused naming the scan. The work directory is a new
 numbered directory under ``<run>/pdv/figures/``. PDV's CLI chooses the hit it
@@ -395,7 +397,9 @@ A Percolator row is joined to **exactly one** pepXML hit and **exactly one**
 spectrum:
 
 * its ``PSMId`` ``<base>_<scan>_<charge>_<rank>`` names the source by its
-  absolute ``-N`` base, and the hit by (``start_scan``, ``assumed_charge``,
+  ``-N`` base (bare, or absolute in a run made before Phase 16 unit 3b; a
+  ``PdvMzTabSource`` carries both forms), and the hit by (``start_scan``,
+  ``assumed_charge``,
   **1-based position of the hit in its** ``spectrum_query``) -- in the
   ``.decoy.pep.xml`` for a decoy-table row when the search wrote decoys
   separately. **The rank is the position, not** ``hit_rank``: Comet gives tied

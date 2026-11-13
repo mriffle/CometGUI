@@ -97,7 +97,12 @@ FASTA stay where the user keeps them; ``run.json`` records each one's canonical
 path, size, modification time, MD5 and SHA-256.
 
 **Comet's outputs** for spectrum file ``nn`` are named after its *base name*,
-which Comet receives as ``-N<run>/outputs/comet/<base>``:
+which Comet receives as ``-N<base>`` and is run in ``<run>/outputs/comet``.
+Comet writes that value at the start of every identifier in its PIN file, so a
+PSM identifier anywhere in the run is ``<base>_<scan>_<charge>_<rank>`` and
+holds no directory. (A run made by an earlier CometGUI was given
+``-N<run>/outputs/comet/<base>``, and its identifiers begin with that absolute
+path; such a run is read as it is and is never rewritten.)
 
 * the base name is the file name without its spectrum extension (``.mzML``,
   ``.mzXML``, ``.mgf``, ``.ms2``, ``.cms2``, ``.bms2``, ``.raw``, in any case);

@@ -775,27 +775,70 @@ The search, one invocation per file
 ``run-comet`` builds one command per spectrum file (``CometSearchCommands``,
 decision P8-4) and runs them through ``invokeAll``::
 
-    comet -P<run>/parameters/comet.params [-D<database>] -N<run>/outputs/comet/<base> <input>
+    comet -P<run>/parameters/comet.params [-D<database>] -N<base> <input>
+
+run in ``<run>/outputs/comet``.
 
 * ``-P`` is always the archived file ``writeOnce`` wrote and hashed; the
   builder takes no parameter-file path at all.
 * ``-D`` appears only when the database must override ``database_name`` --
   in Phase 08, only to search a cached index -- and ``run.json``'s
   ``databaseDelivery`` records which mechanism was used (``R-CMT-04``).
-* ``-N`` always names ``outputs/comet/<base>`` inside the run (``R-CMT-03``).
+* ``-N`` always names ``outputs/comet/<base>`` inside the run (``R-CMT-03``):
+  it is the bare base, and the working directory is the run's own
+  ``outputs/comet`` (``R-PROC-04``: explicit, and inside the run directory).
+  **The base is bare because Comet writes the** ``-N`` **value verbatim at the
+  start of every PIN row's** ``SpecId``, which Percolator carries into every
+  ``PSMId`` and ``psm_id`` and the product into every export of the PSM table.
+  Until Phase 16 unit 3b the value was the absolute
+  ``<run>/outputs/comet/<base>``, so every identifier held the path of the
+  user's run directory. Measured on both pinned releases: the two forms write
+  the same files in the same place, the PINs are byte for byte equal once the
+  directory is removed from the earlier form's identifiers, and the pepXML is
+  the same too, because Comet resolves the base and writes the absolute path
+  as ``search_summary``'s ``base_name`` either way. Runs made before are not
+  rewritten; see :ref:`dev-workflow-psm-identifiers`.
   Comet ignores ``-N`` **silently** when given two inputs and writes beside
   each input instead -- re-measured on 2026.03.0 in unit 4 -- so no public
   method of the builder can put two inputs on one command line
   (``CometSearchCommandsTest.twoInputsAreInexpressible``).
 * Two commands of one run differ in exactly the ``-N`` base and the input.
-  The working directory is the run directory; the environment is exactly
-  ``LANG=C.UTF-8``. A run directory holding a control character is refused,
-  because Comet writes the ``-N`` path verbatim into every PIN row's ``SpecId``
-  (Phase 09 must know: ``SpecId`` carries the absolute path).
+  The working directory is the run's ``outputs/comet``; the environment is
+  exactly ``LANG=C.UTF-8``. A run directory holding a control character is
+  refused, because Comet writes the path ``-N`` names raw into its pepXML's
+  ``base_name`` attribute, where an XML reader turns a tab or a line break
+  into a space.
 
 Outputs left by an earlier attempt are removed before the search, so a stale
 file cannot pass for a fresh one. Each invocation's stage identifier is
 ``comet-<nn>``, ``nn`` the file's 1-based position.
+
+.. _dev-workflow-psm-identifiers:
+
+PSM identifiers, and runs made before they were bare
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A PSM identifier is ``<base>_<scan>_<charge>_<rank>`` (``SpectrumReference``
+reads it from the right, so a base may hold underscores, digits and spaces).
+In a run made since Phase 16 unit 3b the base is the spectrum file's bare
+``-N`` base; in a run made before, it is the absolute path
+``<run>/outputs/comet/<base>``. **Both are read, and nothing rewrites an
+earlier run.** ``RunLayout.psmIdBases(base)`` is the one place that says so --
+the bare base, then the absolute output base -- and the three readers that map
+an identifier to a spectrum file use it: ``ProjectResultsPort`` (the Results
+tables' source-file column), ``PdvMzTabs`` (each ``PdvMzTabSource`` carries
+both) and ``PsmFigures``. A base holds no path separator, so the two forms
+never collide, and an identifier whose base is neither is refused as it always
+was. Two spectrum files never share a base: ``OutputBaseNames`` makes bases
+distinct ignoring case and Unicode normalisation, suffixing a later file's with
+``_2``, ``_3`` ... (``OutputBaseNamesTest``), and ``CometSearchCommands``
+refuses a list that is not that rule's own derivation. The Limelight
+conversion needs no copy of the Percolator XML for a bare-identifier run and
+still makes one for an earlier run (``PoutForConverter``).
+``RealIdentifiersTest`` proves both halves on real runs: every identifier of
+every PIN, table and Percolator XML of a new run with each pinned Comet
+release, and a run made the earlier way that differs from it only in that
+directory, is exported for PDV and is converted by the real converter.
 
 Output validation and the PIN merge
 -----------------------------------

@@ -636,10 +636,11 @@ has been run.
        different PSMs at 1%. (``matrix.pair-results-differ-by-comet``)
 
 One behaviour common to both Comet releases, recorded because it shapes every
-PSM identifier: **Comet builds each PSM's identifier from its** ``-N`` **value**,
-which the product passes as the absolute output base inside the run directory,
-so every ``PSMId`` in a Percolator table begins with that run's own path
-(``/.../runs/<run>/outputs/comet/<base>_<scan>_<charge>_<rank>``). Identifiers
-therefore differ from run to run and machine to machine; the matrix compares
-them with the directory removed. Whether the product should shorten them is a
-product question, not the matrix's.
+PSM identifier: **Comet builds each PSM's identifier from its** ``-N`` **value**.
+Since Phase 16 unit 3b the product passes the bare base and runs Comet in the
+run's ``outputs/comet``, so a ``PSMId`` is ``<base>_<scan>_<charge>_<rank>``
+and is the same from run to run and machine to machine. Before that it passed
+the absolute output base, so every ``PSMId`` began with that run's own path
+(``/.../runs/<run>/outputs/comet/<base>_<scan>_<charge>_<rank>``). The matrix
+has always compared identifiers with any directory removed, which is why its
+goldens are the same for both forms.

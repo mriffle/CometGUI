@@ -180,7 +180,11 @@ Columns
      - What it holds
    * - PSMId
      - Percolator's identifier for the match, exactly as written. Comet
-       builds it from the spectrum file, scan number, charge and rank.
+       builds it from the spectrum file's name (without its extension), the
+       scan number, the charge and the rank: ``sample_A_11188_2_1``. It
+       holds no folder name. In a run made by an earlier CometGUI it begins
+       with the full path of the run's folder; such a run is shown, and
+       exported, as it was written.
    * - Source file
      - The spectrum file the match came from, read from the PSMId and named
        as you chose it (its full path, if two of the run's files have the
