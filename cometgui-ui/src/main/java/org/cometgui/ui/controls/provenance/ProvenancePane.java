@@ -35,6 +35,7 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import org.cometgui.ui.controls.CommittedChoice;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.params.Texts;
 import org.cometgui.ui.viewmodel.provenance.ProvenanceViewModel;
@@ -52,6 +53,16 @@ import org.cometgui.ui.viewmodel.provenance.ProvenanceViewModel;
  * clipboard, which only the interface can reach. Every row list is a list a keyboard user moves
  * through with the arrow keys, each row read out as the text it shows; the actions below it act on
  * the selected row and are disabled while none is selected.
+ *
+ * <h2>The run selector reads a run when a choice is made, not while the list is walked</h2>
+ *
+ * <p>Reading a run's provenance empties the section and reads the run's record, events and archived
+ * files again. The selector is a {@link CommittedChoice}, as the Results section's run chooser is:
+ * Up or Down on the closed selector opens its list; the arrow keys move through the runs and none
+ * is read; Enter, Space or a click on a run reads the run then shown, once, and nothing if it is
+ * the run already chosen; Escape, a click elsewhere or leaving the selector puts it back on the
+ * chosen run. A selection made while the list is closed -- by a test or an assistive technology
+ * acting on the control directly -- is a committed choice.
  */
 public final class ProvenancePane extends ScrollPane {
 
@@ -76,14 +87,11 @@ public final class ProvenancePane extends ScrollPane {
         run.setId(UiIds.PROVENANCE_RUN);
         named(run, "The run whose provenance is shown");
         run.setMaxWidth(Double.MAX_VALUE);
-        run.getSelectionModel()
-                .selectedIndexProperty()
-                .addListener(
-                        (observable, before, after) -> {
-                            if (!updating && after.intValue() >= 0) {
-                                provenance.choose(after.intValue());
-                            }
-                        });
+        CommittedChoice.over(
+                run,
+                run.getSelectionModel().selectedIndexProperty(),
+                this::commitRunChoice,
+                this::showRuns);
         provenance.runsProperty().addListener((observable, before, after) -> showRuns());
         provenance.chosenIndexProperty().addListener((observable, before, after) -> showRuns());
         showRuns();
@@ -340,6 +348,14 @@ public final class ProvenancePane extends ScrollPane {
                         verifyStatus,
                         verification);
         setContent(content);
+    }
+
+    /** Reads the provenance of the run the selector shows, if it is not the one already chosen. */
+    private void commitRunChoice() {
+        int shown = run.getSelectionModel().getSelectedIndex();
+        if (!updating && shown >= 0 && shown != provenance.chosenIndexProperty().get()) {
+            provenance.choose(shown);
+        }
     }
 
     private void showRuns() {

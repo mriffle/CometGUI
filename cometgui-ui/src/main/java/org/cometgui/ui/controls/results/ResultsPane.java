@@ -34,8 +34,6 @@ import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
-import javafx.event.EventTarget;
-import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -43,21 +41,16 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
-import javafx.scene.control.ListCell;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SelectionMode;
-import javafx.scene.control.Skin;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.skin.ComboBoxListViewSkin;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
@@ -65,6 +58,7 @@ import org.cometgui.results.filtering.store.Category;
 import org.cometgui.results.filtering.store.ResultSort;
 import org.cometgui.results.filtering.store.RowKey;
 import org.cometgui.results.filtering.store.TableKind;
+import org.cometgui.ui.controls.CommittedChoice;
 import org.cometgui.ui.controls.UiIds;
 import org.cometgui.ui.controls.params.Texts;
 import org.cometgui.ui.viewmodel.results.ColumnState;
@@ -125,6 +119,10 @@ import org.cometgui.ui.viewmodel.results.WeightsViewModel;
  * <p>A value set while the list is closed -- by a test or an assistive technology acting on the
  * control directly -- is a committed choice and opens that run.
  *
+ * <p>The keys and the pointer are watched by {@link CommittedChoice}, which the Provenance
+ * section's run selector shares; this view says only what a committed choice does (open the run
+ * shown) and what an abandoned walk does (show the open run again).
+ *
  * <h2>A thin view</h2>
  *
  * <p>Every text shown is a view-model's, every action calls a view-model method. Nothing here reads
@@ -167,12 +165,6 @@ public final class ResultsPane extends ScrollPane {
 
     /** Set while the view moves a control itself, so that the move is not taken as a choice. */
     private boolean updating;
-
-    /**
-     * Set when Enter, Space or a click on a run is closing the run chooser's list: only then is the
-     * run it shows a choice.
-     */
-    private boolean committingRunChoice;
 
     /**
      * The section's content.
@@ -383,91 +375,10 @@ public final class ResultsPane extends ScrollPane {
                         return null;
                     }
                 });
-        run.addEventFilter(KeyEvent.KEY_PRESSED, this::runChoiceKeyPressed);
-        run.skinProperty().addListener((observable, before, after) -> watchRunList(after));
-        watchRunList(run.getSkin());
-        run.showingProperty()
-                .addListener(
-                        (observable, was, showing) -> {
-                            if (showing) {
-                                committingRunChoice = false;
-                            } else if (committingRunChoice) {
-                                committingRunChoice = false;
-                                commitRunChoice();
-                            } else {
-                                showRuns();
-                            }
-                        });
-        run.valueProperty()
-                .addListener(
-                        (observable, before, after) -> {
-                            // While the list is open the value only follows the arrow keys; the
-                            // choice is made when the list closes.
-                            if (!run.isShowing()) {
-                                commitRunChoice();
-                            }
-                        });
+        CommittedChoice.over(run, run.valueProperty(), this::commitRunChoice, this::showRuns);
         results.runsProperty().addListener((observable, before, after) -> showRuns());
         results.chosenRunProperty().addListener((observable, before, after) -> showRuns());
         showRuns();
-    }
-
-    /**
-     * The run chooser's keys: an arrow on the closed chooser opens its list instead of changing the
-     * run, and Enter or Space in the open list makes the run shown the choice.
-     */
-    private void runChoiceKeyPressed(KeyEvent pressed) {
-        KeyCode code = pressed.getCode();
-        if (run.isShowing()) {
-            if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
-                committingRunChoice = true;
-            }
-            return;
-        }
-        boolean arrow =
-                code == KeyCode.UP
-                        || code == KeyCode.DOWN
-                        || code == KeyCode.KP_UP
-                        || code == KeyCode.KP_DOWN;
-        if (arrow && !pressed.isAltDown()) {
-            // Alt with an arrow is the toolkit's own key for opening the list; left to it.
-            run.show();
-            pressed.consume();
-        }
-    }
-
-    /**
-     * Watches the chooser's list for what makes a choice. While the list is open the toolkit hands
-     * every key to the list first, and the list closes itself on Enter and Space before the chooser
-     * is told, so the keys are seen here or not at all; and a mouse press in the list is a choice
-     * when it is on a run, not on the empty space below the last one or on the scroll bar. The
-     * press is watched on the list, not in its cells: the chooser keeps the toolkit's own cells, so
-     * what it shows for a run is its converter's text and nothing else.
-     */
-    private void watchRunList(Skin<?> skin) {
-        if (skin instanceof ComboBoxListViewSkin<?> listSkin) {
-            Node list = listSkin.getPopupContent();
-            list.addEventFilter(
-                    KeyEvent.KEY_PRESSED,
-                    pressed -> {
-                        KeyCode code = pressed.getCode();
-                        if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
-                            committingRunChoice = true;
-                        }
-                    });
-            list.addEventFilter(
-                    MouseEvent.MOUSE_PRESSED,
-                    pressed -> committingRunChoice = onARun(pressed.getTarget()));
-        }
-    }
-
-    /** Whether what the pointer pressed is a cell of the list that holds a run, or inside one. */
-    private static boolean onARun(EventTarget pressed) {
-        Node node = pressed instanceof Node target ? target : null;
-        while (node != null && !(node instanceof ListCell<?>)) {
-            node = node.getParent();
-        }
-        return node instanceof ListCell<?> cell && !cell.isEmpty();
     }
 
     /** Opens the run the chooser shows, if it is not the one already open. */

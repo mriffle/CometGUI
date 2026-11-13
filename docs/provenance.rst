@@ -131,6 +131,12 @@ or ends. **Read the runs again** reads it on demand -- for example after the
 Limelight section's compatible rerun has created a new run, which does not
 refresh the list by itself.
 
+With the keyboard, **Up** or **Down** opens the list and moves through it
+without reading anything; **Enter** or **Space** shows the run you stopped on,
+and **Escape** closes the list and leaves the run shown as it is. With the
+mouse, a click on a run shows it. A run's provenance is read only when you
+choose the run, as in the Results section.
+
 When a run is chosen, a line under the list says what kind of record it has:
 a **sealed record** that was read and checked, **no sealed record**, or a
 **record unreadable** (see `Runs without a sealed record`_). Then come the

@@ -71,7 +71,11 @@ Packages and classes
    * - ``cometgui-ui``
      - ``ui.controls.provenance``
      - ``ProvenancePane``: the run selector and *Read the runs again*, the
-       seven parts, the buttons, and the clipboard. Holds no logic.
+       seven parts, the buttons, and the clipboard. Holds no logic. The
+       selector is a ``ui.controls.CommittedChoice``, shared with the Results
+       section's run chooser: a run is read when a choice is committed (Enter,
+       Space, a click on a run), not while the list is walked
+       (``ProvenanceRunSelectorUiTest``).
    * - ``cometgui-app``
      - ``app.config``
      - ``ProjectProvenancePort`` (the port over the session's project and

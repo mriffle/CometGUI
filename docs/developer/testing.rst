@@ -2223,7 +2223,22 @@ was later raised and the injection re-made at 1.2 s.
   Space or a click on a run -- and walking its list opens none
   (``ResultsRunChooserUiTest``, which counts the runs the section starts
   opening; red on the old chooser at "runs opened ==> expected: <[]> but was:
-  <[run-c]>").
+  <[run-c]>"). That fix gave the chooser a cell factory, which the end-to-end
+  driver refuses to read through (``selectedTextOf``: a box with its own cells
+  can show something other than its converter's text), and the ``e2e`` control
+  was red until Phase 16 unit 4 took the cell factory out again: a click on a
+  run is watched on the list the cells are in.
+  ``ResultsRunChooserUiTest#theDriverReadsWhatTheCellsShow`` now holds, in the
+  ordinary suite, that the driver can read the chooser and that what it reads
+  is what the cells show. **The Provenance section's run selector had the same
+  defect** -- and the driver's own ``select`` (a click, the arrow keys, Enter)
+  read every run it passed -- and has the same behaviour now, from the same
+  class (``org.cometgui.ui.controls.CommittedChoice``):
+  ``ProvenanceRunSelectorUiTest`` counts the runs the section starts reading;
+  red on the old selector at "runs read ==> expected: <[]> but was: <[run-a,
+  run-b]>" after two presses of Down, and at "runs read: exactly the chosen
+  ==> expected: <[run-a]> but was: <[run-b, run-a]>" for the driver's
+  ``select``.
 * The peak retained heap **creeps by about 0.6 MiB per run opened** in one
   session (6.6, 7.6, 8.2, 8.7, 9.3 MiB over five runs in one baseline); small
   against the 64 MB budget, but it does not return to the baseline when a run is

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -34,6 +35,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Control;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
@@ -425,6 +427,29 @@ final class ParameterEditorApp {
             return fail("#" + id + " is a " + node.getClass().getName() + ", not a combo box");
         }
         return box;
+    }
+
+    /**
+     * The text of every cell under a node that holds an item, in the order of the items: what a
+     * combo box or a list really shows, read from its cells and not through its converter. Called
+     * on the JavaFX application thread.
+     *
+     * @param within the closed combo box (its one cell), or an open list
+     * @return the cells' texts
+     */
+    static List<String> cellTexts(Node within) {
+        List<ListCell<?>> cells = new ArrayList<>();
+        for (Node node : within.lookupAll(".list-cell")) {
+            if (node instanceof ListCell<?> cell && !cell.isEmpty()) {
+                cells.add(cell);
+            }
+        }
+        cells.sort(Comparator.comparingInt(ListCell::getIndex));
+        List<String> texts = new ArrayList<>();
+        for (ListCell<?> cell : cells) {
+            texts.add(cell.getText());
+        }
+        return texts;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

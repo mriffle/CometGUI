@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -440,22 +439,6 @@ class ResultsRunChooserUiTest {
                 () -> assertEquals(List.of(), listenerFailures, "listener failures"));
     }
 
-    /** The text of every cell under a node that holds an item, in the order they are laid out. */
-    private static List<String> cellTexts(Node within) {
-        List<ListCell<?>> cells = new ArrayList<>();
-        for (Node node : within.lookupAll(".list-cell")) {
-            if (node instanceof ListCell<?> cell && !cell.isEmpty()) {
-                cells.add(cell);
-            }
-        }
-        cells.sort(Comparator.comparingInt(ListCell::getIndex));
-        List<String> texts = new ArrayList<>();
-        for (ListCell<?> cell : cells) {
-            texts.add(cell.getText());
-        }
-        return texts;
-    }
-
     @Test
     @Order(10)
     @DisplayName("the scenarios' driver reads the chooser, and reads what its cells really show")
@@ -464,14 +447,15 @@ class ResultsRunChooserUiTest {
         List<String> offered = driver.itemsOf("results-run");
         String shown = driver.selectedTextOf("results-run");
         ComboBox<?> chooser = (ComboBox<?>) driver.node("results-run");
-        List<String> closedCell = driver.callOnFxThread(() -> cellTexts(chooser));
+        List<String> closedCell =
+                driver.callOnFxThread(() -> ParameterEditorApp.cellTexts(chooser));
 
         driver.clickOn("results-run");
         assertTrue(listIsOpen(), "a click on the chooser opens its list");
         List<String> listCells =
                 driver.callOnFxThread(
                         () ->
-                                cellTexts(
+                                ParameterEditorApp.cellTexts(
                                         ((ComboBoxListViewSkin<?>) chooser.getSkin())
                                                 .getPopupContent()));
         driver.press(KeyCode.ESCAPE);

@@ -22,6 +22,10 @@
  * R-TEST-04}). {@link org.cometgui.ui.controls.AccessibleControls} is the only way a control is
  * given an accessible name, and it refuses a blank one.
  *
+ * <p>{@link org.cometgui.ui.controls.CommittedChoice} makes a combo box's choice something its user
+ * commits -- Enter, Space or a click on an item -- instead of something that follows the arrow
+ * keys; the run choosers of the Results and Provenance sections are built over it.
+ *
  * <p>{@link org.cometgui.ui.controls.StageStepper} draws the Run screen's workflow diagram with
  * every stage's state in words rather than in colour. {@code
  * org.cometgui.ui.controls.derived.ConsolePane} is the live console; it is derived from
