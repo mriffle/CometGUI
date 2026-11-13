@@ -65,6 +65,15 @@ import org.cometgui.ui.viewmodel.ToolRowViewModel;
  * A row that stops being offered has its view dropped and its listeners removed with it; leaving
  * them attached would leak one listener per read of a list that is read on every progress report of
  * a finished install.
+ *
+ * <h2>An install that starts or ends does not move the list</h2>
+ *
+ * <p>A row disables the action that can no longer be taken, and the action that was pressed holds
+ * the keyboard focus. Before it is disabled the row hands the focus on, inside itself: to its other
+ * action where that one can now be taken, otherwise to its state label. Left to itself JavaFX moves
+ * the focus of a disabled control to the next control in traversal order -- another build's Install
+ * -- at the next pulse, and the scroll pane scrolls that control into view, under the pointer of a
+ * user who has scrolled elsewhere. {@code ToolManagerRowFocusTest} pins it.
  */
 public final class ToolManagerPane extends VBox {
 
@@ -339,8 +348,54 @@ public final class ToolManagerPane extends VBox {
             showOptional(failure, row.failureText());
             showOptional(installedPath, row.installedPathText());
             showOptional(progress, row.progressText());
-            install.setDisable(!row.canInstall());
-            cancel.setDisable(!row.canCancel());
+            boolean canInstall = row.canInstall();
+            boolean canCancel = row.canCancel();
+            Node keep = focusAfter(canInstall, canCancel);
+            // enable first, so that the focus can move to an enabled action before one is disabled
+            if (canInstall) {
+                install.setDisable(false);
+            }
+            if (canCancel) {
+                cancel.setDisable(false);
+            }
+            if (keep != null) {
+                keep.requestFocus();
+            }
+            install.setDisable(!canInstall);
+            cancel.setDisable(!canCancel);
+        }
+
+        /*
+         * AN INSTALL THAT STARTS OR ENDS MUST NOT MOVE THE LIST.  The action that was pressed
+         * holds the keyboard focus, and it is disabled when it can no longer be taken: Install
+         * once the build is installing, Cancel once the install has ended.  JavaFX does not leave
+         * the focus on a disabled control.  At the next pulse it moves it to the next control in
+         * traversal order -- ANOTHER build's Install -- and the scroll pane the rows are in
+         * scrolls that control into view.  A user who had scrolled down to a second build while
+         * the first one installed had the list jump back under the pointer the moment the first
+         * install ended, and a press aimed at the second build's Install landed on whatever was
+         * there instead (Phase 16, unit 4c: the end-to-end suite lost exactly that press).
+         *
+         * So the focus is handed on here, inside the row, before the action is disabled: to the
+         * row's other action where that one can now be taken -- Cancel when an install starts,
+         * Install again when one fails or is cancelled -- and otherwise to the row's state, which
+         * is what has just changed and what a screen reader should say next.  requestFocus() moves
+         * the focus without a traversal, so nothing scrolls; and the pulse finds a focus owner that
+         * can have the focus and moves nothing.  ResultsPane's paging row does the same.
+         *
+         * The scene's focus owner is asked, not isFocused(): a window that is not the active one
+         * (the user went to another program while a download ran) has no focused node, but its
+         * scene keeps its focus owner and JavaFX moves that just the same.
+         */
+        private Node focusAfter(boolean canInstall, boolean canCancel) {
+            Node owner = getScene() == null ? null : getScene().getFocusOwner();
+            if (owner == install && !canInstall) {
+                return canCancel ? cancel : state;
+            }
+            if (owner == cancel && !canCancel) {
+                return canInstall ? install : state;
+            }
+            return null;
         }
 
         /**

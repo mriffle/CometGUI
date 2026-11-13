@@ -263,6 +263,14 @@ bytes behind that a later attempt would resume from and trust. The next attempt
 starts from zero, which has been measured on the 103 MB PDV download -- two
 requests, neither of them asking for a byte range.
 
+An install that starts, ends or fails does not scroll the list, so a build you
+have scrolled to while another one downloads is not moved away from the pointer
+(a row above it still grows or shrinks by the line or two its own state adds or
+removes). The keyboard focus stays in the row the install belongs to: on
+**Cancel** while it runs, on **Install** again if it failed or was cancelled,
+and on the row's state once the build is installed -- never on another build's
+**Install**.
+
 If a download arrives corrupt, it is rejected and **the tool is never run**.
 The checksum check happens before anything is unpacked, and a failed check ends
 the install without launching a process.
