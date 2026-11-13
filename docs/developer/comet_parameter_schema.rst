@@ -2789,7 +2789,10 @@ Every fact below was established on 2026-10-06 by running the pinned
 linux/x86-64 binaries (2026.03.0 SHA-256 ``ad93b4cf...``, 2026.02.2
 ``af515b6e...``, and the migration fixture 2024.01.0 ``2834f928...``) in a
 private scratch directory, on the ``D-006`` subset (the UniProt proteome's first
-1000 records, SHA-256 ``5005d961...``) and the LF copy of the K562 run. Each
+1000 records, SHA-256 ``5005d961...``) and the LF copy of the K562 run. Since
+2026-11-13 the tests that hold these facts run them on the validation corpus's
+present database instead, a cut of the committed fixture FASTA
+(:ref:`dev-test-fixtures-moved`), and every one of them held there. Each
 index was built as the workflow builds one, in a directory holding the
 release's own ``comet -q`` output with ``database_name = subset.fasta``,
 ``spectral_library_name`` empty and ``num_threads = 4``, and ``subset.fasta``, a
@@ -3089,9 +3092,11 @@ How each case was run
 Every case is the release's own ``comet -q`` fixture
 (``fixtures/comet/<version>/linux-x86-64/comet-q.params``) with five **base
 edits** and then the case's edits, each replacing the one line that declares
-the parameter -- CONSTRUCTED input. The base edits: ``database_name`` the
-first 1000 records of the UniProt human proteome ``UP000005640_9606.fasta``
-(SHA-256 ``5005d961...558f`` for the subset); ``spectral_library_name``
+the parameter -- CONSTRUCTED input. The base edits: ``database_name`` a cut
+of the committed fixture FASTA, its first 500 records that the accession list
+marks ``identified`` (SHA-256 ``c12a0261...088e``; until 2026-11-13 the first
+1000 records of the whole proteome, :ref:`dev-test-fixtures-moved`);
+``spectral_library_name``
 empty (``-q``'s placeholder ``/some/path/speclib.file`` stops every search
 with ``Error (5) - cannot read spectral library file``); ``scan_range = 11188
 11192``; ``num_threads = 4``; ``output_percolatorfile = 1`` (so the base model

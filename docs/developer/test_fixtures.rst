@@ -72,9 +72,11 @@ fetched by checksum for long. The subset is 18% of its size, is committed, and
 Comet searches it in 2.6 s a file where the whole proteome takes 9.3 s (four
 threads, this host).
 
-**Nothing reads it yet.** At the commit that added this page every test still
-reads ``scratch/fixture/UP000005640_9606.fasta``. Moving them is a later unit
-of the same phase, and :ref:`dev-test-fixtures-touches` is its list.
+**Only some tests read it yet.** The real-binary tests of ``cometgui-tools``
+and ``cometgui-params-comet`` search a cut of it since 2026-11-13
+(:ref:`dev-test-fixtures-moved`). Every other test still reads
+``scratch/fixture/UP000005640_9606.fasta``; :ref:`dev-test-fixtures-touches`
+is the list of them, as it stood before anything was moved.
 
 .. warning::
 
@@ -785,6 +787,183 @@ check, its attribution file and this page have to be brought up to date, and
 every golden keyed by the fixture's digest has to be reviewed again
 (``R-TEST-07``).
 
+.. _dev-test-fixtures-moved:
+
+What has been moved, and what moving it found
+=============================================
+
+Phase 16, unit 5a, 2026-11-13. This section is the record the unit was asked
+to keep of how it chose what the moved tests search. Everything was measured
+on the one Linux x86-64 host, with the two pinned Comet releases and
+Percolator 3.07.1 run directly, four Comet threads.
+
+**Moved.** In ``cometgui-tools``: ``CometIndexRealBinaryTest``,
+``CometAdapterRealBinaryTest``, ``CometIndexHeaderReaderTest``,
+``PepXmlSearchHitReaderRealBinaryTest``, ``RealCometFidelityTest``,
+``PercolatorCommandRealBinaryTest`` and ``IndependenceGuardTest``, through
+``RealCometSearch`` and a new helper ``FixtureFasta``; the six committed index
+headers and their two ``SHA256SUMS``. In ``cometgui-params-comet``: the
+validation corpus, ``ValidationCorpusRealBinaryTest``,
+``MigratedFileRealBinaryTest``, ``IndexCompatibilityRealBinaryTest`` and the
+typed values in ``IndexDescriptions`` and ``FastaDecoyRulesTest``. In
+``cometgui-domain``: one typed value in ``PreRunFactValuesTest``. The 42
+verdicts of the validation corpus were run again on both Comet releases
+against the new database and none changed.
+
+**Not moved.** Everything behind ``RealComet.subset`` (``cometgui-workflow``)
+and ``RealSearch.subset`` (``cometgui-app``). They still cut the whole
+proteome's first 1,000 records. The reason is the second finding below.
+
+**What the moved tests search.** Not the whole committed file and not its
+first records: the first 500 records of the committed file, in its order and
+byte for byte, that ``accessions.tsv`` marks ``identified`` -- 392,463 bytes,
+SHA-256 ``c12a0261c8ae410cbaf7d5060e23a53c7d9a6d7f628d28422f102a09d978088e``.
+Each helper holds the committed file to the digest, size and record count the
+accession list's header pins, and the cut to that digest.
+
+.. warning::
+
+   That cut holds only proteins these spectra identify. A search of it is the
+   over-filtered search the acceptance check exists to refuse. It was chosen
+   for tests that prove files, counts and records, never a rate of
+   identification, and it is one agent's choice under a ruling that asked for
+   a cut "by measured test time"; the phase orchestrator and tier 1 have not
+   confirmed it.
+
+**Why not a simpler cut.** The ruling was that the modules' ``verify`` must
+not grow and that no test's bound may be lowered. One test,
+``RealCometFidelityTest``, requires more than 3,000 PSMs from a search with
+two static labels. Measured:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 13 15 16 16 16
+
+   * - What is searched
+     - Records
+     - Comet, s a file (2026.03.0)
+     - Percolator 3.07.1, s, five results
+     - PSMs at 1%
+     - PSMs of the labelled search
+   * - whole proteome's first 1,000 (before)
+     - 1,000
+     - 1.37, 1.26
+     - 1.4--1.5
+     - 0
+     - 4,170
+   * - committed file, whole
+     - 3,698
+     - 2.58, 2.60
+     - 1.8--1.9
+     - 1,097--1,133
+     - 5,346
+   * - committed file, first 250
+     - 250
+     - 1.07, 0.87
+     - 1.0--3.2
+     - 0
+     - **2,439**
+   * - first 450
+     - 450
+     - 1.18, 0.99
+     - **1.3--13.7**
+     - 136--159
+     - 3,147
+   * - first 500
+     - 500
+     - 1.17, 0.99
+     - **5.0**
+     - 162
+     - 3,263
+   * - first 1,000
+     - 1,000
+     - 1.41, 1.29
+     - **22.2**
+     - 231
+     - 4,175
+   * - first 1,500
+     - 1,500
+     - **1.78, 1.49**
+     - 1.6--2.3
+     - 429--463
+     - 4,633
+   * - first 1,000 marked ``background``
+     - 1,000
+     - 1.52, 1.35
+     - **exits 1**
+     - 0
+     - 4,082
+   * - first 500 marked ``identified`` (chosen)
+     - 500
+     - 1.29, 1.07
+     - 1.7--1.9
+     - 796--832
+     - 3,562
+
+Comet's two figures are the K562_3 and K562_4 files, the mean of three runs
+(of one run for 450, 500 and 1,500 records). A Percolator range is over
+random seeds 1, 2, 3, 4, 7 and 42 and both releases' PINs where more than one
+was run; 22.2 s was measured twice. Bold marks what rules a row out: the
+bound not cleared, Percolator slow or erratic, Percolator failing, or Comet
+slower than before. No cut of the file's first records passes all three.
+
+With one result per spectrum Percolator 3.07.1 is slower and less steady on
+every input measured that identifies anything. Over six runs each (seeds 1, 2
+and 7, both releases' PINs): 2.5 to 3.5 s on the chosen cut with one run of
+13.0 s, 2.8 to 10.2 s on the whole committed file, 1.8 to 12.9 s on the first
+1,500 records, against 1.4 to 2.8 s before. The first 1,500 records also hold
+``P38159``, the subject of the second finding below.
+
+**The affected classes' time.** Run alone, before and after, once each:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 20 20 30
+
+   * - Module
+     - Before, s
+     - After, s
+     - Tests, failures
+   * - ``cometgui-tools`` (7 classes)
+     - 65.9
+     - 61.3
+     - 93, 0
+   * - ``cometgui-params-comet`` (6 classes)
+     - 15.3
+     - 12.2
+     - 185, 0
+   * - ``cometgui-domain`` (1 class)
+     - 0.12
+     - 0.13
+     - 7, 0
+
+**First finding: the helper that makes a target-decoy FASTA split records at
+every** ``>``. The committed file holds ``DNA dC->dU-editing enzyme
+APOBEC-3H`` (``Q6NTF7``), which that split turned into two records, one with
+no sequence. The three copies of the helper now split where a line begins
+with ``>``. On the old input both give the same bytes.
+
+**Second finding: the Limelight converter refuses a five-result run of any
+FASTA that holds** ``P38159`` **or** ``Q96E39``. They are records 1,313 and
+2,548 of the committed file. At scan 11483 of ``K562_3`` Comet reports
+``R.GGHM[15.9949]DDGGYSMNFNMSSSR.G`` twice, and converter v2.8.1 stops with
+"Got more than one entry ... for the same scan to the same reported peptide".
+This is the refusal described under :ref:`dev-test-fixtures-check`. Three
+workflow tests -- ``RealLimelightConversionTest``,
+``RealLimelightCompatibleRerunTest`` and
+``RealIdentifiersTest.theEarlierRunIsStillConverted`` -- convert five-result
+runs, and they pass today only because the whole proteome's first 1,000
+records hold neither protein. On the chosen cut all three were refused. The
+unit did not change those tests to one result per spectrum and did not pick
+a cut that leaves the two proteins out; it stopped, left the workflow and the
+application as they were, and put the question to the phase orchestrator.
+The application's Limelight tests search the same input and were not run on
+the cut.
+
+On the cut, the workflow classes that needed no change of a pinned value ran
+in 111.2 s against 107.8 s before (one run each), so "does not grow" is shown
+for the two moved modules and not for the workflow.
+
 .. _dev-test-fixtures-touches:
 
 What the change of FASTA touches
@@ -1252,5 +1431,6 @@ What this page does not establish
   the helpers that read it. A committed file *derived* from the fixture that
   quotes none of those is found only by reading: one such group was, the
   index headers under ``fixtures/comet-index``. There may be another.
-* **Nothing has been moved onto the subset.** No test, golden, baseline or CI
-  job reads it yet.
+* **Most of the tree has not been moved onto the subset.** Two modules'
+  real-binary tests read it (:ref:`dev-test-fixtures-moved`); no workflow or
+  application test, golden, baseline or CI job does yet.

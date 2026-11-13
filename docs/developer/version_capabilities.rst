@@ -533,9 +533,9 @@ before use. What has executed:
 * **3.07.1 and 3.06.5**: the managed Linux portable ``noxml`` binaries,
   probed to all twelve capabilities, and 3.07.1 run end to end on a merged PIN
   from the real Comet path (Comet 2026.03.0, the two ``D-006`` K562 mzML files,
-  the proteome's first 1000 records: 3285 target and 3187 decoy PIN rows,
-  3285 PSM rows, 2482 peptides, 3 weight splits of 22 features, a 3285-PSM pout
-  XML).
+  a cut of the committed fixture FASTA: 3520 target and 2929 decoy PIN rows,
+  3520 PSM rows, 2461 peptides, 3 weight splits of 22 features, a 3520-PSM pout
+  XML; taken again on 2026-11-13, :ref:`dev-test-fixtures-moved`).
 * **3.09**: there is no installable Linux 3.09 (``D-003``), so it runs as a
   **registered local binary**: the upstream ``.rpm``'s executable with the
   ``libboost_filesystem`` and ``libboost_system`` 1.66 libraries from CentOS
