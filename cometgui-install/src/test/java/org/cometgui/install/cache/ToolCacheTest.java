@@ -417,6 +417,30 @@ class ToolCacheTest {
     }
 
     @Test
+    @DisplayName(
+            "a second reason written over a first is the one read back, whole, and the first"
+                    + " leaves nothing behind")
+    void aSecondReasonReplacesTheFirst() throws IOException {
+        ToolCache cache = cache();
+        Path file = cache.failureFile(ToolName.PERCOLATOR, ToolVersion.parse("3.07.1"), LINUX);
+        // the first is the longer, so a second written into it rather than over it would show
+        String first = "Install step 2 of 8, DOWNLOAD, failed: the connection was reset\n";
+        String second = "Install step 6 of 8, PROBE, failed: exit 3\n";
+
+        cache.recordFailure(percolator(), first);
+        String afterTheFirst = Files.readString(file, StandardCharsets.UTF_8);
+        cache.recordFailure(percolator(), second);
+
+        assertEquals(first, afterTheFirst, "the first reason was on disk before the second");
+        assertEquals(second, Files.readString(file, StandardCharsets.UTF_8), "the file itself");
+        assertEquals(java.util.Optional.of(second), cache.recordedFailure(percolator()));
+        assertEquals(
+                List.of("percolator__3.7.1__linux-x86-64.txt"),
+                names(temporary.resolve("root/cache/failures")),
+                "one record: neither reason's temporary name is left");
+    }
+
+    @Test
     @DisplayName("a later failure replaces the record, and clearing it leaves none")
     void aFailureIsReplacedAndCleared() throws IOException {
         ToolCache cache = cache();

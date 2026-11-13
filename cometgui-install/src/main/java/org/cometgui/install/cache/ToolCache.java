@@ -232,6 +232,12 @@ public final class ToolCache {
      * nothing that looks like a credential may reach it. Written to a temporary name and renamed
      * into place, for the reason {@link #writeMarker} gives: a reader never sees half a reason.
      *
+     * <p>A record already there is replaced: the last attempt's reason is the one kept. The move
+     * asks for that in so many words ({@code REPLACE_EXISTING} beside {@code ATOMIC_MOVE}), as
+     * every other atomic write in this product onto a file that may exist does, because what a bare
+     * {@code ATOMIC_MOVE} does to an existing target is left to the implementation by {@link
+     * Files#move}'s contract.
+     *
      * @param record the artefact whose install failed
      * @param reason why, already redacted
      * @throws IOException if it cannot be written
@@ -251,7 +257,11 @@ public final class ToolCache {
         Path temporary =
                 target.resolveSibling(target.getFileName() + "." + UUID.randomUUID() + ".tmp");
         Files.writeString(temporary, reason, StandardCharsets.UTF_8);
-        Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+        Files.move(
+                temporary,
+                target,
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
     }
 
     /**
