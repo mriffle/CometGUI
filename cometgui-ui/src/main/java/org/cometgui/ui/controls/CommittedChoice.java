@@ -190,9 +190,12 @@ public final class CommittedChoice {
     /** Whether what the pointer pressed is a cell of the list that holds an item, or inside one. */
     private static boolean onAnItem(EventTarget pressed) {
         Node node = pressed instanceof Node target ? target : null;
-        while (node != null && !(node instanceof ListCell<?>)) {
+        while (node != null) {
+            if (node instanceof ListCell<?> cell) {
+                return !cell.isEmpty();
+            }
             node = node.getParent();
         }
-        return node instanceof ListCell<?> cell && !cell.isEmpty();
+        return false;
     }
 }
