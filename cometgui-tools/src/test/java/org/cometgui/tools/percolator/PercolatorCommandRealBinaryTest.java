@@ -57,8 +57,8 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * The built command, run: {@code R-PERC-06} and {@code R-DEC-04} against the REAL binaries, on a
  * merged PIN made by the REAL Comet path ({@link RealCometSearch}: Comet 2026.03.0, the two K562
- * mzML, the proteome's first 1000 records, {@code decoy_search = 1}, two {@code -N} searches, then
- * the merge), through the real process service.
+ * mzML, the committed fixture FASTA's cut ({@code FixtureFasta}), {@code decoy_search = 1}, two
+ * {@code -N} searches, then the merge), through the real process service.
  *
  * <p>Every build's capabilities are the real probe's verdict on that build, run here, and the
  * builder is given nothing else: 3.07.1 (the mirror's portable zip, held to the manifest's SHA-256)
@@ -242,10 +242,11 @@ class PercolatorCommandRealBinaryTest {
                     + "\tm0";
 
     /*
-     * WHAT EVERY RUN ON THIS PIN WRITES, measured on 2026-10-07 with 3.07.1 and 3.09 alike: every
-     * target row of the PIN in the PSM table (3285 = 1807 + 1478) and every decoy row in the decoy
-     * PSM table (3187 = 1747 + 1440) -- the tables are counted against the PIN, an independent
-     * count, not against a number read back from the same file; 2482 target and 2399 decoy
+     * WHAT EVERY RUN ON THIS PIN WRITES, measured on 2026-10-07 with 3.07.1 and 3.09 alike and
+     * taken again on 2026-11-13 over the committed fixture FASTA's cut: every
+     * target row of the PIN in the PSM table (3520 = 1942 + 1578) and every decoy row in the decoy
+     * PSM table (2929 = 1601 + 1328) -- the tables are counted against the PIN, an independent
+     * count, not against a number read back from the same file; 2461 target and 2217 decoy
      * peptides; and a weights file of three comment lines and three cross-validation splits of
      * three lines each.
      */
@@ -260,10 +261,10 @@ class PercolatorCommandRealBinaryTest {
                 () -> assertEquals(TABLE_HEADER, peptides.get(0)),
                 () -> assertEquals(TABLE_HEADER, decoyPsms.get(0)),
                 () -> assertEquals(TABLE_HEADER, decoyPeptides.get(0)),
-                () -> assertEquals(1807 + 1478, psms.size() - 1),
-                () -> assertEquals(1747 + 1440, decoyPsms.size() - 1),
-                () -> assertEquals(2482, peptides.size() - 1),
-                () -> assertEquals(2399, decoyPeptides.size() - 1),
+                () -> assertEquals(1942 + 1578, psms.size() - 1),
+                () -> assertEquals(1601 + 1328, decoyPsms.size() - 1),
+                () -> assertEquals(2461, peptides.size() - 1),
+                () -> assertEquals(2217, decoyPeptides.size() - 1),
                 () -> assertEquals(3 + 3 * 3, weights.size()),
                 () -> assertTrue(weights.get(0).startsWith("# "), weights.get(0)),
                 () ->
@@ -312,9 +313,9 @@ class PercolatorCommandRealBinaryTest {
                 () -> assertEquals(23, summary.featureColumns().size()),
                 () -> assertEquals("ExpMass", summary.featureColumns().get(0)),
                 () -> assertEquals("absdM", summary.featureColumns().get(22)),
-                () -> assertEquals(1807 + 1478, summary.targets()),
-                () -> assertEquals(1747 + 1440, summary.decoys()),
-                () -> assertEquals(6472, search.merge().totalRows()));
+                () -> assertEquals(1942 + 1578, summary.targets()),
+                () -> assertEquals(1601 + 1328, summary.decoys()),
+                () -> assertEquals(6449, search.merge().totalRows()));
     }
 
     @Test
@@ -358,9 +359,9 @@ class PercolatorCommandRealBinaryTest {
                 () -> assertTheTables(out),
                 () -> assertEquals("http://per-colator.com/percolator_out/15", pout.namespace()),
                 () -> assertEquals("percolator_output", pout.rootElement()),
-                () -> assertEquals(3285, pout.psmCount()),
+                () -> assertEquals(3520, pout.psmCount()),
                 () -> assertEquals(psmRows, pout.psmCount(), "one psm per PSM-table row"),
-                () -> assertEquals(2482, pout.peptideCount()),
+                () -> assertEquals(2461, pout.peptideCount()),
                 () -> assertEquals(peptideRows, pout.peptideCount()),
                 () ->
                         assertEquals(
@@ -428,9 +429,9 @@ class PercolatorCommandRealBinaryTest {
     /*
      * REPRODUCED, NOT CONSTRUCTED: Comet 2026.02.2 builds a fragment-ion index with the run's own
      * decoy_search = 1 and searches both files against it, and writes no decoy row (Phase 08's
-     * finding, measured again here: 118 and 80 target rows).  Comet validation already refuses each
-     * per-file PIN; the check before launch must refuse the MERGED one too, because a rerun reuses
-     * a preserved merged PIN without Comet validation.
+     * finding, measured again here: 523 and 380 target rows).  Comet validation already refuses
+     * each per-file PIN; the check before launch must refuse the MERGED one too, because a rerun
+     * reuses a preserved merged PIN without Comet validation.
      */
     @Test
     @DisplayName("the REAL zero-decoy PIN (2026.02.2, fragment-ion index) is refused before launch")
@@ -454,16 +455,16 @@ class PercolatorCommandRealBinaryTest {
         assertAll(
                 () ->
                         assertEquals(
-                                List.of(118L, 80L),
+                                List.of(523L, 380L),
                                 older.merge().inputs().stream()
                                         .map(input -> input.rows())
                                         .toList()),
-                () -> assertEquals(198, older.merge().totalRows()),
+                () -> assertEquals(903, older.merge().totalRows()),
                 () ->
                         assertEquals(
                                 "the PIN file "
                                         + older.run().pinFile("k562_3")
-                                        + " holds 118 target rows and no decoy row (Label -1), so"
+                                        + " holds 523 target rows and no decoy row (Label -1), so"
                                         + " Percolator would have no negative examples; the decoy"
                                         + " configuration was decoy_search = 1 (Comet's internal"
                                         + " decoys, concatenated), decoy_prefix = \"DECOY_\"",
@@ -472,7 +473,7 @@ class PercolatorCommandRealBinaryTest {
                         assertEquals(
                                 "Percolator was not started: the PIN file "
                                         + merged
-                                        + " holds 198 target rows and no decoy row (Label -1), so"
+                                        + " holds 903 target rows and no decoy row (Label -1), so"
                                         + " Percolator would have no negative examples; the decoy"
                                         + " configuration was decoy_search = 1 (Comet's internal"
                                         + " decoys, concatenated), decoy_prefix = \"DECOY_\"",

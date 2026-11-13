@@ -52,15 +52,15 @@ import org.cometgui.tools.process.ProcessService;
 /**
  * A merged PIN made by the REAL Comet path, for the tests that run Percolator on one (design
  * decision P9-13: never a hand-typed PIN): the pinned Comet binary from the mirror, the two K562
- * mzML files of {@code scratch/fixture} with their line endings repaired, the UniProt proteome's
- * first 1000 records, {@code decoy_search = 1}, one {@code -N} search per file through {@link
- * CometSearchCommands} and the process service, then {@link PinMerger}.
+ * mzML files of {@code scratch/fixture} with their line endings repaired, the committed fixture
+ * FASTA's cut ({@link FixtureFasta}), {@code decoy_search = 1}, one {@code -N} search per file
+ * through {@link CometSearchCommands} and the process service, then {@link PinMerger}.
  *
  * <p>Every input is held to its SHA-256 before use, and a missing one FAILS with how to refill it;
- * nothing skips. The hashes are the ones {@code tools.comet}'s {@code CometAdapterRealBinaryTest}
- * and {@code CometIndexRealBinaryTest} pin, typed again here: those constants and their FASTA and
- * parameter-file helpers are package-private test code in another package, and this module does not
- * publish a test jar, so they are deliberately repeated -- test scaffolding, not a second parser.
+ * nothing skips. The spectra's hashes are the ones {@code tools.comet}'s {@code
+ * CometAdapterRealBinaryTest} pins, typed again here: those constants and their parameter-file
+ * helpers are package-private test code in another package, and this module does not publish a test
+ * jar, so they are deliberately repeated -- test scaffolding, not a second parser.
  *
  * <p>{@link #fragmentIndexSearch} is Phase 08's finding made reproducible: Comet 2026.02.2
  * searching a fragment-ion index it built with {@code decoy_search = 1} writes <strong>no decoy
@@ -92,11 +92,6 @@ public final class RealCometSearch {
             "d30aa5af4b15e1c927616fce4dacfd68c6249e6cc2b7461913481c12d8408cfa";
     private static final String MZML_4_LF =
             "602aad75e18257feabdb94ece0fa82e19e5f17153eee4fb89875976920855c82";
-    private static final String PROTEOME = "scratch/fixture/UP000005640_9606.fasta";
-    private static final String PROTEOME_SHA256 =
-            "2329a517bec9bd7269f9ce3b9252d8b959ae98bc41405a945c2d6134b284d5a0";
-    private static final String SUBSET_SHA256 =
-            "5005d9614b20f944915616201389cc7529d209a0f039278cae29cb356192558f";
 
     private static final String REFILL =
             " It is a local, gitignored input (D-006); refill it with python3"
@@ -201,11 +196,7 @@ public final class RealCometSearch {
         assertEquals(MZML_3_LF, UpstreamArtefacts.sha256(k3), "the LF-repaired K562_3");
         Path k4 = lfCopy(repository.resolve(MZML_4), MZML_4_FETCHED, inputs.resolve("k562_4.mzML"));
         assertEquals(MZML_4_LF, UpstreamArtefacts.sha256(k4), "the LF-repaired K562_4");
-        Path proteome = repository.resolve(PROTEOME);
-        assertTrue(Files.isRegularFile(proteome), proteome + " does not exist." + REFILL);
-        assertEquals(PROTEOME_SHA256, UpstreamArtefacts.sha256(proteome), "the proteome");
-        Path fasta = Files.write(inputs.resolve("subset.fasta"), firstRecords(proteome, 1000));
-        assertEquals(SUBSET_SHA256, UpstreamArtefacts.sha256(fasta), "the first 1000 records");
+        Path fasta = FixtureFasta.cut(inputs.resolve("subset.fasta"));
 
         RunLayout run = new RunLayout(root.resolve("project one/runs/20261007T120000Z-run-0001"));
         for (Path directory : run.directories()) {
@@ -286,17 +277,6 @@ public final class RealCometSearch {
         }
         assertEquals(Map.of(), pending, "declarations the -q file does not have");
         return out.substring(0, out.length() - 1);
-    }
-
-    /** The first records of a FASTA, through the line before the next record's header. */
-    private static byte[] firstRecords(Path fasta, int records) throws IOException {
-        String text = Files.readString(fasta, StandardCharsets.ISO_8859_1);
-        int end = -1;
-        for (int record = 0; record < records; record++) {
-            end = text.indexOf("\n>", end + 1);
-            assertTrue(end > 0, fasta + " has fewer than " + records + " records");
-        }
-        return (text.substring(0, end) + "\n").getBytes(StandardCharsets.ISO_8859_1);
     }
 
     /** Copies a fetched mzML held to its hash, dropping every CR byte. */

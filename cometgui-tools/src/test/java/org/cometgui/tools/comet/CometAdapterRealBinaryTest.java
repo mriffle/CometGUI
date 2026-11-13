@@ -44,6 +44,7 @@ import org.cometgui.domain.run.RunLayout;
 import org.cometgui.tools.api.ToolRunOutcome;
 import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.process.ProcessService;
+import org.cometgui.tools.testing.FixtureFasta;
 import org.cometgui.tools.testing.UpstreamArtefacts;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -61,12 +62,12 @@ import org.junit.jupiter.api.io.TempDir;
  * real PIN with its decoys removed; and an index built through {@link CometIndexCommand} and
  * searched through {@link CometSearchCommands#databaseOverride}.
  *
- * <p>Inputs, never committed ({@code D-006}), each held to its SHA-256 -- a missing or changed
- * input FAILS this test, nothing skips: the binary from the mirror against the artefact manifest's
- * hash; the two K562 mzML files of {@code scratch/fixture} against the hashes {@code
+ * <p>Inputs, each held to its SHA-256 -- a missing or changed input FAILS this test, nothing skips:
+ * the binary from the mirror against the artefact manifest's hash; the two K562 mzML files of
+ * {@code scratch/fixture} (never committed, {@code D-006}) against the hashes {@code
  * scripts/feasibility/fetch_ephemeral_input.py} fetches them by, then their CRLF-to-LF repaired
- * private copies against {@code docs/feasibility/scientific-path.rst}'s; the proteome's first 1000
- * records against the validation corpus's subset hash. The parameter file is the binary's own
+ * private copies against {@code docs/feasibility/scientific-path.rst}'s; the committed fixture
+ * FASTA's cut against its hash ({@link FixtureFasta}). The parameter file is the binary's own
  * {@code -q} output with {@code num_threads = 4}, {@code decoy_search = 1} and {@code
  * output_percolatorfile = 1}. Phase 00's {@code .pep.xml}/{@code .pin} leftovers in {@code
  * scratch/fixture} are never read. Each search takes about 1.4 s.
@@ -138,22 +139,7 @@ class CometAdapterRealBinaryTest {
         assertEquals(MZML_3_LF, UpstreamArtefacts.sha256(k3), "the LF-repaired K562_3");
         Path k4 = lfCopy(root.resolve(MZML_4), MZML_4_FETCHED, inputs.resolve("k562_4.mzML"));
         assertEquals(MZML_4_LF, UpstreamArtefacts.sha256(k4), "the LF-repaired K562_4");
-        Path proteome = root.resolve(CometIndexRealBinaryTest.PROTEOME);
-        assertTrue(
-                Files.isRegularFile(proteome),
-                proteome
-                        + " does not exist. It is a local, gitignored input (D-006); refill it with"
-                        + " python3 scripts/feasibility/fetch_ephemeral_input.py.");
-        assertEquals(
-                CometIndexRealBinaryTest.PROTEOME_SHA256,
-                UpstreamArtefacts.sha256(proteome),
-                "the proteome");
-        fasta = inputs.resolve("subset.fasta");
-        Files.write(fasta, CometIndexRealBinaryTest.firstRecords(proteome, 1000));
-        assertEquals(
-                CometIndexRealBinaryTest.SUBSET_SHA256,
-                UpstreamArtefacts.sha256(fasta),
-                "the first 1000 records");
+        fasta = FixtureFasta.cut(inputs.resolve("subset.fasta"));
 
         makeReadOnly(inputs);
         inputsBefore = listing(inputs);
@@ -292,7 +278,7 @@ class CometAdapterRealBinaryTest {
                         () -> run.pinFile(input.base()) + ": the SpecId \"" + specId + "\"");
                 rows++;
             }
-            assertEquals(input.base().equals("k562_3") ? 3554 : 2918, rows);
+            assertEquals(input.base().equals("k562_3") ? 3543 : 2906, rows);
         }
         assertEquals(
                 "k562_3_11188_2_1",
@@ -343,14 +329,14 @@ class CometAdapterRealBinaryTest {
     void pins() throws IOException {
         PinSummary first = CometPinValidator.validate(run.pinFile("k562_3"), CONCATENATED);
         assertEquals(PinText.FEATURES, first.featureColumns());
-        assertEquals(1807, first.targets());
-        assertEquals(1747, first.decoys());
-        assertEquals(3554, first.rows());
+        assertEquals(1942, first.targets());
+        assertEquals(1601, first.decoys());
+        assertEquals(3543, first.rows());
         PinSummary second = CometPinValidator.validate(run.pinFile("k562_4"), CONCATENATED);
         assertEquals(PinText.FEATURES, second.featureColumns());
-        assertEquals(1478, second.targets());
-        assertEquals(1440, second.decoys());
-        assertEquals(2918, second.rows());
+        assertEquals(1578, second.targets());
+        assertEquals(1328, second.decoys());
+        assertEquals(2906, second.rows());
     }
 
     /** How many of a file's lines have each field count. */
@@ -362,21 +348,36 @@ class CometAdapterRealBinaryTest {
         return counts;
     }
 
+    /** Field counts and how many lines have each, as pairs. */
+    private static Map<Integer, Long> counts(int... pairs) {
+        Map<Integer, Long> counts = new TreeMap<>();
+        for (int at = 0; at < pairs.length; at += 2) {
+            counts.put(pairs[at], (long) pairs[at + 1]);
+        }
+        return counts;
+    }
+
     @Test
     @DisplayName("Comet writes each further protein as one more tab-separated field")
     void multiProteinRows() throws IOException {
-        assertEquals(Map.of(28, 3528L, 29, 25L, 30, 2L), fieldCounts(run.pinFile("k562_3")));
-        assertEquals(Map.of(28, 2894L, 29, 22L, 30, 3L), fieldCounts(run.pinFile("k562_4")));
+        assertEquals(
+                counts(
+                        28, 3372, 29, 128, 30, 20, 31, 6, 32, 1, 33, 2, 34, 4, 35, 6, 36, 1, 37, 2,
+                        38, 2),
+                fieldCounts(run.pinFile("k562_3")));
+        assertEquals(
+                counts(28, 2759, 29, 118, 30, 10, 31, 3, 32, 4, 33, 4, 34, 4, 36, 1, 37, 2, 38, 2),
+                fieldCounts(run.pinFile("k562_4")));
         String specIdPrefix = "k562_3_";
         for (String line :
                 Files.readAllLines(run.pinFile("k562_3"), StandardCharsets.ISO_8859_1)
-                        .subList(1, 3555)) {
+                        .subList(1, 3544)) {
             assertTrue(line.startsWith(specIdPrefix), "SpecId carries the -N base: " + line);
         }
     }
 
     @Test
-    @DisplayName("gate 3: the merged real PIN has one header and 3554 + 2918 = 6472 rows")
+    @DisplayName("gate 3: the merged real PIN has one header and 3543 + 2906 = 6449 rows")
     void merged() throws IOException {
         TestHashes hashes = new TestHashes();
         PinMergeRecord record =
@@ -388,16 +389,16 @@ class CometAdapterRealBinaryTest {
         // Hand-checked arithmetic: each file's own data rows, then their sum.
         long first = Files.readAllLines(run.pinFile("k562_3")).size() - 1;
         long second = Files.readAllLines(run.pinFile("k562_4")).size() - 1;
-        assertEquals(3554, first);
-        assertEquals(2918, second);
-        assertEquals(6472, first + second);
-        assertEquals(6472, lines.size() - 1);
+        assertEquals(3543, first);
+        assertEquals(2906, second);
+        assertEquals(6449, first + second);
+        assertEquals(6449, lines.size() - 1);
         assertEquals(
                 List.of(
-                        new PinMergeRecord.Input(run.pinFile("k562_3"), 3554),
-                        new PinMergeRecord.Input(run.pinFile("k562_4"), 2918)),
+                        new PinMergeRecord.Input(run.pinFile("k562_3"), 3543),
+                        new PinMergeRecord.Input(run.pinFile("k562_4"), 2906)),
                 record.inputs());
-        assertEquals(6472, record.totalRows());
+        assertEquals(6449, record.totalRows());
 
         byte[] three = Files.readAllBytes(run.pinFile("k562_3"));
         byte[] four = Files.readAllBytes(run.pinFile("k562_4"));
@@ -412,8 +413,8 @@ class CometAdapterRealBinaryTest {
         assertEquals(run.mergedPinFile(), record.output());
 
         PinSummary mergedSummary = CometPinValidator.validate(run.mergedPinFile(), CONCATENATED);
-        assertEquals(1807 + 1478, mergedSummary.targets());
-        assertEquals(1747 + 1440, mergedSummary.decoys());
+        assertEquals(1942 + 1578, mergedSummary.targets());
+        assertEquals(1601 + 1328, mergedSummary.decoys());
     }
 
     private static int indexOf(byte[] bytes, byte value) {
@@ -510,7 +511,7 @@ class CometAdapterRealBinaryTest {
         assertEquals(
                 "the PIN file "
                         + targetsOnly
-                        + " holds 1807 target rows and no decoy row (Label -1), so Percolator"
+                        + " holds 1942 target rows and no decoy row (Label -1), so Percolator"
                         + " would have no negative examples; the decoy configuration was"
                         + " decoy_search = 1 (Comet's internal decoys, concatenated), decoy_prefix"
                         + " = \"DECOY_\"",
@@ -529,7 +530,7 @@ class CometAdapterRealBinaryTest {
         assertEquals(
                 "the PIN file "
                         + cutPin
-                        + " ends without a line terminator: line 2919 is incomplete, so the file"
+                        + " ends without a line terminator: line 2907 is incomplete, so the file"
                         + " is truncated",
                 assertThrows(
                                 CometOutputException.class,
@@ -585,7 +586,7 @@ class CometAdapterRealBinaryTest {
         assertTrue(searched.exitedZero(), searched.joinedOutput());
         assertEquals(728, CometPepXmlValidator.validate(indexed, spectra.get(0)).spectrumQueries());
         PinSummary pin = CometPinValidator.validate(indexed.pinFile("k562_3"), CONCATENATED);
-        assertEquals(118, pin.targets());
-        assertEquals(96, pin.decoys());
+        assertEquals(523, pin.targets());
+        assertEquals(84, pin.decoys());
     }
 }

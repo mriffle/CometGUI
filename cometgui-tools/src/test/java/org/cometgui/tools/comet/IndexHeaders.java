@@ -41,14 +41,15 @@ import org.cometgui.domain.run.IndexMode;
  * {@code fixtures/comet-index/<release>/linux-x86-64/} and held to the {@code SHA256SUMS} beside
  * them, and their contents hand-typed from the bytes.
  *
- * <p>Each file is the header of an index built from the first 1000 records of the {@code D-006}
- * UniProt proteome (SHA-256 {@code 5005d961...}) by {@code comet -Pcomet.params -i -Dsubset.fasta}
- * (or {@code -j}), run in a directory holding {@code comet.params} -- that release's own {@code
- * comet -q} output with {@code database_name = subset.fasta}, {@code spectral_library_name} empty
- * and {@code num_threads = 4} -- and {@code subset.fasta}, a symbolic link to the subset, so that
- * the index lands there and its {@code InputDB:} line holds no machine path. The bytes are the file
- * from its start through the empty line that ends the header. {@link CometIndexRealBinaryTest}
- * repeats the capture with both binaries on every Linux build and requires these bytes.
+ * <p>Each file is the header of an index built from the cut of the committed fixture FASTA the
+ * real-binary tests search (SHA-256 {@code c12a0261...}) by {@code comet -Pcomet.params -i
+ * -Dsubset.fasta} (or {@code -j}), run in a directory holding {@code comet.params} -- that
+ * release's own {@code comet -q} output with {@code database_name = subset.fasta}, {@code
+ * spectral_library_name} empty and {@code num_threads = 4} -- and {@code subset.fasta}, a symbolic
+ * link to the subset, so that the index lands there and its {@code InputDB:} line holds no machine
+ * path. The bytes are the file from its start through the empty line that ends the header. {@link
+ * CometIndexRealBinaryTest} repeats the capture with both binaries on every Linux build and
+ * requires these bytes.
  */
 final class IndexHeaders {
 
@@ -225,7 +226,7 @@ final class IndexHeaders {
                 newer ? OptionalInt.of(2) : OptionalInt.empty(),
                 newer ? OptionalInt.of(1) : OptionalInt.empty(),
                 newer ? Optional.of(false) : Optional.empty(),
-                81849,
+                55319,
                 modsStaticMods(),
                 modsSlots(newer, newer ? "^" : "n"),
                 false,
@@ -315,7 +316,7 @@ final class IndexHeaders {
                 OptionalInt.of(2),
                 OptionalInt.of(2),
                 Optional.of(false),
-                129327,
+                89848,
                 staticMods(),
                 formatFiveSlots(),
                 false,
@@ -349,7 +350,7 @@ final class IndexHeaders {
                 OptionalInt.empty(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                129327,
+                89848,
                 staticMods(),
                 formatFourSlots(),
                 false,

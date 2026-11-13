@@ -45,6 +45,7 @@ import org.cometgui.domain.run.IndexMode;
 import org.cometgui.tools.api.ToolRunOutcome;
 import org.cometgui.tools.api.ToolRunner;
 import org.cometgui.tools.process.ProcessService;
+import org.cometgui.tools.testing.FixtureFasta;
 import org.cometgui.tools.testing.UpstreamArtefacts;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -69,12 +70,12 @@ import org.junit.jupiter.params.provider.MethodSource;
  * directory of its own, with {@code -D} naming a symbolic link to the FASTA inside it, so that the
  * index lands there and nothing is written beside the FASTA -- which this test checks.
  *
- * <p>Inputs, never committed ({@code D-006}): the UniProt human proteome {@code
- * scratch/fixture/UP000005640_9606.fasta}, held to its SHA-256; its first 1000 records, held to
- * theirs ({@code 5005d961...}, the validation corpus's subset); and a target-decoy FASTA built here
- * from the subset -- each record followed by {@code DECOY_} and its reversed sequence, 60 residues
- * a line -- held to its own. Missing or changed inputs FAIL this test; nothing is skipped. Comet's
- * threads are bounded ({@code num_threads = 4}); each build takes about a second.
+ * <p>Inputs: the committed fixture FASTA, held to the digest its accession list pins, and the cut
+ * of it the real-binary tests search, held to its own ({@link FixtureFasta}; the validation
+ * corpus's subset); and a target-decoy FASTA built here from the subset -- each record followed by
+ * {@code DECOY_} and its reversed sequence, 60 residues a line -- held to its own. Missing or
+ * changed inputs FAIL this test; nothing is skipped. Comet's threads are bounded ({@code
+ * num_threads = 4}); each build takes about a second.
  */
 @EnabledOnOs(
         value = OS.LINUX,
@@ -82,19 +83,9 @@ import org.junit.jupiter.params.provider.MethodSource;
                 "only the linux/x86-64 Comet binary has ever been executed in this project")
 class CometIndexRealBinaryTest {
 
-    /** The proteome, from the D-006 local fixture. */
-    static final String PROTEOME = "scratch/fixture/UP000005640_9606.fasta";
-
-    static final String PROTEOME_SHA256 =
-            "2329a517bec9bd7269f9ce3b9252d8b959ae98bc41405a945c2d6134b284d5a0";
-
-    /** Its first 1000 records: the validation corpus's subset. */
-    static final String SUBSET_SHA256 =
-            "5005d9614b20f944915616201389cc7529d209a0f039278cae29cb356192558f";
-
     /** The subset with a reversed DECOY_ record after each record. */
     static final String DECOY_SHA256 =
-            "ff098f19bba637aa33a736a01ad59cf35911292c9fb7598324ed02a7d5b07a99";
+            "1030b29dd80c3d6248fba69cf05509aece28cde0da3a695bb0bc5e5480df3d77";
 
     /**
      * One pinned release, typed out from the artefact manifest (this module cannot read it).
@@ -148,19 +139,8 @@ class CometIndexRealBinaryTest {
 
     @BeforeAll
     static void buildEverything(@TempDir Path scratch) throws IOException {
-        Path root = UpstreamArtefacts.repositoryRoot();
-        Path proteome = root.resolve(PROTEOME);
-        assertTrue(
-                Files.isRegularFile(proteome),
-                PROTEOME
-                        + " does not exist. It is a local, gitignored input (D-006); refill it with"
-                        + " python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches by"
-                        + " checksum.");
-        assertEquals(PROTEOME_SHA256, UpstreamArtefacts.sha256(proteome), PROTEOME);
         Path inputs = Files.createDirectories(scratch.resolve("inputs"));
-        subset = inputs.resolve("subset.fasta");
-        Files.write(subset, firstRecords(proteome, 1000));
-        assertEquals(SUBSET_SHA256, UpstreamArtefacts.sha256(subset), "the first 1000 records");
+        subset = FixtureFasta.cut(inputs.resolve("subset.fasta"));
         decoys = inputs.resolve("target-decoy.fasta");
         Files.write(decoys, withReversedDecoys(Files.readAllBytes(subset)));
         assertEquals(DECOY_SHA256, UpstreamArtefacts.sha256(decoys), "the target-decoy FASTA");
@@ -249,22 +229,15 @@ class CometIndexRealBinaryTest {
         }
     }
 
-    /** The first records of a FASTA, through the line before the next record's header. */
-    static byte[] firstRecords(Path fasta, int records) throws IOException {
-        String text = Files.readString(fasta, StandardCharsets.ISO_8859_1);
-        int end = -1;
-        for (int record = 0; record < records; record++) {
-            end = text.indexOf("\n>", end + 1);
-            assertTrue(end > 0, fasta + " has fewer than " + records + " records");
-        }
-        return (text.substring(0, end) + "\n").getBytes(StandardCharsets.ISO_8859_1);
-    }
-
-    /** Each record followed by a decoy: DECOY_ before its header, its sequence reversed. */
+    /**
+     * Each record followed by a decoy: DECOY_ before its header, its sequence reversed. A record
+     * begins where a line begins with {@code >}; a {@code >} inside a header (the committed FASTA
+     * holds {@code DNA dC->dU-editing enzyme APOBEC-3H}) does not begin one.
+     */
     static byte[] withReversedDecoys(byte[] fasta) {
         String text = new String(fasta, StandardCharsets.ISO_8859_1);
         StringBuilder out = new StringBuilder();
-        for (String chunk : text.split(">", -1)) {
+        for (String chunk : ("\n" + text).split("\n>", -1)) {
             if (chunk.isEmpty()) {
                 continue;
             }
@@ -358,23 +331,19 @@ class CometIndexRealBinaryTest {
     }
 
     @Test
-    @DisplayName("the real subset holds 1000 records and no decoy")
+    @DisplayName("the real subset holds 500 records and no decoy")
     void subsetCensus() throws IOException {
         assertEquals(
-                new FastaDecoyCensus(subset, "DECOY_", 1000, 0, Optional.empty()),
+                new FastaDecoyCensus(subset, "DECOY_", 500, 0, Optional.empty()),
                 FastaDecoyScanner.scan(subset, "DECOY_"));
     }
 
     @Test
-    @DisplayName("the target-decoy FASTA holds 2000 records, 1000 of them decoys")
+    @DisplayName("the target-decoy FASTA holds 1000 records, 500 of them decoys")
     void decoyCensus() throws IOException {
         assertEquals(
                 new FastaDecoyCensus(
-                        decoys,
-                        "DECOY_",
-                        2000,
-                        1000,
-                        Optional.of("DECOY_sp|A0A075B6H9|LV469_HUMAN")),
+                        decoys, "DECOY_", 1000, 500, Optional.of("DECOY_sp|P22626|ROA2_HUMAN")),
                 FastaDecoyScanner.scan(decoys, "DECOY_"));
     }
 
@@ -386,7 +355,7 @@ class CometIndexRealBinaryTest {
                 crlf,
                 Files.readString(subset, StandardCharsets.ISO_8859_1).replace("\n", "\r\n"),
                 StandardCharsets.ISO_8859_1);
-        assertEquals(1000, FastaDecoyScanner.scan(crlf, "DECOY_").records());
+        assertEquals(500, FastaDecoyScanner.scan(crlf, "DECOY_").records());
         assertTrue(
                 Pattern.compile("\r\n")
                         .matcher(Files.readString(crlf, StandardCharsets.ISO_8859_1))

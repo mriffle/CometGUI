@@ -95,7 +95,7 @@ class CometIndexHeaderReaderTest {
         assertEquals(expected.enzymeTermini(), read.enzymeTermini());
         assertEquals(expected.missedCleavages(), read.missedCleavages());
         assertEquals(expected.clipNtermMethionine(), read.clipNtermMethionine());
-        assertEquals(129327, read.peptides());
+        assertEquals(89848, read.peptides());
         assertEquals(expected.staticMods(), read.staticMods());
         assertEquals(expected.variableMods(), read.variableMods());
         assertEquals(false, read.proteinModList());
@@ -412,7 +412,7 @@ class CometIndexHeaderReaderTest {
                         "\"ProteinModList: -1\" is not 0 or 1, which is what Comet writes there"),
                 Arguments.of(
                         "a negative peptide count",
-                        "NumPeptides: 129327",
+                        "NumPeptides: 89848",
                         "NumPeptides: -3\n",
                         "\"NumPeptides: -3\" is not a count, which is what Comet writes there"),
                 Arguments.of(
