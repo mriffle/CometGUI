@@ -35,12 +35,15 @@ import org.cometgui.tools.limelight.PercolatorXmlPsms;
  * The run's Percolator XML as the Limelight converter can read it (proposed design decision
  * P12-18).
  *
- * <h2>Why a CometGUI run needs this</h2>
+ * <h2>Which runs need this</h2>
  *
- * <p>CometGUI runs Comet with an <em>absolute</em> {@code -N} base, {@code
+ * <p>Until Phase 16 unit 3b CometGUI ran Comet with an <em>absolute</em> {@code -N} base, {@code
  * <run>/outputs/comet/<base>}, and Comet writes that base into every PIN {@code SpecId}, which
- * Percolator carries into every {@code p:psm_id} and every peptide's {@code psm_id}. The pinned
- * converter v2.8.1 cannot read such a file, whatever {@code -d} is given (observed 2026-10-11):
+ * Percolator carries into every {@code p:psm_id} and every peptide's {@code psm_id}. A run made
+ * since is searched with the bare base, its ids hold no directory, and the converter is given its
+ * own Percolator XML: no copy is made. A run made before still holds the absolute ids -- runs are
+ * never rewritten -- and this class is what lets it be converted. The pinned converter v2.8.1
+ * cannot read such a file, whatever {@code -d} is given (observed 2026-10-11):
  *
  * <ul>
  *   <li>it opens {@code new File(<-d>, <psm id's file part> + ".pep.xml")}, and {@code

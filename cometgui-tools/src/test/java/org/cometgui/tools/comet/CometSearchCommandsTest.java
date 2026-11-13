@@ -39,9 +39,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@link CometSearchCommands}: every argument array hand-typed and compared element by element;
- * {@code -D} only for an override; one input per command; two commands of a run differing only in
- * {@code -N} and the input. The real binary runs these commands in {@link
- * CometAdapterRealBinaryTest}.
+ * {@code -N} the bare base and the working directory the run's {@code outputs/comet}, so that no
+ * identifier Comet writes holds the run directory; {@code -D} only for an override; one input per
+ * command; two commands of a run differing only in {@code -N} and the input. The real binary runs
+ * these commands in {@link CometAdapterRealBinaryTest}.
  */
 class CometSearchCommandsTest {
 
@@ -69,7 +70,8 @@ class CometSearchCommandsTest {
     }
 
     @Test
-    @DisplayName("database in the parameter file: -P, -N, the input; no -D")
+    @DisplayName(
+            "database in the parameter file: -P, -N<base>, the input; no -D; run in outputs/comet")
     void parameterFileCommands() {
         List<ToolCommand> commands = fromParameterFile().commands(inputs());
         assertEquals(2, commands.size());
@@ -77,19 +79,20 @@ class CometSearchCommandsTest {
                 List.of(
                         "/tools/comet 2026.03.0/bin/comet",
                         "-P/projects/p one/runs/20261006T120000Z-run-0001/parameters/comet.params",
-                        "-N/projects/p one/runs/20261006T120000Z-run-0001/outputs/comet/K562 3",
+                        "-NK562 3",
                         "/data/K562 3.mzML"),
                 commands.get(0).argv());
         assertEquals(
                 List.of(
                         "/tools/comet 2026.03.0/bin/comet",
                         "-P/projects/p one/runs/20261006T120000Z-run-0001/parameters/comet.params",
-                        "-N/projects/p one/runs/20261006T120000Z-run-0001/outputs/comet/k562_4",
+                        "-Nk562_4",
                         "/data/fractions/k562_4.MZXML"),
                 commands.get(1).argv());
         for (ToolCommand command : commands) {
             assertEquals(
-                    TestPaths.absolute("projects/p one/runs/20261006T120000Z-run-0001"),
+                    TestPaths.absolute(
+                            "projects/p one/runs/20261006T120000Z-run-0001/outputs/comet"),
                     command.workingDirectory());
             assertEquals(Map.of("LANG", "C.UTF-8"), command.environment());
             assertTrue(
@@ -109,7 +112,7 @@ class CometSearchCommandsTest {
                         "/tools/comet 2026.03.0/bin/comet",
                         "-P/projects/p one/runs/20261006T120000Z-run-0001/parameters/comet.params",
                         "-D/projects/p one/index-cache/key 1/subset.fasta.idx",
-                        "-N/projects/p one/runs/20261006T120000Z-run-0001/outputs/comet/K562 3",
+                        "-NK562 3",
                         "/data/K562 3.mzML"),
                 commands.command(inputs().get(0)).argv());
         assertEquals(
@@ -117,9 +120,46 @@ class CometSearchCommandsTest {
                         "/tools/comet 2026.03.0/bin/comet",
                         "-P/projects/p one/runs/20261006T120000Z-run-0001/parameters/comet.params",
                         "-D/projects/p one/index-cache/key 1/subset.fasta.idx",
-                        "-N/projects/p one/runs/20261006T120000Z-run-0001/outputs/comet/k562_4",
+                        "-Nk562_4",
                         "/data/fractions/k562_4.MZXML"),
                 commands.commands(inputs()).get(1).argv());
+        assertEquals(
+                TestPaths.absolute("projects/p one/runs/20261006T120000Z-run-0001/outputs/comet"),
+                commands.command(inputs().get(0)).workingDirectory());
+    }
+
+    @Test
+    @DisplayName(
+            "-N holds no directory: Comet writes it into every SpecId, so it is the bare base, and"
+                    + " the path it names is the working directory's <base> -- inside the run"
+                    + " (R-CMT-03, R-PROC-04)")
+    void outputBaseHoldsNoDirectory() {
+        RunLayout run = new RunLayout(RUN);
+        List<OutputBase> inputs = inputs();
+        for (CometSearchCommands commands : List.of(fromParameterFile(), overriding())) {
+            List<ToolCommand> built = commands.commands(inputs);
+            for (int index = 0; index < built.size(); index++) {
+                ToolCommand command = built.get(index);
+                List<String> named = new ArrayList<>();
+                for (String argument : command.argv()) {
+                    if (argument.startsWith("-N")) {
+                        named.add(argument.substring(2));
+                    }
+                }
+                String base = inputs.get(index).base();
+                assertEquals(List.of(base), named, "exactly one -N, and it is the base");
+                assertTrue(
+                        base.indexOf('/') < 0 && base.indexOf('\\') < 0,
+                        "a base holds no path separator: " + base);
+                // What -N names: the working directory's <base>, which is the layout's output
+                // base, under the run's root.
+                Path names = command.workingDirectory().resolve(named.get(0));
+                assertEquals(run.cometOutputBase(base), names);
+                assertEquals(run.cometOutputDirectory(), command.workingDirectory());
+                assertTrue(command.workingDirectory().startsWith(run.root()));
+                assertTrue(!command.workingDirectory().equals(run.root()));
+            }
+        }
     }
 
     @Test
@@ -242,9 +282,7 @@ class CometSearchCommandsTest {
                 List.of(
                         new OutputBase(1, TestPaths.absolute("d/a.mzML"), "a"),
                         new OutputBase(2, TestPaths.absolute("e/A.mgf"), "A_2"));
-        assertEquals(
-                "-N/projects/p one/runs/20261006T120000Z-run-0001/outputs/comet/A_2",
-                fromParameterFile().commands(fixed).get(1).argv().get(2));
+        assertEquals("-NA_2", fromParameterFile().commands(fixed).get(1).argv().get(2));
     }
 
     @Test
@@ -288,7 +326,9 @@ class CometSearchCommandsTest {
     }
 
     @Test
-    @DisplayName("a run directory holding a tab is refused: -N lands verbatim in every SpecId")
+    @DisplayName(
+            "a run directory holding a tab is refused: the path -N names lands verbatim in the"
+                    + " pepXML")
     void controlCharacterInBaseRefused() {
         CometSearchCommands commands =
                 CometSearchCommands.databaseFromParameterFile(
@@ -298,8 +338,8 @@ class CometSearchCommandsTest {
                         IllegalArgumentException.class, () -> commands.command(inputs().get(0)));
         assertEquals(
                 "the Comet output base \"/projects/a\tb/run/outputs/comet/K562 3\" holds a control"
-                        + " character; Comet writes it verbatim into every PIN row's SpecId, where"
-                        + " a tab or a line break would corrupt the file",
+                        + " character; Comet writes it verbatim into its pepXML, where a tab or a"
+                        + " line break would not be read back",
                 refused.getMessage());
         CometSearchCommands newline =
                 CometSearchCommands.databaseFromParameterFile(

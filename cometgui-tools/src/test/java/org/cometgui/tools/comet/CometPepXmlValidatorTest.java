@@ -357,7 +357,7 @@ class CometPepXmlValidatorTest {
                 "the pepXML file "
                         + file
                         + " names the output base \"/old/run/k562 3\" (search_summary"
-                        + " base_name), not the -N base the search was given,"
+                        + " base_name), not the output base the search's -N named,"
                         + " \"/run/outputs/comet/k562 3\"",
                 refused(file).getMessage());
         Path bare = write(document(RUN_SUMMARY, "search_id=\"1\"", 1));

@@ -202,6 +202,33 @@ final class DownstreamSteps {
                                 + " ("
                                 + rows.size()
                                 + " rows shown)");
+        // The row's second cell is the source-file column. The PSM's identifier begins with the
+        // bare -N base of its spectrum file -- no directory -- and the table shows that file by
+        // name.
+        String psmBase = drawn.psmId().replaceFirst("_[0-9]+_[0-9]+_[0-9]+$", "");
+        List<String> sourceNames = new ArrayList<>();
+        for (Path spectrum : layout().spectra()) {
+            String name = String.valueOf(spectrum.getFileName());
+            if (name.replaceFirst("\\.[^.]*$", "").equals(psmBase)) {
+                sourceNames.add(name);
+            }
+        }
+        assertAll(
+                "step 25: the chosen PSM's identifier and its source file",
+                () ->
+                        assertFalse(
+                                drawn.psmId().contains("/") || drawn.psmId().contains("\\"),
+                                () -> "the PSM identifier holds no path: " + drawn.psmId()),
+                () ->
+                        assertEquals(
+                                1,
+                                sourceNames.size(),
+                                () -> "one spectrum file has the base " + psmBase),
+                () ->
+                        assertEquals(
+                                sourceNames,
+                                List.of(rows.get(found).split("\t", -1)[1]),
+                                "the Results table shows the PSM's spectrum file by name"));
         screen().ui().clickOn("results-table");
         screen().ui().pressKey("HOME");
         for (int step = 0; step < found; step++) {
@@ -1049,10 +1076,10 @@ final class DownstreamSteps {
 
     /**
      * What a tool's argument array must say, typed out here: Comet's is exactly the installed
-     * executable, the archived {@code comet.params}, one {@code -N} base under {@code
-     * outputs/comet} and one spectrum file, all declared; Percolator's names the merged PIN last,
-     * as a declared input, and writes each of its tables, its weights and its XML to a declared
-     * output.
+     * executable, the archived {@code comet.params}, one bare {@code -N} base (Comet runs in the
+     * run's {@code outputs/comet}) and one spectrum file, all declared; Percolator's names the
+     * merged PIN last, as a declared input, and writes each of its tables, its weights and its XML
+     * to a declared output.
      */
     private List<String> argumentProblems(
             String name,
@@ -1069,7 +1096,7 @@ final class DownstreamSteps {
                     List.of(
                             scenario.cometExecutable().toString(),
                             "-P" + run().resolve("parameters/comet.params"),
-                            "-N" + run().resolve("outputs/comet").resolve(stem),
+                            "-N" + stem,
                             spectrum);
             if (!expected.equals(argv) || !declaredInputs.contains(spectrum)) {
                 problems.add(stage + ": Comet's argument array " + argv + ", not " + expected);

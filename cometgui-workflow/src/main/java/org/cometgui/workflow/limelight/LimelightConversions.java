@@ -96,8 +96,9 @@ import org.cometgui.workflow.storage.LimelightSettingsStore;
  * <h2>The conversion: {@link #convert}</h2>
  *
  * <ol>
- *   <li>The Percolator XML is given to the converter as it is, or -- when its PSM ids carry Comet's
- *       absolute {@code -N} base, as every CometGUI run's do -- as a verified copy with the pepXML
+ *   <li>The Percolator XML is given to the converter as it is -- a run's PSM ids begin with the
+ *       bare {@code -N} base -- or, when its PSM ids carry Comet's absolute {@code -N} base, as
+ *       those of a run made before Phase 16 unit 3b do, as a verified copy with the pepXML
  *       directory removed from them (proposed design decision P12-18, {@code PoutForConverter}).
  *   <li>Every pepXML the converter will read is proved the run's own ({@link PepXmlSet}, P12-8).
  *   <li>The installed converter is started with {@code --version} through the process service and

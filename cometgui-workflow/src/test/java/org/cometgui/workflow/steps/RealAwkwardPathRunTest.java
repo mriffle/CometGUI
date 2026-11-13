@@ -72,14 +72,16 @@ import org.junit.jupiter.api.io.TempDir;
  * {@code -N} output base and its {@code -P} parameter-file path at 511 bytes</strong> and to refuse
  * a {@code database_name} of 511 bytes or more. So the long-path run puts its spectrum files at a
  * depth of about 4 000 bytes through directories whose names are exactly 255 bytes long, its
- * database at about 500 bytes, and nests the project so that the longest {@code -N} base Comet is
- * given is within a few bytes of 511 -- and asserts each of those lengths, so the claim "near the
+ * database at about 500 bytes, and nests the project so that the longest output base {@code -N}
+ * names is within a few bytes of 511 -- and asserts each of those lengths, so the claim "near the
  * limits" is measured rather than described. Beyond those limits the product has no check of its
  * own -- the pre-run check holds {@code database_name} to 4095 bytes, so a 511-byte database passes
- * it and Comet refuses it, and a {@code -N} base over 511 bytes is truncated by Comet, which exits
- * 0 having written its outputs under a shorter name -- and the Phase 14 unit 8a report records that
- * as a defect for the orchestrator. This class proves only the envelope that works. Windows'
- * 260-character {@code MAX_PATH} case cannot be exercised on this host and is not claimed.
+ * it and Comet refuses it, and a {@code -N} value over 511 bytes is truncated by Comet, which exits
+ * 0 having written its outputs under a shorter name (since Phase 16 unit 3b the value is the bare
+ * base, so that no longer happens to a run, while {@code -P} is still the whole path) -- and the
+ * Phase 14 unit 8a report records that as a defect for the orchestrator. This class proves only the
+ * envelope that works. Windows' 260-character {@code MAX_PATH} case cannot be exercised on this
+ * host and is not claimed.
  *
  * <p>Files read outside this module: {@code scratch/phase05/artefacts} (both binaries), {@code
  * scratch/fixture} (both K562 mzML and the proteome), and {@code manifests/tools.json}, as {@link
@@ -190,8 +192,10 @@ class RealAwkwardPathRunTest {
     /**
      * What every successful run here must show, whatever its paths: success; the outputs named by
      * each file's natural base; a merged PIN holding the summed data rows of its two sources,
-     * counted here; one Percolator PSM row per target row of it; and the record naming every input
-     * by its exact path.
+     * counted here; one Percolator PSM row per target row of it; every identifier of every PIN and
+     * every Percolator table exactly {@code <base>_<scan>_<charge>_<rank>} -- the base with its
+     * spaces and non-ASCII letters, and nothing of the directories the run is in; and the record
+     * naming every input by its exact path.
      */
     private static void assertARealRunSucceeded(Staged staged, Ran ran, List<String> bases)
             throws IOException {
@@ -217,6 +221,24 @@ class RealAwkwardPathRunTest {
         long first = dataRows(out.resolve(bases.get(0) + ".pin"));
         long second = dataRows(out.resolve(bases.get(1) + ".pin"));
         Path psms = ran.prepared().percolatorOutputDirectory().orElseThrow().resolve("psms.tsv");
+        Path percolator = ran.prepared().percolatorOutputDirectory().orElseThrow();
+        assertAll(
+                "no identifier holds a directory, however awkward the run's own is",
+                () ->
+                        assertEquals(
+                                first,
+                                RunIdentifiers.assertIds(
+                                        out.resolve(bases.get(0) + ".pin"), List.of(bases.get(0)))),
+                () ->
+                        assertEquals(
+                                second,
+                                RunIdentifiers.assertIds(
+                                        out.resolve(bases.get(1) + ".pin"), List.of(bases.get(1)))),
+                () -> assertEquals(first + second, RunIdentifiers.assertIds(merged, bases)),
+                () -> assertEquals(dataRows(psms), RunIdentifiers.assertIds(psms, bases)),
+                () -> RunIdentifiers.assertIds(percolator.resolve("peptides.tsv"), bases),
+                () -> RunIdentifiers.assertIds(percolator.resolve("decoy-psms.tsv"), bases),
+                () -> RunIdentifiers.assertIds(percolator.resolve("decoy-peptides.tsv"), bases));
         assertAll(
                 () -> assertTrue(first > 0 && second > 0, "both PINs hold rows"),
                 () ->
@@ -315,10 +337,13 @@ class RealAwkwardPathRunTest {
         }
         Path fasta = within(root.resolve("db"), 500 - "/db.fasta".length()).resolve("db.fasta");
         /*
-         * The run directory is <project>/runs/<20261023T070115Z-run-0001>/: the longest -N base
-         * is <run>/outputs/comet/<base> and the parameter file <run>/parameters/comet.params,
-         * whose suffixes after <project> are 46 + base and 55 bytes. The project is nested so that
-         * the -N base lands within 8 bytes of Comet's 511.
+         * The run directory is <project>/runs/<20261023T070115Z-run-0001>/: the longest output
+         * base -N names is <run>/outputs/comet/<base> and the parameter file
+         * <run>/parameters/comet.params, whose suffixes after <project> are 46 + base and 55
+         * bytes. The project is nested so that the output base lands within 8 bytes of Comet's
+         * 511. (Comet is given the bare base and run in <run>/outputs/comet, so 511 no longer
+         * bounds that path -- measured: a 700-byte output base is written whole -- but it still
+         * bounds -P, and this class keeps the envelope it has always proved.)
          */
         int project =
                 COMET_KEEPS
@@ -350,7 +375,7 @@ class RealAwkwardPathRunTest {
                 () ->
                         assertTrue(
                                 nBase.length() > COMET_KEEPS - 8 && nBase.length() <= COMET_KEEPS,
-                                () -> "the -N base is " + nBase.length() + ": " + nBase),
+                                () -> "the output base is " + nBase.length() + ": " + nBase),
                 () ->
                         assertTrue(
                                 params.length() <= COMET_KEEPS,

@@ -1037,13 +1037,20 @@ public final class CanonicalScenario {
                                     cometExecutable.toString(), argv.get(0), "the installed Comet"),
                     () -> assertEquals(1, inputs.size(), "exactly one spectrum file"),
                     () -> assertEquals(1, named.size(), "exactly one -N"),
+                    () ->
+                            assertEquals(
+                                    run.resolve("outputs/comet").toString(),
+                                    execution.get("workingDirectory"),
+                                    "run in the run's own outputs/comet, which is where the bare"
+                                            + " -N base puts its outputs"),
                     () -> assertEquals(new BigDecimal(0), execution.get("exitCode"), "exit 0"));
             searched.add(inputs.get(0));
             bases.add(named.get(0).substring(2));
         }
         List<String> expectedBases = new ArrayList<>();
         for (Path spectrum : layout.spectra()) {
-            expectedBases.add(run.resolve("outputs/comet").resolve(stem(spectrum)).toString());
+            // The bare base: Comet writes -N into every SpecId, so it holds no directory.
+            expectedBases.add(stem(spectrum));
         }
         assertAll(
                 "step 18: once per file, each with its own -N base",
@@ -1091,17 +1098,18 @@ public final class CanonicalScenario {
                                             "msms_run_summary=" + layout.inputs().resolve(base),
                                             1L),
                                     pepxml.attributeValues(),
-                                    "its search summary names its own -N base, and its run"
-                                            + " summary the spectrum file it searched"),
+                                    "its search summary names the path its -N base named, and its"
+                                            + " run summary the spectrum file it searched"),
                     () -> assertEquals(List.of("SpecId", "Label"), pin.header().subList(0, 2)),
                     () -> assertEquals(1, pin.headerLines(), "one header"),
                     () -> assertTrue(pin.rows() > 0, "data rows"),
                     () -> assertEquals(List.of(), pin.malformed()),
                     () ->
                             assertEquals(
-                                    Set.of(nBase),
+                                    Set.of(base),
                                     pin.rowsBySource().keySet(),
-                                    "every row's SpecId begins with its own -N base"));
+                                    "every row's SpecId begins with its own -N base, which is the"
+                                            + " bare base: no SpecId holds the run directory"));
             observations.add(
                     base
                             + ": "
@@ -1129,8 +1137,7 @@ public final class CanonicalScenario {
         List<String> header = null;
         for (Path spectrum : layout.spectra()) {
             PinFile source = PinFile.read(run.resolve("outputs/comet/" + stem(spectrum) + ".pin"));
-            bySource.put(
-                    run.resolve("outputs/comet").resolve(stem(spectrum)).toString(), source.rows());
+            bySource.put(stem(spectrum), source.rows());
             sum += source.rows();
             header = source.header();
         }

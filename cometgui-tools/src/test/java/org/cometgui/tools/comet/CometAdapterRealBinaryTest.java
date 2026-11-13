@@ -248,25 +248,57 @@ class CometAdapterRealBinaryTest {
     }
 
     @Test
-    @DisplayName("each real command, element by element: -P, -N into the run, one input")
+    @DisplayName(
+            "each real command, element by element: -P, -N<base>, one input; run in the run's"
+                    + " outputs/comet")
     void argumentArrays() {
         String runRoot = scratch + "/project one/runs/20261006T120000Z-run-0001";
         assertEquals(
                 List.of(
                         scratch + "/bin/comet",
                         "-P" + runRoot + "/parameters/comet.params",
-                        "-N" + runRoot + "/outputs/comet/k562_3",
+                        "-Nk562_3",
                         scratch + "/read-only inputs/k562_3.mzML"),
                 commands.get(0).argv());
         assertEquals(
                 List.of(
                         scratch + "/bin/comet",
                         "-P" + runRoot + "/parameters/comet.params",
-                        "-N" + runRoot + "/outputs/comet/k562_4",
+                        "-Nk562_4",
                         scratch + "/read-only inputs/k562_4.mzML"),
                 commands.get(1).argv());
-        assertEquals(Path.of(runRoot), commands.get(0).workingDirectory());
+        assertEquals(Path.of(runRoot + "/outputs/comet"), commands.get(0).workingDirectory());
+        assertEquals(Path.of(runRoot + "/outputs/comet"), commands.get(1).workingDirectory());
         assertEquals(Map.of("LANG", "C.UTF-8"), commands.get(1).environment());
+    }
+
+    @Test
+    @DisplayName(
+            "every SpecId of each real PIN is <base>_<scan>_<charge>_<rank>: no path separator,"
+                    + " nothing of the run directory")
+    void specIdsHoldNoDirectory() throws IOException {
+        for (OutputBase input : spectra) {
+            List<String> lines =
+                    Files.readAllLines(run.pinFile(input.base()), StandardCharsets.ISO_8859_1);
+            assertEquals("SpecId", lines.get(0).split("\t", -1)[0]);
+            java.util.regex.Pattern shape =
+                    java.util.regex.Pattern.compile(
+                            java.util.regex.Pattern.quote(input.base()) + "_[0-9]+_[0-9]+_[0-9]+");
+            long rows = 0;
+            for (String line : lines.subList(1, lines.size())) {
+                String specId = line.split("\t", -1)[0];
+                assertTrue(
+                        shape.matcher(specId).matches(),
+                        () -> run.pinFile(input.base()) + ": the SpecId \"" + specId + "\"");
+                rows++;
+            }
+            assertEquals(input.base().equals("k562_3") ? 3554 : 2918, rows);
+        }
+        assertEquals(
+                "k562_3_11188_2_1",
+                Files.readAllLines(run.pinFile("k562_3"), StandardCharsets.ISO_8859_1)
+                        .get(1)
+                        .split("\t", -1)[0]);
     }
 
     @Test
@@ -282,7 +314,9 @@ class CometAdapterRealBinaryTest {
     }
 
     @Test
-    @DisplayName("each real pepXML names its own input and -N base; 728 and 607 spectrum queries")
+    @DisplayName(
+            "each real pepXML names its own input and the path -N named; 728 and 607 spectrum"
+                    + " queries")
     void pepXml() throws IOException {
         PepXmlSummary first = CometPepXmlValidator.validate(run, spectra.get(0));
         assertEquals(728, first.spectrumQueries());
@@ -333,7 +367,7 @@ class CometAdapterRealBinaryTest {
     void multiProteinRows() throws IOException {
         assertEquals(Map.of(28, 3528L, 29, 25L, 30, 2L), fieldCounts(run.pinFile("k562_3")));
         assertEquals(Map.of(28, 2894L, 29, 22L, 30, 3L), fieldCounts(run.pinFile("k562_4")));
-        String specIdPrefix = run.cometOutputBase("k562_3") + "_";
+        String specIdPrefix = "k562_3_";
         for (String line :
                 Files.readAllLines(run.pinFile("k562_3"), StandardCharsets.ISO_8859_1)
                         .subList(1, 3555)) {

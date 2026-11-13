@@ -147,7 +147,7 @@ class RealIndexTest {
                             comet.toString(),
                             "-P" + run1 + "/parameters/comet.params",
                             "-D" + index,
-                            "-N" + run1 + "/outputs/comet/k562_3",
+                            "-Nk562_3",
                             inputs + "/k562_3.mzML"),
                     launches.get(1).command().argv());
             RunIdentity identity = project.store().read(first.layout()).identity();
@@ -313,7 +313,7 @@ class RealIndexTest {
                     List.of(
                             older.toString(),
                             "-P" + run + "/parameters/comet.params",
-                            "-N" + run + "/outputs/comet/k562_3",
+                            "-Nk562_3",
                             inputs + "/k562_3.mzML"),
                     launches.get(0).command().argv());
             assertEquals(List.of(), project.runner().launchesOf(newer));

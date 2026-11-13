@@ -110,10 +110,10 @@ import org.xml.sax.SAXException;
                         + " this project")
 class RealLimelightConversionTest {
 
-    private static final String CONVERTER_JAR =
+    static final String CONVERTER_JAR =
             "scratch/phase05/artefacts/v2.8.1__cometPercolator2LimelightXML.jar";
 
-    private static final String CONVERTER_SHA256 =
+    static final String CONVERTER_SHA256 =
             "843573396ce0654a0ac81582b378c496923e49dde71f40d750d890947774ece1";
 
     @TempDir private static Path scratch;
@@ -193,25 +193,8 @@ class RealLimelightConversionTest {
                         .orElseThrow();
         identity = project.store().read(prepared.layout()).identity();
 
-        jar =
-                Files.createDirectories(root.resolve("cache/limelight-converter/2.8.1"))
-                        .resolve("cometPercolator2LimelightXML.jar");
-        Path pinned = RealComet.repositoryRoot().resolve(CONVERTER_JAR);
-        assertTrue(Files.isRegularFile(pinned), pinned + " is missing (gitignored scratch)");
-        assertEquals(CONVERTER_SHA256, RealComet.sha256(pinned), "the pinned converter JAR");
-        Files.copy(pinned, jar, StandardCopyOption.REPLACE_EXISTING);
-        conversions =
-                new LimelightConversions(
-                        new LimelightProvisioning(new InstalledConverter(jar)),
-                        project.runner(),
-                        project.hashes(),
-                        SecretRedactor.patternsOnly(),
-                        project.sink(),
-                        Clock.systemUTC(),
-                        RealPercolator.HOST,
-                        JavaRuntime.ofThisApplication(),
-                        LimelightConverter.DEFAULT_TIMEOUT,
-                        Set::of);
+        jar = stageConverter(root);
+        conversions = conversions(project, jar);
         RunLayout layout = prepared.layout();
         viewStateBefore =
                 Files.exists(layout.viewStateFile())
@@ -237,6 +220,33 @@ class RealLimelightConversionTest {
         if (project != null) {
             project.close();
         }
+    }
+
+    /** The pinned converter v2.8.1, held to its SHA-256, staged as an installed tool's JAR. */
+    static Path stageConverter(Path root) throws IOException {
+        Path staged =
+                Files.createDirectories(root.resolve("cache/limelight-converter/2.8.1"))
+                        .resolve("cometPercolator2LimelightXML.jar");
+        Path pinned = RealComet.repositoryRoot().resolve(CONVERTER_JAR);
+        assertTrue(Files.isRegularFile(pinned), pinned + " is missing (gitignored scratch)");
+        assertEquals(CONVERTER_SHA256, RealComet.sha256(pinned), "the pinned converter JAR");
+        Files.copy(pinned, staged, StandardCopyOption.REPLACE_EXISTING);
+        return staged;
+    }
+
+    /** The product's conversions over a project's own runner, hasher and console. */
+    static LimelightConversions conversions(RealProject of, Path converterJar) throws IOException {
+        return new LimelightConversions(
+                new LimelightProvisioning(new InstalledConverter(converterJar)),
+                of.runner(),
+                of.hashes(),
+                SecretRedactor.patternsOnly(),
+                of.sink(),
+                Clock.systemUTC(),
+                RealPercolator.HOST,
+                JavaRuntime.ofThisApplication(),
+                LimelightConverter.DEFAULT_TIMEOUT,
+                Set::of);
     }
 
     /** The Tool Manager's answer for an installed, verified converter at one JAR. */
@@ -283,7 +293,7 @@ class RealLimelightConversionTest {
                 .toList();
     }
 
-    private static List<String> argv(ProvenanceEvent event) {
+    static List<String> argv(ProvenanceEvent event) {
         Map<String, String> payload = event.payload();
         int count = Integer.parseInt(payload.get(LimelightConversions.ARGV_COUNT));
         List<String> argv = new ArrayList<>(count);
@@ -293,7 +303,7 @@ class RealLimelightConversionTest {
         return argv;
     }
 
-    private static boolean adjacent(List<String> argv, String option, String value) {
+    static boolean adjacent(List<String> argv, String option, String value) {
         for (int index = 0; index + 1 < argv.size(); index++) {
             if (argv.get(index).equals(option) && argv.get(index + 1).equals(value)) {
                 return true;
@@ -377,7 +387,9 @@ class RealLimelightConversionTest {
     @DisplayName(
             "gate 1, AC-LL-02: the real run's real conversion is a valid Limelight XML holding"
                     + " every target PSM of the run's own table, checksummed into provenance with"
-                    + " this test's own MD5 and SHA-256, -q 0.01 and -d <run>/outputs/comet")
+                    + " this test's own MD5 and SHA-256, -q 0.01 and -d <run>/outputs/comet; the"
+                    + " run's PSM ids hold no directory, so the converter is given the run's own"
+                    + " Percolator XML")
     void gate1ARealConversion() throws IOException, SAXException {
         assertEquals(
                 AttemptOutcome.SUCCEEDED, result.outcome(), () -> result.failures().toString());
@@ -390,15 +402,44 @@ class RealLimelightConversionTest {
         ProvenanceEvent converted = events(ProvenanceEventType.LIMELIGHT_CONVERTED).get(0);
         Map<String, String> payload = converted.payload();
         List<String> argv = argv(converted);
-        String pout = Files.readString(layout.root().resolve("outputs/percolator/pout.xml"));
+        Path poutFile = layout.root().resolve("outputs/percolator/pout.xml");
+        List<String> roles = new ArrayList<>();
+        for (int input = 1; payload.containsKey("input." + input + ".role"); input++) {
+            roles.add(payload.get("input." + input + ".role"));
+        }
         assertAll(
                 () -> assertEquals(file, first.file()),
                 () -> assertTrue(targets > 0, "the run found target PSMs"),
                 () -> assertEquals(targets, read.psms(), "every target PSM of psms.tsv"),
                 () ->
                         assertTrue(
-                                pout.contains("p:psm_id=\"" + layout.cometOutputDirectory() + "/"),
-                                "the run's own PSM ids carry Comet's absolute -N base"),
+                                RunIdentifiers.assertIds(
+                                                poutFile.toString(),
+                                                RunIdentifiers.poutIds(poutFile),
+                                                List.of("k562_3", "k562_4"))
+                                        > targets,
+                                "every psm_id of the run's Percolator XML -- each PSM's and each"
+                                        + " peptide's -- is <base>_<scan>_<charge>_<rank>"),
+                () ->
+                        assertTrue(
+                                adjacent(argv, "-p", poutFile.toString()),
+                                () -> "the converter reads the run's own pout.xml: " + argv),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "comet-params",
+                                        "percolator-xml",
+                                        "pepxml",
+                                        "pepxml",
+                                        "fasta"),
+                                roles,
+                                "no copy of the Percolator XML is made or recorded"),
+                () ->
+                        assertTrue(
+                                !Files.exists(layout.limelightWorkDirectory())
+                                        || RunEvidence.listing(layout.limelightWorkDirectory())
+                                                .isEmpty(),
+                                "and none is in the run's results/limelight"),
                 () -> assertEquals(List.of("0.01"), read.psmQFilters()),
                 () -> assertEquals(digest(file, "SHA-256"), payload.get("output.sha256")),
                 () -> assertEquals(digest(file, "MD5"), payload.get("output.md5")),
@@ -428,7 +469,6 @@ class RealLimelightConversionTest {
                                         layout.root().resolve("outputs/percolator/pout.xml"),
                                         "SHA-256"),
                                 payload.get("input.2.sha256")),
-                () -> assertEquals("percolator-xml-for-converter", payload.get("input.3.role")),
                 () ->
                         assertFalse(
                                 Files.getPosixFilePermissions(file)

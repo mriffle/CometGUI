@@ -689,10 +689,11 @@ class RealProvenanceGateTest {
                                         "the archived parameter file"));
                 String input = inputs.get(0);
                 String stem = fileName(input).replace(".mzML", "");
+                assertEquals("-N" + stem, base.get(0), "its own base, and nothing of a path");
                 assertEquals(
-                        "-N" + world.completed().resolve("outputs/comet").resolve(stem),
-                        base.get(0),
-                        "its own base, beside its own outputs");
+                        world.completed().resolve("outputs/comet").toString(),
+                        string(object(comet.get("execution")), "workingDirectory"),
+                        "run in the run's own outputs/comet, so the base is beside its outputs");
                 assertTrue(named.add(input), input + " searched twice");
                 assertTrue(bases.add(base.get(0)), base.get(0) + " used twice");
             }

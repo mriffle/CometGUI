@@ -38,16 +38,29 @@ import org.cometgui.domain.run.RunLayout;
  * <h2>The argument array</h2>
  *
  * <pre>
- *   comet  -P{run}/parameters/comet.params  [-D{database}]  -N{run}/outputs/comet/{base}  {input}
+ *   comet  -P{run}/parameters/comet.params  [-D{database}]  -N{base}  {input}
  * </pre>
+ *
+ * <p>run in {@code <run>/outputs/comet}, so {@code -N} names the output base {@code
+ * <run>/outputs/comet/<base>} -- a path inside the run directory ({@code R-CMT-03}) -- without
+ * holding the run directory's path. That matters because Comet writes the {@code -N} value,
+ * verbatim, at the start of every PIN row's {@code SpecId}, and Percolator carries the {@code
+ * SpecId} into every {@code PSMId} and from there into every export of the PSM table: with {@code
+ * -N<run>/outputs/comet/<base>}, which a run made before Phase 16 unit 3b was given, every
+ * identifier held the path of the user's run directory. Measured on both pinned releases, 2026.03.0
+ * and 2026.02.2: the two forms write the same files in the same place; the PINs are byte for byte
+ * equal once the directory is removed from the first form's identifiers ({@code k562_3_11188_2_1});
+ * and the pepXML is the same too, because Comet resolves the base it is given and writes the
+ * absolute path as {@code search_summary}'s {@code base_name} either way.
  *
  * <p>Comet's options take their value <em>attached</em> -- its own usage text reads {@code
  * -P<params>}, {@code -N<name>}, {@code -D<dbase>} -- so each is one argument array element, and a
- * path containing a space is part of that one element, never quoted. The parameter file is always
- * the run's archived {@code parameters/comet.params} ({@code R-PARAM-12}: the file written once and
- * hashed is the file executed), which is why this class takes no parameter-file path at all. {@code
- * -D} appears only for a run built with {@link #databaseOverride}, and the run records which of the
- * two it was through {@link #delivery()}.
+ * base or path containing a space is part of that one element, never quoted. Every other path on
+ * the command line is absolute, so the working directory decides nothing but where {@code -N}
+ * points. The parameter file is always the run's archived {@code parameters/comet.params} ({@code
+ * R-PARAM-12}: the file written once and hashed is the file executed), which is why this class
+ * takes no parameter-file path at all. {@code -D} appears only for a run built with {@link
+ * #databaseOverride}, and the run records which of the two it was through {@link #delivery()}.
  *
  * <h2>Exactly one input per command, by construction</h2>
  *
@@ -56,16 +69,17 @@ import org.cometgui.domain.run.RunLayout;
  * beside each input, in the user's data directory ({@code docs/feasibility/scientific-path.rst}).
  * So no method of this class can put two inputs on one command line: {@link #command(OutputBase)}
  * takes one {@link OutputBase}, which holds one path, and {@link #commands(List)} returns one
- * command per element of its list. Every path is absolute, so no input can begin with {@code -} and
- * be read by Comet as an option.
+ * command per element of its list. Every input path is absolute, so no input can begin with {@code
+ * -} and be read by Comet as an option.
  *
  * <p>Two commands of one run differ in exactly two elements: the {@code -N} base and the input.
  *
  * <h2>The working directory and the environment ({@code R-PROC-04})</h2>
  *
- * <p>The working directory is the run directory. The environment is constructed, never inherited:
- * it is exactly {@link #ENVIRONMENT}, {@code LANG=C.UTF-8}. Measured on linux/x86-64: Comet
- * 2026.03.0 searches correctly with a completely empty environment (it needs no {@code PATH},
+ * <p>The working directory is {@link RunLayout#cometOutputDirectory()}, {@code outputs/comet} of
+ * the run -- explicit, and inside the run directory. The environment is constructed, never
+ * inherited: it is exactly {@link #ENVIRONMENT}, {@code LANG=C.UTF-8}. Measured on linux/x86-64:
+ * Comet 2026.03.0 searches correctly with a completely empty environment (it needs no {@code PATH},
  * {@code HOME} or {@code TMPDIR}, and writes nothing outside {@code -N}'s directory), so {@code
  * LANG} is not there because Comet fails without it. It is there to pin the C library's locale to
  * one whose decimal separator is a point, whatever the user's shell has, and because Phase 03
@@ -75,10 +89,13 @@ import org.cometgui.domain.run.RunLayout;
  *
  * <h2>A run directory containing a control character is refused</h2>
  *
- * <p>Comet writes the {@code -N} base, verbatim, at the start of every PIN row's {@code SpecId} --
- * measured: {@code <run>/outputs/comet/k562_3_11188_2_1}. A tab in the run directory's path would
- * therefore shift every column of the PIN and a newline would split every row, so a {@code -N} path
- * holding any control character is refused here, before Comet starts.
+ * <p>Comet writes the path {@code -N} names -- {@code <run>/outputs/comet/<base>}, resolved -- as
+ * the {@code base_name} attribute of its pepXML's {@code search_summary}, raw (measured with a tab
+ * in the run directory's name: the file holds the tab itself). An XML reader turns a tab or a line
+ * break in an attribute value into a space, so the file would no longer name the base it was
+ * written for; and in the base itself a tab would shift every column of the PIN and a newline split
+ * every row. So an output base whose path holds any control character is refused here, before Comet
+ * starts. (A base from {@link OutputBaseNames} never holds one; a run directory can.)
  */
 public final class CometSearchCommands {
 
@@ -160,24 +177,24 @@ public final class CometSearchCommands {
      * The command that searches one spectrum file.
      *
      * @param input the file, with its position and the base name {@link OutputBaseNames} gave it
-     * @return the command: the argument array, the run directory, {@link #ENVIRONMENT}
+     * @return the command: the argument array, the run's {@code outputs/comet} as the working
+     *     directory, {@link #ENVIRONMENT}
      * @throws NullPointerException if {@code input} is {@code null}
-     * @throws IllegalArgumentException if the input path is not absolute, or the {@code -N} path
-     *     holds a control character
+     * @throws IllegalArgumentException if the input path is not absolute, or the path {@code -N}
+     *     names holds a control character
      */
     public ToolCommand command(OutputBase input) {
         Objects.requireNonNull(input, "input");
         Path spectra = absolute(input.input(), "spectrum file " + input.position());
-        Path outputBase = run.cometOutputBase(input.base());
-        String base = outputBase.toString();
-        for (int index = 0; index < base.length(); index++) {
-            if (Character.isISOControl(base.charAt(index))) {
+        String named = run.cometOutputBase(input.base()).toString();
+        for (int index = 0; index < named.length(); index++) {
+            if (Character.isISOControl(named.charAt(index))) {
                 throw new IllegalArgumentException(
                         "the Comet output base \""
-                                + base
+                                + named
                                 + "\" holds a control character; Comet writes it verbatim into"
-                                + " every PIN row's SpecId, where a tab or a line break would"
-                                + " corrupt the file");
+                                + " its pepXML, where a tab or a line break would not be read"
+                                + " back");
             }
         }
         List<String> argv = new ArrayList<>(5);
@@ -186,9 +203,9 @@ public final class CometSearchCommands {
         if (database != null) {
             argv.add(DATABASE_OPTION + database);
         }
-        argv.add(OUTPUT_BASE_OPTION + base);
+        argv.add(OUTPUT_BASE_OPTION + input.base());
         argv.add(spectra.toString());
-        return new ToolCommand(argv, run.root(), ENVIRONMENT);
+        return new ToolCommand(argv, run.cometOutputDirectory(), ENVIRONMENT);
     }
 
     /**

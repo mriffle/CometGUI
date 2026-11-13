@@ -29,9 +29,12 @@ import java.util.Set;
  * The {@code -N} output base name of every spectrum file in a run: design decision P8-4, as a pure
  * function.
  *
- * <p>Comet is run once per spectrum file, always with {@code -N<run>/outputs/comet/<base>}, and
- * writes {@code <base>.pep.xml} and {@code <base>.pin}. The base names therefore decide whether two
- * inputs' outputs overwrite each other, and whether an output can land outside the run.
+ * <p>Comet is run once per spectrum file, always with {@code -N<base>} in the run's {@code
+ * outputs/comet}, and writes {@code <base>.pep.xml} and {@code <base>.pin} there. The base names
+ * therefore decide whether two inputs' outputs overwrite each other, and whether an output can land
+ * outside the run -- and, because Comet writes the {@code -N} value at the start of every PIN row's
+ * {@code SpecId}, they are how a PSM names its spectrum file, so two files' bases being distinct
+ * (rule 3) is also what tells their PSMs apart.
  *
  * <h2>The rule</h2>
  *

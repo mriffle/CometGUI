@@ -166,6 +166,16 @@ public final class PreparedRun {
     }
 
     /**
+     * The run's Comet half, for this package's tests: what an action of a search step is built
+     * over.
+     *
+     * @return the Comet half
+     */
+    CometRun cometRun() {
+        return run;
+    }
+
+    /**
      * The run's Percolator half, for this package's tests: what an action of a Percolator step is
      * built over.
      *

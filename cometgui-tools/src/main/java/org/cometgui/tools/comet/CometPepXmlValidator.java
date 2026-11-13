@@ -47,8 +47,9 @@ import org.cometgui.domain.run.RunLayout;
  *       {@code raw_data} is the spectrum file the search was given -- this is where Comet names its
  *       input, measured: {@code base_name="<dir>/k562_3"}, {@code raw_data=".mzML"}, with the
  *       extension's case kept ({@code .MZML}) and the path XML-escaped ({@code &amp;amp;});
- *   <li>it holds exactly one {@code search_summary}, whose {@code base_name} is the {@code -N} base
- *       the search was given, so the file is this invocation's and not a stale one.
+ *   <li>it holds exactly one {@code search_summary}, whose {@code base_name} is the output base the
+ *       search's {@code -N} named -- Comet resolves the base it is given and writes the absolute
+ *       path -- so the file is this invocation's and not a stale one.
  * </ul>
  *
  * <p>It counts the {@code spectrum_query} elements. Zero is not refused here: a search that matched
@@ -97,11 +98,11 @@ public final class CometPepXmlValidator {
     }
 
     /**
-     * Validates a pepXML file against the input and the {@code -N} base it must name.
+     * Validates a pepXML file against the input and the output base it must name.
      *
      * @param pepXml the file
      * @param input the spectrum file the search was given, as it was given
-     * @param outputBase the {@code -N} base the search was given
+     * @param outputBase the output base the search's {@code -N} named, absolute
      * @return what the file says
      * @throws CometOutputException if the file is missing, unreadable or not a valid pepXML of that
      *     input, naming it
@@ -181,8 +182,8 @@ public final class CometPepXmlValidator {
                     pepXml,
                     "names the output base \""
                             + walk.searchBase
-                            + "\" (search_summary base_name), not the -N base the search was"
-                            + " given, \""
+                            + "\" (search_summary base_name), not the output base the search's"
+                            + " -N named, \""
                             + outputBase
                             + "\"",
                     null);

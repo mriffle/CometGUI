@@ -1052,13 +1052,13 @@ control_1a() {
     # names the missing element.
     inject_and_run "-N dropped" "${SEARCH_COMMANDS}" "${SEL_1}" regex \
         'Error - cannot write to file "[^"]*/read-only inputs/k562_3\.pep\.xml"' \
-        '        argv.add(OUTPUT_BASE_OPTION + base);
+        '        argv.add(OUTPUT_BASE_OPTION + input.base());
 ' \
         ''
     assert_class_setup_failed "the real search from the read-only directory, in its @BeforeAll" "${T_ADAPTER}"
     assert_testcase "the argv test names the command without -N" failed "${T_ARGV}" parameterFileCommands
-    assert_log_contains "in the argv test's own words: -N into the run expected, the input alone found" \
-        "${DIRTY_LOG}" 'outputs/comet/K562 3, /data/K562 3.mzML]> but was: <[/tools/comet 2026.03.0/bin/comet, -P/projects/p one/runs/20261006T120000Z-run-0001/parameters/comet.params, /data/K562 3.mzML]>'
+    assert_log_contains "in the argv test's own words: -N<base> expected before the input, the input alone found" \
+        "${DIRTY_LOG}" 'comet.params, -NK562 3, /data/K562 3.mzML]> but was: <[/tools/comet 2026.03.0/bin/comet, -P/projects/p one/runs/20261006T120000Z-run-0001/parameters/comet.params, /data/K562 3.mzML]>'
     assert_no_processes_left "1a"
     restore_pristine "${SEARCH_COMMANDS}"
     end_control
@@ -1082,8 +1082,8 @@ control_1b() {
         }
         commands.add(new ToolCommand(every, single.workingDirectory(), single.environment()));'
     assert_class_setup_failed "the real search from the read-only directory, in its @BeforeAll" "${T_ADAPTER}"
-    assert_log_matches "the refused command carried -N into the run AND both inputs: Comet ignored -N" \
-        "${DIRTY_LOG}" '"-N[^"]*/outputs/comet/k562_3", "[^"]*/read-only inputs/k562_3\.mzML", "[^"]*/read-only inputs/k562_4\.mzML"'
+    assert_log_matches "the refused command carried -N<base> (run in the run's outputs/comet) AND both inputs: Comet ignored -N" \
+        "${DIRTY_LOG}" '"-Nk562_3", "[^"]*/read-only inputs/k562_3\.mzML", "[^"]*/read-only inputs/k562_4\.mzML"\], workingDirectory=[^,]*/outputs/comet,'
     assert_testcase "one input per command: the test that says so went red" failed "${T_ARGV}" oneInputPerCommand
     assert_log_contains "in that test's own words" "${DIRTY_LOG}" \
         'expected: <[/data/K562 3.mzML]> but was: <[/data/K562 3.mzML, /data/fractions/k562_4.MZXML]>'
@@ -1096,11 +1096,14 @@ control_2() {
     begin_control "2" "item 2 [NEW]: the -N base outside the run directory, beside the run in runs/"
     # Comet's outputs land in <project>/runs/, which is writable, so the search
     # SUCCEEDS -- only the before/after snapshot of the whole tree can see that
-    # something was written outside the run directory.
+    # something was written outside the run directory.  Comet runs in
+    # <run>/outputs/comet with a bare -N base (Phase 16 unit 3b), so the base
+    # that names <project>/runs/<base> -- the same place the control has always
+    # put it -- is ../../../<base>.
     inject_and_run "outputs written outside the run directory" "${SEARCH_COMMANDS}" "${SEL_2}" fixed \
         'expected: <[project/runs]> but was: <[project/runs, project/runs/k562_3.pep.xml' \
-        '        Path outputBase = run.cometOutputBase(input.base());' \
-        '        Path outputBase = run.root().resolveSibling(input.base());'
+        '        argv.add(OUTPUT_BASE_OPTION + input.base());' \
+        '        argv.add(OUTPUT_BASE_OPTION + "../../../" + input.base());'
     assert_testcase "gate 2's snapshot is the method that failed" failed \
         "${T_RUN}" gate2NothingWrittenOutsideTheRunDirectory
     assert_no_processes_left "2"

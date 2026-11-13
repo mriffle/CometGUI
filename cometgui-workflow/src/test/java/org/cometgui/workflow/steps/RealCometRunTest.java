@@ -213,17 +213,20 @@ class RealCometRunTest {
                 List.of(
                         comet.toString(),
                         "-P" + run + "/parameters/comet.params",
-                        "-N" + run + "/outputs/comet/k562_3",
+                        "-Nk562_3",
                         root + "/read-only inputs/k562_3.mzML"),
                 launches.get(0).command().argv());
         assertEquals(
                 List.of(
                         comet.toString(),
                         "-P" + run + "/parameters/comet.params",
-                        "-N" + run + "/outputs/comet/k562_4",
+                        "-Nk562_4",
                         root + "/read-only inputs/k562_4.mzML"),
                 launches.get(1).command().argv());
-        assertEquals(Path.of(run), launches.get(0).command().workingDirectory());
+        // -N is the bare base and Comet runs in the run's outputs/comet, so the base it names is
+        // inside the run directory (R-CMT-03, R-PROC-04) and no SpecId holds the run's path.
+        assertEquals(Path.of(run + "/outputs/comet"), launches.get(0).command().workingDirectory());
+        assertEquals(Path.of(run + "/outputs/comet"), launches.get(1).command().workingDirectory());
 
         Map<String, String> validated =
                 RunEvidence.finished(layout(), EngineStep.VALIDATE_COMET_OUTPUTS);
@@ -247,6 +250,20 @@ class RealCometRunTest {
                 "RealCometRunTest: prepare + two real searches + validate + merge + provenance"
                         + " took %d ms%n",
                 searchMillis);
+    }
+
+    @Test
+    @DisplayName(
+            "every SpecId of both real PINs and of the merged PIN is <base>_<scan>_<charge>_<rank>:"
+                    + " no path separator, nothing of the run directory")
+    void specIdsHoldNoDirectory() throws IOException {
+        assertEquals(3554, RunIdentifiers.assertIds(layout().pinFile("k562_3"), List.of("k562_3")));
+        assertEquals(2918, RunIdentifiers.assertIds(layout().pinFile("k562_4"), List.of("k562_4")));
+        assertEquals(
+                6472,
+                RunIdentifiers.assertIds(layout().mergedPinFile(), List.of("k562_3", "k562_4")));
+        assertEquals(
+                "k562_3_11188_2_1", RunIdentifiers.firstColumn(layout().pinFile("k562_3")).get(0));
     }
 
     @Test

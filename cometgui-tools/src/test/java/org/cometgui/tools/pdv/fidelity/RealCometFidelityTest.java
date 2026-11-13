@@ -114,16 +114,16 @@ class RealCometFidelityTest {
                     Files.isRegularFile(decoyPepXml),
                     "Comet wrote a separate decoy pepXML exactly under decoy_search = 2");
             Path spectra = root.resolve("inputs").resolve(base + ".mzML");
-            String psmIdBase = run.cometOutputBase(base).toString();
+            // Every PSMId starts with the search's own -N, which is the bare base.
             sources.add(
                     new FidelityCheck.Source(
-                            psmIdBase,
+                            base,
                             spectra,
                             run.pepXmlFile(base),
                             separateDecoys ? decoyPepXml : null));
             exported.add(
                     new PdvMzTabSource(
-                            psmIdBase,
+                            base,
                             spectra,
                             SpectrumFileFormat.MZML,
                             run.pepXmlFile(base),

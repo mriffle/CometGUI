@@ -192,7 +192,7 @@ class PepXmlSearchHitReaderRealBinaryTest {
             }
             String[] fields = line.split("\t", -1);
             rows.add(fields);
-            ("1".equals(fields[1]) ? targets : decoys).add(key(fields[0], run, base));
+            ("1".equals(fields[1]) ? targets : decoys).add(key(fields[0], base));
         }
         assertTrue(!targets.isEmpty() && !decoys.isEmpty(), base + ": both labels");
         PepXmlHitIndex targetIndex = PepXmlHitIndex.of(target, targets);
@@ -204,17 +204,17 @@ class PepXmlSearchHitReaderRealBinaryTest {
             boolean isDecoy = "-1".equals(row[1]);
             PepXmlSearchHit hit =
                     (isDecoy ? decoyIndex : targetIndex)
-                            .find(key(row[0], run, base))
+                            .find(key(row[0], base))
                             .orElseThrow()
                             .hit();
             assertPinRow(row, peptideColumn, hit, isDecoy);
         }
     }
 
-    private static PepXmlHitKey key(String specId, RunLayout run, String base) {
+    private static PepXmlHitKey key(String specId, String base) {
         Matcher id = SPEC_ID.matcher(specId);
         assertTrue(id.matches(), specId);
-        assertEquals(run.cometOutputBase(base).toString(), id.group(1), "the -N base");
+        assertEquals(base, id.group(1), "the -N base, which is the bare base");
         return new PepXmlHitKey(
                 Long.parseLong(id.group(2)),
                 Integer.parseInt(id.group(3)),

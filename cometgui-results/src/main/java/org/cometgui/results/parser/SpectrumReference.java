@@ -24,8 +24,9 @@ import java.util.Optional;
  *
  * <p>Comet names each PSM by its {@code SpecId}, which Percolator carries into {@code PSMId}
  * unchanged: {@code <base>_<scan>_<charge>_<rank>}, where the base is Comet's {@code -N} output
- * name verbatim -- in a CometGUI run an absolute path, which may itself hold underscores, digits
- * and spaces. The identifier is therefore read <strong>from the right</strong>: the last three
+ * name verbatim -- in a CometGUI run the spectrum file's base name, and in a run made before Phase
+ * 16 unit 3b that name as an absolute path; either may itself hold underscores, digits and spaces.
+ * The identifier is therefore read <strong>from the right</strong>: the last three
  * underscore-separated fields are the rank, the charge and the scan, each a run of ASCII digits,
  * and everything before them, underscores included, is the base.
  *

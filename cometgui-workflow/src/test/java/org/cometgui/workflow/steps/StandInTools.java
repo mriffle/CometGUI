@@ -122,6 +122,9 @@ final class StandInTools {
         lines.add("  esac");
         lines.add("done");
         lines.add("[ -n \"$base\" ] && [ -n \"$input\" ] || exit 9");
+        // As the real Comet does: the pepXML names the path -N names, resolved against the
+        // working directory when -N is the bare base (pwd is a built-in of the shell).
+        lines.add("case \"$base\" in /*) named=\"$base\" ;; *) named=\"$(pwd -P)/$base\" ;; esac");
         lines.add("stem=\"${input%.*}\"");
         lines.add("extension=\".${input##*.}\"");
         lines.add(
@@ -129,7 +132,7 @@ final class StandInTools {
                         + " xmlns=\"http://regis-web.systemsbiology.net/pepXML\"><msms_run_summary"
                         + " base_name=\"%s\" raw_data=\"%s\"><search_summary base_name=\"%s\"/>"
                         + "</msms_run_summary></msms_pipeline_analysis>\\n'"
-                        + " \"$stem\" \"$extension\" \"$base\" > \"$base.pep.xml\"");
+                        + " \"$stem\" \"$extension\" \"$named\" > \"$base.pep.xml\"");
         lines.add(
                 "while IFS= read -r line; do printf '%s\\n' \"$line\"; done > \"$base.pin\""
                         + " <<'PIN'");

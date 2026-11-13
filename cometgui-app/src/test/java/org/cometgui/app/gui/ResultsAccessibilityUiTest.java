@@ -74,7 +74,9 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <p>The run is constructed ({@link ResultRuns}) with two spectrum files, {@code sample_A.mzML} and
  * {@code sample_B.mzML}, and a target PSM table written here whose {@code PSMId}s begin with the
- * run's own Comet {@code -N} bases -- {@code <run>/outputs/comet/sample_A} -- as a real run's do:
+ * run's own Comet output bases as absolute paths -- {@code <run>/outputs/comet/sample_A} -- as
+ * those of a run made before Phase 16 unit 3b do (a run made since holds the bare base, which the
+ * end-to-end scenario shows by name). Such a run is still shown by its spectrum files' names:
  *
  * <pre>
  *   PSMId           score  q-value  at 0.01
