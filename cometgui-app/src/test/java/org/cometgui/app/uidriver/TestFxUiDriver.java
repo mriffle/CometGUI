@@ -36,11 +36,10 @@ import org.testfx.api.FxRobot;
  *
  * <p><strong>What is used, and what is not.</strong> Only {@link FxRobot}: its identifier lookup
  * (made on the application thread), its {@code clickOn} at a point computed there, and its {@code
- * push}. TestFX's own {@code FxToolkit} does not start the application here -- {@link
- * RunningApplication#launchedByMain()} does, through the product's own {@code main} -- so what this
- * class contributes is synthetic input and nothing else. That keeps the two drivers comparable:
- * they drive the same application, started the same way, and differ only in how a click and a key
- * press are made.
+ * push}. This class does not start the application: it is handed a {@link RunningApplication} that
+ * is already showing, as {@link RobotFxUiDriver} is, so what it contributes is synthetic input and
+ * nothing else. That keeps the two drivers comparable: they drive the same application, started the
+ * same way, and differ only in how a click and a key press are made.
  *
  * <p>No TestFX type appears in {@link FxUiDriver}, which is the whole point of the interface: a
  * test names {@code clickOn("nav-results")}, not a robot.

@@ -1274,13 +1274,15 @@ alone" mean anything. *Reading* is deliberately different -- assertions read
 scene-graph state directly, because a test that could only read through the
 robot it typed with would be asserting its own echo.
 
-``RunningApplication.launchedByMain()`` starts the real product through
-``CometGuiLauncher.main`` on a background thread and then waits on two
-observable facts -- whether the toolkit accepts work, and whether a showing
-stage exists -- never on a sleep. Nothing is hand-built: no test constructs a
-``ShellView``, and the composition root is the real one.
-``RunningApplication.showing(stage)`` wraps a stage a test started itself, which
-is what the console flood test needs in order to supply the log it floods.
+``RunningApplication.showing(stage)`` wraps a stage that is already showing:
+the real ``CometGuiApplication``, whose ``start`` builds the window over the
+real composition root, started by the test with the few things a test must own
+handed to it -- the application-data directory, the file chooser and, for the
+console flood test, the log it floods. Nothing else is hand-built: no test
+constructs a ``ShellView``. Until Phase 16 unit 4 there was also
+``RunningApplication.launchedByMain()``, which started the product through
+``CometGuiLauncher.main``; once no GUI test went through ``main`` it had no
+caller and was removed.
 
 **No GUI test in this package starts the application over the machine's
 application-data directory** (since Phase 16 unit 4). ``main`` reads that
