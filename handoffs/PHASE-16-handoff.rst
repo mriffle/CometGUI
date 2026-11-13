@@ -17,6 +17,15 @@ PHASE-16 handoff -- Documentation and Release Qualification (PAUSE)
    pushed** (``origin/main`` is ``d303e21``). Nobody in this phase ran
    ``scripts/build.sh`` or the full ``scripts/verify-all-gates.sh``.
 
+.. important::
+
+   **This page is the pause record of 2026-11-12 and is out of date.** The
+   phase was resumed the same day by a second orchestrator, which replaces
+   this page with the phase-end handoff when it finishes. Until then
+   ``handoffs/PHASE-16-worklog.rst`` is the current record: its table says
+   which units are accepted, its sign-offs say what was seen, and its
+   *Resume* and *The split of unit 5* sections say what comes next.
+
 .. contents:: Contents
    :depth: 2
    :local:

@@ -342,7 +342,7 @@ Work units
        test's wait if not; never a retry, a longer bound or a quarantine;
        the class green 30 times running and 15 times on two cores.
      - Gate 7; the flakiness policy; ``R-TOOL-04``
-     - dispatched 2026-11-13 at the commit that records unit 3b
+     - **Accepted 2026-11-13** at ``60970a1``. See *Unit 4c* below.
    * - 4
      - **Residue B, install and tools.** The probe's message for a non-zero
        exit carries the status; a failed install's reason survives a restart;
@@ -365,8 +365,8 @@ Work units
        baseline and every test that pinned a count from the old fixture
        moved; the matrix, determinism and end-to-end tiers green on it.
      - Gate 8; step 7; ``R-TEST-07``
-     - **Split into 5a to 5e** (P16-8, *The split of unit 5*); none
-       started
+     - **Split into 5a to 5e** (P16-8, *The split of unit 5*). 5a
+       dispatched 2026-11-13 at the commit that records unit 4c
    * - 6
      - ``D-016`` **option B and** ``D-017`` **option A.** The added PIT wall
        clock measured before adoption (stop above about fifteen minutes);
@@ -1043,6 +1043,78 @@ about 3 s more.
 * Comet's 511-byte limit no longer bounds a run's output base, only
   ``-P``: the Phase 14 unit 8a finding is partly out of date; unit 12's
   troubleshooting page states what is true now.
+
+Unit 4c -- an Install that is pressed and never starts (accepted 2026-11-13)
+-----------------------------------------------------------------------------
+
+One fresh agent, one round. Commits ``e3a9246`` (the fix, its test, the user
+page), ``4d0d629`` (the flakiness record in ``testing.rst``) and ``60970a1``
+(the fix restructured so the ``install`` harness's anchor line is byte for
+byte as before -- the agent's first form stranded control 5's anchor, the
+harness said so with exit 4, and the agent changed its own code, not the
+harness). Brief ``scratch/p16/orch/briefs/u4c.txt``.
+
+**The cause is in the product.** When an install ends, the row disables the
+action that holds the keyboard focus (Cancel). At the next pulse JavaFX moves
+the focus to the next control in traversal order -- another build's Install
+-- and the rows' scroll pane scrolls it into view, so every row moves. A
+press aimed in that one frame lands on a label. The test pressed
+Percolator's Install just after Comet's row said "installed"; a user who has
+scrolled to a second build while the first downloads loses the press the
+same way. The agent's evidence: 0 red in 60 runs of the class at 60 Hz, 4 in
+240 of an instrumented copy, and **4 in 5 of the unchanged class with the
+pulse slowed to 4 Hz**, each with the gate's own two messages; a trace
+showing text, aim, the focus move, the button 466 px lower, a press on a
+label and no action. Rows are not rebuilt, the view model refuses nothing,
+and unit 4's failure record is not involved.
+
+**The fix.** ``ToolManagerPane``: before a row disables an action that owns
+the focus, the focus is moved inside the row (to the row's other action if
+it can be taken, otherwise to the state label), which scrolls nothing. No
+test, driver, harness, bound or gate was changed.
+
+**What I ran and saw**, at ``60970a1``.
+
+* The diff (57 lines of production code).
+* **My injection**, into ``ToolManagerPane``: the call ``handTheFocusOn()``
+  deleted (anchor gone, ``sha256sum -c`` FAILED).
+  ``ToolManagerRowFocusTest``: 6 run, **5 red**. Restored, OK.
+* ``bash scripts/dev-verify.sh --since cb593b6 --verify``: BUILD SUCCESS in
+  50 min 18 s; domain 1239, provenance 709, process 286, results 1312, tools
+  1151, install 1090, params-comet 2123, params-percolator 68, workflow
+  1051, ui 849, app 601 (91 opt-in skipped), archtests 40; 0 failures.
+* ``bash scripts/verify-all-gates.sh --only
+  e2e,install,shell,paramui,results,pdv,limelight,provenanceui,workflow,percolator,flakiness,quality,traceability,docs``,
+  beside that verify: **14 passed, 0 failed, 3044 s** -- e2e 50, install 95,
+  shell 30, paramui 87, results 100, pdv 107, limelight 130, provenanceui
+  96, workflow 110, percolator 109, flakiness 44, quality 42, traceability
+  8, docs 1; the four shared directories unchanged.
+* Not repeated: the agent's loops after the fix (the class 30 times running
+  unconfined and 15 times on two cores at ``60970a1``, 0 red; 5 of 5 green
+  at 4 Hz, where the old code was 4 of 5 red). ``e2e`` has now been 50 of 50
+  in my last two runs.
+
+**What this does not show.** The gate's own red cannot be replayed; the
+identification rests on the identical message, the traces and the forced
+runs. If ``NetworkUnavailableUiTest`` goes red again in these words, the
+cause was not, or not only, this.
+
+**Cost.** ``ToolManagerRowFocusTest``, 6 tests, about 2.3 s.
+
+**Carried, and where.**
+
+* After an install ends the keyboard focus is on that row's state label,
+  which shows no focus ring; before, it jumped to another build's Install.
+  Whether a focus with no visible indicator is acceptable is a UX finding
+  for a person: it goes into unit 15's keyboard checklist as a named item,
+  and to tier 1.
+* ``NoManagedBuildView``'s Register button (``D-011``) is disabled while it
+  holds the focus -- the same shape, not fixed; other controls disabled
+  while focused inside a scroll pane were not audited. Unit 15's heuristic
+  and keyboard review audits them and files what it finds.
+* A row that gains its installed path still moves the rows below it by 18
+  px in one frame; a press in that frame could still miss. Recorded, not
+  fixed.
 
 The outage (2026-11-13)
 -----------------------
