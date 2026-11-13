@@ -86,7 +86,7 @@ class FastaDecoyRulesTest {
                 "decoy_search = 0 (no internal decoys) and "
                         + IndexDescriptions.SUBSET
                         + " holds no entry whose"
-                        + " accession begins with DECOY_ (0 of 1000 records): Percolator would have"
+                        + " accession begins with DECOY_ (0 of 500 records): Percolator would have"
                         + " no negative examples; set decoy_search to 1 or 2 so that Comet makes"
                         + " decoys, or choose a FASTA whose decoys begin with DECOY_",
                 finding.message());
@@ -113,9 +113,9 @@ class FastaDecoyRulesTest {
                 "decoy_search = 1 (Comet's internal decoys, concatenated) and"
                         + " "
                         + IndexDescriptions.TARGET_DECOY
-                        + " already holds 1000 entries whose accession"
-                        + " begins with DECOY_ (1000 of 2000 records; the first is"
-                        + " DECOY_sp|A0A075B6H9|LV469_HUMAN): Comet would make decoys of those"
+                        + " already holds 500 entries whose accession"
+                        + " begins with DECOY_ (500 of 1000 records; the first is"
+                        + " DECOY_sp|P22626|ROA2_HUMAN): Comet would make decoys of those"
                         + " decoys too, so decoys would be counted twice; set decoy_search to 0 to"
                         + " use the FASTA's own decoys, or choose a FASTA of targets only",
                 finding.message());
@@ -140,9 +140,9 @@ class FastaDecoyRulesTest {
                 "decoy_search = 2 (Comet's internal decoys, reported separately) and"
                         + " "
                         + IndexDescriptions.TARGET_DECOY
-                        + " already holds 1000 entries whose accession"
-                        + " begins with DECOY_ (1000 of 2000 records; the first is"
-                        + " DECOY_sp|A0A075B6H9|LV469_HUMAN): Comet would make decoys of those"
+                        + " already holds 500 entries whose accession"
+                        + " begins with DECOY_ (500 of 1000 records; the first is"
+                        + " DECOY_sp|P22626|ROA2_HUMAN): Comet would make decoys of those"
                         + " decoys too, so decoys would be counted twice; set decoy_search to 0 to"
                         + " use the FASTA's own decoys, or choose a FASTA of targets only",
                 finding.message());
@@ -226,7 +226,7 @@ class FastaDecoyRulesTest {
     @DisplayName("a census taken for another prefix is refused, never used")
     void otherPrefix() {
         FastaDecoyCensus reversed =
-                new FastaDecoyCensus(IndexDescriptions.SUBSET, "REV_", 1000, 0, Optional.empty());
+                new FastaDecoyCensus(IndexDescriptions.SUBSET, "REV_", 500, 0, Optional.empty());
         assertEquals(
                 "the decoy census of "
                         + IndexDescriptions.SUBSET
@@ -239,7 +239,7 @@ class FastaDecoyRulesTest {
                         .getMessage());
         CometParameters rev = Models.with(NEWER, "decoy_search", "0", "decoy_prefix", "REV_");
         Finding finding = Models.only(new ValidationReport(decoyFindings(validate(rev, reversed))));
-        assertTrue(finding.message().contains("begins with REV_ (0 of 1000 records)"));
+        assertTrue(finding.message().contains("begins with REV_ (0 of 500 records)"));
         assertThrows(
                 IllegalArgumentException.class,
                 () -> validate(rev, IndexDescriptions.subsetCensus()));

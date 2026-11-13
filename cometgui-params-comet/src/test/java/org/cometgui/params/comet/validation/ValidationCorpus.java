@@ -104,13 +104,19 @@ final class ValidationCorpus {
     /** A release's control run: the lines every case of that release prints anyway. */
     record Control(ToolVersion version, List<String> lines) {}
 
-    /** The pinned local inputs a search reads (D-006: never committed). */
+    /**
+     * The pinned inputs a search reads: the spectra, local and never committed (D-006), and the
+     * database, a cut of the committed fixture FASTA -- the file, the accession list that pins it,
+     * what the list calls the records the cut is taken from, how many of them, and the cut's
+     * SHA-256.
+     */
     record Inputs(
             String spectra,
             String spectraSha256,
             String lineFeedSha256,
             String database,
-            String databaseSha256,
+            String accessions,
+            String keptAs,
             int records,
             String subsetSha256) {}
 
@@ -206,7 +212,8 @@ final class ValidationCorpus {
                 text(spectra, "sha256"),
                 text(spectra, "lineFeedSha256"),
                 text(database, "file"),
-                text(database, "sha256"),
+                text(database, "accessions"),
+                text(database, "keptAs"),
                 (int) ((JsonValue.JsonNumber) member(database, "records")).value(),
                 text(database, "subsetSha256"));
     }

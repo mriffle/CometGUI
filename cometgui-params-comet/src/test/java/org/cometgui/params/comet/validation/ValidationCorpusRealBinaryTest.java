@@ -47,6 +47,7 @@ import org.cometgui.domain.ports.RunningProcess;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.fixtures.CometManifest;
+import org.cometgui.params.comet.fixtures.FixtureFasta;
 import org.cometgui.params.comet.fixtures.UpstreamMirror;
 import org.cometgui.tools.process.ProcessService;
 import org.junit.jupiter.api.BeforeAll;
@@ -74,15 +75,14 @@ import org.junit.jupiter.params.provider.MethodSource;
  * mutant and would re-run all 86 searches for each, which times out (the params gate's control 9
  * scores a timeout as not killed).
  *
- * <p>The search reads local inputs that are never committed ({@code D-006}): the Crux K562 run
- * {@code scratch/fixture/20100614_Velos1_TaGe_SA_K562_3.mzML} and the UniProt human proteome {@code
- * scratch/fixture/UP000005640_9606.fasta}, each held to its SHA-256 here. Refill them with {@code
- * python3 scripts/feasibility/fetch_ephemeral_input.py}, which fetches by checksum. The mzML is
- * served with CRLF line endings, which break its index; the test strips them into a private copy
- * and holds the copy to its own SHA-256 too. The database is the proteome's first 1000 records,
- * written to a private copy and held to its SHA-256, so each search takes about 0.2 s; the corpus
- * scans five spectra (one case, 1500). Missing or changed inputs FAIL this test; nothing is
- * skipped.
+ * <p>The search reads one local input that is never committed ({@code D-006}): the Crux K562 run
+ * {@code scratch/fixture/20100614_Velos1_TaGe_SA_K562_3.mzML}, held to its SHA-256 here. Refill it
+ * with {@code python3 scripts/feasibility/fetch_ephemeral_input.py}, which fetches by checksum. The
+ * mzML is served with CRLF line endings, which break its index; the test strips them into a private
+ * copy and holds the copy to its own SHA-256 too. The database is the cut of the committed fixture
+ * FASTA the corpus names ({@link FixtureFasta}), written to a private copy and held to its SHA-256,
+ * so each search takes about 0.2 s; the corpus scans five spectra (one case, 1500). Missing or
+ * changed inputs FAIL this test; nothing is skipped.
  */
 @EnabledOnOs(
         value = OS.LINUX,
@@ -150,17 +150,16 @@ class ValidationCorpusRealBinaryTest {
         assertEquals(inputs.lineFeedSha256(), sha256(repaired), "the CRLF-repaired mzML");
         spectra = scratch.resolve("20100614_Velos1_TaGe_SA_K562_3.mzML");
         Files.write(spectra, repaired);
-        byte[] proteome = pinned(root, inputs.database(), inputs.databaseSha256());
-        String text = new String(proteome, StandardCharsets.ISO_8859_1);
-        int end = -1;
-        for (int record = 0; record < inputs.records(); record++) {
-            end = text.indexOf("\n>", end + 1);
-            assertTrue(end > 0, "the proteome has fewer than " + inputs.records() + " records");
-        }
-        byte[] subset = (text.substring(0, end) + "\n").getBytes(StandardCharsets.ISO_8859_1);
-        assertEquals(inputs.subsetSha256(), sha256(subset), "the proteome's first records");
         database = scratch.resolve("subset.fasta");
-        Files.write(database, subset);
+        Files.write(
+                database,
+                FixtureFasta.cut(
+                        root,
+                        inputs.database(),
+                        inputs.accessions(),
+                        inputs.keptAs(),
+                        inputs.records(),
+                        inputs.subsetSha256()));
 
         Map<ToolVersion, Path> binaries = new LinkedHashMap<>();
         for (ToolVersion release : RELEASES) {

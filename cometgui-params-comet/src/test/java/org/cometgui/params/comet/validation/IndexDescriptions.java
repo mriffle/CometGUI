@@ -39,10 +39,10 @@ import org.cometgui.domain.run.IndexMode;
  *       2026.03.0 (format 5) and 2026.02.2 (format 4) binaries, which {@code
  *       CometIndexRealBinaryTest} rebuilds and {@code CometIndexHeaderReaderTest} reads field by
  *       field;
- *   <li>the censuses are what {@code FastaDecoyScanner} counts in the {@code D-006} subset (the
- *       UniProt proteome's first 1000 records, SHA-256 {@code 5005d961...}) and in the target-decoy
- *       FASTA built from it (SHA-256 {@code ff098f19...}), as {@code CometIndexRealBinaryTest}
- *       proves.
+ *   <li>the censuses are what {@code FastaDecoyScanner} counts in the subset (the cut of the
+ *       committed fixture FASTA the validation corpus names: its first 500 records marked {@code
+ *       identified}, SHA-256 {@code c12a0261...}) and in the target-decoy FASTA built from it
+ *       (SHA-256 {@code 1030b29d...}), as {@code CometIndexRealBinaryTest} proves.
  * </ul>
  */
 final class IndexDescriptions {
@@ -58,15 +58,15 @@ final class IndexDescriptions {
 
     private IndexDescriptions() {}
 
-    /** The subset's census: 1000 records, no decoy. */
+    /** The subset's census: 500 records, no decoy. */
     static FastaDecoyCensus subsetCensus() {
-        return new FastaDecoyCensus(SUBSET, "DECOY_", 1000, 0, Optional.empty());
+        return new FastaDecoyCensus(SUBSET, "DECOY_", 500, 0, Optional.empty());
     }
 
-    /** The target-decoy FASTA's census: 2000 records, 1000 decoys. */
+    /** The target-decoy FASTA's census: 1000 records, 500 decoys. */
     static FastaDecoyCensus targetDecoyCensus() {
         return new FastaDecoyCensus(
-                TARGET_DECOY, "DECOY_", 2000, 1000, Optional.of("DECOY_sp|A0A075B6H9|LV469_HUMAN"));
+                TARGET_DECOY, "DECOY_", 1000, 500, Optional.of("DECOY_sp|P22626|ROA2_HUMAN"));
     }
 
     private static BigDecimal d(String text) {
@@ -152,7 +152,7 @@ final class IndexDescriptions {
      * @return the description
      */
     static CometIndexDescription formatFive(IndexMode mode) {
-        return description(true, mode, 0, 2, 129327, staticMods(false), plainSlots(true), 0, 5);
+        return description(true, mode, 0, 2, 89848, staticMods(false), plainSlots(true), 0, 5);
     }
 
     /**
@@ -162,7 +162,7 @@ final class IndexDescriptions {
      * @return the description
      */
     static CometIndexDescription formatFour(IndexMode mode) {
-        return description(false, mode, 0, 2, 129327, staticMods(false), plainSlots(false), 0, 5);
+        return description(false, mode, 0, 2, 89848, staticMods(false), plainSlots(false), 0, 5);
     }
 
     /** The edits of the modifications capture, as name and value text pairs. */
@@ -194,6 +194,6 @@ final class IndexDescriptions {
                         slot(newer ? "^" : "n", "42.010565", "0.000000", 1, newer, 0),
                         slot("X", "0.000000", "0.000000", 3, newer, 0));
         return description(
-                newer, IndexMode.FRAGMENT_ION, 1, 1, 81849, staticMods(true), slots, 8, 6);
+                newer, IndexMode.FRAGMENT_ION, 1, 1, 55319, staticMods(true), slots, 8, 6);
     }
 }

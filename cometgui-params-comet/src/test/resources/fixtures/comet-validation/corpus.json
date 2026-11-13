@@ -6,10 +6,11 @@
     "lineFeedSha256": "a562f6e642b2880bece3134c43aa9581124788926bd1b9305c2db0bb506954da"
   },
   "database": {
-    "file": "scratch/fixture/UP000005640_9606.fasta",
-    "sha256": "2329a517bec9bd7269f9ce3b9252d8b959ae98bc41405a945c2d6134b284d5a0",
-    "records": 1000,
-    "subsetSha256": "5005d9614b20f944915616201389cc7529d209a0f039278cae29cb356192558f"
+    "file": "fixtures/human-k562-subset/uniprot-human-2026_02-k562-subset.fasta",
+    "accessions": "fixtures/human-k562-subset/accessions.tsv",
+    "keptAs": "identified",
+    "records": 500,
+    "subsetSha256": "c12a0261c8ae410cbaf7d5060e23a53c7d9a6d7f628d28422f102a09d978088e"
   },
   "base": [
     {

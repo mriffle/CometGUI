@@ -265,9 +265,12 @@ readonly LOGS="${ROOT}/_build/param-gate-logs"
 readonly MIRROR_2026="scratch/phase05/artefacts/v2026.02.2__comet.linux.exe"
 readonly MIRROR_2024="scratch/phase06/artefacts/v2024.01.0__comet.linux.exe"
 readonly MIRROR_2026_03="scratch/phase05/artefacts/v2026.03.0__comet.linux.exe"
-# The validation corpus's real-binary test searches these (D-006, gitignored).
+# The validation corpus's real-binary test searches these: the spectra (D-006,
+# gitignored) against a cut of the committed fixture FASTA, which it holds to
+# the digest the accession list pins (Phase 16 unit 5a; corpus.json names both).
 readonly CORPUS_SPECTRA="scratch/fixture/20100614_Velos1_TaGe_SA_K562_3.mzML"
-readonly CORPUS_PROTEOME="scratch/fixture/UP000005640_9606.fasta"
+readonly CORPUS_FASTA="fixtures/human-k562-subset/uniprot-human-2026_02-k562-subset.fasta"
+readonly CORPUS_ACCESSIONS="fixtures/human-k562-subset/accessions.tsv"
 
 # The one module every control damages and runs.
 readonly MODULE="cometgui-params-comet"
@@ -1038,6 +1041,8 @@ build_sandbox() {
     [ -f "${SANDBOX}/${MIRROR_2026}" ] && [ -f "${SANDBOX}/${MIRROR_2024}" ] \
         && [ -f "${SANDBOX}/${MIRROR_2026_03}" ] && [ -f "${SANDBOX}/${CORPUS_SPECTRA}" ] \
         || harness_error "the sandbox's scratch/ symlink does not resolve to the three Comet mirrors and the corpus inputs."
+    [ -f "${SANDBOX}/${CORPUS_FASTA}" ] && [ -f "${SANDBOX}/${CORPUS_ACCESSIONS}" ] \
+        || harness_error "the sandbox does not hold the committed fixture FASTA and its accession list (${CORPUS_FASTA}, ${CORPUS_ACCESSIONS}); git archive HEAD should have carried them."
     local head dirty
     head="$(cd -- "${ROOT}" && git rev-parse --short HEAD)"
     echo "Sandbox: $(rel "${SANDBOX}") (git archive ${head}, $(find "${SANDBOX}/${MODULE}/src" -name '*.java' -type f | wc -l) java files in ${MODULE})"
@@ -2134,10 +2139,12 @@ main() {
         [ -f "${ROOT}/${mirror}" ] \
             || die "${mirror} does not exist. ${MODULE}'s real-binary tests run it and FAIL rather than skip without it, so PIT (control 9) would score a failing suite. The mirror is gitignored; refill it from the release URL and verify its SHA-256 (manifests/tools.json for 2026.03.0 and 2026.02.2; handoffs/PHASE-06-worklog.rst, unit 6, for 2024.01.0)." 3
     done
+    [ -f "${ROOT}/${CORPUS_SPECTRA}" ] \
+        || die "${CORPUS_SPECTRA} does not exist. ${MODULE}'s validation-corpus test searches it with the real Comet binaries and FAILS rather than skips without it, so control v5g and PIT (control 9) could not run. The input is gitignored (D-006); refill it with python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches by checksum." 3
     local input
-    for input in "${CORPUS_SPECTRA}" "${CORPUS_PROTEOME}"; do
+    for input in "${CORPUS_FASTA}" "${CORPUS_ACCESSIONS}"; do
         [ -f "${ROOT}/${input}" ] \
-            || die "${input} does not exist. ${MODULE}'s validation-corpus test searches it with the real Comet binaries and FAILS rather than skips without it, so control v5g and PIT (control 9) could not run. The inputs are gitignored (D-006); refill them with python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches by checksum." 3
+            || die "${input} does not exist. It is a committed file: ${MODULE}'s validation-corpus test searches a cut of the fixture FASTA with the real Comet binaries, holds the file to the digest the accession list pins, and FAILS rather than skips without either, so control v5g and PIT (control 9) could not run. Restore it from git." 3
     done
 
     local -a selected=()

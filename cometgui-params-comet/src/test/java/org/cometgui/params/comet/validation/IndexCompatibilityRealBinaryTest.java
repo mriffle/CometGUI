@@ -50,6 +50,7 @@ import org.cometgui.domain.ports.RunningProcess;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.domain.tools.ToolVersion;
 import org.cometgui.params.comet.fixtures.CometManifest;
+import org.cometgui.params.comet.fixtures.FixtureFasta;
 import org.cometgui.params.comet.fixtures.UpstreamMirror;
 import org.cometgui.provenance.json.JsonReader;
 import org.cometgui.provenance.json.JsonValue;
@@ -90,10 +91,10 @@ import org.junit.jupiter.params.provider.MethodSource;
  * module</strong>: parameter files are plain text edits of the release's real {@code -q} fixture
  * ({@link ValidationCorpus#file}), and the metadata is read with the provenance module's JSON
  * reader, so PIT never maps a validator mutant to these searches. Inputs, never committed ({@code
- * D-006}), each held to its SHA-256, FAIL the test when missing: the K562 run (an LF copy), the
- * proteome's first 1000 records, and a target-decoy FASTA built here from them. Each index is built
- * as the workflow builds one, with {@code -D} naming a symbolic link inside the index's own
- * directory; Comet's threads are bounded ({@code num_threads = 4}).
+ * D-006}), each held to its SHA-256, FAIL the test when missing: the K562 run (an LF copy), the cut
+ * of the committed fixture FASTA the corpus names, and a target-decoy FASTA built here from it.
+ * Each index is built as the workflow builds one, with {@code -D} naming a symbolic link inside the
+ * index's own directory; Comet's threads are bounded ({@code num_threads = 4}).
  */
 @EnabledOnOs(
         value = OS.LINUX,
@@ -109,7 +110,7 @@ class IndexCompatibilityRealBinaryTest {
 
     /** The subset with a reversed DECOY_ record after each record, 60 residues a line. */
     static final String TARGET_DECOY_SHA256 =
-            "ff098f19bba637aa33a736a01ad59cf35911292c9fb7598324ed02a7d5b07a99";
+            "1030b29dd80c3d6248fba69cf05509aece28cde0da3a695bb0bc5e5480df3d77";
 
     /** The scans searched: enough for 495 PSMs from a peptide index. */
     private static final String SCANS = "11000 11300";
@@ -188,7 +189,8 @@ class IndexCompatibilityRealBinaryTest {
     static byte[] withReversedDecoys(byte[] fasta) {
         String text = new String(fasta, StandardCharsets.ISO_8859_1);
         StringBuilder out = new StringBuilder();
-        for (String chunk : text.split(">", -1)) {
+        // A record begins where a line begins with '>': a '>' inside a header does not.
+        for (String chunk : ("\n" + text).split("\n>", -1)) {
             if (chunk.isEmpty()) {
                 continue;
             }
@@ -225,17 +227,14 @@ class IndexCompatibilityRealBinaryTest {
         assertEquals(inputs.lineFeedSha256(), sha256(repaired), "the CRLF-repaired mzML");
         Path spectra = scratch.resolve("20100614_Velos1_TaGe_SA_K562_3.mzML");
         Files.write(spectra, repaired);
-        String proteome =
-                new String(
-                        pinned(root, inputs.database(), inputs.databaseSha256()),
-                        StandardCharsets.ISO_8859_1);
-        int end = -1;
-        for (int record = 0; record < inputs.records(); record++) {
-            end = proteome.indexOf("\n>", end + 1);
-        }
         byte[] subsetBytes =
-                (proteome.substring(0, end) + "\n").getBytes(StandardCharsets.ISO_8859_1);
-        assertEquals(inputs.subsetSha256(), sha256(subsetBytes), "the proteome's first records");
+                FixtureFasta.cut(
+                        root,
+                        inputs.database(),
+                        inputs.accessions(),
+                        inputs.keptAs(),
+                        inputs.records(),
+                        inputs.subsetSha256());
         Path subset = scratch.resolve("subset.fasta");
         Files.write(subset, subsetBytes);
         byte[] decoyBytes = withReversedDecoys(subsetBytes);

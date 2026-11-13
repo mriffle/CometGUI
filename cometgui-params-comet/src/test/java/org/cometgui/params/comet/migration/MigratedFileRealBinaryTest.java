@@ -44,6 +44,7 @@ import org.cometgui.domain.ports.RunningProcess;
 import org.cometgui.domain.ports.ToolCommand;
 import org.cometgui.params.comet.fixtures.CometFixtures;
 import org.cometgui.params.comet.fixtures.CometManifest;
+import org.cometgui.params.comet.fixtures.FixtureFasta;
 import org.cometgui.params.comet.fixtures.UpstreamMirror;
 import org.cometgui.provenance.json.JsonReader;
 import org.cometgui.provenance.json.JsonValue;
@@ -78,11 +79,11 @@ import org.junit.jupiter.params.provider.MethodSource;
  *       it. The file is run exactly as written.
  *   <li><strong>A real short search</strong>: {@code comet -P<file> -N<out> <spectra>}, with five
  *       explicit text edits: four of the validation corpus's base edits -- {@code database_name}
- *       the first 1000 records of the UniProt human proteome, {@code spectral_library_name} empty,
- *       {@code scan_range = 11188 11192} and {@code num_threads = 4} -- and {@code output_txtfile =
- *       1}, so that the results can be compared with the control's. Every migrated file holds
- *       {@code /some/path/db.fasta}, the placeholder Comet's own {@code -q} writes and migration
- *       carries; the one migrated from 2026.02.2's {@code -q} also carries its {@code
+ *       the cut of the committed fixture FASTA the corpus names, {@code spectral_library_name}
+ *       empty, {@code scan_range = 11188 11192} and {@code num_threads = 4} -- and {@code
+ *       output_txtfile = 1}, so that the results can be compared with the control's. Every migrated
+ *       file holds {@code /some/path/db.fasta}, the placeholder Comet's own {@code -q} writes and
+ *       migration carries; the one migrated from 2026.02.2's {@code -q} also carries its {@code
  *       spectral_library_name = /some/path/speclib.file}, while the others, whose source has no
  *       such line, hold it empty, CometGUI's starting value (D-012). A search with either
  *       placeholder stops before it starts. Choosing the database and the library is the workflow's
@@ -94,10 +95,11 @@ import org.junit.jupiter.params.provider.MethodSource;
  * index_search_type = 1}, must add exactly Comet 2026.03.0's "is ignored" warning: what migration
  * spared every search.
  *
- * <p>The spectra and the proteome are local inputs that are never committed ({@code D-006}), read
- * from {@code scratch/fixture/} and held to the SHA-256s the validation corpus records; refill them
- * with {@code python3 scripts/feasibility/fetch_ephemeral_input.py}. Missing or changed inputs FAIL
- * this test; nothing is skipped.
+ * <p>The spectra are a local input that is never committed ({@code D-006}), read from {@code
+ * scratch/fixture/} and held to the SHA-256s the validation corpus records; refill them with {@code
+ * python3 scripts/feasibility/fetch_ephemeral_input.py}. The database is cut from the committed
+ * fixture FASTA ({@link FixtureFasta}). Missing or changed inputs FAIL this test; nothing is
+ * skipped.
  */
 @EnabledOnOs(
         value = OS.LINUX,
@@ -207,18 +209,16 @@ class MigratedFileRealBinaryTest {
         spectra = scratch.resolve("20100614_Velos1_TaGe_SA_K562_3.mzML");
         Files.write(spectra, repaired);
         JsonValue.JsonObject db = object(corpus, "database");
-        byte[] proteome = pinned(root, text(db, "file"), text(db, "sha256"));
-        String all = new String(proteome, StandardCharsets.ISO_8859_1);
-        int records = (int) ((JsonValue.JsonNumber) db.member("records").orElseThrow()).value();
-        int end = -1;
-        for (int record = 0; record < records; record++) {
-            end = all.indexOf("\n>", end + 1);
-            assertTrue(end > 0, "the proteome has fewer than " + records + " records");
-        }
-        byte[] subset = (all.substring(0, end) + "\n").getBytes(StandardCharsets.ISO_8859_1);
-        assertEquals(text(db, "subsetSha256"), sha256(subset), "the proteome's first records");
         database = scratch.resolve("subset.fasta");
-        Files.write(database, subset);
+        Files.write(
+                database,
+                FixtureFasta.cut(
+                        root,
+                        text(db, "file"),
+                        text(db, "accessions"),
+                        text(db, "keptAs"),
+                        (int) ((JsonValue.JsonNumber) db.member("records").orElseThrow()).value(),
+                        text(db, "subsetSha256")));
 
         CometManifest.Row row =
                 CometManifest.cometRows(CometManifest.repositoryManifest()).stream()

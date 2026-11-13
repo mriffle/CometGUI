@@ -147,7 +147,7 @@ class PreRunFactValuesTest {
                     OptionalInt.of(2),
                     OptionalInt.of(2),
                     Optional.of(false),
-                    129327,
+                    89848,
                     statics,
                     slots,
                     false,
