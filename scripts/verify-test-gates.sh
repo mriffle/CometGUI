@@ -655,6 +655,20 @@ build_sandbox() {
     # than one that passes for the wrong reason.
     cp -r "${ROOT}/manifests" "${SANDBOX}/manifests"
 
+    # fixtures/ is here by the same rule: the build reads it as INPUT.  Since
+    # Phase 16 unit 5a the real-binary tests of cometgui-tools and
+    # cometgui-params-comet search a cut of the committed fixture FASTA,
+    # fixtures/human-k562-subset/, hold the file to the digest its accession
+    # list pins, and fail rather than skip without it -- so without this
+    # directory every sandbox build would die in those tests, and the controls
+    # that need a build would be red for that reason rather than their own.
+    # Copied, not symlinked: it is 2.6 MB, and nothing a test does there may
+    # reach the working tree.
+    cp -r "${ROOT}/fixtures" "${SANDBOX}/fixtures"
+    cmp -s "${ROOT}/fixtures/human-k562-subset/accessions.tsv" \
+        "${SANDBOX}/fixtures/human-k562-subset/accessions.tsv" \
+        || die "HARNESS ERROR: fixtures/ was not copied into the sandbox."
+
     local module
     for module in "${ROOT}"/cometgui-*/; do
         module="$(basename -- "${module}")"
@@ -1741,12 +1755,15 @@ preflight() {
     # rather than skip without it -- so the sandbox build would die there too.
     [ -d "${ROOT}/scratch/phase06/artefacts" ] \
         || die "scratch/phase06/artefacts does not exist. cometgui-params-comet's migration tests run the real Comet 2024.01.0 binary from there and fail rather than skip without it, so the sandbox build would die before any control ran. The mirror is gitignored; refill it as docs/developer/comet_parameter_schema.rst (The migration fixture: Comet 2024.01.0) describes, checking the SHA-256 pinned in MigrationFixtures.ROW."
-    # And for the local spectra and FASTA (D-006: never committed): the
-    # validation corpus's real-binary test (ValidationCorpusRealBinaryTest,
-    # Comet 2026.03.0 intake unit 4) searches them with both Comet releases and
-    # fails rather than skips without them.
+    # And for the local spectra (D-006: never committed): the validation
+    # corpus's real-binary test (ValidationCorpusRealBinaryTest, Comet 2026.03.0
+    # intake unit 4) searches them with both Comet releases and fails rather
+    # than skips without them.  Its database is a cut of the committed fixture
+    # FASTA since Phase 16 unit 5a (fixtures/, copied into the sandbox); the
+    # workflow's and the application's real-binary tests still cut the whole
+    # proteome from scratch/fixture until the rest of that unit lands.
     [ -d "${ROOT}/scratch/fixture" ] \
-        || die "scratch/fixture does not exist. cometgui-params-comet's validation-corpus test searches the Crux K562 mzML and the UniProt human proteome from there with the real Comet binaries and fails rather than skip without them, so the sandbox build would die before any control ran. The inputs are gitignored (D-006); refill them with python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches by checksum, as docs/developer/comet_parameter_schema.rst (Validation agreed with the real binaries) describes."
+        || die "scratch/fixture does not exist. cometgui-params-comet's validation-corpus test searches the Crux K562 mzML from there with the real Comet binaries, and the workflow's and the application's real-binary tests read the spectra and the UniProt human proteome from there, and they fail rather than skip without them, so the sandbox build would die before any control ran. The inputs are gitignored (D-006); refill them with python3 scripts/feasibility/fetch_ephemeral_input.py, which fetches by checksum, as docs/developer/comet_parameter_schema.rst (Validation agreed with the real binaries) describes."
     # Phase 10's large results fixture (P10-2): LargeFixture and the results
     # suites in cometgui-results, cometgui-ui and cometgui-app read it and fail
     # rather than skip when it is missing or changed -- so the sandbox build
