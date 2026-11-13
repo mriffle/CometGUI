@@ -2516,7 +2516,7 @@ Known instances, and their state
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Every test called flaky, intermittent or timing-dependent in ``STATUS.rst``
-and ``handoffs/`` up to 2026-11-07:
+and ``handoffs/`` up to 2026-11-13:
 
 .. list-table::
    :header-rows: 1
@@ -2582,6 +2582,13 @@ and ``handoffs/`` up to 2026-11-07:
        the precondition is asserted, and is red on the old launch with a
        Comet in the folder ("builds the application found installed ==>
        expected: <[]> but was: <[CometGUI-managed: installed]>").
+   * - ``NetworkUnavailableUiTest.theNetworkBack`` (``e2e`` control 4)
+     - Phase 16 unit 3b's sign-off (one ``e2e`` run in five)
+     - The product. The end of an install disabled the Cancel that held the
+       focus; at the next pulse JavaFX moved the focus to the next build's
+       Install and the list scrolled to it, away from the Install the test
+       had just aimed at.
+     - Fixed in the product (Phase 16 unit 4c), below.
 
 None is quarantined.
 
@@ -2709,6 +2716,95 @@ What was checked:
 
 No grader reads a result that may have been overwritten; nothing needed
 repair.
+
+.. _dev-install-end-moved-the-list:
+
+The end of an install moved the Tool Manager's list (Phase 16, unit 4c)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``NetworkUnavailableUiTest.theNetworkBack`` was red in one run in five of the
+``e2e`` control at ``0b18c18``: "waited PT2M for tool-row-percolator-3_07_1-1
+to be read again as installed, with its installed path, observing 3915 times;
+the last value observed was: CometGUI-managed: not installed \|". Comet's
+Install, pressed one line earlier, had worked. Percolator's was pressed and no
+install started.
+
+*The cause is in the product.* A Tool Manager row disables the action that can
+no longer be taken, and the action that was pressed holds the keyboard focus:
+Install, then -- once the row says "installing" -- Cancel. When the install
+ends, Cancel is disabled. JavaFX does not move the focus off a disabled control
+at once: the scene marks its focus dirty and **at the next pulse** moves it to
+the next control in traversal order -- the next build's Install -- and that
+traversal makes the scroll pane the rows are in scroll the control into view.
+The test read "installed" on Comet's row; the driver scrolled to Percolator's
+Install and aimed (it applies CSS and layout before it aims, and nothing can
+apply a focus move that is still pending); the pulse then ran, the list
+scrolled back to Comet 2026.02.2's Install, and the pointer arrived on a
+label. A user who scrolls to a second build while the first one downloads
+loses the same press, with the whole download as the window instead of one
+frame.
+
+*Reproduced on purpose.* A scratch copy of the test's first two steps logged,
+from the application thread, every text change, focus change, movement of
+Percolator's Install and mouse event. With the pulse slowed to 4 Hz
+(``-Djavafx.animation.pulse=4``: the window between the row's text and the
+pulse is 250 ms, not 16) the unchanged class was red 4 runs of 5, each with
+both of the gate's failures in the gate's own words, and the copy 10 of 10,
+each with this sequence: Comet's row says installed; the driver scrolls and
+aims (Percolator's Install at y 380); ``FOCUS`` Comet's Cancel, nothing,
+Comet 2026.02.2's Install; Percolator's Install at y 846; ``MOUSE_PRESSED``
+picks a label; no ``ACTION``. At the ordinary 60 Hz the class was green 60
+runs of 60 (20 unconfined, 20 on two cores, 20 on four; load average 8 to 20)
+and the copy red 3 runs of 240 on two and on four cores, each with the same
+sequence (a fourth red was the copy's own 10 s bound on a slow Percolator
+probe). The other candidates were excluded: the rows are kept, not rebuilt
+(``setAll`` with the same nodes detaches none of them, read in
+``Parent``'s source); ``ToolManagerViewModel.install`` refuses nothing, and
+no ``ACTION`` reached it; a stale listing is dropped by its refresh number
+and the terminal report's read would correct it; and unit 4's failure record
+is Comet's, read for a build that is neither installed nor being installed.
+
+*Fixed* in ``ToolManagerPane``. Before a row disables an action that holds the
+scene's focus it hands the focus on inside the row with ``requestFocus()``,
+which traverses nothing and so scrolls nothing: to the row's other action where
+that can now be taken (Cancel when an install starts, Install when one fails
+or is cancelled), otherwise to the row's state label. The pulse then finds a
+focus owner that can have the focus and moves nothing. ``ResultsPane``'s paging
+row has done the same since Phase 10. No test was changed.
+``ToolManagerRowFocusTest`` (cometgui-ui) pins it with no robot and no clock --
+a shown window, a scripted port applied in the task that reports, and the
+scene's own post-layout pulse listener awaited: on the old pane 6 run, 5
+failed, among them "the list was not scrolled: it is at the offset, in pixels,
+the user left it at ==> expected: <511.0> but was: <0.0>" and "its Install
+moved down by what the finished row above it grew by, and by nothing else ==>
+expected: <18.0> but was: <529.0>".
+
+*What is left.* A row whose state changes still grows or shrinks by the lines
+its own labels add or remove (18 px when a build gains its installed path),
+and the rows below it move by that much in the same layout pass. That is not
+a scroll, the driver lays the scene out before it aims, and the test above
+asserts the movement is exactly that and no more.
+
+*Who else pressed a second Install after a first.*
+``InstallReachesTheSectionsUiTest`` and ``CanonicalScenario`` (both Tier A
+and both Tier B scenarios: Percolator, then Comet) do exactly what
+``NetworkUnavailableUiTest`` does, and were exposed in the same way: on the
+old pane at 4 Hz ``InstallReachesTheSectionsUiTest`` was red 2 runs of 5 with
+the same words. Their waits "for the Install control to be shown and enabled"
+before the click were added when this symptom showed as TestFX's "no nodes
+were visible"; the condition held throughout, so the waits never were what
+kept those tests green. ``ToolManagerInstallUiTest`` and
+``TierBLocaleControlTest`` press one Install with the pointer and were not
+exposed (3 of 3 at 4 Hz on the old pane). All are safe on the fixed pane for
+one reason: the end of an install leaves no focus move pending.
+
+*Evidence on the fixed pane.* At 4 Hz: ``NetworkUnavailableUiTest`` green 5
+runs of 5, ``InstallReachesTheSectionsUiTest`` 5 of 5,
+``ToolManagerInstallUiTest`` 3 of 3, and the copy 10 of 10 -- its log shows
+the focus going from Comet's Cancel to Comet's state label in the task that
+sets the text, and Percolator's Install not moving again before the press. At
+60 Hz ``NetworkUnavailableUiTest`` green 30 runs in a row unconfined and 15
+in a row under ``taskset -c 0-1`` (load average 3 to 16).
 
 
 Falsifiability
