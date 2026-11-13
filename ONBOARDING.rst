@@ -345,6 +345,45 @@ For the main orchestrator
    the evidence you saw; file any new decisions; commit with the phase ID in
    the subject.
 
+.. _onboarding-pickup:
+
+If a phase is already in progress when your session starts
+----------------------------------------------------------
+
+Sessions end without warning: a server restart, a lost login, an exhausted
+context. **No agent survives the end of the session that started it.** A
+phase that ``STATUS.rst`` shows ``IN PROGRESS`` has, at the start of a new
+session, no orchestrator and no unit agent, whatever the records say was
+running. Nothing resumes itself.
+
+#. **Find out where it really stopped, from the evidence and not from the
+   last sentence anyone wrote.** In this order: ``git status --short``
+   (uncommitted work); ``git log --oneline origin/main..HEAD``; the unit
+   table and the last entries of ``handoffs/PHASE-nn-worklog.rst``; the block
+   at the head of ``handoffs/PHASE-nn-handoff.rst``; ``ps`` for a build or
+   gate run that outlived its agent; and any ``INJECTION-IN-PROGRESS.txt``
+   under ``_build/``.
+#. **Do not discard uncommitted work, and do not commit it blind.** It is
+   either a dead agent's unfinished unit or an injection that was never
+   restored. An injection is a small deliberate breakage of production code
+   with no test beside it, and its marker file or the work log names it;
+   restore that with ``git checkout -- FILE`` and say that you did. Anything
+   else is left for the next phase orchestrator to judge against the unit's
+   acceptance conditions.
+#. **Tell the owner what you found, plainly, before doing anything to the
+   phase** -- and if ``STATUS.rst`` records that the owner paused it, do not
+   resume until the owner says so.
+#. **To resume, dispatch one fresh phase orchestrator** from the phase's
+   brief (``handoffs/PHASE-nn-BRIEF.rst``), its work log and its handoff. It
+   keeps the unit numbers and the accepted units, and its first job is the
+   unit that was interrupted: finish it or redo it, then sign it off in the
+   normal way. A unit a dead orchestrator had not signed off is not accepted,
+   however complete its commits look.
+#. **Record the interruption** in ``STATUS.rst`` and commit.
+
+``STATUS.rst`` carries the particulars for the phase in hand, where there
+are any (for Phase 16: :ref:`status-p16-pickup`).
+
 For the phase orchestrator
 --------------------------
 
@@ -398,6 +437,43 @@ writes ``DECISIONS.rst``, and only the owner closes a ``D-`` item.
 An agent inventing an answer to a ``D-`` item (adding a licence, picking a
 public dataset, pointing a test at a real server) is a serious error, not a
 shortcut.
+
+.. _onboarding-owner:
+
+Working with the owner
+======================
+
+The owner is a mass-spectrometry scientist, not a software engineer, and is
+the only person who answers a ``D-`` item. These are standing instructions
+the owner has given tier 1. They are written here because a fresh session
+has no other way to learn them.
+
+* **Explain plainly first.** Lead with what happened in plain English and
+  the one thing, if any, the owner needs to do or decide. Scientific detail
+  is welcome; build-engineering detail goes second or not at all.
+* **One phase at a time, and units one at a time** (2026-08-31;
+  :ref:`onboarding-no-parallel-phases`).
+* **No gratuitous full builds** (said three times: 2026-09-17, 2026-09-18,
+  2026-10-01). ``scripts/build.sh`` and the full
+  ``scripts/verify-all-gates.sh`` take about four hours together and run
+  **once per phase, at its exit gate, by tier 1**. Everything else uses
+  ``scripts/dev-verify.sh``, one module's ``verify`` and
+  ``verify-all-gates.sh --only NAME``. Put this in every brief, verbatim.
+* **On a red check in approved work, fix the root cause and continue;
+  report afterwards** (2026-10-01). Never by weakening the check.
+* **Watch long runs, cheaply.** Run them detached (``setsid nohup``), wake on
+  the first failure and not only on completion, with one waiting loop and no
+  duplicate watchers (2026-10-23).
+* **CI runners have two to four cores** (2026-11-05). Anything concurrent
+  falls back to serial at four cores or fewer.
+* **A phase orchestrator that ends its turn "waiting" may never wake.** If
+  one goes quiet, check ``git log``, ``ps`` and the agent list, and resume it
+  with a message rather than starting a second one.
+* **When the owner says pause, the unit in progress is finished and signed
+  off, a pause handoff is written, and nothing new starts.** Tier 1 records
+  the pause and pushes ``main``; it runs no sign-off and no full build.
+* **Do not assume what comes next.** Signing off the last phase is not an
+  instruction to release anything. Ask.
 
 Working conventions
 ===================

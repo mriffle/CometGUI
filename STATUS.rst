@@ -3,31 +3,29 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-11-12
+:Updated: 2026-11-13
 :Updated by: Main orchestrator, session 12 (**``D-016``, ``D-017`` and
    ``D-006``'s CI fixture decided; a trimmed-FASTA step added to Phase 16;
    ``D-018`` decided; Thermo RAW files found and ``D-019`` decided; **Phase
    16 dispatched, paused by the owner after its second unit, and resumed
-   the same day; ``D-020`` raised and decided, option A**)
+   the same day; ``D-020`` raised and decided, option A**; 2026-11-13: **a
+   second pause ordered, to take effect after unit 5a, and a server restart
+   expected** -- a fresh session starts at :ref:`status-p16-pickup`)
 :Current phase: **Phase 16 (documentation and release qualification), IN
-   PROGRESS.** Dispatched 2026-11-12, paused by the owner the same day after
-   unit 2 of 16, and **resumed by the owner** (*"Resume phase 16"*). A second
-   phase orchestrator runs from ``handoffs/PHASE-16-BRIEF.rst`` (its *Resume*
-   section) and the pause record ``handoffs/PHASE-16-handoff.rst``; it is the
-   only agent live in the tree. Units 1 (the Windows RAW trial) and 2 (the
-   trimmed FASTA and its acceptance check) are accepted by the first
-   orchestrator; no exit-gate item is met and the phase is not signed off.
-   **Before the resume tier 1 ran the trimmed FASTA's acceptance check and
-   its self-test itself and confirmed the proposed floors** (change log).
-   **``D-020`` is DECIDED, option A** (owner, 2026-11-12: *"yes, it is
-   acceptable"*): with the trimmed FASTA, Percolator warns that its negative
-   samples are too few on one-result-per-spectrum runs, and the fixture
-   stands as it is; the check reports the warning and does not grade it. The
-   units that waited on it (5, 7, part of 10) may run, and the orchestrator
-   has been told. **No ``D-`` item is open.** ``main`` is pushed with this
-   recorded. The
-   phase may push branches named ``phase16/...`` for runner evidence, and
-   nothing else; one exists, ``phase16/raw-trial-1``.
+   PROGRESS, with a pause ordered by the owner to take effect when unit 5a is
+   finished** (2026-11-13: *"When 5a finishes, I want a pause."*). The owner
+   also expects to restart the server, which ends every agent. **If you are
+   reading this at the start of a session, no agent is running, whatever
+   this says was; go to** :ref:`status-p16-pickup` **and do not resume the
+   phase until the owner says so.** As of 2026-11-13 23:50 UTC: units 1, 2,
+   3, 3b, 4 and 4c are accepted by the phase orchestrators; unit 5a (the
+   first of five parts of the switch to the trimmed FASTA) has four commits
+   and its verification was running, **not yet accepted**; 5b to 5e and 6 to
+   16 have not started. No exit-gate item is met and the phase is not signed
+   off. **No ``D-`` item is open** (``D-020`` decided, option A, 2026-11-12).
+   ``main`` is pushed with all of this. The phase may push branches named
+   ``phase16/...`` for runner evidence, and nothing else; one exists,
+   ``phase16/raw-trial-1``.
 :Overall: Sixteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03,
    04, 05, 08, 09, 10, 11, 12, 13, 14 and 15 PARTIAL -- plus the Comet
    2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every
@@ -66,6 +64,149 @@ Project Status
 This file is the **only** authoritative record of where the project is. Update
 it at every gate, every decision and every milestone. If it disagrees with
 anything else, fix it here first.
+
+.. _status-p16-pickup:
+
+Picking up Phase 16 in a fresh session (written 2026-11-13)
+===========================================================
+
+**Read this before anything below it.** It is written for a main
+orchestrator who starts with nothing but the repository. The general
+procedure is ``ONBOARDING.rst``, *If a phase is already in progress when
+your session starts*; the owner's standing instructions are its *Working
+with the owner*. This section holds what is particular to now.
+
+What was true when this was written
+-----------------------------------
+
+2026-11-13, 23:50 UTC. The owner had ordered a pause to take effect when
+unit 5a finished, and then said the server was likely to be restarted and
+the phase must be able to be picked up by a fresh session.
+
+* **Accepted by the phase orchestrators** (tier 2; tier 1 has not signed the
+  phase off): unit 1, the Windows RAW trial; 2, the trimmed FASTA; 3 and 4,
+  Phase 15's residue; 3b, PSM identifiers without the run's path; 4c, a lost
+  Install press.
+* **In progress, not accepted:** unit 5a -- the tests that searched the
+  proteome's first 1,000 records now search a cut of the committed FASTA.
+  Four commits, ``e88e440`` to ``581a659``; its gate verification was
+  running, with logs under ``_build/p16u5a/``.
+* **Not started:** 5b to 5e (the cancelling tests; Phase 00's search
+  outputs; the goldens and the named fixture; the remainder), 6 (``D-016``,
+  ``D-017``), 7 (the fixture in CI), 8 to 10 (launcher, packaging, three
+  runners), 11 (the RAW smoke test through the product), 12 to 16 (the
+  documentation, the licence audit, the UX preparation, traceability). The
+  work log has each unit's acceptance conditions.
+* **Tier 1 itself has verified only this much:** the trimmed FASTA's
+  acceptance check and self-test (run 2026-11-12, floors confirmed), and
+  that runner run ``43150059739`` completed successfully. It has **not**
+  re-read that run's counts, read any unit's diff, or run a full build.
+
+Which of three states you are in
+--------------------------------
+
+Run these, from the repository root, before believing anything above::
+
+    git status --short
+    git log --oneline origin/main..HEAD
+    git log --oneline -15
+    ps -eo pid,etime,args | grep -E 'mvn|verify-all|build\.sh|dev-verify' | grep -v grep
+    ls _build/p16-orch/INJECTION-IN-PROGRESS.txt _build/p16u*/INJECTION-IN-PROGRESS.txt
+    git worktree list
+
+then read the head of ``handoffs/PHASE-16-handoff.rst`` and the unit table
+of ``handoffs/PHASE-16-worklog.rst``.
+
+A. **The pause completed.** The handoff's head says the phase is paused
+   after unit 5a, the work log's row for 5a says *Accepted*, and the tree is
+   clean. Nothing is owed to the phase. If the change log below has no entry
+   for that pause, write one, run ``scripts/ci/docs-build.sh``, commit, and
+   push ``main`` if ``origin/main`` is behind. Then wait for the owner.
+B. **The restart came first, and the tree is clean.** 5a's row does not say
+   *Accepted*. Its commits may be complete; its sign-off is not. Nothing is
+   owed until the owner resumes; then 5a's sign-off is the new orchestrator's
+   first job.
+C. **The restart came first, and there are uncommitted changes.** Follow
+   ``ONBOARDING.rst``: restore a named injection, leave everything else in
+   place for the new orchestrator, and tell it exactly what you found.
+
+In every case: **tell the owner, in plain words, which state you found, and
+do not resume until the owner says to.** The owner's instruction was a pause
+after 5a, so finishing an interrupted 5a also waits for the owner's word.
+
+How to resume when the owner says so
+------------------------------------
+
+Dispatch **one** fresh phase orchestrator, as a background general-purpose
+agent, with a short message that points at ``handoffs/PHASE-16-BRIEF.rst``
+and tells it that the sections *Resume* and *For any later orchestrator*
+are addressed to it. The brief is the whole of its instructions. The
+message repeats only what has gone wrong before:
+
+* the build economy, passed verbatim to every unit agent;
+* one unit agent at a time;
+* never end its turn while its own agent or check is running; a foreground
+  command is moved to the background after about three minutes;
+* it alone may push, and only branches named ``phase16/...``; never
+  ``main``; the credential is never printed or stored;
+* it does not edit ``STATUS.rst``, ``DECISIONS.rst``, ``phases/``,
+  ``ONBOARDING.rst``, ``CLAUDE.md`` or the brief, answers no ``D-`` item,
+  names no copyright holder, fabricates no UX finding, weakens no gate;
+* explicit pathspecs, and the commit trailer the session requires;
+* what you found in the tree, exactly.
+
+Then record the resume here and in the change log, run the documentation
+build, commit, and push ``main``.
+
+What the resume depends on that is not in git
+---------------------------------------------
+
+All of it is on this machine's disk under ignored directories and should
+survive a restart; check that it did.
+
+* ``tools/`` and ``.venv`` -- the toolchain (``. tools/env.sh``).
+* ``_build/m2repo`` -- Maven's repository; the phase's checks run offline.
+* ``scratch/fixture/`` -- the two K562 mzML files and the whole proteome.
+  The spectra are refetched by checksum if lost (``D-006``); the proteome is
+  needed only to prove the committed FASTA can be rebuilt.
+* ``scratch/phase05/artefacts``, ``scratch/phase06/artefacts``,
+  ``scratch/percolator/3.09``, ``scratch/scientific-path``,
+  ``scratch/limelight-upload-spike/artefacts`` -- as the Phase 14 and 15
+  handoffs list them.
+* **Pushing** uses a credential the session's environment supplies to git;
+  no credential is stored in the repository or its configuration. If a
+  fresh session cannot push, say so to the owner; do not look for one.
+  ``gh`` is not installed. The repository is public, so a runner run's
+  status can be read from ``api.github.com`` without a credential.
+* One stale ``git worktree`` entry points into a temporary directory of an
+  old session (``windows-percolator-verification``, marked prunable). It is
+  harmless; leave it unless it is in the way.
+
+What tier 1 owes when the phase reports finished
+------------------------------------------------
+
+Read the diffs. Run ``scripts/build.sh`` and ``scripts/verify-all-gates.sh``
+once, detached, watching for the first failure. Make your own injections
+into production code. Re-read every runner run the phase relies on, from
+GitHub and not from the work log. Grade each of the nine gate items in
+``phases/PHASE-16-release.rst``. The expected grade is PARTIAL, because the
+items below are not an agent's to complete.
+
+What only the owner can do, and has been told
+---------------------------------------------
+
+* The six UX-validation activities (``AC-UX-01``..``06``), with real
+  participants. The phase prepares the materials.
+* A person's install on a real Mac and a real Windows machine.
+* The licence audit's sign-off (``AC-REL-03``), once it is compiled.
+* Connecting the repository to a Read the Docs project.
+* ``D-009``: whose name is on the copyright line, and whether the University
+  of Washington has a claim. Asked on 2026-11-12; **not yet answered**, and
+  needed before any release.
+* ``D-011`` option D is the owner's own action.
+
+**The owner has given no instruction about what follows Phase 16's
+sign-off.** Ask; do not assume a release.
 
 Where we are
 ============
@@ -346,7 +487,10 @@ Phase board
        complete. Paused by the owner 2026-11-12 after unit 2 of 16, at
        ``0659194``, and **resumed by the owner the same day** with a second
        orchestrator. No gate item met yet. ``D-020`` decided (A) the same
-       day; nothing is held back.
+       day; nothing is held back. **2026-11-13:** units 1, 2, 3, 3b, 4 and
+       4c accepted by tier 2; 5a in progress; **a pause ordered to take
+       effect after 5a**, and a server restart expected
+       (:ref:`status-p16-pickup`).
 
 Status values are ``NOT STARTED``, ``IN PROGRESS``, ``PARTIAL`` (with the
 residue named), ``BLOCKED`` (with the decision or dependency named), or
@@ -4866,6 +5010,28 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-11-13
+     - 16
+     - **A second pause ordered, and the records made fit for a fresh
+       session.** The owner: *"When 5a finishes, I want a pause"*, then:
+       *"I'm likely to restart this server, so phase 16 will need to be able
+       to be picked up by a fresh session."* Relayed to the orchestrator:
+       finish and sign off 5a, write a pause handoff, start nothing else;
+       and, against a restart before that, checkpoint the work log, keep a
+       true block at the head of the handoff, and mark any injection in
+       progress with a file under ``_build/``. **State at 23:50 UTC:** units
+       1, 2, 3, 3b, 4 and 4c accepted by tier 2 (3b: PSM identifiers no
+       longer carry the run's path; 4c: a lost Install press, fixed in the
+       product); unit 5 split into 5a to 5e (``P16-8``); 5a has four commits
+       and is under verification, not accepted. Earlier that day an API
+       login failure on the host ended the orchestrator and its unit agent
+       mid-unit-3b; tier 1 resumed it by message once the owner had logged
+       in, and it finished 3b. **Written for the fresh session:**
+       :ref:`status-p16-pickup` above; ``ONBOARDING.rst``, *If a phase is
+       already in progress when your session starts* and *Working with the
+       owner*; the brief's *For any later orchestrator*. ``main`` pushed,
+       which publishes 5a's commits before their sign-off; this entry is
+       the mark that they are not accepted.
    * - 2026-11-12
      - 16
      - **``D-020`` decided, option A.** The owner: *"re: D-020: yes, it is

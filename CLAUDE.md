@@ -3,6 +3,12 @@
 **Read `ONBOARDING.rst` first, then `STATUS.rst`.** Do not start work from this
 file — it exists only because the coding harness reads it.
 
+**If `STATUS.rst` shows a phase IN PROGRESS when your session starts, no agent
+is running it** — sessions end without warning. Read "If a phase is already in
+progress when your session starts" and "Working with the owner" in
+`ONBOARDING.rst`, then the pickup section at the top of `STATUS.rst`, before
+touching anything. Do not resume a paused phase until the owner says so.
+
 - `ONBOARDING.rst` — what the project is, how phases are run, what finished means
 - `STATUS.rst` — authoritative current state; update at every gate
 - `DECISIONS.rst` — `D-001`..`D-020`; an agent must never answer these alone

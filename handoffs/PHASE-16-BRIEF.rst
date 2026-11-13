@@ -368,3 +368,51 @@ The owner may pause again
 If tier 1 relays a pause, finish the unit in progress, sign it off, commit,
 write a pause handoff as your predecessor did, push nothing more, and
 report.
+
+.. _p16b-later:
+
+For any later orchestrator -- written 2026-11-13
+================================================
+
+The owner may pause this phase, and the server it runs on may be restarted,
+at any time. If you are the third orchestrator or a later one, this section
+is addressed to you. Everything above still binds you, including the
+*Resume* section, which was written for your predecessor and whose rulings
+(the floors, the four rulings on unit 5, the documents placed in units, the
+practical notes, the pushing rule) are unchanged. ``D-020`` is decided: the
+detour it describes no longer applies, and the order is the work log's.
+
+#. **Read** the brief's *Read first* list, then
+   ``handoffs/PHASE-16-worklog.rst`` in full, the head of
+   ``handoffs/PHASE-16-handoff.rst``, and ``docs/developer/test_fixtures.rst``.
+   The work log is yours: continue it, keep its unit numbers (1, 2, 3, 3b, 4,
+   4c, 5a to 5e, 6 to 16, and any added since) and its design decisions
+   unless you record why one changes.
+#. **Units your predecessors accepted stay accepted.** You do not redo them.
+#. **A unit that was in progress when the last session ended is not
+   accepted**, however complete its commits look. It is your first job.
+   Establish what exists: its commits against its acceptance conditions, any
+   uncommitted change in the tree (tier 1 will have told you what it found
+   and left), any ``INJECTION-IN-PROGRESS.txt`` under ``_build/``, and any
+   check logs and exit files your predecessor left under ``_build/p16-orch/``
+   and ``_build/p16u<N>/`` -- a log without its exit file is a run that was
+   killed, not a result. Then finish the unit with one fresh agent told
+   exactly what exists and what remains, and sign it off in the normal way,
+   running the checks yourself.
+#. **Keep the state durable as you go**, because you may be ended the same
+   way:
+
+   * commit the work log whenever what you know changes materially, not only
+     at unit boundaries;
+   * keep a short dated block at the head of
+     ``handoffs/PHASE-16-handoff.rst`` that is true now: units accepted, the
+     unit in progress and its state, the first thing a successor should do;
+   * before altering a tracked file for an injection, write
+     ``_build/p16-orch/INJECTION-IN-PROGRESS.txt`` naming the file, the
+     SHA-256 of its original and what you changed; delete it when the file is
+     restored and verified. Unit agents do the same under
+     ``_build/p16u<N>/``;
+   * every unit brief you give holds nothing the work log does not.
+
+#. **If tier 1 relays a pause**: finish the unit in progress, sign it off,
+   commit, write the pause handoff, push nothing more, and report.
