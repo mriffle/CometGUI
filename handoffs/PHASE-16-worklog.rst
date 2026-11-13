@@ -96,6 +96,144 @@ before any of it is dispatched; the split is recorded here first.
 verbatim between two rules, and the standing rules -- and its own brief,
 ``scratch/p16/orch/briefs/u<N>.txt``. Both are kept on disk for tier 1.
 
+Current state -- a checkpoint kept true (last written 2026-11-13 23:55)
+=======================================================================
+
+Tier 1 relayed two things on 2026-11-13: **the owner pauses the phase when
+unit 5a is finished** (*"When 5a finishes, I want a pause."*), and the
+server may be restarted before then, ending every agent without warning.
+This section is what a fresh session needs; it is rewritten whenever it
+stops being true.
+
+**Accepted:** units 1, 2, 3, 3b, 4, 4c. Each has its sign-off below.
+
+**In progress: unit 5a** (the seams and the first-1,000-records tests onto
+the committed FASTA), one agent, dispatched at ``aa83b65``, brief
+``scratch/p16/orch/briefs/u5a.txt``. **Not accepted.** At 23:47 its agent
+had made four commits and had not reported:
+
+* ``e88e440`` -- ``cometgui-tools``' real-binary tests search a cut of the
+  committed FASTA; index headers and counts taken again;
+* ``6a2f7fc`` -- the validation corpus searches a cut of it; the 42
+  verdicts run again on both Comet releases;
+* ``1984599`` -- the ``tests`` gate's sandbox carries ``fixtures/``;
+* ``581a659`` -- the record in ``docs/developer/test_fixtures.rst``.
+
+It was then running its own gate run (``--only
+params,tests,workflow,percolator,provenanceui,pdv,limelight,results,shell,paramui,e2e,hardening,docs,...``;
+log ``_build/p16u5a/gates.log``; its reactor log is
+``_build/p16u5a/reactor.log`` with ``reactor.exit``). ``tests`` alone
+takes about 90 minutes. **None of my own sign-off checks for 5a has run.**
+Whether the workflow and app seams (``RealComet``, ``RealSearch``) are
+moved is not yet known to me: read the agent's commits against the 5a row
+of *The split of unit 5* before believing the unit complete.
+
+**If you are a fresh session:** check ``git status`` and
+``_build/p16-orch/INJECTION-IN-PROGRESS.txt`` and
+``_build/p16u*/INJECTION-IN-PROGRESS.txt`` first (an injection left in a
+tracked file is restored from ``git`` before anything else). Then establish
+what 5a's agent left: its commits, anything uncommitted, its logs. Finish
+5a with one fresh agent if it is short, sign it off (reactor ``verify``;
+your own injections; every ``--only`` control whose harness reads what it
+changed, ``e2e`` and the section harnesses among them), and **stop: the
+owner's pause holds after 5a.** Write the pause handoff. Start nothing
+else until tier 1 relays a resume.
+
+**Not started:** 5b, 5c, 5d, 5e, 6 to 16.
+
+**Pushed by this phase:** one branch, ``phase16/raw-trial-1``, by the first
+orchestrator. I have pushed nothing. No runner run is in flight.
+
+How the remaining units are briefed (what the briefs hold beyond the rows)
+--------------------------------------------------------------------------
+
+Every unit agent is given ``scratch/p16/orch/unit-standing.txt`` and one
+brief. Those files are on disk, not in git; if they are gone, this is their
+substance.
+
+*The standing text:* tier 1's *Build economy* section verbatim; one agent,
+one unit, no sub-agents; scratch under ``scratch/p16/u<N>/``, logs under
+``_build/p16u<N>/``, nothing written under ``scratch/`` while a gate run is
+live; long commands detached with an exit file and never a turn ended while
+one runs; never ``-rf`` on a reactor; the end-to-end classes are opt-in, so
+a change to the interface, the engine or what a run writes is checked with
+``--only e2e`` and every section harness whatever the scripts name; a fix
+ships with a test seen red on the old production code, restored with
+``sha256sum -c``; no golden, pinned digest or count moves unless the brief
+names it; nothing weakened, skipped, retried or quarantined; no push;
+explicit pathspecs and the two trailer lines; a clean tree at the report.
+**To add at the next dispatch (tier 1, 2026-11-13):** before altering a
+tracked file for an injection an agent writes
+``_build/p16u<N>/INJECTION-IN-PROGRESS.txt`` (file, SHA-256 of the original,
+one line on the change) and deletes it once the file is restored and
+verified; and it commits at every milestone so a restart costs minutes.
+
+*Lessons that go into every brief from here:* harness controls anchor on
+exact production lines, so a refactor that strands one is repaired in the
+agent's own code where possible (unit 4c) and never by lowering a floor; a
+timing-graded red is reproduced before it is believed or dismissed; the
+host's load is stated with every timing.
+
+*5b (the cancel tests):* drafted, ``scratch/p16/orch/briefs/u5b.txt``. Beyond
+the split's row: the window is measured from the moment the test's trigger
+is observable to Comet's own exit when not cancelled, five runs or more per
+candidate, unconfined and under ``taskset -c 0-1``; each test must fail,
+not pass, if Comet had already finished when the cancel arrived; each moved
+test green ten times running and five times on two cores; ``proteome()``
+itself goes when its last user does; the ``hardening`` control that injects
+"no polite stop" must still go red.
+
+*5c (Phase 00's outputs):* drafted, ``_build/p16-orch/briefs/u5c.txt``.
+Beyond the row: the old outputs are renamed once to
+``scratch/scientific-path.whole-proteome/`` and kept until the unit is
+accepted; the script changes only as far as its input requires and each
+change is listed; one table of every count with the product reader's figure
+and an independent count; the tests that do not run without the directory
+are found by running the modules with it moved aside; ``--only tests`` is
+not run again here unless a value it quotes moved.
+
+*5d (the fixture, goldens, baseline):* not drafted. Beyond the row:
+``docs/developer/test_fixtures.rst`` still says ``D-020`` is put to tier 1
+and is corrected here (the owner accepted the warning, option A); the
+``gui-heap-peak`` threshold's rationale still cites the creep unit 3 fixed
+and is retaken with the baseline; the review record of each new golden
+explains every difference from the old one.
+
+*5e (the words and the proof):* not drafted. Beyond the row:
+``testing.rst`` states the ``D-020`` warning plainly; the dated 2026-11-06
+digests in its prose are of the earlier compared form (unit 3b's note).
+
+*6 (D-016 B, D-017 A):* drafted, ``scratch/p16/orch/briefs/u6.txt``. Beyond
+the row: the class list (every command builder and every stage-invalidation
+class under ``org.cometgui.workflow``, with near misses and why) is checked
+against ``R-TEST-02`` and not narrowed to make the cost come out; the PIT
+wall clock is measured before any POM is committed, on this host and as a
+2- or 4-core runner would see it, and above about fifteen minutes nothing
+of ``D-016`` is committed; every undetected mutant in the new packages is
+audited by name into ``testing.rst``; ``/tmp/cometgui-*-probe-*`` is counted
+before and after the PIT run; a step that throws an ``Error`` was seen once
+to leave the engine waiting until ``await`` timed out (unit 3b) and is
+looked at here; the one ``--only tests`` run, detached.
+
+*7 to 16:* as their rows state, with these additions found so far -- unit 9
+examines the two bare ``ATOMIC_MOVE`` writes (``ToolCache.writeMarker``,
+``LimelightConverter``) and unit 4's replace-on-write on the Windows and
+macOS runners; unit 12 corrects ``PreRunChecks``' "Comet runs in the run
+directory", states the ``D-020`` warning for users, and what bounds a
+run's paths now that ``-N`` is bare; unit 13 rewords ``CONTRIBUTING.rst``
+(the single-page check, *Before you report a unit done*); unit 15's
+keyboard checklist names the focus that rests on a row's state label with
+no ring after an install (unit 4c) and audits controls disabled while
+focused; unit 16 fixes ``dev-verify.sh`` (a changed gate script mapped to
+``verify-shell-gates.sh``; its closing text under ``--verify``) with a test
+of the mapping, and ``testing.rst``'s "Limelight enabled".
+
+*For tier 1, so far:* ``STATUS.rst``'s Phase 15 residue line on
+``KeyboardOnlyNavigationUiTest`` was a prediction, not what happens; the
+Limelight XML's ``conversion_program arguments`` carries absolute paths; the
+specification has no ``R-INS`` rule though documents cite one; the
+determinism grader's tie key was repaired (P16-10, ``0b18c18``).
+
 Design decisions (orchestrator's, recorded before dispatch)
 ===========================================================
 
