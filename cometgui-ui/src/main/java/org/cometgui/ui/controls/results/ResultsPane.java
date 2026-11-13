@@ -34,6 +34,8 @@ import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
+import javafx.event.EventTarget;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -396,21 +398,6 @@ public final class ResultsPane extends ScrollPane {
                                 showRuns();
                             }
                         });
-        run.setCellFactory(
-                list -> {
-                    ListCell<ResultsRun> cell =
-                            new ListCell<>() {
-                                @Override
-                                protected void updateItem(ResultsRun item, boolean empty) {
-                                    super.updateItem(item, empty);
-                                    setText(empty || item == null ? null : item.label());
-                                }
-                            };
-                    cell.addEventFilter(
-                            MouseEvent.MOUSE_PRESSED,
-                            pressed -> committingRunChoice = !cell.isEmpty());
-                    return cell;
-                });
         run.valueProperty()
                 .addListener(
                         (observable, before, after) -> {
@@ -450,22 +437,37 @@ public final class ResultsPane extends ScrollPane {
     }
 
     /**
-     * Watches the chooser's list for the keys that make a choice. While the list is open the
-     * toolkit hands every key to the list first, and the list closes itself on Enter and Space
-     * before the chooser is told, so the keys are seen here or not at all.
+     * Watches the chooser's list for what makes a choice. While the list is open the toolkit hands
+     * every key to the list first, and the list closes itself on Enter and Space before the chooser
+     * is told, so the keys are seen here or not at all; and a mouse press in the list is a choice
+     * when it is on a run, not on the empty space below the last one or on the scroll bar. The
+     * press is watched on the list, not in its cells: the chooser keeps the toolkit's own cells, so
+     * what it shows for a run is its converter's text and nothing else.
      */
     private void watchRunList(Skin<?> skin) {
         if (skin instanceof ComboBoxListViewSkin<?> listSkin) {
-            listSkin.getPopupContent()
-                    .addEventFilter(
-                            KeyEvent.KEY_PRESSED,
-                            pressed -> {
-                                KeyCode code = pressed.getCode();
-                                if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
-                                    committingRunChoice = true;
-                                }
-                            });
+            Node list = listSkin.getPopupContent();
+            list.addEventFilter(
+                    KeyEvent.KEY_PRESSED,
+                    pressed -> {
+                        KeyCode code = pressed.getCode();
+                        if (code == KeyCode.ENTER || code == KeyCode.SPACE) {
+                            committingRunChoice = true;
+                        }
+                    });
+            list.addEventFilter(
+                    MouseEvent.MOUSE_PRESSED,
+                    pressed -> committingRunChoice = onARun(pressed.getTarget()));
         }
+    }
+
+    /** Whether what the pointer pressed is a cell of the list that holds a run, or inside one. */
+    private static boolean onARun(EventTarget pressed) {
+        Node node = pressed instanceof Node target ? target : null;
+        while (node != null && !(node instanceof ListCell<?>)) {
+            node = node.getParent();
+        }
+        return node instanceof ListCell<?> cell && !cell.isEmpty();
     }
 
     /** Opens the run the chooser shows, if it is not the one already open. */

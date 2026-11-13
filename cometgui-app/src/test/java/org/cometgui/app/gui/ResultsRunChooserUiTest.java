@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,6 +73,12 @@ import org.junit.jupiter.api.io.TempDir;
  * two ways a walk is abandoned: a click somewhere else in the window, and the keyboard focus
  * leaving the chooser. Each closes the list, opens nothing and puts the chooser back on the open
  * run, as Escape does.
+ *
+ * <p>The last test holds the chooser to what the end-to-end scenarios need of it: their driver
+ * ({@link FxUiDriver#selectedTextOf} and {@link FxUiDriver#itemsOf}) reads a combo box through its
+ * converter and refuses one that has a cell factory of its own, because such a box can show
+ * something else. The chooser has none, and the test proves the reading against the cells
+ * themselves: the text of the cell in the closed chooser and of every cell in its open list.
  *
  * <p>The application is the real one, launched with its real composition root over a project of
  * four constructed runs. Every time the Results section starts opening a run it says so in its
@@ -431,5 +438,58 @@ class ResultsRunChooserUiTest {
                 () -> assertEquals(open, showing(), "the open run is unchanged"),
                 () -> assertEquals(open, chooserShows(), "the chooser is back on it"),
                 () -> assertEquals(List.of(), listenerFailures, "listener failures"));
+    }
+
+    /** The text of every cell under a node that holds an item, in the order they are laid out. */
+    private static List<String> cellTexts(Node within) {
+        List<ListCell<?>> cells = new ArrayList<>();
+        for (Node node : within.lookupAll(".list-cell")) {
+            if (node instanceof ListCell<?> cell && !cell.isEmpty()) {
+                cells.add(cell);
+            }
+        }
+        cells.sort(Comparator.comparingInt(ListCell::getIndex));
+        List<String> texts = new ArrayList<>();
+        for (ListCell<?> cell : cells) {
+            texts.add(cell.getText());
+        }
+        return texts;
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("the scenarios' driver reads the chooser, and reads what its cells really show")
+    void theDriverReadsWhatTheCellsShow() {
+        String open = showing();
+        List<String> offered = driver.itemsOf("results-run");
+        String shown = driver.selectedTextOf("results-run");
+        ComboBox<?> chooser = (ComboBox<?>) driver.node("results-run");
+        List<String> closedCell = driver.callOnFxThread(() -> cellTexts(chooser));
+
+        driver.clickOn("results-run");
+        assertTrue(listIsOpen(), "a click on the chooser opens its list");
+        List<String> listCells =
+                driver.callOnFxThread(
+                        () ->
+                                cellTexts(
+                                        ((ComboBoxListViewSkin<?>) chooser.getSkin())
+                                                .getPopupContent()));
+        driver.press(KeyCode.ESCAPE);
+
+        List<String> runs = new ArrayList<>();
+        for (String item : offered) {
+            runs.add(item.substring(0, item.indexOf(" -- ")));
+        }
+        assertAll(
+                () -> assertEquals(RUNS, runs, "the runs the driver says the chooser offers"),
+                () -> assertEquals(listCells, offered, "as the cells of the open list show them"),
+                () ->
+                        assertTrue(
+                                shown.startsWith(open + " -- "), () -> "the driver reads " + shown),
+                () ->
+                        assertEquals(
+                                List.of(shown), closedCell, "as the closed chooser's cell shows"),
+                () -> assertFalse(listIsOpen(), "the list is closed again"),
+                () -> assertEquals(open, showing(), "the open run is unchanged"));
     }
 }
