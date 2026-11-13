@@ -348,21 +348,9 @@ public final class ToolManagerPane extends VBox {
             showOptional(failure, row.failureText());
             showOptional(installedPath, row.installedPathText());
             showOptional(progress, row.progressText());
-            boolean canInstall = row.canInstall();
-            boolean canCancel = row.canCancel();
-            Node keep = focusAfter(canInstall, canCancel);
-            // enable first, so that the focus can move to an enabled action before one is disabled
-            if (canInstall) {
-                install.setDisable(false);
-            }
-            if (canCancel) {
-                cancel.setDisable(false);
-            }
-            if (keep != null) {
-                keep.requestFocus();
-            }
-            install.setDisable(!canInstall);
-            cancel.setDisable(!canCancel);
+            handTheFocusOn();
+            install.setDisable(!row.canInstall());
+            cancel.setDisable(!row.canCancel());
         }
 
         /*
@@ -387,15 +375,29 @@ public final class ToolManagerPane extends VBox {
          * (the user went to another program while a download ran) has no focused node, but its
          * scene keeps its focus owner and JavaFX moves that just the same.
          */
-        private Node focusAfter(boolean canInstall, boolean canCancel) {
+        private void handTheFocusOn() {
             Node owner = getScene() == null ? null : getScene().getFocusOwner();
-            if (owner == install && !canInstall) {
-                return canCancel ? cancel : state;
+            if (owner == install && !row.canInstall()) {
+                focusOn(row.canCancel() ? cancel : null);
+            } else if (owner == cancel && !row.canCancel()) {
+                focusOn(row.canInstall() ? install : null);
             }
-            if (owner == cancel && !canCancel) {
-                return canInstall ? install : state;
+        }
+
+        /**
+         * Gives the focus to one of this row's actions, or to its state.
+         *
+         * @param action the action that can now be taken, which is enabled first because a disabled
+         *     control cannot be given the focus; or {@code null} where neither can, and the focus
+         *     goes to the state label
+         */
+        private void focusOn(Button action) {
+            if (action == null) {
+                state.requestFocus();
+                return;
             }
-            return null;
+            action.setDisable(false);
+            action.requestFocus();
         }
 
         /**
