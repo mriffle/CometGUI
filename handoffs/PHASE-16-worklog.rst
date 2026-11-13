@@ -333,7 +333,16 @@ Work units
        seven "run's own directory" fields removed; the matrix green against
        the unchanged goldens.
      - Brief obligation 12; ``R-CMT-03``, ``R-CMT-04``, ``R-PROC-04``
-     - dispatched 2026-11-13 at the commit that records unit 4
+     - **Accepted 2026-11-13** at ``0b18c18``. See *Unit 3b* below.
+   * - 4c
+     - **An Install that is pressed and never starts.** One ``e2e`` run in
+       five was red in ``NetworkUnavailableUiTest.theNetworkBack`` (found at
+       unit 3b's sign-off). Reproduced on purpose; the mechanism named;
+       fixed at its cause -- the product if a user's press can be lost, the
+       test's wait if not; never a retry, a longer bound or a quarantine;
+       the class green 30 times running and 15 times on two cores.
+     - Gate 7; the flakiness policy; ``R-TOOL-04``
+     - dispatched 2026-11-13 at the commit that records unit 3b
    * - 4
      - **Residue B, install and tools.** The probe's message for a non-zero
        exit carries the status; a failed install's reason survives a restart;
@@ -925,6 +934,128 @@ new test is not red on the old line here. It goes to the runner units (9,
   as open; ``handoffs/PHASE-14-worklog.rst`` line 82 names the removed
   ``launchedByMain`` (history, left); the specification has no ``R-INS``
   rule although documents cite one.
+
+Unit 3b -- PSM identifiers without the absolute run path (accepted 2026-11-13)
+------------------------------------------------------------------------------
+
+One fresh agent, one round. Commits ``631e0fe`` (the readers), ``68b74d7``
+(the command, its tests, the harness's controls 1a, 1b and 2, the stand-in
+Comets) and ``0b18c18`` (the tolerance, the grader, the pages); 49 files,
++1817 -307. Brief ``scratch/p16/orch/briefs/u3b.txt``.
+
+**What was built.** ``CometSearchCommands`` gives Comet ``-N<base>`` and
+runs it in ``<run>/outputs/comet``; ``R-CMT-03``, ``R-CMT-04`` and
+``R-PROC-04`` hold as written (``-N`` still names a path inside the run
+directory, the working directory is explicit and inside it), so no
+amendment is asked for. Every identifier of a new run -- a PIN's SpecId,
+Percolator's PSMId and ``psm_id``, an exported table -- is
+``<base>_<scan>_<charge>_<rank>``. ``RunLayout.psmIdBases`` gives the readers
+both the bare base and the absolute one, so **a run made before the change
+still opens, maps to its source files, shows in PDV and converts**;
+``PoutForConverter``'s copy is still made for such a run and not for a new
+one.
+
+**The determinism tolerance** (P16-9). The seven "run's own directory"
+fields are gone from ``scripts/matrix/determinism-data.json`` and from the
+table in ``testing.rst``; nothing was added to either.
+
+**A grader defect came out with it, and the agent repaired the grader**
+(decision **P16-10**, mine, on reading the diff). With bare identifiers the
+suite went red on one tied pair of peptides in ``pout.xml``.
+``determinism.py``'s ``pout_key`` takes a scan from an element's first
+identifier to decide whether two rows are a tie; while every identifier
+began with a path it never found one, so a tie was judged on scores and
+mass alone, and once it could find one it took, for a ``<peptide>``, the
+scan of whichever PSM came first in the text. The repair takes a peptide's
+scan from the PSM among its own that carries its score and mass. That is
+**stricter** than what was graded before -- two rows of different scans are
+no longer a tie -- and it is the rule the page already states. Five new
+self-test cases; with no scan in the key, two of them come back "only tie
+order" where they must be DIFFERS. I accept it: it is a repair to a check
+that could not see what it claimed to compare, in the allowed direction,
+and nothing was tolerated to make a run green. **Tier 1 should read this
+one** (``git show 0b18c18 -- scripts/matrix/determinism.py``).
+
+**What I ran and saw**, at ``0b18c18``.
+
+* ``bash scripts/dev-verify.sh --since b31a49b --verify``: BUILD SUCCESS in
+  47 min 39 s; domain 1239, provenance 709, process 286, results 1312, tools
+  1151, install 1090, params-comet 2123, params-percolator 68, workflow
+  1051, ui 843, app 601 (91 opt-in skipped), archtests 40; 0 failures, 0
+  errors.
+* **Injection I**, into ``RunLayout.psmIdBases`` (production): only the bare
+  base returned, so an earlier run's identifiers are not recognised (anchor
+  gone, ``sha256sum -c`` FAILED). Red in four modules: ``RunLayoutTest`` 1
+  of 19, ``PdvMzTabsTest`` 9 of 12, ``PsmFiguresTest`` 8 of 11,
+  ``PdvMzTabsFidelityTest`` 1 of 2, ``RealIdentifiersTest`` 1 of 7,
+  ``ProjectResultsPortTest`` 3 of 10, ``ResultsAccessibilityUiTest`` 1 of 4.
+  Restored, OK.
+* **Injection II**, into ``CometSearchCommands``: Comet run in the run's
+  root again with the bare ``-N``, so its files land in the wrong place.
+  ``CometSearchCommandsTest`` 3 of 12, ``RealCometRunTest`` 7 of 7,
+  ``RealIdentifiersTest`` 7 of 7 red. Restored, OK.
+* **Injection G**, into ``scripts/matrix/determinism.py``: the tie key's
+  scan made empty, which is what the grader effectively had before.
+  ``determinism.py --self-test``: exit 7, 2 of 28 FAILED -- "two peptides
+  ... of different scans, swapped ... -> DIFFERS -- only tie order" and the
+  same for two PSMs. Restored, OK; 28 of 28 again.
+* ``bash scripts/verify-all-gates.sh --only
+  workflow,percolator,results,pdv,limelight,provenanceui,e2e,shell,paramui,hardening,traceability,docs,flakiness,quality``:
+  **13 passed, 1 FAILED, 3138 s** -- workflow 110, percolator 109, results
+  100, pdv 107, limelight 130, provenanceui 96, shell 30, paramui 87,
+  hardening 35, quality 42, flakiness 44, traceability 8, docs 1, each at
+  its floor; **e2e 48 of 50**. The red is not this unit's code: in control
+  4's failure-path suite ``NetworkUnavailableUiTest.theNetworkBack`` waited
+  two minutes for Percolator's row to say installed and it said "not
+  installed" throughout, as if the Install control was pressed and no
+  attempt began; Comet's install, one line earlier in the same test, had
+  worked. The test's network is a loopback server. **Rerun by me,**
+  ``--only e2e``: **50 of 50 in 1348 s.** The same control was 50 of 50 at
+  ``a502515`` (the agent's run and mine) and at ``0b18c18`` in the agent's
+  run. One red in five runs: an intermittent failure in a release-critical
+  test, which the flakiness policy calls a defect. It is not waved through
+  and not blamed on the unit: **unit 4c** (below) reproduces and fixes it
+  before 5a starts. The red run's logs are kept in
+  ``_build/p16-orch/u3b/e2e-red.log`` and ``e2e-gate-logs-red/``.
+* The version matrix over the present fixture: RUN-PASSED 11, RUN-FAILED 0,
+  UNAVAILABLE 14, UNVERIFIED 36, GREEN against the unchanged goldens. The
+  determinism suite (``--part determinism``): exit 0, GREEN, "every repeat
+  and variation agrees within the documented tolerance; every control
+  differs".
+* Not repeated: the agent's PIT figures (``domain.run`` 77 of 77,
+  ``results.parser`` 43 of 43, ``tools.comet`` 45 of 45, ``tools.pdv`` 256
+  of 264, no survivor); unit 6's ``--only tests`` grades them again.
+
+**Cost.** ``RealIdentifiersTest`` about 32 s; ``PdvMzTabsFidelityTest``
+about 3 s more.
+
+**Carried, and where.**
+
+* The Limelight XML's ``conversion_program arguments`` still holds absolute
+  paths: for tier 1, as recorded under unit 3.
+* ``PreRunChecks`` still says "Comet runs in the run directory" (it runs in
+  ``outputs/comet`` inside it): unit 12, with the user pages.
+* The agent saw, once, from its own test helper, a step that throws an
+  ``Error`` leave the engine waiting until ``await`` timed out (318 s). Not
+  investigated. Unit 6 looks at it, since it adds mutation testing over the
+  engine's neighbours and a mutant that throws an ``Error`` would hang the
+  same way.
+* Comet's 511-byte limit no longer bounds a run's output base, only
+  ``-P``: the Phase 14 unit 8a finding is partly out of date; unit 12's
+  troubleshooting page states what is true now.
+
+The outage (2026-11-13)
+-----------------------
+
+Between about 09:50 and 17:58 this orchestrator was stopped by an
+authentication failure on the host, relayed by tier 1 on resuming it. Unit
+3b's agent had already finished and reported (its last commit, ``0b18c18``,
+is its finished state: verified above, not assumed). What the outage
+interrupted was my own gate run for unit 3b, which ran on detached and
+ended at 10:16 with the result above. On resuming I checked: the tree
+clean at ``0b18c18``; no Maven, gate or tool process alive; every file I
+had injected into equal to ``HEAD`` (``git status`` empty). Nothing was
+lost.
 
 Runner runs relied on
 =====================
