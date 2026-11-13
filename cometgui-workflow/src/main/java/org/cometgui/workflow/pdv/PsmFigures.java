@@ -49,8 +49,10 @@ import org.cometgui.tools.pdv.SpectrumFileFormat;
  * <ol>
  *   <li>The PSM's identifier gives its {@code -N} base, scan and charge ({@link
  *       SpectrumReference}); one that does not is refused.
- *   <li>The base is the one the run gave Comet for exactly one of its spectrum files ({@code
- *       outputs/comet/<base>} of the searched run); the pepXML is {@code <base>.pep.xml} beside it.
+ *   <li>The base is the one the run gave Comet for exactly one of its spectrum files, in either
+ *       form a run's identifiers have had ({@link RunLayout#psmIdBases}: the bare base, or {@code
+ *       outputs/comet/<base>} of the searched run as an absolute path); the pepXML is {@code
+ *       outputs/comet/<base>.pep.xml} of the searched run.
  *   <li>The spectrum file is checked against the installed PDV version <strong>before anything is
  *       launched</strong> ({@link PdvSpectrumSupport#check}): an unsupported file is refused with
  *       that class's specified error.
@@ -182,10 +184,7 @@ public final class PsmFigures {
     private static SpectrumInput inputOf(PsmFigureRequest request, SpectrumReference reference)
             throws SpectrumNotDrawnException {
         for (SpectrumInput input : request.identity().spectra()) {
-            if (request.searched()
-                    .cometOutputBase(input.base())
-                    .toString()
-                    .equals(reference.base())) {
+            if (request.searched().psmIdBases(input.base()).contains(reference.base())) {
                 return input;
             }
         }

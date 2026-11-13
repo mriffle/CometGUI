@@ -159,7 +159,7 @@ class PdvMzTabExporterRealTest {
                                 List.of("ms_run-1.mgf", "ms_run-2.mgf", "psms.mztab"),
                                 fileNames(export.directory())),
                 () -> assertEquals(1, export.mgfs().get(0).msRun()),
-                () -> assertEquals(BASE_4, export.mgfs().get(1).source().psmIdBase()));
+                () -> assertEquals(List.of(BASE_4), export.mgfs().get(1).source().psmIdBases()));
     }
 
     private static long countRows(Path table, String base) throws IOException {

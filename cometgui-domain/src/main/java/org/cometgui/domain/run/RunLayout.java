@@ -318,7 +318,8 @@ public record RunLayout(Path root) {
     }
 
     /**
-     * What Comet's {@code -N} names for one input: the output path without a suffix.
+     * What Comet's {@code -N} names for one input: the output path without a suffix. Comet is given
+     * the bare base and run in {@link #cometOutputDirectory()}, so this is the path that names.
      *
      * @param base the input's base name from {@link OutputBaseNames}
      * @return {@code outputs/comet/<base>}
@@ -329,6 +330,27 @@ public record RunLayout(Path root) {
     public Path cometOutputBase(String base) {
         OutputBaseNames.requireSafe(base);
         return cometOutputDirectory().resolve(base);
+    }
+
+    /**
+     * The bases a {@code PSMId} of one input may begin with, in the two forms a run's identifiers
+     * have had.
+     *
+     * <p>Comet writes its {@code -N} value at the start of every PIN row's {@code SpecId}, and
+     * Percolator carries that into every {@code PSMId}. A run is searched with {@code -N<base>} in
+     * {@code outputs/comet/}, so its identifiers begin with the bare base. A run made before that
+     * (Phase 16, unit 3b) was searched with {@code -N<run>/outputs/comet/<base>}, so its
+     * identifiers begin with that absolute path, and it is still read. A base holds no path
+     * separator, so the two forms are never equal, and no base of one form is another input's base
+     * in the other.
+     *
+     * @param base the input's base name from {@link OutputBaseNames}
+     * @return the bare base, then {@link #cometOutputBase(String)} as text
+     * @throws NullPointerException if {@code base} is {@code null}
+     * @throws IllegalArgumentException as {@link #cometOutputBase(String)}
+     */
+    public List<String> psmIdBases(String base) {
+        return List.of(OutputBaseNames.requireSafe(base), cometOutputBase(base).toString());
     }
 
     /**

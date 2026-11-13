@@ -248,6 +248,38 @@ class RunLayoutTest {
     }
 
     @Test
+    @DisplayName(
+            "a PSMId of an input begins with its bare base, or -- in a run made before Comet was"
+                    + " given the bare base -- with the output base's absolute path: both, in that"
+                    + " order, and nothing else")
+    void psmIdBases() {
+        String r = "data/MyProject/runs/20260828T231500Z-run-0001/";
+        assertAll(
+                () ->
+                        assertEquals(
+                                List.of("k562_3", absolute(r + "outputs/comet/k562_3").toString()),
+                                RUN.psmIdBases("k562_3")),
+                () ->
+                        assertEquals(
+                                List.of(
+                                        "k 562_3 b",
+                                        absolute(r + "outputs/comet/k 562_3 b").toString()),
+                                RUN.psmIdBases("k 562_3 b")),
+                () ->
+                        assertEquals(
+                                "\"a/b\" cannot be an output base name: would contain a path"
+                                        + " separator, and so escape outputs/comet",
+                                assertThrows(
+                                                IllegalArgumentException.class,
+                                                () -> RUN.psmIdBases("a/b"))
+                                        .getMessage()),
+                () ->
+                        assertThrows(
+                                NullPointerException.class,
+                                () -> RUN.psmIdBases(Nulls.of(String.class))));
+    }
+
+    @Test
     @DisplayName("an output base that would leave outputs/comet is refused for every output path")
     void escapeRefused() {
         assertAll(

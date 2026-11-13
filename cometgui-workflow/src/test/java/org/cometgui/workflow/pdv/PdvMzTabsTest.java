@@ -417,6 +417,33 @@ class PdvMzTabsTest {
 
     @Test
     @DisplayName(
+            "rows named by the bare base -- what Comet writes now that it is given -N<base> -- are"
+                    + " exported, with each PSMId as Percolator wrote it and no path in it")
+    void bareBases() throws IOException {
+        String base = identity.spectra().get(0).base();
+        targets(base + "_101_2_1\t2.5\t0.001\t0.01\tR.PEPTIDEK.A\tsp|P1|ONE");
+        decoys(base + "_101_2_2\t-1.5\t0.9\t0.01\tK.KEDITPEP.-\tsp|P1|ONE");
+
+        PdvMzTab mzTab = mzTabs().prepare(run, identity, run, PDV);
+
+        List<String> ids = new ArrayList<>();
+        for (String line : Files.readAllLines(mzTab.mzTab(), StandardCharsets.UTF_8)) {
+            if (line.startsWith("PSM\t")) {
+                int column =
+                        org.cometgui.tools.pdv.PdvMzTabExporter.COLUMNS.indexOf(
+                                        org.cometgui.tools.pdv.PdvMzTabExporter.PSM_ID_COLUMN)
+                                + 1;
+                ids.add(line.split("\t", -1)[column]);
+            }
+        }
+        assertAll(
+                () -> assertEquals(2, mzTab.psms()),
+                () -> assertEquals(List.of(base + "_101_2_1", base + "_101_2_2"), ids),
+                () -> assertFalse(base.contains("/"), base));
+    }
+
+    @Test
+    @DisplayName(
             "a refused export leaves nothing, not even the earlier export, and records nothing")
     void refusedExport() throws IOException {
         mzTabs().prepare(run, identity, run, PDV);

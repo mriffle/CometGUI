@@ -53,9 +53,11 @@ public record PdvMzTabRequest(
         }
         Set<String> bases = new HashSet<>();
         for (PdvMzTabSource source : sources) {
-            if (!bases.add(source.psmIdBase())) {
-                throw new IllegalArgumentException(
-                        "two sources share the PSMId base \"" + source.psmIdBase() + "\"");
+            for (String base : source.psmIdBases()) {
+                if (!bases.add(base)) {
+                    throw new IllegalArgumentException(
+                            "two sources share the PSMId base \"" + base + "\"");
+                }
             }
         }
         if (directory.toAbsolutePath().getParent() == null) {

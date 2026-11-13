@@ -44,18 +44,23 @@ import org.cometgui.provenance.hashing.StreamingHashService;
 import org.cometgui.results.filtering.store.TableKind;
 import org.cometgui.tools.pdv.PdvSpectrumSupport;
 import org.cometgui.workflow.steps.RunResultFiles;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Phase 11 exit gate items 6 and 7 through the run-level path, on the mzTab the product actually
- * gives PDV: a finished run laid out from the real K562 {@code _3} + {@code _4} sources (the
- * Percolator tables' {@code PSMId}s re-based on the run's absolute {@code -N} base, as Comet writes
- * it in a CometGUI run), {@link PdvMzTabs#prepare}, and then the fidelity suite of {@code
- * cometgui-tools} -- {@code org.cometgui.tools.pdv.fidelity.FidelityCheck} and its readers,
- * compiled here from that module's test sources rather than copied, so there is one suite and it
- * cannot drift. They depend on the JDK alone, which that module's {@code IndependenceGuardTest}
- * enforces.
+ * gives PDV: a finished run laid out from the real K562 {@code _3} + {@code _4} sources, {@link
+ * PdvMzTabs#prepare}, and then the fidelity suite of {@code cometgui-tools} -- {@code
+ * org.cometgui.tools.pdv.fidelity.FidelityCheck} and its readers, compiled here from that module's
+ * test sources rather than copied, so there is one suite and it cannot drift. They depend on the
+ * JDK alone, which that module's {@code IndependenceGuardTest} enforces.
+ *
+ * <p>The run is laid out twice, once in each form a run's {@code PSMId}s have had: with the
+ * Percolator tables as Percolator wrote them, whose identifiers begin with the bare {@code -N} base
+ * -- what Comet writes in a CometGUI run now that it is given {@code -N<base>} -- and with every
+ * identifier re-based on the run's absolute {@code -N} base, {@code <run>/outputs/comet/<base>}, as
+ * a run made before Phase 16 unit 3b holds them. Both must give the same verdict.
  *
  * <p>Reads outside this module: {@code scratch/fixture/*.mzML}, {@code scratch/scientific-path/
  * comet/*.pep.xml}, {@code scratch/scientific-path/percolator-3.07.1/psms.*.txt} (each held to its
@@ -165,7 +170,24 @@ class PdvMzTabsFidelityTest {
     }
 
     @Test
+    @DisplayName(
+            "a run whose PSMIds begin with the bare -N base: every PSM exported, true to its"
+                    + " sources")
     void theRunLevelMzTabIsTrueToTheSources() throws IOException, ReflectiveOperationException {
+        verifyRunLaidOut(false);
+    }
+
+    @Test
+    @DisplayName(
+            "a run made before Comet was given the bare base, whose PSMIds begin with"
+                    + " <run>/outputs/comet/<base>: every PSM exported, true to its sources, as"
+                    + " before")
+    void anEarlierRunsMzTabIsTrueToTheSources() throws IOException, ReflectiveOperationException {
+        verifyRunLaidOut(true);
+    }
+
+    private void verifyRunLaidOut(boolean absoluteBases)
+            throws IOException, ReflectiveOperationException {
         Path root = repository();
         List<Path> inputs = new ArrayList<>();
         for (List<String> input : INPUTS) {
@@ -180,12 +202,19 @@ class PdvMzTabsFidelityTest {
         List<List<String>> bases = new ArrayList<>();
         for (String base : List.of(BASE_3, BASE_4)) {
             Files.copy(inputs.get(base.equals(BASE_3) ? 2 : 3), run.pepXmlFile(base));
-            bases.add(List.of(base, run.cometOutputBase(base).toString()));
+            bases.add(List.of(base, absoluteBases ? run.cometOutputBase(base).toString() : base));
         }
         Path targets = RunResultFiles.table(run, TableKind.TARGET_PSMS);
         Path decoys = RunResultFiles.table(run, TableKind.DECOY_PSMS);
         rebased(inputs.get(4), targets, bases);
         rebased(inputs.get(5), decoys, bases);
+        String firstId =
+                Files.readAllLines(targets, StandardCharsets.UTF_8).get(1).split("\t", -1)[0];
+        assertEquals(
+                absoluteBases,
+                firstId.startsWith(run.cometOutputDirectory() + "/"),
+                "the form this layout is meant to have: " + firstId);
+        assertEquals(absoluteBases, firstId.contains("/"), firstId);
 
         PdvMzTab mzTab =
                 new PdvMzTabs(

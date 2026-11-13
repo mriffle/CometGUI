@@ -158,6 +158,63 @@ class PdvMzTabExporterTest {
     class Writes {
 
         @Test
+        @DisplayName(
+                "a source named in two forms -- the bare base and the absolute path an earlier"
+                        + " run's identifiers start with -- joins rows of either form to it, and"
+                        + " writes each PSMId as Percolator did")
+        void bothFormsOfTheBase() throws IOException {
+            String earlier = "/project/runs/r1/outputs/comet/" + BASE;
+            PdvMzTabSource both =
+                    new PdvMzTabSource(
+                            List.of(BASE, earlier),
+                            spectra(nativeId(101)),
+                            SpectrumFileFormat.MGF,
+                            pepXml(DECLARATIONS, ordinaryQuery()),
+                            Optional.empty());
+            PdvMzTabExport export =
+                    PdvMzTabExporter.export(
+                            request(
+                                    table(
+                                            "targets.tsv",
+                                            row(
+                                                    BASE + "_101_2_1",
+                                                    "2.5",
+                                                    "0.001",
+                                                    "0.002",
+                                                    "R.PEPTIDEK.A",
+                                                    "sp|P3|C"),
+                                            row(
+                                                    earlier + "_101_2_2",
+                                                    "1.5",
+                                                    "0.01",
+                                                    "0.02",
+                                                    "K.M[15.9949]MMMK.G",
+                                                    "sp|P1|A")),
+                                    both));
+            List<String[]> lines = psmLines(export.mzTab());
+            assertAll(
+                    () -> assertEquals(2, lines.size()),
+                    () -> assertEquals(1, export.mgfs().size()),
+                    () -> assertEquals(2, export.mgfs().get(0).entries()),
+                    () ->
+                            assertEquals(
+                                    List.of(BASE, earlier),
+                                    export.mgfs().get(0).source().psmIdBases()),
+                    () -> assertEquals("PEPTIDEK", field(lines.get(0), "sequence")),
+                    () ->
+                            assertEquals(
+                                    BASE + "_101_2_1",
+                                    field(lines.get(0), PdvMzTabExporter.PSM_ID_COLUMN)),
+                    () -> assertEquals("MMMMK", field(lines.get(1), "sequence")),
+                    () ->
+                            assertEquals(
+                                    earlier + "_101_2_2",
+                                    field(lines.get(1), PdvMzTabExporter.PSM_ID_COLUMN)),
+                    () -> assertEquals("ms_run[1]:index=0", field(lines.get(0), "spectra_ref")),
+                    () -> assertEquals("ms_run[1]:index=1", field(lines.get(1), "spectra_ref")));
+        }
+
+        @Test
         @DisplayName("each row's values come from its own sources, one MGF entry per row")
         void ordinaryRows() throws IOException {
             PdvMzTabExport export =
@@ -638,7 +695,7 @@ class PdvMzTabExporterTest {
                                     target));
             assertAll(
                     () -> assertEquals(1, export.mgfs().size()),
-                    () -> assertEquals(BASE, export.mgfs().get(0).source().psmIdBase()),
+                    () -> assertEquals(List.of(BASE), export.mgfs().get(0).source().psmIdBases()),
                     () -> assertEquals(1, export.mgfs().get(0).msRun()),
                     () ->
                             assertEquals(
@@ -683,6 +740,19 @@ class PdvMzTabExporterTest {
         @DisplayName("no PSM at all")
         void noPsms() throws IOException {
             refused(ordinaryRequest(), Reason.NO_PSMS, null);
+        }
+
+        @Test
+        @DisplayName(
+                "a base that is the run's only as a path is refused when the source does not name"
+                        + " that form")
+        void pathFormIsNotAssumed() throws IOException {
+            String earlier = "/project/runs/r1/outputs/comet/" + BASE;
+            refused(
+                    ordinaryRequest(
+                            row(earlier + "_101_2_1", "2", "0.01", "0.1", "R.PEPTIDEK.A", "p")),
+                    Reason.UNKNOWN_BASE,
+                    earlier + "_101_2_1");
         }
 
         @Test

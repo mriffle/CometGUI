@@ -264,6 +264,46 @@ class PsmFiguresTest {
     }
 
     @Test
+    @DisplayName(
+            "a PSM named by the bare base -- what Comet writes now that it is given -N<base> -- is"
+                    + " drawn from that base's spectrum file and pepXML, as one named by the"
+                    + " absolute base of an earlier run is")
+    void aPsmNamedByTheBareBaseIsDrawn() throws IOException {
+        FakePdv pdv = new FakePdv(run, Behaviour.DRAWS, PEPTIDE);
+        String bare = "k562_3_102_2_1";
+
+        DrawnSpectrum drawn = figures(pdv).draw(request(bare));
+
+        assertAll(
+                () -> assertEquals(bare, drawn.psmId()),
+                () -> assertEquals(PdvFixtures.SCAN_102, drawn.nativeId()),
+                () -> assertEquals(spectra, drawn.spectrumFile()),
+                () -> assertEquals(run.pepXmlFile("k562_3"), drawn.pepXml()),
+                () ->
+                        assertEquals(
+                                bare,
+                                PdvFixtures.launches(run).get(0).payload().get("launch.psm-id")));
+        // The earlier form of the same PSM names the same spectrum.
+        DrawnSpectrum earlier = figures(pdv).draw(request(psm(102)));
+        assertEquals(drawn.nativeId(), earlier.nativeId());
+        assertEquals(drawn.spectrumFile(), earlier.spectrumFile());
+    }
+
+    @Test
+    @DisplayName("a bare base that is none of the run's is refused, as a foreign path is")
+    void anotherBareBase() {
+        FakePdv pdv = new FakePdv(run, Behaviour.DRAWS, PEPTIDE);
+
+        SpectrumNotDrawnException refused =
+                assertThrows(
+                        SpectrumNotDrawnException.class,
+                        () -> figures(pdv).draw(request("k562_9_101_2_1")));
+
+        assertEquals(SpectrumNotDrawnException.Reason.NO_SPECTRUM_FILE, refused.reason());
+        assertNothingHappened(pdv);
+    }
+
+    @Test
     @DisplayName("a PSM identifier without a spectrum reference is refused")
     void noReference() {
         FakePdv pdv = new FakePdv(run, Behaviour.DRAWS, PEPTIDE);

@@ -304,7 +304,9 @@ public final class PdvMzTabExporter {
             queries = new LongIntMap[sources.size()][2];
             slots = new Slots[sources.size()];
             for (int s = 0; s < sources.size(); s++) {
-                sourceByBase.put(sources.get(s).psmIdBase(), s);
+                for (String base : sources.get(s).psmIdBases()) {
+                    sourceByBase.put(base, s);
+                }
                 for (int f = 0; f < 2; f++) {
                     hits[s][f] = new LongIntMap();
                     queries[s][f] = new LongIntMap();

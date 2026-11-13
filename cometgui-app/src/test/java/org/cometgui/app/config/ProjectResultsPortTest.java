@@ -182,7 +182,8 @@ class ProjectResultsPortTest {
     @Test
     @DisplayName(
             "open: each table through the store factory, the weights, the spectrum files by the"
-                    + " -N base a PSMId begins with, the view state; close closes every store")
+                    + " -N base a PSMId begins with -- the bare base, and the absolute path an"
+                    + " earlier run's begin with -- the view state; close closes every store")
     void open() throws IOException {
         RunLayout layout =
                 run(
@@ -207,6 +208,10 @@ class ProjectResultsPortTest {
                 () ->
                         assertEquals(
                                 Map.of(
+                                        "sample_A",
+                                        "sample_A.mzML",
+                                        "sample_B",
+                                        "sample_B.mzML",
                                         root.resolve(
                                                         "project/runs/20261009T080000Z-run-open/"
                                                                 + "outputs/comet/sample_A")
@@ -279,7 +284,10 @@ class ProjectResultsPortTest {
     }
 
     @Test
-    @DisplayName("two spectrum files of one name: each is shown by its whole path")
+    @DisplayName(
+            "two spectrum files of one name: each is shown by its whole path, and their bare bases"
+                    + " -- which the output-base rule keeps distinct, sample and sample_2 -- tell"
+                    + " their PSMs apart")
     void sharedNames() throws IOException {
         ProjectLayout project = ResultRuns.project(root.resolve("project"));
         ResultRuns.run(
@@ -299,6 +307,13 @@ class ProjectResultsPortTest {
                             root.resolve("data/a/sample.mzML").toString(),
                             root.resolve("data/b/sample.mzML").toString()),
                     Set.copyOf(opened.sourceFiles().values()));
+            assertEquals(
+                    root.resolve("data/a/sample.mzML").toString(),
+                    opened.sourceFiles().get("sample"));
+            assertEquals(
+                    root.resolve("data/b/sample.mzML").toString(),
+                    opened.sourceFiles().get("sample_2"));
+            assertEquals(4, opened.sourceFiles().size(), "each base in both forms");
             assertEquals(Optional.empty(), opened.weights());
         } finally {
             port.close(opened);
@@ -353,6 +368,8 @@ class ProjectResultsPortTest {
         try {
             assertEquals(
                     Map.of(
+                            "x",
+                            "x.mzML",
                             root.resolve("project/runs/20261009T070000Z-run-source/outputs/comet/x")
                                     .toString(),
                             "x.mzML"),

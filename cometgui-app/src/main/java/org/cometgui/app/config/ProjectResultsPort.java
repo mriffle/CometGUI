@@ -77,11 +77,13 @@ import org.cometgui.workflow.storage.ViewStateStore;
  * a table above the in-memory limit is opened on disk and its index, built by {@code
  * finalise-results}, is checked and reused. A failure closes what was opened. The weights are read
  * by the one weights reader and summarised by {@link WeightsSummary}. The spectrum files' display
- * names come from the run's recorded inputs: each Comet {@code -N} base -- the absolute path {@code
- * outputs/comet/<base>} the run gave Comet, which is what every {@code PSMId} begins with -- maps
- * to its spectrum file's name (its whole path when two inputs share a name). A derived run (a
- * Percolator rerun) rescored its source's merged PIN, so its {@code PSMId}s begin with the source
- * run's bases, and those are the ones mapped. The view state is {@link ViewStateStore}'s.
+ * names come from the run's recorded inputs: each Comet {@code -N} base, which is what every {@code
+ * PSMId} begins with, maps to its spectrum file's name (its whole path when two inputs share a
+ * name) -- in both forms a run's identifiers have had ({@link RunLayout#psmIdBases}): the bare
+ * base, and the absolute path {@code outputs/comet/<base>} that a run made before Phase 16 unit 3b
+ * gave Comet. A derived run (a Percolator rerun) rescored its source's merged PIN, so its {@code
+ * PSMId}s begin with the source run's bases, and those are the ones mapped. The view state is
+ * {@link ViewStateStore}'s.
  *
  * <h2>Writes</h2>
  *
@@ -290,8 +292,8 @@ final class ProjectResultsPort implements ResultsPort {
     }
 
     /**
-     * Each {@code -N} base of the run's spectrum files -- as the absolute path a {@code PSMId}
-     * begins with -- to the spectrum file's display name.
+     * Each {@code -N} base of the run's spectrum files -- in each form a {@code PSMId} may begin
+     * with it ({@link RunLayout#psmIdBases}) -- to the spectrum file's display name.
      */
     private Map<String, String> sourceFiles(Listed of) {
         RunIdentity identity = of.identity();
@@ -313,9 +315,10 @@ final class ProjectResultsPort implements ResultsPort {
         }
         Map<String, String> files = new HashMap<>();
         for (SpectrumInput spectrum : spectra) {
-            files.put(
-                    searched.cometOutputBase(spectrum.base()).toString(),
-                    shared ? spectrum.file().path().toString() : fileName(spectrum));
+            String name = shared ? spectrum.file().path().toString() : fileName(spectrum);
+            for (String base : searched.psmIdBases(spectrum.base())) {
+                files.put(base, name);
+            }
         }
         return Map.copyOf(files);
     }

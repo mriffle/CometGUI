@@ -70,8 +70,9 @@ import org.cometgui.workflow.steps.RunResultFiles;
  *       <base>.pep.xml} of the run that searched it ({@code searched}: the run itself, or for a
  *       Percolator rerun the run it was derived from), and {@code <base>}{@value
  *       #DECOY_PEP_XML_SUFFIX} beside it when that exists (Comet's {@code decoy_search = 2}); every
- *       {@code PSMId} from that file starts with the absolute {@code -N} base, {@code
- *       outputs/comet/<base>}, which Comet wrote into its PIN;
+ *       {@code PSMId} from that file starts with the {@code -N} base Comet wrote into its PIN --
+ *       the bare base, or in a run made before Phase 16 unit 3b the absolute {@code
+ *       outputs/comet/<base>} ({@link RunLayout#psmIdBases}; the export is given both);
  *   <li>and the spectrum file itself, whose format the PDV version must support ({@link
  *       PdvSpectrumSupport#check}, refused before anything is read).
  * </ul>
@@ -250,7 +251,11 @@ public final class PdvMzTabs {
             Path spectra = input.file().path();
             sources.add(
                     new PdvMzTabSource(
-                            base.toString(), spectra, support.check(spectra), pepXml, decoy));
+                            searched.psmIdBases(input.base()),
+                            spectra,
+                            support.check(spectra),
+                            pepXml,
+                            decoy));
             inputs.add(new Source(ROLE_PEPXML, pepXml));
             decoy.ifPresent(file -> inputs.add(new Source(ROLE_DECOY_PEPXML, file)));
             inputs.add(new Source(ROLE_SPECTRA, spectra));
