@@ -333,7 +333,7 @@ Work units
        seven "run's own directory" fields removed; the matrix green against
        the unchanged goldens.
      - Brief obligation 12; ``R-CMT-03``, ``R-CMT-04``, ``R-PROC-04``
-     - not started
+     - dispatched 2026-11-13 at the commit that records unit 4
    * - 4
      - **Residue B, install and tools.** The probe's message for a non-zero
        exit carries the status; a failed install's reason survives a restart;
@@ -347,7 +347,8 @@ Work units
        through ``main``; the Provenance section's run selector; the
        chooser's untested abandon cases.
      - Brief obligation 12; ``status-p15-signed``
-     - dispatched 2026-11-12 at the commit that records unit 3
+     - **Accepted 2026-11-13** at ``a502515``, after a second round. See
+       *Unit 4* below.
    * - 5
      - **One fixture.** Local testing and CI read the K562 pair with the
        committed trimmed FASTA; one fetch script (checksum, CRLF defence);
@@ -791,6 +792,140 @@ count or floor changed.
   attribute carries the run's absolute paths whatever is done about PSM
   identifiers; nothing in the residue list covers it.
 
+Unit 4 -- Residue B: install and tools (accepted 2026-11-13, after a second round)
+-----------------------------------------------------------------------------------
+
+Two fresh agents. The first (commits ``6d72280`` .. ``9995ceb``, eleven)
+finished items A to G and the second half of H and ran short of context; the
+second (``ba86345`` .. ``a502515``, five) finished H, repaired the ``e2e``
+control that unit 3 had broken, and closed two loose ends. Briefs:
+``scratch/p16/orch/briefs/u4.txt`` and ``u4r.txt``.
+
+**What was built** (production diff read in full, both rounds).
+
+* **A.** ``StagedToolProbe`` ends every refusal made after the binary ran
+  with its exit status ("It exited with status N."), so a failed install's
+  recorded reason carries it. The two capability probes already said it; a
+  test now pins that with a redacted token.
+* **B.** ``ToolCache`` keeps a failed install's redacted reason at
+  ``<root>/cache/failures/<key>.txt``; ``ManagedToolManager`` writes it on
+  failure, removes it when the next attempt starts, and reads it back
+  (redacting again) when it has no attempt of its own. Installed outranks
+  it. Round 2: the write is ``ATOMIC_MOVE, REPLACE_EXISTING``, as the
+  product's other atomic writes are.
+* **C.** ``CometCapabilityProbe`` takes its workspace parent; every tools
+  test passes its own and requires it empty afterwards.
+* **D.** ``SecretToolCredentialStore``: an interrupted wait cancels
+  ``secret-tool`` through the process service, restores the interrupt and
+  throws its checked failure.
+* **E.** ``ZipArchiveReader`` refuses a name length or an extra-field length
+  that runs past the central directory, each as ``MALFORMED_ARCHIVE``.
+* **F.** ``manifests/tools.json``: the Windows row of Comet 2026.02.2 lists
+  the four Visual C++ runtime libraries its import table names and carries
+  the 2026.03.0 row's advisory. ``WindowsCometImportTableTest`` holds every
+  Windows Comet row to its mirrored binary's import table and fails, not
+  skips, without the binary.
+* **G.** ``SectionNavigationUiTest``, ``AccessibleNameEnumerationUiTest``,
+  the twelve classes that used ``ParameterEditorApp.launch`` and
+  ``ConsoleFloodUiTest`` no longer read the machine's application-data
+  folder. Still through ``main``, because they test it:
+  ``CometGuiApplicationStartupTest`` and the opt-in
+  ``PerformanceStartupChild``. Round 2 removed the now uncalled
+  ``RunningApplication.launchedByMain``.
+* **H.** The Provenance section's run selector did read every run passed
+  (the new ``ProvenanceRunSelectorUiTest``: 9 of 10 red on the old pane).
+  Unit 3's logic moved to ``org.cometgui.ui.controls.CommittedChoice`` and
+  both panes are built over it. ``ResultsRunChooserUiTest`` gained the two
+  abandon cases and a case holding the driver to what the cells show.
+* **The** ``e2e`` **repair.** ``ResultsPane`` no longer has a cell factory:
+  the mouse press on a run is seen by a filter on the pop-up's list. The
+  driver, the scenario and the harness are untouched.
+
+**What I ran and saw**, at ``a502515``.
+
+* ``bash scripts/dev-verify.sh --since 4907634 --verify``: BUILD SUCCESS in
+  47 min 37 s; domain 1238, provenance 709, process 286, results 1312, tools
+  1143, install 1090, params-comet 2123, params-percolator 68, workflow
+  1039, ui 843, app 601 (91 opt-in skipped), archtests 40; 0 failures, 0
+  errors.
+* **My injections**, each into production code, anchor gone and
+  ``sha256sum -c`` FAILED while in, restored and OK:
+
+  .. list-table::
+     :header-rows: 1
+     :widths: 8 46 46
+
+     * - Item
+       - Injection
+       - Red
+     * - A
+       - ``StagedToolProbe.exitedWith`` returns the empty string
+       - ``StagedToolProbeTest`` 14 run, 4 failed
+     * - B
+       - ``ManagedToolManager`` never forgets an earlier failure when a new
+         attempt starts
+       - ``FailedInstallReasonAfterRestartTest`` 7 run, 2 failed (a later
+         attempt that is cancelled; one that succeeds)
+     * - C
+       - ``CometCapabilityProbe`` does not delete its workspace
+       - ``CometCapabilityProbeTest`` 20 run, 16 failed
+     * - D
+       - ``SecretToolCredentialStore`` does not restore the interrupt
+       - ``SecretToolCredentialStoreTest`` 15 run, 2 failed
+     * - E
+       - ``ZipArchiveReader``'s extra-field bound off by one; its name
+         bound off by 65,536
+       - ``ArchiveEdgeCasesTest`` 38 run, 1 failed, each time
+     * - F
+       - one library deleted from the 2026.02.2 row of ``tools.json``
+       - ``WindowsCometImportTableTest`` 1 run, 1 failed;
+         ``ShippedManifestTest`` 20 run, 1 failed
+     * - H
+       - ``CommittedChoice`` does not put the chooser back when its list
+         closes without a choice
+       - ``ResultsRunChooserUiTest`` 10 run, 8 failed;
+         ``ProvenanceRunSelectorUiTest`` 10 run, 9 failed
+
+  My first injection for B did not compile and proved nothing; it was made
+  again. G is a change to tests; I read it and did not inject.
+* ``bash scripts/verify-all-gates.sh --only
+  e2e,results,shell,provenanceui,pdv,limelight,install,manifest,hardening,paramui,flakiness,quality,traceability,docs``
+  (four at a time): **14 passed, 0 failed, 3000 s** -- e2e 50, results 100,
+  shell 30, provenanceui 96, pdv 107, limelight 130, install 95, manifest
+  30, hardening 35, paramui 87, flakiness 44, quality 42, traceability 8,
+  docs 1, each at its floor; the four shared directories unchanged.
+* The version matrix over the present fixture, after the manifest's change:
+  RUN-PASSED 11, RUN-FAILED 0, UNAVAILABLE 14, UNVERIFIED 36, GREEN.
+* Not repeated: the agents' PIT runs (``install.archive`` 98.5%,
+  ``install.cache`` 99.6%, ``install.manager`` 100%, ``install.probe``
+  100%, ``tools.comet`` 99.5%, ``tools.credentials`` 100%; ``ToolCache`` 49
+  of 49 after round 2). Unit 6's ``--only tests`` grades every package again.
+
+**Cost.** 27 tests and about 5 s (round 1); ``ProvenanceRunSelectorUiTest``,
+about 13 s and one forked JVM (round 2). No gate's count or floor changed.
+
+**Unverified.** Item B's replace-on-write on Windows and macOS: Linux
+replaces the target of a rename with or without ``REPLACE_EXISTING``, so the
+new test is not red on the old line here. It goes to the runner units (9,
+10).
+
+**Carried, and where.**
+
+* Two other bare ``ATOMIC_MOVE`` onto a file (``ToolCache.writeMarker``,
+  ``LimelightConverter`` about line 172) were not examined: unit 9, with the
+  Windows runner, where the difference can be seen.
+* Workflow and app tests still let both probes make their workspaces in
+  ``/tmp`` (they are removed unless the JVM is killed). Unit 6 counts
+  ``/tmp/cometgui-*-probe-*`` before and after its PIT run over workflow
+  classes and fixes it there if any is left.
+* ``dev-verify.sh``'s closing text says Spotless, Checkstyle and SpotBugs
+  were not run even with ``--verify``, where they are: unit 16, with the
+  wrong-gate mapping.
+* For tier 1: ``STATUS.rst``'s Phase 15 residue list still names these items
+  as open; ``handoffs/PHASE-14-worklog.rst`` line 82 names the removed
+  ``launchedByMain`` (history, left); the specification has no ``R-INS``
+  rule although documents cite one.
+
 Runner runs relied on
 =====================
 
@@ -832,6 +967,25 @@ Units sent back, why, and what changed.
 #. ``check-fixture.sh --help`` described the self-test by the phase
    document's prediction (red on the decoy count and on training) and not by
    what it requires (red on ``psms-above-1pct``). Corrected in ``13f7b07``.
+
+**Unit 3, a defect found after acceptance (2026-11-13).** Unit 3's item C
+gave the Results run chooser a cell factory, and the end-to-end driver
+refuses to say what a combo box shows once it has one, so
+``TierACanonicalScenarioTest#relaunch`` failed and the ``e2e`` control was
+red from ``5973c9e``. **I accepted unit 3 without running** ``e2e``: I chose
+the controls by searching the harness scripts for the changed files' names,
+and ``verify-e2e-gates.sh`` names none of them -- it drives the section
+through the scenario classes, which are opt-in and so not in the reactor
+``verify`` either. Unit 4's first agent found it. Repaired in unit 4's
+second round (``ba86345``) at its cause: the chooser needs no cell factory.
+``e2e`` is 50 of 50 again in my run at ``a502515``. **From here on a unit
+that changes anything under** ``cometgui-ui`` **or the application's
+sections is signed off with** ``e2e`` **and every section harness, whatever
+the scripts name.**
+
+**Unit 4, sent back once (2026-11-13)** -- to a fresh agent, the first
+having run short of context with item H half done. The second round also
+carried the ``e2e`` repair above. Nothing of the first round was rejected.
 
 Deferred
 ========
