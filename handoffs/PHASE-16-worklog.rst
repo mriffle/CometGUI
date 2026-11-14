@@ -96,7 +96,7 @@ before any of it is dispatched; the split is recorded here first.
 verbatim between two rules, and the standing rules -- and its own brief,
 ``scratch/p16/orch/briefs/u<N>.txt``. Both are kept on disk for tier 1.
 
-Current state -- a checkpoint kept true (last written 2026-11-13 23:55)
+Current state -- a checkpoint kept true (last written 2026-11-14 01:20)
 =======================================================================
 
 Tier 1 relayed two things on 2026-11-13: **the owner pauses the phase when
@@ -107,26 +107,51 @@ stops being true.
 
 **Accepted:** units 1, 2, 3, 3b, 4, 4c. Each has its sign-off below.
 
-**In progress: unit 5a** (the seams and the first-1,000-records tests onto
-the committed FASTA), one agent, dispatched at ``aa83b65``, brief
-``scratch/p16/orch/briefs/u5a.txt``. **Not accepted.** At 23:47 its agent
-had made four commits and had not reported:
+**Unit 5a: its agent has reported, PARTIAL** (2026-11-14 01:07; the facts
+are also on disk, ``_build/p16u5a/report-draft.txt``). Brief
+``scratch/p16/orch/briefs/u5a.txt``. Commits ``e88e440`` (``cometgui-tools``
+moved), ``6a2f7fc`` (``cometgui-params-comet`` and one value in
+``cometgui-domain`` moved), ``1984599`` (the ``tests`` gate's sandbox
+carries ``fixtures/``), ``581a659`` (the record in ``test_fixtures.rst``).
+**Not moved:** everything behind ``RealComet.subset`` (16 workflow classes,
+the workflow's ``IndexHeaders``) and ``RealSearch.subset`` (10 app classes);
+they still pass on the proteome's first 1,000 records. The agent's
+unapplied workflow and app edits are in ``scratch/p16/u5a/patches/``. It
+stopped on two findings that need a ruling:
 
-* ``e88e440`` -- ``cometgui-tools``' real-binary tests search a cut of the
-  committed FASTA; index headers and counts taken again;
-* ``6a2f7fc`` -- the validation corpus searches a cut of it; the 42
-  verdicts run again on both Comet releases;
-* ``1984599`` -- the ``tests`` gate's sandbox carries ``fixtures/``;
-* ``581a659`` -- the record in ``docs/developer/test_fixtures.rst``.
+#. **The cut it chose is the first 500 records marked** ``identified`` **in**
+   ``accessions.tsv`` (392,463 bytes, SHA-256 ``c12a0261...``). No "first N
+   records" cut met the tests' bounds, the test time and a steady Percolator
+   together (its table is in ``test_fixtures.rst``,
+   ``dev-test-fixtures-moved``). It is over-filtered in kind.
+#. **The Limelight converter refuses a five-result run of any FASTA that
+   holds** ``P38159`` **or** ``Q96E39`` (at scan 11483 of K562_3 Comet
+   reports one peptide twice and converter v2.8.1 stops). The workflow's and
+   the app's Limelight tests pass today only because the proteome's first
+   1,000 records hold neither protein. This is Phase 14's open E5 met by
+   the tests themselves. The agent neither set one result per spectrum in
+   those tests nor chose a cut that leaves the proteins out.
 
-It was then running its own gate run (``--only
-params,tests,workflow,percolator,provenanceui,pdv,limelight,results,shell,paramui,e2e,hardening,docs,...``;
-log ``_build/p16u5a/gates.log``; its reactor log is
-``_build/p16u5a/reactor.log`` with ``reactor.exit``). ``tests`` alone
-takes about 90 minutes. **None of my own sign-off checks for 5a has run.**
-Whether the workflow and app seams (``RealComet``, ``RealSearch``) are
-moved is not yet known to me: read the agent's commits against the 5a row
-of *The split of unit 5* before believing the unit complete.
+**My sign-off of what landed, so far** (at ``581a659``; ``HEAD`` is tier 1's
+``567904e``, which changes records only): three injections into production
+code the moved tests exercise, each red, restored and ``sha256sum -c`` OK,
+tree clean -- ``PinReader`` counting each decoy row twice
+(``CometAdapterRealBinaryTest`` 3 of 12, ``PercolatorCommandRealBinaryTest``
+1 of 6, "expected: <84> but was: <168>"); ``CometIndexHeaderReader``
+reporting one peptide too many (``CometIndexHeaderReaderTest`` 7 of 55,
+``CometIndexRealBinaryTest`` 6 of 14); ``FastaDecoyRule`` stating one decoy
+entry too many (``FastaDecoyRulesTest`` 3 of 11). **Still to run, and
+started next:** the reactor ``verify`` (log
+``_build/p16-orch/u5a/verify.log``, exit file ``verify.exit``) and
+``--only`` the sixteen controls the agent ran, ``tests`` and ``params``
+among them because their scripts changed (log
+``_build/p16-orch/u5a/gates.log``, ``gates.exit``; about 100 minutes).
+
+**What I intend, under the pause:** 5a is recorded PARTIAL -- what landed is
+signed off on those runs; the workflow and app half is not dispatched,
+because how it is done turns on finding 2, which is not an agent's or mine
+to settle (it changes what the Limelight tests exercise, or the fixture, or
+the product) and goes to tier 1 with the pause handoff.
 
 **If you are a fresh session:** check ``git status`` and
 ``_build/p16-orch/INJECTION-IN-PROGRESS.txt`` and

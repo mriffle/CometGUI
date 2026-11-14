@@ -19,17 +19,17 @@ PHASE-16 handoff -- Documentation and Release Qualification (PAUSE)
 
 .. important::
 
-   **State on 2026-11-13 at 23:55 (the rest of this page is the pause
+   **State on 2026-11-14 at 01:20 (the rest of this page is the pause
    record of 2026-11-12 and is out of date).** Units 1, 2, 3, 3b, 4 and 4c
-   are accepted. **Unit 5a is in progress and not accepted**: its agent has
-   committed ``e88e440``, ``6a2f7fc``, ``1984599`` and ``581a659`` and was
-   running its own gate run; none of the orchestrator's sign-off checks for
-   it has run. **The owner pauses the phase when 5a is finished.** Nothing
-   after 5a has started. The first thing a successor does is in
-   ``handoffs/PHASE-16-worklog.rst``, *Current state -- a checkpoint kept
-   true*: check for an injection left in the tree, establish what 5a's
-   agent left, finish and sign off 5a, then stop and write the pause
-   handoff.
+   are accepted. **Unit 5a's agent has reported PARTIAL**: the tools and
+   params-comet tests are moved onto a cut of the committed FASTA
+   (``e88e440``, ``6a2f7fc``, ``1984599``, ``581a659``); the workflow and
+   app tests are not, pending a ruling on two findings. The orchestrator's
+   injections on what landed are done and red; its reactor ``verify`` and
+   gate run are in flight or next (``_build/p16-orch/u5a/``). **The owner
+   pauses the phase when 5a is finished**; nothing after it has started.
+   What a successor does first is in ``handoffs/PHASE-16-worklog.rst``,
+   *Current state -- a checkpoint kept true*.
 
 .. contents:: Contents
    :depth: 2
