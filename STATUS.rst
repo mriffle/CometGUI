@@ -3,29 +3,31 @@ Project Status
 ==============
 
 :Project: CometGUI -- Comet + Percolator desktop workflow
-:Updated: 2026-11-13
+:Updated: 2026-11-14
 :Updated by: Main orchestrator, session 12 (**``D-016``, ``D-017`` and
    ``D-006``'s CI fixture decided; a trimmed-FASTA step added to Phase 16;
    ``D-018`` decided; Thermo RAW files found and ``D-019`` decided; **Phase
    16 dispatched, paused by the owner after its second unit, and resumed
-   the same day; ``D-020`` raised and decided, option A**; 2026-11-13: **a
+   the same day; ``D-020`` raised and decided, option A**; 2026-11-13: a
    second pause ordered, to take effect after unit 5a, and a server restart
-   expected** -- a fresh session starts at :ref:`status-p16-pickup`)
+   expected; 2026-11-14: **Phase 16 PAUSED after unit 5a, which is
+   PARTIAL** -- a fresh session starts at :ref:`status-p16-pickup`)
 :Current phase: **Phase 16 (documentation and release qualification), IN
-   PROGRESS, with a pause ordered by the owner to take effect when unit 5a is
-   finished** (2026-11-13: *"When 5a finishes, I want a pause."*). The owner
-   also expects to restart the server, which ends every agent. **If you are
-   reading this at the start of a session, no agent is running, whatever
-   this says was; go to** :ref:`status-p16-pickup` **and do not resume the
-   phase until the owner says so.** As of 2026-11-13 23:50 UTC: units 1, 2,
-   3, 3b, 4 and 4c are accepted by the phase orchestrators; unit 5a (the
-   first of five parts of the switch to the trimmed FASTA) has four commits
-   and its verification was running, **not yet accepted**; 5b to 5e and 6 to
-   16 have not started. No exit-gate item is met and the phase is not signed
-   off. **No ``D-`` item is open** (``D-020`` decided, option A, 2026-11-12).
-   ``main`` is pushed with all of this. The phase may push branches named
-   ``phase16/...`` for runner evidence, and nothing else; one exists,
-   ``phase16/raw-trial-1``.
+   PROGRESS and PAUSED by the owner since 2026-11-14, after unit 5a**
+   (2026-11-13: *"When 5a finishes, I want a pause."*). **No agent is
+   running. Do not resume the phase until the owner says so; start at**
+   :ref:`status-p16-pickup`. Units 1, 2, 3, 3b, 4 and 4c are accepted by the
+   phase orchestrators. **Unit 5a is PARTIAL**: the real-binary tests of the
+   tools and Comet-parameter modules now search a cut of the committed
+   FASTA and that half is signed off by tier 2; the workflow and application
+   half was not started, because on that cut the Limelight converter refuses
+   the run (Phase 14's open finding E5) and the way through is tier 1's to
+   rule on, and perhaps the owner's. 5b to 5e and 6 to 16 have not started.
+   No exit-gate item is met and the phase is not signed off; tier 1 has
+   checked none of this session's units itself. **No ``D-`` item is open**
+   (``D-020`` decided, option A, 2026-11-12). ``main`` is pushed with all of
+   this. The phase may push branches named ``phase16/...`` for runner
+   evidence, and nothing else; one exists, ``phase16/raw-trial-1``.
 :Overall: Sixteen phases are signed off -- 02, 06 and 07 PASSED; 00, 01, 03,
    04, 05, 08, 09, 10, 11, 12, 13, 14 and 15 PARTIAL -- plus the Comet
    2026.03.0 intake (PARTIAL, ``D-011``). The repository, build and every
@@ -67,7 +69,7 @@ anything else, fix it here first.
 
 .. _status-p16-pickup:
 
-Picking up Phase 16 in a fresh session (written 2026-11-13)
+Picking up Phase 16 in a fresh session (written 2026-11-14)
 ===========================================================
 
 **Read this before anything below it.** It is written for a main
@@ -79,18 +81,28 @@ with the owner*. This section holds what is particular to now.
 What was true when this was written
 -----------------------------------
 
-2026-11-13, 23:50 UTC. The owner had ordered a pause to take effect when
-unit 5a finished, and then said the server was likely to be restarted and
-the phase must be able to be picked up by a fresh session.
+2026-11-14. **The pause the owner ordered has taken effect.** The second
+phase orchestrator stopped after unit 5a and wrote its pause handoff
+(``handoffs/PHASE-16-handoff.rst``, commit ``df568b0``); tier 1 recorded the
+pause here and pushed ``main``. The tree was clean, nothing was running, no
+injection marker existed, and the only phase branch on the remote was
+``phase16/raw-trial-1``. Nobody had run ``scripts/build.sh`` or the full
+``scripts/verify-all-gates.sh`` in this phase.
 
 * **Accepted by the phase orchestrators** (tier 2; tier 1 has not signed the
   phase off): unit 1, the Windows RAW trial; 2, the trimmed FASTA; 3 and 4,
   Phase 15's residue; 3b, PSM identifiers without the run's path; 4c, a lost
   Install press.
-* **In progress, not accepted:** unit 5a -- the tests that searched the
-  proteome's first 1,000 records now search a cut of the committed FASTA.
-  Four commits, ``e88e440`` to ``581a659``; its gate verification was
-  running, with logs under ``_build/p16u5a/``.
+* **PARTIAL: unit 5a.** *Landed and signed off by tier 2* (``e88e440`` to
+  ``581a659``): the real-binary tests of ``cometgui-tools`` and
+  ``cometgui-params-comet`` search a cut of the committed FASTA -- its first
+  500 records marked ``identified``, 392,463 bytes, SHA-256
+  ``c12a0261...088e`` -- with the pinned counts retaken from both Comet
+  releases. *Not started:* the 16 workflow and 10 application test classes
+  behind ``RealComet.subset`` and ``RealSearch.subset``, which still search
+  the whole proteome's first 1,000 records and pass. The agent's unapplied
+  edits for them are on disk, not in git:
+  ``scratch/p16/u5a/patches/``.
 * **Not started:** 5b to 5e (the cancelling tests; Phase 00's search
   outputs; the goldens and the named fixture; the remainder), 6 (``D-016``,
   ``D-017``), 7 (the fixture in CI), 8 to 10 (launcher, packaging, three
@@ -101,9 +113,58 @@ the phase must be able to be picked up by a fresh session.
   acceptance check and self-test (run 2026-11-12, floors confirmed), and
   that runner run ``43150059739`` completed successfully. It has **not**
   re-read that run's counts, read any unit's diff, or run a full build.
+  Everything said above of units 3 to 5a is the phase orchestrator's report.
 
-Which of three states you are in
---------------------------------
+What tier 1 owes before the phase can go on
+-------------------------------------------
+
+The orchestrator put these to tier 1 with the pause. None is settled. Settle
+the first two before dispatching, and write the rulings into the brief; the
+second half of 5a waits on the first.
+
+1. **How the tests that convert to Limelight XML stand on the committed
+   FASTA.** With Comet's default of five results per spectrum, any FASTA
+   that holds ``P38159`` or ``Q96E39`` (records 1,313 and 2,548 of the
+   committed file) makes Comet report one peptide twice at scan 11483 of
+   ``K562_3``, and the Limelight converter v2.8.1 stops ("Got more than one
+   entry ... for the same scan to the same reported peptide"). That is
+   Phase 14's open finding E5 (:ref:`status-p14-signed`), which the old test input
+   avoided by chance. Three workflow tests convert five-result runs
+   (``RealLimelightConversionTest``, ``RealLimelightCompatibleRerunTest``,
+   ``RealIdentifiersTest.theEarlierRunIsStillConverted``); the
+   application's Limelight tests use the same input. The ways through the
+   orchestrator named: one result per spectrum in the tests that convert; a
+   cut that leaves the two proteins out; settling E5 in the product. **The
+   third is a question of what the product should do, and E5 is recorded as
+   "either the specification or the program changes": put it to the owner
+   plainly before ruling** -- a user who searches a human proteome with
+   Comet's defaults and converts for Limelight will meet this refusal. A
+   cut chosen to avoid the two proteins hides the defect again; if it is
+   used, a test must hold the refusal in view.
+2. **Whether 5a's cut may stand.** It holds identified proteins only, which
+   is the over-filtering the fixture's acceptance check exists to catch.
+   Tier 2 accepted it for adapter tests, which pin counts and claim nothing
+   about error rates. Rule on it, and on what the page
+   ``docs/developer/test_fixtures.rst`` must say of it.
+3. **Read** ``0b18c18``: unit 3b repaired the determinism grader's tie key in
+   ``scripts/matrix/determinism.py`` (``P16-10``). It is reported stricter
+   than before, but it changes a check tier 1 signed off in Phase 15.
+4. **This file's Phase 15 residue list** (:ref:`status-p15-signed`) still
+   shows as open the items units 3, 3b, 4 and 4c fixed, and its line on
+   ``KeyboardOnlyNavigationUiTest`` was a prediction that does not occur.
+   Correct it when the fixes are checked at sign-off, not before.
+5. **Place two things in a unit:** the Limelight XML's ``conversion_program
+   arguments`` attribute still carries absolute paths (in no residue list);
+   and nobody has shown the ``tests`` control red when its sandbox lacks the
+   ``fixtures/`` copy.
+6. **For a person, at unit 15:** after 4c's fix the keyboard focus rests on
+   a Tool Manager row's state label, which shows no focus ring.
+7. ``D-020``'s documentation duty is undischarged:
+   ``docs/developer/test_fixtures.rst`` still says the warning is put to
+   tier 1. It is placed in units 5d, 5e and 12.
+
+If the session that reads this is not the one that wrote it
+-----------------------------------------------------------
 
 Run these, from the repository root, before believing anything above::
 
@@ -117,22 +178,16 @@ Run these, from the repository root, before believing anything above::
 then read the head of ``handoffs/PHASE-16-handoff.rst`` and the unit table
 of ``handoffs/PHASE-16-worklog.rst``.
 
-A. **The pause completed.** The handoff's head says the phase is paused
-   after unit 5a, the work log's row for 5a says *Accepted*, and the tree is
-   clean. Nothing is owed to the phase. If the change log below has no entry
-   for that pause, write one, run ``scripts/ci/docs-build.sh``, commit, and
-   push ``main`` if ``origin/main`` is behind. Then wait for the owner.
-B. **The restart came first, and the tree is clean.** 5a's row does not say
-   *Accepted*. Its commits may be complete; its sign-off is not. Nothing is
-   owed until the owner resumes; then 5a's sign-off is the new orchestrator's
-   first job.
-C. **The restart came first, and there are uncommitted changes.** Follow
-   ``ONBOARDING.rst``: restore a named injection, leave everything else in
-   place for the new orchestrator, and tell it exactly what you found.
+The expected answer is: a clean tree, nothing ahead of ``origin/main``,
+nothing running, no marker file. If so, nothing is owed to the phase until
+the owner resumes it. If there are uncommitted changes or a marker, someone
+worked after this was written: follow ``ONBOARDING.rst`` -- restore a named
+injection, leave everything else in place, and find out what it was before
+going on.
 
-In every case: **tell the owner, in plain words, which state you found, and
-do not resume until the owner says to.** The owner's instruction was a pause
-after 5a, so finishing an interrupted 5a also waits for the owner's word.
+In every case: **tell the owner, in plain words, what you found, and do not
+resume until the owner says to.** The homework above may be done while the
+phase is paused; dispatching may not.
 
 How to resume when the owner says so
 ------------------------------------
@@ -153,7 +208,9 @@ message repeats only what has gone wrong before:
   ``ONBOARDING.rst``, ``CLAUDE.md`` or the brief, answers no ``D-`` item,
   names no copyright holder, fabricates no UX finding, weakens no gate;
 * explicit pathspecs, and the commit trailer the session requires;
-* what you found in the tree, exactly.
+* what you found in the tree, exactly;
+* your rulings on the two questions above, which you have also written
+  into the brief. Its first job is the second half of unit 5a.
 
 Then record the resume here and in the change log, run the documentation
 build, commit, and push ``main``.
@@ -488,9 +545,12 @@ Phase board
        ``0659194``, and **resumed by the owner the same day** with a second
        orchestrator. No gate item met yet. ``D-020`` decided (A) the same
        day; nothing is held back. **2026-11-13:** units 1, 2, 3, 3b, 4 and
-       4c accepted by tier 2; 5a in progress; **a pause ordered to take
-       effect after 5a**, and a server restart expected
-       (:ref:`status-p16-pickup`).
+       4c accepted by tier 2; a pause ordered to take effect after 5a.
+       **2026-11-14: PAUSED after unit 5a**, at ``df568b0``. 5a is PARTIAL
+       (tools and Comet-parameter tests moved to a cut of the committed
+       FASTA; workflow and application tests not, pending tier 1's ruling
+       on Phase 14's E5); 5b to 5e and 6 to 16 not started; no gate item
+       met (:ref:`status-p16-pickup`).
 
 Status values are ``NOT STARTED``, ``IN PROGRESS``, ``PARTIAL`` (with the
 residue named), ``BLOCKED`` (with the decision or dependency named), or
@@ -5010,6 +5070,28 @@ Change log
    * - Date
      - Phase
      - Entry
+   * - 2026-11-14
+     - 16
+     - **Paused by the owner after unit 5a; 5a is PARTIAL.** The second
+       phase orchestrator stopped as ordered and wrote its pause handoff
+       (``df568b0``); tree clean, nothing running, nothing pushed by it, no
+       full build run. Accepted by tier 2 in this session: units 3, 3b, 4
+       and 4c (Phase 15's residue; PSM identifiers without the run's path;
+       a lost Install press). **5a:** the real-binary tests of
+       ``cometgui-tools`` and ``cometgui-params-comet`` search a cut of the
+       committed FASTA (its first 500 ``identified`` records); tier 2
+       recomputed the cut's digest, saw three injections red, a reactor
+       ``verify`` green and fifteen of sixteen controls green, the
+       sixteenth (``hardening``) green when rerun alone. The workflow and
+       application tests were **not** moved: on that cut the Limelight
+       converter refuses a five-result run, because the committed FASTA
+       holds two proteins (``P38159``, ``Q96E39``) for which Comet reports
+       one peptide twice at one scan -- Phase 14's open finding E5, which
+       the old input avoided by chance. Which way through is tier 1's
+       ruling, and what the product should do about E5 is to be put to the
+       owner. **Tier 1 checked none of this**: a pause is not a sign-off.
+       What tier 1 owes before the phase goes on is listed in
+       :ref:`status-p16-pickup`.
    * - 2026-11-13
      - 16
      - **A second pause ordered, and the records made fit for a fresh

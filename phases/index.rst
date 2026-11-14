@@ -102,7 +102,8 @@ authoritative for its own scope and exit gate.
      - 15
      - D-009. D-001, D-004, D-006, D-008, D-018, D-019 and D-020 DECIDED
      - IN PROGRESS (dispatched 2026-11-12; paused after unit 2 of 16 and
-       resumed by the owner the same day)
+       resumed by the owner the same day; **paused again by the owner
+       2026-11-14 after unit 5a**)
 
 Ordering notes
 ==============
