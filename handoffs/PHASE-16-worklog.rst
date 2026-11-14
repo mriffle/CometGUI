@@ -13,6 +13,9 @@ PHASE-16 work log -- Documentation and Release Qualification
 :Resumed: 2026-11-12, by the owner (*"Resume phase 16"*), with a second
    phase orchestrator dispatched by tier 1 at ``b76704a``. From unit 3 on
    this log is the second orchestrator's; see *Resume* below.
+:Paused again: 2026-11-14, by the owner, after unit 5a (*"When 5a finishes,
+   I want a pause."*, relayed by tier 1 on 2026-11-13). Units 1, 2, 3, 3b, 4
+   and 4c are accepted; 5a is partial; nothing after it has started.
 
 Maintained by the phase orchestrator as the phase runs. One row per work unit.
 A unit is not done until it carries a sign-off entry naming what was run and
@@ -96,78 +99,34 @@ before any of it is dispatched; the split is recorded here first.
 verbatim between two rules, and the standing rules -- and its own brief,
 ``scratch/p16/orch/briefs/u<N>.txt``. Both are kept on disk for tier 1.
 
-Current state -- a checkpoint kept true (last written 2026-11-14 01:20)
+Current state -- a checkpoint kept true (last written 2026-11-14 03:05)
 =======================================================================
 
-Tier 1 relayed two things on 2026-11-13: **the owner pauses the phase when
-unit 5a is finished** (*"When 5a finishes, I want a pause."*), and the
-server may be restarted before then, ending every agent without warning.
-This section is what a fresh session needs; it is rewritten whenever it
-stops being true.
+**The phase is PAUSED by the owner after unit 5a** (*"When 5a finishes, I
+want a pause."*, relayed by tier 1 on 2026-11-13).
+``handoffs/PHASE-16-handoff.rst`` is the pause handoff, written at this
+commit.
 
-**Accepted:** units 1, 2, 3, 3b, 4, 4c. Each has its sign-off below.
+**Accepted:** units 1, 2, 3, 3b, 4, 4c. **Unit 5a: PARTIAL** -- the half
+that landed is signed off (*Unit 5a* below); the workflow and application
+half is not dispatched and waits on tier 1's ruling on its second finding.
 
-**Unit 5a: its agent has reported, PARTIAL** (2026-11-14 01:07; the facts
-are also on disk, ``_build/p16u5a/report-draft.txt``). Brief
-``scratch/p16/orch/briefs/u5a.txt``. Commits ``e88e440`` (``cometgui-tools``
-moved), ``6a2f7fc`` (``cometgui-params-comet`` and one value in
-``cometgui-domain`` moved), ``1984599`` (the ``tests`` gate's sandbox
-carries ``fixtures/``), ``581a659`` (the record in ``test_fixtures.rst``).
-**Not moved:** everything behind ``RealComet.subset`` (16 workflow classes,
-the workflow's ``IndexHeaders``) and ``RealSearch.subset`` (10 app classes);
-they still pass on the proteome's first 1,000 records. The agent's
-unapplied workflow and app edits are in ``scratch/p16/u5a/patches/``. It
-stopped on two findings that need a ruling:
+**Not started:** the rest of 5a, 5b, 5c, 5d, 5e, 6 to 16.
 
-#. **The cut it chose is the first 500 records marked** ``identified`` **in**
-   ``accessions.tsv`` (392,463 bytes, SHA-256 ``c12a0261...``). No "first N
-   records" cut met the tests' bounds, the test time and a steady Percolator
-   together (its table is in ``test_fixtures.rst``,
-   ``dev-test-fixtures-moved``). It is over-filtered in kind.
-#. **The Limelight converter refuses a five-result run of any FASTA that
-   holds** ``P38159`` **or** ``Q96E39`` (at scan 11483 of K562_3 Comet
-   reports one peptide twice and converter v2.8.1 stops). The workflow's and
-   the app's Limelight tests pass today only because the proteome's first
-   1,000 records hold neither protein. This is Phase 14's open E5 met by
-   the tests themselves. The agent neither set one result per spectrum in
-   those tests nor chose a cut that leaves the proteins out.
-
-**My sign-off of what landed, so far** (at ``581a659``; ``HEAD`` is tier 1's
-``567904e``, which changes records only): three injections into production
-code the moved tests exercise, each red, restored and ``sha256sum -c`` OK,
-tree clean -- ``PinReader`` counting each decoy row twice
-(``CometAdapterRealBinaryTest`` 3 of 12, ``PercolatorCommandRealBinaryTest``
-1 of 6, "expected: <84> but was: <168>"); ``CometIndexHeaderReader``
-reporting one peptide too many (``CometIndexHeaderReaderTest`` 7 of 55,
-``CometIndexRealBinaryTest`` 6 of 14); ``FastaDecoyRule`` stating one decoy
-entry too many (``FastaDecoyRulesTest`` 3 of 11). **Still to run, and
-started next:** the reactor ``verify`` (log
-``_build/p16-orch/u5a/verify.log``, exit file ``verify.exit``) and
-``--only`` the sixteen controls the agent ran, ``tests`` and ``params``
-among them because their scripts changed (log
-``_build/p16-orch/u5a/gates.log``, ``gates.exit``; about 100 minutes).
-
-**What I intend, under the pause:** 5a is recorded PARTIAL -- what landed is
-signed off on those runs; the workflow and app half is not dispatched,
-because how it is done turns on finding 2, which is not an agent's or mine
-to settle (it changes what the Limelight tests exercise, or the fixture, or
-the product) and goes to tier 1 with the pause handoff.
+**Nothing is running, nothing is uncommitted, no injection is in place**
+(``git status`` empty; no ``INJECTION-IN-PROGRESS.txt`` under ``_build/``).
+**Pushed by this phase:** one branch, ``phase16/raw-trial-1``, by the first
+orchestrator. I pushed nothing. No runner run is in flight.
 
 **If you are a fresh session:** check ``git status`` and
 ``_build/p16-orch/INJECTION-IN-PROGRESS.txt`` and
 ``_build/p16u*/INJECTION-IN-PROGRESS.txt`` first (an injection left in a
-tracked file is restored from ``git`` before anything else). Then establish
-what 5a's agent left: its commits, anything uncommitted, its logs. Finish
-5a with one fresh agent if it is short, sign it off (reactor ``verify``;
-your own injections; every ``--only`` control whose harness reads what it
-changed, ``e2e`` and the section harnesses among them), and **stop: the
-owner's pause holds after 5a.** Write the pause handoff. Start nothing
-else until tier 1 relays a resume.
-
-**Not started:** 5b, 5c, 5d, 5e, 6 to 16.
-
-**Pushed by this phase:** one branch, ``phase16/raw-trial-1``, by the first
-orchestrator. I have pushed nothing. No runner run is in flight.
+tracked file is restored from ``git`` before anything else). Start nothing
+until tier 1 relays a resume. Then: with tier 1's ruling on 5a's finding 2,
+dispatch one fresh agent for the rest of 5a; sign it off with the reactor
+``verify``, ``e2e`` and every section harness (``hardening`` on a quiet
+tree, never beside a ``verify``); go on with 5b, 5c, 5d, 5e, 6, 7, then 8
+to 16.
 
 How the remaining units are briefed (what the briefs hold beyond the rows)
 --------------------------------------------------------------------------
@@ -187,7 +146,7 @@ ships with a test seen red on the old production code, restored with
 ``sha256sum -c``; no golden, pinned digest or count moves unless the brief
 names it; nothing weakened, skipped, retried or quarantined; no push;
 explicit pathspecs and the two trailer lines; a clean tree at the report.
-**To add at the next dispatch (tier 1, 2026-11-13):** before altering a
+**Added 2026-11-14 (tier 1's instruction):** before altering a
 tracked file for an injection an agent writes
 ``_build/p16u<N>/INJECTION-IN-PROGRESS.txt`` (file, SHA-256 of the original,
 one line on the change) and deletes it once the file is restored and
@@ -346,6 +305,16 @@ P16-9 -- PSM identifiers are their own unit, and the determinism tolerance gets 
    ``testing.rst``: the tolerance gets stricter, which is the allowed
    direction. Nothing is added to it. No golden moves (identifier digests
    are taken without the directory); if one would, the unit stops.
+
+P16-10 -- the determinism grader's tie key is repaired, not worked around
+   Decided at unit 3b's sign-off, on reading the diff. With bare
+   identifiers ``determinism.py`` could, for the first time, read a scan out
+   of an identifier, and for a ``<peptide>`` it read the wrong one. The key
+   now takes a peptide's scan from the PSM among its own that carries its
+   score and mass. Two rows of different scans are no longer a tie, which is
+   stricter than what was graded and is the rule ``testing.rst`` states.
+   Nothing was added to the tolerance. Tier 1 should read it: it touches a
+   check signed off in Phase 15.
 
 The split of unit 5 (recorded 2026-11-12, before any part is dispatched)
 ------------------------------------------------------------------------
@@ -528,8 +497,11 @@ Work units
        baseline and every test that pinned a count from the old fixture
        moved; the matrix, determinism and end-to-end tiers green on it.
      - Gate 8; step 7; ``R-TEST-07``
-     - **Split into 5a to 5e** (P16-8, *The split of unit 5*). 5a
-       dispatched 2026-11-13 at the commit that records unit 4c
+     - **Split into 5a to 5e** (P16-8, *The split of unit 5*). **5a:
+       PARTIAL, 2026-11-14** -- the tools and params-comet half landed and
+       is signed off at ``581a659``; the workflow and application half is
+       not dispatched (*Unit 5a* below). 5b to 5e not started. **Paused by
+       the owner here.**
    * - 6
      - ``D-016`` **option B and** ``D-017`` **option A.** The added PIT wall
        clock measured before adoption (stop above about fifteen minutes);
@@ -1278,6 +1250,131 @@ cause was not, or not only, this.
 * A row that gains its installed path still moves the rows below it by 18
   px in one frame; a press in that frame could still miss. Recorded, not
   fixed.
+
+Unit 5a -- the seams, first half (PARTIAL, 2026-11-14)
+------------------------------------------------------
+
+One fresh agent, one round, stopped by itself on a finding. Commits
+``e88e440`` (``cometgui-tools``), ``6a2f7fc`` (``cometgui-params-comet``,
+one value in ``cometgui-domain``, ``verify-param-gates.sh``), ``1984599``
+(``verify-test-gates.sh``'s sandbox carries ``fixtures/``) and ``581a659``
+(``docs/developer/test_fixtures.rst`` and three lines in two other pages);
+29 files, +776 -275, **no production code**. Brief
+``scratch/p16/orch/briefs/u5a.txt``; the agent's report is kept at
+``_build/p16u5a/report-draft.txt``.
+
+**What landed.** The real-binary tests of ``cometgui-tools`` (7 classes:
+``CometIndexRealBinaryTest``, ``CometAdapterRealBinaryTest``,
+``CometIndexHeaderReaderTest``, ``PepXmlSearchHitReaderRealBinaryTest``,
+``RealCometFidelityTest``, ``PercolatorCommandRealBinaryTest``,
+``IndependenceGuardTest``) and of ``cometgui-params-comet`` (6:
+``ValidationCorpusRealBinaryTest``, ``MigratedFileRealBinaryTest``,
+``IndexCompatibilityRealBinaryTest``, ``ValidationCorpusTest``,
+``IndexCompatibilityRulesTest``, ``FastaDecoyRulesTest``), and
+``PreRunFactValuesTest``'s one typed value, read the committed FASTA from
+``fixtures/`` through a ``FixtureFasta`` helper in each module, which takes
+the file's digest, size and record count from ``accessions.tsv``'s header
+and types only the cut's digest.
+
+**The cut** (ruling 2, decided by measurement): the first 500 records
+marked ``identified`` in ``accessions.tsv``, in the file's order -- 392,463
+bytes, SHA-256 ``c12a0261c8ae...088e``. The agent's table of alternatives is
+in ``test_fixtures.rst`` (``dev-test-fixtures-moved``): no "first N records"
+cut met the tests' bounds, their time and a steady Percolator together.
+**I accept it for these two modules** -- their tests check that the adapters
+read what the tools wrote -- **and record that it is a cut of identified
+proteins alone**, for tier 1.
+
+**The pinned values taken again** (the agent's table, from both real
+binaries; each of its scripts first reproduced the old value on the old
+input): the target-decoy FASTA's digest and census (2,000 / 1,000 decoys to
+1,000 / 500; first decoy ``DECOY_sp|P22626|ROA2_HUMAN``); ``NumPeptides``
+129,327 to 89,848 and 81,849 to 55,319; the six header files and both
+``SHA256SUMS``; K562_3's PIN 3,554 / 1,807 / 1,747 to 3,543 / 1,942 / 1,601
+rows / targets / decoys, K562_4's 2,918 / 1,478 / 1,440 to 2,906 / 1,578 /
+1,328, merged 6,472 / 3,285 / 3,187 to 6,449 / 3,520 / 2,929; Percolator's
+peptides 2,482 / 2,399 to 2,461 / 2,217; the index search's rows; the
+decoy messages' "500 of 1000 records". The 42 validation verdicts were run
+again on both releases and none changed. **No bound was changed.** The
+spectrum-query counts (728, 607) did not move.
+
+**Also fixed by the agent:** the test helper that builds a target-decoy
+FASTA split records at every ``>``, and the committed file holds one in a
+description (``DNA dC->dU-editing enzyme``); the tools and params-comet
+copies split at line starts. The workflow's copy (``RealComet.decoySubset``)
+is in the half not landed.
+
+**What did not land, and why**: everything behind ``RealComet.subset`` and
+``RealSearch.subset`` (16 workflow classes, the workflow's ``IndexHeaders``,
+10 application classes; the harness lists of ``percolator``,
+``provenanceui`` and ``workflow``). On the cut the Limelight converter
+refuses the run: any FASTA holding ``P38159`` or ``Q96E39`` makes Comet
+report one peptide twice at scan 11483 of K562_3 with five results per
+spectrum, and converter v2.8.1 stops. That is Phase 14's open finding E5,
+reached by the tests. The agent did not weaken the tests to pass it and did
+not cut around the proteins; I did not dispatch the second half, because
+the choice among "one result per spectrum in the tests that convert", "a
+cut without the two proteins" and "settle E5 in the product" is not this
+tier's. **Escalated to tier 1 with the pause handoff.**
+
+**What I ran and saw**, at ``581a659`` (``HEAD`` then ``02850ae``, which adds
+records only).
+
+* The diff's shape and the two helpers; **the cut recomputed
+  independently** (the committed FASTA's records in order, kept where the
+  accession is marked ``identified``, the first 500): 392,463 bytes,
+  SHA-256 ``c12a0261c8ae410cbaf7d5060e23a53c7d9a6d7f628d28422f102a09d978088e``,
+  equal to the pinned one.
+* **Three injections into production code the moved tests exercise**, each
+  with ``_build/p16-orch/INJECTION-IN-PROGRESS.txt`` written first, anchor
+  gone and ``sha256sum -c`` FAILED while in, restored and OK:
+
+  * ``PinReader`` counts each decoy row twice:
+    ``CometAdapterRealBinaryTest`` 12 run, 3 red;
+    ``PercolatorCommandRealBinaryTest`` 6 run, 1 red ("expected: <84> but
+    was: <168>").
+  * ``CometIndexHeaderReader`` reports one peptide too many:
+    ``CometIndexHeaderReaderTest`` 55 run, 7 red;
+    ``CometIndexRealBinaryTest`` 14 run, 6 red.
+  * ``FastaDecoyRule`` states one decoy entry too many:
+    ``FastaDecoyRulesTest`` 11 run, 3 red ("... already holds 500 entries
+    ... (500 of 1000 records ...").
+
+* ``bash scripts/dev-verify.sh --since aa83b65 --verify``: BUILD SUCCESS in
+  52 min 36 s; domain 1239, provenance 709, process 286, results 1312, tools
+  1151, install 1090, params-comet 2123, params-percolator 68, workflow
+  1051, ui 849, app 601 (91 opt-in skipped), archtests 40; 0 failures.
+* ``bash scripts/verify-all-gates.sh --only
+  params,tests,workflow,percolator,provenanceui,pdv,limelight,results,shell,paramui,e2e,hardening,docs,traceability,flakiness,quality``:
+  **15 passed, 1 FAILED, 5891 s** -- tests 68 (5764 s), params 109, workflow
+  110, percolator 109, provenanceui 96, pdv 107, limelight 130, results
+  100, shell 30, paramui 87, e2e 50, quality 42, flakiness 44, traceability
+  8, docs 1, each at its floor; the four shared directories unchanged.
+  **The red was mine:** ``hardening``, 34 of 35, its control C -- "the
+  working tree's cometgui-*/target changed" -- because I ran the reactor
+  ``verify`` beside the gate run. **Rerun alone on a quiet tree:
+  hardening 35 of 35 in 599 s.** A reactor ``verify`` is not run beside
+  ``hardening`` again; the standing text now says so.
+* Not run by me: PIT (no production Java changed). Not shown by anyone: the
+  ``tests`` control red without the ``fixtures/`` copy in its sandbox (a
+  second 96-minute run; the repair is four lines of ``cp`` and the control
+  is green with it).
+
+**Cost.** The moved classes got no slower by the agent's measurement (tools
+65.9 to 61.3 s; params-comet 15.3 to 12.2 s). Mine: the reactor took 52 min
+36 s beside a gate run, against 47 to 50 min for the three units before.
+
+**Carried to the resume.**
+
+* The second half of 5a, after tier 1's ruling.
+* Percolator 3.07.1 with one result per spectrum is slower and unsteady on
+  any input that identifies anything (2.5 to 3.5 s on the cut with one run
+  of 13.0 s; the agent's figures). It bears on whatever is ruled for the
+  Limelight tests and on 5b's windows.
+* ``LimelightFixtures.FASTA`` is left for 5c, with the outputs it is given
+  to the converter beside.
+* The dated inventory in ``test_fixtures.rst`` and one dated sentence in
+  ``comet_parameter_schema.rst`` still name the old cut's digest: 5e.
 
 The outage (2026-11-13)
 -----------------------

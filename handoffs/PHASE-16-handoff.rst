@@ -1,35 +1,26 @@
-===================================================================
-PHASE-16 handoff -- Documentation and Release Qualification (PAUSE)
-===================================================================
+==========================================================================
+PHASE-16 handoff -- Documentation and Release Qualification (SECOND PAUSE)
+==========================================================================
 
 :Phase: 16
-:Written: 2026-11-12 by the Phase-16 orchestrator (tier 2)
-:Outcome: **PAUSED by the owner after work unit 2**, not finished. The
-   owner, relayed by tier 1: *"I want to pause phase 16 after it finishes its
-   current unit's work. I will continue it later."* Two of sixteen work units
-   are accepted; fourteen have not started. **No exit-gate item is met.**
-   This is a pause handoff, not a phase-end handoff: it says what exists, what
-   was seen, and where to pick up.
+:Written: 2026-11-14 by the second Phase-16 orchestrator (tier 2). It
+   replaces the first orchestrator's pause record of 2026-11-12, whose
+   substance on units 1 and 2 is carried below.
+:Outcome: **PAUSED by the owner after unit 5a**, not finished. The owner,
+   relayed by tier 1 on 2026-11-13: *"It looks like 5a is currently being
+   run. When 5a finishes, I want a pause."* Units 1, 2, 3, 3b, 4 and 4c are
+   accepted. **Unit 5a is PARTIAL**: half of it landed and is signed off;
+   the other half was not dispatched, because it turns on a finding that is
+   tier 1's to rule on. Units 5b to 5e and 6 to 16 have not started. **No
+   exit-gate item is met.**
 :Records: ``handoffs/PHASE-16-worklog.rst`` -- **this page is the map; the
    work log is the proof.** Each sign-off there names the commands run, the
-   counts seen and the orchestrator's own injections.
-:Commits: ``c15acef`` .. the commit adding this page, on ``main``, **not
-   pushed** (``origin/main`` is ``d303e21``). Nobody in this phase ran
-   ``scripts/build.sh`` or the full ``scripts/verify-all-gates.sh``.
-
-.. important::
-
-   **State on 2026-11-14 at 01:20 (the rest of this page is the pause
-   record of 2026-11-12 and is out of date).** Units 1, 2, 3, 3b, 4 and 4c
-   are accepted. **Unit 5a's agent has reported PARTIAL**: the tools and
-   params-comet tests are moved onto a cut of the committed FASTA
-   (``e88e440``, ``6a2f7fc``, ``1984599``, ``581a659``); the workflow and
-   app tests are not, pending a ruling on two findings. The orchestrator's
-   injections on what landed are done and red; its reactor ``verify`` and
-   gate run are in flight or next (``_build/p16-orch/u5a/``). **The owner
-   pauses the phase when 5a is finished**; nothing after it has started.
-   What a successor does first is in ``handoffs/PHASE-16-worklog.rst``,
-   *Current state -- a checkpoint kept true*.
+   counts seen and the orchestrator's own injections. Its section *Current
+   state -- a checkpoint kept true* is what a fresh session reads first.
+:Commits: the first orchestrator's ``c15acef`` .. ``0659194``; the second's
+   ``91efc6d`` .. the commit adding this page; tier 1's own among them. Nobody
+   in this phase ran ``scripts/build.sh`` or the full
+   ``scripts/verify-all-gates.sh``.
 
 .. contents:: Contents
    :depth: 2
@@ -38,155 +29,157 @@ PHASE-16 handoff -- Documentation and Release Qualification (PAUSE)
 In one paragraph
 ================
 
-Comet for Windows opens the project's Thermo RAW fixture: a bare-tools trial
-on a GitHub Windows runner read ``ph050213_18.raw`` directly with both Comet
-releases and carried it through Percolator. A FASTA trimmed to suit the K562
-spectra exists, is committed with UniProt's attribution, is reproducible byte
-for byte from a committed accession list, and has an acceptance check that is
-green on it and red on the identified proteins alone. Nothing uses that FASTA
-yet. Nothing else in the phase has started.
+Comet for Windows reads the project's Thermo RAW fixture on a GitHub
+runner. A FASTA trimmed to suit the K562 spectra is committed, reproducible
+byte for byte, with an acceptance check tier 1 confirmed; the owner accepted
+Percolator's warning on it (``D-020``, option A). All of Phase 15's residue
+is fixed, each item with a test seen red on the old code, and four defects
+that fixing it uncovered are fixed too: PSM identifiers no longer carry the
+run's absolute path; the Provenance run selector no longer reads every run
+it passes; a press on Install is no longer lost when another install ends;
+the determinism grader's tie key now includes the scan it claimed to. The
+move of the tests onto the committed FASTA has begun: the tools and
+parameter modules' real-binary tests search a cut of it. The workflow and
+application tests still search the whole proteome's first 1,000 records,
+and moving them has met an open product defect (the Limelight converter
+refuses a five-result run that holds a duplicated peptide). Nothing else in
+the phase has started.
 
-What was built, and where
-=========================
+Units, and the evidence
+=======================
+
+Every figure below is from a run the orchestrator of the time made itself;
+the commands and the injections are in the work log under each unit's name.
 
 .. list-table::
    :header-rows: 1
-   :widths: 6 20 74
+   :widths: 6 12 82
 
    * - Unit
-     - Commits
-     - What
+     - Verdict
+     - What, and what was seen
    * - 1
-     - ``5980502`` ``6dae9f5``
-     - ``scripts/spikes/windows-raw-trial/`` -- ``trial.py`` (standard library
-       only; downloads Comet for Windows with its Thermo companions and
-       Percolator 3.07.1 by the manifest's pins, the RAW file from PRIDE by
-       ``D-019``'s digest, searches it and counts at q < 0.01; ``--check-only``
-       runs anywhere), ``run.sh``, and ``workflow.yml``, a template kept
-       outside ``.github/workflows/``. ``fixtures/synechococcus-wh8102/`` --
-       the WH8102 proteome (2,513 records, 1,080,427 bytes, UniProt release
-       2026_04) with ``ATTRIBUTION.txt``. ``.gitattributes``: ``fixtures/**
-       -text``. ``docs/citations.rst``: a UniProt section.
+     - Accepted
+     - **The RAW trial.** ``scripts/spikes/windows-raw-trial/``; the WH8102
+       proteome under ``fixtures/synechococcus-wh8102/``. Run
+       ``43150059739`` on a Windows runner: both Comet releases read
+       ``ph050213_18.raw`` directly (17,655 PIN rows; 873 / 761 and 894 /
+       767 PSMs / peptides at q < 0.01). Two pin injections red.
    * - 2
-     - ``d2b57e2`` ``d8d985a`` ``41411c4`` ``18b7a26`` ``13f7b07``
-     - ``fixtures/human-k562-subset/`` -- the trimmed FASTA
-       (``uniprot-human-2026_02-k562-subset.fasta``), ``accessions.tsv`` (the
-       list and the pinned digest), ``ATTRIBUTION.txt``.
-       ``scripts/fixtures/`` -- ``fixture-fasta.sh`` and ``fixture_fasta.py``
-       (``describe``, ``verify``, ``build``, ``identify``);
-       ``check-fixture.sh``, ``fixture_acceptance.py`` and
-       ``fixture-acceptance.json`` (the acceptance check and its floors).
-       ``cometgui-app`` test code: the opt-in ``FixtureAcceptancePairs`` and
-       a ``runOnce`` overload in ``VersionMatrixPairs``.
-       ``docs/developer/test_fixtures.rst`` -- the fixture, the sizing series,
-       the floors, how to rebuild, and the list of what switching to the new
-       FASTA touches.
+     - Accepted
+     - **The trimmed FASTA.** ``fixtures/human-k562-subset/`` (3,698
+       records, 2,539,164 bytes, SHA-256 ``bd252b62...1b34``),
+       ``scripts/fixtures/``. Rebuilt byte for byte from its source; the
+       acceptance check green (60 criteria, four pairs, two
+       configurations) and red on the identified proteins alone; tier 1
+       confirmed the floors by its own run.
+   * - 3
+     - Accepted
+     - **Residue A.** The merged PIN's rows are counted after writing
+       (``PinMergeRowCountException``); the Results run chooser opens a run
+       when a choice is committed; the retained-heap leak traced to
+       discarded column headers and fixed; ``KeyboardOnlyNavigationUiTest``
+       isolated. Injections into ``PinMerger`` and ``ResultsPane`` red;
+       reactor ``verify`` green; 7 controls green; matrix GREEN. **Its
+       cell factory broke** ``e2e`` **and I accepted it without running
+       that control**; found by unit 4's agent, repaired in unit 4.
+   * - 3b
+     - Accepted
+     - **PSM identifiers.** Comet is run in ``<run>/outputs/comet`` with
+       ``-N<base>``; no identifier of a new run holds a path; runs made
+       before still open, map, show in PDV and convert. The determinism
+       tolerance lost its seven "run's own directory" fields; **the
+       grader's tie key was repaired** (P16-10). Injections into
+       ``RunLayout``, ``CometSearchCommands`` and ``determinism.py`` red;
+       reactor green; 13 of 14 controls green and ``e2e`` 48 of 50, then 50
+       of 50 on a rerun (see 4c); matrix and determinism GREEN against the
+       unchanged goldens.
+   * - 4
+     - Accepted
+     - **Residue B**, two rounds. The staged probe's refusal carries the
+       exit status; a failed install's reason survives a restart;
+       ``CometCapabilityProbe`` owns no workspace in ``/tmp``;
+       ``SecretToolCredentialStore`` cancels on interrupt;
+       ``ZipArchiveReader`` refuses lengths past the directory; the Windows
+       manifest row for Comet 2026.02.2 lists its runtime libraries, held to
+       the binary's import table by a test; fifteen GUI test classes no
+       longer read the machine's application-data folder; the Provenance
+       selector fixed over a shared ``CommittedChoice``. Eight injections
+       red; reactor green; 14 controls green; matrix GREEN.
+   * - 4c
+     - Accepted
+     - **A lost Install press.** One ``e2e`` run in five was red in
+       ``NetworkUnavailableUiTest``. Cause in the product: a row disabling
+       the action that holds the focus made JavaFX move the focus and
+       scroll the list in the next frame. Fixed in ``ToolManagerPane``;
+       reproduced 4 of 5 at a 4 Hz pulse on the old code, 0 of 5 after.
+       Injection red; reactor green; 14 controls green.
+   * - 5a
+     - **PARTIAL**
+     - **The seams, first half.** See the next section.
 
-**No product code changed. No POM, threshold, floor of an existing control,
-workflow file or golden changed.** No test reads the new FASTA.
+Unit 5a -- what landed, what did not, and why
+=============================================
 
-Units accepted, and the evidence
-================================
+**Landed** (``e88e440``, ``6a2f7fc``, ``1984599``, ``581a659``): the
+real-binary tests of ``cometgui-tools`` (7 classes) and
+``cometgui-params-comet`` (6 classes), and one typed value in
+``cometgui-domain``, search **a cut of the committed FASTA**: its first 500
+records marked ``identified`` in ``accessions.tsv`` (392,463 bytes, SHA-256
+``c12a0261...088e``; I recomputed the cut and its digest independently and
+they agree). The six committed index headers, both ``SHA256SUMS`` and every
+pinned count were taken again from both Comet releases (the table is in the
+work log and in ``docs/developer/test_fixtures.rst``,
+``dev-test-fixtures-moved``); the 42 validation verdicts were run again and
+none changed; no bound was changed. ``verify-test-gates.sh``'s sandbox
+carries ``fixtures/``; ``verify-param-gates.sh`` checks for the file. The
+moved classes got no slower (tools 65.9 to 61.3 s, params-comet 15.3 to
+12.2 s, the agent's figures).
 
-Unit 1 -- the RAW trial
------------------------
+**What the orchestrator saw of what landed** (the work log, *Unit 5a*):
+three injections into production code the moved tests exercise, each red
+(``PinReader`` counting decoys twice, ``CometIndexHeaderReader`` one peptide
+too many, ``FastaDecoyRule`` one decoy entry too many); the reactor
+``verify`` green in 52 min 36 s, 0 failures; sixteen controls, 15 green at
+their floors (``tests`` 68, ``params`` 109, ``e2e`` 50 among them) and
+``hardening`` red on its control C because I ran the ``verify`` beside it --
+rerun alone, 35 of 35. Not shown by anyone: the ``tests`` control red
+without the ``fixtures/`` copy in its sandbox.
 
-Run https://github.com/mriffle/CometGUI/actions/runs/43150059739 on
-``Windows-2025Server-10.0.26100``, green in 59 s.
+**Not landed:** everything behind ``RealComet.subset`` (16 workflow classes
+and the workflow's ``IndexHeaders``) and ``RealSearch.subset`` (10
+application classes), with the three harness lists that follow them
+(``percolator``, ``provenanceui``, ``workflow``). They still search the
+whole proteome's first 1,000 records and still pass. The agent's unapplied
+edits for them are in ``scratch/p16/u5a/patches/``.
 
-.. list-table::
-   :header-rows: 1
-   :widths: 18 12 24 14 14 18
+**Why it stopped -- two findings, both for tier 1.**
 
-   * - Comet
-     - Read
-     - PIN rows (target / decoy)
-     - PSMs, q < 0.01
-     - Peptides, q < 0.01
-     - Linux mzML search, same release
-   * - 2026.02.2
-     - READ
-     - 17,655 (9,674 / 7,981)
-     - 873
-     - 761
-     - 906 / 787
-   * - 2026.03.0
-     - READ
-     - 17,655 (9,674 / 7,981)
-     - 894
-     - 767
-     - 920 / 797
-
-The fallback file was not needed. Read directly, Comet loads 3,531 spectra
-against 3,624 from the converted mzML and assigns charge differently, so the
-counts are about 3% lower. Mine: ``--check-only`` green on 11 pinned
-downloads; two pin injections (the manifest's Comet digest, the RAW file's
-digest in ``trial.py``), each exit 3 naming the file; both restored.
-
-Unit 2 -- the trimmed FASTA
----------------------------
-
-3,698 records -- the 698 proteins Percolator names for a target PSM or peptide
-at q <= 0.01 in any of eight whole-proteome runs, and 3,000 others ranked by
-the SHA-256 of the accession -- 2,539,164 bytes, SHA-256
-``bd252b62568d88881e0d13bcdfaa6b9db96666af0ba08fc51863fcd7bdec1b34``, cut from
-``UP000005640_9606.fasta`` of UniProt release 2026_02 (20,652 records,
-13,731,881 bytes, SHA-256 ``2329a517...d5a0``). Mine, at ``13f7b07``:
-
-* rebuilt byte for byte (``fixture-fasta.sh verify --source
-  scratch/fixture/UP000005640_9606.fasta``);
-* the acceptance check green, 60 criteria over four pairs in two
-  configurations, 131 s;
-* its self-test red on the identified proteins alone, on ``psms-above-1pct``
-  with five results per spectrum for every pair and on nothing else;
-* the version matrix over the present fixture unchanged (11 / 0 / 14 / 36);
-* a row dropped in ``PinMerger``: the check red on
-  ``percolator-wrote-results`` in all eight runs;
-* a record removed from the committed FASTA: **the check passed it**, which
-  was a defect -- sent back, fixed, and then seen refused (exit 3);
-* ``verify -DskipTests`` over the app module and its dependencies, the
-  flakiness check, and the controls ``hardening``, ``docs``, ``traceability``
-  and ``flakiness``: all green.
-
-The proposed floors
--------------------
-
-For tier 1 to confirm. Each is 95% of the smallest of the four pairs' counts
-**against the whole proteome** (two thirds for the two small counts of the
-one-result run); none is set from the trimmed file or from a failing run. The
-committed file's counts and the identified-only file's are in the work log's
-table under *Unit 2*.
-
-.. list-table::
-   :header-rows: 1
-   :widths: 30 14 14 42
-
-   * - Criterion
-     - Five results per spectrum
-     - One result per spectrum
-     - What it catches
-   * - Target PSMs at q <= 0.01
-     - 957
-     - 998
-     - A FASTA that lost the identified proteins
-   * - Target peptides at q <= 0.01
-     - 562
-     - 589
-     - The same
-   * - Decoy PSMs
-     - 2644
-     - 80
-     - Decoys not searched, or a PIN that lost rows
-   * - Target PSMs at q > 0.01
-     - **2691**
-     - 93
-     - With five results, **over-filtering**: the committed file gives 2,784
-       to 2,795, the identified proteins alone 2,580 to 2,605
-
-The exact criteria beside them: the workflow succeeded, Percolator trained
-three bins and wrote non-zero weights, its tables hold the PIN's rows and the
-product's readers count what the check counts, and the one-result run's
-Limelight XML is valid against the converter's schema. Linux x86-64 only.
+#. **The cut is over-filtered in kind.** No "first N records" of the
+   committed file met the tests' bounds, their time and a steady Percolator
+   together (first 1,000: Percolator 22 s, twice; first 1,000 background
+   records: Percolator exits 1; first 250: a bound of more than 3,000 PSMs
+   missed). The first 500 identified records do. Choosing the cut was this
+   tier's to do, by measured time, and I accept the agent's choice for the
+   two modules it moved: those tests check that the adapters read what the
+   tools wrote, not that a search is statistically sound. **Tier 1 should
+   know** that a cut of identified proteins alone is what the owner's
+   trimming step warned against for the fixture as a whole; here it is a
+   cut for adapter tests, and the fixture itself is unchanged.
+#. **The Limelight converter refuses a five-result run of any FASTA that
+   holds** ``P38159`` **or** ``Q96E39`` (records 1,313 and 2,548 of the
+   committed file): at scan 11483 of K562_3 Comet reports one peptide
+   twice and converter v2.8.1 stops. On the cut, the workflow's
+   ``RealLimelightConversionTest``, ``RealLimelightCompatibleRerunTest`` and
+   ``RealIdentifiersTest.theEarlierRunIsStillConverted`` are refused; the
+   application's Limelight tests search the same input. They pass today
+   only because the proteome's first 1,000 records hold neither protein.
+   **This is Phase 14's open finding E5 reached by the tests themselves**,
+   and it is why the second half was not dispatched: the ways through are
+   to search with one result per spectrum in the tests that convert (which
+   changes what they exercise), to cut around the two proteins (which hides
+   the defect), or to settle E5 in the product (a product decision). None
+   is a unit agent's or this tier's to choose.
 
 Gate items
 ==========
@@ -197,11 +190,10 @@ Gate items
 
    * - Item
      - Result
-     - State at the pause
+     - State at this pause
    * - 1
      - Not started
-     - The documentation units (12, 13) have not run. The strict build passes
-       on the tree as it is (``scripts/ci/docs-build.sh``, 59 and 96 pages).
+     - Units 12 and 13. The strict build passes on the tree as it is.
    * - 2
      - Not started
      - Unit 16. The six "planned, phase 15" entries stand.
@@ -210,156 +202,165 @@ Gate items
      - Units 8 to 10.
    * - 4
      - Not started
-     - Units 8, 9 and 14. Two data files are committed, each with its
-       attribution, and wait to be entered in the licence audit.
+     - Units 8, 9 and 14. Two data files are committed with their
+       attribution and wait for the licence audit.
    * - 5
      - Not assessed
      - ``D-001`` is decided; the audit that records it is unit 14.
    * - 6
      - Not started
-     - Unit 15. Nothing was prepared and no finding exists.
+     - Unit 15. Nothing prepared; no finding exists. Two items are noted
+       for its keyboard checklist (unit 4c).
    * - 7
      - Not started
-     - Units 9 and 16.
+     - Units 9 and 16. One intermittent red in a release-critical test was
+       found and fixed at its cause (unit 4c); the quarantine register is
+       still empty.
    * - 8
      - **Partial**
-     - The trimmed FASTA exists and its acceptance check passes and has been
-       seen to fail on an over-filtered FASTA. **Not done:** no CI job uses
-       it, no golden is regenerated, the jobs that name ``D-006`` are still
-       stubs that exit 70 (units 5 and 7).
+     - The trimmed FASTA exists; its acceptance check passes, was seen red
+       on an over-filtered FASTA, and its floors are confirmed. Two of five
+       modules' real-binary tests read a cut of it. **Not done:** the
+       workflow and application tests (5a's second half), the cancel tests
+       (5b), Phase 00's outputs (5c), the goldens and the single fixture
+       (5d), the proof that nothing reads the whole proteome (5e), the CI
+       jobs (7), which are still stubs that exit 70.
    * - 9
      - **Partial**
-     - Step 1 only: Comet on a Windows runner reads the file. The smoke test
-       through the product and its golden do not exist;
-       ``nightly-windows-raw.sh`` is still a stub (unit 11).
-
-What is incomplete and why
-==========================
-
-Everything from unit 3 on, because the owner paused the phase. The work log's
-table has each unit's acceptance conditions; none has an agent, a branch or a
-file in the tree. In order (decision P16-3): 3 and 4, Phase 15's residue; 5,
-the switch to one fixture and the goldens; 6, ``D-016`` and ``D-017``; 7, the
-fixture in CI; 8 to 10, the launcher, packaging and the three runners; 11,
-the RAW smoke test through the product; 12 to 16, the documentation, the
-licence audit, the UX preparation, traceability and the phase's own harness.
-
-**Nothing was left half-done.** The tree is clean, no agent or check is
-running, and no runner job is in flight.
+     - Step 1 only: Comet on a Windows runner reads the file (unit 1). The
+       smoke test through the product is unit 11.
 
 Pushed branches and runner runs
 ===============================
 
-One branch, one run. Nothing else was pushed; ``main`` was not pushed.
+One branch and one run, both the first orchestrator's. **The second
+orchestrator pushed nothing**, and no runner run is in flight.
 
-* ``phase16/raw-trial-1`` at ``25abc52``: ``main``'s ``6dae9f5`` plus one
-  commit that copies ``scripts/spikes/windows-raw-trial/workflow.yml`` to
-  ``.github/workflows/phase16-raw-trial.yml`` (decision P16-1). It stays on
-  ``origin``; a local branch of the same name exists.
-* Run ``43150059739``, workflow ``phase16-raw-trial``, job ``130956861567``:
-  **success**, 2026-11-12 03:43 to 03:44 UTC. The lines of its log that begin
-  ``RAW-TRIAL|`` are the result.
+* ``phase16/raw-trial-1`` at ``25abc52`` (``6dae9f5`` plus one commit adding
+  ``.github/workflows/phase16-raw-trial.yml``). It stays on ``origin``.
+* Run ``43150059739``, workflow ``phase16-raw-trial``, job
+  ``130956861567``: success, 2026-11-12 03:43 to 03:44 UTC.
+
+``main`` is tier 1's to push.
 
 State on disk outside git
 =========================
 
-All under ignored directories. A resume needs the first group; the rest is
-evidence and can be deleted.
+All under ignored directories.
 
-Needed:
+Needed by a resume:
 
-* ``scratch/fixture/`` -- the two K562 mzML files and the whole proteome
-  (``UP000005640_9606.fasta``, release 2026_02). The proteome is the source
-  ``fixture-fasta.sh verify`` rebuilds from, and every existing test still
-  reads this directory until unit 5.
+* ``scratch/fixture/`` -- the two K562 mzML files and the whole proteome.
+  The workflow and application tests still read the proteome's first 1,000
+  records from it; ``fixture-fasta.sh verify --source`` rebuilds from it.
 * ``scratch/phase05/artefacts``, ``scratch/phase06/artefacts``,
   ``scratch/percolator/3.09``, ``scratch/scientific-path``,
-  ``scratch/limelight-upload-spike/artefacts`` -- as the Phase 14 and 15
-  handoffs list them; unchanged.
-* ``_build/m2repo`` -- Maven's repository; the checks above ran offline.
-* ``scratch/p16/orch/build-economy.txt`` -- the brief's *Build economy*
-  section, extracted with ``sed`` so it can be handed to every unit agent
-  verbatim. It can be made again from the brief in one line.
+  ``scratch/limelight-upload-spike/artefacts`` -- unchanged.
+* ``_build/m2repo`` -- Maven's repository; every check ran offline.
+* ``scratch/p16/orch/unit-standing.txt`` and ``scratch/p16/orch/briefs/``
+  (``u3``, ``u3b``, ``u4``, ``u4r``, ``u4c``, ``u5a``, ``u5b``, ``u6``) and
+  ``_build/p16-orch/briefs/u5c.txt`` -- what each unit agent was or would be
+  given. Their substance is in the work log (*How the remaining units are
+  briefed*), so their loss costs wording, not content.
+* ``scratch/p16/u5a/patches/`` -- the 5a agent's unapplied workflow and
+  application seam edits; ``scratch/p16/u5a/measure/`` -- the scripts its
+  pinned numbers came from; ``_build/p16u5a/report-draft.txt`` -- its
+  report.
+* ``scratch/p16/u3/item-B-investigation.txt`` -- the record behind unit 3b.
 
-Evidence, not needed:
+Evidence, not needed: ``_build/p16-orch/u3``, ``u3b``, ``u4``, ``u4c``,
+``u5a`` (my runs and injections, among them the red ``e2e`` run of
+2026-11-13, ``u3b/e2e-red.log``); ``_build/p16u3`` .. ``_build/p16u5a`` (the
+agents' logs); ``scratch/p16/u*`` (their working files);
+``scratch/p16/tier1/`` is tier 1's.
 
-* ``scratch/p16/orch/`` -- ``ghapi.py`` (read-only Actions queries; it takes
-  the credential from ``git credential fill`` and never prints or stores it),
-  ``wait.sh``, ``raw-trial-1.log`` (the trial's job log), the injection
-  transcripts.
-* ``scratch/p16/u1/`` (1.2 GB) and ``scratch/p16/u2/`` (1.1 GB) -- the unit
-  agents' working files: downloads, the sizing series' reports, the QfO
-  archive member.
-* ``_build/p16-orch/`` -- my runs of the acceptance check, its self-test, the
-  matrix, the injections and the four controls; ``_build/p16u2/`` -- the unit
-  2 agent's Maven logs.
-* ``scratch/raw-scout/`` -- the RAW search agent's files, from before the
-  phase.
+**Nothing is left uncommitted in the tree, and no injection is in place**
+(``git status`` empty; no ``INJECTION-IN-PROGRESS.txt`` under ``_build/``).
 
 Decisions encountered
 =====================
 
-No ``D-`` item was answered. Design decisions P16-1 to P16-7 are in the work
-log; tier 1 should look at **P16-1** (a runner is reached by a branch whose
-one extra commit adds a ``push`` trigger, because no workflow has one and the
-phase may neither open a pull request nor dispatch) and **P16-7** (committed
-fixture data lives under ``fixtures/<name>/`` with a plain-text attribution
-file, and ``fixtures/**`` is ``-text``).
+No ``D-`` item was answered by this tier. ``D-020`` was decided by the
+owner (option A) while unit 3 ran, and the order went back to P16-3's.
+Design decisions P16-1 to P16-10 are in the work log. **Tier 1 should look
+at:**
 
-Escalated (none answered here)
-==============================
+* **P16-8** -- unit 5 split into 5a to 5e within the four rulings.
+* **P16-9** -- the determinism tolerance's seven "run's own directory"
+  fields removed with the identifier change.
+* **P16-10** -- the determinism grader's tie key repaired (``git show
+  0b18c18 -- scripts/matrix/determinism.py``). Stricter than before; it
+  touches a check tier 1 signed off in Phase 15.
+* **Unit 3b's reading of** ``R-CMT-03`` **and** ``R-PROC-04``: Comet now
+  runs in ``outputs/comet`` inside the run with a bare ``-N``; the rules
+  hold as written and no amendment was asked for.
 
-#. **The floors** above.
-#. **Percolator warns that its negative samples are too few** in every
-   one-result-per-spectrum run against every trimmed FASTA measured (90 to
-   105 decoy PSMs; the warning stops above 105; the whole proteome gives
-   120). It still trains, and every run converts to valid Limelight XML. The
-   check reports the warning and does not grade it. This follows from
-   trimming the FASTA at all, and whether it is acceptable is not an agent's
-   to decide.
-#. **Unit 5 is larger than planned.** The inventory names 129 files. Three
-   things in it change the plan: most real-binary tests search the
-   proteome's first 1,000 records, not the whole file; four tests and one
-   control need a search long enough to cancel, which the subset no longer
-   gives; and many tests read Phase 00's outputs under
-   ``scratch/scientific-path``, which a runner does not have. The resuming
-   orchestrator should split unit 5 before dispatching it.
-#. **Documents found wrong** that this tier may not edit: the work log's
-   *Blockers escalated* and the end of *Unit 1* list them (``D-019``'s
-   figure is one release's; ``D-018`` on whether the proteome's bytes can
-   still be fetched; the phase document's prediction of what over-filtering
-   does; ``testing.rst`` on the matrix's "Limelight enabled"; the manifest's
-   Windows row for Comet 2026.02.2; ``CONTRIBUTING.rst``; ``ONBOARDING.rst``).
+Escalated to tier 1
+===================
+
+#. **Unit 5a's finding 2** (above): how the tests that convert for
+   Limelight are to stand on the committed FASTA, given E5. The second half
+   of 5a waits on it.
+#. **Unit 5a's finding 1**: the cut of identified records, accepted by this
+   tier for the adapter tests; say if it should not stand.
+#. **A keyboard focus with no visible ring** rests on a Tool Manager row's
+   state label after an install ends (unit 4c's fix). Whether that is
+   acceptable is a person's judgement (``AC-UX``); it is listed for unit 15.
+#. **Documents this tier may not edit:** ``STATUS.rst``'s Phase 15 residue
+   list still names its items as open, and its line that
+   ``KeyboardOnlyNavigationUiTest`` fails beside an installed Comet was a
+   prediction (the test passed there; it was unisolated). The specification
+   has no ``R-INS`` rule although documents cite one.
+#. **Not in any residue list:** the Limelight XML's ``conversion_program
+   arguments`` attribute carries the run's absolute paths, whatever PSM
+   identifiers hold.
+#. **A documentation duty from** ``D-020`` **not yet discharged:**
+   ``docs/developer/test_fixtures.rst`` still says the warning is put to
+   tier 1. It is placed in unit 5d (that page), 5e (``testing.rst``) and 12
+   (the user pages); none has run.
+#. **Unverified here:** unit 4's replace-on-write of a failed install's
+   reason on Windows and macOS (for units 9 and 10).
 
 Surprises
 =========
 
-* **The first run on Windows was green.** The Thermo reader references five
-  assemblies that are neither beside Comet nor in the GAC, and reads the file
-  without them.
-* **Over-filtering does not starve Percolator.** With the identified proteins
-  alone it trains, has as many decoy rows as against the whole proteome, and
-  reports *more* PSMs at 1%. What shrinks is the rejected side, and that is
-  the one criterion the check can be red on.
-* **A check written this phase could not go red** in the phase's own
-  signature way: ``--require-committed`` vouched for whatever the checkout
-  held. Found by altering the real file, not a copy handed to the check.
-* **The proteome's 2026_02 bytes are still downloadable**, from EMBL-EBI's
-  QfO copies, although UniProt's ``current_release/`` moved to 2026_04.
-* **A gate run's log must not be written under** ``scratch/``: the run
-  fingerprints that directory and fails itself. Write it under ``_build/``.
-* **A foreground command here is moved to the background after about three
-  minutes.** An orchestrator waits in calls shorter than that, or on a
-  detached command with an exit file.
+* **A unit was accepted with** ``e2e`` **red.** The end-to-end classes are
+  opt-in, so the reactor ``verify`` does not run them, and the harness
+  script names none of the interface's files. From unit 4 on, a change to
+  the interface, the engine or what a run writes is signed off with ``e2e``
+  and every section harness.
+* **Fixing the residue found four more defects**, each in code the residue
+  list did not name (above, *In one paragraph*).
+* **A grader could not see what it compared.** While identifiers began with
+  a path the determinism grader's tie key held no scan.
+* **A rare red was a real product defect.** One run in five; reproduced only
+  by slowing the frame rate.
+* **The committed FASTA makes the tests meet E5.** The old input avoided it
+  by chance.
+* **Percolator with one result per spectrum is slower and unsteady** on any
+  input that identifies anything (2.5 to 13 s on the cut; the agent's
+  figures). It will bear on the Limelight tests whatever is ruled.
+* **A reactor** ``verify`` **beside the** ``hardening`` **control fails
+  it**: its control C sees ``cometgui-*/target`` change. My doing, once;
+  the standing text for unit agents now forbids it.
+* **Two documentation builds at once break each other** (a ``ThemeError``
+  from a file removed under the other): tier 1's and mine collided once on
+  2026-11-13; mine was run again and passed.
+* **A foreground command is moved to the background after 180 seconds**;
+  an orchestrator waits in shorter calls.
 
 First thing the next agent should do
 ====================================
 
-**Tier 1:** record the pause; decide the floors and the Percolator warning.
-Nothing here needs a full build.
+**Tier 1:** record the pause; rule on 5a's two findings (the second
+decides how 5a is finished); read P16-10. Nothing here needs a full build.
 
-**The resuming phase orchestrator:** read the brief and the work log; confirm
-``git status`` is clean and ``scratch/fixture`` is present; then dispatch
-**unit 3** (Phase 15's residue, results and workflow) exactly as the work
-log's row states it. Units 3, 4 and 6 do not depend on the floors; units 5
-and 7 do, so have tier 1's answer before unit 5, and split unit 5 first.
+**The resuming phase orchestrator:** read the brief, then the work log from
+*Current state* down. Confirm ``git status`` is clean, no
+``INJECTION-IN-PROGRESS.txt`` exists under ``_build/``, and
+``scratch/fixture`` is present. Then, **once tier 1 has ruled on finding
+2**, dispatch one fresh agent for the rest of 5a (the workflow and
+application seams, from ``scratch/p16/u5a/patches/`` as a starting point,
+not as proof), sign it off with the reactor ``verify``, ``e2e`` and every
+section harness, and go on in the work log's order: 5b, 5c, 5d, 5e, 6, 7,
+then 8 to 16.
